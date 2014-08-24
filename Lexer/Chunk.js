@@ -36,7 +36,7 @@ Chunk.prototype._isString = function(text) {
 }
 
 Chunk.prototype._isNumber = function(text) {
-	return !!(new RegExp(/^[0123456789_]+\.?[01234567890_]*$/).exec(text))
+	return !!(new RegExp(/^[0123456789]+\.?[01234567890_]*$/).exec(text))
 }
 
 Chunk.prototype.add = function(text) {
