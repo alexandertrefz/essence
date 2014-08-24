@@ -107,7 +107,7 @@ Lexer.prototype._normalizeBraces = function(tokens) {
 	return normalizedTokens
 }
 
-Lexer.prototype._normalizeLinebreaks = function(tokens) {
+Lexer.prototype._normalizeBlocks = function(tokens) {
 	var normalizedTokens = []
 
 	var i = 1
