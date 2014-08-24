@@ -12,14 +12,14 @@ var Chunk = function(lexer) {
 }
 
 Chunk.prototype._isOperator = function(text) {
-	return !!(new RegExp(/^[=\.\,~\+\-*\\/\^?!]$/).exec(text))
+	return !!(new RegExp(/^[\%\=\.\,~\+\-*\>\<\\/\^?!]$/).exec(text))
 }
 
 Chunk.prototype._isDelimiter = function(text) {
 	return !!~["(", ")", "[", "]", "{", "}", ":"].indexOf(text)
 }
 
-Chunk.prototype._isFullOutdent = function(text) {
+Chunk.prototype._isLinebreak = function(text) {
 	return text === "\n"
 }
 
@@ -28,7 +28,7 @@ Chunk.prototype._isIndent = function(text) {
 }
 
 Chunk.prototype._isKeyword = function(text) {
-	return !!~["new", "func", "block", "if", "else", "and", "or", "namespace", "class", "return", "null"].indexOf(text)
+	return !!~["func", "static", "if", "else", "and", "or", "interface", "namespace", "class", "return", "null"].indexOf(text)
 }
 
 Chunk.prototype._isString = function(text) {
@@ -44,13 +44,8 @@ Chunk.prototype.add = function(text) {
 }
 
 Chunk.prototype.attemptTokenComplete = function() {
-	if (this._isFullOutdent(this.text)) {
-		this.token.type = "fulloutdent"
-		return true
-	}
-
-	if (this._isIndent(this.text)) {
-		this.token.type = "indent"
+	if (this._isLinebreak(this.text)) {
+		this.token.type = "linebreak"
 		return true
 	}
 
@@ -85,7 +80,7 @@ Chunk.prototype.attemptTokenComplete = function() {
 		this._isIndent(lastChar) ||
 		this._isDelimiter(lastChar) ||
 		this._isOperator(lastChar) ||
-		this._isFullOutdent(lastChar)
+		this._isLinebreak(lastChar)
 		) && this.text.trim().length > 0) {
 		this.token.type = "symbol"
 		return true
