@@ -28,7 +28,10 @@ Lexer.prototype._createBasicTokens = function() {
 		chunk.add(this.code[i])
 
 		if (chunk.attemptTokenComplete()) {
+			// single character tokens can delimit a symbol,
+			// so they need to be handled again - prevent double insertion
 			if (chunk.token.type !== "linebreak" && chunk.token.type !== "delimiter" && chunk.token.type !== "operator") {
+
 				chunk.completeToken()
 				this.tokens.push(chunk.token)
 				chunk = new Chunk(this)
@@ -51,7 +54,7 @@ Lexer.prototype._createBasicTokens = function() {
 			this.collumn = 1
 			this.line++
 
-			chunk = new Chunk(this) // update line and collumn inside Chunk
+			chunk = new Chunk(this)
 		} else {
 			this.collumn++
 		}
@@ -74,11 +77,9 @@ Lexer.prototype._normalizeLinebreaks = function(tokens) {
 				tokens = tokens.slice(i - 1)
 				i = 1
 			}
-
-			normalizedTokens.push(tokens.shift())
-		} else {
-			normalizedTokens.push(tokens.shift())
 		}
+
+		normalizedTokens.push(tokens.shift())
 	}
 
 	return normalizedTokens
@@ -106,7 +107,7 @@ Lexer.prototype._normalizeBraces = function(tokens) {
 	return normalizedTokens
 }
 
-Lexer.prototype._normalizeBlocks = function(tokens) {
+Lexer.prototype._normalizeLinebreaks = function(tokens) {
 	var normalizedTokens = []
 
 	var i = 1
@@ -162,6 +163,7 @@ Lexer.prototype.tokenize = function(code) {
 	this.tokens = this._normalizeLinebreaks(this.tokens)
 	this.tokens = this._normalizeBraces(this.tokens)
 	this.tokens = this._normalizeBlocks(this.tokens)
+
 }
 
 module.exports = Lexer
