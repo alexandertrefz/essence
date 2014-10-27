@@ -2,7 +2,7 @@
 NOTHING HERE IS FINAL OR STABLE
 DO NOT USE THIS LANGUAGE
 Everything about this repo is in constant flux.
-Everything can and will change in the next few weeks.
+Everything can and will change.
 If you want to participate please head over to the issues section.
 Any feedback or help is very much appreciated!
 
@@ -14,21 +14,21 @@ The lack of control over the memory will make is not suited for those low level,
 
 # Features
 
-## v0.1 Main Goal: Getting of the ground | Timeline: mid-end october
+## v0.1 Main Goal: Getting of the ground | Timeline: 2015
 * Modules
 * Interfaces
-** with implicit Interface satisfaction
+  * with implicit Interface satisfaction
 * Classes
 * Unified, Static and Dynamic Structural Typing
 * Named Parameters // Maybe enforced?
 * method Overloading
-** Optional Parameters ? // maybe 0-initialized values like Go?
+  * Optional Parameters ? // maybe 0-initialized values like Go?
 * First class functions
 * Built-in Types
-** Array // Size and type limited at initialization
-** List // dynamic size
-** Tuple // immutable ?
-** Named Tuple // immutable ?
+  * Array // Size and type limited at initialization
+  * List // dynamic size
+  * Tuple // immutable ?
+  * Named Tuple // immutable ?
 * Generics
 * Blocks ? // maybe v2, maybe remove alltogether -> issues with first class block semantics(return outer function/block after being passed)
 * overloadable Literals?
