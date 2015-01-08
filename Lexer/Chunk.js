@@ -28,7 +28,7 @@ Chunk.prototype._isIndent = function(text) {
 }
 
 Chunk.prototype._isKeyword = function(text) {
-	return !!~["func", "static", "if", "else", "and", "or", "interface", "namespace", "class", "return", "null"].indexOf(text)
+	return !!~["true", "false", "func", "static", "if", "else", "and", "or", "interface", "namespace", "class", "return", "null"].indexOf(text)
 }
 
 Chunk.prototype._isString = function(text) {

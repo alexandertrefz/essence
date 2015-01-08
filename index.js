@@ -7,7 +7,7 @@ var Parser = require("./Parser/Parser.js")
 
 var parser = new Parser()
 
-var lexer = parser.parse(fs.readFileSync("./test/basic.es", "utf8"))
+var tokens = parser.parse(fs.readFileSync("./test/basic.es", "utf8"))
 
-console.log(lexer.tokens.length)
-console.log(util.inspect(lexer.tokens, { depth: null }))
+console.log(tokens.length)
+console.log(util.inspect(tokens, { depth: null }))

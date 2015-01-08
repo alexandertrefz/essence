@@ -1,13 +1,13 @@
 interface INumber {
-	__add__:      func (arg2:INumber) -> INumber {}
-	__subtract__: func (arg2:INumber) -> INumber {}
-	__divide__:   func (arg2:INumber) -> INumber {}
-	__multiply__: func (arg2:INumber) -> INumber {}
-	__modulo__:   func (arg2:INumber) -> INumber {}
+	__add__:      func (arg1:INumber) -> INumber {}
+	__subtract__: func (arg1:INumber) -> INumber {}
+	__divide__:   func (arg1:INumber) -> INumber {}
+	__multiply__: func (arg1:INumber) -> INumber {}
+	__modulo__:   func (arg1:INumber) -> INumber {}
 }
 
 class A {
-	constructor: func (public prop:Any) {
+	constructor: func (prop:Type) {
 
 	}
 
@@ -17,12 +17,14 @@ class A {
 }
 
 class B extends A {
-	constructor: func (public prop:Any, public prop2:Any) {
+	constructor: func (prop, prop2:Any) {
 		super(prop)
 	}
 
 	method: func (arg1) {
 		super()
+
+		innerFunc = func () {}
 
 	}
 
@@ -33,9 +35,13 @@ class B extends A {
 	method2: func (arg1, arg2) -> INumber {
 		if arg1.satisfies(INumber) and arg2.satisfies(INumber) {
 			return arg1 + arg2
+		} else if arg1.satisfies(INumber) {
+			return arg1
+		} else if arg2.satisfies(INumber) {
+			return arg2
+		} else {
+			return 0
 		}
-
-		return 0
 	}
 
 	method3: func (arg1:INumber, arg2:INumber) -> INumber { return arg1 + arg2 }
