@@ -29,9 +29,8 @@ Lexer.prototype._createBasicTokens = function() {
 
 		if (chunk.attemptTokenComplete()) {
 			// single character tokens can delimit a symbol,
-			// so they need to be handled again - prevent double insertion
+			// so they need to be handled again, thus we need to prevent double insertion
 			if (chunk.token.type !== "linebreak" && chunk.token.type !== "delimiter" && chunk.token.type !== "operator") {
-
 				chunk.completeToken()
 				this.tokens.push(chunk.token)
 				chunk = new Chunk(this)
