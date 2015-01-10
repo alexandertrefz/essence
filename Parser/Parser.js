@@ -309,7 +309,7 @@ Parser.prototype._parseNumbers = function(tokens) {
 
 Parser.prototype._parseFloat = function(tokens) {
 
-	// TODO
+	// TODO: Implement Floating Point Number parsing
 
 	return tokens
 }
@@ -318,6 +318,10 @@ Parser.prototype._parseFloat = function(tokens) {
 	Lookups
 */
 
+// Not every symbol is a lookup, but when this function is called,
+// this is the assumed state. Every other construct that contains symbols
+// therefore needs to be parsed before this point.
+// Function calls use lookups rather then symbols, so they are parsed afterwards.
 Parser.prototype._parseLookups = function(tokens) {
 	var parsedTokens = []
 
@@ -386,7 +390,7 @@ Parser.prototype._parseDirectLookup = function(tokens) {
 */
 Parser.prototype._parseFunctionCalls = function(tokens) {
 	// TODO: Implement Function Call parsing
-	
+
 	return tokens
 }
 
