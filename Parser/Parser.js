@@ -6,9 +6,38 @@ var Parser = function () {
 
 }
 
+Parser._isDotOperator = function(token) {
+	return token.type === "operator" && token.value === "."
+}
+
+Parser._buildMemberLookupToken = function(lookupTokens) {
+	var lookup = {
+		line: lookupTokens[0].line,
+		collumn: lookupTokens[0].collumn,
+		type: "lookup",
+		value: "",
+		lookupChain: []
+	}
+
+	while (lookupTokens.length) {
+		lookup.lookupChain.push(lookupTokens.shift().value)
+	}
+
+	return lookup
+}
+
 Parser.prototype._parse = function(tokens) {
 	tokens = this._parseSpecialOperators(tokens)
+
 	tokens = this._parseFunctions(tokens)
+	tokens = this._parseInterfaces(tokens)
+	tokens = this._parseClasses(tokens)
+
+	tokens = this._parseNumbers(tokens)
+	tokens = this._parseLookups(tokens)
+
+	tokens = this._parseFunctionCalls(tokens)
+
 	return tokens
 }
 
@@ -17,6 +46,51 @@ Parser.prototype.parse = function(code) {
 
 	lexer.tokenize(code)
 	return this._parse(lexer.tokens)
+}
+
+/*
+	Operators
+*/
+Parser.prototype._parseSpecialOperators = function(tokens) {
+	var parsedTokens = []
+	while (tokens.length) {
+		if (tokens[0].type === "keyword" && tokens[0].value === "and") {
+			var line = tokens[0].line
+			var collumn = tokens[0].collumn
+
+			tokens.shift()
+			tokens.unshift({
+				line: line,
+				collumn: collumn,
+				type: "operator",
+				value: "and"
+			})
+		}
+
+		if (tokens[0].type === "keyword" && tokens[0].value === "or") {
+			var line = tokens[0].line
+			var collumn = tokens[0].collumn
+
+			tokens.shift()
+			tokens.unshift({
+				line: line,
+				collumn: collumn,
+				type: "operator",
+				value: "or"
+			})
+		}
+
+		tokens = this._checkOperatorCombination(tokens, "equals", "=", "=")
+		tokens = this._checkOperatorCombination(tokens, "unequals", "!", "=")
+		tokens = this._checkOperatorCombination(tokens, "lessOrEqual", "<", "=")
+		tokens = this._checkOperatorCombination(tokens, "moreOrEqual", ">", "=")
+
+		if (tokens.length) {
+			parsedTokens.push(tokens.shift())
+		}
+	}
+
+	return parsedTokens
 }
 
 Parser.prototype._checkOperatorCombination = function(tokens, value, op1, op2) {
@@ -35,45 +109,47 @@ Parser.prototype._checkOperatorCombination = function(tokens, value, op1, op2) {
 	return tokens
 }
 
-Parser.prototype._parseSpecialOperators = function(tokens) {
+/*
+	Functions
+*/
+Parser.prototype._parseFunctions = function(tokens) {
 	var parsedTokens = []
+	var blockLevel = 0
+	var functionTokens = []
+	var i, hasStarted
+
 	while (tokens.length) {
-		if (tokens[0].type === "keyword" && tokens[0].value === "and") {
-			tokens.shift()
-			tokens.unshift({
-				line: tokens[0].line,
-				collumn: tokens[0].collumn,
-				type: "operator",
-				value: "and"
-			})
+		if (tokens[0].type === "keyword" && tokens[0].value === "func") {
+			functionTokens = []
+			functionTokens.push(tokens[0])
+
+			blockLevel = 0
+			i = 1
+			hasStarted = false
+			while(!hasStarted || blockLevel > 0) {
+				if (tokens[i].type === "startblock") {
+					hasStarted = true
+					blockLevel++
+				}
+
+				if (tokens[i].type === "endblock") {
+					blockLevel--
+				}
+
+				functionTokens.push(tokens[i])
+				i++
+			}
+
+			tokens = tokens.slice(functionTokens.length)
+			parsedTokens.push(this._parseFunction(functionTokens))
 		}
 
-		if (tokens[0].type === "keyword" && tokens[0].value === "or") {
-			tokens.shift()
-			tokens.unshift({
-				line: tokens[0].line,
-				collumn: tokens[0].collumn,
-				type: "operator",
-				value: "or"
-			})
+		if (tokens.length) {
+			parsedTokens.push(tokens.shift())
 		}
-
-		tokens = this._checkOperatorCombination(tokens, "equals", "=", "=")
-		tokens = this._checkOperatorCombination(tokens, "unequals", "!", "=")
-		tokens = this._checkOperatorCombination(tokens, "lessOrEqual", "<", "=")
-		tokens = this._checkOperatorCombination(tokens, "moreOrEqual", ">", "=")
-		parsedTokens.push(tokens.shift())
 	}
 
 	return parsedTokens
-}
-
-Parser.prototype._parseIdentifier = function(tokens) {
-	if (tokens.length === 1) {
-		return tokens[0]
-	}
-
-	// TODO: Handle MemberExpr a.b
 }
 
 Parser.prototype._parseReturnType = function(tokens) {
@@ -145,7 +221,7 @@ Parser.prototype._parseArgumentList = function(tokens) {
 	argumentTokens = argumentTokens.slice(1, -1)
 
 	tokens = []
- 	tmpArr = []
+	tmpArr = []
 	for (i = 0; i < argumentTokens.length; i++) {
 		if (argumentTokens[i].value === ",") {
 			tokens.push(this._parseFunctionArgument(tmpArr))
@@ -156,7 +232,9 @@ Parser.prototype._parseArgumentList = function(tokens) {
 		tmpArr.push(argumentTokens[i])
 	}
 
-	tokens.push(this._parseFunctionArgument(tmpArr)) // handle last argument
+	if (tmpArr.length) {
+		tokens.push(this._parseFunctionArgument(tmpArr)) // handle last argument
+	}
 
 	return tokens
 }
@@ -186,46 +264,130 @@ Parser.prototype._parseFunction = function(tokens) {
 		value: "", // satisfy original token interface
 		argumentList: this._parseArgumentList(headerTokens),
 		body: this._parse(bodyTokens)
+		//body: bodyTokens
 	}
 }
 
-Parser.prototype._parseFunctions = function(tokens) {
+/*
+	Interfaces
+*/
+Parser.prototype._parseInterfaces = function(tokens) {
+	// TODO: Implement Interface Parsing
+
+	return tokens
+}
+
+/*
+	Classes
+*/
+Parser.prototype._parseClasses = function(tokens) {
+	// TODO: Implement Class Parsing
+
+	return tokens
+}
+
+/*
+	Numbers
+*/
+Parser.prototype._parseNumbers = function(tokens) {
 	var parsedTokens = []
-	var blockLevel = 0
-	var functionTokens = []
-	var i, hasStarted
 
 	while (tokens.length) {
-		if (tokens[0].type === "keyword" && tokens[0].value === "func") {
-			functionTokens = []
-			functionTokens.push(tokens[0])
-
-			blockLevel = 0
-			i = 1
-			hasStarted = false
-			while(!hasStarted || blockLevel > 0) {
-				if (tokens[i].type === "startblock") {
-					hasStarted = true
-					blockLevel++
-				}
-
-				if (tokens[i].type === "endblock") {
-					blockLevel--
-				}
-
-				functionTokens.push(tokens[i])
-				i++
+		if (tokens[0].type === "number" && tokens.length > 2) {
+			if (Parser._isDotOperator(tokens[1]) && tokens[2].type === "number") {
+				tokens = this._parseFloat(tokens)
 			}
-
-			tokens = tokens.slice(functionTokens.length)
-
-			parsedTokens.push(this._parseFunction(functionTokens))
 		}
 
-		parsedTokens.push(tokens.shift())
+		if (tokens.length) {
+			parsedTokens.push(tokens.shift())
+		}
 	}
 
 	return parsedTokens
+}
+
+Parser.prototype._parseFloat = function(tokens) {
+
+	// TODO
+
+	return tokens
+}
+
+/*
+	Lookups
+*/
+
+Parser.prototype._parseLookups = function(tokens) {
+	var parsedTokens = []
+
+	while (tokens.length) {
+		if (tokens[0].type === "symbol") {
+			if (tokens.length > 2) {
+				if (Parser._isDotOperator(tokens[1]) && tokens[2].type === "symbol") {
+					tokens = this._parseMemberLookup(tokens)
+				}
+			}
+
+			if (tokens.length > 1) {
+				if (!Parser._isDotOperator(tokens[1])) {
+					tokens = this._parseDirectLookup(tokens)
+				}
+			} else {
+				tokens = this._parseDirectLookup(tokens)
+			}
+		}
+
+		if (tokens.length) {
+			parsedTokens.push(tokens.shift())
+		}
+	}
+
+	return parsedTokens
+}
+
+Parser.prototype._parseMemberLookup = function(tokens) {
+	var expectingDot = false
+	var memberLookup = []
+
+	while (true) {
+		if (expectingDot) {
+			if (Parser._isDotOperator(tokens[0])) {
+				tokens.shift() // discard dot operator
+			} else {
+				// MemberLookup complete
+				tokens.unshift(Parser._buildMemberLookupToken(memberLookup))
+				break
+			}
+		} else {
+			if (tokens[0].type === "symbol") {
+				memberLookup.push(tokens.shift())
+			} else {
+				if (memberLookup.length) {
+					throw new Error("Expected Symbol after '.' Operator following a Symbol but found: " + tokens[0].value + " at " + tokens[0].line + ":" + tokens[0].collumn)
+				}
+			}
+		}
+
+		expectingDot = !expectingDot
+	}
+
+	return tokens
+}
+
+Parser.prototype._parseDirectLookup = function(tokens) {
+	tokens.unshift(Parser._buildMemberLookupToken([tokens.shift()]))
+
+	return tokens
+}
+
+/*
+	Function Calls
+*/
+Parser.prototype._parseFunctionCalls = function(tokens) {
+	// TODO: Implement Function Call parsing
+	
+	return tokens
 }
 
 module.exports = Parser
