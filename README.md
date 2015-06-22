@@ -2,6 +2,10 @@
 The main goal for this language is to allow the rapid prototyping development of dynamically and weakly typed languages like ECMAScript,
 while allowing to upgrade the prototype to a proper program with the safety and performance of static and strongly typed languages like C#.
 
+# Contribution
+Keep the essence of Essence in mind.
+Issues labeled `specification` are meant to hold any discussion surrounding the specific feature in terms of specification and syntax. If there is any question or need for discussion about any specification related topic, create an issue with the label and link it in the feature list down below.
+
 # The essence of Essence
 	Extensibility is better than completeness.
 	Explicit is better than implicit.
@@ -16,8 +20,6 @@ while allowing to upgrade the prototype to a proper program with the safety and 
 	If the implementation is hard to explain, it may be a bad idea.
 	If the implementation is easy to explain, it may be a good idea.
 
-
-
 # Features
 * Unified, Static and Dynamic Structural Typing
 * Modules & Namespaces
@@ -28,6 +30,7 @@ while allowing to upgrade the prototype to a proper program with the safety and 
 * Method Overloading
 	* Optional Parameters - maybe 0/nil-initialized values like Go?
 * First class functions
+* [Memory Managed?](https://github.com/atrefz/essence/issues/1)
 * Built-in Types - could those be implemented in a standard library satisfactory?
 	* Array - Size and type limited at initialization
 	* List - dynamic size
