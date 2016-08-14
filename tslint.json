@@ -29,7 +29,7 @@
     ],
     "member-access": true,
     "member-ordering": [
-      true,
+      false,
       "static-before-instance",
       "variables-before-functions"
     ],
@@ -47,7 +47,7 @@
       "timeEnd",
       "trace"
     ],
-    "no-construct": true,
+    "no-construct": false,
     "no-constructor-vars": true,
     "no-debugger": true,
     "no-duplicate-key": true,
