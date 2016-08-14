@@ -12,7 +12,7 @@
   "author": "Alexander Trefz",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^1.8.10"
+    "typescript": "2.0.0"
   },
   "dependencies": {}
 }
