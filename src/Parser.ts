@@ -38,6 +38,7 @@ import {
 	IPropertyDeclarationNode,
 	IFunctionDefinitionNode,
 	IFunctionInvocationNode,
+	INativeFunctionInvocationNode,
 	IMethodDefinitionNode,
 	IReturnStatementNode,
 	IDeclarationStatementNode,
@@ -56,6 +57,14 @@ const combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 	for (let i = 0; i < tokens.length; i++) {
 		let token = tokens[i]
 		let nextToken = tokens[i + 1]
+
+		if (token.content === '@') {
+			if (nextToken.content === '@') {
+				token.content = '@@'
+				token.tokenType = 'Operator'
+				tokens.splice(i + 1, 1)
+			}
+		}
 
 		if (token.content === '-') {
 			if (nextToken.content === '>') {
@@ -597,6 +606,31 @@ const unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+const nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
+	const parser = sequenceParserGenerator(
+		[
+			{ tokenType: 'Operator', content: '@@', },
+			{
+				parser: choiceParserGenerator([
+					lookup,
+					identifier,
+				]),
+			},
+			{ parser: unnamedArgumentList, },
+			{ isOptional: true, tokenType: 'Linebreak', },
+		],
+		(foundSequence) => {
+			return {
+				nodeType: 'NativeFunctionInvocation',
+				name: foundSequence[1],
+				arguments: foundSequence[2],
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
 const expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
@@ -604,6 +638,7 @@ const expression = (tokens: Array<IToken>): parserResult => {
 			booleanLiteral,
 			namedFunctionInvocation,
 			unnamedFunctionInvocation,
+			nativeFunctionInvocation,
 			functionDefinition,
 			lookup,
 			identifier,
