@@ -3,4 +3,5 @@ node_modules
 lib
 test
 testFiles/Test.es
+testFiles/Test.ir
 Notes.md
