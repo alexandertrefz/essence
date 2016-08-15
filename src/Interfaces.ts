@@ -3,7 +3,8 @@
 */
 
 export type TokenType
-	= 'Delimiter'
+	= null
+	| 'Delimiter'
 	| 'Identifier'
 	| 'Keyword'
 	| 'Operator'
@@ -29,7 +30,8 @@ export interface IAST {
 }
 
 export type ASTType
-	= 'Identifier'
+	= undefined
+	| 'Identifier'
 	| 'Lookup'
 	| 'PackageAssignmentStatement'
 	| 'ImportStatement'
@@ -50,7 +52,6 @@ export type ASTType
 	| 'StringLiteral'
 	| 'BooleanLiteral'
 	| 'ReturnStatement'
-	| 'Lookup'
 
 export interface IASTNode {
 	nodeType: ASTType
@@ -66,7 +67,7 @@ export interface IStatementNode extends IASTNode {
 
 export interface IIdentifierNode extends IExpressionNode {
 	nodeType: 'Identifier'
-	name: String
+	content: string
 }
 
 export interface ILookupNode extends IExpressionNode {
@@ -82,7 +83,7 @@ export interface ITypeNode extends IASTNode {
 
 export interface IStringLiteralNode extends IASTNode {
 	nodeType: 'StringLiteral'
-	content: String
+	content: string
 }
 
 export interface IBooleanLiteralNode extends IASTNode {
