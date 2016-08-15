@@ -49,6 +49,7 @@ export type ASTType
 	| 'NamedArgumentList'
 	| 'FunctionDefinition'
 	| 'FunctionInvocation'
+	| 'NativeFunctionInvocation'
 	| 'StringLiteral'
 	| 'BooleanLiteral'
 	| 'ReturnStatement'
@@ -144,6 +145,12 @@ export interface IFunctionInvocationNode extends IASTNode {
 	nodeType: 'FunctionInvocation'
 	name: IIdentifierNode
 	arguments: IUnnamedArgumentListNode | INamedArgumentListNode
+}
+
+export interface INativeFunctionInvocationNode extends IASTNode {
+	nodeType: 'NativeFunctionInvocation'
+	name: IIdentifierNode
+	arguments: IUnnamedArgumentListNode
 }
 
 export interface IMethodDefinitionNode extends IASTNode {

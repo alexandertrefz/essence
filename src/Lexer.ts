@@ -6,7 +6,7 @@ export class Lexer {
 	static booleanLiterals = ['true', 'false']
 	static commentLiteral  = '§'
 	static keywords        = ['package', 'import', 'as', 'type', 'interface', 'let', 'each', 'in', 'do', 'end', 'return']
-	static delimiters      = ['(', ')', '{', '}', '[', ']', '<', '>', ',', '.', ':', '!', '=', '|', '&', '#', '-', '+', '*', '/']
+	static delimiters      = ['@', '(', ')', '{', '}', '[', ']', '<', '>', ',', '.', ':', '!', '=', '|', '&', '#', '-', '+', '*', '/']
 
 	static _handleLineNumberAndCollumn(char: string, line: number, column: number) {
 		if (char === '\n') {
