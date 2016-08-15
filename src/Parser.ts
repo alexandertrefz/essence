@@ -295,18 +295,61 @@ const parameter = (tokens: Array<IToken>): parserResult => {
 }
 
 const parameterList = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
+	const parser = choiceParserGenerator(
 		[
-			{ tokenType: 'Delimiter', content: '(', },
-			{ isOptional: true, parser: parameter, },
-			{ tokenType: 'Delimiter', content: ')', },
-		],
-		(foundSequence) => {
-			return {
-				nodeType: 'ParameterList',
-				arguments: foundSequence.slice(1, foundSequence.length - 1),
-			}
-		}
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'Delimiter', content: '(', },
+					{
+						isOptional: true,
+						parser: sequenceParserGenerator(
+							[
+								{ parser: parameter, },
+								{ isOptional: true, tokenType: 'Delimiter', content: ',', },
+							],
+							(foundSequence) => {
+								return foundSequence[0]
+							}
+						),
+					},
+					{ tokenType: 'Delimiter', content: ')', },
+				],
+				(foundSequence) => {
+					return {
+						nodeType: 'ParameterList',
+						arguments: foundSequence.slice(1, foundSequence.length - 1),
+					}
+				}
+			),
+
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'Delimiter', content: '(', },
+					{ parser: parameter, },
+					{
+						isOptional: true,
+						canRepeat: true,
+						parser: sequenceParserGenerator(
+							[
+								{ tokenType: 'Delimiter', content: ',', },
+								{ parser: parameter, },
+							],
+							(foundSequence) => {
+								return foundSequence[1]
+							}
+						),
+					},
+					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
+					{ tokenType: 'Delimiter', content: ')', },
+				],
+				(foundSequence) => {
+					return {
+						nodeType: 'ParameterList',
+						arguments: foundSequence.slice(1, foundSequence.length - 1),
+					}
+				}
+			),
+		]
 	)
 
 	return parser(tokens)
