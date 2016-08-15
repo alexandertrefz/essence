@@ -1,4 +1,4 @@
-let util = require('util')
+declare let require: (string) => any
 
 let debugTokens = false
 let debugIndividualNodes = false
@@ -11,7 +11,7 @@ type tokenSequenceMatch = {
 
 type parserResult = {
 	foundSequence: Array<any>
-	node: IASTNode
+	node: IASTNode | undefined
 	tokens: Array<IToken>
 }
 
@@ -193,7 +193,7 @@ const sequenceParserGenerator = (parsers: Array<any>, nodeGenerator: nodeGenerat
 		}
 
 		let foundSequence: Array<any>
-		let node: IASTNode
+		let node: IASTNode | undefined = undefined
 
 		;({ foundSequence, tokens } = matchTokenSequence(tokens, sequence))
 
@@ -201,7 +201,7 @@ const sequenceParserGenerator = (parsers: Array<any>, nodeGenerator: nodeGenerat
 			node = nodeGenerator(foundSequence)
 
 			if (debugIndividualNodes) {
-				console.log(util.inspect(node, { showHidden: false, depth: null }))
+				console.log(require('util').inspect(node, { showHidden: false, depth: null }))
 				console.log()
 			}
 
@@ -230,7 +230,7 @@ const choiceParserGenerator = (parsers: Array<Function>): parser => {
 		}
 
 		return {
-			foundSequence: [], node: undefined, tokens,
+			foundSequence: [] as Array<any>, node: undefined, tokens,
 		}
 	}
 }
@@ -788,7 +788,7 @@ const parseProgram = (tokens: Array<IToken>): IAST => {
 
 	// Handle rest of the program
 	while (tokens.length) {
-		let foundSequence: Array<any>, node: IASTNode
+		let foundSequence: Array<any>, node: IASTNode | undefined
 		;({ foundSequence, node, tokens, } = statement(tokens))
 
 		if (node) {
