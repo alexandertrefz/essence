@@ -360,10 +360,10 @@ const unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 						parser: sequenceParserGenerator(
 							[
 								{ parser: expression, },
-								{ tokenType: 'Delimiter', content: ',', },
+								{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 							],
 							(foundSequence) => {
-								return foundSequence[1]
+								return foundSequence[0]
 							}
 						),
 					},
