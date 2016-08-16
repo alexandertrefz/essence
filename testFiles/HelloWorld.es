@@ -1,5 +1,9 @@
-let greet Function = (greetee String) -> String
-	return String.join('Hello, ', gretee)
+let print Function = (message String) -> String
+	return @@print(message)
 end
 
-print(greet('World'))
+let greet Function = (greetee String) -> String
+	return print(String.join('Hello, ', greetee))
+end
+
+greet('World')
