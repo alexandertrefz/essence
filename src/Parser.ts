@@ -26,6 +26,7 @@ import {
 	IASTNode,
 	IStatementNode,
 	ITypeNode,
+	IValueNode,
 	IStringLiteralNode,
 	IParameterNode,
 	IParameterListNode,
@@ -527,6 +528,56 @@ const stringLiteral = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+const value = (tokens: Array<IToken>): parserResult => {
+	const parser = choiceParserGenerator(
+		[
+			sequenceParserGenerator(
+				[
+					{ parser: functionDefinition },
+				],
+				(foundSequence) => {
+					return {
+						nodeType: 'Value',
+						type: generateTypeNode('Function'),
+						value: foundSequence[0],
+						members: {},
+					}
+				}
+			),
+
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'Boolean', },
+				],
+				(foundSequence) => {
+					return {
+						nodeType: 'Value',
+						type: generateTypeNode('Bool'),
+						value: foundSequence[0].content,
+						members: {},
+					}
+				}
+			),
+
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'String', },
+				],
+				(foundSequence) => {
+					return {
+						nodeType: 'Value',
+						type: generateTypeNode('String'),
+						value: foundSequence[0].content,
+						members: {},
+					}
+				}
+			),
+		]
+	)
+
+	return parser(tokens)
+}
+
 /*
 	2.2.2 General
 */
@@ -674,9 +725,9 @@ const expression = (tokens: Array<IToken>): parserResult => {
 			namedFunctionInvocation,
 			unnamedFunctionInvocation,
 			nativeFunctionInvocation,
-			functionDefinition,
 			lookup,
 			identifier,
+			value,
 		]
 	)
 
