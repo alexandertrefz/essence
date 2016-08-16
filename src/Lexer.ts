@@ -173,11 +173,6 @@ export class Lexer {
 			}
 		}
 
-		// Check if we found a boolean
-		if (token.tokenType === 'Identifier' && !!~Lexer.booleanLiterals.indexOf(token.content)) {
-			token.tokenType = 'Boolean'
-		}
-
 		// Check if we found a keyword
 		if (token.tokenType === 'Identifier') {
 			token = Lexer._lexKeyword(token)
