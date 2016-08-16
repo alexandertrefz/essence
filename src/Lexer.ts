@@ -160,11 +160,6 @@ export class Lexer {
 				break
 			}
 
-			if (token.content.startsWith(Lexer.stringLiteral)) {
-				;({ input, line, column, token } = Lexer._lexString(input, line, column))
-				break
-			}
-
 			if (input[i] === ' ' || input[i] === '\t') {
 				if (token.content.startsWith(' ') || token.content.startsWith('\t')) {
 					token.content = ''
