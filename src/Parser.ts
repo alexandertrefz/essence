@@ -512,22 +512,6 @@ const methodDefinition = (tokens: Array<IToken>): parserResult => {
 	2.2.1 Literals
 */
 
-const stringLiteral = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'String', },
-		],
-		(foundSequence) => {
-			return {
-				nodeType: 'StringLiteral',
-				content: foundSequence[0].content,
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
 const value = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
@@ -721,7 +705,6 @@ const nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 const expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
-			stringLiteral,
 			namedFunctionInvocation,
 			unnamedFunctionInvocation,
 			nativeFunctionInvocation,
@@ -742,7 +725,7 @@ const packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'package', },
-			{ parser: stringLiteral, },
+			{ tokenType: 'String', },
 			{ tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
@@ -799,7 +782,7 @@ const importStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'import', },
-			{ parser: stringLiteral, },
+			{ tokenType: 'String', },
 			{ tokenType: 'Keyword', content: 'as', },
 			{ parser: identifier, },
 			{ tokenType: 'Linebreak', },
