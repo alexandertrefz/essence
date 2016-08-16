@@ -33,6 +33,7 @@ export type ASTType
 	= undefined
 	| 'Identifier'
 	| 'Lookup'
+	| 'Value'
 	| 'PackageAssignmentStatement'
 	| 'ImportStatement'
 	| 'TypeDefinitionStatement'
@@ -79,6 +80,13 @@ export interface ILookupNode extends IExpressionNode {
 export interface ITypeNode extends IASTNode {
 	nodeType: 'TypeDeclaration'
 	name: IIdentifierNode
+}
+
+export interface IValueNode extends IASTNode {
+	nodeType: 'Value'
+	type: ITypeNode
+	value: any
+	members: any
 }
 
 export interface IStringLiteralNode extends IASTNode {
