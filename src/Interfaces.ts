@@ -51,7 +51,6 @@ export type ASTType
 	| 'FunctionInvocation'
 	| 'NativeFunctionInvocation'
 	| 'StringLiteral'
-	| 'BooleanLiteral'
 	| 'ReturnStatement'
 
 export interface IASTNode {
@@ -85,11 +84,6 @@ export interface ITypeNode extends IASTNode {
 export interface IStringLiteralNode extends IASTNode {
 	nodeType: 'StringLiteral'
 	content: string
-}
-
-export interface IBooleanLiteralNode extends IASTNode {
-	nodeType: 'BooleanLiteral'
-	content: boolean
 }
 
 export interface IParameterNode extends IASTNode {

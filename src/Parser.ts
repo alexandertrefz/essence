@@ -27,7 +27,6 @@ import {
 	IStatementNode,
 	ITypeNode,
 	IStringLiteralNode,
-	IBooleanLiteralNode,
 	IParameterNode,
 	IParameterListNode,
 	IUnnamedArgumentListNode,
@@ -518,22 +517,6 @@ const stringLiteral = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const booleanLiteral = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'Boolean', },
-		],
-		(foundSequence) => {
-			return {
-				nodeType: 'BooleanLiteral',
-				content: foundSequence[0].content,
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
 /*
 	2.2.2 General
 */
@@ -678,7 +661,6 @@ const expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			stringLiteral,
-			booleanLiteral,
 			namedFunctionInvocation,
 			unnamedFunctionInvocation,
 			nativeFunctionInvocation,
