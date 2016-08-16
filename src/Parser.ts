@@ -251,6 +251,16 @@ const choiceParserGenerator = (parsers: Array<Function>): parser => {
 	2.1 Helpers
 */
 
+const generateTypeNode = (type: string): ITypeNode => {
+	return {
+		nodeType: "TypeDeclaration",
+		name: {
+			nodeType: "Identifier",
+			content: type
+		}
+	}
+}
+
 /*
 	2.1.1 General Helpers
 */
