@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+
+let process = require('process')
+let fs = require('fs')
+let path = require('path')
+
+let Lexer = require('../lib/Lexer').Lexer
+let Parser = require('../lib/Parser')
+
+let sourceFileName = process.argv[2]
+let tokens = Lexer.lex(fs.readFileSync(sourceFileName, 'utf-8'))
+let program = Parser.parse(tokens)
+
+let sourceFileNameParsed = path.parse(sourceFileName)
+let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
+
+fs.writeFileSync(targetFileName, JSON.stringify(program.nodes))

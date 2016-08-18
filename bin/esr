@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+let process = require('process')
+
+let Runtime = require('../lib/Runtime').Runtime
+let runtime = new Runtime()
+
+runtime.loadFile(process.argv[2])
