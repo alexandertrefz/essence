@@ -141,6 +141,7 @@ export interface IFunctionDefinitionNode extends IASTNode {
 	parameters: IParameterListNode
 	returnType: ITypeNode
 	body: Array<IStatementNode>
+	scope?: any
 }
 
 export interface IFunctionInvocationNode extends IASTNode {
