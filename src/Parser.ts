@@ -49,6 +49,14 @@ import {
 	ILookupNode,
 } from './Interfaces'
 
+interface IParser {
+	isOptional?: boolean
+	canRepeat?: boolean
+	tokenType?: string
+	content?: string
+	parser?: Function | Array<Function>
+}
+
 /*
 	1. Parser Generators
 */
@@ -114,7 +122,7 @@ const matchToken = (token: any, tokenDefinition: any): boolean => {
 	return true
 }
 
-const matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: any): tokenSequenceMatch => {
+const matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
 	let hasOptionalTokens = false
 	if (tokenDefinitions.length > tokens.length) {
@@ -189,9 +197,9 @@ const matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: any): token
 	return { foundSequence: tokens.slice(0, tokenIndex), tokens }
 }
 
-const sequenceParserGenerator = (parsers: Array<any>, nodeGenerator: nodeGenerator): parser => {
+const sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator): parser => {
 	return (tokens: Array<IToken>) => {
-		let sequence = []
+		let sequence: Array<IParser> = []
 
 		for (let parser of parsers) {
 			if (typeof parser === 'function') {
