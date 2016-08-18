@@ -59,7 +59,7 @@ export interface IASTNode {
 }
 
 export interface IExpressionNode extends IASTNode {
-
+	nodeType: 'Identifier' | 'Lookup' | 'FunctionInvocation' | 'NativeFunctionInvocation' | 'Value'
 }
 
 export interface IStatementNode extends IASTNode {
