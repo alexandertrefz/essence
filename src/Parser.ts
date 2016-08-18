@@ -61,7 +61,7 @@ interface IParser {
 	1. Parser Generators
 */
 
-const combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
+let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 	for (let i = 0; i < tokens.length; i++) {
 		let token = tokens[i]
 		let nextToken = tokens[i + 1]
@@ -94,7 +94,7 @@ const combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 	return tokens
 }
 
-const matchToken = (token: any, tokenDefinition: any): boolean => {
+let matchToken = (token: any, tokenDefinition: any): boolean => {
 	if (!tokenDefinition.isOptional && token == null) {
 		return false
 	}
@@ -122,7 +122,7 @@ const matchToken = (token: any, tokenDefinition: any): boolean => {
 	return true
 }
 
-const matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
+let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
 	let hasOptionalTokens = false
 	if (tokenDefinitions.length > tokens.length) {
@@ -197,7 +197,7 @@ const matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IPars
 	return { foundSequence: tokens.slice(0, tokenIndex), tokens }
 }
 
-const sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator): parser => {
+let sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator): parser => {
 	return (tokens: Array<IToken>) => {
 		let sequence: Array<IParser> = []
 
@@ -231,7 +231,7 @@ const sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerat
 	}
 }
 
-const choiceParserGenerator = (parsers: Array<Function>): parser => {
+let choiceParserGenerator = (parsers: Array<Function>): parser => {
 	return (tokens: Array<IToken>) => {
 		let foundSequence: Array<any>, node: IASTNode
 
@@ -260,7 +260,7 @@ const choiceParserGenerator = (parsers: Array<Function>): parser => {
 	2.1 Helpers
 */
 
-const generateTypeNode = (type: string): ITypeNode => {
+let generateTypeNode = (type: string): ITypeNode => {
 	return {
 		nodeType: "TypeDeclaration",
 		name: {
@@ -274,7 +274,7 @@ const generateTypeNode = (type: string): ITypeNode => {
 	2.1.1 General Helpers
 */
 
-const typeDeclaration = (tokens: Array<IToken>): parserResult => {
+let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -294,7 +294,7 @@ const typeDeclaration = (tokens: Array<IToken>): parserResult => {
 	2.1.2 Function Definition & Invocation Helpers
 */
 
-const parameter = (tokens: Array<IToken>): parserResult => {
+let parameter = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -312,7 +312,7 @@ const parameter = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const parameterList = (tokens: Array<IToken>): parserResult => {
+let parameterList = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -373,7 +373,7 @@ const parameterList = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const namedArgument = (tokens: Array<IToken>): parserResult => {
+let namedArgument = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -392,7 +392,7 @@ const namedArgument = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const namedArgumentList = (tokens: Array<IToken>): parserResult => {
+let namedArgumentList = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Delimiter', content: '{', },
@@ -410,7 +410,7 @@ const namedArgumentList = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
+let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -475,7 +475,7 @@ const unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 	2.1.3 Type Definition Helpers
 */
 
-const propertyDeclaration = (tokens: Array<IToken>): parserResult => {
+let propertyDeclaration = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -494,7 +494,7 @@ const propertyDeclaration = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const methodDefinition = (tokens: Array<IToken>): parserResult => {
+let methodDefinition = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -520,7 +520,7 @@ const methodDefinition = (tokens: Array<IToken>): parserResult => {
 	2.2.1 Literals
 */
 
-const value = (tokens: Array<IToken>): parserResult => {
+let value = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -574,7 +574,7 @@ const value = (tokens: Array<IToken>): parserResult => {
 	2.2.2 General
 */
 
-const identifier = (tokens: Array<IToken>): parserResult => {
+let identifier = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Identifier', },
@@ -590,7 +590,7 @@ const identifier = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const lookup = (tokens: Array<IToken>): parserResult => {
+let lookup = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{
@@ -613,7 +613,7 @@ const lookup = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const functionDefinition = (tokens: Array<IToken>): parserResult => {
+let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: parameterList, },
@@ -637,7 +637,7 @@ const functionDefinition = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const namedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
+let namedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{
@@ -661,7 +661,7 @@ const namedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
+let unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{
@@ -685,7 +685,7 @@ const unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
+let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Operator', content: '@@', },
@@ -710,7 +710,7 @@ const nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const expression = (tokens: Array<IToken>): parserResult => {
+let expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			namedFunctionInvocation,
@@ -729,7 +729,7 @@ const expression = (tokens: Array<IToken>): parserResult => {
 	2.3 Statements
 */
 
-const packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
+let packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'package', },
@@ -747,7 +747,7 @@ const packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
+let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'type', },
@@ -786,7 +786,7 @@ const typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const importStatement = (tokens: Array<IToken>): parserResult => {
+let importStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'import', },
@@ -805,7 +805,7 @@ const importStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const returnStatement = (tokens: Array<IToken>): parserResult => {
+let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'return' },
@@ -823,7 +823,7 @@ const returnStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const declarationStatement = (tokens: Array<IToken>): parserResult => {
+let declarationStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'let', },
@@ -846,7 +846,7 @@ const declarationStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const assignmentStatement = (tokens: Array<IToken>): parserResult => {
+let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: identifier, },
@@ -866,7 +866,7 @@ const assignmentStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-const statement = (tokens: Array<IToken>): parserResult => {
+let statement = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			packageAssignmentStatement,
@@ -886,7 +886,7 @@ const statement = (tokens: Array<IToken>): parserResult => {
 	3. Public Interface
 */
 
-const parseProgram = (tokens: Array<IToken>): IAST => {
+let parseProgram = (tokens: Array<IToken>): IAST => {
 	let nodes: Array<IASTNode> = []
 
 	tokens = combineMultiTokenOperators(tokens)
