@@ -73,7 +73,7 @@ export interface IIdentifierNode extends IExpressionNode {
 
 export interface ILookupNode extends IExpressionNode {
 	nodeType: 'Lookup'
-	base: IExpressionNode
+	base: IIdentifierNode
 	member: IIdentifierNode
 }
 
