@@ -201,7 +201,9 @@ export class Lexer {
 		}
 
 		// Trim whitespace and linebreaks
-		token.content = token.content.replace(/^\s+|\s+$/g, '')
+		if (token.tokenType !== 'String') {
+			token.content = token.content.replace(/^\s+|\s+$/g, '')
+		}
 
 		return token
 	}
