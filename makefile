@@ -8,14 +8,13 @@ TYPESCRIPT = $(shell find src -name '*.ts')
 #targets
 JS = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT))
 
-TSC := ./node_modules/.bin/tsc
+TSC := ./tsc
 TSC_ARGS := -t es6 -m commonjs --strictNullChecks --pretty --outDir
 
 all: build-setup $(JS)
 
 $(JS_BUILD_DIR)/%.js: src/%.ts
-	@echo "Typescript $< -- $@"
-	- $(TSC) $< $(TSC_ARGS) $(dir $@)
+	- $(TSC) $(TSC_ARGS) $(dir $@) $<
 
 build-setup:
 	mkdir -p $(BUILD_DIR)
