@@ -54,89 +54,77 @@ export type ASTType
 	| 'StringLiteral'
 	| 'ReturnStatement'
 
-export interface IASTNode {
-	nodeType: ASTType
-}
-
-export interface IExpressionNode extends IASTNode {
-	nodeType: 'Identifier' | 'Lookup' | 'FunctionInvocation' | 'NativeFunctionInvocation' | 'Value'
-}
-
-export interface IStatementNode extends IASTNode {
-
-}
-
-export interface IIdentifierNode extends IExpressionNode {
+export interface IIdentifierNode {
 	nodeType: 'Identifier'
 	content: string
 }
 
-export interface ILookupNode extends IExpressionNode {
+export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IIdentifierNode
 	member: IIdentifierNode
 }
 
-export interface ITypeNode extends IASTNode {
+export interface ITypeNode {
 	nodeType: 'TypeDeclaration'
 	name: IIdentifierNode
 }
 
-export interface IValueNode extends IASTNode {
+export interface IValueNode {
 	nodeType: 'Value'
 	type: ITypeNode
 	value: any
 	members: any
 }
 
-export interface IStringLiteralNode extends IASTNode {
+export interface IStringLiteralNode {
 	nodeType: 'StringLiteral'
 	content: string
 }
 
-export interface IParameterNode extends IASTNode {
+export interface IParameterNode {
 	nodeType: 'Parameter'
 	name: IIdentifierNode
 	type: ITypeNode
 }
 
-export interface IParameterListNode extends IASTNode {
+export interface IParameterListNode {
 	nodeType: 'ParameterList'
 	arguments: Array<IParameterNode>
 }
 
-export interface IUnnamedArgumentListNode extends IASTNode {
+export interface IUnnamedArgumentListNode {
 	nodeType: 'UnnamedArgumentList'
 	arguments: Array<IExpressionNode>
 }
 
-export interface INamedArgumentNode extends IASTNode {
+export interface INamedArgumentNode {
 	nodeType: 'NamedArgument'
 	name: IIdentifierNode
 	value: IExpressionNode
 }
 
-export interface INamedArgumentListNode extends IASTNode {
+export interface INamedArgumentListNode {
 	nodeType: 'NamedArgumentList'
 	arguments: Array<INamedArgumentNode>
 }
 
-export interface IPackageAssignmentStatementNode extends IStatementNode {
+export interface IPackageAssignmentStatementNode {
 	nodeType: 'PackageAssignmentStatement'
 	name: IStringLiteralNode
 }
 
-export interface IImportStatementNode extends IStatementNode {
+export interface IImportStatementNode {
 	nodeType: 'ImportStatement'
 }
 
-export interface IPropertyDeclarationNode extends IASTNode {
+export interface IPropertyDeclarationNode {
 	nodeType: 'PropertyDeclaration'
 	name: IIdentifierNode
 	type: ITypeNode
 }
 
-export interface IFunctionDefinitionNode extends IASTNode {
+export interface IFunctionDefinitionNode {
 	nodeType: 'FunctionDefinition'
 	parameters: IParameterListNode
 	returnType: ITypeNode
@@ -144,45 +132,74 @@ export interface IFunctionDefinitionNode extends IASTNode {
 	scope?: any
 }
 
-export interface IFunctionInvocationNode extends IASTNode {
+export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
 	name: IIdentifierNode
 	arguments: IUnnamedArgumentListNode | INamedArgumentListNode
 }
 
-export interface INativeFunctionInvocationNode extends IASTNode {
+export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
 	name: IIdentifierNode
 	arguments: IUnnamedArgumentListNode
 }
 
-export interface IMethodDefinitionNode extends IASTNode {
+export interface IMethodDefinitionNode {
 	nodeType: 'MethodDefinition'
 	name: IIdentifierNode
 	function: IFunctionDefinitionNode
 }
 
-export interface IReturnStatementNode extends IStatementNode {
+export interface IReturnStatementNode {
 	nodeType: 'ReturnStatement'
 	expression: IExpressionNode
 }
 
-export interface IDeclarationStatementNode extends IStatementNode {
+export interface IDeclarationStatementNode {
 	nodeType: 'DeclarationStatement'
 	name: IIdentifierNode
 	type: ITypeNode
 	value: IExpressionNode
 }
 
-export interface IAssignmentStatementNode extends IStatementNode {
+export interface IAssignmentStatementNode {
 	nodeType: 'AssignmentStatement'
 	name: IIdentifierNode
 	value: IExpressionNode
 }
 
-export interface ITypeDefinitionStatementNode extends IStatementNode {
+export interface ITypeDefinitionStatementNode {
 	nodeType: 'TypeDefinitionStatement'
 	name: IIdentifierNode
 	properties: Array<IPropertyDeclarationNode>
 	methods: Array<IMethodDefinitionNode>
 }
+
+export type IExpressionNode
+	= IValueNode
+	| IIdentifierNode
+	| ILookupNode
+	| IFunctionInvocationNode
+	| INativeFunctionInvocationNode
+
+export type IStatementNode
+	= IPackageAssignmentStatementNode
+	| IImportStatementNode
+	| IDeclarationStatementNode
+	| IAssignmentStatementNode
+	| ITypeDefinitionStatementNode
+	| IReturnStatementNode
+
+export type IASTNode
+	= IExpressionNode
+	| IStatementNode
+	| ITypeNode
+	| IStringLiteralNode
+	| IParameterNode
+	| IParameterListNode
+	| IUnnamedArgumentListNode
+	| INamedArgumentNode
+	| INamedArgumentListNode
+	| IPropertyDeclarationNode
+	| IMethodDefinitionNode
+	| IFunctionDefinitionNode
