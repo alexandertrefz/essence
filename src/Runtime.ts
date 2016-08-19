@@ -71,54 +71,61 @@ export class Runtime {
 				value: null,
 				members: {
 					join: {
-						nodeType: 'Value',
-						type: {
-							nodeType: 'TypeDeclaration',
-							name: { nodeType: 'Identifier', content: 'Function' }
-						},
+						nodeType: "Value",
+						type: "Function",
 						value: {
-							nodeType: 'FunctionDefinition',
+							nodeType: "FunctionDefinition",
 							parameters: {
-								nodeType: 'ParameterList',
-								arguments: [
-									{
-										nodeType: 'Parameter',
-										name: { nodeType: 'Identifier', content: 'self' },
-										type: {
-											nodeType: 'TypeDeclaration',
-											name: { nodeType: 'Identifier', content: 'String' }
-										}
-									},
-									{
-										nodeType: 'Parameter',
-										name: { nodeType: 'Identifier', content: 'string' },
-										type: {
-											nodeType: 'TypeDeclaration',
-											name: { nodeType: 'Identifier', content: 'String' }
+								nodeType: "ParameterList",
+								arguments: [{
+									nodeType: "Parameter",
+									name: "self",
+									type: {
+										nodeType: "TypeDeclaration",
+										name: {
+											nodeType: "Identifier",
+											content: "String"
 										}
 									}
-								]
+								}, {
+									nodeType: "Parameter",
+									name: "string",
+									type: {
+										nodeType: "TypeDeclaration",
+										name: {
+											nodeType: "Identifier",
+											content: "String"
+										}
+									}
+								}]
 							},
 							returnType: {
-								nodeType: 'TypeDeclaration',
-								name: { nodeType: 'Identifier', content: 'String' }
+								nodeType: "TypeDeclaration",
+								name: {
+									nodeType: "Identifier",
+									content: "String"
+								}
 							},
-							body: [
-								{
-									nodeType: 'ReturnStatement',
-									expression: {
-										nodeType: 'NativeFunctionInvocation',
-										name: { nodeType: 'Identifier', content: 'stringJoin' },
-										arguments: {
-											nodeType: 'UnnamedArgumentList',
-											arguments: [
-												{ nodeType: 'Identifier', content: 'self' },
-												{ nodeType: 'Identifier', content: 'string' }
-											]
-										}
+							body: [{
+								nodeType: "ReturnStatement",
+								expression: {
+									nodeType: "NativeFunctionInvocation",
+									name: {
+										nodeType: "Identifier",
+										content: "stringJoin"
+									},
+									arguments: {
+										nodeType: "UnnamedArgumentList",
+										arguments: [{
+											nodeType: "Identifier",
+											content: "self"
+										}, {
+											nodeType: "Identifier",
+											content: "string"
+										}]
 									}
 								}
-							],
+							}],
 							scope: {
 								parent: null
 							}
@@ -130,26 +137,20 @@ export class Runtime {
 		}
 	}
 
-	protected generateValueNode(type: string, value: any, members: any) {
+	protected generateValueNode(type: string, value: any, members: any): IValueNode {
 		return {
 			nodeType: 'Value',
-			type: {
-				nodeType: "TypeDeclaration",
-				name: {
-					nodeType: "Identifier",
-					content: type
-				}
-			},
+			type,
 			value,
 			members,
 		}
 	}
 
-	protected memberLookup(base: IValueNode, member: IIdentifierNode): IValueNode {
+	protected memberLookup(base: IValueNode, member: string): IValueNode {
 		verboseLogs && log(base)
-		verboseLogs && console.log(member.content)
-		verboseLogs && log(base.members[member.content])
-		return base.members[member.content]
+		verboseLogs && console.log(member)
+		verboseLogs && log(base.members[member])
+		return base.members[member]
 	}
 
 	protected lookup(node: IIdentifierNode | ILookupNode, scope: Scope): IValueNode {
@@ -158,7 +159,7 @@ export class Runtime {
 			verboseLogs && console.log('Simple Lookup:', node.content)
 			while (true) {
 				if (searchScope === null) {
-					verboseLogs && log(scope)
+					log(scope)
 					throw new Error('Can not find variable \'' + node.content + '\' in this Scope - File a Bug Report!')
 				}
 				if (searchScope[node.content] != null) {
@@ -170,7 +171,7 @@ export class Runtime {
 				}
 			}
 		} else {
-			verboseLogs && console.log('Complex Lookup:', node.base.content + '.' + node.member.content)
+			verboseLogs && console.log('Complex Lookup:', node.base.content + '.' + node.member)
 			return this.memberLookup(this.lookup(node.base, scope), node.member)
 		}
 	}
@@ -188,7 +189,7 @@ export class Runtime {
 		let scope = func.scope
 
 		let argumentNames = func.parameters.arguments.map((value) => {
-			return value.name.content
+			return value.name
 		})
 
 		for (let i = 0; i < argumentNames.length; i++) {
@@ -221,7 +222,7 @@ export class Runtime {
 			}
 		}
 
-		scope[node.name.content] = this.resolveExpression(node.value, scope).result
+		scope[node.name] = this.resolveExpression(node.value, scope).result
 		return { scope }
 	}
 
@@ -236,7 +237,7 @@ export class Runtime {
 			}
 		}
 
-		scope[node.name.content] = this.resolveExpression(node.value, scope).result
+		scope[node.name] = this.resolveExpression(node.value, scope).result
 		return { scope }
 	}
 
@@ -256,6 +257,8 @@ export class Runtime {
 	}
 
 	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: Scope): IValueNode {
+		verboseLogs && console.log('NativeFunctionInvocation:')
+		verboseLogs && log(node)
 		let func = this.nativeLookup(node.name)
 		let args = node.arguments.arguments.map((value) => {
 			return this.resolveExpression(value, scope).result

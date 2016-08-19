@@ -62,7 +62,7 @@ export interface IIdentifierNode {
 export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IIdentifierNode
-	member: IIdentifierNode
+	member: string
 }
 
 export interface ITypeNode {
@@ -72,7 +72,7 @@ export interface ITypeNode {
 
 export interface IValueNode {
 	nodeType: 'Value'
-	type: ITypeNode
+	type: string
 	value: any
 	members: any
 }
@@ -84,7 +84,7 @@ export interface IStringLiteralNode {
 
 export interface IParameterNode {
 	nodeType: 'Parameter'
-	name: IIdentifierNode
+	name: string
 	type: ITypeNode
 }
 
@@ -100,7 +100,7 @@ export interface IUnnamedArgumentListNode {
 
 export interface INamedArgumentNode {
 	nodeType: 'NamedArgument'
-	name: IIdentifierNode
+	name: string
 	value: IExpressionNode
 }
 
@@ -111,7 +111,7 @@ export interface INamedArgumentListNode {
 
 export interface IPackageAssignmentStatementNode {
 	nodeType: 'PackageAssignmentStatement'
-	name: IStringLiteralNode
+	name: string
 }
 
 export interface IImportStatementNode {
@@ -120,7 +120,7 @@ export interface IImportStatementNode {
 
 export interface IPropertyDeclarationNode {
 	nodeType: 'PropertyDeclaration'
-	name: IIdentifierNode
+	name: string
 	type: ITypeNode
 }
 
@@ -134,7 +134,7 @@ export interface IFunctionDefinitionNode {
 
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
-	name: IIdentifierNode
+	name: IIdentifierNode | ILookupNode
 	arguments: IUnnamedArgumentListNode | INamedArgumentListNode
 }
 
@@ -146,7 +146,7 @@ export interface INativeFunctionInvocationNode {
 
 export interface IMethodDefinitionNode {
 	nodeType: 'MethodDefinition'
-	name: IIdentifierNode
+	name: string
 	function: IFunctionDefinitionNode
 }
 
@@ -157,20 +157,20 @@ export interface IReturnStatementNode {
 
 export interface IDeclarationStatementNode {
 	nodeType: 'DeclarationStatement'
-	name: IIdentifierNode
+	name: string
 	type: ITypeNode
 	value: IExpressionNode
 }
 
 export interface IAssignmentStatementNode {
 	nodeType: 'AssignmentStatement'
-	name: IIdentifierNode
+	name: string
 	value: IExpressionNode
 }
 
 export interface ITypeDefinitionStatementNode {
 	nodeType: 'TypeDefinitionStatement'
-	name: IIdentifierNode
+	name: string
 	properties: Array<IPropertyDeclarationNode>
 	methods: Array<IMethodDefinitionNode>
 }
