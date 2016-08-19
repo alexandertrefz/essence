@@ -650,11 +650,14 @@ let namedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
+			throw new Error('NamedFunctionInvocations are not supported yet!')
+			/*
 			return {
 				nodeType: 'FunctionInvocation',
 				name: foundSequence[0],
 				arguments: foundSequence[1],
 			}
+			//*/
 		}
 	)
 
@@ -737,10 +740,13 @@ let packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
 			{ tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
+			throw new Error('PackageAssignmentStatements are not supported yet!')
+			/*
 			return {
 				nodeType: 'PackageAssignmentStatement',
 				name: foundSequence[1].content,
 			}
+			//*/
 		}
 	)
 
@@ -765,6 +771,8 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			{ tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
+			throw new Error('TypeDefinitionStatements are not supported yet!')
+			/*
 			let propertyFilter = (node: IASTNode) => {
 				return node.nodeType === 'PropertyDeclaration'
 			}
@@ -773,13 +781,13 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 				return node.nodeType === 'MethodDefinition'
 			}
 
-
 			return {
 				nodeType: 'TypeDefinitionStatement',
 				name: <IIdentifierNode>(foundSequence[1]),
 				properties: (<IPropertyDeclarationNode[]>foundSequence).filter(propertyFilter),
 				methods: (<IMethodDefinitionNode[]>foundSequence).filter(methodFilter),
 			}
+			//*/
 		}
 	)
 
@@ -796,9 +804,12 @@ let importStatement = (tokens: Array<IToken>): parserResult => {
 			{ tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
+			throw new Error('ImportStatements are not supported yet!')
+			/*
 			return {
 				nodeType: 'ImportStatement',
 			}
+			//*/
 		}
 	)
 
@@ -855,11 +866,14 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
+			throw new Error('AssignmentStatements are not supported yet!')
+			/*
 			return {
 				nodeType: 'AssignmentStatement',
 				name: foundSequence[0],
 				value: foundSequence[2],
 			}
+			//*/
 		}
 	)
 
@@ -898,7 +912,6 @@ let parseProgram = (tokens: Array<IToken>): IAST => {
 		console.log()
 	}
 
-	// Handle rest of the program
 	while (tokens.length) {
 		let foundSequence: Array<any>, node: IASTNode | undefined
 		;({ foundSequence, node, tokens, } = statement(tokens))
