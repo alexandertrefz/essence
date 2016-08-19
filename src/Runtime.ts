@@ -211,11 +211,16 @@ export class Runtime {
 	}
 
 	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: Scope): { scope: Scope } {
-		if ((node.value as IValueNode).value.nodeType === 'FunctionDefinition') {
-			(node.value as IValueNode).value.scope = {
-				parent: scope
+		if (node.value.nodeType === 'Value') {
+			if ((node.value as IValueNode).value.nodeType === 'FunctionDefinition') {
+				if ((node.value as IValueNode).value.scope === undefined) {
+					(node.value as IValueNode).value.scope = {
+						parent: scope
+					}
+				}
 			}
 		}
+
 		scope[node.name.content] = this.resolveExpression(node.value, scope).result
 		return { scope }
 	}
