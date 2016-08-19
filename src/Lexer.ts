@@ -1,3 +1,5 @@
+/// <reference path="../typings/index.d.ts" />
+
 import { TokenType, IToken, } from './Interfaces'
 
 export class Lexer {

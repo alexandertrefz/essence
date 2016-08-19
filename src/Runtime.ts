@@ -1,4 +1,4 @@
-declare let require: (string) => any
+/// <reference path="../typings/index.d.ts" />
 
 let verboseLogs = false
 
