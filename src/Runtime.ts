@@ -197,7 +197,7 @@ export class Runtime {
 
 		for (let node of func.body) {
 			if (node.nodeType === 'ReturnStatement') {
-				return this.resolveExpression((node as IReturnStatementNode).expression, scope).result
+				return this.resolveExpression(node.expression, scope).result
 			} else {
 				;({ scope } = this.interpretNode(node, scope))
 			}
@@ -212,9 +212,9 @@ export class Runtime {
 
 	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: Scope): { scope: Scope } {
 		if (node.value.nodeType === 'Value') {
-			if ((node.value as IValueNode).value.nodeType === 'FunctionDefinition') {
-				if ((node.value as IValueNode).value.scope === undefined) {
-					(node.value as IValueNode).value.scope = {
+			if (node.value.value.nodeType === 'FunctionDefinition') {
+				if (node.value.value.scope === undefined) {
+					node.value.value.scope = {
 						parent: scope
 					}
 				}
@@ -227,9 +227,9 @@ export class Runtime {
 
 	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: Scope): { scope: Scope } {
 		if (node.value.nodeType === 'Value') {
-			if ((node.value as IValueNode).value.nodeType === 'FunctionDefinition') {
-				if ((node.value as IValueNode).value.scope === undefined) {
-					(node.value as IValueNode).value.scope = {
+			if (node.value.value.nodeType === 'FunctionDefinition') {
+				if (node.value.value.scope === undefined) {
+					node.value.value.scope = {
 						parent: scope
 					}
 				}
@@ -268,15 +268,15 @@ export class Runtime {
 		let result: IValueNode
 
 		if (node.nodeType === 'Identifier') {
-			result = this.lookup(node as IIdentifierNode, scope)
+			result = this.lookup(node, scope)
 		} else if (node.nodeType === 'Lookup') {
-			result = this.lookup(node as ILookupNode, scope)
+			result = this.lookup(node, scope)
 		} else if (node.nodeType === 'FunctionInvocation') {
-			result = this.interpretFunctionInvocation(node as IFunctionInvocationNode, scope)
+			result = this.interpretFunctionInvocation(node, scope)
 		} else if (node.nodeType === 'NativeFunctionInvocation') {
-			result = this.interpretNativeFunctionInvocation(node as INativeFunctionInvocationNode, scope)
+			result = this.interpretNativeFunctionInvocation(node, scope)
 		} else if (node.nodeType === 'Value') {
-			result = (node as IValueNode)
+			result = node
 		} else {
 			throw new Error(`Unknown ExpressionNode of type: ${node.nodeType}`)
 		}
@@ -287,16 +287,16 @@ export class Runtime {
 	protected interpretNode(node: IASTNode, scope: Scope) {
 		switch (node.nodeType) {
 			case 'DeclarationStatement':
-				;({ scope } = this.interpretDeclarationStatement(node as IDeclarationStatementNode, scope))
+				;({ scope } = this.interpretDeclarationStatement(node, scope))
 				break
 			case 'AssignmentStatement':
-				;({ scope } = this.interpretAssignmentStatement(node as IAssignmentStatementNode, scope))
+				;({ scope } = this.interpretAssignmentStatement(node, scope))
 				break
 			case 'FunctionInvocation':
-				this.interpretFunctionInvocation(node as IFunctionInvocationNode, scope)
+				this.interpretFunctionInvocation(node, scope)
 				break
 			case 'NativeFunctionInvocation':
-				this.interpretNativeFunctionInvocation(node as INativeFunctionInvocationNode, scope)
+				this.interpretNativeFunctionInvocation(node, scope)
 				break
 
 			default:
