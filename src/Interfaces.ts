@@ -30,8 +30,7 @@ export interface IAST {
 }
 
 export type ASTType
-	= undefined
-	| 'Identifier'
+	= 'Identifier'
 	| 'Lookup'
 	| 'Value'
 	| 'PackageAssignmentStatement'
