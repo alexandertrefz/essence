@@ -267,24 +267,30 @@ export class Runtime {
 	protected resolveExpression(node: IExpressionNode, scope: Scope): { result: IValueNode, scope: Scope } {
 		let result: IValueNode
 
-		if (node.nodeType === 'Identifier') {
-			result = this.lookup(node, scope)
-		} else if (node.nodeType === 'Lookup') {
-			result = this.lookup(node, scope)
-		} else if (node.nodeType === 'FunctionInvocation') {
-			result = this.interpretFunctionInvocation(node, scope)
-		} else if (node.nodeType === 'NativeFunctionInvocation') {
-			result = this.interpretNativeFunctionInvocation(node, scope)
-		} else if (node.nodeType === 'Value') {
-			result = node
-		} else {
-			throw new Error(`Unknown ExpressionNode of type: ${node.nodeType}`)
+		switch (node.nodeType) {
+			case 'Identifier':
+				result = this.lookup(node, scope)
+				break
+			case 'Lookup':
+				result = this.lookup(node, scope)
+				break
+			case 'FunctionInvocation':
+				result = this.interpretFunctionInvocation(node, scope)
+				break
+			case 'NativeFunctionInvocation':
+				result = this.interpretNativeFunctionInvocation(node, scope)
+				break
+			case 'Value':
+				result = node
+				break
+			default:
+				throw new Error(`Unknown ExpressionNode of type: ${(node as IExpressionNode).nodeType}`)
 		}
 
 		return { result, scope }
 	}
 
-	protected interpretNode(node: IASTNode, scope: Scope) {
+	protected interpretNode(node: IStatementNode | IExpressionNode, scope: Scope) {
 		switch (node.nodeType) {
 			case 'DeclarationStatement':
 				;({ scope } = this.interpretDeclarationStatement(node, scope))
@@ -298,7 +304,6 @@ export class Runtime {
 			case 'NativeFunctionInvocation':
 				this.interpretNativeFunctionInvocation(node, scope)
 				break
-
 			default:
 				throw new Error(`Unknown Node of type: ${node.nodeType}`)
 		}
@@ -310,7 +315,7 @@ export class Runtime {
 		require('fs').readFile(path, 'utf8', (err, data) => {
 			if (err) throw err
 
-			let nodes: Array<IASTNode> = JSON.parse(data)
+			let nodes: Array<IExpressionNode | IStatementNode> = JSON.parse(data)
 
 			for (let node of nodes) {
 				this.fileScope = this.interpretNode(node, this.fileScope).scope
