@@ -3,7 +3,9 @@ let print Function = (message String) -> String
 end
 
 let greet Function = (greetee String) -> String
-	return print(String.join('Hello, ', greetee))
+	let message String = String.join('Hello, ', greetee)
+	message = String.join(message, '!')
+	return print(message)
 end
 
 greet('World')
