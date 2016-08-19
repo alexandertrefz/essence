@@ -260,8 +260,10 @@ export class Runtime {
 			result = this.interpretFunctionInvocation(node as IFunctionInvocationNode, scope)
 		} else if (node.nodeType === 'NativeFunctionInvocation') {
 			result = this.interpretNativeFunctionInvocation(node as INativeFunctionInvocationNode, scope)
-		} else { // node.nodeType must be 'Value'
+		} else if (node.nodeType === 'Value') {
 			result = (node as IValueNode)
+		} else {
+			throw new Error(`Unknown ExpressionNode of type: ${node.nodeType}`)
 		}
 
 		return { result, scope }
@@ -280,7 +282,7 @@ export class Runtime {
 				break
 
 			default:
-				break
+				throw new Error(`Unknown Node of type: ${node.nodeType}`)
 		}
 
 		return { scope }
