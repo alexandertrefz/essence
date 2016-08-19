@@ -866,14 +866,11 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
 		(foundSequence) => {
-			throw new Error('AssignmentStatements are not supported yet!')
-			/*
 			return {
 				nodeType: 'AssignmentStatement',
 				name: foundSequence[0],
 				value: foundSequence[2],
 			}
-			//*/
 		}
 	)
 

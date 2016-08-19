@@ -225,6 +225,21 @@ export class Runtime {
 		return { scope }
 	}
 
+	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: Scope): { scope: Scope } {
+		if (node.value.nodeType === 'Value') {
+			if ((node.value as IValueNode).value.nodeType === 'FunctionDefinition') {
+				if ((node.value as IValueNode).value.scope === undefined) {
+					(node.value as IValueNode).value.scope = {
+						parent: scope
+					}
+				}
+			}
+		}
+
+		scope[node.name.content] = this.resolveExpression(node.value, scope).result
+		return { scope }
+	}
+
 	protected interpretFunctionInvocation(node: IFunctionInvocationNode, scope: Scope): IValueNode {
 		let func = this.lookup(node.name, scope)
 		let args
@@ -273,6 +288,9 @@ export class Runtime {
 		switch (node.nodeType) {
 			case 'DeclarationStatement':
 				;({ scope } = this.interpretDeclarationStatement(node as IDeclarationStatementNode, scope))
+				break
+			case 'AssignmentStatement':
+				;({ scope } = this.interpretAssignmentStatement(node as IAssignmentStatementNode, scope))
 				break
 			case 'FunctionInvocation':
 				this.interpretFunctionInvocation(node as IFunctionInvocationNode, scope)
