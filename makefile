@@ -1,28 +1,57 @@
 # build output dirs
-BUILD_DIR = lib
-JS_BUILD_DIR = $(BUILD_DIR)
+JS_BUILD_DIR = lib
+TESTS_BUILD_DIR = compiledTests
 
 # sources
-TYPESCRIPT = $(shell find src -name '*.ts')
+TYPESCRIPT_SRC = $(shell find src -name '*.ts')
+TYPESCRIPT_TESTS = $(shell find tests -name '*.ts')
 
 #targets
-JS = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT))
+JS = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_SRC))
+TESTS = $(patsubst tests/%.ts, $(TESTS_BUILD_DIR)/%.js, $(TYPESCRIPT_TESTS))
 
-TSC := ./tsc
-TSC_ARGS := -t es6 -m commonjs --strictNullChecks --pretty --outDir
+TSC := ./node_modules/.bin/tsc
+TSC_ARGS := -t es6 -m commonjs --strictNullChecks --pretty --experimentalDecorators --outDir
 
-all: build-setup $(JS)
+MOCHA := ./node_modules/.bin/mocha
+MOCHA_ARGS = --ui tdd --growl --reporter spec
+
+all: clean build-src build-tests
+
+build-src: $(JS)
+
+build-tests: $(TESTS)
 
 $(JS_BUILD_DIR)/%.js: src/%.ts
+	@clear
 	- $(TSC) $(TSC_ARGS) $(dir $@) $<
 
-build-setup:
-	mkdir -p $(BUILD_DIR)
+$(TESTS_BUILD_DIR)/%.js: tests/%.ts
+	@clear
+	- $(TSC) $(TSC_ARGS) $(dir $@) $<
+
+test:
+	@clear
+	@$(MOCHA) $(MOCHA_ARGS) $(TESTS_BUILD_DIR)/*.js
 
 watch:
-	watchman-make -p 'src/*.ts' 'lib/.js' -t all
+	@clear
+	watchman-make -p 'src/*.ts' 'lib/.js' -t build-src -p 'tests/*.ts' 'compiledTests/.js' -t build-tests
+
+watch-src:
+	@clear
+	watchman-make -p 'src/*.ts' 'lib/.js' -t build-src
+
+watch-tests:
+	@clear
+	watchman-make -p 'tests/*.ts' 'compiledTests/.js' -t build-tests
+
+watch-all-run-test:
+	@clear
+	watchman-make -p 'src/*.ts' 'lib/.js' -t build-src test -p 'tests/*.ts' 'compiledTests/.js' -t build-tests test
 
 clean:
-	rm -rf lib/
+	rm -rf $(JS_BUILD_DIR)
+	rm -rf $(TESTS_BUILD_DIR)
 
-.PHONY: clean
+.NOTPARALLEL: test
