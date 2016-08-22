@@ -31,6 +31,7 @@ import {
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
+	IIfElseStatementNode
 } from './Interfaces'
 
 interface Scope {
@@ -347,6 +348,22 @@ export class Runtime {
 		return this.nativeInvoke(func, args)
 	}
 
+	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: Scope): { scope: Scope } {
+		let condition = this.resolveExpression(node.condition, scope).result
+
+		if (condition.value) {
+			let subScope: Scope = {
+				parent: scope
+			}
+
+			for (let subNode of node.trueBody) {
+				subScope = this.interpretNode(subNode, subScope).scope
+			}
+		}
+
+		return { scope }
+	}
+
 	protected resolveExpression(node: IExpressionNode, scope: Scope): { result: IValueNode, scope: Scope } {
 		let result: IValueNode
 
@@ -386,6 +403,9 @@ export class Runtime {
 				break
 			case 'NativeFunctionInvocation':
 				this.interpretNativeFunctionInvocation(node, scope)
+				break
+			case 'IfElseStatement':
+				this.interpretIfElseStatement(node, scope)
 				break
 			default:
 				log(node)
