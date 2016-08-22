@@ -51,6 +51,10 @@ export class Runtime {
 				return this.generateValueNode('String', newValue, {})
 			},
 
+			stringEquals: (self, str) => {
+				return this.generateValueNode('Bool', self.value === str.value, {})
+			},
+
 			print: (message) => {
 				console.log(message.value)
 				return message
@@ -131,6 +135,69 @@ export class Runtime {
 							}
 						},
 						members: {}
+					},
+
+					equals: {
+						nodeType: "Value",
+						type: "Function",
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: {
+								nodeType: "ParameterList",
+								arguments: [{
+									nodeType: "Parameter",
+									name: "self",
+									type: {
+										nodeType: "TypeDeclaration",
+										name: {
+											nodeType: "Identifier",
+											content: "String"
+										}
+									}
+								}, {
+									nodeType: "Parameter",
+									name: "other",
+									type: {
+										nodeType: "TypeDeclaration",
+										name: {
+											nodeType: "Identifier",
+											content: "String"
+										}
+									}
+								}]
+							},
+							returnType: {
+								nodeType: "TypeDeclaration",
+								name: {
+									nodeType: "Identifier",
+									content: "Bool"
+								}
+							},
+							body: [{
+								nodeType: "ReturnStatement",
+								expression: {
+									nodeType: "NativeFunctionInvocation",
+									name: {
+										nodeType: "Identifier",
+										content: "stringEquals"
+									},
+									arguments: {
+										nodeType: "UnnamedArgumentList",
+										arguments: [{
+											nodeType: "Identifier",
+											content: "self"
+										}, {
+											nodeType: "Identifier",
+											content: "other"
+										}]
+									}
+								}
+							}],
+							scope: {
+								parent: null
+							}
+						},
+						"members": {}
 					}
 				}
 			}
