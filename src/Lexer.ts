@@ -175,7 +175,12 @@ export class Lexer {
 			}
 		}
 
-		// Check if we found a keyword
+		// Handle EOF
+		if (token.tokenType === null) {
+			token.tokenType = 'Identifier'
+		}
+
+		// Check if we found a keyword or boolean
 		if (token.tokenType === 'Identifier') {
 			token = Lexer._lexKeyword(token)
 		}
