@@ -321,6 +321,7 @@ export class Runtime {
 				this.interpretNativeFunctionInvocation(node, scope)
 				break
 			default:
+				log(node)
 				throw new Error(`Unknown Node of type: ${node.nodeType}`)
 		}
 
