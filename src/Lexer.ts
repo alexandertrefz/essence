@@ -86,7 +86,7 @@ export class Lexer {
 
 			;({ line, column } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
 
-			if (token.content.endsWith('\n')) {
+			if (token.content.endsWith('\n') || i + 1 === input.length) {
 				token.tokenType = 'Comment'
 				break
 			}
