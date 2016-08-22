@@ -52,6 +52,7 @@ export type ASTType
 	| 'NativeFunctionInvocation'
 	| 'StringLiteral'
 	| 'ReturnStatement'
+	| 'IfElseStatement'
 
 export interface IIdentifierNode {
 	nodeType: 'Identifier'
@@ -174,6 +175,13 @@ export interface ITypeDefinitionStatementNode {
 	methods: Array<IMethodDefinitionNode>
 }
 
+export interface IIfElseStatementNode {
+	nodeType: 'IfElseStatement'
+	condition: IExpressionNode
+	trueBody: Array<IStatementNode>
+	falseBody: Array<IStatementNode>
+}
+
 export type IExpressionNode
 	= IValueNode
 	| IIdentifierNode
@@ -188,6 +196,7 @@ export type IStatementNode
 	| IAssignmentStatementNode
 	| ITypeDefinitionStatementNode
 	| IReturnStatementNode
+	| IIfElseStatementNode
 
 export type IASTNode
 	= IExpressionNode

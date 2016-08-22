@@ -47,6 +47,7 @@ import {
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
+	IIfElseStatementNode,
 } from './Interfaces'
 
 interface IParser {
@@ -858,6 +859,34 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+let ifElseStatement = (tokens: Array<IToken>): parserResult => {
+	const parser = choiceParserGenerator(
+		[
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'Keyword', content: 'if', },
+					{ parser: expression, },
+					{ tokenType: 'Keyword', content: 'then', },
+					{ tokenType: 'Linebreak', },
+					{ isOptional: true, canRepeat: true, parser: statement, },
+					{ tokenType: 'Keyword', content: 'end', },
+					{ tokenType: 'Linebreak', },
+				],
+				(foundSequence: [IToken, IExpressionNode, IToken, IToken, any]): IIfElseStatementNode => {
+					return {
+						nodeType: 'IfElseStatement',
+						condition: foundSequence[1],
+						trueBody: foundSequence.slice(4, foundSequence.length - 2) as IStatementNode[],
+						falseBody: [],
+					}
+				}
+			)
+		]
+	)
+
+	return parser(tokens)
+}
+
 let statement = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
@@ -866,6 +895,7 @@ let statement = (tokens: Array<IToken>): parserResult => {
 			typeDefinitionStatement,
 			declarationStatement,
 			assignmentStatement,
+			ifElseStatement,
 			returnStatement,
 			expression,
 		]
