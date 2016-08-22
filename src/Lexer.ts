@@ -110,6 +110,14 @@ export class Lexer {
 		return token
 	}
 
+	static _lexBoolean(token: IToken) {
+		if (~Lexer.booleanLiterals.indexOf(token.content)) {
+			token.tokenType = 'Boolean'
+		}
+
+		return token
+	}
+
 	static _lexToken(input: string, line: number, column: number) {
 		let token: IToken = {
 			content: '',
@@ -183,6 +191,7 @@ export class Lexer {
 		// Check if we found a keyword or boolean
 		if (token.tokenType === 'Identifier') {
 			token = Lexer._lexKeyword(token)
+			token = Lexer._lexBoolean(token)
 		}
 
 		input = input.slice(i + 1)
