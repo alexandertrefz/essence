@@ -237,8 +237,21 @@ export class Runtime {
 			}
 		}
 
-		scope[node.name] = this.resolveExpression(node.value, scope).result
-		return { scope }
+		let searchScope: Scope | null = scope
+		while (true) {
+			if (searchScope === null) {
+				log(scope)
+				throw new Error('Can not find variable \'' + node.name + '\' in this Scope - File a Bug Report!')
+			}
+			if (searchScope[node.name] != null) {
+				verboseLogs && console.log('Found:')
+				verboseLogs && log(searchScope[node.name])
+				searchScope[node.name] = this.resolveExpression(node.value, scope).result
+				return { scope }
+			} else {
+				searchScope = searchScope.parent
+			}
+		}
 	}
 
 	protected interpretFunctionInvocation(node: IFunctionInvocationNode, scope: Scope): IValueNode {
