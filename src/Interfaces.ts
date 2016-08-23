@@ -4,7 +4,7 @@
 
 export type TokenType
 	= null
-	| 'Delimiter'
+	| 'Delimiter'
 	| 'Identifier'
 	| 'Keyword'
 	| 'Operator'
