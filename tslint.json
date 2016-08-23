@@ -3,8 +3,7 @@
     "align": [
       true,
       "parameters",
-      "arguments",
-      "statements"
+      "arguments"
     ],
     "ban": false,
     "class-name": true,
@@ -24,10 +23,10 @@
     "label-position": true,
     "label-undefined": true,
     "max-line-length": [
-      true,
+      false,
       140
     ],
-    "member-access": true,
+    "member-access": false,
     "member-ordering": [
       false,
       "static-before-instance",
@@ -57,18 +56,18 @@
     "no-inferrable-types": false,
     "no-internal-module": true,
     "no-null-keyword": false,
-    "no-require-imports": true,
-    "no-shadowed-variable": true,
+    "no-require-imports": false,
+    "no-shadowed-variable": false,
     "no-string-literal": true,
     "no-switch-case-fall-through": true,
     "no-trailing-whitespace": true,
-    "no-unreachable": true,
-    "no-unused-expression": true,
-    "no-unused-variable": true,
-    "no-use-before-declare": true,
+    "no-unreachable": false,
+    "no-unused-expression": false,
+    "no-unused-variable": false,
+    "no-use-before-declare": false,
     "no-var-keyword": true,
-    "no-var-requires": true,
-    "object-literal-sort-keys": true,
+    "no-var-requires": false,
+    "object-literal-sort-keys": false,
     "one-line": [
       true,
       "check-open-brace",
@@ -88,8 +87,7 @@
     "trailing-comma": [
       true,
       {
-        "multiline": "always",
-        "singleline": "never"
+        "multiline": "always"
       }
     ],
     "triple-equals": [
@@ -100,8 +98,7 @@
       true,
       "call-signature",
       "parameter",
-      "property-declaration",
-      "member-variable-declaration"
+      "property-declaration"
     ],
     "typedef-whitespace": [
       true,
@@ -113,8 +110,6 @@
         "variable-declaration": "nospace"
       },
       {
-        "call-signature": "space",
-        "index-signature": "space",
         "parameter": "space",
         "property-declaration": "space",
         "variable-declaration": "space"
@@ -128,6 +123,7 @@
     "variable-name": [
       true,
       "check-format",
+	  "allow-pascal-case",
       "allow-leading-underscore",
       "ban-keywords"
     ],
@@ -135,7 +131,6 @@
       true,
       "check-branch",
       "check-decl",
-      "check-operator",
       "check-separator",
       "check-type"
     ]
