@@ -388,10 +388,10 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence): IParameterListNode => {
+				(foundSequence: [IToken, IParameterNode[], IToken]): IParameterListNode => {
 					return {
 						nodeType: 'ParameterList',
-						arguments: foundSequence.slice(1, foundSequence.length - 1) as IParameterNode[],
+						arguments: foundSequence[1],
 					}
 				}
 			),
@@ -458,10 +458,10 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					},
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode, IToken]): IUnnamedArgumentListNode => {
 					return {
 						nodeType: 'UnnamedArgumentList',
-						arguments: foundSequence.slice(1, foundSequence.length - 1) as IExpressionNode[],
+						arguments: [foundSequence[1]],
 					}
 				}
 			),
@@ -486,10 +486,10 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode, IExpressionNode[], IToken, IToken]): IUnnamedArgumentListNode => {
 					return {
 						nodeType: 'UnnamedArgumentList',
-						arguments: foundSequence.slice(1, foundSequence.length - 1) as IExpressionNode[],
+						arguments: [foundSequence[1], ...foundSequence[2]],
 					}
 				}
 			),
@@ -638,6 +638,9 @@ let lookup = (tokens: Array<IToken>): parserResult => {
 }
 
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
+	type functionDefinitionSequence
+		= [IParameterListNode, IToken, ITypeNode, IToken, IStatementNode[], IToken, IToken]
+
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: parameterList, },
@@ -648,12 +651,12 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 			{ tokenType: 'Keyword', content: 'end', },
 			{ tokenType: 'Linebreak', },
 		],
-		(foundSequence: [IParameterListNode, IToken, ITypeNode, IToken, any]): IFunctionDefinitionNode => {
+		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
 			return {
 				nodeType: 'FunctionDefinition',
 				parameters: foundSequence[0],
 				returnType: foundSequence[2],
-				body: foundSequence.slice(4, foundSequence.length - 2),
+				body: foundSequence[4],
 			}
 		}
 	)
@@ -897,6 +900,7 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
+	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IStatementNode[]]
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -909,11 +913,11 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 					{ tokenType: 'Keyword', content: 'end', },
 					{ tokenType: 'Linebreak', },
 				],
-				(foundSequence: [IToken, IExpressionNode, IToken, IToken, any]): IIfElseStatementNode => {
+				(foundSequence: ifStatementSequence): IIfElseStatementNode => {
 					return {
 						nodeType: 'IfElseStatement',
 						condition: foundSequence[1],
-						trueBody: foundSequence.slice(4, foundSequence.length - 2) as IStatementNode[],
+						trueBody: foundSequence[4],
 						falseBody: [],
 					}
 				}
