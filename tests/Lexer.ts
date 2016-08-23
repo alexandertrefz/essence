@@ -25,6 +25,23 @@ export interface IToken {
 
 describe('Lexer', () => {
 	describe('strings', () => {
+		it('should lex empty strings', () => {
+			let input: string
+			let output: Array<IToken>
+
+			input = '\'\''
+			output = [
+				{
+					content: '',
+					tokenType: 'String',
+					line: 1,
+					column: 2
+				}
+			]
+
+			assert.deepEqual(Lexer.lex(input), output)
+		})
+
 		it('should lex simple strings', () => {
 			let input: string
 			let output: Array<IToken>

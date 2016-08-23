@@ -248,7 +248,10 @@ export class Lexer {
 			}
 			// Dont save empty tokens since they are useless in parsing
 			if (token.content === '') {
-				continue
+				// Except Strings, as they may legally be empty
+				if (token.tokenType !== 'String') {
+					continue
+				}
 			}
 
 			tokens.push(token)
