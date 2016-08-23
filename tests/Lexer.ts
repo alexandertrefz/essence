@@ -312,6 +312,57 @@ describe('Lexer', () => {
 
 			assert.deepEqual(Lexer.lex(input), output)
 		})
+
+		it('should lex if', () => {
+			let input: string
+			let output: Array<IToken>
+
+			input = 'if'
+			output = [
+				{
+					content: 'if',
+					tokenType: 'Keyword',
+					line: 1,
+					column: 1
+				}
+			]
+
+			assert.deepEqual(Lexer.lex(input), output)
+		})
+
+		it('should lex then', () => {
+			let input: string
+			let output: Array<IToken>
+
+			input = 'then'
+			output = [
+				{
+					content: 'then',
+					tokenType: 'Keyword',
+					line: 1,
+					column: 1
+				}
+			]
+
+			assert.deepEqual(Lexer.lex(input), output)
+		})
+
+		it('should lex else', () => {
+			let input: string
+			let output: Array<IToken>
+
+			input = 'else'
+			output = [
+				{
+					content: 'else',
+					tokenType: 'Keyword',
+					line: 1,
+					column: 1
+				}
+			]
+
+			assert.deepEqual(Lexer.lex(input), output)
+		})
 	})
 
 	describe('delimiters', () => {
