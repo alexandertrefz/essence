@@ -4,30 +4,13 @@ let debugTokens = false
 let debugIndividualNodes = false
 let debugNodes = false
 
-type tokenSequenceMatch = {
-	foundSequence: Array<IToken | IASTNode>
-	tokens: Array<IToken>
-}
-
-type parserResult = {
-	foundSequence: Array<IToken | IASTNode>
-	node: IASTNode | undefined
-	tokens: Array<IToken>
-}
-
-type parser = (tokens: Array<IToken>) => parserResult
-
-type nodeGenerator = (foundSequence: Array<any>) => IASTNode
-
 import {
 	IToken,
 	IAST,
-	ASTType,
 	IASTNode,
 	IStatementNode,
 	ITypeNode,
 	IValueNode,
-	IStringLiteralNode,
 	IParameterNode,
 	IParameterListNode,
 	IUnnamedArgumentListNode,
@@ -49,6 +32,27 @@ import {
 	ILookupNode,
 	IIfElseStatementNode,
 } from './Interfaces'
+
+type tokenSequenceMatch = {
+	foundSequence: Array<IToken | IASTNode>
+	tokens: Array<IToken>
+}
+
+type parserResult = {
+	foundSequence: Array<IToken | IASTNode>
+	node: IASTNode | undefined
+	tokens: Array<IToken>
+}
+
+type statementParserResult = {
+	foundSequence: Array<IToken | IASTNode>
+	node: IStatementNode | IExpressionNode | undefined
+	tokens: Array<IToken>
+}
+
+type parser = (tokens: Array<IToken>) => parserResult
+
+type nodeGenerator = (foundSequence: Array<any>) => IASTNode
 
 interface IParser {
 	isOptional?: boolean
@@ -101,6 +105,10 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 	}
 
 	for (let definitionKey in tokenDefinition) {
+		if (!tokenDefinition.hasOwnProperty(definitionKey)) {
+			continue
+		}
+
 		if (definitionKey === 'isOptional') {
 			if (token == null) {
 				return false
@@ -113,33 +121,35 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 			return false
 		}
 
+		/* tslint:disable */
 		for (let tokenKey in tokenDefinition[definitionKey]) {
 			if (token[definitionKey] !== tokenDefinition[definitionKey]) {
 				return false
 			}
 		}
+		/* tslint:enable */
 	}
 
 	return true
 }
 
 let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => {
-	let defaultResult = { nodes: [], tokens }
-	let newTokenDefinition = [Object.assign({}, tokenDefinition, { canRepeat: false })]
+	let defaultResult = { nodes: [], tokens, }
+	let newTokenDefinition = [Object.assign({}, tokenDefinition, { canRepeat: false, })]
 	let newTokens = tokens.slice(0)
 
 	let nodes: Array<IASTNode> = []
 
 	while (true) {
 		let foundSequence
-		;({ foundSequence, tokens: newTokens } = matchTokenSequence(newTokens, newTokenDefinition))
+		; ({ foundSequence, tokens: newTokens, } = matchTokenSequence(newTokens, newTokenDefinition))
 
 		if (foundSequence.length) {
 			nodes.push(foundSequence[0])
 			newTokens = newTokens.slice(1)
 		} else {
 			if (nodes.length) {
-				return { nodes, tokens: newTokens }
+				return { nodes, tokens: newTokens, }
 			} else {
 				return defaultResult
 			}
@@ -149,7 +159,7 @@ let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => 
 
 let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
-	let defaultResult = { foundSequence: [], tokens: originalTokens }
+	let defaultResult = { foundSequence: [], tokens: originalTokens, }
 	let hasOptionalTokens = false
 
 	if (tokenDefinitions.length > tokens.length) {
@@ -203,7 +213,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 			for (let parser of parsers) {
 				let subTokens = tokens.slice(tokenIndex)
-				let { foundSequence, node, tokens: newTokens } = parser(subTokens)
+				let { foundSequence, node, tokens: newTokens, } = parser(subTokens)
 
 				if (foundSequence.length) {
 					foundMatch = true
@@ -232,7 +242,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 		tokenIndex++
 	}
 
-	return { foundSequence: tokens.slice(0, tokenIndex), tokens }
+	return { foundSequence: tokens.slice(0, tokenIndex), tokens, }
 }
 
 let sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator): parser => {
@@ -241,7 +251,7 @@ let sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator
 
 		for (let parser of parsers) {
 			if (typeof parser === 'function') {
-				sequence.push({ parser })
+				sequence.push({ parser, })
 			} else {
 				sequence.push(parser)
 			}
@@ -250,13 +260,13 @@ let sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator
 		let foundSequence: Array<any>
 		let node: IASTNode | undefined = undefined
 
-		;({ foundSequence, tokens } = matchTokenSequence(tokens, sequence))
+		; ({ foundSequence, tokens, } = matchTokenSequence(tokens, sequence))
 
 		if (foundSequence.length) {
 			node = nodeGenerator(foundSequence)
 
 			if (debugIndividualNodes) {
-				console.log(require('util').inspect(node, { showHidden: false, depth: null }))
+				console.log(require('util').inspect(node, { showHidden: false, depth: null, }))
 				console.log()
 			}
 
@@ -264,7 +274,7 @@ let sequenceParserGenerator = (parsers: Array<IParser | Function>, nodeGenerator
 		}
 
 		return {
-			foundSequence, node, tokens
+			foundSequence, node, tokens,
 		}
 	}
 }
@@ -273,8 +283,8 @@ let choiceParserGenerator = (parsers: Array<Function>): parser => {
 	return (tokens: Array<IToken>) => {
 		let foundSequence: Array<any>, node: IASTNode
 
-		for(let parser of parsers) {
-			;({ foundSequence, node, tokens } = parser(tokens))
+		for (let parser of parsers) {
+			; ({ foundSequence, node, tokens, } = parser(tokens))
 
 			if (node) {
 				// No token slicing needed here, we are using the results of parsers that already sliced
@@ -553,7 +563,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 		[
 			sequenceParserGenerator(
 				[
-					{ parser: functionDefinition },
+					{ parser: functionDefinition, },
 				],
 				(foundSequence): IValueNode => {
 					return {
@@ -841,9 +851,9 @@ let importStatement = (tokens: Array<IToken>): parserResult => {
 let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
-			{ tokenType: 'Keyword', content: 'return' },
-			{ parser: expression },
-			{ isOptional: true, tokenType: 'Linebreak' },
+			{ tokenType: 'Keyword', content: 'return', },
+			{ parser: expression, },
+			{ isOptional: true, tokenType: 'Linebreak', },
 		],
 		(foundSequence: [IToken, IExpressionNode]): IReturnStatementNode => {
 			return {
@@ -946,14 +956,14 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 						falseBody: foundSequence[7],
 					}
 				}
-			)
+			),
 		]
 	)
 
 	return parser(tokens)
 }
 
-let statement = (tokens: Array<IToken>): parserResult => {
+let statement = (tokens: Array<IToken>): statementParserResult => {
 	const parser = choiceParserGenerator(
 		[
 			packageAssignmentStatement,
@@ -967,7 +977,7 @@ let statement = (tokens: Array<IToken>): parserResult => {
 		]
 	)
 
-	return parser(tokens)
+	return parser(tokens) as statementParserResult
 }
 
 /*
@@ -975,7 +985,7 @@ let statement = (tokens: Array<IToken>): parserResult => {
 */
 
 let parseProgram = (tokens: Array<IToken>): IAST => {
-	let nodes: Array<IASTNode> = []
+	let nodes: Array<IExpressionNode | IStatementNode> = []
 
 	tokens = combineMultiTokenOperators(tokens)
 
@@ -988,7 +998,7 @@ let parseProgram = (tokens: Array<IToken>): IAST => {
 
 	while (tokens.length) {
 		let foundSequence: Array<any>, node: IASTNode | undefined
-		;({ foundSequence, node, tokens, } = statement(tokens))
+		; ({ foundSequence, node, tokens, } = statement(tokens))
 
 		if (node) {
 			nodes.push(node)

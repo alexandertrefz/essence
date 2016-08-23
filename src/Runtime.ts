@@ -1,4 +1,4 @@
-/// <reference path="../typings/index.d.ts" />
+/// <reference path='../typings/index.d.ts' />
 
 let verboseLogs = false
 
@@ -10,33 +10,18 @@ let log = (node) => {
 import {
 	IASTNode,
 	IStatementNode,
-	ITypeNode,
 	IValueNode,
-	IParameterNode,
-	IParameterListNode,
-	IUnnamedArgumentListNode,
-	INamedArgumentNode,
-	INamedArgumentListNode,
-	IPackageAssignmentStatementNode,
-	IImportStatementNode,
-	IPropertyDeclarationNode,
 	IFunctionDefinitionNode,
 	IFunctionInvocationNode,
 	INativeFunctionInvocationNode,
-	IMethodDefinitionNode,
-	IReturnStatementNode,
 	IDeclarationStatementNode,
 	IAssignmentStatementNode,
-	ITypeDefinitionStatementNode,
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
-	IIfElseStatementNode
+	IIfElseStatementNode,
+	IScope,
 } from './Interfaces'
-
-interface Scope {
-	parent: Scope | null
-}
 
 export class Runtime {
 	public fileScope: any
@@ -70,138 +55,138 @@ export class Runtime {
 					nodeType: 'TypeDeclaration',
 					name: {
 						nodeType: 'Identifier',
-						content: 'TypeDeclaration'
+						content: 'TypeDeclaration',
 					},
 				},
 				value: null,
 				members: {
 					join: {
-						nodeType: "Value",
-						type: "Function",
+						nodeType: 'Value',
+						type: 'Function',
 						value: {
-							nodeType: "FunctionDefinition",
+							nodeType: 'FunctionDefinition',
 							parameters: {
-								nodeType: "ParameterList",
+								nodeType: 'ParameterList',
 								arguments: [{
-									nodeType: "Parameter",
-									name: "self",
+									nodeType: 'Parameter',
+									name: 'self',
 									type: {
-										nodeType: "TypeDeclaration",
+										nodeType: 'TypeDeclaration',
 										name: {
-											nodeType: "Identifier",
-											content: "String"
-										}
-									}
+											nodeType: 'Identifier',
+											content: 'String',
+										},
+									},
 								}, {
-									nodeType: "Parameter",
-									name: "string",
+									nodeType: 'Parameter',
+									name: 'string',
 									type: {
-										nodeType: "TypeDeclaration",
+										nodeType: 'TypeDeclaration',
 										name: {
-											nodeType: "Identifier",
-											content: "String"
-										}
-									}
-								}]
+											nodeType: 'Identifier',
+											content: 'String',
+										},
+									},
+								}],
 							},
 							returnType: {
-								nodeType: "TypeDeclaration",
+								nodeType: 'TypeDeclaration',
 								name: {
-									nodeType: "Identifier",
-									content: "String"
-								}
+									nodeType: 'Identifier',
+									content: 'String',
+								},
 							},
 							body: [{
-								nodeType: "ReturnStatement",
+								nodeType: 'ReturnStatement',
 								expression: {
-									nodeType: "NativeFunctionInvocation",
+									nodeType: 'NativeFunctionInvocation',
 									name: {
-										nodeType: "Identifier",
-										content: "stringJoin"
+										nodeType: 'Identifier',
+										content: 'stringJoin',
 									},
 									arguments: {
-										nodeType: "UnnamedArgumentList",
+										nodeType: 'UnnamedArgumentList',
 										arguments: [{
-											nodeType: "Identifier",
-											content: "self"
+											nodeType: 'Identifier',
+											content: 'self',
 										}, {
-											nodeType: "Identifier",
-											content: "string"
-										}]
-									}
-								}
+											nodeType: 'Identifier',
+											content: 'string',
+										}],
+									},
+								},
 							}],
 							scope: {
-								parent: null
-							}
+								parent: null,
+							},
 						},
-						members: {}
+						members: {},
 					},
 
 					equals: {
-						nodeType: "Value",
-						type: "Function",
+						nodeType: 'Value',
+						type: 'Function',
 						value: {
-							nodeType: "FunctionDefinition",
+							nodeType: 'FunctionDefinition',
 							parameters: {
-								nodeType: "ParameterList",
+								nodeType: 'ParameterList',
 								arguments: [{
-									nodeType: "Parameter",
-									name: "self",
+									nodeType: 'Parameter',
+									name: 'self',
 									type: {
-										nodeType: "TypeDeclaration",
+										nodeType: 'TypeDeclaration',
 										name: {
-											nodeType: "Identifier",
-											content: "String"
-										}
-									}
+											nodeType: 'Identifier',
+											content: 'String',
+										},
+									},
 								}, {
-									nodeType: "Parameter",
-									name: "other",
+									nodeType: 'Parameter',
+									name: 'other',
 									type: {
-										nodeType: "TypeDeclaration",
+										nodeType: 'TypeDeclaration',
 										name: {
-											nodeType: "Identifier",
-											content: "String"
-										}
-									}
-								}]
+											nodeType: 'Identifier',
+											content: 'String',
+										},
+									},
+								}],
 							},
 							returnType: {
-								nodeType: "TypeDeclaration",
+								nodeType: 'TypeDeclaration',
 								name: {
-									nodeType: "Identifier",
-									content: "Bool"
-								}
+									nodeType: 'Identifier',
+									content: 'Bool',
+								},
 							},
 							body: [{
-								nodeType: "ReturnStatement",
+								nodeType: 'ReturnStatement',
 								expression: {
-									nodeType: "NativeFunctionInvocation",
+									nodeType: 'NativeFunctionInvocation',
 									name: {
-										nodeType: "Identifier",
-										content: "stringEquals"
+										nodeType: 'Identifier',
+										content: 'stringEquals',
 									},
 									arguments: {
-										nodeType: "UnnamedArgumentList",
+										nodeType: 'UnnamedArgumentList',
 										arguments: [{
-											nodeType: "Identifier",
-											content: "self"
+											nodeType: 'Identifier',
+											content: 'self',
 										}, {
-											nodeType: "Identifier",
-											content: "other"
-										}]
-									}
-								}
+											nodeType: 'Identifier',
+											content: 'other',
+										}],
+									},
+								},
 							}],
 							scope: {
-								parent: null
-							}
+								parent: null,
+							},
 						},
-						"members": {}
-					}
-				}
-			}
+						members: {},
+					},
+				},
+			},
 		}
 	}
 
@@ -221,8 +206,8 @@ export class Runtime {
 		return base.members[member]
 	}
 
-	protected lookup(node: IIdentifierNode | ILookupNode, scope: Scope): IValueNode {
-		let searchScope: Scope | null = scope
+	protected lookup(node: IIdentifierNode | ILookupNode, scope: IScope): IValueNode {
+		let searchScope: IScope | null = scope
 		if (node.nodeType === 'Identifier') {
 			verboseLogs && console.log('Simple Lookup:', node.content)
 			while (true) {
@@ -268,7 +253,7 @@ export class Runtime {
 			if (node.nodeType === 'ReturnStatement') {
 				return this.resolveExpression(node.expression, scope).result
 			} else {
-				;({ scope } = this.interpretNode(node, scope))
+				; ({ scope } = this.interpretNode(node, scope))
 			}
 		}
 
@@ -279,12 +264,12 @@ export class Runtime {
 		return func.apply(undefined, args)
 	}
 
-	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: Scope): { scope: Scope } {
+	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: IScope): { scope: IScope } {
 		if (node.value.nodeType === 'Value') {
 			if (node.value.value.nodeType === 'FunctionDefinition') {
 				if (node.value.value.scope === undefined) {
 					node.value.value.scope = {
-						parent: scope
+						parent: scope,
 					}
 				}
 			}
@@ -294,18 +279,18 @@ export class Runtime {
 		return { scope }
 	}
 
-	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: Scope): { scope: Scope } {
+	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: IScope): { scope: IScope } {
 		if (node.value.nodeType === 'Value') {
 			if (node.value.value.nodeType === 'FunctionDefinition') {
 				if (node.value.value.scope === undefined) {
 					node.value.value.scope = {
-						parent: scope
+						parent: scope,
 					}
 				}
 			}
 		}
 
-		let searchScope: Scope | null = scope
+		let searchScope: IScope | null = scope
 		while (true) {
 			if (searchScope === null) {
 				log(scope)
@@ -322,7 +307,7 @@ export class Runtime {
 		}
 	}
 
-	protected interpretFunctionInvocation(node: IFunctionInvocationNode, scope: Scope): IValueNode {
+	protected interpretFunctionInvocation(node: IFunctionInvocationNode, scope: IScope): IValueNode {
 		let func = this.lookup(node.name, scope)
 		let args
 
@@ -337,7 +322,7 @@ export class Runtime {
 		return this.invoke(func.value, args)
 	}
 
-	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: Scope): IValueNode {
+	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: IScope): IValueNode {
 		verboseLogs && console.log('NativeFunctionInvocation:')
 		verboseLogs && log(node)
 		let func = this.nativeLookup(node.name)
@@ -348,7 +333,7 @@ export class Runtime {
 		return this.nativeInvoke(func, args)
 	}
 
-	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: Scope): { scope: Scope } {
+	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: IScope): { scope: IScope } {
 		let condition = this.resolveExpression(node.condition, scope).result
 		let body: Array<IStatementNode>
 
@@ -358,8 +343,8 @@ export class Runtime {
 			body = node.falseBody
 		}
 
-		let subScope: Scope = {
-			parent: scope
+		let subScope: IScope = {
+			parent: scope,
 		}
 
 		for (let subNode of body) {
@@ -369,7 +354,7 @@ export class Runtime {
 		return { scope }
 	}
 
-	protected resolveExpression(node: IExpressionNode, scope: Scope): { result: IValueNode, scope: Scope } {
+	protected resolveExpression(node: IExpressionNode, scope: IScope): { result: IValueNode, scope: IScope } {
 		let result: IValueNode
 
 		switch (node.nodeType) {
@@ -395,13 +380,13 @@ export class Runtime {
 		return { result, scope }
 	}
 
-	protected interpretNode(node: IStatementNode | IExpressionNode, scope: Scope) {
+	protected interpretNode(node: IStatementNode | IExpressionNode, scope: IScope): { scope: IScope } {
 		switch (node.nodeType) {
 			case 'DeclarationStatement':
-				;({ scope } = this.interpretDeclarationStatement(node, scope))
+				; ({ scope } = this.interpretDeclarationStatement(node, scope))
 				break
 			case 'AssignmentStatement':
-				;({ scope } = this.interpretAssignmentStatement(node, scope))
+				; ({ scope } = this.interpretAssignmentStatement(node, scope))
 				break
 			case 'FunctionInvocation':
 				this.interpretFunctionInvocation(node, scope)
@@ -420,9 +405,9 @@ export class Runtime {
 		return { scope }
 	}
 
-	public loadFile(path) {
+	public loadFile(path: string): void {
 		require('fs').readFile(path, 'utf8', (err, data) => {
-			if (err) throw err
+			if (err) { throw err }
 
 			let nodes: Array<IExpressionNode | IStatementNode> = JSON.parse(data)
 
