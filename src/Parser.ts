@@ -5,12 +5,12 @@ let debugIndividualNodes = false
 let debugNodes = false
 
 type tokenSequenceMatch = {
-	foundSequence: Array<any>
+	foundSequence: Array<IToken | IASTNode>
 	tokens: Array<IToken>
 }
 
 type parserResult = {
-	foundSequence: Array<any>
+	foundSequence: Array<IToken | IASTNode>
 	node: IASTNode | undefined
 	tokens: Array<IToken>
 }
