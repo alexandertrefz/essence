@@ -1,4 +1,4 @@
-/// <reference path="../typings/index.d.ts" />
+/// <reference path="../../typings/index.d.ts" />
 let assert = require('assert')
 let Lexer = require('../lib/Lexer').Lexer
 
