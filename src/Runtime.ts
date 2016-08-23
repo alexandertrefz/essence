@@ -350,15 +350,20 @@ export class Runtime {
 
 	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: Scope): { scope: Scope } {
 		let condition = this.resolveExpression(node.condition, scope).result
+		let body: Array<IStatementNode>
 
 		if (condition.value) {
-			let subScope: Scope = {
-				parent: scope
-			}
+			body = node.trueBody
+		} else {
+			body = node.falseBody
+		}
 
-			for (let subNode of node.trueBody) {
-				subScope = this.interpretNode(subNode, subScope).scope
-			}
+		let subScope: Scope = {
+			parent: scope
+		}
+
+		for (let subNode of body) {
+			subScope = this.interpretNode(subNode, subScope).scope
 		}
 
 		return { scope }

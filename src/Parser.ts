@@ -901,6 +901,8 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IStatementNode[]]
+	type ifElseStatementSequence
+		= [IToken, IExpressionNode, IToken, IToken, IStatementNode[], IToken, IToken, IStatementNode[]]
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -919,6 +921,29 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 						condition: foundSequence[1],
 						trueBody: foundSequence[4],
 						falseBody: [],
+					}
+				}
+			),
+
+			sequenceParserGenerator(
+				[
+					{ tokenType: 'Keyword', content: 'if', },
+					{ parser: expression, },
+					{ tokenType: 'Keyword', content: 'then', },
+					{ tokenType: 'Linebreak', },
+					{ isOptional: true, canRepeat: true, parser: statement, },
+					{ tokenType: 'Keyword', content: 'else', },
+					{ tokenType: 'Linebreak', },
+					{ isOptional: true, canRepeat: true, parser: statement, },
+					{ tokenType: 'Keyword', content: 'end', },
+					{ tokenType: 'Linebreak', },
+				],
+				(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
+					return {
+						nodeType: 'IfElseStatement',
+						condition: foundSequence[1],
+						trueBody: foundSequence[4],
+						falseBody: foundSequence[7],
 					}
 				}
 			)
