@@ -95,7 +95,7 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 	return tokens
 }
 
-let matchToken = (token: any, tokenDefinition: any): boolean => {
+let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 	if (!tokenDefinition.isOptional && token == null) {
 		return false
 	}
