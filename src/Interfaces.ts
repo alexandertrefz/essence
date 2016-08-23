@@ -26,7 +26,7 @@ export interface IToken {
 */
 
 export interface IAST {
-	nodes: Array<IASTNode>
+	nodes: Array<IExpressionNode | IStatementNode>
 }
 
 export type ASTType
@@ -211,3 +211,9 @@ export type IASTNode
 	| IPropertyDeclarationNode
 	| IMethodDefinitionNode
 	| IFunctionDefinitionNode
+
+/* tslint:disable */
+export interface IScope {
+	parent: IScope | null
+}
+/* tslint:enable */

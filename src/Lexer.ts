@@ -1,6 +1,13 @@
 /// <reference path="../typings/index.d.ts" />
 
-import { TokenType, IToken, } from './Interfaces'
+import { IToken, } from './Interfaces'
+
+type lexingResult = {
+	input: string
+	line: number
+	column: number
+	token: IToken
+}
 
 export class Lexer {
 	static stringLiteral   = '\''
@@ -10,7 +17,7 @@ export class Lexer {
 	static keywords        = ['package', 'import', 'as', 'type', 'interface', 'let', 'each', 'in', 'do', 'end', 'return', 'if', 'then', 'else']
 	static delimiters      = ['@', '(', ')', '{', '}', '[', ']', '<', '>', ',', '.', ':', '!', '=', '|', '&', '#', '-', '+', '*', '/']
 
-	static _handleLineNumberAndCollumn(char: string, line: number, column: number) {
+	static _handleLineNumberAndCollumn(char: string, line: number, column: number): { line: number, column: number } {
 		if (char === '\n') {
 			column = 1
 			line++
@@ -24,7 +31,7 @@ export class Lexer {
 		}
 	}
 
-	static _lexString(input: string, line: number, column: number) {
+	static _lexString(input: string, line: number, column: number): lexingResult {
 		let token: IToken = {
 			content: '',
 			tokenType: 'String',
@@ -39,7 +46,7 @@ export class Lexer {
 		for (let i = 0; i < input.length; i++) {
 			token.content += input[i]
 
-			;({ line, column } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
+			; ({ line, column, } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
 
 			if (token.content.startsWith(Lexer.stringLiteral) && token.content.length === 1) {
 				balanceWasChanged = true
@@ -71,7 +78,7 @@ export class Lexer {
 		}
 	}
 
-	static _lexComment(input: string, line: number, column: number) {
+	static _lexComment(input: string, line: number, column: number): lexingResult {
 		let token: IToken = {
 			content: '',
 			tokenType: null,
@@ -79,12 +86,12 @@ export class Lexer {
 			column,
 		}
 
-		let i:number
+		let i: number
 
 		for (i = 0; i < input.length; i++) {
 			token.content += input[i]
 
-			;({ line, column } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
+			; ({ line, column, } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
 
 			if (token.content.endsWith('\n') || i + 1 === input.length) {
 				token.tokenType = 'Comment'
@@ -102,7 +109,7 @@ export class Lexer {
 		}
 	}
 
-	static _lexKeyword(token: IToken) {
+	static _lexKeyword(token: IToken): IToken {
 		if (~Lexer.keywords.indexOf(token.content)) {
 			token.tokenType = 'Keyword'
 		}
@@ -110,7 +117,7 @@ export class Lexer {
 		return token
 	}
 
-	static _lexBoolean(token: IToken) {
+	static _lexBoolean(token: IToken): IToken {
 		if (~Lexer.booleanLiterals.indexOf(token.content)) {
 			token.tokenType = 'Boolean'
 		}
@@ -118,7 +125,7 @@ export class Lexer {
 		return token
 	}
 
-	static _lexToken(input: string, line: number, column: number) {
+	static _lexToken(input: string, line: number, column: number): lexingResult {
 		let token: IToken = {
 			content: '',
 			tokenType: null,
@@ -126,7 +133,7 @@ export class Lexer {
 			column,
 		}
 
-		let i:number
+		let i: number
 
 		for (i = 0; i < input.length; i++) {
 			token.content += input[i]
@@ -135,7 +142,7 @@ export class Lexer {
 			// to handle it before handling linenumbers potentially
 			if (input[i] === '\n') {
 				if (token.content.startsWith('\n')) {
-					;({ line, column } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
+					; ({ line, column, } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
 					token.tokenType = 'Linebreak'
 					break
 				} else {
@@ -146,7 +153,7 @@ export class Lexer {
 				}
 			}
 
-			;({ line, column } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
+			; ({ line, column, } = Lexer._handleLineNumberAndCollumn(input[i], line, column))
 
 			if (!!~Lexer.delimiters.indexOf(token.content)) {
 				token.tokenType = 'Delimiter'
@@ -161,12 +168,12 @@ export class Lexer {
 			}
 
 			if (token.content.startsWith(Lexer.commentLiteral)) {
-				;({ input, line, column, token } = Lexer._lexComment(input, line, column))
+				; ({ input, line, column, token, } = Lexer._lexComment(input, line, column))
 				break
 			}
 
 			if (token.content.startsWith(Lexer.stringLiteral)) {
-				;({ input, line, column, token } = Lexer._lexString(input, line, column))
+				; ({ input, line, column, token, } = Lexer._lexString(input, line, column))
 				break
 			}
 
@@ -204,13 +211,13 @@ export class Lexer {
 		}
 	}
 
-	static _cleanTokenEnd(token: IToken) {
+	static _cleanTokenEnd(token: IToken): IToken {
 		// Ensure that the line-number stays correct
 		let i = 0
 		while (token.content[i] === ' ' || token.content[i] === '\n' || token.content[i] === '\t') {
-			;({
+			; ({
 				line: token.line,
-				column: token.column
+				column: token.column,
 			} = Lexer._handleLineNumberAndCollumn(token.content[i], token.line, token.column))
 
 			i++
@@ -224,13 +231,13 @@ export class Lexer {
 		return token
 	}
 
-	static lex(input: string, line = 1, column = 1) {
+	static lex(input: string, line: number = 1, column: number = 1): Array<IToken> {
 		let tokens: IToken[] = []
 
 		while (input) {
 			let token: IToken
 
-			;({ input, line, column, token } = Lexer._lexToken(input, line, column))
+			; ({ input, line, column, token, } = Lexer._lexToken(input, line, column))
 
 			// Dont save comments since they are useless in parsing
 			if (token.tokenType === 'Comment') {

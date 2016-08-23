@@ -1,29 +1,11 @@
 /// <reference path="../../typings/index.d.ts" />
-let assert = require('assert')
-let Lexer = require('../lib/Lexer').Lexer
 
-// TODO: Investigate why the typescript compiler does not emit,
-//       if we import the interfaces file
-export type TokenType
-	= null
-	| 'Delimiter'
-	| 'Identifier'
-	| 'Keyword'
-	| 'Operator'
-	| 'String'
-	| 'Comment'
-	| 'Linebreak'
-	| 'Boolean'
-	| 'Number'
-
-export interface IToken {
-	content: string
-	tokenType: TokenType
-	line: number
-	column: number
-}
+import { Lexer, } from '../Lexer'
+import { IToken, } from '../Interfaces'
 
 describe('Lexer', () => {
+	let assert = require('assert')
+
 	describe('strings', () => {
 		it('should lex empty strings', () => {
 			let input: string
@@ -35,8 +17,8 @@ describe('Lexer', () => {
 					content: '',
 					tokenType: 'String',
 					line: 1,
-					column: 2
-				}
+					column: 2,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -52,8 +34,8 @@ describe('Lexer', () => {
 					content: 'test',
 					tokenType: 'String',
 					line: 1,
-					column: 2
-				}
+					column: 2,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -69,8 +51,8 @@ describe('Lexer', () => {
 					content: 'test test',
 					tokenType: 'String',
 					line: 1,
-					column: 2
-				}
+					column: 2,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -88,8 +70,8 @@ describe('Lexer', () => {
 					content: 'true',
 					tokenType: 'Boolean',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -105,8 +87,8 @@ describe('Lexer', () => {
 					content: 'false',
 					tokenType: 'Boolean',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -136,8 +118,8 @@ describe('Lexer', () => {
 					content: 'package',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -153,8 +135,8 @@ describe('Lexer', () => {
 					content: 'import',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -170,8 +152,8 @@ describe('Lexer', () => {
 					content: 'as',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -187,8 +169,8 @@ describe('Lexer', () => {
 					content: 'type',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -204,8 +186,8 @@ describe('Lexer', () => {
 					content: 'interface',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -221,8 +203,8 @@ describe('Lexer', () => {
 					content: 'let',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -238,8 +220,8 @@ describe('Lexer', () => {
 					content: 'each',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -255,8 +237,8 @@ describe('Lexer', () => {
 					content: 'in',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -272,8 +254,8 @@ describe('Lexer', () => {
 					content: 'do',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -289,8 +271,8 @@ describe('Lexer', () => {
 					content: 'end',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -306,8 +288,8 @@ describe('Lexer', () => {
 					content: 'return',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -323,8 +305,8 @@ describe('Lexer', () => {
 					content: 'if',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -340,8 +322,8 @@ describe('Lexer', () => {
 					content: 'then',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -357,8 +339,8 @@ describe('Lexer', () => {
 					content: 'else',
 					tokenType: 'Keyword',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -376,8 +358,8 @@ describe('Lexer', () => {
 					content: '@',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -393,8 +375,8 @@ describe('Lexer', () => {
 					content: '(',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -410,8 +392,8 @@ describe('Lexer', () => {
 					content: ')',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -427,8 +409,8 @@ describe('Lexer', () => {
 					content: '{',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -444,8 +426,8 @@ describe('Lexer', () => {
 					content: '}',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -461,8 +443,8 @@ describe('Lexer', () => {
 					content: '[',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -478,8 +460,8 @@ describe('Lexer', () => {
 					content: ']',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -495,8 +477,8 @@ describe('Lexer', () => {
 					content: '<',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -512,8 +494,8 @@ describe('Lexer', () => {
 					content: '>',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -529,8 +511,8 @@ describe('Lexer', () => {
 					content: ',',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -546,8 +528,8 @@ describe('Lexer', () => {
 					content: '.',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -563,8 +545,8 @@ describe('Lexer', () => {
 					content: ':',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -580,8 +562,8 @@ describe('Lexer', () => {
 					content: '!',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -597,8 +579,8 @@ describe('Lexer', () => {
 					content: '=',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -614,8 +596,8 @@ describe('Lexer', () => {
 					content: '|',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -631,8 +613,8 @@ describe('Lexer', () => {
 					content: '&',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -648,8 +630,8 @@ describe('Lexer', () => {
 					content: '#',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -665,8 +647,8 @@ describe('Lexer', () => {
 					content: '-',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -682,8 +664,8 @@ describe('Lexer', () => {
 					content: '+',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -699,8 +681,8 @@ describe('Lexer', () => {
 					content: '*',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
@@ -716,8 +698,8 @@ describe('Lexer', () => {
 					content: '/',
 					tokenType: 'Delimiter',
 					line: 1,
-					column: 1
-				}
+					column: 1,
+				},
 			]
 
 			assert.deepEqual(Lexer.lex(input), output)
