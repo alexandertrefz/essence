@@ -125,7 +125,9 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 
 let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
+	let defaultResult = { foundSequence: [], tokens: originalTokens }
 	let hasOptionalTokens = false
+
 	if (tokenDefinitions.length > tokens.length) {
 		for (let tokenDefinition of tokenDefinitions) {
 			if (tokenDefinition.isOptional) {
@@ -135,7 +137,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 		}
 
 		if (!hasOptionalTokens) {
-			return { foundSequence: [], tokens }
+			return defaultResult
 		}
 	}
 
@@ -175,7 +177,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				if (currentDefinition.isOptional) {
 					tokenIndex--
 				} else {
-					return { foundSequence: [], tokens: originalTokens }
+					return defaultResult
 				}
 			}
 		} else {
@@ -187,7 +189,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				if (currentDefinition.isOptional) {
 					tokenIndex--
 				} else {
-					return { foundSequence: [], tokens: originalTokens }
+					return defaultResult
 				}
 			}
 		}
