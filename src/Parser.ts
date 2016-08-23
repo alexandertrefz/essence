@@ -123,6 +123,30 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 	return true
 }
 
+let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => {
+	let defaultResult = { nodes: [], tokens }
+	let newTokenDefinition = [Object.assign({}, tokenDefinition, { canRepeat: false })]
+	let newTokens = tokens.slice(0)
+
+	let nodes: Array<IASTNode> = []
+
+	while (true) {
+		let foundSequence
+		;({ foundSequence, tokens: newTokens } = matchTokenSequence(newTokens, newTokenDefinition))
+
+		if (foundSequence.length) {
+			nodes.push(foundSequence[0])
+			newTokens = newTokens.slice(1)
+		} else {
+			if (nodes.length) {
+				return { nodes, tokens: newTokens }
+			} else {
+				return defaultResult
+			}
+		}
+	}
+}
+
 let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
 	let defaultResult = { foundSequence: [], tokens: originalTokens }
@@ -156,6 +180,25 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				parsers = currentDefinition.parser
 			}
 
+			if (currentDefinition.canRepeat) {
+				let {
+					nodes,
+					tokens: newTokens,
+				} = matchRepeatingParser(tokens.slice(tokenIndex), currentDefinition)
+
+				if (nodes.length === 0) {
+					if (!currentDefinition.isOptional) {
+						return defaultResult
+					} else {
+						tokenIndex--
+					}
+				} else {
+					tokens = [...tokens.slice(0, tokenIndex), nodes as any, ...newTokens]
+					tokenIndex++
+					continue
+				}
+			}
+
 			let foundMatch = false
 
 			for (let parser of parsers) {
@@ -165,10 +208,6 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				if (foundSequence.length) {
 					foundMatch = true
 					tokens = [...tokens.slice(0, tokenIndex), node, ...newTokens]
-
-					if (currentDefinition.canRepeat) {
-						definitionIndex--
-					}
 					break
 				}
 			}
@@ -181,11 +220,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				}
 			}
 		} else {
-			if (matchToken(currentToken, currentDefinition)) {
-				if (currentDefinition.canRepeat) {
-					definitionIndex--
-				}
-			} else {
+			if (!matchToken(currentToken, currentDefinition)) {
 				if (currentDefinition.isOptional) {
 					tokenIndex--
 				} else {
