@@ -4,10 +4,12 @@ end
 
 let greet Function = (greetee String) -> String
 	let message String = String.join('Hello, ', greetee)
-	let messageEnd String = '.'
+	let messageEnd String = ''
 
 	if String.equals(greetee, 'Universe') then
 		messageEnd = '!'
+	else
+		messageEnd = '.'
 	end
 
 	return print(String.join(message, messageEnd))
