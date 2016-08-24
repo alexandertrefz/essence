@@ -34,9 +34,12 @@ import {
 } from './Interfaces'
 
 type tokenSequenceMatch = {
-	foundSequence: Array<IToken | IASTNode>
+	foundSequence: Array<IToken | IASTNode | null>
 	tokens: Array<IToken>
-}
+}; // This semicolon is strategically placed to fix a bug in TSLint.
+//    Removing it causes TSLint to declare missing commas on places
+//    where no comma is missing.
+//    I don't know why this semicolon fixes that bug, but it does.
 
 type parserResult = {
 	foundSequence: Array<IToken | IASTNode>
@@ -144,9 +147,10 @@ let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => 
 		let foundSequence
 		; ({ foundSequence, tokens: newTokens, } = matchTokenSequence(newTokens, newTokenDefinition))
 
-		if (foundSequence.length) {
+		newTokens = newTokens.slice(1)
+
+		if (foundSequence[0] !== null) {
 			nodes.push(foundSequence[0])
-			newTokens = newTokens.slice(1)
 		} else {
 			if (nodes.length) {
 				return { nodes, tokens: newTokens, }
@@ -200,7 +204,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 					if (!currentDefinition.isOptional) {
 						return defaultResult
 					} else {
-						tokenIndex--
+						tokens = [...tokens.slice(0, tokenIndex), null as any, ...tokens.slice(tokenIndex)]
 					}
 				} else {
 					tokens = [...tokens.slice(0, tokenIndex), nodes as any, ...newTokens]
@@ -215,7 +219,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 				let subTokens = tokens.slice(tokenIndex)
 				let { foundSequence, node, tokens: newTokens, } = parser(subTokens)
 
-				if (foundSequence.length) {
+				if (node) {
 					foundMatch = true
 					tokens = [...tokens.slice(0, tokenIndex), node, ...newTokens]
 					break
@@ -224,7 +228,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 			if (!foundMatch) {
 				if (currentDefinition.isOptional) {
-					tokenIndex--
+					tokens = [...tokens.slice(0, tokenIndex), null as any, ...tokens.slice(tokenIndex)]
 				} else {
 					return defaultResult
 				}
@@ -232,7 +236,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 		} else {
 			if (!matchToken(currentToken, currentDefinition)) {
 				if (currentDefinition.isOptional) {
-					tokenIndex--
+					tokens = [...tokens.slice(0, tokenIndex), null as any, ...tokens.slice(tokenIndex)]
 				} else {
 					return defaultResult
 				}
@@ -370,10 +374,17 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 					},
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence): IParameterListNode => {
+				(foundSequence: [IToken, IParameterNode | null]): IParameterListNode => {
+					let parameter = foundSequence[1]
+					let args: Array<IParameterNode> = []
+
+					if (parameter !== null) {
+						args.push(parameter)
+					}
+
 					return {
 						nodeType: 'ParameterList',
-						arguments: foundSequence.slice(1, foundSequence.length - 1) as IParameterNode[],
+						arguments: args,
 					}
 				}
 			),
@@ -398,10 +409,19 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence: [IToken, IParameterNode[], IToken]): IParameterListNode => {
+				(foundSequence: [IToken, IParameterNode, IParameterNode[] | null]): IParameterListNode => {
+					let parameters = foundSequence[2]
+					let args: Array<IParameterNode> = []
+
+					if (parameters !== null) {
+						args = [foundSequence[1], ...parameters]
+					} else {
+						args = [foundSequence[1]]
+					}
+
 					return {
 						nodeType: 'ParameterList',
-						arguments: foundSequence[1],
+						arguments: args,
 					}
 				}
 			),
@@ -437,10 +457,17 @@ let namedArgumentList = (tokens: Array<IToken>): parserResult => {
 			{ isOptional: true, parser: namedArgument, },
 			{ tokenType: 'Delimiter', content: '}', },
 		],
-		(foundSequence): INamedArgumentListNode => {
+		(foundSequence: [IToken, INamedArgumentNode | null]): INamedArgumentListNode => {
+			let argument = foundSequence[1]
+			let args: Array<INamedArgumentNode> = []
+
+			if (argument !== null) {
+				args.push(argument)
+			}
+
 			return {
 				nodeType: 'NamedArgumentList',
-				arguments: foundSequence.slice(1, foundSequence.length - 1) as INamedArgumentNode[],
+				arguments: args,
 			}
 		}
 	)
@@ -468,10 +495,17 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					},
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence: [IToken, IExpressionNode, IToken]): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode | null, IToken]): IUnnamedArgumentListNode => {
+					let argument = foundSequence[1]
+					let args: Array<IExpressionNode> = []
+
+					if (argument !== null) {
+						args.push(argument)
+					}
+
 					return {
 						nodeType: 'UnnamedArgumentList',
-						arguments: [foundSequence[1]],
+						arguments: args,
 					}
 				}
 			),
@@ -496,10 +530,19 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence: [IToken, IExpressionNode, IExpressionNode[], IToken, IToken]): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode, IExpressionNode[] | null]): IUnnamedArgumentListNode => {
+					let args: Array<IExpressionNode>
+					let secondaryArguments = foundSequence[2]
+
+					if (secondaryArguments !== null) {
+						args = [foundSequence[1], ...secondaryArguments]
+					} else {
+						args = [foundSequence[1]]
+					}
+
 					return {
 						nodeType: 'UnnamedArgumentList',
-						arguments: [foundSequence[1], ...foundSequence[2]],
+						arguments: args,
 					}
 				}
 			),
@@ -649,7 +692,7 @@ let lookup = (tokens: Array<IToken>): parserResult => {
 
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	type functionDefinitionSequence
-		= [IParameterListNode, IToken, ITypeNode, IToken, IStatementNode[], IToken, IToken]
+		= [IParameterListNode, IToken, ITypeNode, IToken, IStatementNode[] | null, IToken, IToken]
 
 	const parser = sequenceParserGenerator(
 		[
@@ -662,11 +705,20 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 			{ tokenType: 'Linebreak', },
 		],
 		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
+			let possibleBody = foundSequence[4]
+			let body: Array<IStatementNode>
+
+			if (possibleBody !== null) {
+				body = possibleBody
+			} else {
+				body = []
+			}
+
 			return {
 				nodeType: 'FunctionDefinition',
 				parameters: foundSequence[0],
 				returnType: foundSequence[2],
-				body: foundSequence[4],
+				body,
 			}
 		}
 	)
@@ -910,9 +962,14 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
-	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IStatementNode[]]
-	type ifElseStatementSequence
-		= [IToken, IExpressionNode, IToken, IToken, IStatementNode[], IToken, IToken, IStatementNode[]]
+	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IStatementNode[] | null]
+	type ifElseStatementSequence = [
+			IToken, IExpressionNode, IToken, IToken,
+			IStatementNode[] | null,
+			IToken, IToken,
+			IStatementNode[] | null,
+			IToken, IToken
+		]
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -926,10 +983,19 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 					{ tokenType: 'Linebreak', },
 				],
 				(foundSequence: ifStatementSequence): IIfElseStatementNode => {
+					let trueBody: Array<IStatementNode>
+					let possibleTrueBody = foundSequence[4]
+
+					if (possibleTrueBody !== null) {
+						trueBody = possibleTrueBody
+					} else {
+						trueBody = []
+					}
+
 					return {
 						nodeType: 'IfElseStatement',
 						condition: foundSequence[1],
-						trueBody: foundSequence[4],
+						trueBody,
 						falseBody: [],
 					}
 				}
@@ -949,11 +1015,29 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 					{ tokenType: 'Linebreak', },
 				],
 				(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
+					let trueBody: Array<IStatementNode>
+					let possibleTrueBody = foundSequence[4]
+
+					let falseBody: Array<IStatementNode>
+					let possibleFalseBody = foundSequence[7]
+
+					if (possibleTrueBody !== null) {
+						trueBody = possibleTrueBody
+					} else {
+						trueBody = []
+					}
+
+					if (possibleFalseBody !== null) {
+						falseBody = possibleFalseBody
+					} else {
+						falseBody = []
+					}
+
 					return {
 						nodeType: 'IfElseStatement',
 						condition: foundSequence[1],
-						trueBody: foundSequence[4],
-						falseBody: foundSequence[7],
+						trueBody,
+						falseBody,
 					}
 				}
 			),
