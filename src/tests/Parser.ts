@@ -3,9 +3,7 @@
 import { } from '../Interfaces'
 
 describe('Parser', () => {
-	let assert = require('assert')
-
-	describe('something', () => {
-		assert.ok(true)
+	it('something', () => {
+		expect(true).toBeTruthy()
 	})
 })

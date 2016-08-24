@@ -12,7 +12,7 @@
   "author": "Alexander Trefz",
   "license": "MIT",
   "devDependencies": {
-    "mocha": "^3.0.2",
+    "jasmine": "^2.4.1",
     "typescript": "2.0.0"
   },
   "dependencies": {}
