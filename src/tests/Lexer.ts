@@ -22,8 +22,6 @@ let stripNumbers = (token: IToken): ISimpleToken => {
 }
 
 describe('Lexer', () => {
-	let assert = require('assert')
-
 	describe('stripNumbers', () => {
 		it('should strip line and column', () => {
 			let input: IToken = {
@@ -38,7 +36,7 @@ describe('Lexer', () => {
 				tokenType: 'String',
 			}
 
-			assert.deepEqual(stripNumbers(input), output)
+			expect(stripNumbers(input)).toEqual(output)
 		})
 	})
 
@@ -56,7 +54,7 @@ describe('Lexer', () => {
 				tokenType: 'String',
 			}]
 
-			assert.deepEqual(stripNumbersFromArray(input), output)
+			expect(stripNumbersFromArray(input)).toEqual(output)
 		})
 	})
 
@@ -73,7 +71,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex multiple linebreaks as one', () => {
@@ -88,7 +86,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 
@@ -105,7 +103,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex simple strings', () => {
@@ -120,7 +118,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex complex strings', () => {
@@ -135,7 +133,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 
@@ -152,7 +150,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex false', () => {
@@ -167,7 +165,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 
@@ -179,7 +177,7 @@ describe('Lexer', () => {
 			input = '§ Comment'
 			output = []
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 
@@ -196,7 +194,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex import', () => {
@@ -211,7 +209,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex as', () => {
@@ -226,7 +224,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex type', () => {
@@ -241,7 +239,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex interface', () => {
@@ -256,7 +254,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex let', () => {
@@ -271,7 +269,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex each', () => {
@@ -286,7 +284,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex in', () => {
@@ -301,7 +299,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex do', () => {
@@ -316,7 +314,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex end', () => {
@@ -331,7 +329,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex return', () => {
@@ -346,7 +344,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex if', () => {
@@ -361,7 +359,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex then', () => {
@@ -376,7 +374,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex else', () => {
@@ -391,7 +389,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 
@@ -408,7 +406,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex (', () => {
@@ -423,7 +421,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex )', () => {
@@ -438,7 +436,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex {', () => {
@@ -453,7 +451,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex }', () => {
@@ -468,7 +466,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex [', () => {
@@ -483,7 +481,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex ]', () => {
@@ -498,7 +496,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex <', () => {
@@ -513,7 +511,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex >', () => {
@@ -528,7 +526,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex ,', () => {
@@ -543,7 +541,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex .', () => {
@@ -558,7 +556,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex :', () => {
@@ -573,7 +571,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex !', () => {
@@ -588,7 +586,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex =', () => {
@@ -603,7 +601,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex |', () => {
@@ -618,7 +616,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex &', () => {
@@ -633,7 +631,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex #', () => {
@@ -648,7 +646,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex -', () => {
@@ -663,7 +661,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex +', () => {
@@ -678,7 +676,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex *', () => {
@@ -693,7 +691,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
 		it('should lex /', () => {
@@ -708,7 +706,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 	})
 })

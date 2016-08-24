@@ -13,8 +13,7 @@ JS_TESTS = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_TESTS))
 TSC := ./node_modules/.bin/tsc
 TSC_ARGS := -t es6 -m commonjs --strictNullChecks --pretty --experimentalDecorators --outDir $(JS_BUILD_DIR)/
 
-MOCHA := ./node_modules/.bin/mocha
-MOCHA_ARGS = --ui tdd --growl --reporter spec
+JASMINE := ./node_modules/.bin/jasmine
 
 $(JS_BUILD_DIR)/%.js: src/%.ts
 	- $(TSC) $(TSC_ARGS) $<
@@ -32,7 +31,7 @@ build-tests: $(JS_TESTS)
 
 test: build-src build-tests |
 	@clear
-	@$(MOCHA) $(MOCHA_ARGS) $(JS_BUILD_DIR)/tests/*.js
+	@$(JASMINE)
 
 watch:
 	@clear

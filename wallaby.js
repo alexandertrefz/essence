@@ -12,6 +12,6 @@ module.exports = function (wallaby) {
 			type: 'node'
 		},
 
-		testFramework: 'mocha'
+		testFramework: 'jasmine'
 	}
 }
