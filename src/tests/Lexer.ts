@@ -60,6 +60,38 @@ describe('Lexer', () => {
 		})
 	})
 
+	describe('linebreaks', () => {
+		it('should lex linebreaks', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '\n\n'
+			output = [
+				{
+					content: '\n',
+					tokenType: 'Linebreak',
+				},
+			]
+
+			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+		})
+
+		it('should lex multiple linebreaks as one', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '\n\n'
+			output = [
+				{
+					content: '\n',
+					tokenType: 'Linebreak',
+				},
+			]
+
+			assert.deepEqual(stripNumbersFromArray(Lexer.lex(input)), output)
+		})
+	})
+
 	describe('strings', () => {
 		it('should lex empty strings', () => {
 			let input: string
