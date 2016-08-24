@@ -88,6 +88,19 @@ describe('Lexer', () => {
 
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
+
+		it('should lex linebreak after other tokens', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = 'identifier\n'
+			output = [
+				{ content: 'identifier', tokenType: 'Identifier', },
+				{ content: '\n', tokenType: 'Linebreak', },
+			]
+
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
+		})
 	})
 
 	describe('strings', () => {
@@ -135,6 +148,14 @@ describe('Lexer', () => {
 
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
+
+		it('should not lex open strings', () => {
+			let input: string
+
+			input = '\'test'
+
+			expect(() => Lexer.lex(input)).toThrow()
+		})
 	})
 
 	describe('booleans', () => {
@@ -176,6 +197,58 @@ describe('Lexer', () => {
 
 			input = '§ Comment'
 			output = []
+
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
+		})
+	})
+
+	describe('identifiers', () => {
+		it('should lex identifiers without whitespace', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = 'identifier'
+			output = [
+				{ content: 'identifier', tokenType: 'Identifier', },
+			]
+
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
+		})
+
+		it('should lex identifiers with whitespace in front', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '   identifier'
+			output = [
+				{ content: 'identifier', tokenType: 'Identifier', },
+			]
+
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
+		})
+
+		it('should lex identifiers with whitespace after', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = 'identifier  '
+			output = [
+				{ content: 'identifier', tokenType: 'Identifier', },
+			]
+
+			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
+		})
+
+		it('should lex identifiers separated by delimiters', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = 'identifier.identifier2'
+			output = [
+				{ content: 'identifier', tokenType: 'Identifier', },
+				{ content: '.', tokenType: 'Delimiter', },
+				{ content: 'identifier2', tokenType: 'Identifier', },
+			]
 
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
