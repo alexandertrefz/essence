@@ -178,7 +178,7 @@ export class Lexer {
 			}
 
 			if (input[i] === ' ' || input[i] === '\t') {
-				if (token.content.startsWith(' ') || token.content.startsWith('\t')) {
+				if (token.content === input[i]) {
 					token.content = ''
 					i--
 					input = input.slice(1)
@@ -211,26 +211,6 @@ export class Lexer {
 		}
 	}
 
-	static _cleanTokenEnd(token: IToken): IToken {
-		// Ensure that the line-number stays correct
-		let i = 0
-		while (token.content[i] === ' ' || token.content[i] === '\n' || token.content[i] === '\t') {
-			; ({
-				line: token.line,
-				column: token.column,
-			} = Lexer._handleLineNumberAndCollumn(token.content[i], token.line, token.column))
-
-			i++
-		}
-
-		// Trim whitespace and linebreaks
-		if (token.tokenType !== 'String') {
-			token.content = token.content.replace(/^\s+|\s+$/g, '')
-		}
-
-		return token
-	}
-
 	static lex(input: string, line: number = 1, column: number = 1): Array<IToken> {
 		let tokens: IToken[] = []
 
@@ -244,12 +224,9 @@ export class Lexer {
 				continue
 			}
 
-			// Keep linebreaks since they are needed for parsing
-			if (token.content !== '\n') {
-				token = Lexer._cleanTokenEnd(token)
-			} else {
-				// we can clean up multiple in a row however
-				if (tokens.length && tokens[tokens.length - 1].content === '\n') {
+			// ignore multiple linebreaks
+			if (token.content === '\n') {
+				if (tokens.length && tokens[tokens.length - 1].tokenType === 'Linebreak') {
 					continue
 				}
 			}
