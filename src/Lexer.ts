@@ -249,7 +249,7 @@ export class Lexer {
 				token = Lexer._cleanTokenEnd(token)
 			} else {
 				// we can clean up multiple in a row however
-				if (tokens[tokens.length - 1].content === '\n') {
+				if (tokens.length && tokens[tokens.length - 1].content === '\n') {
 					continue
 				}
 			}
