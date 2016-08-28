@@ -255,81 +255,6 @@ describe('Lexer', () => {
 	})
 
 	describe('keywords', () => {
-		it('should lex package', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'package'
-			output = [
-				{
-					content: 'package',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex import', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'import'
-			output = [
-				{
-					content: 'import',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex as', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'as'
-			output = [
-				{
-					content: 'as',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex type', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'type'
-			output = [
-				{
-					content: 'type',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex interface', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'interface'
-			output = [
-				{
-					content: 'interface',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
 		it('should lex let', () => {
 			let input: string
 			let output: Array<ISimpleToken>
@@ -338,66 +263,6 @@ describe('Lexer', () => {
 			output = [
 				{
 					content: 'let',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex each', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'each'
-			output = [
-				{
-					content: 'each',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex in', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'in'
-			output = [
-				{
-					content: 'in',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex do', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'do'
-			output = [
-				{
-					content: 'do',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex end', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'end'
-			output = [
-				{
-					content: 'end',
 					tokenType: 'Keyword',
 				},
 			]
@@ -428,21 +293,6 @@ describe('Lexer', () => {
 			output = [
 				{
 					content: 'if',
-					tokenType: 'Keyword',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex then', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = 'then'
-			output = [
-				{
-					content: 'then',
 					tokenType: 'Keyword',
 				},
 			]
@@ -542,66 +392,6 @@ describe('Lexer', () => {
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
-		it('should lex [', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '['
-			output = [
-				{
-					content: '[',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex ]', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = ']'
-			output = [
-				{
-					content: ']',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex <', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '<'
-			output = [
-				{
-					content: '<',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex >', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '>'
-			output = [
-				{
-					content: '>',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
 		it('should lex ,', () => {
 			let input: string
 			let output: Array<ISimpleToken>
@@ -647,21 +437,6 @@ describe('Lexer', () => {
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
-		it('should lex !', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '!'
-			output = [
-				{
-					content: '!',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
 		it('should lex =', () => {
 			let input: string
 			let output: Array<ISimpleToken>
@@ -670,51 +445,6 @@ describe('Lexer', () => {
 			output = [
 				{
 					content: '=',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex |', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '|'
-			output = [
-				{
-					content: '|',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex &', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '&'
-			output = [
-				{
-					content: '&',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex #', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '#'
-			output = [
-				{
-					content: '#',
 					tokenType: 'Delimiter',
 				},
 			]
@@ -737,44 +467,14 @@ describe('Lexer', () => {
 			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
 		})
 
-		it('should lex +', () => {
+		it('should lex >', () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '+'
+			input = '>'
 			output = [
 				{
-					content: '+',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex *', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '*'
-			output = [
-				{
-					content: '*',
-					tokenType: 'Delimiter',
-				},
-			]
-
-			expect(stripNumbersFromArray(Lexer.lex(input))).toEqual(output)
-		})
-
-		it('should lex /', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '/'
-			output = [
-				{
-					content: '/',
+					content: '>',
 					tokenType: 'Delimiter',
 				},
 			]

@@ -14,8 +14,8 @@ export class Lexer {
 	static numberLiterals  = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 	static booleanLiterals = ['true', 'false']
 	static commentLiteral  = '§'
-	static keywords        = ['package', 'import', 'as', 'type', 'interface', 'let', 'each', 'in', 'do', 'end', 'return', 'if', 'then', 'else']
-	static delimiters      = ['@', '(', ')', '{', '}', '[', ']', '<', '>', ',', '.', ':', '!', '=', '|', '&', '#', '-', '+', '*', '/']
+	static keywords        = ['let', 'return', 'if', 'else']
+	static delimiters      = ['@', '(', ')', '{', '}', ',', '.', ':', '=', '-', '>']
 
 	static _handleLineNumberAndCollumn(char: string, line: number, column: number): { line: number, column: number } {
 		if (char === '\n') {
