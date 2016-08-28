@@ -311,13 +311,9 @@ export class Runtime {
 		let func = this.lookup(node.name, scope)
 		let args
 
-		if (node.arguments.nodeType === 'UnnamedArgumentList') {
-			args = node.arguments.arguments.map((value) => {
-				return this.resolveExpression(value, scope).result
-			})
-		} else {
-			throw new Error('Named Argument Lists are not supported yet!')
-		}
+		args = node.arguments.arguments.map((value) => {
+			return this.resolveExpression(value, scope).result
+		})
 
 		return this.invoke(func.value, args)
 	}
