@@ -11,7 +11,6 @@ type lexingResult = {
 
 export class Lexer {
 	static stringLiteral   = '\''
-	static numberLiterals  = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 	static booleanLiterals = ['true', 'false']
 	static commentLiteral  = '§'
 	static keywords        = ['let', 'return', 'if', 'else']

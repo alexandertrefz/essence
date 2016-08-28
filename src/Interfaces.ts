@@ -33,24 +33,15 @@ export type ASTType
 	= 'Identifier'
 	| 'Lookup'
 	| 'Value'
-	| 'PackageAssignmentStatement'
-	| 'ImportStatement'
-	| 'TypeDefinitionStatement'
-	| 'MethodDefinition'
 	| 'TypeDeclaration'
-	| 'PropertyDeclaration'
 	| 'DeclarationStatement'
 	| 'AssignmentStatement'
 	| 'Parameter'
 	| 'ParameterList'
-	| 'UnnamedArgument'
 	| 'UnnamedArgumentList'
-	| 'NamedArgument'
-	| 'NamedArgumentList'
 	| 'FunctionDefinition'
 	| 'FunctionInvocation'
 	| 'NativeFunctionInvocation'
-	| 'StringLiteral'
 	| 'ReturnStatement'
 	| 'IfElseStatement'
 
@@ -77,11 +68,6 @@ export interface IValueNode {
 	members: any
 }
 
-export interface IStringLiteralNode {
-	nodeType: 'StringLiteral'
-	content: string
-}
-
 export interface IParameterNode {
 	nodeType: 'Parameter'
 	name: string
@@ -98,32 +84,6 @@ export interface IUnnamedArgumentListNode {
 	arguments: Array<IExpressionNode>
 }
 
-export interface INamedArgumentNode {
-	nodeType: 'NamedArgument'
-	name: string
-	value: IExpressionNode
-}
-
-export interface INamedArgumentListNode {
-	nodeType: 'NamedArgumentList'
-	arguments: Array<INamedArgumentNode>
-}
-
-export interface IPackageAssignmentStatementNode {
-	nodeType: 'PackageAssignmentStatement'
-	name: string
-}
-
-export interface IImportStatementNode {
-	nodeType: 'ImportStatement'
-}
-
-export interface IPropertyDeclarationNode {
-	nodeType: 'PropertyDeclaration'
-	name: string
-	type: ITypeNode
-}
-
 export interface IFunctionDefinitionNode {
 	nodeType: 'FunctionDefinition'
 	parameters: IParameterListNode
@@ -135,19 +95,13 @@ export interface IFunctionDefinitionNode {
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
 	name: IIdentifierNode | ILookupNode
-	arguments: IUnnamedArgumentListNode | INamedArgumentListNode
+	arguments: IUnnamedArgumentListNode
 }
 
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
 	name: IIdentifierNode
 	arguments: IUnnamedArgumentListNode
-}
-
-export interface IMethodDefinitionNode {
-	nodeType: 'MethodDefinition'
-	name: string
-	function: IFunctionDefinitionNode
 }
 
 export interface IReturnStatementNode {
@@ -168,13 +122,6 @@ export interface IAssignmentStatementNode {
 	value: IExpressionNode
 }
 
-export interface ITypeDefinitionStatementNode {
-	nodeType: 'TypeDefinitionStatement'
-	name: string
-	properties: Array<IPropertyDeclarationNode>
-	methods: Array<IMethodDefinitionNode>
-}
-
 export interface IIfElseStatementNode {
 	nodeType: 'IfElseStatement'
 	condition: IExpressionNode
@@ -190,11 +137,8 @@ export type IExpressionNode
 	| INativeFunctionInvocationNode
 
 export type IStatementNode
-	= IPackageAssignmentStatementNode
-	| IImportStatementNode
-	| IDeclarationStatementNode
+	= IDeclarationStatementNode
 	| IAssignmentStatementNode
-	| ITypeDefinitionStatementNode
 	| IReturnStatementNode
 	| IIfElseStatementNode
 
@@ -202,14 +146,9 @@ export type IASTNode
 	= IExpressionNode
 	| IStatementNode
 	| ITypeNode
-	| IStringLiteralNode
 	| IParameterNode
 	| IParameterListNode
 	| IUnnamedArgumentListNode
-	| INamedArgumentNode
-	| INamedArgumentListNode
-	| IPropertyDeclarationNode
-	| IMethodDefinitionNode
 	| IFunctionDefinitionNode
 
 /* tslint:disable */

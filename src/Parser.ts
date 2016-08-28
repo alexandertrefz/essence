@@ -4,6 +4,7 @@ let debugTokens = false
 let debugIndividualNodes = false
 let debugNodes = false
 
+
 import {
 	IToken,
 	IAST,
@@ -14,19 +15,12 @@ import {
 	IParameterNode,
 	IParameterListNode,
 	IUnnamedArgumentListNode,
-	INamedArgumentNode,
-	INamedArgumentListNode,
-	IPackageAssignmentStatementNode,
-	IImportStatementNode,
-	IPropertyDeclarationNode,
 	IFunctionDefinitionNode,
 	IFunctionInvocationNode,
 	INativeFunctionInvocationNode,
-	IMethodDefinitionNode,
 	IReturnStatementNode,
 	IDeclarationStatementNode,
 	IAssignmentStatementNode,
-	ITypeDefinitionStatementNode,
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
@@ -85,14 +79,6 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 		if (token.content === '-') {
 			if (nextToken.content === '>') {
 				token.content = '->'
-				token.tokenType = 'Operator'
-				tokens.splice(i + 1, 1)
-			}
-		}
-
-		if (token.content === ':') {
-			if (nextToken.content === ':') {
-				token.content = '::'
 				token.tokenType = 'Operator'
 				tokens.splice(i + 1, 1)
 			}
@@ -431,50 +417,6 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let namedArgument = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ parser: identifier, },
-			{ tokenType: 'Delimiter', content: '=', },
-			{ parser: expression, },
-		],
-		(foundSequence: [IIdentifierNode, IToken, IExpressionNode]): INamedArgumentNode => {
-			return {
-				nodeType: 'NamedArgument',
-				name: foundSequence[0].content,
-				value: foundSequence[2],
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
-let namedArgumentList = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'Delimiter', content: '{', },
-			{ isOptional: true, parser: namedArgument, },
-			{ tokenType: 'Delimiter', content: '}', },
-		],
-		(foundSequence: [IToken, INamedArgumentNode | null]): INamedArgumentListNode => {
-			let argument = foundSequence[1]
-			let args: Array<INamedArgumentNode> = []
-
-			if (argument !== null) {
-				args.push(argument)
-			}
-
-			return {
-				nodeType: 'NamedArgumentList',
-				arguments: args,
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
 let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
@@ -547,47 +489,6 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 				}
 			),
 		]
-	)
-
-	return parser(tokens)
-}
-
-/*
-	2.1.3 Type Definition Helpers
-*/
-
-let propertyDeclaration = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ parser: identifier, },
-			{ parser: typeDeclaration, },
-			{ tokenType: 'Linebreak', },
-		],
-		(foundSequence: [IIdentifierNode, ITypeNode]): IPropertyDeclarationNode => {
-			return {
-				nodeType: 'PropertyDeclaration',
-				name: foundSequence[0].content,
-				type: foundSequence[1],
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
-let methodDefinition = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ parser: identifier, },
-			{ parser: functionDefinition, },
-		],
-		(foundSequence: [IIdentifierNode, IFunctionDefinitionNode]): IMethodDefinitionNode => {
-			return {
-				nodeType: 'MethodDefinition',
-				name: foundSequence[0].content,
-				function: foundSequence[1],
-			}
-		}
 	)
 
 	return parser(tokens)
@@ -729,33 +630,6 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let namedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{
-				parser: choiceParserGenerator([
-					lookup,
-					identifier,
-				]),
-			},
-			{ parser: namedArgumentList, },
-			{ isOptional: true, tokenType: 'Linebreak', },
-		],
-		(foundSequence): IFunctionInvocationNode => {
-			throw new Error('NamedFunctionInvocations are not supported yet!')
-			/*
-			return {
-				nodeType: 'FunctionInvocation',
-				name: foundSequence[0],
-				arguments: foundSequence[1],
-			}
-			//*/
-		}
-	)
-
-	return parser(tokens)
-}
-
 let unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
@@ -803,7 +677,6 @@ let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 let expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
-			namedFunctionInvocation,
 			unnamedFunctionInvocation,
 			nativeFunctionInvocation,
 			lookup,
@@ -818,91 +691,6 @@ let expression = (tokens: Array<IToken>): parserResult => {
 /*
 	2.3 Statements
 */
-
-let packageAssignmentStatement = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'Keyword', content: 'package', },
-			{ tokenType: 'String', },
-			{ tokenType: 'Linebreak', },
-		],
-		(foundSequence): IPackageAssignmentStatementNode => {
-			throw new Error('PackageAssignmentStatements are not supported yet!')
-			/*
-			return {
-				nodeType: 'PackageAssignmentStatement',
-				name: foundSequence[1].content,
-			}
-			//*/
-		}
-	)
-
-	return parser(tokens)
-}
-
-let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'Keyword', content: 'type', },
-			{ parser: identifier, },
-			{ tokenType: 'Linebreak', },
-			{
-				isOptional: true,
-				canRepeat: true,
-				parser: choiceParserGenerator([
-					propertyDeclaration,
-					methodDefinition,
-				]),
-			},
-			{ tokenType: 'Keyword', content: 'end', },
-			{ tokenType: 'Linebreak', },
-		],
-		(foundSequence): ITypeDefinitionStatementNode => {
-			throw new Error('TypeDefinitionStatements are not supported yet!')
-			/*
-			let propertyFilter = (node: IASTNode) => {
-				return node.nodeType === 'PropertyDeclaration'
-			}
-
-			let methodFilter = (node: IASTNode) => {
-				return node.nodeType === 'MethodDefinition'
-			}
-
-			return {
-				nodeType: 'TypeDefinitionStatement',
-				name: <IIdentifierNode>(foundSequence[1]),
-				properties: (<IPropertyDeclarationNode[]>foundSequence).filter(propertyFilter),
-				methods: (<IMethodDefinitionNode[]>foundSequence).filter(methodFilter),
-			}
-			//*/
-		}
-	)
-
-	return parser(tokens)
-}
-
-let importStatement = (tokens: Array<IToken>): parserResult => {
-	const parser = sequenceParserGenerator(
-		[
-			{ tokenType: 'Keyword', content: 'import', },
-			{ tokenType: 'String', },
-			{ tokenType: 'Keyword', content: 'as', },
-			{ parser: identifier, },
-			{ tokenType: 'Linebreak', },
-		],
-		(foundSequence): IImportStatementNode => {
-			throw new Error('ImportStatements are not supported yet!')
-			/*
-			return {
-				nodeType: 'ImportStatement',
-			}
-			//*/
-		}
-	)
-
-	return parser(tokens)
-}
-
 let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
@@ -1056,9 +844,6 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 let statement = (tokens: Array<IToken>): statementParserResult => {
 	const parser = choiceParserGenerator(
 		[
-			packageAssignmentStatement,
-			importStatement,
-			typeDefinitionStatement,
 			declarationStatement,
 			assignmentStatement,
 			ifElseStatement,
