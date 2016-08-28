@@ -38,7 +38,7 @@ export type ASTType
 	| 'AssignmentStatement'
 	| 'Parameter'
 	| 'ParameterList'
-	| 'UnnamedArgumentList'
+	| 'ArgumentList'
 	| 'FunctionDefinition'
 	| 'FunctionInvocation'
 	| 'NativeFunctionInvocation'
@@ -79,8 +79,8 @@ export interface IParameterListNode {
 	arguments: Array<IParameterNode>
 }
 
-export interface IUnnamedArgumentListNode {
-	nodeType: 'UnnamedArgumentList'
+export interface IArgumentListNode {
+	nodeType: 'ArgumentList'
 	arguments: Array<IExpressionNode>
 }
 
@@ -95,13 +95,13 @@ export interface IFunctionDefinitionNode {
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
 	name: IIdentifierNode | ILookupNode
-	arguments: IUnnamedArgumentListNode
+	arguments: IArgumentListNode
 }
 
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
 	name: IIdentifierNode
-	arguments: IUnnamedArgumentListNode
+	arguments: IArgumentListNode
 }
 
 export interface IReturnStatementNode {
@@ -148,7 +148,7 @@ export type IASTNode
 	| ITypeNode
 	| IParameterNode
 	| IParameterListNode
-	| IUnnamedArgumentListNode
+	| IArgumentListNode
 	| IFunctionDefinitionNode
 
 /* tslint:disable */

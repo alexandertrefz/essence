@@ -14,7 +14,7 @@ import {
 	IValueNode,
 	IParameterNode,
 	IParameterListNode,
-	IUnnamedArgumentListNode,
+	IArgumentListNode,
 	IFunctionDefinitionNode,
 	IFunctionInvocationNode,
 	INativeFunctionInvocationNode,
@@ -417,7 +417,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
+let argumentList = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
 			sequenceParserGenerator(
@@ -437,7 +437,7 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					},
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence: [IToken, IExpressionNode | null, IToken]): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode | null, IToken]): IArgumentListNode => {
 					let argument = foundSequence[1]
 					let args: Array<IExpressionNode> = []
 
@@ -446,7 +446,7 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					}
 
 					return {
-						nodeType: 'UnnamedArgumentList',
+						nodeType: 'ArgumentList',
 						arguments: args,
 					}
 				}
@@ -472,7 +472,7 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					{ isOptional: true, tokenType: 'Delimiter', content: ',', },
 					{ tokenType: 'Delimiter', content: ')', },
 				],
-				(foundSequence: [IToken, IExpressionNode, IExpressionNode[] | null]): IUnnamedArgumentListNode => {
+				(foundSequence: [IToken, IExpressionNode, IExpressionNode[] | null]): IArgumentListNode => {
 					let args: Array<IExpressionNode>
 					let secondaryArguments = foundSequence[2]
 
@@ -483,7 +483,7 @@ let unnamedArgumentList = (tokens: Array<IToken>): parserResult => {
 					}
 
 					return {
-						nodeType: 'UnnamedArgumentList',
+						nodeType: 'ArgumentList',
 						arguments: args,
 					}
 				}
@@ -630,7 +630,7 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
+let functionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{
@@ -639,10 +639,10 @@ let unnamedFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 					identifier,
 				]),
 			},
-			{ parser: unnamedArgumentList, },
+			{ parser: argumentList, },
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
-		(foundSequence: [IIdentifierNode | ILookupNode, IUnnamedArgumentListNode]): IFunctionInvocationNode => {
+		(foundSequence: [IIdentifierNode | ILookupNode, IArgumentListNode]): IFunctionInvocationNode => {
 			return {
 				nodeType: 'FunctionInvocation',
 				name: foundSequence[0],
@@ -659,10 +659,10 @@ let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 		[
 			{ tokenType: 'Operator', content: '@@', },
 			{ parser: identifier, },
-			{ parser: unnamedArgumentList, },
+			{ parser: argumentList, },
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
-		(foundSequence: [IToken, IIdentifierNode, IUnnamedArgumentListNode]): INativeFunctionInvocationNode => {
+		(foundSequence: [IToken, IIdentifierNode, IArgumentListNode]): INativeFunctionInvocationNode => {
 			return {
 				nodeType: 'NativeFunctionInvocation',
 				name: foundSequence[1],
@@ -677,7 +677,7 @@ let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 let expression = (tokens: Array<IToken>): parserResult => {
 	const parser = choiceParserGenerator(
 		[
-			unnamedFunctionInvocation,
+			functionInvocation,
 			nativeFunctionInvocation,
 			lookup,
 			identifier,
