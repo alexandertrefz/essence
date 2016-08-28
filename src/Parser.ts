@@ -692,20 +692,23 @@ let lookup = (tokens: Array<IToken>): parserResult => {
 
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	type functionDefinitionSequence
-		= [IParameterListNode, IToken, ITypeNode, IToken, IStatementNode[] | null, IToken, IToken]
+		= [IParameterListNode, IToken, ITypeNode, IToken, IToken,
+		IStatementNode[] | null,
+		IToken, IToken]
 
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: parameterList, },
 			{ tokenType: 'Operator', content: '->', },
 			{ parser: typeDeclaration, },
-			{ tokenType: 'Linebreak', },
+			{ tokenType: 'Delimiter', content: '{' },
+			{ isOptional: true, tokenType: 'Linebreak', },
 			{ isOptional: true, canRepeat: true, parser: statement, },
-			{ tokenType: 'Keyword', content: 'end', },
-			{ tokenType: 'Linebreak', },
+			{ tokenType: 'Delimiter', content: '}' },
+			{ isOptional: true, tokenType: 'Linebreak', },
 		],
 		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
-			let possibleBody = foundSequence[4]
+			let possibleBody = foundSequence[5]
 			let body: Array<IStatementNode>
 
 			if (possibleBody !== null) {
@@ -962,13 +965,13 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
-	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IStatementNode[] | null]
+	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IToken, IStatementNode[] | null]
 	type ifElseStatementSequence = [
 			IToken, IExpressionNode, IToken, IToken,
 			IStatementNode[] | null,
-			IToken, IToken,
+			IToken, IToken, IToken, IToken,
 			IStatementNode[] | null,
-			IToken, IToken
+			IToken, IToken, IToken
 		]
 	const parser = choiceParserGenerator(
 		[
@@ -976,15 +979,15 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				[
 					{ tokenType: 'Keyword', content: 'if', },
 					{ parser: expression, },
-					{ tokenType: 'Keyword', content: 'then', },
-					{ tokenType: 'Linebreak', },
+					{ tokenType: 'Delimiter', content: '{', },
+					{ isOptional: true, tokenType: 'Linebreak', },
 					{ isOptional: true, canRepeat: true, parser: statement, },
-					{ tokenType: 'Keyword', content: 'end', },
-					{ tokenType: 'Linebreak', },
+					{ tokenType: 'Delimiter', content: '}', },
+					{ isOptional: true, tokenType: 'Linebreak', },
 				],
 				(foundSequence: ifStatementSequence): IIfElseStatementNode => {
 					let trueBody: Array<IStatementNode>
-					let possibleTrueBody = foundSequence[4]
+					let possibleTrueBody = foundSequence[5]
 
 					if (possibleTrueBody !== null) {
 						trueBody = possibleTrueBody
@@ -1005,21 +1008,24 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				[
 					{ tokenType: 'Keyword', content: 'if', },
 					{ parser: expression, },
-					{ tokenType: 'Keyword', content: 'then', },
-					{ tokenType: 'Linebreak', },
+					{ tokenType: 'Delimiter', content: '{', },
+					{ isOptional: true, tokenType: 'Linebreak', },
 					{ isOptional: true, canRepeat: true, parser: statement, },
+					{ tokenType: 'Delimiter', content: '}', },
 					{ tokenType: 'Keyword', content: 'else', },
-					{ tokenType: 'Linebreak', },
+					{ tokenType: 'Delimiter', content: '{', },
+					{ isOptional: true, tokenType: 'Linebreak', },
 					{ isOptional: true, canRepeat: true, parser: statement, },
-					{ tokenType: 'Keyword', content: 'end', },
-					{ tokenType: 'Linebreak', },
+					{ isOptional: true, tokenType: 'Linebreak', },
+					{ tokenType: 'Delimiter', content: '}', },
+					{ isOptional: true, tokenType: 'Linebreak', },
 				],
 				(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
 					let trueBody: Array<IStatementNode>
 					let possibleTrueBody = foundSequence[4]
 
 					let falseBody: Array<IStatementNode>
-					let possibleFalseBody = foundSequence[7]
+					let possibleFalseBody = foundSequence[9]
 
 					if (possibleTrueBody !== null) {
 						trueBody = possibleTrueBody
