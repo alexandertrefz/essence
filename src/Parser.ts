@@ -753,88 +753,82 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
-	type ifStatementSequence = [IToken, IExpressionNode, IToken, IToken, IToken, IStatementNode[] | null]
+	type ifStatementSequence = [
+		IToken, IExpressionNode, IToken, IToken,
+		IStatementNode[] | null,
+		IToken, IToken
+	]
+
 	type ifElseStatementSequence = [
-			IToken, IExpressionNode, IToken, IToken,
-			IStatementNode[] | null,
-			IToken, IToken, IToken, IToken,
-			IStatementNode[] | null,
-			IToken, IToken, IToken
-		]
+		IIfElseStatementNode,
+		IToken, IToken, IToken,
+		IStatementNode[] | null,
+		IToken, IToken, IToken
+	]
+
+	const ifStatement = sequenceParserGenerator(
+		[
+			{ tokenType: 'Keyword', content: 'if', },
+			{ parser: expression, },
+			{ tokenType: 'Delimiter', content: '{', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ isOptional: true, canRepeat: true, parser: statement, },
+			{ tokenType: 'Delimiter', content: '}', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+		],
+		(foundSequence: ifStatementSequence): IIfElseStatementNode => {
+			let trueBody: Array<IStatementNode>
+			let possibleTrueBody = foundSequence[4]
+
+			if (possibleTrueBody !== null) {
+				trueBody = possibleTrueBody
+			} else {
+				trueBody = []
+			}
+
+			return {
+				nodeType: 'IfElseStatement',
+				condition: foundSequence[1],
+				trueBody,
+				falseBody: [],
+			}
+		}
+	)
+
+	const ifElseStatement = sequenceParserGenerator(
+		[
+			{ parser: ifStatement },
+			{ tokenType: 'Keyword', content: 'else', },
+			{ tokenType: 'Delimiter', content: '{', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ isOptional: true, canRepeat: true, parser: statement, },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ tokenType: 'Delimiter', content: '}', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+		],
+		(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
+			let falseBody: Array<IStatementNode>
+			let possibleFalseBody = foundSequence[4]
+
+			if (possibleFalseBody !== null) {
+				falseBody = possibleFalseBody
+			} else {
+				falseBody = []
+			}
+
+			return {
+				nodeType: 'IfElseStatement',
+				condition: foundSequence[0].condition,
+				trueBody: foundSequence[0].trueBody,
+				falseBody,
+			}
+		}
+	)
+
 	const parser = choiceParserGenerator(
 		[
-			sequenceParserGenerator(
-				[
-					{ tokenType: 'Keyword', content: 'if', },
-					{ parser: expression, },
-					{ tokenType: 'Delimiter', content: '{', },
-					{ isOptional: true, tokenType: 'Linebreak', },
-					{ isOptional: true, canRepeat: true, parser: statement, },
-					{ tokenType: 'Delimiter', content: '}', },
-					{ tokenType: 'Keyword', content: 'else', },
-					{ tokenType: 'Delimiter', content: '{', },
-					{ isOptional: true, tokenType: 'Linebreak', },
-					{ isOptional: true, canRepeat: true, parser: statement, },
-					{ isOptional: true, tokenType: 'Linebreak', },
-					{ tokenType: 'Delimiter', content: '}', },
-					{ isOptional: true, tokenType: 'Linebreak', },
-				],
-				(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
-					let trueBody: Array<IStatementNode>
-					let possibleTrueBody = foundSequence[4]
-
-					let falseBody: Array<IStatementNode>
-					let possibleFalseBody = foundSequence[9]
-
-					if (possibleTrueBody !== null) {
-						trueBody = possibleTrueBody
-					} else {
-						trueBody = []
-					}
-
-					if (possibleFalseBody !== null) {
-						falseBody = possibleFalseBody
-					} else {
-						falseBody = []
-					}
-
-					return {
-						nodeType: 'IfElseStatement',
-						condition: foundSequence[1],
-						trueBody,
-						falseBody,
-					}
-				}
-			),
-
-			sequenceParserGenerator(
-				[
-					{ tokenType: 'Keyword', content: 'if', },
-					{ parser: expression, },
-					{ tokenType: 'Delimiter', content: '{', },
-					{ isOptional: true, tokenType: 'Linebreak', },
-					{ isOptional: true, canRepeat: true, parser: statement, },
-					{ tokenType: 'Delimiter', content: '}', },
-					{ isOptional: true, tokenType: 'Linebreak', },
-				],
-				(foundSequence: ifStatementSequence): IIfElseStatementNode => {
-					let trueBody: Array<IStatementNode>
-					let possibleTrueBody = foundSequence[5]
-
-					if (possibleTrueBody !== null) {
-						trueBody = possibleTrueBody
-					} else {
-						trueBody = []
-					}
-
-					return {
-						nodeType: 'IfElseStatement',
-						condition: foundSequence[1],
-						trueBody,
-						falseBody: [],
-					}
-				}
-			),
+			ifElseStatement,
+			ifStatement,
 		]
 	)
 
