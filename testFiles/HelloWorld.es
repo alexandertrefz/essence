@@ -8,9 +8,7 @@ let greet Function = (greetee String) -> String {
 
 	if String.equals(greetee, '') {
 		return print('This is not a valid greetee!')
-	}
-
-	if String.equals(greetee, 'Universe') {
+	} else if String.equals(greetee, 'Universe') {
 		messageEnd = '!'
 	} else {
 		messageEnd = '.'
