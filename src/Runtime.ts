@@ -19,6 +19,7 @@ import {
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
+	IIfStatementNode,
 	IIfElseStatementNode,
 	IScope,
 } from './Interfaces'
@@ -329,6 +330,23 @@ export class Runtime {
 		return this.nativeInvoke(func, args)
 	}
 
+	protected interpretIfStatement(node: IIfStatementNode, scope: IScope): { scope: IScope } {
+		let condition = this.resolveExpression(node.condition, scope).result
+		let body: Array<IStatementNode>
+
+		if (condition.value) {
+			let subScope: IScope = {
+				parent: scope,
+			}
+
+			for (let subNode of node.body) {
+				subScope = this.interpretNode(subNode, subScope).scope
+			}
+		}
+
+		return { scope }
+	}
+
 	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: IScope): { scope: IScope } {
 		let condition = this.resolveExpression(node.condition, scope).result
 		let body: Array<IStatementNode>
@@ -389,6 +407,9 @@ export class Runtime {
 				break
 			case 'NativeFunctionInvocation':
 				this.interpretNativeFunctionInvocation(node, scope)
+				break
+			case 'IfStatement':
+				this.interpretIfStatement(node, scope)
 				break
 			case 'IfElseStatement':
 				this.interpretIfElseStatement(node, scope)
