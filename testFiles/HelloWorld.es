@@ -3,8 +3,14 @@ let print Function = (message String) -> String {
 }
 
 let greet Function = (greetee String) -> String {
-	let message String = String.join('Hello, ', greetee)
+	let message String = ''
 	let messageEnd String = ''
+
+	if String.equals(greetee, '') {
+		print('Empty?!')
+		print('Defaulting to World...')
+		greetee = 'World'
+	}
 
 	if String.equals(greetee, 'Universe') {
 		messageEnd = '!'
@@ -12,8 +18,10 @@ let greet Function = (greetee String) -> String {
 		messageEnd = '.'
 	}
 
+	message = String.join('Hello, ', greetee)
+
 	return print(String.join(message, messageEnd))
 }
 
-greet('World')
+greet('')
 greet('Universe')
