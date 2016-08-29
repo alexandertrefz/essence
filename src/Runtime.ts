@@ -21,8 +21,12 @@ import {
 	ILookupNode,
 	IIfStatementNode,
 	IIfElseStatementNode,
+	IReturnStatementNode,
 	IScope,
 } from './Interfaces'
+
+type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
+type scopeAndValue = { scope: IScope, value: IValueNode, }
 
 export class Runtime {
 	public fileScope: any
@@ -241,6 +245,7 @@ export class Runtime {
 
 	protected invoke(func: IFunctionDefinitionNode, args: Array<IASTNode>): IValueNode {
 		let scope = func.scope
+		let returnValue: IValueNode | null = null
 
 		let argumentNames = func.parameters.arguments.map((value) => {
 			return value.name
@@ -252,9 +257,12 @@ export class Runtime {
 
 		for (let node of func.body) {
 			if (node.nodeType === 'ReturnStatement') {
-				return this.resolveExpression(node.expression, scope).result
+				return this.resolveExpression(node.expression, scope).value
 			} else {
-				; ({ scope } = this.interpretNode(node, scope))
+				; ({ scope, returnValue } = this.interpretNode(node, scope))
+				if (returnValue !== null) {
+					return returnValue
+				}
 			}
 		}
 
@@ -276,7 +284,7 @@ export class Runtime {
 			}
 		}
 
-		scope[node.name] = this.resolveExpression(node.value, scope).result
+		scope[node.name] = this.resolveExpression(node.value, scope).value
 		return { scope }
 	}
 
@@ -300,7 +308,7 @@ export class Runtime {
 			if (searchScope[node.name] != null) {
 				verboseLogs && console.log('Found:')
 				verboseLogs && log(searchScope[node.name])
-				searchScope[node.name] = this.resolveExpression(node.value, scope).result
+				searchScope[node.name] = this.resolveExpression(node.value, scope).value
 				return { scope }
 			} else {
 				searchScope = searchScope.parent
@@ -313,7 +321,7 @@ export class Runtime {
 		let args
 
 		args = node.arguments.arguments.map((value) => {
-			return this.resolveExpression(value, scope).result
+			return this.resolveExpression(value, scope).value
 		})
 
 		return this.invoke(func.value, args)
@@ -324,15 +332,16 @@ export class Runtime {
 		verboseLogs && log(node)
 		let func = this.nativeLookup(node.name)
 		let args = node.arguments.arguments.map((value) => {
-			return this.resolveExpression(value, scope).result
+			return this.resolveExpression(value, scope).value
 		})
 
 		return this.nativeInvoke(func, args)
 	}
 
-	protected interpretIfStatement(node: IIfStatementNode, scope: IScope): { scope: IScope } {
-		let condition = this.resolveExpression(node.condition, scope).result
+	protected interpretIfStatement(node: IIfStatementNode, scope: IScope): scopeAndMaybeReturnValue {
+		let condition = this.resolveExpression(node.condition, scope).value
 		let body: Array<IStatementNode>
+		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
 			let subScope: IScope = {
@@ -340,16 +349,23 @@ export class Runtime {
 			}
 
 			for (let subNode of node.body) {
-				subScope = this.interpretNode(subNode, subScope).scope
+				// If we find a return, resolve the expression since only we know the correct scope,
+				// and return a new IReturnStatementNode so that the parent can deal with it
+				if (subNode.nodeType === 'ReturnStatement') {
+					returnValue = this.resolveExpression(subNode.expression, subScope).value
+				} else {
+					({ scope: subScope, returnValue } = this.interpretNode(subNode, subScope))
+				}
 			}
 		}
 
-		return { scope }
+		return { scope, returnValue }
 	}
 
-	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: IScope): { scope: IScope } {
-		let condition = this.resolveExpression(node.condition, scope).result
+	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: IScope): scopeAndMaybeReturnValue {
+		let condition = this.resolveExpression(node.condition, scope).value
 		let body: Array<IStatementNode>
+		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
 			body = node.trueBody
@@ -362,39 +378,47 @@ export class Runtime {
 		}
 
 		for (let subNode of body) {
-			subScope = this.interpretNode(subNode, subScope).scope
-		}
+				// If we find a return, resolve the expression since only we know the correct scope,
+				// and return a new IReturnStatementNode so that the parent can deal with it
+				if (subNode.nodeType === 'ReturnStatement') {
+					returnValue = this.resolveExpression(subNode.expression, subScope).value
+				} else {
+					; ({ scope: subScope, returnValue } = this.interpretNode(subNode, subScope))
+				}
+			}
 
-		return { scope }
+		return { scope, returnValue }
 	}
 
-	protected resolveExpression(node: IExpressionNode, scope: IScope): { result: IValueNode, scope: IScope } {
-		let result: IValueNode
+	protected resolveExpression(node: IExpressionNode, scope: IScope): scopeAndValue {
+		let value: IValueNode
 
 		switch (node.nodeType) {
 			case 'Identifier':
-				result = this.lookup(node, scope)
+				value = this.lookup(node, scope)
 				break
 			case 'Lookup':
-				result = this.lookup(node, scope)
+				value = this.lookup(node, scope)
 				break
 			case 'FunctionInvocation':
-				result = this.interpretFunctionInvocation(node, scope)
+				value = this.interpretFunctionInvocation(node, scope)
 				break
 			case 'NativeFunctionInvocation':
-				result = this.interpretNativeFunctionInvocation(node, scope)
+				value = this.interpretNativeFunctionInvocation(node, scope)
 				break
 			case 'Value':
-				result = node
+				value = node
 				break
 			default:
 				throw new Error(`Unknown ExpressionNode of type: ${(node as IExpressionNode).nodeType}`)
 		}
 
-		return { result, scope }
+		return { scope, value }
 	}
 
-	protected interpretNode(node: IStatementNode | IExpressionNode, scope: IScope): { scope: IScope } {
+	protected interpretNode(node: IStatementNode | IExpressionNode, scope: IScope): scopeAndMaybeReturnValue {
+		let returnValue: IValueNode | null = null
+
 		switch (node.nodeType) {
 			case 'DeclarationStatement':
 				; ({ scope } = this.interpretDeclarationStatement(node, scope))
@@ -409,17 +433,17 @@ export class Runtime {
 				this.interpretNativeFunctionInvocation(node, scope)
 				break
 			case 'IfStatement':
-				this.interpretIfStatement(node, scope)
+				; ({ returnValue } = this.interpretIfStatement(node, scope))
 				break
 			case 'IfElseStatement':
-				this.interpretIfElseStatement(node, scope)
+				; ({ returnValue } = this.interpretIfElseStatement(node, scope))
 				break
 			default:
 				log(node)
 				throw new Error(`Unknown Node of type: ${node.nodeType}`)
 		}
 
-		return { scope }
+		return { scope, returnValue }
 	}
 
 	public loadFile(path: string): void {
@@ -429,7 +453,13 @@ export class Runtime {
 			let nodes: Array<IExpressionNode | IStatementNode> = JSON.parse(data)
 
 			for (let node of nodes) {
-				this.fileScope = this.interpretNode(node, this.fileScope).scope
+				let result = this.interpretNode(node, this.fileScope)
+
+				if (result.returnValue) {
+					throw new Error('Returning out of files is not allowed - File a Bug Report!')
+				} else {
+					this.fileScope = result.scope
+				}
 			}
 		})
 	}
