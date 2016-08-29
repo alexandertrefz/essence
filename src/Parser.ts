@@ -799,7 +799,13 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 		IToken, IToken, IToken
 	]
 
-	const ifElseStatement = sequenceParserGenerator(
+	type ifElseIfStatementSequence = [
+		IIfStatementNode,
+		IToken,
+		IIfStatementNode | IIfElseStatementNode
+	]
+
+	const ifElseStatementParser = sequenceParserGenerator(
 		[
 			{ parser: ifStatement },
 			{ tokenType: 'Keyword', content: 'else', },
@@ -829,9 +835,29 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
+	const ifElseIfStatementParser = sequenceParserGenerator(
+		[
+			{ parser: ifStatement },
+			{ tokenType: 'Keyword', content: 'else', },
+			{ parser: choiceParserGenerator([
+				ifElseStatement,
+				ifStatement,
+			]) },
+		],
+		(foundSequence: ifElseIfStatementSequence): IIfElseStatementNode => {
+			return {
+				nodeType: 'IfElseStatement',
+				condition: foundSequence[0].condition,
+				trueBody: foundSequence[0].body,
+				falseBody: [foundSequence[2]],
+			}
+		}
+	)
+
 	const parser = choiceParserGenerator(
 		[
-			ifElseStatement,
+			ifElseIfStatementParser,
+			ifElseStatementParser,
 			ifStatement,
 		]
 	)
