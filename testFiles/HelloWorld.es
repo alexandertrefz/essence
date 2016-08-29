@@ -7,9 +7,7 @@ let greet Function = (greetee String) -> String {
 	let messageEnd String = ''
 
 	if String.equals(greetee, '') {
-		print('Empty?!')
-		print('Defaulting to World...')
-		greetee = 'World'
+		return print('This is not a valid greetee!')
 	}
 
 	if String.equals(greetee, 'Universe') {
