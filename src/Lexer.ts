@@ -13,7 +13,7 @@ export class Lexer {
 	static stringLiteral   = '\''
 	static booleanLiterals = ['true', 'false']
 	static commentLiteral  = '§'
-	static keywords        = ['let', 'return', 'if', 'else']
+	static keywords        = ['let', 'return', 'if', 'else', 'type']
 	static delimiters      = ['@', '(', ')', '{', '}', ',', '.', ':', '=', '-', '>']
 
 	static _handleLineNumberAndCollumn(char: string, line: number, column: number): { line: number, column: number } {
