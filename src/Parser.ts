@@ -4,7 +4,6 @@ let debugTokens = false
 let debugIndividualNodes = false
 let debugNodes = false
 
-
 import {
 	IToken,
 	IAST,
@@ -26,6 +25,7 @@ import {
 	ILookupNode,
 	IIfStatementNode,
 	IIfElseStatementNode,
+	IBlockNode,
 } from './Interfaces'
 
 type tokenSequenceMatch = {
@@ -312,6 +312,32 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'TypeDeclaration',
 				name: foundSequence[0],
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
+let block = (tokens: Array<IToken>): parserResult => {
+	const parser = sequenceParserGenerator(
+		[
+			{ tokenType: 'Delimiter', content: '{', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ isOptional: true, canRepeat: true, parser: statement, },
+			{ tokenType: 'Delimiter', content: '}', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+		],
+		(foundSequence: [IToken, IToken, IStatementNode[] | null]): IBlockNode => {
+			let body = foundSequence[2]
+
+			if (body === null) {
+				body = []
+			}
+
+			return {
+				nodeType: 'Block',
+				body,
 			}
 		}
 	)
@@ -692,6 +718,7 @@ let expression = (tokens: Array<IToken>): parserResult => {
 /*
 	2.3 Statements
 */
+
 let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
