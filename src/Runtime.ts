@@ -1,10 +1,49 @@
 /// <reference path='../typings/index.d.ts' />
+require('console.table')
 
-let verboseLogs = false
+let logger = {
+	verbose: false,
 
-let log = (node) => {
-	console.log(require('util').inspect(node, { showHidden: false, depth: null }))
-	console.log()
+	buffer: [] as { Action: string, Value: string }[],
+
+	log(action: string = '', value: string = ''): void {
+		logger.buffer.push({
+			Action: action,
+			Value: value,
+		})
+	},
+
+	flush(): void {
+		console.log()
+
+		let trace = [{
+			Action: ' '.repeat(70),
+			Value: ' '.repeat(70),
+		}, ...logger.buffer]
+
+		if (trace[trace.length - 3].Action === 'ReturnStatement') {
+			trace = trace.slice(0, trace.length - 2)
+		}
+
+		console.table('Stack Trace', trace)
+	},
+
+	linebreak(): void {
+		console.log()
+	},
+
+	unwrapValue(value: IValueNode): string {
+		if (value.value.nodeType) {
+			return value.value.nodeType
+		} else {
+			return `'${value.value}'`
+		}
+	},
+
+	debug(node: any): void {
+		console.log(require('util').inspect(node, { showHidden: false, depth: null }))
+		console.log()
+	},
 }
 
 import {
@@ -209,40 +248,33 @@ export class Runtime {
 	}
 
 	protected memberLookup(base: IValueNode, member: string): IValueNode {
-		verboseLogs && log(base)
-		verboseLogs && console.log(member)
-		verboseLogs && log(base.members[member])
 		return base.members[member]
 	}
 
 	protected lookup(node: IIdentifierNode | ILookupNode, scope: IScope): IValueNode {
 		let searchScope: IScope | null = scope
 		if (node.nodeType === 'Identifier') {
-			verboseLogs && console.log('Simple Lookup:', node.content)
 			while (true) {
 				if (searchScope === null) {
-					log(scope)
 					throw new Error('Can not find variable \'' + node.content + '\' in this Scope - File a Bug Report!')
 				}
 				if (searchScope[node.content] != null) {
-					verboseLogs && console.log('Found:')
-					verboseLogs && log(searchScope[node.content])
 					return searchScope[node.content]
 				} else {
 					searchScope = searchScope.parent
 				}
 			}
 		} else {
-			verboseLogs && console.log('Complex Lookup:', node.base.content + '.' + node.member)
 			return this.memberLookup(this.lookup(node.base, scope), node.member)
 		}
 	}
 
 	protected nativeLookup(node: IIdentifierNode | ILookupNode): Function {
 		if (node.nodeType === 'Identifier') {
-			verboseLogs && console.log('Simple Native Lookup:', node.content)
+			logger.log('Simple Native Lookup', node.content)
 			return this.nativeScope[node.content]
 		} else {
+			logger.flush()
 			throw new Error('Complex Native Lookups are not supported yet!')
 		}
 	}
@@ -261,7 +293,11 @@ export class Runtime {
 
 		for (let node of func.body.body) {
 			if (node.nodeType === 'ReturnStatement') {
-				return this.resolveExpression(node.expression, scope).value
+				let value = this.resolveExpression(node.expression, scope).value
+				logger.log('ReturnStatement', logger.unwrapValue(value))
+				logger.log()
+				logger.log()
+				return value
 			} else {
 				; ({ scope, returnValue } = this.interpretNode(node, scope))
 				if (returnValue !== null) {
@@ -270,6 +306,7 @@ export class Runtime {
 			}
 		}
 
+		logger.flush()
 		throw new Error('Function ended without a ReturnStatement - File a Bug Report!')
 	}
 
@@ -278,6 +315,8 @@ export class Runtime {
 	}
 
 	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: IScope): { scope: IScope } {
+		logger.log('DeclarationStatement', node.name)
+
 		if (node.value.nodeType === 'Value') {
 			if (node.value.value.nodeType === 'FunctionDefinition') {
 				if (node.value.value.scope === undefined) {
@@ -289,10 +328,13 @@ export class Runtime {
 		}
 
 		scope[node.name] = this.resolveExpression(node.value, scope).value
+		logger.log('DeclarationSuccess', logger.unwrapValue(scope[node.name]))
 		return { scope }
 	}
 
 	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: IScope): { scope: IScope } {
+		logger.log('AssignmentStatement', node.name)
+
 		if (node.value.nodeType === 'Value') {
 			if (node.value.value.nodeType === 'FunctionDefinition') {
 				if (node.value.value.scope === undefined) {
@@ -306,13 +348,14 @@ export class Runtime {
 		let searchScope: IScope | null = scope
 		while (true) {
 			if (searchScope === null) {
-				log(scope)
-				throw new Error('Can not find variable \'' + node.name + '\' in this Scope - File a Bug Report!')
+				logger.flush()
+				logger.linebreak()
+				logger.debug(scope)
+				throw new Error(`Can not find variable '${node.name}' in this Scope - File a Bug Report!`)
 			}
 			if (searchScope[node.name] != null) {
-				verboseLogs && console.log('Found:')
-				verboseLogs && log(searchScope[node.name])
 				searchScope[node.name] = this.resolveExpression(node.value, scope).value
+				logger.log('AssignmentSuccess', logger.unwrapValue(searchScope[node.name]))
 				return { scope }
 			} else {
 				searchScope = searchScope.parent
@@ -332,21 +375,28 @@ export class Runtime {
 	}
 
 	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: IScope): IValueNode {
-		verboseLogs && console.log('NativeFunctionInvocation:')
-		verboseLogs && log(node)
+		logger.log('InterpretNativeFunctionInvocation')
+
 		let func = this.nativeLookup(node.name)
 		let args = node.arguments.arguments.map((value) => {
 			return this.resolveExpression(value, scope).value
 		})
 
+		logger.log('ResolvedNativeFunctionInvocationArguments', args.map((value) => {
+			return logger.unwrapValue(value)
+		}).join(', '))
+
 		return this.nativeInvoke(func, args)
 	}
 
 	protected interpretIfStatement(node: IIfStatementNode, scope: IScope): scopeAndMaybeReturnValue {
+		logger.log('InterpretIfStatement')
+
 		let condition = this.resolveExpression(node.condition, scope).value
 		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
+			logger.log('ResolvedCondition', 'true')
 			let subScope: IScope = {
 				parent: scope,
 			}
@@ -360,19 +410,25 @@ export class Runtime {
 					({ scope: subScope, returnValue } = this.interpretNode(subNode, subScope))
 				}
 			}
+		} else {
+			logger.log('ResolvedCondition', 'false')
 		}
 
 		return { scope, returnValue }
 	}
 
 	protected interpretIfElseStatement(node: IIfElseStatementNode, scope: IScope): scopeAndMaybeReturnValue {
+		logger.log('InterpretIfElseStatement')
+
 		let condition = this.resolveExpression(node.condition, scope).value
 		let body: Array<IStatementNode>
 		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
+			logger.log('ResolvedCondition', 'true')
 			body = node.trueBody.body
 		} else {
+			logger.log('ResolvedCondition', 'false')
 			body = node.falseBody.body
 		}
 
@@ -413,6 +469,7 @@ export class Runtime {
 				value = node
 				break
 			default:
+				logger.flush()
 				throw new Error(`Unknown ExpressionNode of type: ${(node as IExpressionNode).nodeType}`)
 		}
 
@@ -420,6 +477,8 @@ export class Runtime {
 	}
 
 	protected interpretNode(node: IStatementNode | IExpressionNode, scope: IScope): scopeAndMaybeReturnValue {
+		logger.log('InterpretNode', node.nodeType)
+
 		let returnValue: IValueNode | null = null
 
 		switch (node.nodeType) {
@@ -442,7 +501,9 @@ export class Runtime {
 				; ({ returnValue } = this.interpretIfElseStatement(node, scope))
 				break
 			default:
-				log(node)
+				logger.flush()
+				logger.linebreak()
+				logger.debug(node)
 				throw new Error(`Unknown Node of type: ${node.nodeType}`)
 		}
 
@@ -459,11 +520,14 @@ export class Runtime {
 				let result = this.interpretNode(node, this.fileScope)
 
 				if (result.returnValue) {
+					logger.flush()
 					throw new Error('Returning out of files is not allowed - File a Bug Report!')
 				} else {
 					this.fileScope = result.scope
 				}
 			}
+
+			logger.verbose && logger.flush()
 		})
 	}
 }
