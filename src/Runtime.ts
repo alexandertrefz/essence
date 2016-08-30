@@ -346,7 +346,6 @@ export class Runtime {
 
 	protected interpretIfStatement(node: IIfStatementNode, scope: IScope): scopeAndMaybeReturnValue {
 		let condition = this.resolveExpression(node.condition, scope).value
-		let body: Array<IStatementNode>
 		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
@@ -354,7 +353,7 @@ export class Runtime {
 				parent: scope,
 			}
 
-			for (let subNode of node.body) {
+			for (let subNode of node.body.body) {
 				// If we find a return, resolve the expression since only we know the correct scope,
 				// and return a new IReturnStatementNode so that the parent can deal with it
 				if (subNode.nodeType === 'ReturnStatement') {
@@ -374,9 +373,9 @@ export class Runtime {
 		let returnValue: IValueNode | null = null
 
 		if (condition.value) {
-			body = node.trueBody
+			body = node.trueBody.body
 		} else {
-			body = node.falseBody
+			body = node.falseBody.body
 		}
 
 		let subScope: IScope = {
