@@ -204,7 +204,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 			for (let parser of parsers) {
 				let subTokens = tokens.slice(tokenIndex)
-				let { foundSequence, node, tokens: newTokens, } = parser(subTokens)
+				let { node, tokens: newTokens, } = parser(subTokens)
 
 				if (node) {
 					foundMatch = true
