@@ -101,26 +101,29 @@ export class Runtime {
 									content: 'String',
 								},
 							},
-							body: [{
-								nodeType: 'ReturnStatement',
-								expression: {
-									nodeType: 'NativeFunctionInvocation',
-									name: {
-										nodeType: 'Identifier',
-										content: 'stringJoin',
-									},
-									arguments: {
-										nodeType: 'UnnamedArgumentList',
-										arguments: [{
+							body: {
+								nodeType: 'Block',
+								body: [{
+									nodeType: 'ReturnStatement',
+									expression: {
+										nodeType: 'NativeFunctionInvocation',
+										name: {
 											nodeType: 'Identifier',
-											content: 'self',
-										}, {
-											nodeType: 'Identifier',
-											content: 'string',
-										}],
+											content: 'stringJoin',
+										},
+										arguments: {
+											nodeType: 'UnnamedArgumentList',
+											arguments: [{
+												nodeType: 'Identifier',
+												content: 'self',
+											}, {
+												nodeType: 'Identifier',
+												content: 'string',
+											}],
+										},
 									},
-								},
-							}],
+								}],
+							},
 							scope: {
 								parent: null,
 							},
@@ -164,26 +167,29 @@ export class Runtime {
 									content: 'Bool',
 								},
 							},
-							body: [{
-								nodeType: 'ReturnStatement',
-								expression: {
-									nodeType: 'NativeFunctionInvocation',
-									name: {
-										nodeType: 'Identifier',
-										content: 'stringEquals',
-									},
-									arguments: {
-										nodeType: 'UnnamedArgumentList',
-										arguments: [{
+							body: {
+								nodeType: 'Block',
+								body: [{
+									nodeType: 'ReturnStatement',
+									expression: {
+										nodeType: 'NativeFunctionInvocation',
+										name: {
 											nodeType: 'Identifier',
-											content: 'self',
-										}, {
-											nodeType: 'Identifier',
-											content: 'other',
-										}],
+											content: 'stringEquals',
+										},
+										arguments: {
+											nodeType: 'UnnamedArgumentList',
+											arguments: [{
+												nodeType: 'Identifier',
+												content: 'self',
+											}, {
+												nodeType: 'Identifier',
+												content: 'other',
+											}],
+										},
 									},
-								},
-							}],
+								}],
+							},
 							scope: {
 								parent: null,
 							},
@@ -255,7 +261,7 @@ export class Runtime {
 			scope[argumentNames[i]] = args[i]
 		}
 
-		for (let node of func.body) {
+		for (let node of func.body.body) {
 			if (node.nodeType === 'ReturnStatement') {
 				return this.resolveExpression(node.expression, scope).value
 			} else {
