@@ -46,6 +46,9 @@ export type ASTType
 	| 'IfStatement'
 	| 'IfElseStatement'
 	| 'Block'
+	| 'TypeDefinition'
+	| 'TypeProperty'
+	| 'TypeMethod'
 
 export interface IIdentifierNode {
 	nodeType: 'Identifier'
@@ -72,7 +75,9 @@ export interface IValueNode {
 	nodeType: 'Value'
 	type: string
 	value: any
-	members: any
+	members: {
+		[key: string]: IValueNode
+	}
 }
 
 export interface IParameterNode {
@@ -142,6 +147,29 @@ export interface IIfElseStatementNode {
 	falseBody: IBlockNode
 }
 
+export interface ITypeDefinitionNode {
+	nodeType: 'TypeDefinition'
+	name: IIdentifierNode
+	properties: {
+		[key: string]: ITypeNode
+	}
+	members: {
+		[key: string]: IValueNode
+	}
+}
+
+export interface ITypePropertyNode {
+	nodeType: 'TypeProperty'
+	name: string
+	type: ITypeNode
+}
+
+export interface ITypeMethodNode {
+	nodeType: 'TypeMethod'
+	name: string
+	func: IFunctionDefinitionNode
+}
+
 export type IExpressionNode
 	= IValueNode
 	| IIdentifierNode
@@ -155,6 +183,7 @@ export type IStatementNode
 	| IReturnStatementNode
 	| IIfStatementNode
 	| IIfElseStatementNode
+	| ITypeDefinitionNode
 
 export type IASTNode
 	= IExpressionNode
@@ -165,6 +194,8 @@ export type IASTNode
 	| IArgumentListNode
 	| IFunctionDefinitionNode
 	| IBlockNode
+	| ITypePropertyNode
+	| ITypeMethodNode
 
 /* tslint:disable */
 export interface IScope {

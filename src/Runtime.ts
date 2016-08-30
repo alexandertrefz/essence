@@ -62,8 +62,10 @@ import {
 	IIfElseStatementNode,
 	IScope,
 	INativeScope,
+	ITypeDefinitionNode,
 } from './Interfaces'
 
+type valueOrType = IValueNode | ITypeDefinitionNode
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
 type scopeAndValue = { scope: IScope, value: IValueNode, }
 
@@ -247,25 +249,55 @@ export class Runtime {
 		}
 	}
 
-	protected memberLookup(base: IValueNode, member: string): IValueNode {
-		return base.members[member]
+	protected memberLookup(node: ILookupNode, scope: IScope): IValueNode {
+		return this.identifierLookup(node.base, scope).members[node.member]
 	}
 
-	protected lookup(node: IIdentifierNode | ILookupNode, scope: IScope): IValueNode {
+	protected identifierLookup(node: IIdentifierNode, scope: IScope): valueOrType {
+		let searchScope: IScope | null = scope
+
+		while (true) {
+			if (searchScope === null) {
+				logger.flush()
+				console.log()
+				logger.debug(scope)
+				throw new Error(`Can not find variable '${node.content}' in this Scope - File a Bug Report!`)
+			}
+			if (searchScope[node.content] != null) {
+				return searchScope[node.content]
+			} else {
+				searchScope = searchScope.parent
+			}
+		}
+	}
+
+	protected lookup(node: IIdentifierNode | ILookupNode, scope: IScope): valueOrType {
 		let searchScope: IScope | null = scope
 		if (node.nodeType === 'Identifier') {
-			while (true) {
-				if (searchScope === null) {
-					throw new Error('Can not find variable \'' + node.content + '\' in this Scope - File a Bug Report!')
-				}
-				if (searchScope[node.content] != null) {
-					return searchScope[node.content]
-				} else {
-					searchScope = searchScope.parent
-				}
-			}
+			logger.log('Lookup Identifier', node.content)
+			return this.identifierLookup(node, scope)
 		} else {
-			return this.memberLookup(this.lookup(node.base, scope), node.member)
+			logger.log('Lookup Member', `${node.base.content}.${node.member}`)
+			return this.memberLookup(node, scope)
+		}
+	}
+
+	protected valueLookup(node: IIdentifierNode | ILookupNode, scope: IScope): IValueNode {
+		let result = this.lookup(node, scope)
+
+		if (result.nodeType === 'Value') {
+			return result
+		} else {
+			let variableName: string
+
+			if (node.nodeType === 'Identifier') {
+				variableName = node.content
+			} else {
+				variableName = node.base.content + '.' + node.member
+			}
+
+			logger.flush()
+			throw new Error(`Can not find variable '${variableName}' in this Scope - File a Bug Report!`)
 		}
 	}
 
@@ -363,15 +395,38 @@ export class Runtime {
 		}
 	}
 
+	protected interpretTypeDefinitionStatement(node: ITypeDefinitionNode, scope: IScope): { scope: IScope } {
+		logger.log('TypeDefinitionStatement', node.name.content)
+
+		for (let key in node.members) {
+			if (node.members.hasOwnProperty(key)) {
+				node.members[key].value.scope = {
+					parent: scope,
+				}
+			}
+		}
+
+		scope[node.name.content] = node
+		return { scope }
+	}
+
 	protected interpretFunctionInvocation(node: IFunctionInvocationNode, scope: IScope): IValueNode {
-		let func = this.lookup(node.name, scope)
+		logger.log()
+		logger.log()
+		logger.log('InterpretFunctionInvocation')
+
+		let func = this.valueLookup(node.name, scope).value
 		let args
 
 		args = node.arguments.arguments.map((value) => {
 			return this.resolveExpression(value, scope).value
 		})
 
-		return this.invoke(func.value, args)
+		logger.log('ResolvedFunctionInvocationArguments', args.map((value) => {
+			return logger.unwrapValue(value)
+		}).join(', '))
+
+		return this.invoke(func, args)
 	}
 
 	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: IScope): IValueNode {
@@ -454,10 +509,10 @@ export class Runtime {
 
 		switch (node.nodeType) {
 			case 'Identifier':
-				value = this.lookup(node, scope)
+				value = this.valueLookup(node, scope)
 				break
 			case 'Lookup':
-				value = this.lookup(node, scope)
+				value = this.valueLookup(node, scope)
 				break
 			case 'FunctionInvocation':
 				value = this.interpretFunctionInvocation(node, scope)
@@ -487,6 +542,9 @@ export class Runtime {
 				break
 			case 'AssignmentStatement':
 				; ({ scope } = this.interpretAssignmentStatement(node, scope))
+				break
+			case 'TypeDefinition':
+				; ({ scope } = this.interpretTypeDefinitionStatement(node, scope))
 				break
 			case 'FunctionInvocation':
 				this.interpretFunctionInvocation(node, scope)

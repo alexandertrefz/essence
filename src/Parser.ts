@@ -26,6 +26,9 @@ import {
 	IIfStatementNode,
 	IIfElseStatementNode,
 	IBlockNode,
+	ITypeDefinitionNode,
+	ITypePropertyNode,
+	ITypeMethodNode,
 } from './Interfaces'
 
 type tokenSequenceMatch = {
@@ -338,6 +341,42 @@ let block = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'Block',
 				body,
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
+let typeProperty = (tokens: Array<IToken>): parserResult => {
+	const parser = sequenceParserGenerator(
+		[
+			{ parser: identifier, },
+			{ parser: typeDeclaration, },
+		],
+		(foundSequence: [IIdentifierNode, ITypeNode]): ITypePropertyNode => {
+			return {
+				nodeType: 'TypeProperty',
+				name: foundSequence[0].content,
+				type: foundSequence[1],
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
+let typeMethod = (tokens: Array<IToken>): parserResult => {
+	const parser = sequenceParserGenerator(
+		[
+			{ parser: identifier, },
+			{ parser: functionDefinition, },
+		],
+		(foundSequence: [IIdentifierNode, IFunctionDefinitionNode]): ITypeMethodNode => {
+			return {
+				nodeType: 'TypeMethod',
+				name: foundSequence[0].content,
+				func: foundSequence[1],
 			}
 		}
 	)
@@ -721,6 +760,71 @@ let returnStatement = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
+	type typeDefinitionStatementSequence = [
+		IToken, IIdentifierNode, IToken, IToken, IToken,
+		Array<ITypeMethodNode | ITypePropertyNode> | null,
+		IToken, IToken, IToken
+	]
+
+	const parser = sequenceParserGenerator(
+		[
+			{ tokenType: 'Keyword', content: 'type', },
+			{ parser: identifier, },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ tokenType: 'Delimiter', content: '{', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ isOptional: true, canRepeat: true, parser: choiceParserGenerator([typeProperty, typeMethod]), },
+			{ isOptional: true, tokenType: 'Linebreak', },
+			{ tokenType: 'Delimiter', content: '}', },
+			{ isOptional: true, tokenType: 'Linebreak', },
+		],
+		(foundSequence: typeDefinitionStatementSequence): ITypeDefinitionNode => {
+			let body = foundSequence[5]
+
+			if (body === null) {
+				body = []
+			}
+
+			let properties = body.reduce(
+				(previous, current) => {
+					if (current.nodeType === 'TypeProperty') {
+						previous[current.name] = current.type
+					}
+
+					return previous
+				},
+				{}
+			)
+
+			let members = body.reduce(
+				(previous, current) => {
+					if (current.nodeType === 'TypeMethod') {
+						previous[current.name] = {
+							nodeType: 'Value',
+							type: 'Method',
+							value: current.func,
+							members: {},
+						}
+					}
+
+					return previous
+				},
+				{}
+			)
+
+			return {
+				nodeType: 'TypeDefinition',
+				name: foundSequence[1],
+				properties,
+				members,
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
 let declarationStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
@@ -850,6 +954,7 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 let statement = (tokens: Array<IToken>): statementParserResult => {
 	const parser = choiceParserGenerator(
 		[
+			typeDefinitionStatement,
 			declarationStatement,
 			assignmentStatement,
 			ifElseStatement,
