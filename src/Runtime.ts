@@ -21,7 +21,6 @@ import {
 	ILookupNode,
 	IIfStatementNode,
 	IIfElseStatementNode,
-	IReturnStatementNode,
 	IScope,
 } from './Interfaces'
 
