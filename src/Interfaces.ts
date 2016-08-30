@@ -132,14 +132,14 @@ export interface IAssignmentStatementNode {
 export interface IIfStatementNode {
 	nodeType: 'IfStatement'
 	condition: IExpressionNode
-	body: Array<IStatementNode>
+	body: IBlockNode
 }
 
 export interface IIfElseStatementNode {
 	nodeType: 'IfElseStatement'
 	condition: IExpressionNode
-	trueBody: Array<IStatementNode>
-	falseBody: Array<IStatementNode>
+	trueBody: IBlockNode
+	falseBody: IBlockNode
 }
 
 export type IExpressionNode

@@ -766,35 +766,20 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 
 let ifStatement = (tokens: Array<IToken>): parserResult => {
 	type ifStatementSequence = [
-		IToken, IExpressionNode, IToken, IToken,
-		IStatementNode[] | null,
-		IToken, IToken
+		IToken, IExpressionNode, IBlockNode
 	]
 
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Keyword', content: 'if', },
 			{ parser: expression, },
-			{ tokenType: 'Delimiter', content: '{', },
-			{ isOptional: true, tokenType: 'Linebreak', },
-			{ isOptional: true, canRepeat: true, parser: statement, },
-			{ tokenType: 'Delimiter', content: '}', },
-			{ isOptional: true, tokenType: 'Linebreak', },
+			{ parser: block },
 		],
 		(foundSequence: ifStatementSequence): IIfStatementNode => {
-			let body: Array<IStatementNode>
-			let possibleBody = foundSequence[4]
-
-			if (possibleBody !== null) {
-				body = possibleBody
-			} else {
-				body = []
-			}
-
 			return {
 				nodeType: 'IfStatement',
 				condition: foundSequence[1],
-				body,
+				body: foundSequence[2],
 			}
 		}
 	)
@@ -805,43 +790,26 @@ let ifStatement = (tokens: Array<IToken>): parserResult => {
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 	type ifElseStatementSequence = [
 		IIfStatementNode,
-		IToken, IToken, IToken,
-		IStatementNode[] | null,
-		IToken, IToken, IToken
+		IToken, IBlockNode
 	]
 
 	type ifElseIfStatementSequence = [
 		IIfStatementNode,
-		IToken,
-		IIfStatementNode | IIfElseStatementNode
+		IToken, IIfStatementNode | IIfElseStatementNode
 	]
 
 	const ifElseStatementParser = sequenceParserGenerator(
 		[
 			{ parser: ifStatement },
 			{ tokenType: 'Keyword', content: 'else', },
-			{ tokenType: 'Delimiter', content: '{', },
-			{ isOptional: true, tokenType: 'Linebreak', },
-			{ isOptional: true, canRepeat: true, parser: statement, },
-			{ isOptional: true, tokenType: 'Linebreak', },
-			{ tokenType: 'Delimiter', content: '}', },
-			{ isOptional: true, tokenType: 'Linebreak', },
+			{ parser: block },
 		],
 		(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
-			let falseBody: Array<IStatementNode>
-			let possibleFalseBody = foundSequence[4]
-
-			if (possibleFalseBody !== null) {
-				falseBody = possibleFalseBody
-			} else {
-				falseBody = []
-			}
-
 			return {
 				nodeType: 'IfElseStatement',
 				condition: foundSequence[0].condition,
 				trueBody: foundSequence[0].body,
-				falseBody,
+				falseBody: foundSequence[2],
 			}
 		}
 	)
@@ -860,7 +828,10 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'IfElseStatement',
 				condition: foundSequence[0].condition,
 				trueBody: foundSequence[0].body,
-				falseBody: [foundSequence[2]],
+				falseBody: {
+					nodeType: 'Block',
+					body: [foundSequence[2]],
+				},
 			}
 		}
 	)
