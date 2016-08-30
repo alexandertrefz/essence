@@ -45,6 +45,7 @@ export type ASTType
 	| 'ReturnStatement'
 	| 'IfStatement'
 	| 'IfElseStatement'
+	| 'Block'
 
 export interface IIdentifierNode {
 	nodeType: 'Identifier'
@@ -60,6 +61,11 @@ export interface ILookupNode {
 export interface ITypeNode {
 	nodeType: 'TypeDeclaration'
 	name: IIdentifierNode
+}
+
+export interface IBlockNode {
+	nodeType: 'Block'
+	body: Array<IStatementNode>
 }
 
 export interface IValueNode {
@@ -158,6 +164,7 @@ export type IASTNode
 	| IParameterListNode
 	| IArgumentListNode
 	| IFunctionDefinitionNode
+	| IBlockNode
 
 /* tslint:disable */
 export interface IScope {
