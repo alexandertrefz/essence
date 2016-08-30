@@ -94,19 +94,16 @@ export class Runtime {
 		this.fileScope = {
 			parent: null,
 			String: {
-				nodeType: 'Value',
-				type: {
-					nodeType: 'TypeDeclaration',
-					name: {
-						nodeType: 'Identifier',
-						content: 'TypeDeclaration',
-					},
+				nodeType: 'TypeDefinition',
+				name: {
+					nodeType: 'Identifier',
+					content: 'String',
 				},
-				value: null,
+				properties: {},
 				members: {
 					join: {
 						nodeType: 'Value',
-						type: 'Function',
+						type: 'Method',
 						value: {
 							nodeType: 'FunctionDefinition',
 							parameters: {
@@ -118,12 +115,12 @@ export class Runtime {
 										nodeType: 'TypeDeclaration',
 										name: {
 											nodeType: 'Identifier',
-											content: 'String',
+											content: 'Self',
 										},
 									},
 								}, {
 									nodeType: 'Parameter',
-									name: 'string',
+									name: 'other',
 									type: {
 										nodeType: 'TypeDeclaration',
 										name: {
@@ -151,13 +148,13 @@ export class Runtime {
 											content: 'stringJoin',
 										},
 										arguments: {
-											nodeType: 'UnnamedArgumentList',
+											nodeType: 'ArgumentList',
 											arguments: [{
 												nodeType: 'Identifier',
 												content: 'self',
 											}, {
 												nodeType: 'Identifier',
-												content: 'string',
+												content: 'other',
 											}],
 										},
 									},
@@ -169,10 +166,9 @@ export class Runtime {
 						},
 						members: {},
 					},
-
 					equals: {
 						nodeType: 'Value',
-						type: 'Function',
+						type: 'Method',
 						value: {
 							nodeType: 'FunctionDefinition',
 							parameters: {
@@ -184,7 +180,7 @@ export class Runtime {
 										nodeType: 'TypeDeclaration',
 										name: {
 											nodeType: 'Identifier',
-											content: 'String',
+											content: 'Self',
 										},
 									},
 								}, {
@@ -217,7 +213,7 @@ export class Runtime {
 											content: 'stringEquals',
 										},
 										arguments: {
-											nodeType: 'UnnamedArgumentList',
+											nodeType: 'ArgumentList',
 											arguments: [{
 												nodeType: 'Identifier',
 												content: 'self',
