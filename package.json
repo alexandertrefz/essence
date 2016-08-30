@@ -12,6 +12,7 @@
   "author": "Alexander Trefz",
   "license": "MIT",
   "devDependencies": {
+    "console.table": "^0.7.0",
     "jasmine": "^2.4.1",
     "typescript": "^2.0.2"
   },
