@@ -3,20 +3,17 @@ let print Function = (message String) -> String {
 }
 
 let greet Function = (greetee String) -> String {
-	let message String = ''
-	let messageEnd String = ''
+	let message String = String.join('Hello, ', greetee)
 
 	if String.equals(greetee, '') {
-		return print('This is not a valid greetee!')
+		return print('Greetee can not be empty!')
 	} else if String.equals(greetee, 'Universe') {
-		messageEnd = '!'
+		message = String.join(message, '!')
 	} else {
-		messageEnd = '.'
+		message = String.join(message, '.')
 	}
 
-	message = String.join('Hello, ', greetee)
-
-	return print(String.join(message, messageEnd))
+	return print(message)
 }
 
 greet('')
