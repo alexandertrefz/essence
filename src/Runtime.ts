@@ -22,19 +22,18 @@ import {
 	IIfStatementNode,
 	IIfElseStatementNode,
 	IScope,
+	INativeScope,
 } from './Interfaces'
 
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
 type scopeAndValue = { scope: IScope, value: IValueNode, }
 
 export class Runtime {
-	public fileScope: any
-	public nativeScope: any
+	public fileScope: IScope
+	public nativeScope: INativeScope
 
 	constructor() {
 		this.nativeScope = {
-			parent: null,
-
 			stringJoin: (self, str) => {
 				let newValue = self.value + str.value
 
