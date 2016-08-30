@@ -95,7 +95,7 @@ export interface IFunctionDefinitionNode {
 	nodeType: 'FunctionDefinition'
 	parameters: IParameterListNode
 	returnType: ITypeNode
-	body: Array<IStatementNode>
+	body: IBlockNode
 	scope?: any
 }
 

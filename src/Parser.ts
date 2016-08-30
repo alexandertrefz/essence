@@ -619,37 +619,21 @@ let lookup = (tokens: Array<IToken>): parserResult => {
 }
 
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
-	type functionDefinitionSequence
-		= [IParameterListNode, IToken, ITypeNode, IToken, IToken,
-		IStatementNode[] | null,
-		IToken, IToken]
+	type functionDefinitionSequence = [IParameterListNode, IToken, ITypeNode, IBlockNode]
 
 	const parser = sequenceParserGenerator(
 		[
 			{ parser: parameterList, },
 			{ tokenType: 'Operator', content: '->', },
 			{ parser: typeDeclaration, },
-			{ tokenType: 'Delimiter', content: '{' },
-			{ isOptional: true, tokenType: 'Linebreak', },
-			{ isOptional: true, canRepeat: true, parser: statement, },
-			{ tokenType: 'Delimiter', content: '}' },
-			{ isOptional: true, tokenType: 'Linebreak', },
+			{ parser: block, },
 		],
 		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
-			let possibleBody = foundSequence[5]
-			let body: Array<IStatementNode>
-
-			if (possibleBody !== null) {
-				body = possibleBody
-			} else {
-				body = []
-			}
-
 			return {
 				nodeType: 'FunctionDefinition',
 				parameters: foundSequence[0],
 				returnType: foundSequence[2],
-				body,
+				body: foundSequence[3],
 			}
 		}
 	)
