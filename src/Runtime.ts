@@ -66,6 +66,7 @@ import {
 } from './Interfaces'
 
 import * as stringPrimitive from './runtimePrimitives/String'
+import * as boolPrimitive from './runtimePrimitives/Bool'
 
 type valueOrType = IValueNode | ITypeDefinitionNode
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
@@ -83,6 +84,8 @@ export class Runtime {
 			},
 
 			String: stringPrimitive,
+
+			Bool: boolPrimitive,
 		}
 
 		this.fileScope = {
