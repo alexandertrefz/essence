@@ -96,15 +96,6 @@ export class Runtime {
 		}
 	}
 
-	protected generateValueNode(type: string, value: any, members: any): IValueNode {
-		return {
-			nodeType: 'Value',
-			type,
-			value,
-			members,
-		}
-	}
-
 	protected memberLookup(node: ILookupNode, scope: IScope): IValueNode {
 		return this.identifierLookup(node.base, scope).members[node.member]
 	}
