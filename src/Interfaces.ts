@@ -204,6 +204,6 @@ export interface IScope {
 }
 
 export interface INativeScope {
-	[key: string]: Function
+	[key: string]: any
 }
 /* tslint:enable */
