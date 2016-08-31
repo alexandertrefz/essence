@@ -65,6 +65,8 @@ import {
 	ITypeDefinitionNode,
 } from './Interfaces'
 
+import * as stringPrimitive from './runtimePrimitives/String'
+
 type valueOrType = IValueNode | ITypeDefinitionNode
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
 type scopeAndValue = { scope: IScope, value: IValueNode, }
@@ -75,20 +77,12 @@ export class Runtime {
 
 	constructor() {
 		this.nativeScope = {
-			stringJoin: (self, str) => {
-				let newValue = self.value + str.value
-
-				return this.generateValueNode('String', newValue, {})
-			},
-
-			stringEquals: (self, str) => {
-				return this.generateValueNode('Bool', self.value === str.value, {})
-			},
-
-			print: (message) => {
+			print: (message: IValueNode) => {
 				console.log(message.value)
 				return message
 			},
+
+			String: stringPrimitive,
 		}
 
 		this.fileScope = {
