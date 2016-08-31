@@ -1,9 +1,9 @@
 type String {
 	join (self Self, other String) -> String {
-		return @@stringJoin(self, other)
+		return @@String.join(self, other)
 	}
 
 	equals (self Self, other String) -> Bool {
-		return @@stringEquals(self, other)
+		return @@String.equals(self, other)
 	}
 }
