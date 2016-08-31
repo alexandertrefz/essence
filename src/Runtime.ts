@@ -21,7 +21,7 @@ let logger = {
 			Value: ' '.repeat(70),
 		}, ...logger.buffer]
 
-		if (trace[trace.length - 3].Action === 'ReturnStatement') {
+		if (trace.length > 3 && trace[trace.length - 3].Action === 'ReturnStatement') {
 			trace = trace.slice(0, trace.length - 2)
 		}
 
