@@ -112,7 +112,7 @@ export interface IFunctionInvocationNode {
 
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
-	name: IIdentifierNode
+	name: IIdentifierNode | ILookupNode
 	arguments: IArgumentListNode
 }
 
