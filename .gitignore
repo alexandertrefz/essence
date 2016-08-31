@@ -8,5 +8,9 @@ TODO.md
 lib
 compiledTests
 
-testFiles/Test.es
-testFiles/Test.ir
+/bin/esc-test
+
+testFiles/HelloWorld.ir
+testFiles/LinkedList.ir
+testFiles/Test*
+testFiles/Event*
