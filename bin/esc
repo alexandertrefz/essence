@@ -7,11 +7,53 @@ let path = require('path')
 let Lexer = require('../lib/Lexer').Lexer
 let Parser = require('../lib/Parser')
 
+let sourceFileTokens = []
+let lexedFiles = []
+let fileCount = 0
+
 let sourceFileName = process.argv[2]
-let tokens = Lexer.lex(fs.readFileSync(sourceFileName, 'utf-8'))
-let program = Parser.parse(tokens)
+let primitivesPath = 'primitives'
 
-let sourceFileNameParsed = path.parse(sourceFileName)
-let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
+fs.readdir(primitivesPath, (err, files) => {
+	if (err) { throw err }
 
-fs.writeFileSync(targetFileName, JSON.stringify(program.nodes))
+	files.filter((value) => {
+		return path.extname(value) === '.es'
+	})
+
+	fileCount = files.length
+
+	files.forEach((value) => {
+		fs.readFile(`${primitivesPath}/${value}`, 'utf8', (err, data) => {
+			lexedFiles.push(Lexer.lex(data))
+
+			if (sourceFileTokens.length && lexedFiles.length === fileCount) {
+				finishCompilation(lexedFiles, sourceFileTokens)
+			}
+		})
+	})
+
+	fs.readFile(sourceFileName, 'utf8', (err, data) => {
+		sourceFileTokens = Lexer.lex(data)
+
+		if (sourceFileTokens.length && lexedFiles.length === fileCount) {
+			finishCompilation(lexedFiles, sourceFileTokens)
+		}
+	})
+})
+
+function finishCompilation(lexedFiles, sourceFileTokens) {
+	let tokens = []
+
+	for (let fileTokens of lexedFiles) {
+		tokens.push(...fileTokens)
+	}
+
+	tokens.push(...sourceFileTokens)
+
+	let sourceFileNameParsed = path.parse(sourceFileName)
+	let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
+	fs.writeFileSync(targetFileName, JSON.stringify(Parser.parse(tokens).nodes))
+}
+
+
