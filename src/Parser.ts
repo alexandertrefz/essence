@@ -708,11 +708,16 @@ let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequenceParserGenerator(
 		[
 			{ tokenType: 'Operator', content: '@@', },
-			{ parser: identifier, },
+			{
+				parser: choiceParserGenerator([
+					lookup,
+					identifier,
+				]),
+			},
 			{ parser: argumentList, },
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
-		(foundSequence: [IToken, IIdentifierNode, IArgumentListNode]): INativeFunctionInvocationNode => {
+		(foundSequence: [IToken, IIdentifierNode | ILookupNode, IArgumentListNode]): INativeFunctionInvocationNode => {
 			return {
 				nodeType: 'NativeFunctionInvocation',
 				name: foundSequence[1],

@@ -162,8 +162,8 @@ export class Runtime {
 			logger.log('Simple Native Lookup', node.content)
 			return this.nativeScope[node.content]
 		} else {
-			logger.flush()
-			throw new Error('Complex Native Lookups are not supported yet!')
+			logger.log('Complex Native Lookup', `${node.base.content}.${node.member}`)
+			return this.nativeScope[node.base.content][node.member]
 		}
 	}
 
