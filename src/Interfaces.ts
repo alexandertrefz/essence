@@ -61,7 +61,7 @@ export interface ILookupNode {
 	member: string
 }
 
-export interface ITypeNode {
+export interface ITypeDeclarationNode {
 	nodeType: 'TypeDeclaration'
 	name: IIdentifierNode
 }
@@ -83,7 +83,7 @@ export interface IValueNode {
 export interface IParameterNode {
 	nodeType: 'Parameter'
 	name: string
-	type: ITypeNode
+	type: ITypeDeclarationNode
 }
 
 export interface IParameterListNode {
@@ -99,7 +99,7 @@ export interface IArgumentListNode {
 export interface IFunctionDefinitionNode {
 	nodeType: 'FunctionDefinition'
 	parameters: IParameterListNode
-	returnType: ITypeNode
+	returnType: ITypeDeclarationNode
 	body: IBlockNode
 	scope?: any
 }
@@ -124,7 +124,7 @@ export interface IReturnStatementNode {
 export interface IDeclarationStatementNode {
 	nodeType: 'DeclarationStatement'
 	name: string
-	type: ITypeNode
+	type: ITypeDeclarationNode
 	value: IExpressionNode
 }
 
@@ -151,7 +151,7 @@ export interface ITypeDefinitionNode {
 	nodeType: 'TypeDefinition'
 	name: IIdentifierNode
 	properties: {
-		[key: string]: ITypeNode
+		[key: string]: ITypeDeclarationNode
 	}
 	members: {
 		[key: string]: IValueNode
@@ -161,7 +161,7 @@ export interface ITypeDefinitionNode {
 export interface ITypePropertyNode {
 	nodeType: 'TypeProperty'
 	name: string
-	type: ITypeNode
+	type: ITypeDeclarationNode
 }
 
 export interface ITypeMethodNode {
@@ -188,7 +188,7 @@ export type IStatementNode
 export type IASTNode
 	= IExpressionNode
 	| IStatementNode
-	| ITypeNode
+	| ITypeDeclarationNode
 	| IParameterNode
 	| IParameterListNode
 	| IArgumentListNode

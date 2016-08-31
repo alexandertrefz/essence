@@ -9,7 +9,7 @@ import {
 	IAST,
 	IASTNode,
 	IStatementNode,
-	ITypeNode,
+	ITypeDeclarationNode,
 	IValueNode,
 	IParameterNode,
 	IParameterListNode,
@@ -311,7 +311,7 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 		[
 			{ parser: identifier, },
 		],
-		(foundSequence: [IIdentifierNode]): ITypeNode => {
+		(foundSequence: [IIdentifierNode]): ITypeDeclarationNode => {
 			return {
 				nodeType: 'TypeDeclaration',
 				name: foundSequence[0],
@@ -354,7 +354,7 @@ let typeProperty = (tokens: Array<IToken>): parserResult => {
 			{ parser: identifier, },
 			{ parser: typeDeclaration, },
 		],
-		(foundSequence: [IIdentifierNode, ITypeNode]): ITypePropertyNode => {
+		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): ITypePropertyNode => {
 			return {
 				nodeType: 'TypeProperty',
 				name: foundSequence[0].content,
@@ -394,7 +394,7 @@ let parameter = (tokens: Array<IToken>): parserResult => {
 			{ parser: identifier, },
 			{ parser: typeDeclaration, },
 		],
-		(foundSequence: [IIdentifierNode, ITypeNode]): IParameterNode => {
+		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): IParameterNode => {
 			return {
 				nodeType: 'Parameter',
 				name: foundSequence[0].content,
@@ -658,7 +658,7 @@ let lookup = (tokens: Array<IToken>): parserResult => {
 }
 
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
-	type functionDefinitionSequence = [IParameterListNode, IToken, ITypeNode, IBlockNode]
+	type functionDefinitionSequence = [IParameterListNode, IToken, ITypeDeclarationNode, IBlockNode]
 
 	const parser = sequenceParserGenerator(
 		[
@@ -840,7 +840,7 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 			{ parser: expression, },
 			{ isOptional: true, tokenType: 'Linebreak', },
 		],
-		(foundSequence: [IToken, IIdentifierNode, ITypeNode, IToken, IExpressionNode]): IDeclarationStatementNode => {
+		(foundSequence: [IToken, IIdentifierNode, ITypeDeclarationNode, IToken, IExpressionNode]): IDeclarationStatementNode => {
 			return {
 				nodeType: 'DeclarationStatement',
 				name: foundSequence[1].content,
