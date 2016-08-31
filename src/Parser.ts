@@ -590,10 +590,12 @@ let value = (tokens: Array<IToken>): parserResult => {
 					{ tokenType: 'Boolean', },
 				],
 				(foundSequence): IValueNode => {
+					let value = foundSequence[0].content === 'true'
+
 					return {
 						nodeType: 'Value',
 						type: 'Bool',
-						value: foundSequence[0].content,
+						value,
 						members: {},
 					}
 				}
