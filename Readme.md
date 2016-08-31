@@ -17,7 +17,6 @@ It also allows for a unified syntactical interface for blocking and non blocking
 * Complex is better than complicated.
 * Beautiful is better than ugly.
 * Clever is seldom good.
-* Only type-annotated code is releasable code.
 
 # Features
 * Static Structural Typing
