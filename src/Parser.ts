@@ -906,13 +906,37 @@ let returnStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
+	type emptyTypeDefinitionStatementSequence = [
+		IToken, IIdentifierNode, IToken, IToken, IToken, IToken, IToken
+	]
+
 	type typeDefinitionStatementSequence = [
 		IToken, IIdentifierNode, IToken, IToken, IToken,
 		Array<ITypeMethodNode | ITypePropertyNode> | null,
 		IToken, IToken, IToken
 	]
 
-	const parser = sequence(
+	const emptyTypeDefinition = sequence(
+		[
+			keyword('type'),
+			identifier,
+			optionalLinebreak,
+			delimiter('{'),
+			optionalLinebreak,
+			delimiter('}'),
+			optionalLinebreak,
+		],
+		(foundSequence: emptyTypeDefinitionStatementSequence): ITypeDefinitionNode => {
+			return {
+				nodeType: 'TypeDefinition',
+				name: foundSequence[1],
+				properties: {},
+				members: {},
+			}
+		}
+	)
+
+	const typeDefinition = sequence(
 		[
 			keyword('type'),
 			identifier,
@@ -967,7 +991,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	return parser(tokens)
+	return choice(emptyTypeDefinition, typeDefinition)(tokens)
 }
 
 let declarationStatement = (tokens: Array<IToken>): parserResult => {
