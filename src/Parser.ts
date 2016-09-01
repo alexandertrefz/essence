@@ -26,7 +26,7 @@ import {
 	IIfStatementNode,
 	IIfElseStatementNode,
 	IBlockNode,
-	ITypeDefinitionNode,
+	ITypeDefinitionStatementNode,
 	ITypePropertyNode,
 	ITypeMethodNode,
 } from './Interfaces'
@@ -926,9 +926,9 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			delimiter('}'),
 			optionalLinebreak,
 		],
-		(foundSequence: emptyTypeDefinitionStatementSequence): ITypeDefinitionNode => {
+		(foundSequence: emptyTypeDefinitionStatementSequence): ITypeDefinitionStatementNode => {
 			return {
-				nodeType: 'TypeDefinition',
+				nodeType: 'TypeDefinitionStatement',
 				name: foundSequence[1],
 				properties: {},
 				members: {},
@@ -948,7 +948,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			delimiter('}'),
 			optionalLinebreak,
 		],
-		(foundSequence: typeDefinitionStatementSequence): ITypeDefinitionNode => {
+		(foundSequence: typeDefinitionStatementSequence): ITypeDefinitionStatementNode => {
 			let body = foundSequence[5]
 
 			if (body === null) {
@@ -983,7 +983,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			)
 
 			return {
-				nodeType: 'TypeDefinition',
+				nodeType: 'TypeDefinitionStatement',
 				name: foundSequence[1],
 				properties,
 				members,

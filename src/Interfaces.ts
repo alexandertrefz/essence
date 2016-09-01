@@ -43,7 +43,7 @@ export type ASTType
 	| 'IfStatement'
 	| 'IfElseStatement'
 	| 'Block'
-	| 'TypeDefinition'
+	| 'TypeDefinitionStatement'
 	| 'TypeProperty'
 	| 'TypeMethod'
 
@@ -150,8 +150,8 @@ export interface IIfElseStatementNode {
 	falseBody: IBlockNode
 }
 
-export interface ITypeDefinitionNode {
-	nodeType: 'TypeDefinition'
+export interface ITypeDefinitionStatementNode {
+	nodeType: 'TypeDefinitionStatement'
 	name: IIdentifierNode
 	properties: {
 		[key: string]: ITypeDeclarationNode
@@ -186,7 +186,7 @@ export type IStatementNode
 	| IReturnStatementNode
 	| IIfStatementNode
 	| IIfElseStatementNode
-	| ITypeDefinitionNode
+	| ITypeDefinitionStatementNode
 
 export type IASTNode
 	= IExpressionNode
