@@ -32,6 +32,7 @@ export interface IAST {
 export type ASTType
 	= 'Identifier'
 	| 'Lookup'
+	| 'NativeLookup'
 	| 'Value'
 	| 'TypeDeclaration'
 	| 'DeclarationStatement'
@@ -58,6 +59,12 @@ export interface IIdentifierNode {
 export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IIdentifierNode
+	member: string
+}
+
+export interface INativeLookupNode {
+	nodeType: 'NativeLookup'
+	base: IIdentifierNode | INativeLookupNode
 	member: string
 }
 
@@ -112,7 +119,7 @@ export interface IFunctionInvocationNode {
 
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
-	name: IIdentifierNode | ILookupNode
+	name: IIdentifierNode | INativeLookupNode
 	arguments: IArgumentListNode
 }
 
@@ -196,6 +203,7 @@ export type IASTNode
 	| IBlockNode
 	| ITypePropertyNode
 	| ITypeMethodNode
+	| INativeLookupNode
 
 /* tslint:disable */
 export interface IScope {

@@ -23,6 +23,7 @@ import {
 	IIdentifierNode,
 	IExpressionNode,
 	ILookupNode,
+	INativeLookupNode,
 	IIfStatementNode,
 	IIfElseStatementNode,
 	IBlockNode,
