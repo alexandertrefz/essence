@@ -172,7 +172,7 @@ export class Runtime {
 		let scope = func.scope
 		let returnValue: IValueNode | null = null
 
-		let argumentNames = func.parameters.arguments.map((value) => {
+		let argumentNames = func.parameters.parameters.map((value) => {
 			return value.name
 		})
 

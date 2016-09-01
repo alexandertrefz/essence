@@ -581,7 +581,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 
 			return {
 				nodeType: 'ParameterList',
-				arguments: args,
+				parameters: args,
 			}
 		}
 	)
@@ -606,7 +606,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 
 			return {
 				nodeType: 'ParameterList',
-				arguments: args,
+				parameters: args,
 			}
 		}
 	)

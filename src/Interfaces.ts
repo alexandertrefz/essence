@@ -95,7 +95,7 @@ export interface IParameterNode {
 
 export interface IParameterListNode {
 	nodeType: 'ParameterList'
-	arguments: Array<IParameterNode>
+	parameters: Array<IParameterNode>
 }
 
 export interface IArgumentListNode {
