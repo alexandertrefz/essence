@@ -63,13 +63,13 @@ import {
 	IIfElseStatementNode,
 	IScope,
 	INativeScope,
-	ITypeDefinitionNode,
+	ITypeDefinitionStatementNode,
 } from './Interfaces'
 
 import * as stringPrimitive from './runtimePrimitives/String'
 import * as boolPrimitive from './runtimePrimitives/Bool'
 
-type valueOrType = IValueNode | ITypeDefinitionNode
+type valueOrType = IValueNode | ITypeDefinitionStatementNode
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
 type scopeAndValue = { scope: IScope, value: IValueNode, }
 
@@ -252,7 +252,7 @@ export class Runtime {
 		}
 	}
 
-	protected interpretTypeDefinitionStatement(node: ITypeDefinitionNode, scope: IScope): { scope: IScope } {
+	protected interpretTypeDefinitionStatement(node: ITypeDefinitionStatementNode, scope: IScope): { scope: IScope } {
 		logger.log('TypeDefinitionStatement', node.name.content)
 
 		for (let key in node.members) {
@@ -400,7 +400,7 @@ export class Runtime {
 			case 'AssignmentStatement':
 				; ({ scope } = this.interpretAssignmentStatement(node, scope))
 				break
-			case 'TypeDefinition':
+			case 'TypeDefinitionStatement':
 				; ({ scope } = this.interpretTypeDefinitionStatement(node, scope))
 				break
 			case 'FunctionInvocation':
