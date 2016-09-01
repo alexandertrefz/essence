@@ -453,6 +453,7 @@ let keyword = tokenHelper('Keyword')
 let linebreak = () => { return tokenHelper('Linebreak')('\n') }
 
 let optionalLinebreak = optional(linebreak())
+
 /*
 	2.1.1 General Helpers
 */
@@ -803,11 +804,9 @@ let functionInvocation = (tokens: Array<IToken>): parserResult => {
 
 let expression = (tokens: Array<IToken>): parserResult => {
 	let identifierOrValue = decorate(
-		choice(
-			identifier,
-			value,
-		),
-		(foundSequence: [IExpressionNode]): IExpressionNode => {
+		choice(identifier, value),
+
+		(foundSequence: [IIdentifierNode | IValueNode]): IExpressionNode => {
 			return foundSequence[0]
 		}
 	)
