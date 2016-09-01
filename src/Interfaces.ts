@@ -114,7 +114,7 @@ export interface IFunctionDefinitionNode {
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
 	name: IExpressionNode
-	arguments: IArgumentListNode
+	arguments: Array<IExpressionNode>
 }
 
 export interface INativeFunctionInvocationNode {
