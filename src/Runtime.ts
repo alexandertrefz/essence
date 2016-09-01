@@ -275,7 +275,7 @@ export class Runtime {
 		let func = this.resolveExpression(node.name, scope).value
 		let args
 
-		args = node.arguments.arguments.map((value) => {
+		args = node.arguments.map((value) => {
 			return this.resolveExpression(value, scope).value
 		})
 

@@ -870,7 +870,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					return {
 						nodeType: 'FunctionInvocation',
 						name: node,
-						arguments: rightNode,
+						arguments: rightNode.arguments,
 					}
 				} else {
 					return {
