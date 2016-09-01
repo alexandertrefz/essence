@@ -120,7 +120,7 @@ export interface IFunctionInvocationNode {
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
 	name: IIdentifierNode | INativeLookupNode
-	arguments: IArgumentListNode
+	arguments: Array<IExpressionNode>
 }
 
 export interface IReturnStatementNode {

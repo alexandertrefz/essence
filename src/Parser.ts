@@ -854,7 +854,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 				return {
 					nodeType: 'NativeFunctionInvocation',
 					name: node,
-					arguments: foundSequence[0],
+					arguments: foundSequence[0].arguments,
 				}
 			}
 		}
