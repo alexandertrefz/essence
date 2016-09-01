@@ -46,7 +46,19 @@ type parserResult = {
 	tokens: Array<IToken>
 }
 
+type expressionParserResult = {
+	foundSequence: Array<IToken | IASTNode>
+	node: IExpressionNode | undefined
+	tokens: Array<IToken>
+}
+
 type statementParserResult = {
+	foundSequence: Array<IToken | IASTNode>
+	node: IStatementNode | undefined
+	tokens: Array<IToken>
+}
+
+type programParserResult = {
 	foundSequence: Array<IToken | IASTNode>
 	node: IStatementNode | IExpressionNode | undefined
 	tokens: Array<IToken>
@@ -803,7 +815,7 @@ let functionInvocation = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let expression = (tokens: Array<IToken>): parserResult => {
+let expression = (tokens: Array<IToken>): expressionParserResult => {
 	let identifierOrValue = decorate(
 		choice(identifier, value),
 
@@ -871,7 +883,7 @@ let expression = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	return choice(expressionOrFunctionInvocation)(tokens)
+	return choice(expressionOrFunctionInvocation)(tokens) as expressionParserResult
 }
 
 /*
@@ -1078,10 +1090,15 @@ let statement = (tokens: Array<IToken>): statementParserResult => {
 		ifElseStatement,
 		ifStatement,
 		returnStatement,
-		expression,
 	)
 
 	return parser(tokens) as statementParserResult
+}
+
+let program = (tokens: Array<IToken>): programParserResult => {
+	const parser = choice(expression, statement)
+
+	return parser(tokens) as programParserResult
 }
 
 /*
@@ -1102,7 +1119,7 @@ let parseProgram = (tokens: Array<IToken>): IAST => {
 
 	while (tokens.length) {
 		let foundSequence: Array<any>, node: IASTNode | undefined
-		; ({ foundSequence, node, tokens, } = statement(tokens))
+		; ({ foundSequence, node, tokens, } = program(tokens))
 
 		if (node) {
 			nodes.push(node)
