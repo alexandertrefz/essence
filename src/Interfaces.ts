@@ -58,7 +58,7 @@ export interface IIdentifierNode {
 
 export interface ILookupNode {
 	nodeType: 'Lookup'
-	base: IIdentifierNode
+	base: IExpressionNode
 	member: string
 }
 
@@ -113,7 +113,7 @@ export interface IFunctionDefinitionNode {
 
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
-	name: IIdentifierNode | ILookupNode
+	name: IExpressionNode
 	arguments: IArgumentListNode
 }
 
