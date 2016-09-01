@@ -95,7 +95,11 @@ export class Runtime {
 	}
 
 	protected memberLookup(node: ILookupNode, scope: IScope): IValueNode {
-		return this.identifierLookup(node.base, scope).members[node.member]
+		if (node.base.nodeType === 'Identifier') {
+			return this.identifierLookup(node.base, scope).members[node.member]
+		} else {
+			return this.resolveExpression(node.base, scope).value.members[node.member]
+		}
 	}
 
 	protected identifierLookup(node: IIdentifierNode, scope: IScope): valueOrType {
@@ -122,7 +126,7 @@ export class Runtime {
 			logger.log('Lookup Identifier', node.content)
 			return this.identifierLookup(node, scope)
 		} else {
-			logger.log('Lookup Member', `${node.base.content}.${node.member}`)
+			logger.log('Lookup Member', `expression.${node.member}`)
 			return this.memberLookup(node, scope)
 		}
 	}
@@ -138,7 +142,7 @@ export class Runtime {
 			if (node.nodeType === 'Identifier') {
 				variableName = node.content
 			} else {
-				variableName = node.base.content + '.' + node.member
+				variableName = 'expression.' + node.member
 			}
 
 			logger.flush()
@@ -146,13 +150,21 @@ export class Runtime {
 		}
 	}
 
-	protected nativeLookup(node: IIdentifierNode | ILookupNode): Function {
+	protected nativeMemberLookup(node: INativeLookupNode): Function {
+		if (node.base.nodeType === 'Identifier') {
+			return this.nativeScope[node.base.content][node.member]
+		} else {
+			return this.nativeMemberLookup(node.base)
+		}
+	}
+
+	protected nativeLookup(node: IIdentifierNode | INativeLookupNode): Function {
 		if (node.nodeType === 'Identifier') {
 			logger.log('Simple Native Lookup', node.content)
 			return this.nativeScope[node.content]
 		} else {
-			logger.log('Complex Native Lookup', `${node.base.content}.${node.member}`)
-			return this.nativeScope[node.base.content][node.member]
+			logger.log('Complex Native Lookup', `expression.${node.member}`)
+			return this.nativeMemberLookup(node)
 		}
 	}
 
@@ -260,7 +272,7 @@ export class Runtime {
 		logger.log()
 		logger.log('InterpretFunctionInvocation')
 
-		let func = this.valueLookup(node.name, scope).value
+		let func = this.resolveExpression(node.name, scope).value
 		let args
 
 		args = node.arguments.arguments.map((value) => {
@@ -271,7 +283,7 @@ export class Runtime {
 			return logger.unwrapValue(value)
 		}).join(', '))
 
-		return this.invoke(func, args)
+		return this.invoke(func.value, args)
 	}
 
 	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: IScope): IValueNode {
@@ -357,7 +369,7 @@ export class Runtime {
 				value = this.valueLookup(node, scope)
 				break
 			case 'Lookup':
-				value = this.valueLookup(node, scope)
+				value = this.memberLookup(node, scope)
 				break
 			case 'FunctionInvocation':
 				value = this.interpretFunctionInvocation(node, scope)

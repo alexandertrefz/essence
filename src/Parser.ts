@@ -299,6 +299,67 @@ let choice = (...parsers: Array<Function>): parser => {
 	}
 }
 
+let suffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+	return (tokens: Array<IToken>): parserResult => {
+		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
+
+		if (node !== undefined) {
+			let parserNode = node // satisfy typescript
+			const rightHandSide = decorate(suffix, (foundSequence) => {
+				return wrappedGenerator(parserNode)(foundSequence)
+			})
+
+			while (true) {
+				let {
+					foundSequence: secondarySequence,
+					node: secondaryNode,
+					tokens: secondaryTokens,
+				} = rightHandSide(newTokens)
+
+				if (secondaryNode) {
+					foundSequence = [...foundSequence, ...secondarySequence]
+					newTokens = secondaryTokens
+					parserNode = secondaryNode
+				} else {
+					return { foundSequence, node: parserNode, tokens: newTokens, }
+				}
+			}
+		} else {
+			return { foundSequence, node, tokens: newTokens, }
+		}
+	}
+}
+
+let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+	return (tokens: Array<IToken>): parserResult => {
+		let { tokens: newTokens, node, foundSequence } = parser(tokens)
+
+		if (node !== undefined) {
+			let parserNode = node // satisfy typescript
+			const rightHandSide = sequence([separator, parser], (foundSequence) => {
+				return wrappedGenerator(parserNode)(foundSequence)
+			})
+
+			while (true) {
+				let {
+					foundSequence: secondarySequence,
+					node: secondaryNode,
+					tokens: secondaryTokens,
+				} = rightHandSide(newTokens)
+
+				if (secondaryNode) {
+					foundSequence = [...foundSequence, ...secondarySequence]
+					newTokens = secondaryTokens
+					parserNode = secondaryNode
+				} else {
+					return { foundSequence, node: parserNode, tokens: newTokens, }
+				}
+			}
+		} else {
+			return { foundSequence, node, tokens: newTokens, }
+		}
+	}
+}
 /*
 	2. Parsers
 */
@@ -658,14 +719,10 @@ let identifier = (tokens: Array<IToken>): parserResult => {
 
 let lookup = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ identifier, delimiter('.'), identifier ],
+		[ delimiter('.'), identifier ],
 
-		(foundSequence: [IIdentifierNode, IToken, IIdentifierNode]): ILookupNode => {
-			return {
-				nodeType: 'Lookup',
-				base: foundSequence[0],
-				member: foundSequence[2].content,
-			}
+		(foundSequence: [IToken, IIdentifierNode]): IIdentifierNode => {
+			return foundSequence[1]
 		}
 	)
 
@@ -697,34 +754,10 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 
 let functionInvocation = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ choice(lookup, identifier), argumentList, optionalLinebreak ],
+		[ argumentList, optionalLinebreak ],
 
-		(foundSequence: [IIdentifierNode | ILookupNode, IArgumentListNode]): IFunctionInvocationNode => {
-			return {
-				nodeType: 'FunctionInvocation',
-				name: foundSequence[0],
-				arguments: foundSequence[1],
-			}
-		}
-	)
-
-	return parser(tokens)
-}
-
-let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[
-			operator('@@'),
-			choice(lookup, identifier),
-			argumentList,
-			optionalLinebreak,
-		],
-		(foundSequence: [IToken, IIdentifierNode | ILookupNode, IArgumentListNode]): INativeFunctionInvocationNode => {
-			return {
-				nodeType: 'NativeFunctionInvocation',
-				name: foundSequence[1],
-				arguments: foundSequence[2],
-			}
+		(foundSequence: [IArgumentListNode]): IArgumentListNode => {
+			return foundSequence[0]
 		}
 	)
 
@@ -732,15 +765,78 @@ let nativeFunctionInvocation = (tokens: Array<IToken>): parserResult => {
 }
 
 let expression = (tokens: Array<IToken>): parserResult => {
-	const parser = choice(
-		functionInvocation,
-		nativeFunctionInvocation,
-		lookup,
-		identifier,
-		value,
+	let identifierOrValue = decorate(
+		choice(
+			identifier,
+			value,
+		),
+		(foundSequence: [IExpressionNode]): IExpressionNode => {
+			return foundSequence[0]
+		}
 	)
 
-	return parser(tokens)
+	type argumentListOrIdentifier = [IArgumentListNode | IIdentifierNode]
+
+	let expressionOrFunctionInvocation = suffix(
+		identifierOrValue,
+		choice(functionInvocation, lookup),
+		(node: IExpressionNode) => {
+			return (foundSequence: argumentListOrIdentifier): IFunctionInvocationNode | ILookupNode => {
+				let rightNode = foundSequence[0]
+				if (rightNode.nodeType === 'ArgumentList') {
+					return {
+						nodeType: 'FunctionInvocation',
+						name: node,
+						arguments: rightNode,
+					}
+				} else {
+					return {
+						nodeType: 'Lookup',
+						base: node,
+						member: rightNode.content,
+					}
+				}
+			}
+		}
+	)
+
+	let nativeLookup = suffix(
+		decorate(operator('@@'), (foundSequence) => { return foundSequence[0] }),
+		chainLeft(
+			identifier,
+			delimiter('.'),
+			(node: IIdentifierNode | INativeLookupNode) => {
+				return (foundSequence: [IToken, IIdentifierNode]): INativeLookupNode => {
+					return {
+						nodeType: 'NativeLookup',
+						base: node,
+						member: foundSequence[1].content,
+					}
+				}
+			}
+		),
+		(node: any) => {
+			return (foundSequence: [IExpressionNode]): IExpressionNode => {
+				return foundSequence[0]
+			}
+		}
+	)
+
+	let nativeFunctionInvocation = suffix(
+		nativeLookup,
+		functionInvocation,
+		(node: INativeLookupNode) => {
+			return (foundSequence: [IArgumentListNode]): INativeFunctionInvocationNode => {
+				return {
+					nodeType: 'NativeFunctionInvocation',
+					name: node,
+					arguments: foundSequence[0],
+				}
+			}
+		}
+	)
+
+	return choice(expressionOrFunctionInvocation, nativeFunctionInvocation)(tokens)
 }
 
 /*
