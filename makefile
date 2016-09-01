@@ -5,7 +5,6 @@ JS_BUILD_DIR = lib
 TYPESCRIPT_SRC   = $(shell find src ! -path "src/tests/*" -name "*.ts")
 TYPESCRIPT_TESTS = $(shell find src/tests -name '*.ts')
 
-
 #targets
 JS_SRC   = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_SRC))
 JS_TESTS = $(patsubst src/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_TESTS))
@@ -21,21 +20,19 @@ $(JS_BUILD_DIR)/%.js: src/%.ts
 $(JS_BUILD_DIR)/tests/%.js: src/tests/%.ts
 	- $(TSC) $(TSC_ARGS) $<
 
-all: build
+all: build build-tests
 
-build: build-src build-tests
-
-build-src: $(JS_SRC)
+build: $(JS_SRC)
 
 build-tests: $(JS_TESTS)
 
-test: build-src build-tests |
+test: all |
 	@clear
 	@$(JASMINE)
 
 watch:
 	@clear
-	watchman-make -p 'src/*.ts' -t build-src
+	watchman-make -p 'src/*.ts' -t build
 
 dev:
 	@clear
