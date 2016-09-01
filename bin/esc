@@ -4,6 +4,12 @@ let process = require('process')
 let fs = require('fs')
 let path = require('path')
 
+let argv = require('minimist')(process.argv.slice(2), {
+	default: {
+		bare: false,
+	}
+})
+
 let Lexer = require('../lib/Lexer').Lexer
 let Parser = require('../lib/Parser')
 
@@ -11,7 +17,7 @@ let sourceFileTokens = []
 let lexedFiles = []
 let fileCount = 0
 
-let sourceFileName = process.argv[2]
+let sourceFileName = argv._[0]
 let primitivesPath = 'primitives'
 
 fs.readdir(primitivesPath, (err, files) => {
@@ -21,17 +27,19 @@ fs.readdir(primitivesPath, (err, files) => {
 		return path.extname(value) === '.es'
 	})
 
-	fileCount = files.length
+	if (argv.bare === false) {
+		fileCount = files.length
 
-	files.forEach((value) => {
-		fs.readFile(`${primitivesPath}/${value}`, 'utf8', (err, data) => {
-			lexedFiles.push(Lexer.lex(data))
+		files.forEach((value) => {
+			fs.readFile(`${primitivesPath}/${value}`, 'utf8', (err, data) => {
+				lexedFiles.push(Lexer.lex(data))
 
-			if (sourceFileTokens.length && lexedFiles.length === fileCount) {
-				finishCompilation(lexedFiles, sourceFileTokens)
-			}
+				if (sourceFileTokens.length && lexedFiles.length === fileCount) {
+					finishCompilation(lexedFiles, sourceFileTokens)
+				}
+			})
 		})
-	})
+	}
 
 	fs.readFile(sourceFileName, 'utf8', (err, data) => {
 		sourceFileTokens = Lexer.lex(data)
