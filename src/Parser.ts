@@ -780,7 +780,7 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
 			return {
 				nodeType: 'FunctionDefinition',
-				parameters: foundSequence[0],
+				parameters: foundSequence[0].parameters,
 				returnType: foundSequence[2],
 				body: foundSequence[3],
 			}

@@ -105,7 +105,7 @@ export interface IArgumentListNode {
 
 export interface IFunctionDefinitionNode {
 	nodeType: 'FunctionDefinition'
-	parameters: IParameterListNode
+	parameters: Array<IParameterNode>
 	returnType: ITypeDeclarationNode
 	body: IBlockNode
 	scope?: any
