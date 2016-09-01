@@ -299,7 +299,7 @@ let choice = (...parsers: Array<Function>): parser => {
 	}
 }
 
-let suffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+let optionalSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
 	return (tokens: Array<IToken>): parserResult => {
 		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
 
@@ -814,8 +814,42 @@ let expression = (tokens: Array<IToken>): parserResult => {
 
 	type argumentListOrIdentifier = [IArgumentListNode | IIdentifierNode]
 
-	let expressionOrFunctionInvocation = suffix(
-		identifierOrValue,
+	let nativeLookup = optionalSuffix(
+		sequence(
+			[operator('@@'), identifier],
+			(foundSequence) => { return foundSequence[1] }
+		),
+		sequence(
+			[delimiter('.'), identifier],
+			(foundSequence) => { return foundSequence[1] }
+		),
+		(node: IIdentifierNode | INativeLookupNode) => {
+			return (foundSequence: [IIdentifierNode]): INativeLookupNode => {
+				return {
+					nodeType: 'NativeLookup',
+					base: node,
+					member: foundSequence[0].content,
+				}
+			}
+		}
+	)
+
+	let nativeFunctionInvocation = oneOrMoreSuffix(
+		nativeLookup,
+		functionInvocation,
+		(node: INativeLookupNode) => {
+			return (foundSequence: [IArgumentListNode]): INativeFunctionInvocationNode => {
+				return {
+					nodeType: 'NativeFunctionInvocation',
+					name: node,
+					arguments: foundSequence[0],
+				}
+			}
+		}
+	)
+
+	let expressionOrFunctionInvocation = optionalSuffix(
+		choice(identifierOrValue, nativeFunctionInvocation),
 		choice(functionInvocation, lookup),
 		(node: IExpressionNode) => {
 			return (foundSequence: argumentListOrIdentifier): IFunctionInvocationNode | ILookupNode => {
@@ -837,43 +871,7 @@ let expression = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	let nativeLookup = suffix(
-		decorate(operator('@@'), (foundSequence) => { return foundSequence[0] }),
-		chainLeft(
-			identifier,
-			delimiter('.'),
-			(node: IIdentifierNode | INativeLookupNode) => {
-				return (foundSequence: [IToken, IIdentifierNode]): INativeLookupNode => {
-					return {
-						nodeType: 'NativeLookup',
-						base: node,
-						member: foundSequence[1].content,
-					}
-				}
-			}
-		),
-		(node: any) => {
-			return (foundSequence: [IExpressionNode]): IExpressionNode => {
-				return foundSequence[0]
-			}
-		}
-	)
-
-	let nativeFunctionInvocation = suffix(
-		nativeLookup,
-		functionInvocation,
-		(node: INativeLookupNode) => {
-			return (foundSequence: [IArgumentListNode]): INativeFunctionInvocationNode => {
-				return {
-					nodeType: 'NativeFunctionInvocation',
-					name: node,
-					arguments: foundSequence[0],
-				}
-			}
-		}
-	)
-
-	return choice(expressionOrFunctionInvocation, nativeFunctionInvocation)(tokens)
+	return choice(expressionOrFunctionInvocation)(tokens)
 }
 
 /*
