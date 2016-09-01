@@ -573,15 +573,17 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 
 		(foundSequence: [IToken, IParameterNode | null]): IParameterListNode => {
 			let parameter = foundSequence[1]
-			let args: Array<IParameterNode> = []
+			let parameters: Array<IParameterNode>
 
 			if (parameter !== null) {
-				args.push(parameter)
+				parameters = [parameter]
+			} else {
+				parameters = []
 			}
 
 			return {
 				nodeType: 'ParameterList',
-				parameters: args,
+				parameters,
 			}
 		}
 	)
@@ -596,17 +598,16 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 		],
 		(foundSequence: [IToken, IParameterNode, IParameterNode[] | null]): IParameterListNode => {
 			let parameters = foundSequence[2]
-			let args: Array<IParameterNode> = []
 
 			if (parameters !== null) {
-				args = [foundSequence[1], ...parameters]
+				parameters = [foundSequence[1], ...parameters]
 			} else {
-				args = [foundSequence[1]]
+				parameters = [foundSequence[1]]
 			}
 
 			return {
 				nodeType: 'ParameterList',
-				parameters: args,
+				parameters,
 			}
 		}
 	)
