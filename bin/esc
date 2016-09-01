@@ -7,6 +7,7 @@ let path = require('path')
 let argv = require('minimist')(process.argv.slice(2), {
 	default: {
 		bare: false,
+		pretty: false,
 	}
 })
 
@@ -61,7 +62,17 @@ function finishCompilation(lexedFiles, sourceFileTokens) {
 
 	let sourceFileNameParsed = path.parse(sourceFileName)
 	let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
-	fs.writeFileSync(targetFileName, JSON.stringify(Parser.parse(tokens).nodes))
+
+	let nodes = Parser.parse(tokens).nodes
+	let ir
+
+	if (argv.pretty) {
+		ir = JSON.stringify(nodes, null, '\t')
+	} else {
+		ir = JSON.stringify(nodes)
+	}
+
+	fs.writeFileSync(targetFileName, ir)
 }
 
 
