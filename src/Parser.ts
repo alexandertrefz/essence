@@ -6,7 +6,6 @@ let debugNodes = false
 
 import {
 	IToken,
-	IAST,
 	IASTNode,
 	IStatementNode,
 	ITypeDeclarationNode,
@@ -1106,7 +1105,7 @@ let program = (tokens: Array<IToken>): programParserResult => {
 	3. Public Interface
 */
 
-let parseProgram = (tokens: Array<IToken>): IAST => {
+let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNode> => {
 	let nodes: Array<IExpressionNode | IStatementNode> = []
 
 	tokens = combineMultiTokenOperators(tokens)
@@ -1138,11 +1137,9 @@ let parseProgram = (tokens: Array<IToken>): IAST => {
 		console.log()
 	}
 
-	return {
-		nodes,
-	}
+	return nodes
 }
 
-export let parse = (tokens: Array<IToken>): IAST => {
+export let parse = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNode> => {
 	return parseProgram(tokens)
 }

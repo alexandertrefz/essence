@@ -25,10 +25,6 @@ export interface IToken {
 	Parser
 */
 
-export interface IAST {
-	nodes: Array<IExpressionNode | IStatementNode>
-}
-
 export type ASTType
 	= 'Identifier'
 	| 'Lookup'

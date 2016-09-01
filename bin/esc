@@ -63,7 +63,7 @@ function finishCompilation(lexedFiles, sourceFileTokens) {
 	let sourceFileNameParsed = path.parse(sourceFileName)
 	let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
 
-	let nodes = Parser.parse(tokens).nodes
+	let nodes = Parser.parse(tokens)
 	let ir
 
 	if (argv.pretty) {
