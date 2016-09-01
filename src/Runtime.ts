@@ -290,7 +290,7 @@ export class Runtime {
 		logger.log('InterpretNativeFunctionInvocation')
 
 		let func = this.nativeLookup(node.name)
-		let args = node.arguments.arguments.map((value) => {
+		let args = node.arguments.map((value) => {
 			return this.resolveExpression(value, scope).value
 		})
 
