@@ -409,13 +409,6 @@ let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IA
 		}
 	}
 }
-/*
-	2. Parsers
-*/
-
-/*
-	2.1 Helpers
-*/
 
 let tokenHelper = (tokenType: string): (content: string) => IParser => {
 	return (content: string): IParser => {
@@ -456,6 +449,10 @@ let many = (parser: IParser | Function): IParser => {
 	return parser
 }
 
+/*
+	2. Parsers
+*/
+
 let operator = tokenHelper('Operator')
 
 let delimiter = tokenHelper('Delimiter')
@@ -465,6 +462,10 @@ let keyword = tokenHelper('Keyword')
 let linebreak = () => { return tokenHelper('Linebreak')('\n') }
 
 let optionalLinebreak = optional(linebreak())
+
+/*
+	2.1 Helpers
+*/
 
 /*
 	2.1.1 General Helpers
