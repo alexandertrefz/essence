@@ -330,6 +330,43 @@ let suffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode)
 	}
 }
 
+let oneOrMoreSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+	return (tokens: Array<IToken>): parserResult => {
+		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
+
+		if (node !== undefined) {
+			let parserNode = node // satisfy typescript
+			const rightHandSide = decorate(suffix, (foundSequence) => {
+				return wrappedGenerator(parserNode)(foundSequence)
+			})
+			let foundSuffix = false
+
+			while (true) {
+				let {
+					foundSequence: secondarySequence,
+					node: secondaryNode,
+					tokens: secondaryTokens,
+				} = rightHandSide(newTokens)
+
+				if (secondaryNode) {
+					foundSuffix = true
+					foundSequence = [...foundSequence, ...secondarySequence]
+					newTokens = secondaryTokens
+					parserNode = secondaryNode
+				} else {
+					if (foundSuffix) {
+						return { foundSequence, node: parserNode, tokens: newTokens, }
+					} else {
+						return { foundSequence: [] as Array<any>, node: undefined, tokens, }
+					}
+				}
+			}
+		} else {
+			return { foundSequence: [] as Array<any>, node: undefined, tokens, }
+		}
+	}
+}
+
 let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
 	return (tokens: Array<IToken>): parserResult => {
 		let { tokens: newTokens, node, foundSequence } = parser(tokens)
