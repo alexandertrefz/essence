@@ -84,9 +84,9 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 		let token = tokens[i]
 		let nextToken = tokens[i + 1]
 
-		if (token.content === '@') {
-			if (nextToken.content === '@') {
-				token.content = '@@'
+		if (token.content === '_') {
+			if (nextToken.content === '_') {
+				token.content = '__'
 				token.tokenType = 'Operator'
 				tokens.splice(i + 1, 1)
 			}
@@ -828,7 +828,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 
 	let nativeLookup = optionalSuffix(
 		sequence(
-			[operator('@@'), identifier],
+			[operator('__'), identifier],
 			(foundSequence) => { return foundSequence[1] }
 		),
 		sequence(
