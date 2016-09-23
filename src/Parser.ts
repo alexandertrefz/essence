@@ -995,6 +995,14 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 }
 
 let declarationStatement = (tokens: Array<IToken>): parserResult => {
+	type declarationSequence = [
+		IToken,
+		IIdentifierNode,
+		ITypeDeclarationNode,
+		IToken,
+		IExpressionNode
+	]
+
 	const parser = sequence(
 		[
 			keyword('let'),
@@ -1004,7 +1012,7 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 			expression,
 			optionalLinebreak,
 		],
-		(foundSequence: [IToken, IIdentifierNode, ITypeDeclarationNode, IToken, IExpressionNode]): IDeclarationStatementNode => {
+		(foundSequence: declarationSequence): IDeclarationStatementNode => {
 			return {
 				nodeType: 'DeclarationStatement',
 				name: foundSequence[1].content,
