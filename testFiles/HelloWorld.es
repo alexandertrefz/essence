@@ -1,8 +1,8 @@
-let print Function = (message String) -> String {
+let print (String) -> String = (message String) -> String {
 	return __print(message)
 }
 
-let greet Function = (greetee String) -> String {
+let greet (String) -> String = (greetee String) -> String {
 	let message String = String.join('Hello, ', greetee)
 
 	if String.equals(greetee, '') {
