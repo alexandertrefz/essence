@@ -66,7 +66,7 @@ export interface INativeLookupNode {
 
 export interface ITypeDeclarationNode {
 	nodeType: 'TypeDeclaration'
-	name: IIdentifierNode
+	name: string
 }
 
 export interface IBlockNode {

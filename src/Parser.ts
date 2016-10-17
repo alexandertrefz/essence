@@ -471,18 +471,105 @@ let optionalLinebreak = optional(linebreak())
 */
 
 let typeDeclaration = (tokens: Array<IToken>): parserResult => {
-	const parser = decorate(
+	type shortComplexTypeDeclarationSequence = [
+		IToken, ITypeDeclarationNode | null, IToken,
+		IToken,
+		ITypeDeclarationNode
+	]
+
+	type longComplexTypeDeclarationSequence = [
+		IToken, ITypeDeclarationNode, ITypeDeclarationNode[] | null, IToken,
+		IToken,
+		ITypeDeclarationNode
+	]
+
+	const simpleTypeDeclaration = decorate(
 		identifier,
 
 		(foundSequence: [IIdentifierNode]): ITypeDeclarationNode => {
 			return {
 				nodeType: 'TypeDeclaration',
-				name: foundSequence[0],
+				name: foundSequence[0].content,
 			}
 		}
 	)
 
-	return parser(tokens)
+	let complexTypeDeclaration
+
+	const generateTypeDeclarationParser = () => {
+		return choice(simpleTypeDeclaration, complexTypeDeclaration)
+	}
+
+	const typeDeclarationWithOptionalTrailingComma = sequence(
+		[ generateTypeDeclarationParser(), optional(delimiter(',')) ],
+
+		(foundSequence: [ITypeDeclarationNode]): ITypeDeclarationNode => {
+			return foundSequence[0]
+		}
+	)
+
+	const typeDeclarationWithPrecedingComma = sequence(
+		[ delimiter(','), generateTypeDeclarationParser() ],
+
+		(foundSequence: [IToken, ITypeDeclarationNode]): ITypeDeclarationNode => {
+			return foundSequence[1]
+		}
+	)
+
+	const zeroOrOneTypeDeclaration = sequence(
+		[
+			delimiter('('),
+			optional(typeDeclarationWithOptionalTrailingComma),
+			delimiter(')'),
+			operator('->'),
+			simpleTypeDeclaration,
+		],
+		(foundSequence: shortComplexTypeDeclarationSequence): ITypeDeclarationNode => {
+			let optionalParameter = foundSequence[1]
+			let returnType = foundSequence[4].name
+			let parameter: string = ''
+
+			if (optionalParameter !== null) {
+				parameter = optionalParameter.name
+			}
+
+			return {
+				nodeType: 'TypeDeclaration',
+				name: `(${parameter}) -> ${returnType}`,
+			}
+		}
+	)
+
+	const oneOrMoreTypeDeclaration = sequence(
+		[
+			delimiter('('),
+			typeDeclaration,
+			many(typeDeclarationWithPrecedingComma),
+			delimiter(')'),
+			operator('->'),
+			simpleTypeDeclaration,
+		],
+		(foundSequence: longComplexTypeDeclarationSequence): ITypeDeclarationNode => {
+			let returnType = foundSequence[5].name
+			let parameters = [foundSequence[1]]
+			let possibleParameters = foundSequence[2]
+
+			if (possibleParameters !== null) {
+				parameters = [...parameters, ...possibleParameters]
+			}
+
+			let params = parameters.reduce((name, node) => `${name},${node.name}`, '').slice(1)
+
+			return {
+				nodeType: 'TypeDeclaration',
+				name: `(${params}) -> ${returnType}`,
+			}
+		}
+	)
+
+	complexTypeDeclaration = choice(zeroOrOneTypeDeclaration, oneOrMoreTypeDeclaration)
+
+	return generateTypeDeclarationParser()(tokens)
 }
 
 let block = (tokens: Array<IToken>): parserResult => {
