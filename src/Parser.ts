@@ -99,6 +99,14 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 				tokens.splice(i + 1, 1)
 			}
 		}
+
+		if (token.content === '<') {
+			if (nextToken.content === '-') {
+				token.content = '<-'
+				token.tokenType = 'Operator'
+				tokens.splice(i + 1, 1)
+			}
+		}
 	}
 
 	return tokens
@@ -979,7 +987,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 
 let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ keyword('return'), expression, optionalLinebreak ],
+		[ operator('<-'), expression, optionalLinebreak ],
 
 		(foundSequence: [IToken, IExpressionNode]): IReturnStatementNode => {
 			return {
