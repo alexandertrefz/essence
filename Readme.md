@@ -2,7 +2,7 @@
 The main goal for this language is to allow the rapid prototyping akin to dynamically
 and weakly typed languages like ECMAScript, while allowing to upgrade the prototype
 to a proper program with the safety of static and strongly typed languages like C#.
-It also allows for a unified syntactical interface for blocking and non blocking code
+It also should allow for a unified syntactical interface for blocking and non blocking code
 – making refactoring painless and easy.
 
 # The Essence
@@ -26,7 +26,6 @@ It also allows for a unified syntactical interface for blocking and non blocking
 * Interfaces
 * Generics
 * Named Parameters
-* Method Overloading
 * First-Class Functions
 * Memory Managed
 * Compact & Readable Syntax
