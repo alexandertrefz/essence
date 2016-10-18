@@ -31,3 +31,8 @@ It also should allow for a unified syntactical interface for blocking and non bl
 * Compact & Readable Syntax
 * All Data is Immutable
 
+# Disclaimer
+This language is still a work in progress. While the semantics could be described as stable at this point,
+the syntax is still somewhat in flux. You can find the most recent and working example of syntax in
+the [HelloWorld.es](testFiles/HelloWorld.es) as well as the other files in [testFiles](testFiles).
+It also should be noted that the syntax is meant to be viewed with a font with code ligatures, like FiraCode.
