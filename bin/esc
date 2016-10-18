@@ -13,6 +13,7 @@ let argv = require('minimist')(process.argv.slice(2), {
 
 let Lexer = require('../lib/Lexer')
 let Parser = require('../lib/Parser')
+let Validator = require('../lib/Validator')
 
 let sourceFileTokens = []
 let lexedFiles = []
@@ -65,6 +66,8 @@ function finishCompilation(lexedFiles, sourceFileTokens) {
 
 	let nodes = Parser.parse(tokens)
 	let ir
+
+	Validator.validateProgram(nodes)
 
 	if (argv.pretty) {
 		ir = JSON.stringify(nodes, null, '\t')
