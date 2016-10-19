@@ -127,7 +127,7 @@ export interface IReturnStatementNode {
 export interface IDeclarationStatementNode {
 	nodeType: 'DeclarationStatement'
 	name: string
-	type: ITypeDeclarationNode
+	type: ITypeDeclarationNode | null
 	value: IExpressionNode
 }
 
