@@ -71,7 +71,7 @@ export interface ITypeDeclarationNode {
 
 export interface IBlockNode {
 	nodeType: 'Block'
-	body: Array<IStatementNode>
+	nodes: Array<IStatementNode>
 }
 
 export interface IValueNode {

@@ -587,15 +587,15 @@ let block = (tokens: Array<IToken>): parserResult => {
 			optionalLinebreak,
 		],
 		(foundSequence: [IToken, IToken, IStatementNode[] | null]): IBlockNode => {
-			let body = foundSequence[2]
+			let nodes = foundSequence[2]
 
-			if (body === null) {
-				body = []
+			if (nodes === null) {
+				nodes = []
 			}
 
 			return {
 				nodeType: 'Block',
-				body,
+				nodes,
 			}
 		}
 	)
@@ -1191,7 +1191,7 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				trueBody: foundSequence[0].body,
 				falseBody: {
 					nodeType: 'Block',
-					body: [foundSequence[2]],
+					nodes: [foundSequence[2]],
 				},
 			}
 		}

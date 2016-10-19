@@ -180,7 +180,7 @@ export class Runtime {
 			scope[argumentNames[i]] = args[i]
 		}
 
-		for (let node of func.body.body) {
+		for (let node of func.body.nodes) {
 			if (node.nodeType === 'ReturnStatement') {
 				let value = this.resolveExpression(node.expression, scope).value
 				logger.log('ReturnStatement', logger.unwrapValue(value))
@@ -313,7 +313,7 @@ export class Runtime {
 				parent: scope,
 			}
 
-			for (let subNode of node.body.body) {
+			for (let subNode of node.body.nodes) {
 				// If we find a return, resolve the expression since only we know the correct scope,
 				// and return a new IReturnStatementNode so that the parent can deal with it
 				if (subNode.nodeType === 'ReturnStatement') {
@@ -338,10 +338,10 @@ export class Runtime {
 
 		if (condition.value) {
 			logger.log('ResolvedCondition', 'true')
-			body = node.trueBody.body
+			body = node.trueBody.nodes
 		} else {
 			logger.log('ResolvedCondition', 'false')
-			body = node.falseBody.body
+			body = node.falseBody.nodes
 		}
 
 		let subScope: IScope = {
