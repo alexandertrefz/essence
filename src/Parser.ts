@@ -34,10 +34,7 @@ import {
 type tokenSequenceMatch = {
 	foundSequence: Array<IToken | IASTNode | null>
 	tokens: Array<IToken>
-}; // This semicolon is strategically placed to fix a bug in TSLint.
-//    Removing it causes TSLint to declare missing commas on places
-//    where no comma is missing.
-//    I don't know why this semicolon fixes that bug, but it does.
+}
 
 type parserResult = {
 	foundSequence: Array<IToken | IASTNode>
