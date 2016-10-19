@@ -1,9 +1,9 @@
-let print (String) -> String = (message String) -> String {
+let print = (message String) -> String {
 	<- __print(message)
 }
 
-let greet (String) -> String = (greetee String) -> String {
-	let message String = String.join('Hello, ', greetee)
+let greet = (greetee String) -> String {
+	let message = String.join('Hello, ', greetee)
 
 	if String.equals(greetee, '') {
 		<- print('Greetee can not be empty!')
