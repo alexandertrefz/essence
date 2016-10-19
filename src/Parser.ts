@@ -1090,7 +1090,7 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 	type declarationSequence = [
 		IToken,
 		IIdentifierNode,
-		ITypeDeclarationNode,
+		ITypeDeclarationNode | null,
 		IToken,
 		IExpressionNode
 	]
@@ -1099,7 +1099,7 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 		[
 			keyword('let'),
 			identifier,
-			typeDeclaration,
+			optional(typeDeclaration),
 			delimiter('='),
 			expression,
 			optionalLinebreak,
