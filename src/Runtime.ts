@@ -126,7 +126,7 @@ export class Runtime {
 			logger.log('Lookup Identifier', node.content)
 			return this.identifierLookup(node, scope)
 		} else {
-			logger.log('Lookup Member', `expression.${node.member}`)
+			logger.log('Lookup Member', `<expression>.${node.member}`)
 			return this.memberLookup(node, scope)
 		}
 	}
@@ -142,7 +142,7 @@ export class Runtime {
 			if (node.nodeType === 'Identifier') {
 				variableName = node.content
 			} else {
-				variableName = 'expression.' + node.member
+				variableName = '<expression>.' + node.member
 			}
 
 			logger.flush()
