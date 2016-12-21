@@ -2,6 +2,11 @@
 	Lexer
 */
 
+export type Position = {
+	line: number
+	column: number
+}
+
 export type TokenType
 	= null
 	| 'Delimiter'
@@ -17,8 +22,7 @@ export type TokenType
 export interface IToken {
 	content: string
 	tokenType: TokenType
-	line: number
-	column: number
+	position: Position
 }
 
 /*

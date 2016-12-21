@@ -8,27 +8,28 @@ type ISimpleToken = {
 	content: string
 }
 
-let stripNumbersFromArray = (tokens: IToken[]): ISimpleToken[] => {
+let stripPositionFromArray = (tokens: IToken[]): ISimpleToken[] => {
 	return tokens.map((value) => {
-		return stripNumbers(value)
+		return stripPosition(value)
 	})
 }
 
-let stripNumbers = (token: IToken): ISimpleToken => {
-	return {
-		tokenType: token.tokenType,
-		content: token.content,
-	}
+let stripPosition = (token: IToken): ISimpleToken => {
+	let tokenCopy = JSON.parse(JSON.stringify(token))
+	delete tokenCopy.position
+	return tokenCopy
 }
 
 describe('Lexer', () => {
-	describe('stripNumbers', () => {
+	describe('stripPosition', () => {
 		it('should strip line and column', () => {
 			let input: IToken = {
 				content: '',
 				tokenType: 'String',
-				line: 1,
-				column: 2,
+				position: {
+					line: 1,
+					column: 2,
+				}
 			}
 
 			let output = {
@@ -36,17 +37,19 @@ describe('Lexer', () => {
 				tokenType: 'String',
 			}
 
-			expect(stripNumbers(input)).toEqual(output)
+			expect(stripPosition(input)).toEqual(output)
 		})
 	})
 
-	describe('stripNumbersFromArray', () => {
+	describe('stripPositionFromArray', () => {
 		it('should strip line and column from all values', () => {
 			let input: IToken[] = [{
 				content: '',
 				tokenType: 'String',
-				line: 1,
-				column: 2,
+				position: {
+					line: 1,
+					column: 2,
+				}
 			}]
 
 			let output = [{
@@ -54,7 +57,7 @@ describe('Lexer', () => {
 				tokenType: 'String',
 			}]
 
-			expect(stripNumbersFromArray(input)).toEqual(output)
+			expect(stripPositionFromArray(input)).toEqual(output)
 		})
 	})
 
@@ -71,7 +74,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex multiple linebreaks as one', () => {
@@ -86,7 +89,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex linebreak after other tokens', () => {
@@ -99,7 +102,7 @@ describe('Lexer', () => {
 				{ content: '\n', tokenType: 'Linebreak', },
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
@@ -116,7 +119,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex simple strings', () => {
@@ -131,7 +134,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex complex strings', () => {
@@ -146,7 +149,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should not lex open strings', () => {
@@ -171,7 +174,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex false', () => {
@@ -186,7 +189,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
@@ -198,7 +201,7 @@ describe('Lexer', () => {
 			input = '§ Comment'
 			output = []
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
@@ -212,7 +215,7 @@ describe('Lexer', () => {
 				{ content: 'identifier', tokenType: 'Identifier', },
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex identifiers with whitespace in front', () => {
@@ -224,7 +227,7 @@ describe('Lexer', () => {
 				{ content: 'identifier', tokenType: 'Identifier', },
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex identifiers with whitespace after', () => {
@@ -236,7 +239,7 @@ describe('Lexer', () => {
 				{ content: 'identifier', tokenType: 'Identifier', },
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex identifiers separated by delimiters', () => {
@@ -250,7 +253,7 @@ describe('Lexer', () => {
 				{ content: 'identifier2', tokenType: 'Identifier', },
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
@@ -267,7 +270,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex if', () => {
@@ -282,7 +285,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex else', () => {
@@ -297,7 +300,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
@@ -314,7 +317,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex (', () => {
@@ -329,7 +332,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex )', () => {
@@ -344,7 +347,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex {', () => {
@@ -359,7 +362,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex }', () => {
@@ -374,7 +377,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex ,', () => {
@@ -389,7 +392,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex .', () => {
@@ -404,7 +407,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex :', () => {
@@ -419,7 +422,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex =', () => {
@@ -434,7 +437,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex -', () => {
@@ -449,7 +452,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex <', () => {
@@ -464,7 +467,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex >', () => {
@@ -479,7 +482,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
 		it('should lex _', () => {
@@ -494,7 +497,7 @@ describe('Lexer', () => {
 				},
 			]
 
-			expect(stripNumbersFromArray(lex(input))).toEqual(output)
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 })

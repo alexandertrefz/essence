@@ -1249,7 +1249,7 @@ let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNo
 			nodes.push(node)
 		} else {
 			// TODO: Handle Error -> Syntax could be lexed but not parsed
-			// TODO: How can we be helpful with this error, aside from line & column?
+			// TODO: How can we be helpful with this error, aside from position?
 			break
 		}
 	}

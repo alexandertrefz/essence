@@ -1,17 +1,11 @@
 /// <reference path="../typings/index.d.ts" />
 
-import { IToken, } from './Interfaces'
+import { Position, IToken, } from './Interfaces'
 
-type position = {
-	column: number
-	line: number
-}
-
-type lexingResult = {
-	line: number
-	column: number
+type LexingResult = {
 	input: string
 	token: IToken
+	position: Position
 }
 
 const stringLiteral   = '\''
@@ -20,26 +14,27 @@ const commentLiteral  = '§'
 const keywords        = ['let', 'if', 'else', 'type']
 const delimiters      = ['@', '(', ')', '{', '}', ',', '.', ':', '=', '-', '>', '<', '_']
 
-let handleLineNumberAndCollumn = (char: string, line: number, column: number): position => {
-	if (char === '\n') {
-		column = 1
-		line++
-	} else {
-		column++
+let handlePosition = (char: string, position: Position): Position => {
+	position = {
+		line: position.line,
+		column: position.column,
 	}
 
-	return {
-		line,
-		column,
+	if (char === '\n') {
+		position.column = 1
+		position.line++
+	} else {
+		position.column++
 	}
+
+	return position
 }
 
-let lexString = (input: string, line: number, column: number): lexingResult => {
+let lexString = (input: string, position: Position): LexingResult => {
 	let token: IToken = {
 		content: '',
 		tokenType: 'String',
-		line,
-		column,
+		position,
 	}
 
 	let inputSliced = false
@@ -49,7 +44,7 @@ let lexString = (input: string, line: number, column: number): lexingResult => {
 	for (let i = 0; i < input.length; i++) {
 		token.content += input[i]
 
-		; ({ line, column, } = handleLineNumberAndCollumn(input[i], line, column))
+		position = handlePosition(input[i], position)
 
 		if (token.content.startsWith(stringLiteral) && token.content.length === 1) {
 			balanceWasChanged = true
@@ -70,23 +65,21 @@ let lexString = (input: string, line: number, column: number): lexingResult => {
 	}
 
 	if (!inputSliced) {
-		throw new Error(`String Token not closed at line: ${line}, column: ${column}`)
+		throw new Error(`String Token not closed at line: ${position.line}, column: ${position.column}`)
 	}
 
 	return {
 		input,
-		line,
-		column,
 		token,
+		position,
 	}
 }
 
-let lexComment = (input: string, line: number, column: number): lexingResult => {
+let lexComment = (input: string, position: Position): LexingResult => {
 	let token: IToken = {
 		content: '',
 		tokenType: null,
-		line,
-		column,
+		position,
 	}
 
 	let i: number
@@ -94,7 +87,7 @@ let lexComment = (input: string, line: number, column: number): lexingResult => 
 	for (i = 0; i < input.length; i++) {
 		token.content += input[i]
 
-		; ({ line, column, } = handleLineNumberAndCollumn(input[i], line, column))
+		position = handlePosition(input[i], position)
 
 		if (token.content.endsWith('\n') || i + 1 === input.length) {
 			token.tokenType = 'Comment'
@@ -106,9 +99,8 @@ let lexComment = (input: string, line: number, column: number): lexingResult => 
 
 	return {
 		input,
-		line,
-		column,
 		token,
+		position,
 	}
 }
 
@@ -128,12 +120,11 @@ let lexBoolean = (token: IToken): IToken => {
 	return token
 }
 
-let lexToken = (input: string, line: number, column: number): lexingResult => {
+let lexToken = (input: string, position: Position): LexingResult => {
 	let token: IToken = {
 		content: '',
 		tokenType: null,
-		line,
-		column,
+		position,
 	}
 
 	let i: number
@@ -145,7 +136,7 @@ let lexToken = (input: string, line: number, column: number): lexingResult => {
 		// to handle it before handling linenumbers potentially
 		if (input[i] === '\n') {
 			if (token.content.startsWith('\n')) {
-				; ({ line, column, } = handleLineNumberAndCollumn(input[i], line, column))
+				position = handlePosition(input[i], position)
 				token.tokenType = 'Linebreak'
 				break
 			} else {
@@ -156,7 +147,7 @@ let lexToken = (input: string, line: number, column: number): lexingResult => {
 			}
 		}
 
-		; ({ line, column, } = handleLineNumberAndCollumn(input[i], line, column))
+		position = handlePosition(input[i], position)
 
 		if (!!~delimiters.indexOf(token.content)) {
 			token.tokenType = 'Delimiter'
@@ -171,12 +162,12 @@ let lexToken = (input: string, line: number, column: number): lexingResult => {
 		}
 
 		if (token.content.startsWith(commentLiteral)) {
-			; ({ input, line, column, token, } = lexComment(input, line, column))
+			; ({ input, token, position } = lexComment(input, position))
 			break
 		}
 
 		if (token.content.startsWith(stringLiteral)) {
-			; ({ input, line, column, token, } = lexString(input, line, column))
+			; ({ input, token, position } = lexString(input, position))
 			break
 		}
 
@@ -208,19 +199,18 @@ let lexToken = (input: string, line: number, column: number): lexingResult => {
 
 	return {
 		input,
-		line,
-		column,
 		token,
+		position,
 	}
 }
 
-export let lex = (input: string, line: number = 1, column: number = 1): Array<IToken> => {
+export let lex = (input: string, position: Position = { line: 1, column: 1, }): Array<IToken> => {
 	let tokens: IToken[] = []
 
 	while (input) {
 		let token: IToken
 
-		; ({ input, line, column, token, } = lexToken(input, line, column))
+		; ({ input, token, position, } = lexToken(input, position))
 
 		// Dont save comments since they are useless in parsing
 		if (token.tokenType === 'Comment') {
@@ -233,6 +223,7 @@ export let lex = (input: string, line: number = 1, column: number = 1): Array<IT
 				continue
 			}
 		}
+
 		// Dont save empty tokens since they are useless in parsing
 		if (token.content === '') {
 			// Except Strings, as they may legally be empty
