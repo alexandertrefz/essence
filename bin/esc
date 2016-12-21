@@ -11,7 +11,7 @@ let argv = require('minimist')(process.argv.slice(2), {
 	}
 })
 
-let Lexer = require('../lib/Lexer').Lexer
+let Lexer = require('../lib/Lexer')
 let Parser = require('../lib/Parser')
 
 let sourceFileTokens = []
