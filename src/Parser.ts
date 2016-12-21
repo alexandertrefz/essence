@@ -131,13 +131,11 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 			return false
 		}
 
-		/* tslint:disable */
 		for (let tokenKey in tokenDefinition[definitionKey]) {
 			if (token[definitionKey] !== tokenDefinition[definitionKey]) {
 				return false
 			}
 		}
-		/* tslint:enable */
 	}
 
 	return true
