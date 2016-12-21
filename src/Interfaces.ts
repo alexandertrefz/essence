@@ -205,7 +205,6 @@ export type IASTNode
 	| ITypeMethodNode
 	| INativeLookupNode
 
-/* tslint:disable */
 export interface IScope {
 	parent: IScope | null
 	[key: string]: any
@@ -214,4 +213,3 @@ export interface IScope {
 export interface INativeScope {
 	[key: string]: any
 }
-/* tslint:enable */
