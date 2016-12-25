@@ -1,9 +1,5 @@
 /// <reference path="../typings/index.d.ts" />
 
-let debugTokens = false
-let debugIndividualNodes = false
-let debugNodes = false
-
 import {
 	IToken,
 	IASTNode,
@@ -273,12 +269,6 @@ let sequence = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator
 
 		if (foundSequence.length) {
 			node = nodeGenerator(foundSequence)
-
-			if (debugIndividualNodes) {
-				console.log(require('util').inspect(node, { showHidden: false, depth: null, }))
-				console.log()
-			}
-
 			tokens = tokens.slice(foundSequence.length)
 		}
 
@@ -1232,13 +1222,6 @@ let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNo
 
 	tokens = combineMultiTokenOperators(tokens)
 
-	if (debugTokens) {
-		console.log(tokens.length)
-		console.log(tokens)
-		console.log()
-		console.log()
-	}
-
 	while (tokens.length) {
 		let foundSequence: Array<any>, node: IASTNode | undefined
 		; ({ foundSequence, node, tokens, } = program(tokens))
@@ -1250,13 +1233,6 @@ let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNo
 			// TODO: How can we be helpful with this error, aside from position?
 			break
 		}
-	}
-
-	if (debugNodes) {
-		console.log(nodes.length)
-		console.log(nodes)
-		console.log()
-		console.log()
 	}
 
 	return nodes
