@@ -106,9 +106,14 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 }
 
 let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
-	if (!tokenDefinition.isOptional && token == null) {
-		return false
+	if (token == null) {
+		if (tokenDefinition.isOptional) {
+			return true
+		} else {
+			return false
+		}
 	}
+
 
 	for (let definitionKey in tokenDefinition) {
 		if (!tokenDefinition.hasOwnProperty(definitionKey)) {
@@ -164,7 +169,7 @@ let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => 
 
 let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
-	let defaultResult = { foundSequence: [], tokens: originalTokens, }
+	let defaultResult = { foundSequence: [] as Array<IToken>, tokens: originalTokens, }
 	let hasOptionalTokens = false
 
 	if (tokenDefinitions.length > tokens.length) {
@@ -229,7 +234,9 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 			if (!foundMatch) {
 				if (currentDefinition.isOptional) {
-					tokens = [...tokens.slice(0, tokenIndex), null as any, ...tokens.slice(tokenIndex)]
+					if (!currentDefinition.canRepeat) {
+						tokens = [...tokens.slice(0, tokenIndex), null as any, ...tokens.slice(tokenIndex)]
+					}
 				} else {
 					return defaultResult
 				}
@@ -308,7 +315,7 @@ let optionalSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: I
 		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
 
 		if (node !== undefined) {
-			let parserNode = node // satisfy typescript
+			let parserNode = node
 			const rightHandSide = decorate(suffix, (foundSequence) => {
 				return wrappedGenerator(parserNode)(foundSequence)
 			})
@@ -371,6 +378,7 @@ let oneOrMoreSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: 
 	}
 }
 
+/* Unused as of now
 let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
 	return (tokens: Array<IToken>): parserResult => {
 		let { tokens: newTokens, node, foundSequence } = parser(tokens)
@@ -402,6 +410,8 @@ let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IA
 	}
 }
 
+//*/
+
 let tokenHelper = (tokenType: string): (content: string) => IParser => {
 	return (content: string): IParser => {
 		return {
@@ -420,6 +430,8 @@ let optional = (parser: IParser | Function): IParser => {
 	return parser
 }
 
+// TODO: Fix infinite recursion that happens when this is used (repro: block)
+/*
 let many1 = (parser: IParser | Function): IParser => {
 	if (typeof parser === 'function') {
 		parser = { parser }
@@ -429,6 +441,7 @@ let many1 = (parser: IParser | Function): IParser => {
 
 	return parser
 }
+*/
 
 let many = (parser: IParser | Function): IParser => {
 	if (typeof parser === 'function') {
@@ -487,6 +500,8 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
+	/* Use simpleTypeDeclaration for now, as complexTypeDeclaration is buggy
+
 	let complexTypeDeclaration
 
 	const generateTypeDeclarationParser = () => {
@@ -520,7 +535,7 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 		(foundSequence: shortComplexTypeDeclarationSequence): ITypeDeclarationNode => {
 			let optionalParameter = foundSequence[1]
 			let returnType = foundSequence[4].name
-			let parameter: string = ''
+			let parameter = ''
 
 			if (optionalParameter !== null) {
 				parameter = optionalParameter.name
@@ -562,7 +577,8 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 
 	complexTypeDeclaration = choice(zeroOrOneTypeDeclaration, oneOrMoreTypeDeclaration)
 
-	return generateTypeDeclarationParser()(tokens)
+	// */
+	return simpleTypeDeclaration(tokens)
 }
 
 let block = (tokens: Array<IToken>): parserResult => {
@@ -593,7 +609,7 @@ let block = (tokens: Array<IToken>): parserResult => {
 
 let typeProperty = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ identifier, typeDeclaration ],
+		[ identifier, typeDeclaration, optionalLinebreak ],
 
 		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): ITypePropertyNode => {
 			return {
@@ -680,21 +696,22 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	const oneOrMoreParameters = sequence(
+	const twoOrMoreParameters = sequence(
 		[
 			delimiter('('),
 			parameter,
+			parameterWithPrecedingComma,
 			many(parameterWithPrecedingComma),
 			optional(delimiter(',')),
 			delimiter(')'),
 		],
-		(foundSequence: [IToken, IParameterNode, IParameterNode[] | null]): IParameterListNode => {
-			let parameters = foundSequence[2]
+		(foundSequence: [IToken, IParameterNode, IParameterNode, IParameterNode[] | null]): IParameterListNode => {
+			let parameters = foundSequence[3]
 
 			if (parameters !== null) {
-				parameters = [foundSequence[1], ...parameters]
+				parameters = [foundSequence[1], foundSequence[2], ...parameters]
 			} else {
-				parameters = [foundSequence[1]]
+				parameters = [foundSequence[1], foundSequence[2]]
 			}
 
 			return {
@@ -704,7 +721,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	const parser = choice(zeroOrOneParameter, oneOrMoreParameters)
+	const parser = choice(zeroOrOneParameter, twoOrMoreParameters)
 
 	return parser(tokens)
 }
@@ -744,22 +761,22 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	const oneOrMoreArguments = sequence(
+	const twoOrMoreArguments = sequence(
 		[
 			delimiter('('),
 			expression,
+			expressionWithPrecedingComma,
 			many(expressionWithPrecedingComma),
 			optional(delimiter(',')),
 			delimiter(')'),
 		],
-		(foundSequence: [IToken, IExpressionNode, IExpressionNode[] | null]): IArgumentListNode => {
-			let args: Array<IExpressionNode>
-			let secondaryArguments = foundSequence[2]
+		(foundSequence: [IToken, IExpressionNode, IExpressionNode, IExpressionNode[] | null]): IArgumentListNode => {
+			let args = foundSequence[3]
 
-			if (secondaryArguments !== null) {
-				args = [foundSequence[1], ...secondaryArguments]
+			if (args !== null) {
+				args = [foundSequence[1], foundSequence[2], ...args]
 			} else {
-				args = [foundSequence[1]]
+				args = [foundSequence[1], foundSequence[2]]
 			}
 
 			return {
@@ -769,7 +786,7 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 		}
 	)
 
-	const parser = choice(zeroOrOneArgument, oneOrMoreArguments)
+	const parser = choice(zeroOrOneArgument, twoOrMoreArguments)
 
 	return parser(tokens)
 }
@@ -992,7 +1009,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 
 	type typeDefinitionStatementSequence = [
 		IToken, IIdentifierNode, IToken, IToken, IToken,
-		Array<ITypeMethodNode | ITypePropertyNode> | null,
+		Array<ITypeMethodNode | ITypePropertyNode>,
 		IToken, IToken, IToken
 	]
 
@@ -1024,16 +1041,11 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			delimiter('{'),
 			optionalLinebreak,
 			many(choice(typeProperty, typeMethod)),
-			optionalLinebreak,
 			delimiter('}'),
 			optionalLinebreak,
 		],
 		(foundSequence: typeDefinitionStatementSequence): ITypeDefinitionStatementNode => {
 			let body = foundSequence[5]
-
-			if (body === null) {
-				body = []
-			}
 
 			let properties = body.reduce(
 				(previous, current) => {
@@ -1046,6 +1058,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 				{}
 			)
 
+			// TODO: Implicit `self Self` Parameter at the start of the ParameterList needs to be injected
 			let members = body.reduce(
 				(previous, current) => {
 					if (current.nodeType === 'TypeMethod') {
@@ -1208,7 +1221,7 @@ let statement = (tokens: Array<IToken>): statementParserResult => {
 }
 
 let program = (tokens: Array<IToken>): programParserResult => {
-	const parser = choice(expression, statement)
+	const parser = choice(statement, expression)
 
 	return parser(tokens) as programParserResult
 }
