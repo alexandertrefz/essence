@@ -78,9 +78,21 @@ export interface IBlockNode {
 	nodes: Array<IStatementNode>
 }
 
+export interface IKeyValuePairNode {
+	nodeType: 'KeyValuePair'
+	key: string
+	value: IExpressionNode
+}
+
+export interface ITypeConstructorNode {
+	nodeType: 'TypeConstructor'
+	type: string | null
+	members: Array<IKeyValuePairNode>
+}
+
 export interface IValueNode {
 	nodeType: 'Value'
-	type: string
+	type: string | null
 	value: any
 	members: {
 		[key: string]: IValueNode
@@ -204,6 +216,8 @@ export type IASTNode
 	| ITypePropertyNode
 	| ITypeMethodNode
 	| INativeLookupNode
+	| IKeyValuePairNode
+	| ITypeConstructorNode
 
 export interface IScope {
 	parent: IScope | null

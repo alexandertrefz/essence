@@ -25,6 +25,8 @@ import {
 	ITypeDefinitionStatementNode,
 	ITypePropertyNode,
 	ITypeMethodNode,
+	IKeyValuePairNode,
+	ITypeConstructorNode,
 } from './Interfaces'
 
 type tokenSequenceMatch = {
@@ -639,6 +641,27 @@ let typeMethod = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+let keyValuePair = (tokens: Array<IToken>): parserResult => {
+	const parser = sequence(
+		[
+			identifier,
+			delimiter('='),
+			expression,
+			optional(delimiter(',')),
+			optionalLinebreak,
+		],
+		(foundSequence: [IToken, IToken, IExpressionNode, IToken]): IKeyValuePairNode => {
+			return {
+				nodeType: 'KeyValuePair',
+				key: foundSequence[0].content,
+				value: foundSequence[2],
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
 /*
 	2.1.2 Function Definition & Invocation Helpers
 */
@@ -796,8 +819,63 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 */
 
 /*
-	2.2.1 Literals
+	2.2.1 Values (Literals and Type Constructors)
 */
+
+let typeConstructor = (tokens: Array<IToken>): parserResult => {
+	type namedTypeConstructorSequence = [IIdentifierNode, IToken, IToken | null, Array<IKeyValuePairNode> | null]
+
+	const anonymousTypeConstructor = sequence(
+		[
+			delimiter('{'),
+			optionalLinebreak,
+			many(keyValuePair),
+			optionalLinebreak,
+			delimiter('}'),
+			optionalLinebreak,
+		],
+		(foundSequence: [IToken, IToken, Array<IKeyValuePairNode> | null]): ITypeConstructorNode => {
+			let members = foundSequence[2]
+
+			if (members === null) {
+				members = []
+			}
+
+			return {
+				nodeType: 'TypeConstructor',
+				type: null,
+				members,
+			}
+		}
+	)
+
+	const namedTypeConstructor = sequence(
+		[
+			identifier,
+			delimiter('{'),
+			optionalLinebreak,
+			many(keyValuePair),
+			optionalLinebreak,
+			delimiter('}'),
+			optionalLinebreak,
+		],
+		(foundSequence: namedTypeConstructorSequence): ITypeConstructorNode => {
+			let members = foundSequence[3]
+
+			if (members === null) {
+				members = []
+			}
+
+			return {
+				nodeType: 'TypeConstructor',
+				type: foundSequence[0].content,
+				members,
+			}
+		}
+	)
+
+	return choice(anonymousTypeConstructor, namedTypeConstructor)(tokens)
+}
 
 let value = (tokens: Array<IToken>): parserResult => {
 	const parser = choice(
@@ -838,6 +916,24 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: 'String',
 					value: foundSequence[0].content,
 					members: {},
+				}
+			}
+		),
+
+		decorate(
+			typeConstructor,
+
+			(foundSequence: [ITypeConstructorNode]): IValueNode => {
+				const members = {}
+				foundSequence[0].members.map((keyValuePair) => {
+					members[keyValuePair.key] = keyValuePair.value
+				})
+
+				return {
+					nodeType: 'Value',
+					type: foundSequence[0].type,
+					value: null,
+					members,
 				}
 			}
 		),
@@ -914,7 +1010,7 @@ let functionInvocation = (tokens: Array<IToken>): parserResult => {
 
 let expression = (tokens: Array<IToken>): expressionParserResult => {
 	let identifierOrValue = decorate(
-		choice(identifier, value),
+		choice(value, identifier),
 
 		(foundSequence: [IIdentifierNode | IValueNode]): IExpressionNode => {
 			return foundSequence[0]
