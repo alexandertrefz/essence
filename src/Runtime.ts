@@ -81,7 +81,24 @@ export class Runtime {
 	constructor() {
 		this.nativeScope = {
 			print: (message: IValueNode) => {
-				console.log(message.value)
+				if (message.value === null) {
+					const convertMessage = (message: IValueNode) => {
+						const convertedMessage = {}
+						Object.keys(message.members).map((key) => {
+							if (message.members[key].value === null) {
+								convertedMessage[key] = convertMessage(message.members[key])
+							} else {
+								convertedMessage[key] = message.members[key].value
+							}
+						})
+						return convertedMessage
+					}
+
+					console.log(convertMessage(message))
+				} else {
+					console.log(message.value)
+				}
+
 				return message
 			},
 
