@@ -93,7 +93,7 @@ export interface ITypeConstructorNode {
 export interface IValueNode {
 	nodeType: 'Value'
 	type: string | null
-	value: any
+	value: IFunctionDefinitionNode | boolean | string | null
 	members: {
 		[key: string]: IValueNode
 	}

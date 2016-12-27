@@ -9,9 +9,9 @@ export let equals = (self: IValueNode, other: IValueNode) => {
 }
 
 export let contains = (self: IValueNode, other: IValueNode) => {
-	return generateValueNode('Bool', self.value.includes(other.value), {})
+	return generateValueNode('Bool', (self.value as string).includes(other.value as string), {})
 }
 
 export let join = (self: IValueNode, other: IValueNode) => {
-	return generateValueNode('String', self.value + other.value, {})
+	return generateValueNode('String', (self.value as string) + (other.value as string), {})
 }

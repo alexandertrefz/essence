@@ -882,7 +882,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 		decorate(
 			functionDefinition,
 
-			(foundSequence): IValueNode => {
+			(foundSequence: [IFunctionDefinitionNode]): IValueNode => {
 				return {
 					nodeType: 'Value',
 					type: 'Function',
