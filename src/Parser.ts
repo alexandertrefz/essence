@@ -1140,17 +1140,17 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 
 let ifStatement = (tokens: Array<IToken>): parserResult => {
 	type ifStatementSequence = [
-		IToken, IExpressionNode, IBlockNode
+		IToken, IToken, IExpressionNode, IToken, IBlockNode
 	]
 
 	const parser = sequence(
-		[ keyword('if'), expression, block ],
+		[ keyword('if'), delimiter('('), expression, delimiter(')'), block ],
 
 		(foundSequence: ifStatementSequence): IIfStatementNode => {
 			return {
 				nodeType: 'IfStatement',
-				condition: foundSequence[1],
-				body: foundSequence[2],
+				condition: foundSequence[2],
+				body: foundSequence[4],
 			}
 		}
 	)

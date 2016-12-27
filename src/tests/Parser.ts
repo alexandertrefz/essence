@@ -475,7 +475,7 @@ describe('Parser', () => {
 		})
 
 		it('should parse if statements', () => {
-			let input = `if identifier {}`
+			let input = `if (identifier) {}`
 			let output = [{
 				nodeType: 'IfStatement',
 				condition: {
@@ -492,7 +492,7 @@ describe('Parser', () => {
 		})
 
 		it('should parse if else statements', () => {
-			let input = `if identifier {} else {}`
+			let input = `if (identifier) {} else {}`
 			let output = [{
 				nodeType: 'IfElseStatement',
 				condition: {
@@ -513,7 +513,7 @@ describe('Parser', () => {
 		})
 
 		it('should parse if else if statements', () => {
-			let input = `if identifier {} else if identifier2 {}`
+			let input = `if (identifier) {} else if (identifier2) {}`
 			let output = [{
 				nodeType: 'IfElseStatement',
 				condition: {
