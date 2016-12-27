@@ -326,6 +326,106 @@ describe('Parser', () => {
 			expect(parse(lex(input))).toEqual(output)
 		})
 
+		it('should parse anonymous empty type constructors', () => {
+			let input = `{}`
+			let output = [{
+				nodeType: 'Value',
+				type: null,
+				value: null,
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse anonymous type constructors with a KeyValuePair', () => {
+			let input = `{ key = value, }`
+			let output = [{
+				nodeType: 'Value',
+				type: null,
+				value: null,
+				members: {
+					key: {
+						nodeType: 'Identifier',
+						content: 'value',
+					}
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse anonymous type constructors with multiple KeyValuePairs', () => {
+			let input = `{ key = value, key2 = value2, }`
+			let output = [{
+				nodeType: 'Value',
+				type: null,
+				value: null,
+				members: {
+					key: {
+						nodeType: 'Identifier',
+						content: 'value',
+					},
+					key2: {
+						nodeType: 'Identifier',
+						content: 'value2',
+					}
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse named empty type constructors', () => {
+			let input = `Type{}`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Type',
+				value: null,
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse named type constructors with a KeyValuePair', () => {
+			let input = `Type{ key = value, }`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Type',
+				value: null,
+				members: {
+					key: {
+						nodeType: 'Identifier',
+						content: 'value',
+					}
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse named type constructors with multiple KeyValuePairs', () => {
+			let input = `Type{ key = value, key2 = value2, }`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Type',
+				value: null,
+				members: {
+					key: {
+						nodeType: 'Identifier',
+						content: 'value',
+					},
+					key2: {
+						nodeType: 'Identifier',
+						content: 'value2',
+					}
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
 		it('should parse simple lookup', () => {
 			let input = `lookup.member`
 			let output = [{
@@ -725,7 +825,6 @@ describe('Parser', () => {
 						},
 						members: {},
 					},
-
 					method2: {
 						nodeType: 'Value',
 						type: 'Method',
@@ -828,7 +927,6 @@ describe('Parser', () => {
 						},
 						members: {},
 					},
-
 					method2: {
 						nodeType: 'Value',
 						type: 'Method',
