@@ -34,7 +34,7 @@ let logger = {
 	},
 
 	unwrapValue(value: IValueNode): string {
-		if (value.value.nodeType) {
+		if (value.value && typeof value.value === 'object') {
 			return value.value.nodeType
 		} else {
 			return `'${value.value}'`
@@ -208,9 +208,10 @@ export class Runtime {
 		logger.log('DeclarationStatement', node.name)
 
 		if (node.value.nodeType === 'Value') {
-			if (node.value.value.nodeType === 'FunctionDefinition') {
-				if (node.value.value.scope === undefined) {
-					node.value.value.scope = {
+			let value = node.value.value
+			if (value && typeof value === 'object' && value.nodeType === 'FunctionDefinition') {
+				if (value.scope === undefined) {
+					value.scope = {
 						parent: scope,
 					}
 				}
@@ -226,9 +227,10 @@ export class Runtime {
 		logger.log('AssignmentStatement', node.name)
 
 		if (node.value.nodeType === 'Value') {
-			if (node.value.value.nodeType === 'FunctionDefinition') {
-				if (node.value.value.scope === undefined) {
-					node.value.value.scope = {
+			let value = node.value.value
+			if (value && typeof value === 'object' && value.nodeType === 'FunctionDefinition') {
+				if (value.scope === undefined) {
+					value.scope = {
 						parent: scope,
 					}
 				}
@@ -258,7 +260,9 @@ export class Runtime {
 
 		for (let key in node.members) {
 			if (node.members.hasOwnProperty(key)) {
-				node.members[key].value.scope = {
+				let value = node.members[key].value as IFunctionDefinitionNode
+
+				value.scope = {
 					parent: scope,
 				}
 			}
@@ -284,7 +288,7 @@ export class Runtime {
 			return logger.unwrapValue(value)
 		}).join(', '))
 
-		return this.invoke(func.value, args)
+		return this.invoke(func.value as IFunctionDefinitionNode, args)
 	}
 
 	protected interpretNativeFunctionInvocation(node: INativeFunctionInvocationNode, scope: IScope): IValueNode {
