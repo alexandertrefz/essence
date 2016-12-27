@@ -1,6 +1,6 @@
 /// <reference path="../typings/index.d.ts" />
 
-import { Position, IToken, } from './Interfaces'
+import { Position, IToken } from './Interfaces'
 
 type LexingResult = {
 	input: string

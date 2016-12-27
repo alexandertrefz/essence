@@ -1,4 +1,5 @@
 /// <reference path='../typings/index.d.ts' />
+
 require('console.table')
 
 let logger = {
