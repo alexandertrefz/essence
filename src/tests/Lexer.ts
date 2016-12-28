@@ -193,6 +193,101 @@ describe('Lexer', () => {
 		})
 	})
 
+	describe('numbers', () => {
+		it('should lex simple numbers', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '1'
+			output = [
+				{
+					content: '1',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+
+			input = '123'
+			output = [
+				{
+					content: '123',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it('should lex simple numbers with underscores', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '1_000'
+			output = [
+				{
+					content: '1000',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it('should lex float numbers', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '1.5'
+			output = [
+				{
+					content: '1.5',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it('should lex float numbers with underscores', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '1_000.5'
+			output = [
+				{
+					content: '1000.5',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it('should not lex numbers with multiple dots', () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = '1.000.5'
+			output = [
+				{
+					content: '1.000',
+					tokenType: 'Number',
+				},
+				{
+					content: '.',
+					tokenType: 'Delimiter',
+				},
+				{
+					content: '5',
+					tokenType: 'Number',
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+	})
+
 	describe('comments', () => {
 		it('should lex comments', () => {
 			let input: string

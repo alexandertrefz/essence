@@ -9,6 +9,7 @@ type LexingResult = {
 }
 
 const stringLiteral   = '\''
+const numberLiterals  = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 const booleanLiterals = ['true', 'false']
 const commentLiteral  = '§'
 const keywords        = ['let', 'if', 'else', 'type']
@@ -104,6 +105,46 @@ let lexComment = (input: string, position: Position): LexingResult => {
 	}
 }
 
+let lexNumber = (input: string, position: Position): LexingResult => {
+	let token: IToken = {
+		content: '',
+		tokenType: 'Number',
+		position: {
+			line: position.line,
+			column: position.column - 1
+		}
+	}
+
+	let i = 0
+	let foundDot = false
+
+	while (!!~numberLiterals.indexOf(input[i]) || !!~['_', '.'].indexOf(input[i])) {
+		if (input[i] === '.') {
+			if (foundDot) {
+				i--
+				break
+			} else {
+				foundDot = true
+			}
+		}
+
+		if (input[i] !== '_') {
+			token.content += input[i]
+		}
+
+		position = handlePosition(input[i], position)
+		i++
+	}
+
+	input = input.slice(i)
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
 let lexKeyword = (token: IToken): IToken => {
 	if (~keywords.indexOf(token.content)) {
 		token.tokenType = 'Keyword'
@@ -168,6 +209,11 @@ let lexToken = (input: string, position: Position): LexingResult => {
 
 		if (token.content.startsWith(stringLiteral)) {
 			; ({ input, token, position } = lexString(input, position))
+			break
+		}
+
+		if (!!~numberLiterals.indexOf(token.content[0])) {
+			; ({ input, token, position } = lexNumber(input, position))
 			break
 		}
 

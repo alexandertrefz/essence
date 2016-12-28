@@ -921,6 +921,19 @@ let value = (tokens: Array<IToken>): parserResult => {
 		),
 
 		decorate(
+			{ tokenType: 'Number' },
+
+			(foundSequence): IValueNode => {
+				return {
+					nodeType: 'Value',
+					type: 'Number',
+					value: foundSequence[0].content,
+					members: {},
+				}
+			}
+		),
+
+		decorate(
 			typeConstructor,
 
 			(foundSequence: [ITypeConstructorNode]): IValueNode => {

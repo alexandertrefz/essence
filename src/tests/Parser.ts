@@ -63,6 +63,54 @@ describe('Parser', () => {
 			expect(parse(lex(input))).toEqual(output)
 		})
 
+		it('should parse simple number literals', () => {
+			let input = `123`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Number',
+				value: '123',
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse simple number literals with underscores', () => {
+			let input = `1_000`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Number',
+				value: '1000',
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse float number literals', () => {
+			let input = `1.5`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Number',
+				value: '1.5',
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse float number literals with underscores', () => {
+			let input = `1_000.5`
+			let output = [{
+				nodeType: 'Value',
+				type: 'Number',
+				value: '1000.5',
+				members: {},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
 		it('should parse empty function literals', () => {
 			let input = `() -> Type {}`
 			let output = [{
