@@ -1386,7 +1386,7 @@ let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNo
 		} else {
 			// TODO: Handle Error -> Syntax could be lexed but not parsed
 			// TODO: How can we be helpful with this error, aside from position?
-			break
+			throw new Error('Input could not be parsed fully')
 		}
 	}
 

@@ -852,14 +852,14 @@ describe('Parser', () => {
 			let input = `__`
 			let output = []
 
-			expect(parse(lex(input))).toEqual(output)
+			expect(() => parse(lex(input))).toThrow()
 		})
 
 		it('should not parse native lookups without second identifier', () => {
 			let input = `__lookup.`
 			let output = []
 
-			expect(parse(lex(input))).toEqual(output)
+			expect(() => parse(lex(input))).toThrow()
 		})
 
 		it('should parse native function invocation without parameters', () => {
