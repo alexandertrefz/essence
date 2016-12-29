@@ -10,6 +10,10 @@ describe('Parser', () => {
 			let output = [{
 				nodeType: 'Identifier',
 				content: 'identifier',
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -22,6 +26,10 @@ describe('Parser', () => {
 				type: 'Bool',
 				value: true,
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -34,6 +42,10 @@ describe('Parser', () => {
 				type: 'Bool',
 				value: false,
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -46,6 +58,10 @@ describe('Parser', () => {
 				type: 'String',
 				value: '',
 				members: {},
+				position: {
+					line: 1,
+					column: 2,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -58,6 +74,10 @@ describe('Parser', () => {
 				type: 'String',
 				value: 'string',
 				members: {},
+				position: {
+					line: 1,
+					column: 2,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -70,6 +90,10 @@ describe('Parser', () => {
 				type: 'Number',
 				value: '123',
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -82,6 +106,10 @@ describe('Parser', () => {
 				type: 'Number',
 				value: '1000',
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -94,6 +122,10 @@ describe('Parser', () => {
 				type: 'Number',
 				value: '1.5',
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -106,6 +138,10 @@ describe('Parser', () => {
 				type: 'Number',
 				value: '1000.5',
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -122,13 +158,29 @@ describe('Parser', () => {
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 6,
+						},
 					},
 					body: {
 						nodeType: 'Block',
 						nodes: [],
-					}
+						position: {
+							line: 1,
+							column: 12,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -146,13 +198,29 @@ describe('Parser', () => {
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 6,
+						},
 					},
 					body: {
 						nodeType: 'Block',
 						nodes: [],
-					}
+						position: {
+							line: 1,
+							column: 12,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -170,19 +238,43 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 12,
+							},
+						},
+						position: {
+							line: 1,
+							column: 2,
+						},
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 21,
+						},
 					},
 					body: {
 						nodeType: 'Block',
 						nodes: [],
-					}
+						position: {
+							line: 1,
+							column: 27,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -200,26 +292,58 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 12,
+							},
+						},
+						position: {
+							line: 1,
+							column: 2,
+						},
 					}, {
 						nodeType: 'Parameter',
 						name: 'parameter2',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 30,
+							},
+						},
+						position: {
+							line: 1,
+							column: 18,
+						},
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 39,
+						},
 					},
 					body: {
 						nodeType: 'Block',
 						nodes: [],
-					}
+						position: {
+							line: 1,
+							column: 45,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -237,33 +361,73 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 12,
+							},
+						},
+						position: {
+							line: 1,
+							column: 2,
+						},
 					}, {
 						nodeType: 'Parameter',
 						name: 'parameter2',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 30,
+							},
+						},
+						position: {
+							line: 1,
+							column: 18,
+						},
 					}, {
 						nodeType: 'Parameter',
 						name: 'parameter3',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type'
-						}
+							name: 'Type',
+							position: {
+								line: 1,
+								column: 48,
+							},
+						},
+						position: {
+							line: 1,
+							column: 36,
+						},
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 57,
+						},
 					},
 					body: {
 						nodeType: 'Block',
 						nodes: [],
-					}
+						position: {
+							line: 1,
+							column: 63,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -282,6 +446,10 @@ describe('Parser', () => {
 					returnType: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 1,
+							column: 6,
+						},
 					},
 					body: {
 						nodeType: 'Block',
@@ -290,11 +458,31 @@ describe('Parser', () => {
 							expression: {
 								nodeType: 'Identifier',
 								content: 'identifier',
-							}
+								position: {
+									line: 2,
+									column: 7,
+								},
+							},
+							position: {
+								line: 2,
+								column: 1,
+							},
 						}],
-					}
+						position: {
+							line: 1,
+							column: 12,
+						},
+					},
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -307,8 +495,16 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'invocation',
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
-				arguments: []
+				arguments: [],
+				position: {
+					line: 1,
+					column: 12,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -321,11 +517,23 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'invocation',
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				arguments: [{
 					nodeType: 'Identifier',
-					content: 'argument'
-				}]
+					content: 'argument',
+					position: {
+						line: 1,
+						column: 13,
+					},
+				}],
+				position: {
+					line: 1,
+					column: 12,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -338,14 +546,30 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'invocation',
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				arguments: [{
 					nodeType: 'Identifier',
-					content: 'argument'
+					content: 'argument',
+					position: {
+						line: 1,
+						column: 13,
+					},
 				}, {
 					nodeType: 'Identifier',
-					content: 'argument2'
-				}]
+					content: 'argument2',
+					position: {
+						line: 1,
+						column: 23,
+					},
+				}],
+				position: {
+					line: 1,
+					column: 12,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -358,17 +582,37 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'invocation',
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
 				arguments: [{
 					nodeType: 'Identifier',
-					content: 'argument'
+					content: 'argument',
+					position: {
+						line: 1,
+						column: 13,
+					},
 				}, {
 					nodeType: 'Identifier',
-					content: 'argument2'
+					content: 'argument2',
+					position: {
+						line: 1,
+						column: 23,
+					},
 				}, {
 					nodeType: 'Identifier',
-					content: 'argument3'
-				}]
+					content: 'argument3',
+					position: {
+						line: 1,
+						column: 35,
+					},
+				}],
+				position: {
+					line: 1,
+					column: 12,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -381,6 +625,10 @@ describe('Parser', () => {
 				type: null,
 				value: null,
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -396,7 +644,15 @@ describe('Parser', () => {
 					key: {
 						nodeType: 'Identifier',
 						content: 'value',
-					}
+						position: {
+							line: 1,
+							column: 8,
+						},
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -413,11 +669,23 @@ describe('Parser', () => {
 					key: {
 						nodeType: 'Identifier',
 						content: 'value',
+						position: {
+							line: 1,
+							column: 8,
+						},
 					},
 					key2: {
 						nodeType: 'Identifier',
 						content: 'value2',
+						position: {
+							line: 1,
+							column: 23,
+						},
 					}
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -431,6 +699,10 @@ describe('Parser', () => {
 				type: 'Type',
 				value: null,
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -446,7 +718,15 @@ describe('Parser', () => {
 					key: {
 						nodeType: 'Identifier',
 						content: 'value',
+						position: {
+							line: 1,
+							column: 13,
+						},
 					}
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -463,11 +743,23 @@ describe('Parser', () => {
 					key: {
 						nodeType: 'Identifier',
 						content: 'value',
+						position: {
+							line: 1,
+							column: 13,
+						},
 					},
 					key2: {
 						nodeType: 'Identifier',
 						content: 'value2',
+						position: {
+							line: 1,
+							column: 28,
+						},
 					}
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -481,8 +773,16 @@ describe('Parser', () => {
 				base: {
 					nodeType: 'Identifier',
 					content: 'lookup',
+					position: {
+						line: 1,
+						column: 1,
+					},
 				},
-				member: 'member'
+				member: 'member',
+				position: {
+					line: 1,
+					column: 9,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -497,10 +797,22 @@ describe('Parser', () => {
 					base: {
 						nodeType: 'Identifier',
 						content: 'lookup',
+						position: {
+							line: 1,
+							column: 1,
+						},
 					},
-					member: 'member'
+					member: 'member',
+					position: {
+						line: 1,
+						column: 9,
+					},
 				},
-				arguments: []
+				arguments: [],
+				position: {
+					line: 1,
+					column: 16,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -515,10 +827,22 @@ describe('Parser', () => {
 					base: {
 						nodeType: 'Identifier',
 						content: 'lookup',
+						position: {
+							line: 1,
+							column: 1,
+						},
 					},
-					member: 'member1'
+					member: 'member1',
+					position: {
+						line: 1,
+						column: 9,
+					},
 				},
-				member: 'member2'
+				member: 'member2',
+				position: {
+					line: 1,
+					column: 18,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -545,8 +869,16 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'lookup',
+					position: {
+						line: 1,
+						column: 3,
+					},
 				},
-				arguments: []
+				arguments: [],
+				position: {
+					line: 1,
+					column: 10,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -561,10 +893,22 @@ describe('Parser', () => {
 					base: {
 						nodeType: 'Identifier',
 						content: 'lookup',
+						position: {
+							line: 1,
+							column: 3,
+						},
 					},
 					member: 'member',
+					position: {
+						line: 1,
+						column: 11,
+					},
 				},
-				arguments: []
+				arguments: [],
+				position: {
+					line: 1,
+					column: 18,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -577,11 +921,23 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'lookup',
+					position: {
+						line: 1,
+						column: 3,
+					},
 				},
 				arguments: [{
 					nodeType: 'Identifier',
-					content: 'argument'
-				}]
+					content: 'argument',
+					position: {
+						line: 1,
+						column: 11,
+					},
+				}],
+				position: {
+					line: 1,
+					column: 10,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -594,14 +950,30 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'lookup',
+					position: {
+						line: 1,
+						column: 3,
+					},
 				},
 				arguments: [{
 					nodeType: 'Identifier',
-					content: 'argument'
+					content: 'argument',
+					position: {
+						line: 1,
+						column: 11,
+					},
 				}, {
 					nodeType: 'Identifier',
-					content: 'argument2'
-				}]
+					content: 'argument2',
+					position: {
+						line: 1,
+						column: 21,
+					},
+				}],
+				position: {
+					line: 1,
+					column: 10,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -616,7 +988,15 @@ describe('Parser', () => {
 				expression: {
 					nodeType: 'Identifier',
 					content: 'identifier',
-				}
+					position: {
+						line: 1,
+						column: 3,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -629,10 +1009,22 @@ describe('Parser', () => {
 				condition: {
 					nodeType: 'Identifier',
 					content: 'identifier',
+					position: {
+						line: 1,
+						column: 5,
+					},
 				},
 				body: {
 					nodeType: 'Block',
 					nodes: [],
+					position: {
+						line: 1,
+						column: 17,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -646,14 +1038,30 @@ describe('Parser', () => {
 				condition: {
 					nodeType: 'Identifier',
 					content: 'identifier',
+					position: {
+						line: 1,
+						column: 5,
+					},
 				},
 				trueBody: {
 					nodeType: 'Block',
 					nodes: [],
+					position: {
+						line: 1,
+						column: 17,
+					},
 				},
 				falseBody: {
 					nodeType: 'Block',
 					nodes: [],
+					position: {
+						line: 1,
+						column: 26,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -667,10 +1075,18 @@ describe('Parser', () => {
 				condition: {
 					nodeType: 'Identifier',
 					content: 'identifier',
+					position: {
+						line: 1,
+						column: 5,
+					},
 				},
 				trueBody: {
 					nodeType: 'Block',
 					nodes: [],
+					position: {
+						line: 1,
+						column: 17,
+					},
 				},
 				falseBody: {
 					nodeType: 'Block',
@@ -679,12 +1095,32 @@ describe('Parser', () => {
 						condition: {
 							nodeType: 'Identifier',
 							content: 'identifier2',
+							position: {
+								line: 1,
+								column: 30,
+							},
 						},
 						body: {
 							nodeType: 'Block',
 							nodes: [],
+							position: {
+								line: 1,
+								column: 43,
+							},
+						},
+						position: {
+							line: 1,
+							column: 26,
 						},
 					}],
+					position: {
+						line: 1,
+						column: 20,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -701,7 +1137,15 @@ describe('Parser', () => {
 					nodeType: 'Value',
 					type: 'String',
 					value: '',
-					members: {}
+					members: {},
+					position: {
+						line: 1,
+						column: 19,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -716,12 +1160,24 @@ describe('Parser', () => {
 				type: {
 					nodeType: 'TypeDeclaration',
 					name: 'Type',
+					position: {
+						line: 1,
+						column: 16,
+					},
 				},
 				value: {
 					nodeType: 'Value',
 					type: 'String',
 					value: '',
-					members: {}
+					members: {},
+					position: {
+						line: 1,
+						column: 24,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -737,7 +1193,15 @@ describe('Parser', () => {
 					nodeType: 'Value',
 					type: 'String',
 					value: '',
-					members: {}
+					members: {},
+					position: {
+						line: 1,
+						column: 15,
+					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -751,9 +1215,17 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -768,14 +1240,26 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 2,
+							column: 14,
+						},
 					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -791,18 +1275,34 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 2,
+							column: 14,
+						},
 					},
 					property2: {
 						nodeType: 'TypeDeclaration',
 						name: 'Type',
+						position: {
+							line: 3,
+							column: 15,
+						},
 					},
 				},
 				members: {},
+				position: {
+					line: 1,
+					column: 1,
+				},
 			}]
 
 			expect(parse(lex(input))).toEqual(output)
@@ -817,6 +1317,10 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {
@@ -829,14 +1333,34 @@ describe('Parser', () => {
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 2,
+									column: 17,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 2,
+									column: 23,
+								},
+							},
+							position: {
+								line: 2,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 2,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -853,6 +1377,10 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {
@@ -865,13 +1393,29 @@ describe('Parser', () => {
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 2,
+									column: 17,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 2,
+									column: 23,
+								},
+							},
+							position: {
+								line: 2,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 2,
+							column: 1,
+						},
 					},
 					method2: {
 						nodeType: 'Value',
@@ -882,14 +1426,34 @@ describe('Parser', () => {
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 3,
+									column: 18,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 3,
+									column: 24,
+								},
+							},
+							position: {
+								line: 3,
+								column: 13,
+							},
 						},
 						members: {},
+						position: {
+							line: 3,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -905,6 +1469,10 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {
@@ -919,19 +1487,47 @@ describe('Parser', () => {
 								type: {
 									nodeType: 'TypeDeclaration',
 									name: 'ParameterType',
+									position: {
+										line: 2,
+										column: 23,
+									},
+								},
+								position: {
+									line: 2,
+									column: 13,
 								},
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 2,
+									column: 41,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 2,
+									column: 47,
+								},
+							},
+							position: {
+								line: 2,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 2,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -948,6 +1544,10 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {
@@ -962,18 +1562,42 @@ describe('Parser', () => {
 								type: {
 									nodeType: 'TypeDeclaration',
 									name: 'ParameterType',
+									position: {
+										line: 2,
+										column: 23,
+									},
+								},
+								position: {
+									line: 2,
+									column: 13,
 								},
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 2,
+									column: 41,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 2,
+									column: 47,
+								},
+							},
+							position: {
+								line: 2,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 2,
+							column: 1,
+						},
 					},
 					method2: {
 						nodeType: 'Value',
@@ -986,19 +1610,47 @@ describe('Parser', () => {
 								type: {
 									nodeType: 'TypeDeclaration',
 									name: 'ParameterType',
+									position: {
+										line: 3,
+										column: 24,
+									},
+								},
+								position: {
+									line: 3,
+									column: 14,
 								},
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 3,
+									column: 42,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 3,
+									column: 48,
+								},
+							},
+							position: {
+								line: 3,
+								column: 13,
+							},
 						},
 						members: {},
+						position: {
+							line: 3,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -1015,6 +1667,10 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {},
 				members: {
@@ -1029,18 +1685,42 @@ describe('Parser', () => {
 								type: {
 									nodeType: 'TypeDeclaration',
 									name: 'ParameterType',
+									position: {
+										line: 2,
+										column: 23,
+									},
+								},
+								position: {
+									line: 2,
+									column: 13,
 								},
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 2,
+									column: 41,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 2,
+									column: 47,
+								},
+							},
+							position: {
+								line: 2,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 2,
+							column: 1,
+						},
 					},
 
 					method2: {
@@ -1052,14 +1732,34 @@ describe('Parser', () => {
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 3,
+									column: 18,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 3,
+									column: 24,
+								},
+							},
+							position: {
+								line: 3,
+								column: 13,
+							},
 						},
 						members: {},
+						position: {
+							line: 3,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 
@@ -1076,11 +1776,19 @@ describe('Parser', () => {
 				name: {
 					nodeType: 'Identifier',
 					content: 'Type',
+					position: {
+						line: 1,
+						column: 6,
+					},
 				},
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
 						name: 'PropertyType',
+						position: {
+							line: 2,
+							column: 14,
+						},
 					},
 				},
 				members: {
@@ -1095,19 +1803,47 @@ describe('Parser', () => {
 								type: {
 									nodeType: 'TypeDeclaration',
 									name: 'ParameterType',
+									position: {
+										line: 3,
+										column: 23,
+									},
+								},
+								position: {
+									line: 3,
+									column: 13,
 								},
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
 								name: 'Type',
+								position: {
+									line: 3,
+									column: 41,
+								},
 							},
 							body: {
 								nodeType: 'Block',
 								nodes: [],
-							}
+								position: {
+									line: 3,
+									column: 47,
+								},
+							},
+							position: {
+								line: 3,
+								column: 12,
+							},
 						},
 						members: {},
+						position: {
+							line: 3,
+							column: 1,
+						},
 					},
+				},
+				position: {
+					line: 1,
+					column: 1,
 				},
 			}]
 

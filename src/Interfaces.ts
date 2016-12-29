@@ -54,40 +54,47 @@ export type ASTType
 export interface IIdentifierNode {
 	nodeType: 'Identifier'
 	content: string
+	position: Position
 }
 
 export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IExpressionNode
 	member: string
+	position: Position
 }
 
 export interface INativeLookupNode {
 	nodeType: 'NativeLookup'
 	base: IIdentifierNode | INativeLookupNode
 	member: string
+	position: Position
 }
 
 export interface ITypeDeclarationNode {
 	nodeType: 'TypeDeclaration'
 	name: string
+	position: Position
 }
 
 export interface IBlockNode {
 	nodeType: 'Block'
 	nodes: Array<IStatementNode>
+	position: Position
 }
 
 export interface IKeyValuePairNode {
 	nodeType: 'KeyValuePair'
 	key: string
 	value: IExpressionNode
+	position: Position
 }
 
 export interface ITypeConstructorNode {
 	nodeType: 'TypeConstructor'
 	type: string | null
 	members: Array<IKeyValuePairNode>
+	position: Position
 }
 
 export interface IValueNode {
@@ -97,22 +104,26 @@ export interface IValueNode {
 	members: {
 		[key: string]: IValueNode
 	}
+	position: Position
 }
 
 export interface IParameterNode {
 	nodeType: 'Parameter'
 	name: string
 	type: ITypeDeclarationNode
+	position: Position
 }
 
 export interface IParameterListNode {
 	nodeType: 'ParameterList'
 	parameters: Array<IParameterNode>
+	position: Position
 }
 
 export interface IArgumentListNode {
 	nodeType: 'ArgumentList'
 	arguments: Array<IExpressionNode>
+	position: Position
 }
 
 export interface IFunctionDefinitionNode {
@@ -121,23 +132,27 @@ export interface IFunctionDefinitionNode {
 	returnType: ITypeDeclarationNode
 	body: IBlockNode
 	scope?: any
+	position: Position
 }
 
 export interface IFunctionInvocationNode {
 	nodeType: 'FunctionInvocation'
 	name: IExpressionNode
 	arguments: Array<IExpressionNode>
+	position: Position
 }
 
 export interface INativeFunctionInvocationNode {
 	nodeType: 'NativeFunctionInvocation'
 	name: IIdentifierNode | INativeLookupNode
 	arguments: Array<IExpressionNode>
+	position: Position
 }
 
 export interface IReturnStatementNode {
 	nodeType: 'ReturnStatement'
 	expression: IExpressionNode
+	position: Position
 }
 
 export interface IDeclarationStatementNode {
@@ -145,18 +160,21 @@ export interface IDeclarationStatementNode {
 	name: string
 	type: ITypeDeclarationNode | null
 	value: IExpressionNode
+	position: Position
 }
 
 export interface IAssignmentStatementNode {
 	nodeType: 'AssignmentStatement'
 	name: string
 	value: IExpressionNode
+	position: Position
 }
 
 export interface IIfStatementNode {
 	nodeType: 'IfStatement'
 	condition: IExpressionNode
 	body: IBlockNode
+	position: Position
 }
 
 export interface IIfElseStatementNode {
@@ -164,6 +182,7 @@ export interface IIfElseStatementNode {
 	condition: IExpressionNode
 	trueBody: IBlockNode
 	falseBody: IBlockNode
+	position: Position
 }
 
 export interface ITypeDefinitionStatementNode {
@@ -175,18 +194,21 @@ export interface ITypeDefinitionStatementNode {
 	members: {
 		[key: string]: IValueNode
 	}
+	position: Position
 }
 
 export interface ITypePropertyNode {
 	nodeType: 'TypeProperty'
 	name: string
 	type: ITypeDeclarationNode
+	position: Position
 }
 
 export interface ITypeMethodNode {
 	nodeType: 'TypeMethod'
 	name: string
 	func: IFunctionDefinitionNode
+	position: Position
 }
 
 export type IExpressionNode
