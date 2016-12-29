@@ -325,7 +325,11 @@ let choice = (...parsers: Array<Function>): parser => {
 	}
 }
 
-let optionalSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+let suffix = (prefix: IParser | parser, suffix: IParser | parser, nodeGenerator: nodeGenerator): parser => {
+	return sequence([prefix, suffix], nodeGenerator)
+}
+
+let optionalChainSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
 	return (tokens: Array<IToken>): parserResult => {
 		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
 
@@ -356,7 +360,7 @@ let optionalSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: I
 	}
 }
 
-let oneOrMoreSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
+let oneOrMoreChainSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (node: IASTNode) => nodeGenerator) => {
 	return (tokens: Array<IToken>): parserResult => {
 		let { tokens: newTokens, node, foundSequence } = prefix(tokens)
 
@@ -642,8 +646,9 @@ let typeProperty = (tokens: Array<IToken>): parserResult => {
 }
 
 let typeMethod = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[ identifier, functionDefinition ],
+	const parser = suffix(
+		identifier,
+		functionDefinition,
 
 		(foundSequence: [IIdentifierNode, IFunctionDefinitionNode]): ITypeMethodNode => {
 			return {
@@ -685,8 +690,9 @@ let keyValuePair = (tokens: Array<IToken>): parserResult => {
 */
 
 let parameter = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[ identifier, typeDeclaration ],
+	const parser = suffix(
+		identifier,
+		typeDeclaration,
 
 		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): IParameterNode => {
 			return {
@@ -702,16 +708,18 @@ let parameter = (tokens: Array<IToken>): parserResult => {
 }
 
 let parameterList = (tokens: Array<IToken>): parserResult => {
-	const parameterWithOptionalTrailingComma = sequence(
-		[ parameter, optional(delimiter(',')) ],
+	const parameterWithOptionalTrailingComma = suffix(
+		parameter,
+		optional(delimiter(',')),
 
 		(foundSequence: [IParameterNode]): IParameterNode => {
 			return foundSequence[0]
 		}
 	)
 
-	const parameterWithPrecedingComma = sequence(
-		[ delimiter(','), parameter ],
+	const parameterWithPrecedingComma = suffix(
+		delimiter(','),
+		parameter,
 
 		(foundSequence: [IToken, IParameterNode]): IParameterNode => {
 			return foundSequence[1]
@@ -771,16 +779,18 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 }
 
 let argumentList = (tokens: Array<IToken>): parserResult => {
-	const expressionWithOptionalTrailingComma = sequence(
-		[ expression, optional(delimiter(',')) ],
+	const expressionWithOptionalTrailingComma = suffix(
+		expression,
+		optional(delimiter(',')),
 
 		(foundSequence: [IExpressionNode]): IExpressionNode => {
 			return foundSequence[0]
 		}
 	)
 
-	const expressionWithPrecedingComma = sequence(
-		[ delimiter(','), expression ],
+	const expressionWithPrecedingComma = suffix(
+		delimiter(','),
+		expression,
 
 		(foundSequence: [IToken, IExpressionNode]): IExpressionNode => {
 			return foundSequence[1]
@@ -1006,8 +1016,9 @@ let identifier = (tokens: Array<IToken>): parserResult => {
 }
 
 let partialLookup = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[ delimiter('.'), identifier ],
+	const parser = suffix(
+		delimiter('.'),
+		identifier,
 
 		(foundSequence: [IToken, IIdentifierNode]): IPartialLookupNode => {
 			return {
@@ -1022,8 +1033,9 @@ let partialLookup = (tokens: Array<IToken>): parserResult => {
 }
 
 let partialMethodLookup = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[ operator('::'), identifier ],
+	const parser = suffix(
+		operator('::'),
+		identifier,
 
 		(foundSequence: [IToken, IIdentifierNode]): IPartialMethodLookupNode => {
 			return {
@@ -1062,8 +1074,9 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 }
 
 let functionInvocation = (tokens: Array<IToken>): parserResult => {
-	const parser = sequence(
-		[ argumentList, optionalLinebreak ],
+	const parser = suffix(
+		argumentList,
+		optionalLinebreak,
 
 		(foundSequence: [IArgumentListNode]): IArgumentListNode => {
 			return foundSequence[0]
@@ -1082,8 +1095,8 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
-	let nativeFunctionInvocation = oneOrMoreSuffix(
-		optionalSuffix(
+	let nativeFunctionInvocation = oneOrMoreChainSuffix(
+		optionalChainSuffix(
 			sequence(
 				[operator('__'), identifier],
 				(foundSequence) => { return foundSequence[1] }
@@ -1135,7 +1148,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 	type partialExpressionSequence = [IArgumentListNode | IPartialLookupNode | IPartialMethodInvocationNode]
 	type partialExpressionResult = IFunctionInvocationNode | ILookupNode | IMethodInvocationNode
 
-	let partialExpression = optionalSuffix(
+	let partialExpression = optionalChainSuffix(
 		choice(identifierOrValue, nativeFunctionInvocation),
 		choice(functionInvocation, partialLookup, partialMethodInvocation),
 		(node: IExpressionNode) => {
