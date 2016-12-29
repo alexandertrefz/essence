@@ -29,28 +29,6 @@ export interface IToken {
 	Parser
 */
 
-export type ASTType
-	= 'Identifier'
-	| 'Lookup'
-	| 'NativeLookup'
-	| 'Value'
-	| 'TypeDeclaration'
-	| 'DeclarationStatement'
-	| 'AssignmentStatement'
-	| 'Parameter'
-	| 'ParameterList'
-	| 'ArgumentList'
-	| 'FunctionDefinition'
-	| 'FunctionInvocation'
-	| 'NativeFunctionInvocation'
-	| 'ReturnStatement'
-	| 'IfStatement'
-	| 'IfElseStatement'
-	| 'Block'
-	| 'TypeDefinitionStatement'
-	| 'TypeProperty'
-	| 'TypeMethod'
-
 export interface IIdentifierNode {
 	nodeType: 'Identifier'
 	content: string
