@@ -35,6 +35,12 @@ export interface IIdentifierNode {
 	position: Position
 }
 
+export interface IPartialLookupNode {
+	nodeType: 'PartialLookup'
+	identifier: IIdentifierNode
+	position: Position
+}
+
 export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IExpressionNode
@@ -218,6 +224,7 @@ export type IASTNode
 	| INativeLookupNode
 	| IKeyValuePairNode
 	| ITypeConstructorNode
+	| IPartialLookupNode
 
 export interface IScope {
 	parent: IScope | null
