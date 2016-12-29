@@ -17,6 +17,7 @@ import {
 	IAssignmentStatementNode,
 	IIdentifierNode,
 	IExpressionNode,
+	IPartialLookupNode,
 	ILookupNode,
 	INativeLookupNode,
 	IIfStatementNode,
@@ -992,12 +993,16 @@ let identifier = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
-let lookup = (tokens: Array<IToken>): parserResult => {
+let partialLookup = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
 		[ delimiter('.'), identifier ],
 
-		(foundSequence: [IToken, IIdentifierNode]): IIdentifierNode => {
-			return foundSequence[1]
+		(foundSequence: [IToken, IIdentifierNode]): IPartialLookupNode => {
+			return {
+				nodeType: 'PartialLookup',
+				identifier: foundSequence[1],
+				position: foundSequence[0].position,
+			}
 		}
 	)
 
@@ -1049,8 +1054,6 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
-	type argumentListOrIdentifier = [IArgumentListNode | IIdentifierNode]
-
 	let nativeLookup = optionalSuffix(
 		sequence(
 			[operator('__'), identifier],
@@ -1087,25 +1090,27 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
+	type argumentListOrPartialLookup = [IArgumentListNode | IPartialLookupNode | IPartialMethodLookupNode]
+
 	let expressionOrFunctionInvocation = optionalSuffix(
 		choice(identifierOrValue, nativeFunctionInvocation),
-		choice(functionInvocation, lookup),
+		choice(functionInvocation, partialLookup),
 		(node: IExpressionNode) => {
-			return (foundSequence: argumentListOrIdentifier): IFunctionInvocationNode | ILookupNode => {
+			return (foundSequence: argumentListOrPartialLookup): IFunctionInvocationNode | ILookupNode => {
 				let rightNode = foundSequence[0]
 				if (rightNode.nodeType === 'ArgumentList') {
 					return {
 						nodeType: 'FunctionInvocation',
 						name: node,
 						arguments: rightNode.arguments,
-						position: foundSequence[0].position,
+						position: rightNode.position,
 					}
 				} else {
 					return {
 						nodeType: 'Lookup',
 						base: node,
-						member: rightNode.content,
-						position: foundSequence[0].position,
+						member: rightNode.identifier.content,
+						position: rightNode.position,
 					}
 				}
 			}

@@ -781,7 +781,7 @@ describe('Parser', () => {
 				member: 'member',
 				position: {
 					line: 1,
-					column: 9,
+					column: 8,
 				},
 			}]
 
@@ -805,7 +805,7 @@ describe('Parser', () => {
 					member: 'member',
 					position: {
 						line: 1,
-						column: 9,
+						column: 8,
 					},
 				},
 				arguments: [],
@@ -835,13 +835,13 @@ describe('Parser', () => {
 					member: 'member1',
 					position: {
 						line: 1,
-						column: 9,
+						column: 8,
 					},
 				},
 				member: 'member2',
 				position: {
 					line: 1,
-					column: 18,
+					column: 17,
 				},
 			}]
 
