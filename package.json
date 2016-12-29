@@ -12,11 +12,11 @@
   "author": "Alexander Trefz",
   "license": "MIT",
   "devDependencies": {
-    "console.table": "0.7.0",
+    "console.table": "0.8.0",
     "deep-equal": "1.0.1",
     "jasmine": "2.5.2",
     "minimist": "1.2.0",
-    "typescript": "2.0.3"
+    "typescript": "2.1.4"
   },
   "dependencies": {},
   "repository": {
