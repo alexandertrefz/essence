@@ -479,9 +479,9 @@ let delimiter = tokenHelper('Delimiter')
 
 let keyword = tokenHelper('Keyword')
 
-let linebreak = () => { return tokenHelper('Linebreak')('\n') }
+let linebreak = tokenHelper('Linebreak')('\n')
 
-let optionalLinebreak = optional(linebreak())
+let optionalLinebreak = optional(linebreak)
 
 /*
 	2.1 Helpers
