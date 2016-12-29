@@ -48,6 +48,19 @@ export interface ILookupNode {
 	position: Position
 }
 
+export interface IPartialMethodLookupNode {
+	nodeType: 'PartialMethodLookup'
+	identifier: IIdentifierNode
+	position: Position
+}
+
+export interface IMethodLookupNode {
+	nodeType: 'MethodLookup'
+	base: IExpressionNode
+	member: string
+	position: Position
+}
+
 export interface INativeLookupNode {
 	nodeType: 'NativeLookup'
 	base: IIdentifierNode | INativeLookupNode
@@ -133,6 +146,20 @@ export interface INativeFunctionInvocationNode {
 	position: Position
 }
 
+export interface IPartialMethodInvocationNode {
+	nodeType: 'PartialMethodInvocation'
+	member: IIdentifierNode
+	arguments: IArgumentListNode
+	position: Position
+}
+
+export interface IMethodInvocationNode {
+	nodeType: 'MethodInvocation'
+	name: IMethodLookupNode
+	arguments: Array<IExpressionNode>
+	position: Position
+}
+
 export interface IReturnStatementNode {
 	nodeType: 'ReturnStatement'
 	expression: IExpressionNode
@@ -199,8 +226,10 @@ export type IExpressionNode
 	= IValueNode
 	| IIdentifierNode
 	| ILookupNode
+	| IMethodLookupNode
 	| IFunctionInvocationNode
 	| INativeFunctionInvocationNode
+	| IMethodInvocationNode
 
 export type IStatementNode
 	= IDeclarationStatementNode
@@ -225,6 +254,8 @@ export type IASTNode
 	| IKeyValuePairNode
 	| ITypeConstructorNode
 	| IPartialLookupNode
+	| IPartialMethodLookupNode
+	| IPartialMethodInvocationNode
 
 export interface IScope {
 	parent: IScope | null

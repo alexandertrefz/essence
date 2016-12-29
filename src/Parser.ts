@@ -12,6 +12,8 @@ import {
 	IFunctionDefinitionNode,
 	IFunctionInvocationNode,
 	INativeFunctionInvocationNode,
+	IPartialMethodInvocationNode,
+	IMethodInvocationNode,
 	IReturnStatementNode,
 	IDeclarationStatementNode,
 	IAssignmentStatementNode,
@@ -19,6 +21,8 @@ import {
 	IExpressionNode,
 	IPartialLookupNode,
 	ILookupNode,
+	IPartialMethodLookupNode,
+	IMethodLookupNode,
 	INativeLookupNode,
 	IIfStatementNode,
 	IIfElseStatementNode,
@@ -99,6 +103,14 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 		if (token.content === '<') {
 			if (nextToken.content === '-') {
 				token.content = '<-'
+				token.tokenType = 'Operator'
+				tokens.splice(i + 1, 1)
+			}
+		}
+
+		if (token.content === ':') {
+			if (nextToken.content === ':') {
+				token.content = '::'
 				token.tokenType = 'Operator'
 				tokens.splice(i + 1, 1)
 			}
@@ -1009,6 +1021,22 @@ let partialLookup = (tokens: Array<IToken>): parserResult => {
 	return parser(tokens)
 }
 
+let partialMethodLookup = (tokens: Array<IToken>): parserResult => {
+	const parser = sequence(
+		[ operator('::'), identifier ],
+
+		(foundSequence: [IToken, IIdentifierNode]): IPartialMethodLookupNode => {
+			return {
+				nodeType: 'PartialMethodLookup',
+				identifier: foundSequence[1],
+				position: foundSequence[0].position,
+			}
+		}
+	)
+
+	return parser(tokens)
+}
+
 let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	type functionDefinitionSequence = [IParameterListNode, IToken, ITypeDeclarationNode, IBlockNode]
 
@@ -1054,29 +1082,27 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
-	let nativeLookup = optionalSuffix(
-		sequence(
-			[operator('__'), identifier],
-			(foundSequence) => { return foundSequence[1] }
-		),
-		sequence(
-			[delimiter('.'), identifier],
-			(foundSequence) => { return foundSequence[1] }
-		),
-		(node: IIdentifierNode | INativeLookupNode) => {
-			return (foundSequence: [IIdentifierNode]): INativeLookupNode => {
-				return {
-					nodeType: 'NativeLookup',
-					base: node,
-					member: foundSequence[0].content,
-					position: foundSequence[0].position,
+	let nativeFunctionInvocation = oneOrMoreSuffix(
+		optionalSuffix(
+			sequence(
+				[operator('__'), identifier],
+				(foundSequence) => { return foundSequence[1] }
+			),
+			sequence(
+				[delimiter('.'), identifier],
+				(foundSequence) => { return foundSequence[1] }
+			),
+			(node: IIdentifierNode | INativeLookupNode) => {
+				return (foundSequence: [IIdentifierNode]): INativeLookupNode => {
+					return {
+						nodeType: 'NativeLookup',
+						base: node,
+						member: foundSequence[0].content,
+						position: foundSequence[0].position,
+					}
 				}
 			}
-		}
-	)
-
-	let nativeFunctionInvocation = oneOrMoreSuffix(
-		nativeLookup,
+		),
 		functionInvocation,
 		(node: INativeLookupNode) => {
 			return (foundSequence: [IArgumentListNode]): INativeFunctionInvocationNode => {
@@ -1090,20 +1116,50 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
-	type argumentListOrPartialLookup = [IArgumentListNode | IPartialLookupNode | IPartialMethodLookupNode]
+	let partialMethodInvocation = sequence(
+		[
+			operator('::'),
+			identifier,
+			functionInvocation,
+		],
+		(foundSequence: [IToken, IIdentifierNode, IArgumentListNode]): IPartialMethodInvocationNode => {
+			return {
+				nodeType: 'PartialMethodInvocation',
+				member: foundSequence[1],
+				arguments: foundSequence[2],
+				position: foundSequence[0].position,
+			}
+		}
+	)
 
-	let expressionOrFunctionInvocation = optionalSuffix(
+	type partialExpressionSequence = [IArgumentListNode | IPartialLookupNode | IPartialMethodInvocationNode]
+	type partialExpressionResult = IFunctionInvocationNode | ILookupNode | IMethodInvocationNode
+
+	let partialExpression = optionalSuffix(
 		choice(identifierOrValue, nativeFunctionInvocation),
-		choice(functionInvocation, partialLookup),
+		choice(functionInvocation, partialLookup, partialMethodInvocation),
 		(node: IExpressionNode) => {
-			return (foundSequence: argumentListOrPartialLookup): IFunctionInvocationNode | ILookupNode => {
+			return (foundSequence: partialExpressionSequence): partialExpressionResult => {
 				let rightNode = foundSequence[0]
+
 				if (rightNode.nodeType === 'ArgumentList') {
 					return {
 						nodeType: 'FunctionInvocation',
 						name: node,
 						arguments: rightNode.arguments,
 						position: rightNode.position,
+					}
+				} else if (rightNode.nodeType === 'PartialMethodInvocation') {
+					return {
+						nodeType: 'MethodInvocation',
+						name: {
+							nodeType: 'MethodLookup',
+							base: node,
+							member: rightNode.member.content,
+							position: rightNode.position,
+						},
+						arguments: rightNode.arguments.arguments,
+						position: node.position,
 					}
 				} else {
 					return {
@@ -1117,7 +1173,31 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 		}
 	)
 
-	return choice(expressionOrFunctionInvocation)(tokens) as expressionParserResult
+	// MethodLookups shall not recurse, so they are separated from the partialExpression parser
+	let methodLookup = sequence(
+		[
+			partialExpression,
+			partialMethodLookup,
+		],
+		(foundSequence: [IExpressionNode, IPartialMethodLookupNode]): IMethodLookupNode => {
+			let leftNode = foundSequence[0]
+			let rightNode = foundSequence[1]
+
+			return {
+				nodeType: 'MethodLookup',
+				base: leftNode,
+				member: rightNode.identifier.content,
+				position: rightNode.position,
+			}
+		}
+	)
+
+	const parser = choice(
+		methodLookup,
+		partialExpression
+	)
+
+	return parser(tokens) as expressionParserResult
 }
 
 /*
