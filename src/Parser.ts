@@ -498,6 +498,7 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'TypeDeclaration',
 				name: foundSequence[0].content,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -602,6 +603,7 @@ let block = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'Block',
 				nodes,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -618,6 +620,7 @@ let typeProperty = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'TypeProperty',
 				name: foundSequence[0].content,
 				type: foundSequence[1],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -634,6 +637,7 @@ let typeMethod = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'TypeMethod',
 				name: foundSequence[0].content,
 				func: foundSequence[1],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -655,6 +659,7 @@ let keyValuePair = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'KeyValuePair',
 				key: foundSequence[0].content,
 				value: foundSequence[2],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -675,6 +680,7 @@ let parameter = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'Parameter',
 				name: foundSequence[0].content,
 				type: foundSequence[1],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -715,6 +721,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'ParameterList',
 				parameters,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -740,6 +747,7 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'ParameterList',
 				parameters,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -780,6 +788,7 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'ArgumentList',
 				arguments: args,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -805,6 +814,7 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'ArgumentList',
 				arguments: args,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -845,6 +855,7 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'TypeConstructor',
 				type: null,
 				members,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -870,6 +881,7 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'TypeConstructor',
 				type: foundSequence[0].content,
 				members,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -888,6 +900,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: 'Function',
 					value: foundSequence[0],
 					members: {},
+					position: foundSequence[0].position,
 				}
 			}
 		),
@@ -903,6 +916,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: 'Bool',
 					value,
 					members: {},
+					position: foundSequence[0].position,
 				}
 			}
 		),
@@ -916,6 +930,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: 'String',
 					value: foundSequence[0].content,
 					members: {},
+					position: foundSequence[0].position,
 				}
 			}
 		),
@@ -929,6 +944,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: 'Number',
 					value: foundSequence[0].content,
 					members: {},
+					position: foundSequence[0].position,
 				}
 			}
 		),
@@ -947,6 +963,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 					type: foundSequence[0].type,
 					value: null,
 					members,
+					position: foundSequence[0].position,
 				}
 			}
 		),
@@ -967,6 +984,7 @@ let identifier = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'Identifier',
 				content: foundSequence[0].content,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1002,6 +1020,7 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 				parameters: foundSequence[0].parameters,
 				returnType: foundSequence[2],
 				body: foundSequence[3],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1047,6 +1066,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					nodeType: 'NativeLookup',
 					base: node,
 					member: foundSequence[0].content,
+					position: foundSequence[0].position,
 				}
 			}
 		}
@@ -1061,6 +1081,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					nodeType: 'NativeFunctionInvocation',
 					name: node,
 					arguments: foundSequence[0].arguments,
+					position: foundSequence[0].position,
 				}
 			}
 		}
@@ -1077,12 +1098,14 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 						nodeType: 'FunctionInvocation',
 						name: node,
 						arguments: rightNode.arguments,
+						position: foundSequence[0].position,
 					}
 				} else {
 					return {
 						nodeType: 'Lookup',
 						base: node,
 						member: rightNode.content,
+						position: foundSequence[0].position,
 					}
 				}
 			}
@@ -1104,6 +1127,7 @@ let returnStatement = (tokens: Array<IToken>): parserResult => {
 			return {
 				nodeType: 'ReturnStatement',
 				expression: foundSequence[1],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1138,6 +1162,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 				name: foundSequence[1],
 				properties: {},
 				members: {},
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1176,6 +1201,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 							type: 'Method',
 							value: current.func,
 							members: {},
+							position: current.position,
 						}
 					}
 
@@ -1189,6 +1215,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 				name: foundSequence[1],
 				properties,
 				members,
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1220,6 +1247,7 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 				name: foundSequence[1].content,
 				type: foundSequence[2],
 				value: foundSequence[4],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1240,6 +1268,7 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'AssignmentStatement',
 				name: foundSequence[0].content,
 				value: foundSequence[2],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1260,6 +1289,7 @@ let ifStatement = (tokens: Array<IToken>): parserResult => {
 				nodeType: 'IfStatement',
 				condition: foundSequence[2],
 				body: foundSequence[4],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1287,6 +1317,7 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				condition: foundSequence[0].condition,
 				trueBody: foundSequence[0].body,
 				falseBody: foundSequence[2],
+				position: foundSequence[0].position,
 			}
 		}
 	)
@@ -1302,7 +1333,9 @@ let ifElseStatement = (tokens: Array<IToken>): parserResult => {
 				falseBody: {
 					nodeType: 'Block',
 					nodes: [foundSequence[2]],
+					position: foundSequence[1].position,
 				},
+				position: foundSequence[0].position,
 			}
 		}
 	)
