@@ -848,6 +848,134 @@ describe('Parser', () => {
 			expect(parse(lex(input))).toEqual(output)
 		})
 
+		it('should parse raw method lookups', () => {
+			let input = `lookup::member`
+			let output = [{
+				nodeType: 'MethodLookup',
+				base: {
+					nodeType: 'Identifier',
+					content: 'lookup',
+					position: {
+						line: 1,
+						column: 1,
+					},
+				},
+				member: 'member',
+				position: {
+					line: 1,
+					column: 8,
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse method lookups with invocation', () => {
+			let input = `lookup::member()`
+			let output = [{
+				nodeType: 'MethodInvocation',
+				name: {
+					nodeType: 'MethodLookup',
+					base: {
+						nodeType: 'Identifier',
+						content: 'lookup',
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+					member: 'member',
+					position: {
+						line: 1,
+						column: 8,
+					},
+				},
+				arguments: [],
+				position: {
+					line: 1,
+					column: 1,
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should parse multiple method lookups with invocation', () => {
+			let input = `lookup::member()::member()`
+			let output = [{
+				nodeType: 'MethodInvocation',
+				name: {
+					nodeType: 'MethodLookup',
+					base: {
+						nodeType: 'MethodInvocation',
+						name: {
+							nodeType: 'MethodLookup',
+							base: {
+								nodeType: 'Identifier',
+								content: 'lookup',
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: 'member',
+							position: {
+								line: 1,
+								column: 8,
+							},
+						},
+						arguments: [],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+					member: 'member',
+					position: {
+						line: 1,
+						column: 19,
+					},
+				},
+				arguments: [],
+				position: {
+					line: 1,
+					column: 1,
+				},
+			}]
+
+			expect(parse(lex(input))).toEqual(output)
+		})
+
+		it('should not parse complex raw method lookups', () => {
+			let input = `lookup::member1::member2`
+			let output = [{
+				nodeType: 'MethodLookup',
+				base: {
+					nodeType: 'MethodLookup',
+					base: {
+						nodeType: 'Identifier',
+						content: 'lookup',
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+					member: 'member1',
+					position: {
+						line: 1,
+						column: 8,
+					},
+				},
+				member: 'member2',
+				position: {
+					line: 1,
+					column: 18,
+				},
+			}]
+
+			expect(() => parse(lex(input))).toThrow()
+		})
+
 		it('should not parse native prefix without identifier', () => {
 			let input = `__`
 			let output = []
