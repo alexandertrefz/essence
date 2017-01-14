@@ -1,5 +1,5 @@
-import { lex } from '../Lexer'
-import { parse } from '../Parser'
+import { lex } from '../lexer'
+import { parse } from '../parser'
 
 describe('Parser', () => {
 	describe('Expressions', () => {
