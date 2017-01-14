@@ -1,5 +1,5 @@
-import { lex } from '../Lexer'
-import { lexer } from '../Interfaces'
+import { lex } from '../lexer'
+import { lexer } from '../interfaces'
 
 type TokenType = lexer.TokenType
 type IToken = lexer.IToken

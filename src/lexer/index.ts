@@ -1,4 +1,4 @@
-import { lexer } from './interfaces'
+import { lexer } from '../interfaces'
 
 type IToken   = lexer.IToken
 type Position = lexer.Position
