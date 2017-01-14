@@ -80,7 +80,7 @@ export class Runtime {
 
 	constructor() {
 		this.nativeScope = {
-			print: (message: IValueNode) => {
+			print(message: IValueNode) {
 				if (message.value === null) {
 					const convertMessage = (message: IValueNode) => {
 						const convertedMessage = {}
