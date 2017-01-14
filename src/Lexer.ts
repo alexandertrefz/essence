@@ -1,6 +1,9 @@
 /// <reference path="../typings/index.d.ts" />
 
-import { Position, IToken } from './Interfaces'
+import { lexer } from './interfaces'
+
+type IToken   = lexer.IToken
+type Position = lexer.Position
 
 type LexingResult = {
 	input: string
@@ -251,7 +254,7 @@ let lexToken = (input: string, position: Position): LexingResult => {
 }
 
 export let lex = (input: string, position: Position = { line: 1, column: 1, }): Array<IToken> => {
-	let tokens: IToken[] = []
+	let tokens: Array<IToken> = []
 
 	while (input) {
 		let token: IToken

@@ -1,6 +1,6 @@
 /// <reference path="../../typings/index.d.ts" />
 
-import { } from '../Interfaces'
+import { } from '../interfaces'
 
 describe('Runtime', () => {
 	it('something', () => {

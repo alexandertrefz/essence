@@ -1,6 +1,6 @@
-import {
-	IValueNode,
-} from '../Interfaces'
+import { parser } from '../interfaces'
+
+type IValueNode = parser.IValueNode
 
 import { generateValueNode } from './helpers'
 
