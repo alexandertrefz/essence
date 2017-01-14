@@ -14,9 +14,9 @@
   "devDependencies": {
     "console.table": "0.8.0",
     "deep-equal": "1.0.1",
-    "jasmine": "2.5.2",
+    "jasmine": "2.5.3",
     "minimist": "1.2.0",
-    "typescript": "2.1.4"
+    "typescript": "2.1.5"
   },
   "dependencies": {},
   "repository": {
