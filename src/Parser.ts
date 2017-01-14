@@ -1,38 +1,39 @@
 /// <reference path="../typings/index.d.ts" />
 
-import {
-	IToken,
-	IASTNode,
-	IStatementNode,
-	ITypeDeclarationNode,
-	IValueNode,
-	IParameterNode,
-	IParameterListNode,
-	IArgumentListNode,
-	IFunctionDefinitionNode,
-	IFunctionInvocationNode,
-	INativeFunctionInvocationNode,
-	IPartialMethodInvocationNode,
-	IMethodInvocationNode,
-	IReturnStatementNode,
-	IDeclarationStatementNode,
-	IAssignmentStatementNode,
-	IIdentifierNode,
-	IExpressionNode,
-	IPartialLookupNode,
-	ILookupNode,
-	IPartialMethodLookupNode,
-	IMethodLookupNode,
-	INativeLookupNode,
-	IIfStatementNode,
-	IIfElseStatementNode,
-	IBlockNode,
-	ITypeDefinitionStatementNode,
-	ITypePropertyNode,
-	ITypeMethodNode,
-	IKeyValuePairNode,
-	ITypeConstructorNode,
-} from './Interfaces'
+import { lexer, parser } from './interfaces'
+
+type IToken = lexer.IToken
+
+type IASTNode                      = parser.IASTNode
+type IExpressionNode               = parser.IExpressionNode
+type IStatementNode                = parser.IStatementNode
+type ITypeDeclarationNode          = parser.ITypeDeclarationNode
+type IIdentifierNode               = parser.IIdentifierNode
+type IBlockNode                    = parser.IBlockNode
+type IFunctionDefinitionNode       = parser.IFunctionDefinitionNode
+type ITypePropertyNode             = parser.ITypePropertyNode
+type ITypeMethodNode               = parser.ITypeMethodNode
+type IKeyValuePairNode             = parser.IKeyValuePairNode
+type IParameterNode                = parser.IParameterNode
+type IParameterListNode            = parser.IParameterListNode
+type IArgumentListNode             = parser.IArgumentListNode
+type ITypeConstructorNode          = parser.ITypeConstructorNode
+type IValueNode                    = parser.IValueNode
+type IPartialLookupNode            = parser.IPartialLookupNode
+type IPartialMethodLookupNode      = parser.IPartialMethodLookupNode
+type INativeLookupNode             = parser.INativeLookupNode
+type INativeFunctionInvocationNode = parser.INativeFunctionInvocationNode
+type IPartialMethodInvocationNode  = parser.IPartialMethodInvocationNode
+type IFunctionInvocationNode       = parser.IFunctionInvocationNode
+type ILookupNode                   = parser.ILookupNode
+type IMethodInvocationNode         = parser.IMethodInvocationNode
+type IMethodLookupNode             = parser.IMethodLookupNode
+type IReturnStatementNode          = parser.IReturnStatementNode
+type ITypeDefinitionStatementNode  = parser.ITypeDefinitionStatementNode
+type IDeclarationStatementNode     = parser.IDeclarationStatementNode
+type IAssignmentStatementNode      = parser.IAssignmentStatementNode
+type IIfStatementNode              = parser.IIfStatementNode
+type IIfElseStatementNode          = parser.IIfElseStatementNode
 
 type tokenSequenceMatch = {
 	foundSequence: Array<IToken | IASTNode | null>

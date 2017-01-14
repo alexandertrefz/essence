@@ -1,5 +1,26 @@
 /// <reference path='../typings/index.d.ts' />
 
+import { parser, runtime } from './interfaces'
+
+type IASTNode                      = parser.IASTNode
+type IStatementNode                = parser.IStatementNode
+type IValueNode                    = parser.IValueNode
+type IFunctionDefinitionNode       = parser.IFunctionDefinitionNode
+type IFunctionInvocationNode       = parser.IFunctionInvocationNode
+type INativeFunctionInvocationNode = parser.INativeFunctionInvocationNode
+type IDeclarationStatementNode     = parser.IDeclarationStatementNode
+type IAssignmentStatementNode      = parser.IAssignmentStatementNode
+type IIdentifierNode               = parser.IIdentifierNode
+type IExpressionNode               = parser.IExpressionNode
+type ILookupNode                   = parser.ILookupNode
+type INativeLookupNode             = parser.INativeLookupNode
+type IIfStatementNode              = parser.IIfStatementNode
+type IIfElseStatementNode          = parser.IIfElseStatementNode
+type ITypeDefinitionStatementNode  = parser.ITypeDefinitionStatementNode
+
+type IScope       = runtime.IScope
+type INativeScope = runtime.INativeScope
+
 require('console.table')
 
 let logger = {
@@ -46,26 +67,6 @@ let logger = {
 		console.log()
 	},
 }
-
-import {
-	IASTNode,
-	IStatementNode,
-	IValueNode,
-	IFunctionDefinitionNode,
-	IFunctionInvocationNode,
-	INativeFunctionInvocationNode,
-	IDeclarationStatementNode,
-	IAssignmentStatementNode,
-	IIdentifierNode,
-	IExpressionNode,
-	ILookupNode,
-	INativeLookupNode,
-	IIfStatementNode,
-	IIfElseStatementNode,
-	IScope,
-	INativeScope,
-	ITypeDefinitionStatementNode,
-} from './Interfaces'
 
 import * as stringPrimitive from './runtimePrimitives/String'
 import * as boolPrimitive from './runtimePrimitives/Bool'
@@ -126,7 +127,7 @@ export class Runtime {
 		while (true) {
 			if (searchScope === null) {
 				logger.flush()
-				console.log()
+				logger.linebreak()
 				logger.debug(scope)
 				throw new Error(`Can not find variable '${node.content}' in this Scope - File a Bug Report!`)
 			}

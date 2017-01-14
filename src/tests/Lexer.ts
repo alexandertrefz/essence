@@ -1,7 +1,10 @@
 /// <reference path="../../typings/index.d.ts" />
 
 import { lex } from '../Lexer'
-import { TokenType, IToken } from '../Interfaces'
+import { lexer } from '../Interfaces'
+
+type TokenType = lexer.TokenType
+type IToken = lexer.IToken
 
 type ISimpleToken = {
 	tokenType: TokenType
