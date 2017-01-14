@@ -2,7 +2,7 @@
 
 let process = require('process')
 
-let Runtime = require('../lib/Runtime').Runtime
+let Runtime = require('../lib/runtime').Runtime
 let runtime = new Runtime()
 
 runtime.loadFile(process.argv[2])

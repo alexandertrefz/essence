@@ -1,4 +1,4 @@
-import { parser, runtime } from './interfaces'
+import { parser, runtime } from '../interfaces'
 
 type IASTNode                      = parser.IASTNode
 type IStatementNode                = parser.IStatementNode
@@ -66,8 +66,8 @@ let logger = {
 	},
 }
 
-import * as stringPrimitive from './runtimePrimitives/String'
-import * as boolPrimitive from './runtimePrimitives/Bool'
+import * as stringPrimitive from './primitives/String'
+import * as boolPrimitive from './primitives/Bool'
 
 type valueOrType = IValueNode | ITypeDefinitionStatementNode
 type scopeAndMaybeReturnValue = { scope: IScope, returnValue: IValueNode | null, }
