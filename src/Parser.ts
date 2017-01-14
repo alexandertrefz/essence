@@ -1,5 +1,3 @@
-/// <reference path="../typings/index.d.ts" />
-
 import { lexer, parser } from './interfaces'
 
 type IToken = lexer.IToken

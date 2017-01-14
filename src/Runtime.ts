@@ -1,5 +1,3 @@
-/// <reference path='../typings/index.d.ts' />
-
 import { parser, runtime } from './interfaces'
 
 type IASTNode                      = parser.IASTNode

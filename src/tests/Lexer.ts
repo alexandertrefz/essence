@@ -1,5 +1,3 @@
-/// <reference path="../../typings/index.d.ts" />
-
 import { lex } from '../Lexer'
 import { lexer } from '../Interfaces'
 
