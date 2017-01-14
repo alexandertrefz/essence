@@ -1,4 +1,4 @@
-import { parser } from '../interfaces'
+import { parser } from '../../interfaces'
 
 type IValueNode = parser.IValueNode
 
