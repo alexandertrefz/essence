@@ -1,6 +1,7 @@
 .DS_Store
 node_modules
 .vscode
+yarn-error.log
 
 Scrapbook.md
 Notes.md
