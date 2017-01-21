@@ -1404,7 +1404,14 @@ describe('Parser', () => {
 			let input = `let identifier = ''`
 			let output = [{
 				nodeType: 'DeclarationStatement',
-				name: 'identifier',
+				name: {
+					nodeType: 'Identifier',
+					content: 'identifier',
+					position: {
+						line: 1,
+						column: 5,
+					},
+				},
 				type: null,
 				value: {
 					nodeType: 'Value',
@@ -1429,7 +1436,14 @@ describe('Parser', () => {
 			let input = `let identifier Type = ''`
 			let output = [{
 				nodeType: 'DeclarationStatement',
-				name: 'identifier',
+				name: {
+					nodeType: 'Identifier',
+					content: 'identifier',
+					position: {
+						line: 1,
+						column: 5,
+					},
+				},
 				type: {
 					nodeType: 'TypeDeclaration',
 					name: {
