@@ -147,7 +147,7 @@ export interface IDeclarationStatementNode {
 
 export interface IAssignmentStatementNode {
 	nodeType: 'AssignmentStatement'
-	name: string
+	name: IIdentifierNode
 	value: IExpressionNode
 	position: Position
 }

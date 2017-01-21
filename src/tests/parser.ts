@@ -1482,7 +1482,14 @@ describe('Parser', () => {
 			let input = `identifier = ''`
 			let output = [{
 				nodeType: 'AssignmentStatement',
-				name: 'identifier',
+				name: {
+					nodeType: 'Identifier',
+					content: 'identifier',
+					position: {
+						line: 1,
+						column: 1,
+					},
+				},
 				value: {
 					nodeType: 'Value',
 					type: 'String',
