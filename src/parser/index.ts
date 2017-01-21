@@ -1343,13 +1343,13 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 			expression,
 			optionalLinebreak,
 		],
-		(foundSequence: declarationSequence): IDeclarationStatementNode => {
+		([token, name, type, delim, value]: declarationSequence): IDeclarationStatementNode => {
 			return {
 				nodeType: 'DeclarationStatement',
-				name: foundSequence[1].content,
-				type: foundSequence[2],
-				value: foundSequence[4],
-				position: foundSequence[0].position,
+				name,
+				type,
+				value,
+				position: token.position,
 			}
 		}
 	)

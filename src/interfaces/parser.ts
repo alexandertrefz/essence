@@ -139,7 +139,7 @@ export interface IReturnStatementNode {
 
 export interface IDeclarationStatementNode {
 	nodeType: 'DeclarationStatement'
-	name: string
+	name: IIdentifierNode
 	type: ITypeDeclarationNode | null
 	value: IExpressionNode
 	position: Position
