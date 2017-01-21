@@ -776,7 +776,14 @@ describe('Parser', () => {
 						column: 1,
 					},
 				},
-				member: 'member',
+				member: {
+					nodeType: 'Identifier',
+					content: 'member',
+					position: {
+						line: 1,
+						column: 9,
+					},
+				},
 				position: {
 					line: 1,
 					column: 8,
@@ -800,7 +807,14 @@ describe('Parser', () => {
 							column: 1,
 						},
 					},
-					member: 'member',
+					member: {
+						nodeType: 'Identifier',
+						content: 'member',
+						position: {
+							line: 1,
+							column: 9,
+						},
+					},
 					position: {
 						line: 1,
 						column: 8,
@@ -830,13 +844,27 @@ describe('Parser', () => {
 							column: 1,
 						},
 					},
-					member: 'member1',
+					member: {
+						nodeType: 'Identifier',
+						content: 'member1',
+						position: {
+							line: 1,
+							column: 9,
+						},
+					},
 					position: {
 						line: 1,
 						column: 8,
 					},
 				},
-				member: 'member2',
+				member: {
+					nodeType: 'Identifier',
+					content: 'member2',
+					position: {
+						line: 1,
+						column: 18,
+					},
+				},
 				position: {
 					line: 1,
 					column: 17,
@@ -858,7 +886,14 @@ describe('Parser', () => {
 						column: 1,
 					},
 				},
-				member: 'member',
+				member: {
+					nodeType: 'Identifier',
+					content: 'member',
+					position: {
+						line: 1,
+						column: 10,
+					},
+				},
 				position: {
 					line: 1,
 					column: 8,
@@ -882,7 +917,14 @@ describe('Parser', () => {
 							column: 1,
 						},
 					},
-					member: 'member',
+					member: {
+						nodeType: 'Identifier',
+						content: 'member',
+						position: {
+							line: 1,
+							column: 10,
+						},
+					},
 					position: {
 						line: 1,
 						column: 8,
@@ -916,7 +958,14 @@ describe('Parser', () => {
 									column: 1,
 								},
 							},
-							member: 'member',
+							member: {
+								nodeType: 'Identifier',
+								content: 'member',
+								position: {
+									line: 1,
+									column: 10,
+								},
+							},
 							position: {
 								line: 1,
 								column: 8,
@@ -928,7 +977,14 @@ describe('Parser', () => {
 							column: 1,
 						},
 					},
-					member: 'member',
+					member: {
+						nodeType: 'Identifier',
+						content: 'member',
+						position: {
+							line: 1,
+							column: 21,
+						},
+					},
 					position: {
 						line: 1,
 						column: 19,
@@ -1024,7 +1080,14 @@ describe('Parser', () => {
 							column: 3,
 						},
 					},
-					member: 'member',
+					member: {
+						nodeType: 'Identifier',
+						content: 'member',
+						position: {
+							line: 1,
+							column: 11,
+						},
+					},
 					position: {
 						line: 1,
 						column: 11,
