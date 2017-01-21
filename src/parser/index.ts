@@ -1109,7 +1109,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					return {
 						nodeType: 'NativeLookup',
 						base: node,
-						member: foundSequence[0].content,
+						member: foundSequence[0],
 						position: foundSequence[0].position,
 					}
 				}
@@ -1167,7 +1167,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 						name: {
 							nodeType: 'MethodLookup',
 							base: node,
-							member: rightNode.member.content,
+							member: rightNode.member,
 							position: rightNode.position,
 						},
 						arguments: rightNode.arguments.arguments,
@@ -1177,7 +1177,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					return {
 						nodeType: 'Lookup',
 						base: node,
-						member: rightNode.identifier.content,
+						member: rightNode.identifier,
 						position: rightNode.position,
 					}
 				}
@@ -1198,7 +1198,7 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 			return {
 				nodeType: 'MethodLookup',
 				base: leftNode,
-				member: rightNode.identifier.content,
+				member: rightNode.identifier,
 				position: rightNode.position,
 			}
 		}

@@ -15,7 +15,7 @@ export interface IPartialLookupNode {
 export interface ILookupNode {
 	nodeType: 'Lookup'
 	base: IExpressionNode
-	member: string
+	member: IIdentifierNode
 	position: Position
 }
 
@@ -28,14 +28,14 @@ export interface IPartialMethodLookupNode {
 export interface IMethodLookupNode {
 	nodeType: 'MethodLookup'
 	base: IExpressionNode
-	member: string
+	member: IIdentifierNode
 	position: Position
 }
 
 export interface INativeLookupNode {
 	nodeType: 'NativeLookup'
 	base: IIdentifierNode | INativeLookupNode
-	member: string
+	member: IIdentifierNode
 	position: Position
 }
 
