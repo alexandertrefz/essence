@@ -1365,12 +1365,12 @@ let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 			expression,
 			optionalLinebreak,
 		],
-		(foundSequence: [IIdentifierNode, IToken, IExpressionNode]): IAssignmentStatementNode => {
+		([name, delim, value]: [IIdentifierNode, IToken, IExpressionNode]): IAssignmentStatementNode => {
 			return {
 				nodeType: 'AssignmentStatement',
-				name: foundSequence[0].content,
-				value: foundSequence[2],
-				position: foundSequence[0].position,
+				name,
+				value,
+				position: name.position,
 			}
 		}
 	)
