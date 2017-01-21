@@ -513,7 +513,7 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 		(foundSequence: [IIdentifierNode]): ITypeDeclarationNode => {
 			return {
 				nodeType: 'TypeDeclaration',
-				name: foundSequence[0].content,
+				name: foundSequence[0],
 				position: foundSequence[0].position,
 			}
 		}

@@ -41,7 +41,7 @@ export interface INativeLookupNode {
 
 export interface ITypeDeclarationNode {
 	nodeType: 'TypeDeclaration'
-	name: string
+	name: IIdentifierNode
 	position: Position
 }
 
