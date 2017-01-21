@@ -53,7 +53,7 @@ export interface IBlockNode {
 
 export interface IKeyValuePairNode {
 	nodeType: 'KeyValuePair'
-	key: string
+	key: IIdentifierNode
 	value: IExpressionNode
 	position: Position
 }

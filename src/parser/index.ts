@@ -671,10 +671,10 @@ let keyValuePair = (tokens: Array<IToken>): parserResult => {
 			optional(delimiter(',')),
 			optionalLinebreak,
 		],
-		(foundSequence: [IToken, IToken, IExpressionNode, IToken]): IKeyValuePairNode => {
+		(foundSequence: [IIdentifierNode, IToken, IExpressionNode, IToken]): IKeyValuePairNode => {
 			return {
 				nodeType: 'KeyValuePair',
-				key: foundSequence[0].content,
+				key: foundSequence[0],
 				value: foundSequence[2],
 				position: foundSequence[0].position,
 			}
@@ -977,7 +977,7 @@ let value = (tokens: Array<IToken>): parserResult => {
 			(foundSequence: [ITypeConstructorNode]): IValueNode => {
 				const members = {}
 				foundSequence[0].members.map((keyValuePair) => {
-					members[keyValuePair.key] = keyValuePair.value
+					members[keyValuePair.key.content] = keyValuePair.value
 				})
 
 				return {
