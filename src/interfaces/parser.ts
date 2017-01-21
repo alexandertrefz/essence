@@ -181,14 +181,14 @@ export interface ITypeDefinitionStatementNode {
 
 export interface ITypePropertyNode {
 	nodeType: 'TypeProperty'
-	name: string
+	name: IIdentifierNode
 	type: ITypeDeclarationNode
 	position: Position
 }
 
 export interface ITypeMethodNode {
 	nodeType: 'TypeMethod'
-	name: string
+	name: IIdentifierNode
 	func: IFunctionDefinitionNode
 	position: Position
 }
