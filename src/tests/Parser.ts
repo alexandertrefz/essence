@@ -155,7 +155,14 @@ describe('Parser', () => {
 					parameters: [],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
 						position: {
 							line: 1,
 							column: 6,
@@ -195,7 +202,14 @@ describe('Parser', () => {
 					parameters: [],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
 						position: {
 							line: 1,
 							column: 6,
@@ -236,7 +250,14 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 12,
+								},
+							},
 							position: {
 								line: 1,
 								column: 12,
@@ -249,7 +270,14 @@ describe('Parser', () => {
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 21,
+							},
+						},
 						position: {
 							line: 1,
 							column: 21,
@@ -290,7 +318,14 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 12,
+								},
+							},
 							position: {
 								line: 1,
 								column: 12,
@@ -305,7 +340,14 @@ describe('Parser', () => {
 						name: 'parameter2',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 30,
+								},
+							},
 							position: {
 								line: 1,
 								column: 30,
@@ -318,7 +360,14 @@ describe('Parser', () => {
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 39,
+							},
+						},
 						position: {
 							line: 1,
 							column: 39,
@@ -359,7 +408,14 @@ describe('Parser', () => {
 						name: 'parameter',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 12,
+								},
+							},
 							position: {
 								line: 1,
 								column: 12,
@@ -374,7 +430,14 @@ describe('Parser', () => {
 						name: 'parameter2',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 30,
+								},
+							},
 							position: {
 								line: 1,
 								column: 30,
@@ -389,7 +452,14 @@ describe('Parser', () => {
 						name: 'parameter3',
 						type: {
 							nodeType: 'TypeDeclaration',
-							name: 'Type',
+							name: {
+								nodeType: 'Identifier',
+								content: 'Type',
+								position: {
+									line: 1,
+									column: 48,
+								},
+							},
 							position: {
 								line: 1,
 								column: 48,
@@ -402,7 +472,14 @@ describe('Parser', () => {
 					}],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 57,
+							},
+						},
 						position: {
 							line: 1,
 							column: 57,
@@ -443,7 +520,14 @@ describe('Parser', () => {
 					parameters: [],
 					returnType: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
 						position: {
 							line: 1,
 							column: 6,
@@ -1348,7 +1432,14 @@ describe('Parser', () => {
 				name: 'identifier',
 				type: {
 					nodeType: 'TypeDeclaration',
-					name: 'Type',
+					name: {
+						nodeType: 'Identifier',
+						content: 'Type',
+						position: {
+							line: 1,
+							column: 16,
+						},
+					},
 					position: {
 						line: 1,
 						column: 16,
@@ -1437,7 +1528,14 @@ describe('Parser', () => {
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 2,
+								column: 14,
+							},
+						},
 						position: {
 							line: 2,
 							column: 14,
@@ -1472,7 +1570,14 @@ describe('Parser', () => {
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 2,
+								column: 14,
+							},
+						},
 						position: {
 							line: 2,
 							column: 14,
@@ -1480,7 +1585,14 @@ describe('Parser', () => {
 					},
 					property2: {
 						nodeType: 'TypeDeclaration',
-						name: 'Type',
+						name: {
+							nodeType: 'Identifier',
+							content: 'Type',
+							position: {
+								line: 3,
+								column: 15,
+							},
+						},
 						position: {
 							line: 3,
 							column: 15,
@@ -1521,7 +1633,14 @@ describe('Parser', () => {
 							parameters: [],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 2,
+										column: 17,
+									},
+								},
 								position: {
 									line: 2,
 									column: 17,
@@ -1581,7 +1700,14 @@ describe('Parser', () => {
 							parameters: [],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 2,
+										column: 17,
+									},
+								},
 								position: {
 									line: 2,
 									column: 17,
@@ -1614,7 +1740,14 @@ describe('Parser', () => {
 							parameters: [],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 3,
+										column: 18,
+									},
+								},
 								position: {
 									line: 3,
 									column: 18,
@@ -1675,7 +1808,14 @@ describe('Parser', () => {
 								name: 'parameter',
 								type: {
 									nodeType: 'TypeDeclaration',
-									name: 'ParameterType',
+									name: {
+										nodeType: 'Identifier',
+										content: 'ParameterType',
+										position: {
+											line: 2,
+											column: 23,
+										},
+									},
 									position: {
 										line: 2,
 										column: 23,
@@ -1688,7 +1828,14 @@ describe('Parser', () => {
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 2,
+										column: 41,
+									},
+								},
 								position: {
 									line: 2,
 									column: 41,
@@ -1750,7 +1897,14 @@ describe('Parser', () => {
 								name: 'parameter',
 								type: {
 									nodeType: 'TypeDeclaration',
-									name: 'ParameterType',
+									name: {
+										nodeType: 'Identifier',
+										content: 'ParameterType',
+										position: {
+											line: 2,
+											column: 23,
+										},
+									},
 									position: {
 										line: 2,
 										column: 23,
@@ -1763,7 +1917,14 @@ describe('Parser', () => {
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 2,
+										column: 41,
+									},
+								},
 								position: {
 									line: 2,
 									column: 41,
@@ -1798,7 +1959,14 @@ describe('Parser', () => {
 								name: 'parameter',
 								type: {
 									nodeType: 'TypeDeclaration',
-									name: 'ParameterType',
+									name: {
+										nodeType: 'Identifier',
+										content: 'ParameterType',
+										position: {
+											line: 3,
+											column: 24,
+										},
+									},
 									position: {
 										line: 3,
 										column: 24,
@@ -1811,7 +1979,14 @@ describe('Parser', () => {
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 3,
+										column: 42,
+									},
+								},
 								position: {
 									line: 3,
 									column: 42,
@@ -1873,7 +2048,14 @@ describe('Parser', () => {
 								name: 'parameter',
 								type: {
 									nodeType: 'TypeDeclaration',
-									name: 'ParameterType',
+									name: {
+										nodeType: 'Identifier',
+										content: 'ParameterType',
+										position: {
+											line: 2,
+											column: 23,
+										},
+									},
 									position: {
 										line: 2,
 										column: 23,
@@ -1886,7 +2068,14 @@ describe('Parser', () => {
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 2,
+										column: 41,
+									},
+								},
 								position: {
 									line: 2,
 									column: 41,
@@ -1920,7 +2109,14 @@ describe('Parser', () => {
 							parameters: [],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 3,
+										column: 18,
+									},
+								},
 								position: {
 									line: 3,
 									column: 18,
@@ -1973,7 +2169,14 @@ describe('Parser', () => {
 				properties: {
 					property: {
 						nodeType: 'TypeDeclaration',
-						name: 'PropertyType',
+						name: {
+							nodeType: 'Identifier',
+							content: 'PropertyType',
+							position: {
+								line: 2,
+								column: 14,
+							},
+						},
 						position: {
 							line: 2,
 							column: 14,
@@ -1991,7 +2194,14 @@ describe('Parser', () => {
 								name: 'parameter',
 								type: {
 									nodeType: 'TypeDeclaration',
-									name: 'ParameterType',
+									name: {
+										nodeType: 'Identifier',
+										content: 'ParameterType',
+										position: {
+											line: 3,
+											column: 23,
+										},
+									},
 									position: {
 										line: 3,
 										column: 23,
@@ -2004,7 +2214,14 @@ describe('Parser', () => {
 							}],
 							returnType: {
 								nodeType: 'TypeDeclaration',
-								name: 'Type',
+								name: {
+									nodeType: 'Identifier',
+									content: 'Type',
+									position: {
+										line: 3,
+										column: 41,
+									},
+								},
 								position: {
 									line: 3,
 									column: 41,
