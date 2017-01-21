@@ -901,7 +901,7 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 
 			return {
 				nodeType: 'TypeConstructor',
-				type: foundSequence[0].content,
+				type: foundSequence[0],
 				members,
 				position: foundSequence[0].position,
 			}
@@ -974,18 +974,23 @@ let value = (tokens: Array<IToken>): parserResult => {
 		decorate(
 			typeConstructor,
 
-			(foundSequence: [ITypeConstructorNode]): IValueNode => {
-				const members = {}
-				foundSequence[0].members.map((keyValuePair) => {
+			([typeConstructor]: [ITypeConstructorNode]): IValueNode => {
+				let members = {}
+				let type: string | null = null
+				typeConstructor.members.map((keyValuePair) => {
 					members[keyValuePair.key.content] = keyValuePair.value
 				})
 
+				if (typeConstructor.type !== null) {
+					type = typeConstructor.type.content
+				}
+
 				return {
 					nodeType: 'Value',
-					type: foundSequence[0].type,
+					type,
 					value: null,
 					members,
-					position: foundSequence[0].position,
+					position: typeConstructor.position,
 				}
 			}
 		),

@@ -60,7 +60,7 @@ export interface IKeyValuePairNode {
 
 export interface ITypeConstructorNode {
 	nodeType: 'TypeConstructor'
-	type: string | null
+	type: IIdentifierNode | null
 	members: Array<IKeyValuePairNode>
 	position: Position
 }
