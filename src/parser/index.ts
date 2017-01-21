@@ -631,12 +631,12 @@ let typeProperty = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
 		[ identifier, typeDeclaration, optionalLinebreak ],
 
-		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): ITypePropertyNode => {
+		([name, type]: [IIdentifierNode, ITypeDeclarationNode]): ITypePropertyNode => {
 			return {
 				nodeType: 'TypeProperty',
-				name: foundSequence[0].content,
-				type: foundSequence[1],
-				position: foundSequence[0].position,
+				name,
+				type,
+				position: name.position,
 			}
 		}
 	)
@@ -649,12 +649,12 @@ let typeMethod = (tokens: Array<IToken>): parserResult => {
 		identifier,
 		functionDefinition,
 
-		(foundSequence: [IIdentifierNode, IFunctionDefinitionNode]): ITypeMethodNode => {
+		([name, func]: [IIdentifierNode, IFunctionDefinitionNode]): ITypeMethodNode => {
 			return {
 				nodeType: 'TypeMethod',
-				name: foundSequence[0].content,
-				func: foundSequence[1],
-				position: foundSequence[0].position,
+				name,
+				func,
+				position: name.position,
 			}
 		}
 	)
@@ -1286,7 +1286,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			let properties = body.reduce(
 				(previous, current) => {
 					if (current.nodeType === 'TypeProperty') {
-						previous[current.name] = current.type
+						previous[current.name.content] = current.type
 					}
 
 					return previous
@@ -1298,7 +1298,7 @@ let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
 			let members = body.reduce(
 				(previous, current) => {
 					if (current.nodeType === 'TypeMethod') {
-						previous[current.name] = {
+						previous[current.name.content] = {
 							nodeType: 'Value',
 							type: 'Method',
 							value: current.func,
