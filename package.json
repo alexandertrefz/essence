@@ -1,28 +1,30 @@
 {
-  "name": "essence-compiler",
-  "version": "0.0.1",
-  "description": "A new highly concurrent but simple language.",
-  "main": "index.js",
-  "scripts": {},
-  "keywords": [
-    "language",
-    "essence",
-    "concurrent"
-  ],
-  "author": "Alexander Trefz",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/jasmine": "^2.5.40",
-    "@types/node": "^7.0.0",
-    "console.table": "0.8.0",
-    "deep-equal": "1.0.1",
-    "jasmine": "2.5.3",
-    "minimist": "1.2.0",
-    "typescript": "2.1.5"
-  },
-  "dependencies": {},
-  "repository": {
-    "url": "https://atrefz@github.com/atrefz/essence.git",
-    "type": "git"
-  }
+	"name": "essence-compiler",
+	"version": "0.0.1",
+	"description": "A new simple but powerful language.",
+	"main": "index.js",
+	"scripts": {},
+	"keywords": ["language", "essence"],
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"engines": {
+		"node" : ">=8.8.0",
+		"yarn" : ">=1.2.1"
+	},
+	"devDependencies": {
+		"@types/jasmine": "2.6.0",
+		"@types/nearley": "2.11.0",
+		"@types/node": "8.0.46",
+		"jasmine": "2.8.0",
+		"minimist": "1.2.0",
+		"typescript": "2.6.1"
+	},
+	"dependencies": {
+		"nearley": "alexandertrefz/nearley#8fbb3f8024927b12e638c7dbd4b6b301648bd67f",
+		"llvmc": "1.0.2"
+	},
+	"repository": {
+		"url": "https://atrefz@github.com/atrefz/essence.git",
+		"type": "git"
+	}
 }
