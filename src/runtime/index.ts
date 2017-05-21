@@ -113,9 +113,9 @@ export class Runtime {
 
 	protected memberLookup(node: ILookupNode, scope: IScope): IValueNode {
 		if (node.base.nodeType === 'Identifier') {
-			return this.identifierLookup(node.base, scope).members[node.member]
+			return this.identifierLookup(node.base, scope).members[node.member.content]
 		} else {
-			return this.resolveExpression(node.base, scope).value.members[node.member]
+			return this.resolveExpression(node.base, scope).value.members[node.member.content]
 		}
 	}
 
@@ -169,7 +169,7 @@ export class Runtime {
 
 	protected nativeMemberLookup(node: INativeLookupNode): Function {
 		if (node.base.nodeType === 'Identifier') {
-			return this.nativeScope[node.base.content][node.member]
+			return this.nativeScope[node.base.content][node.member.content]
 		} else {
 			return this.nativeMemberLookup(node.base)
 		}
@@ -180,7 +180,7 @@ export class Runtime {
 			logger.log('Simple Native Lookup', node.content)
 			return this.nativeScope[node.content]
 		} else {
-			logger.log('Complex Native Lookup', `expression.${node.member}`)
+			logger.log('Complex Native Lookup', `expression.${node.member.content}`)
 			return this.nativeMemberLookup(node)
 		}
 	}
@@ -221,7 +221,7 @@ export class Runtime {
 	}
 
 	protected interpretDeclarationStatement(node: IDeclarationStatementNode, scope: IScope): { scope: IScope } {
-		logger.log('DeclarationStatement', node.name)
+		logger.log('DeclarationStatement', node.name.content)
 
 		if (node.value.nodeType === 'Value') {
 			let value = node.value.value
@@ -234,13 +234,13 @@ export class Runtime {
 			}
 		}
 
-		scope[node.name] = this.resolveExpression(node.value, scope).value
-		logger.log('DeclarationSuccess', logger.unwrapValue(scope[node.name]))
+		scope[node.name.content] = this.resolveExpression(node.value, scope).value
+		logger.log('DeclarationSuccess', logger.unwrapValue(scope[node.name.content]))
 		return { scope }
 	}
 
 	protected interpretAssignmentStatement(node: IAssignmentStatementNode, scope: IScope): { scope: IScope } {
-		logger.log('AssignmentStatement', node.name)
+		logger.log('AssignmentStatement', node.name.content)
 
 		if (node.value.nodeType === 'Value') {
 			let value = node.value.value
@@ -259,11 +259,11 @@ export class Runtime {
 				logger.flush()
 				logger.linebreak()
 				logger.debug(scope)
-				throw new Error(`Can not find variable '${node.name}' in this Scope - File a Bug Report!`)
+				throw new Error(`Can not find variable '${node.name.content}' in this Scope - File a Bug Report!`)
 			}
-			if (searchScope[node.name] != null) {
-				searchScope[node.name] = this.resolveExpression(node.value, scope).value
-				logger.log('AssignmentSuccess', logger.unwrapValue(searchScope[node.name]))
+			if (searchScope[node.name.content] != null) {
+				searchScope[node.name.content] = this.resolveExpression(node.value, scope).value
+				logger.log('AssignmentSuccess', logger.unwrapValue(searchScope[node.name.content]))
 				return { scope }
 			} else {
 				searchScope = searchScope.parent
