@@ -1,9 +1,9 @@
 {
 	"compilerOptions": {
-		"target": "ES6",
+		"target": "es2017",
 		"module": "commonjs",
-		"strictNullChecks": true,
-		"experimentalDecorators": true
+		"strict": true,
+		"allowJs": true
 	},
 	"compileOnSave": false
 }
