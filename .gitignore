@@ -8,11 +8,6 @@ Notes.md
 TODO.md
 
 lib
-compiledTests
 
-/bin/esc-test
-
-testFiles/HelloWorld.ir
-testFiles/LinkedList.ir
-testFiles/Test*
-testFiles/Event*
+testFiles/local
+testFiles/*.js
