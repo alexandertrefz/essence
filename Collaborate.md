@@ -7,4 +7,3 @@
 
 Use `make watch` for automated compiling.
 Use `./bin/ecs <file.es>` to compile a file to `file.ir`.
-Use `./bin/ecr <file.ir>` to run that file.
