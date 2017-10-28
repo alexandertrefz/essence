@@ -1,5 +1,5 @@
-import { lex } from '../lexer'
-import { lexer } from '../interfaces'
+import { lex } from "../lexer"
+import { lexer } from "../interfaces"
 
 type TokenType = lexer.TokenType
 type IToken = lexer.IToken
@@ -10,7 +10,7 @@ type ISimpleToken = {
 }
 
 let stripPositionFromArray = (tokens: IToken[]): ISimpleToken[] => {
-	return tokens.map((value) => {
+	return tokens.map(value => {
 		return stripPosition(value)
 	})
 }
@@ -21,267 +21,173 @@ let stripPosition = (token: IToken): ISimpleToken => {
 	return tokenCopy
 }
 
-describe('Lexer', () => {
-	describe('stripPosition', () => {
-		it('should strip line and column', () => {
+describe("Lexer", () => {
+	describe("stripPosition", () => {
+		it("should strip line and column", () => {
 			let input: IToken = {
-				content: '',
-				tokenType: 'String',
+				content: "",
+				tokenType: "String",
 				position: {
 					line: 1,
 					column: 2,
-				}
+				},
 			}
 
 			let output = {
-				content: '',
-				tokenType: 'String',
+				content: "",
+				tokenType: "String",
 			}
 
 			expect(stripPosition(input)).toEqual(output)
 		})
 	})
 
-	describe('stripPositionFromArray', () => {
-		it('should strip line and column from all values', () => {
-			let input: IToken[] = [{
-				content: '',
-				tokenType: 'String',
-				position: {
-					line: 1,
-					column: 2,
-				}
-			}]
+	describe("stripPositionFromArray", () => {
+		it("should strip line and column from all values", () => {
+			let input: IToken[] = [
+				{
+					content: "",
+					tokenType: "String",
+					position: {
+						line: 1,
+						column: 2,
+					},
+				},
+			]
 
-			let output = [{
-				content: '',
-				tokenType: 'String',
-			}]
+			let output = [
+				{
+					content: "",
+					tokenType: "String",
+				},
+			]
 
 			expect(stripPositionFromArray(input)).toEqual(output)
 		})
 	})
 
-	describe('linebreaks', () => {
-		it('should lex linebreaks', () => {
+	describe("linebreaks", () => {
+		it("should lex linebreaks", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '\n\n'
+			input = "\n\n"
 			output = [
 				{
-					content: '\n',
-					tokenType: 'Linebreak',
+					content: "\n",
+					tokenType: "Linebreak",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex multiple linebreaks as one', () => {
+		it("should lex multiple linebreaks as one", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '\n\n'
+			input = "\n\n"
 			output = [
 				{
-					content: '\n',
-					tokenType: 'Linebreak',
+					content: "\n",
+					tokenType: "Linebreak",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex linebreak after other tokens', () => {
+		it("should lex linebreak after other tokens", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'identifier\n'
-			output = [
-				{ content: 'identifier', tokenType: 'Identifier', },
-				{ content: '\n', tokenType: 'Linebreak', },
-			]
+			input = "identifier\n"
+			output = [{ content: "identifier", tokenType: "Identifier" }, { content: "\n", tokenType: "Linebreak" }]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
-	describe('strings', () => {
-		it('should lex empty strings', () => {
+	describe("strings", () => {
+		it("should lex empty strings", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '\'\''
+			input = "''"
 			output = [
 				{
-					content: '',
-					tokenType: 'String',
+					content: "",
+					tokenType: "String",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex simple strings', () => {
+		it("should lex simple strings", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '\'test\''
+			input = "'test'"
 			output = [
 				{
-					content: 'test',
-					tokenType: 'String',
+					content: "test",
+					tokenType: "String",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex complex strings', () => {
+		it("should lex complex strings", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '\'test test\''
+			input = "'test test'"
 			output = [
 				{
-					content: 'test test',
-					tokenType: 'String',
+					content: "test test",
+					tokenType: "String",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should not lex open strings', () => {
+		it("should not lex open strings", () => {
 			let input: string
 
-			input = '\'test'
+			input = "'test"
 
 			expect(() => lex(input)).toThrow()
 		})
 	})
 
-	describe('booleans', () => {
-		it('should lex true', () => {
+	describe("booleans", () => {
+		it("should lex true", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'true'
+			input = "true"
 			output = [
 				{
-					content: 'true',
-					tokenType: 'Boolean',
+					content: "true",
+					tokenType: "Boolean",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex false', () => {
+		it("should lex false", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'false'
+			input = "false"
 			output = [
 				{
-					content: 'false',
-					tokenType: 'Boolean',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-	})
-
-	describe('numbers', () => {
-		it('should lex simple numbers', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '1'
-			output = [
-				{
-					content: '1',
-					tokenType: 'Number',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-
-			input = '123'
-			output = [
-				{
-					content: '123',
-					tokenType: 'Number',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it('should lex simple numbers with underscores', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '1_000'
-			output = [
-				{
-					content: '1000',
-					tokenType: 'Number',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it('should lex float numbers', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '1.5'
-			output = [
-				{
-					content: '1.5',
-					tokenType: 'Number',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it('should lex float numbers with underscores', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '1_000.5'
-			output = [
-				{
-					content: '1000.5',
-					tokenType: 'Number',
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it('should not lex numbers with multiple dots', () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = '1.000.5'
-			output = [
-				{
-					content: '1.000',
-					tokenType: 'Number',
-				},
-				{
-					content: '.',
-					tokenType: 'Delimiter',
-				},
-				{
-					content: '5',
-					tokenType: 'Number',
+					content: "false",
+					tokenType: "Boolean",
 				},
 			]
 
@@ -289,110 +195,199 @@ describe('Lexer', () => {
 		})
 	})
 
-	describe('comments', () => {
-		it('should lex comments', () => {
+	describe("numbers", () => {
+		it("should lex simple numbers", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '§ Comment'
+			input = "1"
+			output = [
+				{
+					content: "1",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+
+			input = "123"
+			output = [
+				{
+					content: "123",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it("should lex simple numbers with underscores", () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = "1_000"
+			output = [
+				{
+					content: "1000",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it("should lex float numbers", () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = "1.5"
+			output = [
+				{
+					content: "1.5",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it("should lex float numbers with underscores", () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = "1_000.5"
+			output = [
+				{
+					content: "1000.5",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+
+		it("should not lex numbers with multiple dots", () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = "1.000.5"
+			output = [
+				{
+					content: "1.000",
+					tokenType: "Number",
+				},
+				{
+					content: ".",
+					tokenType: "Delimiter",
+				},
+				{
+					content: "5",
+					tokenType: "Number",
+				},
+			]
+
+			expect(stripPositionFromArray(lex(input))).toEqual(output)
+		})
+	})
+
+	describe("comments", () => {
+		it("should lex comments", () => {
+			let input: string
+			let output: Array<ISimpleToken>
+
+			input = "§ Comment"
 			output = []
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
-	describe('identifiers', () => {
-		it('should lex identifiers without whitespace', () => {
+	describe("identifiers", () => {
+		it("should lex identifiers without whitespace", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'identifier'
-			output = [
-				{ content: 'identifier', tokenType: 'Identifier', },
-			]
+			input = "identifier"
+			output = [{ content: "identifier", tokenType: "Identifier" }]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex identifiers with whitespace in front', () => {
+		it("should lex identifiers with whitespace in front", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '   identifier'
-			output = [
-				{ content: 'identifier', tokenType: 'Identifier', },
-			]
+			input = "   identifier"
+			output = [{ content: "identifier", tokenType: "Identifier" }]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex identifiers with whitespace after', () => {
+		it("should lex identifiers with whitespace after", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'identifier  '
-			output = [
-				{ content: 'identifier', tokenType: 'Identifier', },
-			]
+			input = "identifier  "
+			output = [{ content: "identifier", tokenType: "Identifier" }]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex identifiers separated by delimiters', () => {
+		it("should lex identifiers separated by delimiters", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'identifier.identifier2'
+			input = "identifier.identifier2"
 			output = [
-				{ content: 'identifier', tokenType: 'Identifier', },
-				{ content: '.', tokenType: 'Delimiter', },
-				{ content: 'identifier2', tokenType: 'Identifier', },
+				{ content: "identifier", tokenType: "Identifier" },
+				{ content: ".", tokenType: "Delimiter" },
+				{ content: "identifier2", tokenType: "Identifier" },
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 	})
 
-	describe('keywords', () => {
-		it('should lex let', () => {
+	describe("keywords", () => {
+		it("should lex let", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'let'
+			input = "let"
 			output = [
 				{
-					content: 'let',
-					tokenType: 'Keyword',
+					content: "let",
+					tokenType: "Keyword",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex if', () => {
+		it("should lex if", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'if'
+			input = "if"
 			output = [
 				{
-					content: 'if',
-					tokenType: 'Keyword',
+					content: "if",
+					tokenType: "Keyword",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex else', () => {
+		it("should lex else", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = 'else'
+			input = "else"
 			output = [
 				{
-					content: 'else',
-					tokenType: 'Keyword',
+					content: "else",
+					tokenType: "Keyword",
 				},
 			]
 
@@ -400,196 +395,196 @@ describe('Lexer', () => {
 		})
 	})
 
-	describe('delimiters', () => {
-		it('should lex @', () => {
+	describe("delimiters", () => {
+		it("should lex @", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '@'
+			input = "@"
 			output = [
 				{
-					content: '@',
-					tokenType: 'Delimiter',
+					content: "@",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex (', () => {
+		it("should lex (", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '('
+			input = "("
 			output = [
 				{
-					content: '(',
-					tokenType: 'Delimiter',
+					content: "(",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex )', () => {
+		it("should lex )", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = ')'
+			input = ")"
 			output = [
 				{
-					content: ')',
-					tokenType: 'Delimiter',
+					content: ")",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex {', () => {
+		it("should lex {", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '{'
+			input = "{"
 			output = [
 				{
-					content: '{',
-					tokenType: 'Delimiter',
+					content: "{",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex }', () => {
+		it("should lex }", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '}'
+			input = "}"
 			output = [
 				{
-					content: '}',
-					tokenType: 'Delimiter',
+					content: "}",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex ,', () => {
+		it("should lex ,", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = ','
+			input = ","
 			output = [
 				{
-					content: ',',
-					tokenType: 'Delimiter',
+					content: ",",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex .', () => {
+		it("should lex .", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '.'
+			input = "."
 			output = [
 				{
-					content: '.',
-					tokenType: 'Delimiter',
+					content: ".",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex :', () => {
+		it("should lex :", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = ':'
+			input = ":"
 			output = [
 				{
-					content: ':',
-					tokenType: 'Delimiter',
+					content: ":",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex =', () => {
+		it("should lex =", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '='
+			input = "="
 			output = [
 				{
-					content: '=',
-					tokenType: 'Delimiter',
+					content: "=",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex -', () => {
+		it("should lex -", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '-'
+			input = "-"
 			output = [
 				{
-					content: '-',
-					tokenType: 'Delimiter',
+					content: "-",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex <', () => {
+		it("should lex <", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '<'
+			input = "<"
 			output = [
 				{
-					content: '<',
-					tokenType: 'Delimiter',
+					content: "<",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex >', () => {
+		it("should lex >", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '>'
+			input = ">"
 			output = [
 				{
-					content: '>',
-					tokenType: 'Delimiter',
+					content: ">",
+					tokenType: "Delimiter",
 				},
 			]
 
 			expect(stripPositionFromArray(lex(input))).toEqual(output)
 		})
 
-		it('should lex _', () => {
+		it("should lex _", () => {
 			let input: string
 			let output: Array<ISimpleToken>
 
-			input = '_'
+			input = "_"
 			output = [
 				{
-					content: '_',
-					tokenType: 'Delimiter',
+					content: "_",
+					tokenType: "Delimiter",
 				},
 			]
 

@@ -1,9 +1,4 @@
-import * as lexer from './lexer'
-import * as parser from './parser'
+import * as lexer from "./lexer"
+import * as parser from "./parser"
 
-export {
-	lexer,
-	parser,
-}
-
-
+export { lexer, parser }

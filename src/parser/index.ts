@@ -1,37 +1,37 @@
-import { lexer, parser } from '../interfaces'
+import { lexer, parser } from "../interfaces"
 
 type IToken = lexer.IToken
 
-type IASTNode                      = parser.IASTNode
-type IExpressionNode               = parser.IExpressionNode
-type IStatementNode                = parser.IStatementNode
-type ITypeDeclarationNode          = parser.ITypeDeclarationNode
-type IIdentifierNode               = parser.IIdentifierNode
-type IBlockNode                    = parser.IBlockNode
-type IFunctionDefinitionNode       = parser.IFunctionDefinitionNode
-type ITypePropertyNode             = parser.ITypePropertyNode
-type ITypeMethodNode               = parser.ITypeMethodNode
-type IKeyValuePairNode             = parser.IKeyValuePairNode
-type IParameterNode                = parser.IParameterNode
-type IParameterListNode            = parser.IParameterListNode
-type IArgumentListNode             = parser.IArgumentListNode
-type ITypeConstructorNode          = parser.ITypeConstructorNode
-type IValueNode                    = parser.IValueNode
-type IPartialLookupNode            = parser.IPartialLookupNode
-type IPartialMethodLookupNode      = parser.IPartialMethodLookupNode
-type INativeLookupNode             = parser.INativeLookupNode
+type IASTNode = parser.IASTNode
+type IExpressionNode = parser.IExpressionNode
+type IStatementNode = parser.IStatementNode
+type ITypeDeclarationNode = parser.ITypeDeclarationNode
+type IIdentifierNode = parser.IIdentifierNode
+type IBlockNode = parser.IBlockNode
+type IFunctionDefinitionNode = parser.IFunctionDefinitionNode
+type ITypePropertyNode = parser.ITypePropertyNode
+type ITypeMethodNode = parser.ITypeMethodNode
+type IKeyValuePairNode = parser.IKeyValuePairNode
+type IParameterNode = parser.IParameterNode
+type IParameterListNode = parser.IParameterListNode
+type IArgumentListNode = parser.IArgumentListNode
+type ITypeConstructorNode = parser.ITypeConstructorNode
+type IValueNode = parser.IValueNode
+type IPartialLookupNode = parser.IPartialLookupNode
+type IPartialMethodLookupNode = parser.IPartialMethodLookupNode
+type INativeLookupNode = parser.INativeLookupNode
 type INativeFunctionInvocationNode = parser.INativeFunctionInvocationNode
-type IPartialMethodInvocationNode  = parser.IPartialMethodInvocationNode
-type IFunctionInvocationNode       = parser.IFunctionInvocationNode
-type ILookupNode                   = parser.ILookupNode
-type IMethodInvocationNode         = parser.IMethodInvocationNode
-type IMethodLookupNode             = parser.IMethodLookupNode
-type IReturnStatementNode          = parser.IReturnStatementNode
-type ITypeDefinitionStatementNode  = parser.ITypeDefinitionStatementNode
-type IDeclarationStatementNode     = parser.IDeclarationStatementNode
-type IAssignmentStatementNode      = parser.IAssignmentStatementNode
-type IIfStatementNode              = parser.IIfStatementNode
-type IIfElseStatementNode          = parser.IIfElseStatementNode
+type IPartialMethodInvocationNode = parser.IPartialMethodInvocationNode
+type IFunctionInvocationNode = parser.IFunctionInvocationNode
+type ILookupNode = parser.ILookupNode
+type IMethodInvocationNode = parser.IMethodInvocationNode
+type IMethodLookupNode = parser.IMethodLookupNode
+type IReturnStatementNode = parser.IReturnStatementNode
+type ITypeDefinitionStatementNode = parser.ITypeDefinitionStatementNode
+type IDeclarationStatementNode = parser.IDeclarationStatementNode
+type IAssignmentStatementNode = parser.IAssignmentStatementNode
+type IIfStatementNode = parser.IIfStatementNode
+type IIfElseStatementNode = parser.IIfElseStatementNode
 
 type tokenSequenceMatch = {
 	foundSequence: Array<IToken | IASTNode | null>
@@ -40,7 +40,7 @@ type tokenSequenceMatch = {
 
 type parserResult = {
 	foundSequence: Array<IToken | IASTNode>
-	node: IASTNode | undefined
+	node: IASTNode | undefined
 	tokens: Array<IToken>
 }
 
@@ -71,7 +71,7 @@ interface IParser {
 	canRepeat?: boolean
 	tokenType?: string
 	content?: string
-	parser?: Function | Array<Function>
+	parser?: Function | Array<Function>
 }
 
 /*
@@ -83,34 +83,34 @@ let combineMultiTokenOperators = (tokens: Array<IToken>): Array<IToken> => {
 		let token = tokens[i]
 		let nextToken = tokens[i + 1]
 
-		if (token.content === '_') {
-			if (nextToken.content === '_') {
-				token.content = '__'
-				token.tokenType = 'Operator'
+		if (token.content === "_") {
+			if (nextToken.content === "_") {
+				token.content = "__"
+				token.tokenType = "Operator"
 				tokens.splice(i + 1, 1)
 			}
 		}
 
-		if (token.content === '-') {
-			if (nextToken.content === '>') {
-				token.content = '->'
-				token.tokenType = 'Operator'
+		if (token.content === "-") {
+			if (nextToken.content === ">") {
+				token.content = "->"
+				token.tokenType = "Operator"
 				tokens.splice(i + 1, 1)
 			}
 		}
 
-		if (token.content === '<') {
-			if (nextToken.content === '-') {
-				token.content = '<-'
-				token.tokenType = 'Operator'
+		if (token.content === "<") {
+			if (nextToken.content === "-") {
+				token.content = "<-"
+				token.tokenType = "Operator"
 				tokens.splice(i + 1, 1)
 			}
 		}
 
-		if (token.content === ':') {
-			if (nextToken.content === ':') {
-				token.content = '::'
-				token.tokenType = 'Operator'
+		if (token.content === ":") {
+			if (nextToken.content === ":") {
+				token.content = "::"
+				token.tokenType = "Operator"
 				tokens.splice(i + 1, 1)
 			}
 		}
@@ -128,13 +128,12 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 		}
 	}
 
-
 	for (let definitionKey in tokenDefinition) {
 		if (!tokenDefinition.hasOwnProperty(definitionKey)) {
 			continue
 		}
 
-		if (definitionKey === 'isOptional') {
+		if (definitionKey === "isOptional") {
 			if (token == null) {
 				return false
 			} else {
@@ -157,15 +156,15 @@ let matchToken = (token: IToken, tokenDefinition: IParser): boolean => {
 }
 
 let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => {
-	let defaultResult = { nodes: [], tokens, }
-	let newTokenDefinition = [Object.assign({}, tokenDefinition, { canRepeat: false, })]
+	let defaultResult = { nodes: [], tokens }
+	let newTokenDefinition = [Object.assign({}, tokenDefinition, { canRepeat: false })]
 	let newTokens = tokens.slice(0)
 
 	let nodes: Array<IASTNode> = []
 
 	while (true) {
 		let foundSequence
-		; ({ foundSequence, tokens: newTokens, } = matchTokenSequence(newTokens, newTokenDefinition))
+		;({ foundSequence, tokens: newTokens } = matchTokenSequence(newTokens, newTokenDefinition))
 
 		newTokens = newTokens.slice(1)
 
@@ -173,7 +172,7 @@ let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => 
 			nodes.push(foundSequence[0])
 		} else {
 			if (nodes.length) {
-				return { nodes, tokens: newTokens, }
+				return { nodes, tokens: newTokens }
 			} else {
 				return defaultResult
 			}
@@ -183,7 +182,7 @@ let matchRepeatingParser = (tokens: Array<IToken>, tokenDefinition: IParser) => 
 
 let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser>): tokenSequenceMatch => {
 	let originalTokens = tokens.slice(0)
-	let defaultResult = { foundSequence: [] as Array<IToken>, tokens: originalTokens, }
+	let defaultResult = { foundSequence: [] as Array<IToken>, tokens: originalTokens }
 	let hasOptionalTokens = false
 
 	if (tokenDefinitions.length > tokens.length) {
@@ -208,17 +207,14 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 		if (currentDefinition.parser) {
 			let parsers: Array<Function>
-			if (typeof currentDefinition.parser === 'function') {
+			if (typeof currentDefinition.parser === "function") {
 				parsers = [currentDefinition.parser]
 			} else {
 				parsers = currentDefinition.parser
 			}
 
 			if (currentDefinition.canRepeat) {
-				let {
-					nodes,
-					tokens: newTokens,
-				} = matchRepeatingParser(tokens.slice(tokenIndex), currentDefinition)
+				let { nodes, tokens: newTokens } = matchRepeatingParser(tokens.slice(tokenIndex), currentDefinition)
 
 				if (nodes.length === 0) {
 					if (!currentDefinition.isOptional) {
@@ -237,7 +233,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 
 			for (let parser of parsers) {
 				let subTokens = tokens.slice(tokenIndex)
-				let { node, tokens: newTokens, } = parser(subTokens)
+				let { node, tokens: newTokens } = parser(subTokens)
 
 				if (node) {
 					foundMatch = true
@@ -268,7 +264,7 @@ let matchTokenSequence = (tokens: Array<IToken>, tokenDefinitions: Array<IParser
 		tokenIndex++
 	}
 
-	return { foundSequence: tokens.slice(0, tokenIndex), tokens, }
+	return { foundSequence: tokens.slice(0, tokenIndex), tokens }
 }
 
 let sequence = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator): parser => {
@@ -276,8 +272,8 @@ let sequence = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator
 		let sequence: Array<IParser> = []
 
 		for (let parser of parsers) {
-			if (typeof parser === 'function') {
-				sequence.push({ parser, })
+			if (typeof parser === "function") {
+				sequence.push({ parser })
 			} else {
 				sequence.push(parser)
 			}
@@ -285,8 +281,7 @@ let sequence = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator
 
 		let foundSequence: Array<any>
 		let node: IASTNode | undefined = undefined
-
-		; ({ foundSequence, tokens, } = matchTokenSequence(tokens, sequence))
+		;({ foundSequence, tokens } = matchTokenSequence(tokens, sequence))
 
 		if (foundSequence.length) {
 			node = nodeGenerator(foundSequence)
@@ -294,7 +289,9 @@ let sequence = (parsers: Array<IParser | Function>, nodeGenerator: nodeGenerator
 		}
 
 		return {
-			foundSequence, node, tokens,
+			foundSequence,
+			node,
+			tokens,
 		}
 	}
 }
@@ -308,23 +305,27 @@ let choice = (...parsers: Array<Function>): parser => {
 		let foundSequence: Array<any>, node: IASTNode
 
 		for (let parser of parsers) {
-			; ({ foundSequence, node, tokens, } = parser(tokens))
+			;({ foundSequence, node, tokens } = parser(tokens))
 
 			if (node) {
 				// No token slicing needed here, we are using the results of parsers that already sliced
 				return {
-					foundSequence, node, tokens,
+					foundSequence,
+					node,
+					tokens,
 				}
 			}
 		}
 
 		return {
-			foundSequence: [] as Array<any>, node: undefined, tokens,
+			foundSequence: [] as Array<any>,
+			node: undefined,
+			tokens,
 		}
 	}
 }
 
-let suffix = (prefix: IParser | parser, suffix: IParser | parser, nodeGenerator: nodeGenerator): parser => {
+let suffix = (prefix: IParser | parser, suffix: IParser | parser, nodeGenerator: nodeGenerator): parser => {
 	return sequence([prefix, suffix], nodeGenerator)
 }
 
@@ -334,27 +335,25 @@ let optionalChainSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (no
 
 		if (node !== undefined) {
 			let parserNode = node
-			const rightHandSide = decorate(suffix, (foundSequence) => {
+			const rightHandSide = decorate(suffix, foundSequence => {
 				return wrappedGenerator(parserNode)(foundSequence)
 			})
 
 			while (true) {
-				let {
-					foundSequence: secondarySequence,
-					node: secondaryNode,
-					tokens: secondaryTokens,
-				} = rightHandSide(newTokens)
+				let { foundSequence: secondarySequence, node: secondaryNode, tokens: secondaryTokens } = rightHandSide(
+					newTokens,
+				)
 
 				if (secondaryNode) {
 					foundSequence = [...foundSequence, ...secondarySequence]
 					newTokens = secondaryTokens
 					parserNode = secondaryNode
 				} else {
-					return { foundSequence, node: parserNode, tokens: newTokens, }
+					return { foundSequence, node: parserNode, tokens: newTokens }
 				}
 			}
 		} else {
-			return { foundSequence, node, tokens: newTokens, }
+			return { foundSequence, node, tokens: newTokens }
 		}
 	}
 }
@@ -365,17 +364,15 @@ let oneOrMoreChainSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (n
 
 		if (node !== undefined) {
 			let parserNode = node // satisfy typescript
-			const rightHandSide = decorate(suffix, (foundSequence) => {
+			const rightHandSide = decorate(suffix, foundSequence => {
 				return wrappedGenerator(parserNode)(foundSequence)
 			})
 			let foundSuffix = false
 
 			while (true) {
-				let {
-					foundSequence: secondarySequence,
-					node: secondaryNode,
-					tokens: secondaryTokens,
-				} = rightHandSide(newTokens)
+				let { foundSequence: secondarySequence, node: secondaryNode, tokens: secondaryTokens } = rightHandSide(
+					newTokens,
+				)
 
 				if (secondaryNode) {
 					foundSuffix = true
@@ -384,14 +381,14 @@ let oneOrMoreChainSuffix = (prefix: parser, suffix: parser, wrappedGenerator: (n
 					parserNode = secondaryNode
 				} else {
 					if (foundSuffix) {
-						return { foundSequence, node: parserNode, tokens: newTokens, }
+						return { foundSequence, node: parserNode, tokens: newTokens }
 					} else {
-						return { foundSequence: [] as Array<any>, node: undefined, tokens, }
+						return { foundSequence: [] as Array<any>, node: undefined, tokens }
 					}
 				}
 			}
 		} else {
-			return { foundSequence: [] as Array<any>, node: undefined, tokens, }
+			return { foundSequence: [] as Array<any>, node: undefined, tokens }
 		}
 	}
 }
@@ -430,7 +427,7 @@ let chainLeft = (parser: parser, separator: IParser, wrappedGenerator: (node: IA
 
 //*/
 
-let tokenHelper = (tokenType: string): (content: string) => IParser => {
+let tokenHelper = (tokenType: string): ((content: string) => IParser) => {
 	return (content: string): IParser => {
 		return {
 			tokenType,
@@ -440,7 +437,7 @@ let tokenHelper = (tokenType: string): (content: string) => IParser => {
 }
 
 let optional = (parser: IParser | Function): IParser => {
-	if (typeof parser === 'function') {
+	if (typeof parser === "function") {
 		parser = { parser }
 	}
 
@@ -462,7 +459,7 @@ let many1 = (parser: IParser | Function): IParser => {
 */
 
 let many = (parser: IParser | Function): IParser => {
-	if (typeof parser === 'function') {
+	if (typeof parser === "function") {
 		parser = { parser }
 	}
 
@@ -476,13 +473,13 @@ let many = (parser: IParser | Function): IParser => {
 	2. Parsers
 */
 
-let operator = tokenHelper('Operator')
+let operator = tokenHelper("Operator")
 
-let delimiter = tokenHelper('Delimiter')
+let delimiter = tokenHelper("Delimiter")
 
-let keyword = tokenHelper('Keyword')
+let keyword = tokenHelper("Keyword")
 
-let linebreak = tokenHelper('Linebreak')('\n')
+let linebreak = tokenHelper("Linebreak")("\n")
 
 let optionalLinebreak = optional(linebreak)
 
@@ -495,29 +492,24 @@ let optionalLinebreak = optional(linebreak)
 */
 
 let typeDeclaration = (tokens: Array<IToken>): parserResult => {
-	type shortComplexTypeDeclarationSequence = [
-		IToken, ITypeDeclarationNode | null, IToken,
-		IToken,
-		ITypeDeclarationNode
-	]
+	type shortComplexTypeDeclarationSequence = [IToken, ITypeDeclarationNode | null, IToken, IToken, ITypeDeclarationNode]
 
 	type longComplexTypeDeclarationSequence = [
-		IToken, ITypeDeclarationNode, ITypeDeclarationNode[] | null, IToken,
+		IToken,
+		ITypeDeclarationNode,
+		ITypeDeclarationNode[] | null,
+		IToken,
 		IToken,
 		ITypeDeclarationNode
 	]
 
-	const simpleTypeDeclaration = decorate(
-		identifier,
-
-		(foundSequence: [IIdentifierNode]): ITypeDeclarationNode => {
-			return {
-				nodeType: 'TypeDeclaration',
-				name: foundSequence[0],
-				position: foundSequence[0].position,
-			}
+	const simpleTypeDeclaration = decorate(identifier, (foundSequence: [IIdentifierNode]): ITypeDeclarationNode => {
+		return {
+			nodeType: "TypeDeclaration",
+			name: foundSequence[0],
+			position: foundSequence[0].position,
 		}
-	)
+	})
 
 	/* Use simpleTypeDeclaration for now, as complexTypeDeclaration is buggy
 
@@ -600,16 +592,10 @@ let typeDeclaration = (tokens: Array<IToken>): parserResult => {
 	return simpleTypeDeclaration(tokens)
 }
 
-let block = (tokens: Array<IToken>): parserResult => {
+let block = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[
-			delimiter('{'),
-			optionalLinebreak,
-			many(statement),
-			delimiter('}'),
-			optionalLinebreak,
-		],
-		(foundSequence: [IToken, IToken, IStatementNode[] | null]): IBlockNode => {
+		[delimiter("{"), optionalLinebreak, many(statement), delimiter("}"), optionalLinebreak],
+		(foundSequence: [IToken, IToken, IStatementNode[] | null]): IBlockNode => {
 			let nodes = foundSequence[2]
 
 			if (nodes === null) {
@@ -617,11 +603,11 @@ let block = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'Block',
+				nodeType: "Block",
 				nodes,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -629,16 +615,15 @@ let block = (tokens: Array<IToken>): parserResult => {
 
 let typeProperty = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ identifier, typeDeclaration, optionalLinebreak ],
-
+		[identifier, typeDeclaration, optionalLinebreak],
 		([name, type]: [IIdentifierNode, ITypeDeclarationNode]): ITypePropertyNode => {
 			return {
-				nodeType: 'TypeProperty',
+				nodeType: "TypeProperty",
 				name,
 				type,
 				position: name.position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -648,15 +633,14 @@ let typeMethod = (tokens: Array<IToken>): parserResult => {
 	const parser = suffix(
 		identifier,
 		functionDefinition,
-
 		([name, func]: [IIdentifierNode, IFunctionDefinitionNode]): ITypeMethodNode => {
 			return {
-				nodeType: 'TypeMethod',
+				nodeType: "TypeMethod",
 				name,
 				func,
 				position: name.position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -664,21 +648,15 @@ let typeMethod = (tokens: Array<IToken>): parserResult => {
 
 let keyValuePair = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[
-			identifier,
-			delimiter('='),
-			expression,
-			optional(delimiter(',')),
-			optionalLinebreak,
-		],
+		[identifier, delimiter("="), expression, optional(delimiter(",")), optionalLinebreak],
 		(foundSequence: [IIdentifierNode, IToken, IExpressionNode, IToken]): IKeyValuePairNode => {
 			return {
-				nodeType: 'KeyValuePair',
+				nodeType: "KeyValuePair",
 				key: foundSequence[0],
 				value: foundSequence[2],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -692,15 +670,14 @@ let parameter = (tokens: Array<IToken>): parserResult => {
 	const parser = suffix(
 		identifier,
 		typeDeclaration,
-
 		(foundSequence: [IIdentifierNode, ITypeDeclarationNode]): IParameterNode => {
 			return {
-				nodeType: 'Parameter',
+				nodeType: "Parameter",
 				name: foundSequence[0].content,
 				type: foundSequence[1],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -709,25 +686,22 @@ let parameter = (tokens: Array<IToken>): parserResult => {
 let parameterList = (tokens: Array<IToken>): parserResult => {
 	const parameterWithOptionalTrailingComma = suffix(
 		parameter,
-		optional(delimiter(',')),
-
+		optional(delimiter(",")),
 		(foundSequence: [IParameterNode]): IParameterNode => {
 			return foundSequence[0]
-		}
+		},
 	)
 
 	const parameterWithPrecedingComma = suffix(
-		delimiter(','),
+		delimiter(","),
 		parameter,
-
 		(foundSequence: [IToken, IParameterNode]): IParameterNode => {
 			return foundSequence[1]
-		}
+		},
 	)
 
 	const zeroOrOneParameter = sequence(
-		[ delimiter('('), optional(parameterWithOptionalTrailingComma), delimiter(')') ],
-
+		[delimiter("("), optional(parameterWithOptionalTrailingComma), delimiter(")")],
 		(foundSequence: [IToken, IParameterNode | null]): IParameterListNode => {
 			let parameter = foundSequence[1]
 			let parameters: Array<IParameterNode>
@@ -739,21 +713,21 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'ParameterList',
+				nodeType: "ParameterList",
 				parameters,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const twoOrMoreParameters = sequence(
 		[
-			delimiter('('),
+			delimiter("("),
 			parameter,
 			parameterWithPrecedingComma,
 			many(parameterWithPrecedingComma),
-			optional(delimiter(',')),
-			delimiter(')'),
+			optional(delimiter(",")),
+			delimiter(")"),
 		],
 		(foundSequence: [IToken, IParameterNode, IParameterNode, IParameterNode[] | null]): IParameterListNode => {
 			let parameters = foundSequence[3]
@@ -765,11 +739,11 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'ParameterList',
+				nodeType: "ParameterList",
 				parameters,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const parser = choice(zeroOrOneParameter, twoOrMoreParameters)
@@ -780,25 +754,22 @@ let parameterList = (tokens: Array<IToken>): parserResult => {
 let argumentList = (tokens: Array<IToken>): parserResult => {
 	const expressionWithOptionalTrailingComma = suffix(
 		expression,
-		optional(delimiter(',')),
-
+		optional(delimiter(",")),
 		(foundSequence: [IExpressionNode]): IExpressionNode => {
 			return foundSequence[0]
-		}
+		},
 	)
 
 	const expressionWithPrecedingComma = suffix(
-		delimiter(','),
+		delimiter(","),
 		expression,
-
 		(foundSequence: [IToken, IExpressionNode]): IExpressionNode => {
 			return foundSequence[1]
-		}
+		},
 	)
 
 	const zeroOrOneArgument = sequence(
-		[ delimiter('('), optional(expressionWithOptionalTrailingComma), delimiter(')') ],
-
+		[delimiter("("), optional(expressionWithOptionalTrailingComma), delimiter(")")],
 		(foundSequence: [IToken, IExpressionNode | null, IToken]): IArgumentListNode => {
 			let argument = foundSequence[1]
 			let args: Array<IExpressionNode> = []
@@ -808,21 +779,21 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'ArgumentList',
+				nodeType: "ArgumentList",
 				arguments: args,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const twoOrMoreArguments = sequence(
 		[
-			delimiter('('),
+			delimiter("("),
 			expression,
 			expressionWithPrecedingComma,
 			many(expressionWithPrecedingComma),
-			optional(delimiter(',')),
-			delimiter(')'),
+			optional(delimiter(",")),
+			delimiter(")"),
 		],
 		(foundSequence: [IToken, IExpressionNode, IExpressionNode, IExpressionNode[] | null]): IArgumentListNode => {
 			let args = foundSequence[3]
@@ -834,11 +805,11 @@ let argumentList = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'ArgumentList',
+				nodeType: "ArgumentList",
 				arguments: args,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const parser = choice(zeroOrOneArgument, twoOrMoreArguments)
@@ -858,14 +829,7 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 	type namedTypeConstructorSequence = [IIdentifierNode, IToken, IToken | null, Array<IKeyValuePairNode> | null]
 
 	const anonymousTypeConstructor = sequence(
-		[
-			delimiter('{'),
-			optionalLinebreak,
-			many(keyValuePair),
-			optionalLinebreak,
-			delimiter('}'),
-			optionalLinebreak,
-		],
+		[delimiter("{"), optionalLinebreak, many(keyValuePair), optionalLinebreak, delimiter("}"), optionalLinebreak],
 		(foundSequence: [IToken, IToken, Array<IKeyValuePairNode> | null]): ITypeConstructorNode => {
 			let members = foundSequence[2]
 
@@ -874,22 +838,22 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'TypeConstructor',
+				nodeType: "TypeConstructor",
 				type: null,
 				members,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const namedTypeConstructor = sequence(
 		[
 			identifier,
-			delimiter('{'),
+			delimiter("{"),
 			optionalLinebreak,
 			many(keyValuePair),
 			optionalLinebreak,
-			delimiter('}'),
+			delimiter("}"),
 			optionalLinebreak,
 		],
 		(foundSequence: namedTypeConstructorSequence): ITypeConstructorNode => {
@@ -900,12 +864,12 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 			}
 
 			return {
-				nodeType: 'TypeConstructor',
+				nodeType: "TypeConstructor",
 				type: foundSequence[0],
 				members,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return choice(anonymousTypeConstructor, namedTypeConstructor)(tokens)
@@ -913,87 +877,63 @@ let typeConstructor = (tokens: Array<IToken>): parserResult => {
 
 let value = (tokens: Array<IToken>): parserResult => {
 	const parser = choice(
-		decorate(
-			functionDefinition,
-
-			(foundSequence: [IFunctionDefinitionNode]): IValueNode => {
-				return {
-					nodeType: 'Value',
-					type: 'Function',
-					value: foundSequence[0],
-					members: {},
-					position: foundSequence[0].position,
-				}
+		decorate(functionDefinition, (foundSequence: [IFunctionDefinitionNode]): IValueNode => {
+			return {
+				nodeType: "Value",
+				type: "Function",
+				value: foundSequence[0],
+				members: {},
+				position: foundSequence[0].position,
 			}
-		),
+		}),
+		decorate({ tokenType: "Boolean" }, (foundSequence): IValueNode => {
+			let value = foundSequence[0].content === "true"
 
-		decorate(
-			{ tokenType: 'Boolean' },
-
-			(foundSequence): IValueNode => {
-				let value = foundSequence[0].content === 'true'
-
-				return {
-					nodeType: 'Value',
-					type: 'Bool',
-					value,
-					members: {},
-					position: foundSequence[0].position,
-				}
+			return {
+				nodeType: "Value",
+				type: "Bool",
+				value,
+				members: {},
+				position: foundSequence[0].position,
 			}
-		),
-
-		decorate(
-			{ tokenType: 'String' },
-
-			(foundSequence): IValueNode => {
-				return {
-					nodeType: 'Value',
-					type: 'String',
-					value: foundSequence[0].content,
-					members: {},
-					position: foundSequence[0].position,
-				}
+		}),
+		decorate({ tokenType: "String" }, (foundSequence): IValueNode => {
+			return {
+				nodeType: "Value",
+				type: "String",
+				value: foundSequence[0].content,
+				members: {},
+				position: foundSequence[0].position,
 			}
-		),
-
-		decorate(
-			{ tokenType: 'Number' },
-
-			(foundSequence): IValueNode => {
-				return {
-					nodeType: 'Value',
-					type: 'Number',
-					value: foundSequence[0].content,
-					members: {},
-					position: foundSequence[0].position,
-				}
+		}),
+		decorate({ tokenType: "Number" }, (foundSequence): IValueNode => {
+			return {
+				nodeType: "Value",
+				type: "Number",
+				value: foundSequence[0].content,
+				members: {},
+				position: foundSequence[0].position,
 			}
-		),
+		}),
+		decorate(typeConstructor, ([typeConstructor]: [ITypeConstructorNode]): IValueNode => {
+			let members = {}
+			let type: string | null = null
+			typeConstructor.members.map(keyValuePair => {
+				members[keyValuePair.key.content] = keyValuePair.value
+			})
 
-		decorate(
-			typeConstructor,
-
-			([typeConstructor]: [ITypeConstructorNode]): IValueNode => {
-				let members = {}
-				let type: string | null = null
-				typeConstructor.members.map((keyValuePair) => {
-					members[keyValuePair.key.content] = keyValuePair.value
-				})
-
-				if (typeConstructor.type !== null) {
-					type = typeConstructor.type.content
-				}
-
-				return {
-					nodeType: 'Value',
-					type,
-					value: null,
-					members,
-					position: typeConstructor.position,
-				}
+			if (typeConstructor.type !== null) {
+				type = typeConstructor.type.content
 			}
-		),
+
+			return {
+				nodeType: "Value",
+				type,
+				value: null,
+				members,
+				position: typeConstructor.position,
+			}
+		}),
 	)
 
 	return parser(tokens)
@@ -1004,50 +944,40 @@ let value = (tokens: Array<IToken>): parserResult => {
 */
 
 let identifier = (tokens: Array<IToken>): parserResult => {
-	const parser = decorate(
-		{ tokenType: 'Identifier' },
-
-		(foundSequence: [IToken]): IIdentifierNode => {
-			return {
-				nodeType: 'Identifier',
-				content: foundSequence[0].content,
-				position: foundSequence[0].position,
-			}
+	const parser = decorate({ tokenType: "Identifier" }, (foundSequence: [IToken]): IIdentifierNode => {
+		return {
+			nodeType: "Identifier",
+			content: foundSequence[0].content,
+			position: foundSequence[0].position,
 		}
-	)
+	})
 
 	return parser(tokens)
 }
 
 let partialLookup = (tokens: Array<IToken>): parserResult => {
-	const parser = suffix(
-		delimiter('.'),
-		identifier,
-
-		(foundSequence: [IToken, IIdentifierNode]): IPartialLookupNode => {
-			return {
-				nodeType: 'PartialLookup',
-				identifier: foundSequence[1],
-				position: foundSequence[0].position,
-			}
+	const parser = suffix(delimiter("."), identifier, (foundSequence: [IToken, IIdentifierNode]): IPartialLookupNode => {
+		return {
+			nodeType: "PartialLookup",
+			identifier: foundSequence[1],
+			position: foundSequence[0].position,
 		}
-	)
+	})
 
 	return parser(tokens)
 }
 
 let partialMethodLookup = (tokens: Array<IToken>): parserResult => {
 	const parser = suffix(
-		operator('::'),
+		operator("::"),
 		identifier,
-
 		(foundSequence: [IToken, IIdentifierNode]): IPartialMethodLookupNode => {
 			return {
-				nodeType: 'PartialMethodLookup',
+				nodeType: "PartialMethodLookup",
 				identifier: foundSequence[1],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -1057,35 +987,25 @@ let functionDefinition = (tokens: Array<IToken>): parserResult => {
 	type functionDefinitionSequence = [IParameterListNode, IToken, ITypeDeclarationNode, IBlockNode]
 
 	const parser = sequence(
-		[
-			parameterList,
-			operator('->'),
-			typeDeclaration,
-			block,
-		],
+		[parameterList, operator("->"), typeDeclaration, block],
 		(foundSequence: functionDefinitionSequence): IFunctionDefinitionNode => {
 			return {
-				nodeType: 'FunctionDefinition',
+				nodeType: "FunctionDefinition",
 				parameters: foundSequence[0].parameters,
 				returnType: foundSequence[2],
 				body: foundSequence[3],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
 }
 
 let functionInvocation = (tokens: Array<IToken>): parserResult => {
-	const parser = suffix(
-		argumentList,
-		optionalLinebreak,
-
-		(foundSequence: [IArgumentListNode]): IArgumentListNode => {
-			return foundSequence[0]
-		}
-	)
+	const parser = suffix(argumentList, optionalLinebreak, (foundSequence: [IArgumentListNode]): IArgumentListNode => {
+		return foundSequence[0]
+	})
 
 	return parser(tokens)
 }
@@ -1093,60 +1013,53 @@ let functionInvocation = (tokens: Array<IToken>): parserResult => {
 let expression = (tokens: Array<IToken>): expressionParserResult => {
 	let identifierOrValue = decorate(
 		choice(value, identifier),
-
 		(foundSequence: [IIdentifierNode | IValueNode]): IExpressionNode => {
 			return foundSequence[0]
-		}
+		},
 	)
 
 	let nativeFunctionInvocation = oneOrMoreChainSuffix(
 		optionalChainSuffix(
-			sequence(
-				[operator('__'), identifier],
-				(foundSequence) => { return foundSequence[1] }
-			),
-			sequence(
-				[delimiter('.'), identifier],
-				(foundSequence) => { return foundSequence[1] }
-			),
+			sequence([operator("__"), identifier], foundSequence => {
+				return foundSequence[1]
+			}),
+			sequence([delimiter("."), identifier], foundSequence => {
+				return foundSequence[1]
+			}),
 			(node: IIdentifierNode | INativeLookupNode) => {
 				return (foundSequence: [IIdentifierNode]): INativeLookupNode => {
 					return {
-						nodeType: 'NativeLookup',
+						nodeType: "NativeLookup",
 						base: node,
 						member: foundSequence[0],
 						position: foundSequence[0].position,
 					}
 				}
-			}
+			},
 		),
 		functionInvocation,
 		(node: INativeLookupNode) => {
 			return (foundSequence: [IArgumentListNode]): INativeFunctionInvocationNode => {
 				return {
-					nodeType: 'NativeFunctionInvocation',
+					nodeType: "NativeFunctionInvocation",
 					name: node,
 					arguments: foundSequence[0].arguments,
 					position: foundSequence[0].position,
 				}
 			}
-		}
+		},
 	)
 
 	let partialMethodInvocation = sequence(
-		[
-			operator('::'),
-			identifier,
-			functionInvocation,
-		],
+		[operator("::"), identifier, functionInvocation],
 		(foundSequence: [IToken, IIdentifierNode, IArgumentListNode]): IPartialMethodInvocationNode => {
 			return {
-				nodeType: 'PartialMethodInvocation',
+				nodeType: "PartialMethodInvocation",
 				member: foundSequence[1],
 				arguments: foundSequence[2],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	type partialExpressionSequence = [IArgumentListNode | IPartialLookupNode | IPartialMethodInvocationNode]
@@ -1159,18 +1072,18 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 			return (foundSequence: partialExpressionSequence): partialExpressionResult => {
 				let rightNode = foundSequence[0]
 
-				if (rightNode.nodeType === 'ArgumentList') {
+				if (rightNode.nodeType === "ArgumentList") {
 					return {
-						nodeType: 'FunctionInvocation',
+						nodeType: "FunctionInvocation",
 						name: node,
 						arguments: rightNode.arguments,
 						position: rightNode.position,
 					}
-				} else if (rightNode.nodeType === 'PartialMethodInvocation') {
+				} else if (rightNode.nodeType === "PartialMethodInvocation") {
 					return {
-						nodeType: 'MethodInvocation',
+						nodeType: "MethodInvocation",
 						name: {
-							nodeType: 'MethodLookup',
+							nodeType: "MethodLookup",
 							base: node,
 							member: rightNode.member,
 							position: rightNode.position,
@@ -1180,39 +1093,33 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 					}
 				} else {
 					return {
-						nodeType: 'Lookup',
+						nodeType: "Lookup",
 						base: node,
 						member: rightNode.identifier,
 						position: rightNode.position,
 					}
 				}
 			}
-		}
+		},
 	)
 
 	// MethodLookups shall not recurse, so they are separated from the partialExpression parser
 	let methodLookup = sequence(
-		[
-			partialExpression,
-			partialMethodLookup,
-		],
+		[partialExpression, partialMethodLookup],
 		(foundSequence: [IExpressionNode, IPartialMethodLookupNode]): IMethodLookupNode => {
 			let leftNode = foundSequence[0]
 			let rightNode = foundSequence[1]
 
 			return {
-				nodeType: 'MethodLookup',
+				nodeType: "MethodLookup",
 				base: leftNode,
 				member: rightNode.identifier,
 				position: rightNode.position,
 			}
-		}
+		},
 	)
 
-	const parser = choice(
-		methodLookup,
-		partialExpression
-	)
+	const parser = choice(methodLookup, partialExpression)
 
 	return parser(tokens) as expressionParserResult
 }
@@ -1223,135 +1130,119 @@ let expression = (tokens: Array<IToken>): expressionParserResult => {
 
 let returnStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[ operator('<-'), expression, optionalLinebreak ],
-
+		[operator("<-"), expression, optionalLinebreak],
 		(foundSequence: [IToken, IExpressionNode]): IReturnStatementNode => {
 			return {
-				nodeType: 'ReturnStatement',
+				nodeType: "ReturnStatement",
 				expression: foundSequence[1],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
 }
 
 let typeDefinitionStatement = (tokens: Array<IToken>): parserResult => {
-	type emptyTypeDefinitionStatementSequence = [
-		IToken, IIdentifierNode, IToken, IToken, IToken, IToken, IToken
-	]
+	type emptyTypeDefinitionStatementSequence = [IToken, IIdentifierNode, IToken, IToken, IToken, IToken, IToken]
 
 	type typeDefinitionStatementSequence = [
-		IToken, IIdentifierNode, IToken, IToken, IToken,
+		IToken,
+		IIdentifierNode,
+		IToken,
+		IToken,
+		IToken,
 		Array<ITypeMethodNode | ITypePropertyNode>,
-		IToken, IToken, IToken
+		IToken,
+		IToken,
+		IToken
 	]
 
 	const emptyTypeDefinition = sequence(
 		[
-			keyword('type'),
+			keyword("type"),
 			identifier,
 			optionalLinebreak,
-			delimiter('{'),
+			delimiter("{"),
 			optionalLinebreak,
-			delimiter('}'),
+			delimiter("}"),
 			optionalLinebreak,
 		],
 		(foundSequence: emptyTypeDefinitionStatementSequence): ITypeDefinitionStatementNode => {
 			return {
-				nodeType: 'TypeDefinitionStatement',
+				nodeType: "TypeDefinitionStatement",
 				name: foundSequence[1],
 				properties: {},
 				members: {},
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const typeDefinition = sequence(
 		[
-			keyword('type'),
+			keyword("type"),
 			identifier,
 			optionalLinebreak,
-			delimiter('{'),
+			delimiter("{"),
 			optionalLinebreak,
 			many(choice(typeProperty, typeMethod)),
-			delimiter('}'),
+			delimiter("}"),
 			optionalLinebreak,
 		],
 		(foundSequence: typeDefinitionStatementSequence): ITypeDefinitionStatementNode => {
 			let body = foundSequence[5]
 
-			let properties = body.reduce(
-				(previous, current) => {
-					if (current.nodeType === 'TypeProperty') {
-						previous[current.name.content] = current.type
-					}
+			let properties = body.reduce((previous, current) => {
+				if (current.nodeType === "TypeProperty") {
+					previous[current.name.content] = current.type
+				}
 
-					return previous
-				},
-				{}
-			)
+				return previous
+			}, {})
 
 			// TODO: Implicit `self Self` Parameter at the start of the ParameterList needs to be injected
-			let members = body.reduce(
-				(previous, current) => {
-					if (current.nodeType === 'TypeMethod') {
-						previous[current.name.content] = {
-							nodeType: 'Value',
-							type: 'Method',
-							value: current.func,
-							members: {},
-							position: current.position,
-						}
+			let members = body.reduce((previous, current) => {
+				if (current.nodeType === "TypeMethod") {
+					previous[current.name.content] = {
+						nodeType: "Value",
+						type: "Method",
+						value: current.func,
+						members: {},
+						position: current.position,
 					}
+				}
 
-					return previous
-				},
-				{}
-			)
+				return previous
+			}, {})
 
 			return {
-				nodeType: 'TypeDefinitionStatement',
+				nodeType: "TypeDefinitionStatement",
 				name: foundSequence[1],
 				properties,
 				members,
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return choice(emptyTypeDefinition, typeDefinition)(tokens)
 }
 
 let declarationStatement = (tokens: Array<IToken>): parserResult => {
-	type declarationSequence = [
-		IToken,
-		IIdentifierNode,
-		ITypeDeclarationNode | null,
-		IToken,
-		IExpressionNode
-	]
+	type declarationSequence = [IToken, IIdentifierNode, ITypeDeclarationNode | null, IToken, IExpressionNode]
 
 	const parser = sequence(
-		[
-			keyword('let'),
-			identifier,
-			optional(typeDeclaration),
-			delimiter('='),
-			expression,
-			optionalLinebreak,
-		],
+		[keyword("let"), identifier, optional(typeDeclaration), delimiter("="), expression, optionalLinebreak],
 		([token, name, type, delim, value]: declarationSequence): IDeclarationStatementNode => {
 			return {
-				nodeType: 'DeclarationStatement',
+				nodeType: "DeclarationStatement",
 				name,
 				type,
 				value,
 				position: token.position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
@@ -1359,94 +1250,74 @@ let declarationStatement = (tokens: Array<IToken>): parserResult => {
 
 let assignmentStatement = (tokens: Array<IToken>): parserResult => {
 	const parser = sequence(
-		[
-			identifier,
-			delimiter('='),
-			expression,
-			optionalLinebreak,
-		],
+		[identifier, delimiter("="), expression, optionalLinebreak],
 		([name, delim, value]: [IIdentifierNode, IToken, IExpressionNode]): IAssignmentStatementNode => {
 			return {
-				nodeType: 'AssignmentStatement',
+				nodeType: "AssignmentStatement",
 				name,
 				value,
 				position: name.position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
 }
 
 let ifStatement = (tokens: Array<IToken>): parserResult => {
-	type ifStatementSequence = [
-		IToken, IToken, IExpressionNode, IToken, IBlockNode
-	]
+	type ifStatementSequence = [IToken, IToken, IExpressionNode, IToken, IBlockNode]
 
 	const parser = sequence(
-		[ keyword('if'), delimiter('('), expression, delimiter(')'), block ],
-
+		[keyword("if"), delimiter("("), expression, delimiter(")"), block],
 		(foundSequence: ifStatementSequence): IIfStatementNode => {
 			return {
-				nodeType: 'IfStatement',
+				nodeType: "IfStatement",
 				condition: foundSequence[2],
 				body: foundSequence[4],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	return parser(tokens)
 }
 
 let ifElseStatement = (tokens: Array<IToken>): parserResult => {
-	type ifElseStatementSequence = [
-		IIfStatementNode,
-		IToken, IBlockNode
-	]
+	type ifElseStatementSequence = [IIfStatementNode, IToken, IBlockNode]
 
-	type ifElseIfStatementSequence = [
-		IIfStatementNode,
-		IToken, IIfStatementNode | IIfElseStatementNode
-	]
+	type ifElseIfStatementSequence = [IIfStatementNode, IToken, IIfStatementNode | IIfElseStatementNode]
 
 	const ifElseStatementParser = sequence(
-		[ ifStatement, keyword('else'), block ],
-
+		[ifStatement, keyword("else"), block],
 		(foundSequence: ifElseStatementSequence): IIfElseStatementNode => {
 			return {
-				nodeType: 'IfElseStatement',
+				nodeType: "IfElseStatement",
 				condition: foundSequence[0].condition,
 				trueBody: foundSequence[0].body,
 				falseBody: foundSequence[2],
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
 	const ifElseIfStatementParser = sequence(
-		[ ifStatement, keyword('else'), choice(ifElseStatement, ifStatement) ],
-
+		[ifStatement, keyword("else"), choice(ifElseStatement, ifStatement)],
 		(foundSequence: ifElseIfStatementSequence): IIfElseStatementNode => {
 			return {
-				nodeType: 'IfElseStatement',
+				nodeType: "IfElseStatement",
 				condition: foundSequence[0].condition,
 				trueBody: foundSequence[0].body,
 				falseBody: {
-					nodeType: 'Block',
+					nodeType: "Block",
 					nodes: [foundSequence[2]],
 					position: foundSequence[1].position,
 				},
 				position: foundSequence[0].position,
 			}
-		}
+		},
 	)
 
-	const parser = choice(
-		ifElseIfStatementParser,
-		ifElseStatementParser,
-		ifStatement,
-	)
+	const parser = choice(ifElseIfStatementParser, ifElseStatementParser, ifStatement)
 
 	return parser(tokens)
 }
@@ -1481,14 +1352,14 @@ let parseProgram = (tokens: Array<IToken>): Array<IExpressionNode | IStatementNo
 
 	while (tokens.length) {
 		let foundSequence: Array<any>, node: IASTNode | undefined
-		; ({ foundSequence, node, tokens, } = program(tokens))
+		;({ foundSequence, node, tokens } = program(tokens))
 
 		if (node) {
 			nodes.push(node)
 		} else {
 			// TODO: Handle Error -> Syntax could be lexed but not parsed
 			// TODO: How can we be helpful with this error, aside from position?
-			throw new Error('Input could not be parsed fully')
+			throw new Error("Input could not be parsed fully")
 		}
 	}
 

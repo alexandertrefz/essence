@@ -1,38 +1,40 @@
 #!/usr/bin/env node
 
-let process = require('process')
-let fs = require('fs')
-let path = require('path')
+let process = require("process")
+let fs = require("fs")
+let path = require("path")
 
-let argv = require('minimist')(process.argv.slice(2), {
+let argv = require("minimist")(process.argv.slice(2), {
 	default: {
 		bare: false,
 		pretty: false,
-	}
+	},
 })
 
-let Lexer = require('../lib/lexer')
-let Parser = require('../lib/parser')
+let Lexer = require("../lib/lexer")
+let Parser = require("../lib/parser")
 
 let sourceFileTokens = []
 let lexedFiles = []
 let fileCount = 0
 
 let sourceFileName = argv._[0]
-let primitivesPath = 'primitives'
+let primitivesPath = "primitives"
 
 fs.readdir(primitivesPath, (err, files) => {
-	if (err) { throw err }
+	if (err) {
+		throw err
+	}
 
-	files.filter((value) => {
-		return path.extname(value) === '.es'
+	files.filter(value => {
+		return path.extname(value) === ".es"
 	})
 
 	if (argv.bare === false) {
 		fileCount = files.length
 
-		files.forEach((value) => {
-			fs.readFile(`${primitivesPath}/${value}`, 'utf8', (err, data) => {
+		files.forEach(value => {
+			fs.readFile(`${primitivesPath}/${value}`, "utf8", (err, data) => {
 				lexedFiles.push(Lexer.lex(data))
 
 				if (sourceFileTokens.length && lexedFiles.length === fileCount) {
@@ -42,7 +44,7 @@ fs.readdir(primitivesPath, (err, files) => {
 		})
 	}
 
-	fs.readFile(sourceFileName, 'utf8', (err, data) => {
+	fs.readFile(sourceFileName, "utf8", (err, data) => {
 		sourceFileTokens = Lexer.lex(data)
 
 		if (sourceFileTokens.length && lexedFiles.length === fileCount) {
@@ -61,18 +63,16 @@ function finishCompilation(lexedFiles, sourceFileTokens) {
 	tokens.push(...sourceFileTokens)
 
 	let sourceFileNameParsed = path.parse(sourceFileName)
-	let targetFileName = sourceFileNameParsed.dir + '/' + sourceFileNameParsed.name + '.ir'
+	let targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".ir"
 
 	let nodes = Parser.parse(tokens)
 	let ir
 
 	if (argv.pretty) {
-		ir = JSON.stringify(nodes, null, '\t')
+		ir = JSON.stringify(nodes, null, "\t")
 	} else {
 		ir = JSON.stringify(nodes)
 	}
 
 	fs.writeFileSync(targetFileName, ir)
 }
-
-
