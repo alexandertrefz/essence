@@ -4,12 +4,15 @@
 	"description": "A new simple but powerful language.",
 	"main": "index.js",
 	"scripts": {},
-	"keywords": ["language", "essence"],
+	"keywords": [
+		"language",
+		"essence"
+	],
 	"author": "Alexander Trefz",
 	"license": "MIT",
 	"engines": {
-		"node" : ">=8.8.0",
-		"yarn" : ">=1.2.1"
+		"node": ">=8.8.0",
+		"yarn": ">=1.2.1"
 	},
 	"devDependencies": {
 		"@types/jasmine": "2.6.0",

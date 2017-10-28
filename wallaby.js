@@ -1,24 +1,19 @@
-module.exports = function (wallaby) {
+module.exports = function(wallaby) {
 	return {
-		files: [
-			'src/**/*.ts',
-			'!src/tests/*.ts'
-		],
+		files: ["src/**/*.ts", "!src/tests/*.ts"],
 
-		filesWithNoCoverageCalculated: ['src/parser/grammar.ts'],
+		filesWithNoCoverageCalculated: ["src/parser/grammar.ts"],
 
-		tests: [
-			'src/tests/*.ts'
-		],
+		tests: ["src/tests/*.ts"],
 
 		env: {
-			type: 'node'
+			type: "node",
 		},
 
 		hints: {
-			ignoreCoverage: /ignore coverage/
+			ignoreCoverage: /ignore coverage/,
 		},
 
-		testFramework: 'jasmine'
+		testFramework: "jasmine",
 	}
 }

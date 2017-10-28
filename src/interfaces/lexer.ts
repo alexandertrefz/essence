@@ -3,17 +3,17 @@ export type Position = {
 	column: number
 }
 
-export type TokenType
-	= null
-	| 'Delimiter'
-	| 'Identifier'
-	| 'Keyword'
-	| 'Operator'
-	| 'String'
-	| 'Comment'
-	| 'Linebreak'
-	| 'Boolean'
-	| 'Number'
+export type TokenType =
+	| null
+	| "Delimiter"
+	| "Identifier"
+	| "Keyword"
+	| "Operator"
+	| "String"
+	| "Comment"
+	| "Linebreak"
+	| "Boolean"
+	| "Number"
 
 export interface IToken {
 	content: string
