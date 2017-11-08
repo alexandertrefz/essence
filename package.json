@@ -17,7 +17,8 @@
 		"@types/node": "8.0.46",
 		"jasmine": "2.8.0",
 		"minimist": "1.2.0",
-		"typescript": "2.6.1"
+		"typescript": "2.6.1",
+		"prettier": "1.5.3"
 	},
 	"dependencies": {
 		"nearley": "alexandertrefz/nearley#8fbb3f8024927b12e638c7dbd4b6b301648bd67f",
