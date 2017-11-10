@@ -1,38 +1,38 @@
 type Event {
-	eventName String
-	isDefaultPrevented Bool
-	isCancelled Bool
-	isPropagationStopped Bool
+	eventName:            String
+	namespaces:           [String]
+	isDefaultPrevented:   Boolean
+	isCancelled:          Boolean
+	isPropagationStopped: Boolean
 
-	preventDefault() -> Self {
+	preventDefault () -> Event {
 		<- @ <| { isDefaultPrevented = true }
 	}
 
-	cancel() -> Self {
+	cancel () -> Event {
 		<- @ <| { isCancelled = true }
 	}
 
-	stopPropagation() -> Self {
-		<- @ <| { isPropagationStopped = true }
+	stopPropagation () -> Event {
+		<- @ <| { isPropagationStopped = true }
 	}
 
-	hasNamespaces() -> Bool {
-		<- @eventName::contains('.')
+	hasNamespaces () -> Boolean {
+		<- @.namespaces::hasItems()
 	}
 
-	getNamespaces() -> [String] {
-		<- @eventName
-			::split(' ')
-			::map((event) -> event::split('.')::slice(1))
-			::reduce((namespaces, eventNames) -> namespaces::join(eventNames), [])
-			::unique()
-	}
+	static create (from eventDescription: String) -> Event {
+		constant dotOrColon = [".", ":"]
+		constant splitEvent = eventDescription::split(on dotOrColon)
 
-	hasEventName() -> Bool {
-		<- @::getEventName() != ''
-	}
+		constant eventName = splitEvent::first()
+		constant namespaces = splitEvent::dropFirst()::unique()
 
-	getEventName() -> String {
-		<- @eventName::split('.')::first()
+		<- {
+			eventName = eventName,
+			namespaces = namespaces,
+		}
 	}
 }
+
+constant event = Event.create("event.namespace")
