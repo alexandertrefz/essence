@@ -15,17 +15,16 @@
 		"yarn": ">=1.2.1"
 	},
 	"devDependencies": {
-		"@types/jasmine": "2.6.0",
+		"@types/jasmine": "2.8.2",
 		"@types/nearley": "2.11.0",
-		"@types/node": "8.0.46",
+		"@types/node": "8.0.53",
 		"jasmine": "2.8.0",
-		"minimist": "1.2.0",
-		"typescript": "2.6.1",
-		"prettier": "1.5.3"
+		"prettier": "1.8.2"
 	},
 	"dependencies": {
-		"nearley": "alexandertrefz/nearley#71e22ead8330e06138da3a4bcd642988dee2b056",
-		"llvmc": "1.0.2"
+		"minimist": "1.2.0",
+		"typescript": "2.6.1",
+		"nearley": "alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88"
 	},
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",

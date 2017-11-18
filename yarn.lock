@@ -2,70 +2,21 @@
 # yarn lockfile v1
 
 
-"@types/ffi@^0.0.19":
-  version "0.0.19"
-  resolved "https://registry.yarnpkg.com/@types/ffi/-/ffi-0.0.19.tgz#bda12de999e1a6e4532b844497318dbaeb984f82"
-  dependencies:
-    "@types/node" "*"
-    "@types/ref" "*"
-    "@types/ref-struct" "*"
-
-"@types/jasmine@2.6.0":
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-2.6.0.tgz#997b41a27752b4850af2683bc4a8d8222c25bd02"
+"@types/jasmine@2.8.2":
+  version "2.8.2"
+  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-2.8.2.tgz#6ae4d8740c0da5d5a627df725b4eed71b8e36668"
 
 "@types/nearley@2.11.0":
   version "2.11.0"
   resolved "https://registry.yarnpkg.com/@types/nearley/-/nearley-2.11.0.tgz#308fd197fdd6d76c52c4ca6f5bb8f42073afa91b"
 
-"@types/node@*":
-  version "8.0.50"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.0.50.tgz#dc545448e128c88c4eec7cd64025fcc3b7604541"
-
-"@types/node@8.0.46":
-  version "8.0.46"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.0.46.tgz#6e1766b2d0ed06631d5b5f87bb8e72c8dbb6888e"
-
-"@types/node@^7.0.5":
-  version "7.0.46"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-7.0.46.tgz#c3dedd25558c676b3d6303e51799abb9c3f8f314"
-
-"@types/ref-array@^0.0.28":
-  version "0.0.28"
-  resolved "https://registry.yarnpkg.com/@types/ref-array/-/ref-array-0.0.28.tgz#0a911c832f41a145f0858e65a64e3d861b3d7fc5"
-  dependencies:
-    "@types/ref" "*"
-
-"@types/ref-struct@*":
-  version "0.0.28"
-  resolved "https://registry.yarnpkg.com/@types/ref-struct/-/ref-struct-0.0.28.tgz#b840a8ac495411515dcae209010d5ac661550e84"
-  dependencies:
-    "@types/ref" "*"
-
-"@types/ref@*", "@types/ref@^0.0.28":
-  version "0.0.28"
-  resolved "https://registry.yarnpkg.com/@types/ref/-/ref-0.0.28.tgz#15a61253ed1259038b47499de1c9b0cbca57f55c"
-  dependencies:
-    "@types/node" "*"
-
-array-index@1:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/array-index/-/array-index-1.0.0.tgz#ec56a749ee103e4e08c790b9c353df16055b97f9"
-  dependencies:
-    debug "^2.2.0"
-    es6-symbol "^3.0.2"
+"@types/node@8.0.53":
+  version "8.0.53"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-8.0.53.tgz#396b35af826fa66aad472c8cb7b8d5e277f4e6d8"
 
 balanced-match@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/balanced-match/-/balanced-match-1.0.0.tgz#89b4d199ab2bee49de164ea02b89ce462d71b767"
-
-bindings@1:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/bindings/-/bindings-1.3.0.tgz#b346f6ecf6a95f5a815c5839fc7cdb22502f1ed7"
-
-bindings@~1.2.0:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/bindings/-/bindings-1.2.1.tgz#14ad6113812d2d37d72e67b4cacb4bb726505f11"
 
 brace-expansion@^1.1.7:
   version "1.1.8"
@@ -82,57 +33,13 @@ concat-map@0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/concat-map/-/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
 
-d@1:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/d/-/d-1.0.0.tgz#754bb5bfe55451da69a58b94d45f4c5b0462d58f"
-  dependencies:
-    es5-ext "^0.10.9"
-
-debug@2, debug@^2.2.0:
-  version "2.6.9"
-  resolved "https://registry.yarnpkg.com/debug/-/debug-2.6.9.tgz#5d128515df134ff327e90a4c93f4e077a536341f"
-  dependencies:
-    ms "2.0.0"
-
 discontinuous-range@1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/discontinuous-range/-/discontinuous-range-1.0.0.tgz#e38331f0844bba49b9a9cb71c771585aab1bc65a"
 
-es5-ext@^0.10.35, es5-ext@^0.10.9, es5-ext@~0.10.14:
-  version "0.10.35"
-  resolved "https://registry.yarnpkg.com/es5-ext/-/es5-ext-0.10.35.tgz#18ee858ce6a3c45c7d79e91c15fcca9ec568494f"
-  dependencies:
-    es6-iterator "~2.0.1"
-    es6-symbol "~3.1.1"
-
-es6-iterator@~2.0.1:
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/es6-iterator/-/es6-iterator-2.0.3.tgz#a7de889141a05a94b0854403b2d0a0fbfa98f3b7"
-  dependencies:
-    d "1"
-    es5-ext "^0.10.35"
-    es6-symbol "^3.1.1"
-
-es6-symbol@^3.0.2, es6-symbol@^3.1.1, es6-symbol@~3.1.1:
-  version "3.1.1"
-  resolved "https://registry.yarnpkg.com/es6-symbol/-/es6-symbol-3.1.1.tgz#bf00ef4fdab6ba1b46ecb7b629b4c7ed5715cc77"
-  dependencies:
-    d "1"
-    es5-ext "~0.10.14"
-
 exit@^0.1.2:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/exit/-/exit-0.1.2.tgz#0632638f8d877cc82107d30a0fff1a17cba1cd0c"
-
-ffi@^2.2.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/ffi/-/ffi-2.2.0.tgz#bf18b04666a29f71227ed56895d5430af47042fa"
-  dependencies:
-    bindings "~1.2.0"
-    debug "2"
-    nan "2"
-    ref "1"
-    ref-struct "1"
 
 fs.realpath@^1.0.0:
   version "1.0.0"
@@ -172,18 +79,6 @@ jasmine@2.8.0:
     glob "^7.0.6"
     jasmine-core "~2.8.0"
 
-llvmc@1.0.2:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/llvmc/-/llvmc-1.0.2.tgz#6fa1502a07267e63d8b0f4c1b472f0d1f6051072"
-  dependencies:
-    "@types/ffi" "^0.0.19"
-    "@types/node" "^7.0.5"
-    "@types/ref" "^0.0.28"
-    "@types/ref-array" "^0.0.28"
-    ffi "^2.2.0"
-    ref "^1.3.4"
-    ref-array "^1.2.0"
-
 minimatch@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-3.0.4.tgz#5166e286457f03306064be5497e8dbb0c3d32083"
@@ -194,17 +89,9 @@ minimist@1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.0.tgz#a35008b20f41383eec1fb914f4cd5df79a264284"
 
-ms@2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/ms/-/ms-2.0.0.tgz#5608aeadfc00be6c2901df5f9861788de0d597c8"
-
-nan@2:
-  version "2.7.0"
-  resolved "https://registry.yarnpkg.com/nan/-/nan-2.7.0.tgz#d95bf721ec877e08db276ed3fc6eb78f9083ad46"
-
-nearley@alexandertrefz/nearley#71e22ead8330e06138da3a4bcd642988dee2b056:
+nearley@alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88:
   version "2.11.0"
-  resolved "https://codeload.github.com/alexandertrefz/nearley/tar.gz/71e22ead8330e06138da3a4bcd642988dee2b056"
+  resolved "https://codeload.github.com/alexandertrefz/nearley/tar.gz/27f50e03a340d411218feb69d4433b7e6deb4a88"
   dependencies:
     nomnom "~1.6.2"
     railroad-diagrams "^1.0.0"
@@ -228,9 +115,9 @@ path-is-absolute@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/path-is-absolute/-/path-is-absolute-1.0.1.tgz#174b9268735534ffbc7ace6bf53a5a9e1b5c5f5f"
 
-prettier@1.5.3:
-  version "1.5.3"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.5.3.tgz#59dadc683345ec6b88f88b94ed4ae7e1da394bfe"
+prettier@1.8.2:
+  version "1.8.2"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.8.2.tgz#bff83e7fd573933c607875e5ba3abbdffb96aeb8"
 
 railroad-diagrams@^1.0.0:
   version "1.0.0"
@@ -242,29 +129,6 @@ randexp@^0.4.2:
   dependencies:
     discontinuous-range "1.0.0"
     ret "~0.1.10"
-
-ref-array@^1.2.0:
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/ref-array/-/ref-array-1.2.0.tgz#bba870152d4ee0abed1421b062392f0b0184290c"
-  dependencies:
-    array-index "1"
-    debug "2"
-    ref "1"
-
-ref-struct@1:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/ref-struct/-/ref-struct-1.1.0.tgz#5d5ee65ad41cefc3a5c5feb40587261e479edc13"
-  dependencies:
-    debug "2"
-    ref "1"
-
-ref@1, ref@^1.3.4:
-  version "1.3.5"
-  resolved "https://registry.yarnpkg.com/ref/-/ref-1.3.5.tgz#0e33f080cdb94a3d95312b2b3b1fd0f82044ca0f"
-  dependencies:
-    bindings "1"
-    debug "2"
-    nan "2"
 
 ret@~0.1.10:
   version "0.1.15"
