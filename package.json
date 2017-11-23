@@ -15,6 +15,7 @@
 		"yarn": ">=1.2.1"
 	},
 	"devDependencies": {
+		"@types/deep-equal": "1.0.1",
 		"@types/jasmine": "2.8.2",
 		"@types/nearley": "2.11.0",
 		"@types/node": "8.0.53",
@@ -22,6 +23,7 @@
 		"prettier": "1.8.2"
 	},
 	"dependencies": {
+		"deep-equal": "1.0.1",
 		"minimist": "1.2.0",
 		"typescript": "2.6.1",
 		"nearley": "alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88"
