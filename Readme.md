@@ -1,9 +1,6 @@
 # Goals
-The main goal for this language is to allow the rapid prototyping akin to dynamically
-and weakly typed languages like ECMAScript, while allowing to upgrade the prototype
-to a proper program with the safety of static and strongly typed languages like C#.
-It also should allow for a unified syntactical interface for blocking and non blocking code
-– making refactoring painless and easy.
+The main goal for this language is to allow the authoring of bug-free maintainable code, in a fast and pleasant manner.
+Essence features a strong typing system combined with a mixture of functional and object oriented concepts, enabling understandable & maintainable code.
 
 # The Essence
 * Extensibility is better than completeness.
@@ -22,10 +19,12 @@ It also should allow for a unified syntactical interface for blocking and non bl
 * Static Structural Typing
 * Algebraic Data Types
 * Type Inference
-* Modules & Namespaces
+* Modules
 * Interfaces
 * Generics
 * Named Parameters
+* Arbitrary Precision Numbers
+* Unicode Strings
 * First-Class Functions
 * Memory Managed
 * Compact & Readable Syntax
@@ -36,6 +35,7 @@ You can find the most recent and working example of syntax in the [HelloWorld.es
 as well as the other files in [testFiles](testFiles). It also should be noted that the syntax is meant to
 be viewed with a font with code ligatures, like FiraCode.
 
+You can compile the testFiles with the `esc` executable in `bin`.
+
 # Disclaimer
-This language is still a work in progress. While the semantics could be described as stable at this point,
-the syntax is still somewhat in flux.
+This language is still a work in progress. It is not ready for use yet and there is no documentation as everything is in flux. Generally: There be dragons.
