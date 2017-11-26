@@ -16,6 +16,8 @@
 	},
 	"devDependencies": {
 		"@types/deep-equal": "1.0.1",
+		"@types/escodegen": "0.0.6",
+		"@types/estree": "0.0.38",
 		"@types/jasmine": "2.8.2",
 		"@types/nearley": "2.11.0",
 		"@types/node": "8.0.53",
@@ -24,6 +26,7 @@
 	},
 	"dependencies": {
 		"deep-equal": "1.0.1",
+		"escodegen": "1.9.0",
 		"minimist": "1.2.0",
 		"typescript": "2.6.1",
 		"nearley": "alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88"
