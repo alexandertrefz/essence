@@ -1,30 +1,62 @@
 #!/usr/bin/env node
 
-let process = require("process")
-let fs = require("fs")
-let path = require("path")
+const process = require("process")
+const fs = require("fs")
+const path = require("path")
 
-let argv = require("minimist")(process.argv.slice(2), {
-	default: {
-		pretty: false,
+const meow = require("meow")
+
+const Parser = require("../lib/parser")
+const Enricher = require("../lib/enricher")
+const Validator = require("../lib/validator")
+const Simplifier = require("../lib/simplifier")
+const Optimiser = require("../lib/optimiser")
+const Rewriter = require("../lib/rewriter")
+
+const compile = (inputFileName, flags) => {
+	const sourceFileNameParsed = path.parse(inputFileName)
+	const targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
+
+	fs.readFile(inputFileName, "utf8", (err, data) => {
+		const initialAST = Parser.parse(data)
+		const enrichedAST = Enricher.enrich(initialAST)
+		const validatedAST = Validator.validate(enrichedAST)
+		const simplifiedAST = Simplifier.simplify(validatedAST)
+		const optimisedAST = Optimiser.optimise(simplifiedAST)
+		const result = Rewriter.rewrite(optimisedAST, flags.mode)
+
+		fs.writeFile(targetFileName, result, err => {
+			if (err) {
+				throw err
+			} else {
+				console.log(`Successfully compiled ${inputFileName} -> ${targetFileName}`)
+			}
+		})
+	})
+}
+
+const cli = meow(
+	{
+		help: `
+			Usage
+			    $ esc <fileName>
+
+			Options
+			    --mode Set the rewriter mode
+
+			Examples
+			    $ foo HelloWorld.es --mode js
+		`,
+		description: false,
 	},
-})
+	{
+		flags: {
+			mode: {
+				type: "string",
+				default: "js",
+			},
+		},
+	},
+)
 
-let Parser = require("../lib/parser")
-
-let sourceFileName = argv._[0]
-let sourceFileNameParsed = path.parse(sourceFileName)
-let targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
-
-fs.readFile(sourceFileName, "utf8", (err, data) => {
-	let module = Parser.parse(data)
-	let js
-
-	if (argv.pretty) {
-		js = JSON.stringify(module, null, "\t")
-	} else {
-		js = JSON.stringify(module)
-	}
-
-	fs.writeFileSync(targetFileName, js)
-})
+compile(cli.input[0], Object.assign({ mode: "js" }, cli.flags))
