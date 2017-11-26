@@ -27,9 +27,9 @@
 	"dependencies": {
 		"deep-equal": "1.0.1",
 		"escodegen": "1.9.0",
-		"minimist": "1.2.0",
-		"typescript": "2.6.1",
-		"nearley": "alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88"
+		"meow": "4.0.0",
+		"nearley": "alexandertrefz/nearley#27f50e03a340d411218feb69d4433b7e6deb4a88",
+		"typescript": "2.6.1"
 	},
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",
