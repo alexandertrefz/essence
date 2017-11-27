@@ -35,7 +35,7 @@ You can find the most recent and working example of syntax in the [HelloWorld.es
 as well as the other files in [testFiles](testFiles). It also should be noted that the syntax is meant to
 be viewed with a font with code ligatures, like FiraCode.
 
-You can compile the testFiles with the `esc` executable in `bin`.
+You can compile the testFiles with the `esc` executable in `bin` (after building the project with `make all`). This will create a .js file with the same name in the same directory. These files do compile, but don't run yet, as the JavaScript runtime(providing Arbitrary Precision Numbers & Unicode Strings) is not built yet. Otherwise they are complete.
 
 # Disclaimer
 This language is still a work in progress. It is not ready for use yet and there is no documentation as everything is in flux. Generally: There be dragons.
