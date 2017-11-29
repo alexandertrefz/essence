@@ -1,22 +1,126 @@
-import { lexer } from "../interfaces"
+import { common, lexer } from "../interfaces"
+import { Token as NearleyToken } from "nearley"
+import { createIsHelper, orHelper } from "./helpers"
 
-type IToken = lexer.IToken
-type Position = lexer.Position
+const TokenType = lexer.TokenType
+type Token = lexer.Token
+type Position = common.Position
 
-type LexingResult = {
+type SubLexingResult = {
 	input: string
-	token: IToken
+	token: Token
 	position: Position
 }
 
-const stringLiteral = "'"
-const numberLiterals = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-const booleanLiterals = ["true", "false"]
-const commentLiteral = "§"
-const keywords = ["let", "if", "else", "type"]
-const delimiters = ["@", "(", ")", "{", "}", ",", ".", ":", "=", "-", ">", "<", "_"]
+type LexingResult = {
+	input: string
+	token: Token | undefined
+	position: Position
+}
 
-let handlePosition = (char: string, position: Position): Position => {
+const linebreak = "\n"
+const stringLiteral = '"'
+const commentLiteral = "§"
+const booleans = ["true", "false"]
+const keywords = ["if", "else", "type", "constant", "variable", "function", "static"]
+const symbols = ["(", ")", "{", "}", "[", "]", "<", ">", "|", "@", ",", ".", ":", "=", "-", "~", "_"]
+const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+const whitespaces = [" ", "\t"]
+
+const isWhitespace = createIsHelper(whitespaces)
+const isLinebreak = createIsHelper(linebreak)
+const isSymbol = createIsHelper(symbols)
+const isKeyword = createIsHelper(keywords)
+const isBooleanLiteral = createIsHelper(booleans)
+const isStringLiteral = createIsHelper(stringLiteral)
+const isNumberLiteral = createIsHelper(numbers)
+const isCommentLiteral = createIsHelper(commentLiteral)
+
+const getBooleanType = (value: string) => {
+	if (value === "true") {
+		return TokenType.LiteralTrue
+	} else {
+		// Pleasing istanbul here
+		/* istanbul ignore else */
+		if (value === "false") {
+			return TokenType.LiteralFalse
+		} else {
+			throw new Error(`${value} is not a valid value for BooleanLiterals`)
+		}
+	}
+}
+
+const getKeywordType = (value: string) => {
+	if (value === "if") {
+		return TokenType.KeywordIf
+	} else if (value === "else") {
+		return TokenType.KeywordElse
+	} else if (value === "type") {
+		return TokenType.KeywordType
+	} else if (value === "variable") {
+		return TokenType.KeywordVariable
+	} else if (value === "constant") {
+		return TokenType.KeywordConstant
+	} else if (value === "function") {
+		return TokenType.KeywordFunction
+	} else {
+		// Pleasing istanbul here
+		/* istanbul ignore else */
+		if (value === "static") {
+			return TokenType.KeywordStatic
+		} else {
+			throw new Error(`${value} is not a valid value for Keywords`)
+		}
+	}
+}
+
+const getSymbolType = (value: string) => {
+	if (value === "@") {
+		return TokenType.SymbolAt
+	} else if (value === "(") {
+		return TokenType.SymbolLeftParen
+	} else if (value === ")") {
+		return TokenType.SymbolRightParen
+	} else if (value === "{") {
+		return TokenType.SymbolLeftBrace
+	} else if (value === "}") {
+		return TokenType.SymbolRightBrace
+	} else if (value === "[") {
+		return TokenType.SymbolLeftBracket
+	} else if (value === "]") {
+		return TokenType.SymbolRightBracket
+	} else if (value === "|") {
+		return TokenType.SymbolPipe
+	} else if (value === ",") {
+		return TokenType.SymbolComma
+	} else if (value === ".") {
+		return TokenType.SymbolDot
+	} else if (value === ":") {
+		return TokenType.SymbolColon
+	} else if (value === "=") {
+		return TokenType.SymbolEqual
+	} else if (value === "-") {
+		return TokenType.SymbolDash
+	} else if (value === ">") {
+		return TokenType.SymbolRightAngle
+	} else if (value === "<") {
+		return TokenType.SymbolLeftAngle
+	} else if (value === "_") {
+		return TokenType.SymbolUnderscore
+	} else {
+		// Pleasing istanbul here
+		/* istanbul ignore else */
+		if (value === "~") {
+			return TokenType.SymbolTilde
+		} else {
+			throw new Error(`${value} is not a valid value for Symbols`)
+		}
+	}
+}
+
+const isEOF = (input: string, index: number): boolean => input.length - 1 === index
+
+const updatePosition = (char: string, position: Position): Position => {
 	position = {
 		line: position.line,
 		column: position.column,
@@ -32,10 +136,48 @@ let handlePosition = (char: string, position: Position): Position => {
 	return position
 }
 
-let lexString = (input: string, position: Position): LexingResult => {
-	let token: IToken = {
-		content: "",
-		tokenType: "String",
+const lexLinebreak = (input: string, position: Position): SubLexingResult => {
+	const firstChar = input[0]
+
+	const token: Token = {
+		value: firstChar,
+		type: TokenType.Linebreak,
+		position,
+	}
+
+	position = updatePosition(firstChar, position)
+	input = input.slice(1)
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
+const lexSymbol = (input: string, position: Position): SubLexingResult => {
+	const firstChar = input[0]
+
+	const token: Token = {
+		value: firstChar,
+		type: getSymbolType(firstChar),
+		position,
+	}
+
+	position = updatePosition(firstChar, position)
+	input = input.slice(1)
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
+const lexString = (input: string, position: Position): SubLexingResult => {
+	let token: Token = {
+		value: "",
+		type: TokenType.LiteralString,
 		position,
 	}
 
@@ -44,23 +186,23 @@ let lexString = (input: string, position: Position): LexingResult => {
 	let balanceWasChanged = false
 
 	for (let i = 0; i < input.length; i++) {
-		token.content += input[i]
+		token.value += input[i]
 
-		position = handlePosition(input[i], position)
+		position = updatePosition(input[i], position)
 
-		if (token.content.startsWith(stringLiteral) && token.content.length === 1) {
+		if (token.value.startsWith(stringLiteral) && token.value.length === 1) {
 			balanceWasChanged = true
 			balance++
 			continue
 		}
 
-		if (token.content.endsWith(stringLiteral)) {
+		if (token.value.endsWith(stringLiteral)) {
 			balance--
 		}
 
 		if (balanceWasChanged && balance === 0) {
-			token.content = token.content.slice(1, token.content.length - 1)
-			input = input.slice(i)
+			token.value = token.value.slice(1, token.value.length - 1)
+			input = input.slice(i + 1)
 			inputSliced = true
 			break
 		}
@@ -77,169 +219,29 @@ let lexString = (input: string, position: Position): LexingResult => {
 	}
 }
 
-let lexComment = (input: string, position: Position): LexingResult => {
-	let token: IToken = {
-		content: "",
-		tokenType: null,
+const lexComment = (input: string, position: Position): SubLexingResult => {
+	let token: Token = {
+		value: "",
+		type: TokenType.Comment,
 		position,
 	}
 
 	let i: number
 
 	for (i = 0; i < input.length; i++) {
-		token.content += input[i]
+		let currentChar = input[i]
 
-		position = handlePosition(input[i], position)
-
-		if (token.content.endsWith("\n") || i + 1 === input.length) {
-			token.tokenType = "Comment"
-			break
-		}
-	}
-
-	input = input.slice(i)
-
-	return {
-		input,
-		token,
-		position,
-	}
-}
-
-let lexNumber = (input: string, position: Position): LexingResult => {
-	let token: IToken = {
-		content: "",
-		tokenType: "Number",
-		position: {
-			line: position.line,
-			column: position.column - 1,
-		},
-	}
-
-	let i = 0
-	let foundDot = false
-
-	while (!!~numberLiterals.indexOf(input[i]) || !!~["_", "."].indexOf(input[i])) {
-		if (input[i] === ".") {
-			if (foundDot) {
-				i--
-				break
-			} else {
-				foundDot = true
-			}
-		}
-
-		if (input[i] !== "_") {
-			token.content += input[i]
-		}
-
-		position = handlePosition(input[i], position)
-		i++
-	}
-
-	input = input.slice(i)
-
-	return {
-		input,
-		token,
-		position,
-	}
-}
-
-let lexKeyword = (token: IToken): IToken => {
-	if (~keywords.indexOf(token.content)) {
-		token.tokenType = "Keyword"
-	}
-
-	return token
-}
-
-let lexBoolean = (token: IToken): IToken => {
-	if (~booleanLiterals.indexOf(token.content)) {
-		token.tokenType = "Boolean"
-	}
-
-	return token
-}
-
-let lexToken = (input: string, position: Position): LexingResult => {
-	let token: IToken = {
-		content: "",
-		tokenType: null,
-		position,
-	}
-
-	let i: number
-
-	for (i = 0; i < input.length; i++) {
-		token.content += input[i]
-
-		// special handling for linebreaks requires us
-		// to handle it before handling linenumbers potentially
-		if (input[i] === "\n") {
-			if (token.content.startsWith("\n")) {
-				position = handlePosition(input[i], position)
-				token.tokenType = "Linebreak"
-				break
-			} else {
-				i--
-				token.content = token.content.slice(0, -1)
-				token.tokenType = "Identifier"
-				break
-			}
-		}
-
-		position = handlePosition(input[i], position)
-
-		if (!!~delimiters.indexOf(token.content)) {
-			token.tokenType = "Delimiter"
-			break
-		}
-
-		if (i > 0 && !!~delimiters.indexOf(input[i])) {
+		if (isLinebreak(currentChar)) {
 			i--
-			token.content = token.content.slice(0, -1)
-			token.tokenType = "Identifier"
 			break
 		}
 
-		if (token.content.startsWith(commentLiteral)) {
-			;({ input, token, position } = lexComment(input, position))
+		token.value += currentChar
+		position = updatePosition(currentChar, position)
+
+		if (isEOF(input, i)) {
 			break
 		}
-
-		if (token.content.startsWith(stringLiteral)) {
-			;({ input, token, position } = lexString(input, position))
-			break
-		}
-
-		if (!!~numberLiterals.indexOf(token.content[0])) {
-			;({ input, token, position } = lexNumber(input, position))
-			break
-		}
-
-		if (input[i] === " " || input[i] === "\t") {
-			if (token.content === input[i]) {
-				token.content = ""
-				i--
-				input = input.slice(1)
-			} else {
-				token.content = token.content.slice(0, token.content.length - 1)
-				token.tokenType = "Identifier"
-				break
-			}
-		}
-	}
-
-	// Handle EOF
-	if (token.tokenType === null) {
-		token.tokenType = "Identifier"
-	}
-
-	// Check if we found a keyword or boolean
-	if (token.tokenType === "Identifier") {
-		token = lexKeyword(token)
-		token = lexBoolean(token)
 	}
 
 	input = input.slice(i + 1)
@@ -251,35 +253,181 @@ let lexToken = (input: string, position: Position): LexingResult => {
 	}
 }
 
-export let lex = (input: string, position: Position = { line: 1, column: 1 }): Array<IToken> => {
-	let tokens: Array<IToken> = []
-
-	while (input) {
-		let token: IToken
-		;({ input, token, position } = lexToken(input, position))
-
-		// Dont save comments since they are useless in parsing
-		if (token.tokenType === "Comment") {
-			continue
-		}
-
-		// ignore multiple linebreaks
-		if (token.content === "\n") {
-			if (tokens.length && tokens[tokens.length - 1].tokenType === "Linebreak") {
-				continue
-			}
-		}
-
-		// Dont save empty tokens since they are useless in parsing
-		if (token.content === "") {
-			// Except Strings, as they may legally be empty
-			if (token.tokenType !== "String") {
-				continue
-			}
-		}
-
-		tokens.push(token)
+const lexNumber = (input: string, position: Position): SubLexingResult => {
+	let token: Token = {
+		value: "",
+		type: TokenType.LiteralNumber,
+		position,
 	}
 
-	return tokens
+	let i: number
+
+	for (i = 0; i < input.length; i++) {
+		let currentChar = input[i]
+
+		if (orHelper([isLinebreak, isSymbol, isCommentLiteral], currentChar)) {
+			i-- // Fix Index for the token slice
+			break
+		}
+
+		token.value += currentChar
+		position = updatePosition(currentChar, position)
+
+		if (isEOF(input, i)) {
+			break
+		}
+	}
+
+	input = input.slice(i + 1)
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
+const lexIdentifier = (input: string, position: Position): SubLexingResult => {
+	const token: Token = {
+		value: "",
+		type: TokenType.Identifier,
+		position,
+	}
+
+	let i: number
+
+	for (i = 0; i < input.length; i++) {
+		let currentChar = input[i]
+
+		if (orHelper([isSymbol, isLinebreak, isWhitespace], currentChar)) {
+			i--
+			break
+		}
+
+		position = updatePosition(currentChar, position)
+		token.value += currentChar
+
+		if (isEOF(input, i)) {
+			break
+		}
+	}
+
+	input = input.slice(i + 1)
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
+const lexToken = (input: string, position: Position, ignoreList: Array<string>): LexingResult => {
+	let token: Token | undefined = undefined
+
+	if (input.length === 0) {
+		return {
+			input,
+			position,
+			token: undefined,
+		}
+	}
+
+	let firstChar = input[0]
+
+	if (isWhitespace(firstChar)) {
+		return lexToken(input.slice(1), updatePosition(firstChar, position), ignoreList)
+	}
+
+	if (isLinebreak(firstChar)) {
+		;({ input, token, position } = lexLinebreak(input, position))
+	} else if (isSymbol(firstChar)) {
+		;({ input, token, position } = lexSymbol(input, position))
+	} else if (isCommentLiteral(firstChar)) {
+		;({ input, token, position } = lexComment(input, position))
+	} else if (isStringLiteral(firstChar)) {
+		;({ input, token, position } = lexString(input, position))
+	} else if (isNumberLiteral(firstChar)) {
+		;({ input, token, position } = lexNumber(input, position))
+	} else {
+		;({ input, token, position } = lexIdentifier(input, position))
+
+		if (isKeyword(token.value)) {
+			token.type = getKeywordType(token.value)
+		} else if (isBooleanLiteral(token.value)) {
+			token.type = getBooleanType(token.value)
+		}
+	}
+
+	if (ignoreList.includes(token.type)) {
+		return lexToken(input, position, ignoreList)
+	}
+
+	return {
+		input,
+		token,
+		position,
+	}
+}
+
+export class Lexer {
+	protected data: string
+	protected index: number
+	protected state: Position
+	protected ignoreList: Array<string>
+
+	constructor() {
+		this.data = ""
+		this.index = 0
+		this.state = { line: 1, column: 1 }
+		this.ignoreList = []
+	}
+
+	reset(data: string, state: Position = { line: 1, column: 1 }) {
+		this.data = data
+		this.index = 0
+		this.state = state
+	}
+
+	next(): lexer.Token | undefined {
+		const data = this.data.slice(this.index)
+
+		const { input, token, position } = lexToken(data, this.state, this.ignoreList)
+
+		this.state = position
+		this.index = this.data.length - input.length
+
+		return token
+	}
+
+	save() {
+		return this.state
+	}
+
+	// TODO: Implement formatError
+	formatError(token: NearleyToken) {
+		return ""
+		// nb. this gets called after consuming the offending token,
+		// so the culprit is index-1
+		// var buffer = this.buffer;
+		// if (typeof buffer === 'string') {
+		// 	var nextLineBreak = buffer.indexOf('\n', this.index);
+		// 	if (nextLineBreak === -1) nextLineBreak = buffer.length;
+		// 	var line = buffer.substring(this.lastLineBreak, nextLineBreak)
+		// 	var col = this.index - this.lastLineBreak;
+		// 	message += " at line " + this.line + " col " + col + ":\n\n";
+		// 	message += "  " + line + "\n"
+		// 	message += "  " + Array(col).join(" ") + "^"
+		// 	return message;
+		// } else {
+		// 	return message + " at index " + (this.index - 1);
+		// }
+	}
+
+	has(name: string) {
+		return name in TokenType
+	}
+
+	ignore(name: lexer.TokenType) {
+		this.ignoreList.push(name)
+	}
 }

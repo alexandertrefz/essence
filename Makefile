@@ -15,6 +15,10 @@ TSC := ./node_modules/.bin/tsc
 TSC_ARGS := -t es2017 -m commonjs --moduleResolution Node --strict --pretty --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)/
 
 JASMINE := ./node_modules/.bin/jasmine
+NEARLEYC := ./node_modules/.bin/nearleyc
+
+$(TS_SOURCE_DIR)/parser/grammar.ts: $(TS_SOURCE_DIR)/parser/grammar.ne
+	$(NEARLEYC) $< -o $@
 
 $(JS_BUILD_DIR)/%.js: $(TS_SOURCE_DIR)/%.ts
 	- $(TSC) $(TSC_ARGS) $<
@@ -24,7 +28,11 @@ $(JS_BUILD_DIR)/tests/%.js: $(TS_SOURCE_DIR)/tests/%.ts
 
 all: build build-tests
 
-build: $(JS_SRC)
+compile-grammar: $(TS_SOURCE_DIR)/parser/grammar.ts
+
+compile-src: $(JS_SRC)
+
+build: compile-grammar compile-src
 
 build-tests: $(JS_TESTS)
 
@@ -34,7 +42,7 @@ test: all |
 
 watch:
 	@clear
-	watchman-make -p '$(TS_SOURCE_DIR)/**/*.ts' -t build
+	watchman-make -p '$(TS_SOURCE_DIR)/**/*.ts' '$(TS_SOURCE_DIR)/parser/grammar.ne' -t build
 
 dev:
 	@clear
@@ -42,4 +50,5 @@ dev:
 
 clean:
 	- rm -rf $(JS_BUILD_DIR)
+	- rm $(TS_SOURCE_DIR)/parser/grammar.ts
 

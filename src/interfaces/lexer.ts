@@ -1,22 +1,49 @@
-export type Position = {
-	line: number
-	column: number
+import { Position } from "./common"
+
+export enum TokenType {
+	SymbolAt = "SymbolAt",
+	SymbolEqual = "SymbolEqual",
+	SymbolColon = "SymbolColon",
+	SymbolTilde = "SymbolTilde",
+	SymbolDot = "SymbolDot",
+	SymbolComma = "SymbolComma",
+	SymbolUnderscore = "SymbolUnderscore",
+	SymbolDash = "SymbolDash",
+	SymbolPipe = "SymbolPipe",
+	SymbolLeftParen = "SymbolLeftParen",
+	SymbolRightParen = "SymbolRightParen",
+	SymbolLeftBrace = "SymbolLeftBrace",
+	SymbolRightBrace = "SymbolRightBrace",
+	SymbolLeftBracket = "SymbolLeftBracket",
+	SymbolRightBracket = "SymbolRightBracket",
+	SymbolLeftAngle = "SymbolLeftAngle",
+	SymbolRightAngle = "SymbolRightAngle",
+
+	LiteralTrue = "LiteralTrue",
+	LiteralFalse = "LiteralFalse",
+	LiteralString = "LiteralString",
+	LiteralNumber = "LiteralNumber",
+
+	KeywordType = "KeywordType",
+	KeywordIf = "KeywordIf",
+	KeywordElse = "KeywordElse",
+	KeywordStatic = "KeywordStatic",
+	KeywordConstant = "KeywordConstant",
+	KeywordVariable = "KeywordVariable",
+	KeywordFunction = "KeywordFunction",
+
+	Identifier = "Identifier",
+	Linebreak = "Linebreak",
+	Comment = "Comment",
 }
 
-export type TokenType =
-	| null
-	| "Delimiter"
-	| "Identifier"
-	| "Keyword"
-	| "Operator"
-	| "String"
-	| "Comment"
-	| "Linebreak"
-	| "Boolean"
-	| "Number"
-
-export interface IToken {
-	content: string
-	tokenType: TokenType
+export interface Token {
+	value: string
+	type: TokenType
 	position: Position
+}
+
+export interface SimpleToken {
+	type: TokenType
+	value: string
 }

@@ -11,3 +11,4 @@ lib
 
 testFiles/local
 testFiles/*.js
+/src/parser/grammar.ts

@@ -1,594 +1,716 @@
-import { lex } from "../lexer"
+import { Lexer } from "../lexer"
 import { lexer } from "../interfaces"
+import { stripPosition, stripPositionFromArray } from "../helpers"
 
-type TokenType = lexer.TokenType
-type IToken = lexer.IToken
-
-type ISimpleToken = {
-	tokenType: TokenType
-	content: string
-}
-
-let stripPositionFromArray = (tokens: IToken[]): ISimpleToken[] => {
-	return tokens.map(value => {
-		return stripPosition(value)
-	})
-}
-
-let stripPosition = (token: IToken): ISimpleToken => {
-	let tokenCopy = JSON.parse(JSON.stringify(token))
-	delete tokenCopy.position
-	return tokenCopy
-}
+const TokenType = lexer.TokenType
+type Token = lexer.Token
+// prettier-ignore
+type SimpleToken = lexer.SimpleToken;
 
 describe("Lexer", () => {
-	describe("stripPosition", () => {
-		it("should strip line and column", () => {
-			let input: IToken = {
-				content: "",
-				tokenType: "String",
-				position: {
-					line: 1,
-					column: 2,
-				},
-			}
+	it("should handle empty input", () => {
+		let lexer = new Lexer()
+		let input: string
+		let output: undefined
 
-			let output = {
-				content: "",
-				tokenType: "String",
-			}
+		input = ""
+		output = undefined
 
-			expect(stripPosition(input)).toEqual(output)
-		})
+		lexer.reset(input)
+
+		expect(lexer.next()).toEqual(output)
 	})
 
-	describe("stripPositionFromArray", () => {
-		it("should strip line and column from all values", () => {
-			let input: IToken[] = [
-				{
-					content: "",
-					tokenType: "String",
-					position: {
-						line: 1,
-						column: 2,
-					},
-				},
-			]
-
-			let output = [
-				{
-					content: "",
-					tokenType: "String",
-				},
-			]
-
-			expect(stripPositionFromArray(input)).toEqual(output)
-		})
-	})
-
-	describe("linebreaks", () => {
+	describe("Linebreaks", () => {
 		it("should lex linebreaks", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
-			input = "\n\n"
-			output = [
-				{
-					content: "\n",
-					tokenType: "Linebreak",
-				},
-			]
+			input = "\n"
+			output = {
+				value: "\n",
+				type: TokenType.Linebreak,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
-		it("should lex multiple linebreaks as one", () => {
+		it("should lex multiple linebreaks", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: Array<SimpleToken>
 
 			input = "\n\n"
 			output = [
 				{
-					content: "\n",
-					tokenType: "Linebreak",
+					value: "\n",
+					type: TokenType.Linebreak,
+				},
+				{
+					value: "\n",
+					type: TokenType.Linebreak,
 				},
 			]
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(output)
 		})
 
 		it("should lex linebreak after other tokens", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: Array<SimpleToken>
 
 			input = "identifier\n"
-			output = [{ content: "identifier", tokenType: "Identifier" }, { content: "\n", tokenType: "Linebreak" }]
+			output = [{ value: "identifier", type: TokenType.Identifier }, { value: "\n", type: TokenType.Linebreak }]
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(output)
 		})
 	})
 
-	describe("strings", () => {
+	describe("Strings", () => {
 		it("should lex empty strings", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
-			input = "''"
-			output = [
-				{
-					content: "",
-					tokenType: "String",
-				},
-			]
+			input = '""'
+			output = {
+				value: "",
+				type: TokenType.LiteralString,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex simple strings", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
-			input = "'test'"
-			output = [
-				{
-					content: "test",
-					tokenType: "String",
-				},
-			]
+			input = '"test"'
+			output = {
+				value: "test",
+				type: TokenType.LiteralString,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex complex strings", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
-			input = "'test test'"
-			output = [
-				{
-					content: "test test",
-					tokenType: "String",
-				},
-			]
+			input = '"test test"'
+			output = {
+				value: "test test",
+				type: TokenType.LiteralString,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should not lex open strings", () => {
+			let lexer = new Lexer()
 			let input: string
 
-			input = "'test"
+			input = '"test'
 
-			expect(() => lex(input)).toThrow()
+			lexer.reset(input)
+
+			expect(() => lexer.next()).toThrow()
 		})
 	})
 
-	describe("booleans", () => {
-		it("should lex true", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "true"
-			output = [
-				{
-					content: "true",
-					tokenType: "Boolean",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it("should lex false", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "false"
-			output = [
-				{
-					content: "false",
-					tokenType: "Boolean",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-	})
-
-	describe("numbers", () => {
-		it("should lex simple numbers", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "1"
-			output = [
-				{
-					content: "1",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-
-			input = "123"
-			output = [
-				{
-					content: "123",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it("should lex simple numbers with underscores", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "1_000"
-			output = [
-				{
-					content: "1000",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it("should lex float numbers", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "1.5"
-			output = [
-				{
-					content: "1.5",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it("should lex float numbers with underscores", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "1_000.5"
-			output = [
-				{
-					content: "1000.5",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-
-		it("should not lex numbers with multiple dots", () => {
-			let input: string
-			let output: Array<ISimpleToken>
-
-			input = "1.000.5"
-			output = [
-				{
-					content: "1.000",
-					tokenType: "Number",
-				},
-				{
-					content: ".",
-					tokenType: "Delimiter",
-				},
-				{
-					content: "5",
-					tokenType: "Number",
-				},
-			]
-
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
-		})
-	})
-
-	describe("comments", () => {
+	describe("Comments", () => {
 		it("should lex comments", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "§ Comment"
-			output = []
+			output = {
+				value: "§ Comment",
+				type: TokenType.Comment,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex comments with a linebreak after", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: Array<SimpleToken>
+
+			input = "§ Comment\n"
+			output = [
+				{
+					value: "§ Comment",
+					type: TokenType.Comment,
+				},
+				{
+					value: "\n",
+					type: TokenType.Linebreak,
+				},
+			]
+
+			lexer.reset(input)
+
+			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(output)
 		})
 	})
 
-	describe("identifiers", () => {
+	describe("Identifiers", () => {
 		it("should lex identifiers without whitespace", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "identifier"
-			output = [{ content: "identifier", tokenType: "Identifier" }]
+			output = {
+				value: "identifier",
+				type: TokenType.Identifier,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex identifiers with whitespace in front", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "   identifier"
-			output = [{ content: "identifier", tokenType: "Identifier" }]
+			output = {
+				value: "identifier",
+				type: TokenType.Identifier,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex identifiers with whitespace after", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "identifier  "
-			output = [{ content: "identifier", tokenType: "Identifier" }]
+			output = {
+				value: "identifier",
+				type: TokenType.Identifier,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
-		it("should lex identifiers separated by delimiters", () => {
+		it("should lex identifiers separated by Symbols", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: Array<SimpleToken>
 
 			input = "identifier.identifier2"
 			output = [
-				{ content: "identifier", tokenType: "Identifier" },
-				{ content: ".", tokenType: "Delimiter" },
-				{ content: "identifier2", tokenType: "Identifier" },
+				{ value: "identifier", type: TokenType.Identifier },
+				{ value: ".", type: TokenType.SymbolDot },
+				{ value: "identifier2", type: TokenType.Identifier },
 			]
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPositionFromArray([lexer.next(), lexer.next(), lexer.next()])).toEqual(output)
 		})
 	})
 
-	describe("keywords", () => {
-		it("should lex let", () => {
+	describe("Booleans", () => {
+		it("should lex true", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
-			input = "let"
-			output = [
-				{
-					content: "let",
-					tokenType: "Keyword",
-				},
-			]
+			input = "true"
+			output = {
+				value: "true",
+				type: TokenType.LiteralTrue,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
-		it("should lex if", () => {
+		it("should lex false", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
+
+			input = "false"
+			output = {
+				value: "false",
+				type: TokenType.LiteralFalse,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+	})
+
+	describe("Keywords", () => {
+		it("should lex if", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
 
 			input = "if"
-			output = [
-				{
-					content: "if",
-					tokenType: "Keyword",
-				},
-			]
+			output = {
+				value: "if",
+				type: TokenType.KeywordIf,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex else", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "else"
-			output = [
-				{
-					content: "else",
-					tokenType: "Keyword",
-				},
-			]
+			output = {
+				value: "else",
+				type: TokenType.KeywordElse,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex type", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "type"
+			output = {
+				value: "type",
+				type: TokenType.KeywordType,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex variable", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "variable"
+			output = {
+				value: "variable",
+				type: TokenType.KeywordVariable,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex constant", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "constant"
+			output = {
+				value: "constant",
+				type: TokenType.KeywordConstant,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex function", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "function"
+			output = {
+				value: "function",
+				type: TokenType.KeywordFunction,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex static", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "static"
+			output = {
+				value: "static",
+				type: TokenType.KeywordStatic,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 	})
 
-	describe("delimiters", () => {
+	describe("Symbols", () => {
 		it("should lex @", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "@"
-			output = [
-				{
-					content: "@",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "@",
+				type: TokenType.SymbolAt,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex |", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "|"
+			output = {
+				value: "|",
+				type: TokenType.SymbolPipe,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex (", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "("
-			output = [
-				{
-					content: "(",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "(",
+				type: TokenType.SymbolLeftParen,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex )", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = ")"
-			output = [
-				{
-					content: ")",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: ")",
+				type: TokenType.SymbolRightParen,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex {", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "{"
-			output = [
-				{
-					content: "{",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "{",
+				type: TokenType.SymbolLeftBrace,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex }", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "}"
-			output = [
-				{
-					content: "}",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "}",
+				type: TokenType.SymbolRightBrace,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex [", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "["
+			output = {
+				value: "[",
+				type: TokenType.SymbolLeftBracket,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex ]", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "]"
+			output = {
+				value: "]",
+				type: TokenType.SymbolRightBracket,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex ,", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = ","
-			output = [
-				{
-					content: ",",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: ",",
+				type: TokenType.SymbolComma,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex .", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "."
-			output = [
-				{
-					content: ".",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: ".",
+				type: TokenType.SymbolDot,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex :", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = ":"
-			output = [
-				{
-					content: ":",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: ":",
+				type: TokenType.SymbolColon,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex =", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "="
-			output = [
-				{
-					content: "=",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "=",
+				type: TokenType.SymbolEqual,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex -", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "-"
-			output = [
-				{
-					content: "-",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "-",
+				type: TokenType.SymbolDash,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex <", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "<"
-			output = [
-				{
-					content: "<",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "<",
+				type: TokenType.SymbolLeftAngle,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex >", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = ">"
-			output = [
-				{
-					content: ">",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: ">",
+				type: TokenType.SymbolRightAngle,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 
 		it("should lex _", () => {
+			let lexer = new Lexer()
 			let input: string
-			let output: Array<ISimpleToken>
+			let output: SimpleToken
 
 			input = "_"
-			output = [
-				{
-					content: "_",
-					tokenType: "Delimiter",
-				},
-			]
+			output = {
+				value: "_",
+				type: TokenType.SymbolUnderscore,
+			}
 
-			expect(stripPositionFromArray(lex(input))).toEqual(output)
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex ~", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "~"
+			output = {
+				value: "~",
+				type: TokenType.SymbolTilde,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+	})
+
+	describe("Numbers", () => {
+		it("should lex 1", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "1"
+			output = {
+				value: "1",
+				type: TokenType.LiteralNumber,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex 1000", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "1000"
+			output = {
+				value: "1000",
+				type: TokenType.LiteralNumber,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex 1000 with a linebreak following", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "1000\n"
+			output = {
+				value: "1000",
+				type: TokenType.LiteralNumber,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
 		})
 	})
 })
