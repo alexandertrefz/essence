@@ -3,7 +3,12 @@
 	"version": "0.0.1",
 	"description": "A new simple but powerful language.",
 	"main": "index.js",
-	"scripts": {},
+	"scripts": {
+		"clean": "make clean",
+		"build": "make all",
+		"watch": "make watch",
+		"test": "make test"
+	},
 	"keywords": [
 		"language",
 		"essence"
