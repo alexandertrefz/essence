@@ -1,229 +1,233 @@
-import { Position } from "./lexer"
+import { Position } from "./common"
 
-export interface IIdentifierNode {
+export type Node = ExpressionNode | StatementNode
+
+/////////////////
+/* Expressions */
+/////////////////
+
+export type ExpressionNode =
+	| NativeFunctionInvocationNode
+	| MethodInvocationNode
+	| FunctionInvocationNode
+	| MethodLookupNode
+	| ValueNode
+	| LookupNode
+	| SelfNode
+	| IdentifierNode
+	| CombinationNode
+
+export interface NativeFunctionInvocationNode {
+	nodeType: "NativeFunctionInvocation"
+	name: IdentifierNode
+	arguments: Array<ArgumentNode>
+	position: Position
+}
+
+export interface MethodInvocationNode {
+	nodeType: "MethodInvocation"
+	name: MethodLookupNode
+	arguments: Array<ArgumentNode>
+	position: Position
+}
+
+export interface FunctionInvocationNode {
+	nodeType: "FunctionInvocation"
+	name: ExpressionNode
+	arguments: Array<ArgumentNode>
+	position: Position
+}
+
+export interface MethodLookupNode {
+	nodeType: "MethodLookup"
+	base: ExpressionNode
+	member: IdentifierNode
+	position: Position
+}
+
+export type ValueNode =
+	| RecordValueNode
+	| StringValueNode
+	| NumberValueNode
+	| BooleanValueNode
+	| FunctionValueNode
+	| ArrayValueNode
+
+export type RecordValueNode = {
+	nodeType: "RecordValue"
+	type: TypeDeclarationNode | null
+	members: {
+		[key: string]: ExpressionNode
+	}
+	position: Position
+}
+
+export type StringValueNode = {
+	nodeType: "StringValue"
+	value: string
+	position: Position
+}
+
+export type NumberValueNode = {
+	nodeType: "NumberValue"
+	value: string
+	position: Position
+}
+export type BooleanValueNode = {
+	nodeType: "BooleanValue"
+	value: boolean
+	position: Position
+}
+
+export type FunctionValueNode = {
+	nodeType: "FunctionValue"
+	value: FunctionDefinitionNode
+	position: Position
+}
+
+export type ArrayValueNode = {
+	nodeType: "ArrayValue"
+	values: Array<ExpressionNode>
+	position: Position
+}
+
+export interface LookupNode {
+	nodeType: "Lookup"
+	base: ExpressionNode
+	member: IdentifierNode
+	position: Position
+}
+
+export interface SelfNode {
+	nodeType: "Self"
+	position: Position
+}
+
+export interface IdentifierNode {
 	nodeType: "Identifier"
 	content: string
 	position: Position
 }
 
-export interface IPartialLookupNode {
-	nodeType: "PartialLookup"
-	identifier: IIdentifierNode
+export interface CombinationNode {
+	nodeType: "Combination"
+	lhs: ExpressionNode
+	rhs: ExpressionNode
 	position: Position
 }
 
-export interface ILookupNode {
-	nodeType: "Lookup"
-	base: IExpressionNode
-	member: IIdentifierNode
+////////////////
+/* Statements */
+////////////////
+
+export type StatementNode =
+	| ConstantDeclarationStatementNode
+	| VariableDeclarationStatementNode
+	| VariableAssignmentStatementNode
+	| TypeDefinitionStatementNode
+	| IfElseStatementNode
+	| IfStatementNode
+	| ReturnStatementNode
+	| FunctionStatementNode
+
+export interface ConstantDeclarationStatementNode {
+	nodeType: "ConstantDeclarationStatement"
+	name: IdentifierNode
+	type: TypeDeclarationNode | null
+	value: ExpressionNode
 	position: Position
 }
 
-export interface IPartialMethodLookupNode {
-	nodeType: "PartialMethodLookup"
-	identifier: IIdentifierNode
+export interface VariableDeclarationStatementNode {
+	nodeType: "VariableDeclarationStatement"
+	name: IdentifierNode
+	type: TypeDeclarationNode | null
+	value: ExpressionNode
 	position: Position
 }
 
-export interface IMethodLookupNode {
-	nodeType: "MethodLookup"
-	base: IExpressionNode
-	member: IIdentifierNode
+export interface VariableAssignmentStatementNode {
+	nodeType: "VariableAssignmentStatement"
+	name: IdentifierNode
+	value: ExpressionNode
 	position: Position
 }
 
-export interface INativeLookupNode {
-	nodeType: "NativeLookup"
-	base: IIdentifierNode | INativeLookupNode
-	member: IIdentifierNode
-	position: Position
-}
-
-export interface ITypeDeclarationNode {
-	nodeType: "TypeDeclaration"
-	name: IIdentifierNode
-	position: Position
-}
-
-export interface IBlockNode {
-	nodeType: "Block"
-	nodes: Array<IStatementNode>
-	position: Position
-}
-
-export interface IKeyValuePairNode {
-	nodeType: "KeyValuePair"
-	key: IIdentifierNode
-	value: IExpressionNode
-	position: Position
-}
-
-export interface ITypeConstructorNode {
-	nodeType: "TypeConstructor"
-	type: IIdentifierNode | null
-	members: Array<IKeyValuePairNode>
-	position: Position
-}
-
-export interface IValueNode {
-	nodeType: "Value"
-	type: string | null
-	value: IFunctionDefinitionNode | boolean | string | null
-	members: {
-		[key: string]: IValueNode
-	}
-	position: Position
-}
-
-export interface IParameterNode {
-	nodeType: "Parameter"
-	name: string
-	type: ITypeDeclarationNode
-	position: Position
-}
-
-export interface IParameterListNode {
-	nodeType: "ParameterList"
-	parameters: Array<IParameterNode>
-	position: Position
-}
-
-export interface IArgumentListNode {
-	nodeType: "ArgumentList"
-	arguments: Array<IExpressionNode>
-	position: Position
-}
-
-export interface IFunctionDefinitionNode {
-	nodeType: "FunctionDefinition"
-	parameters: Array<IParameterNode>
-	returnType: ITypeDeclarationNode
-	body: IBlockNode
-	scope?: any
-	position: Position
-}
-
-export interface IFunctionInvocationNode {
-	nodeType: "FunctionInvocation"
-	name: IExpressionNode
-	arguments: Array<IExpressionNode>
-	position: Position
-}
-
-export interface INativeFunctionInvocationNode {
-	nodeType: "NativeFunctionInvocation"
-	name: IIdentifierNode | INativeLookupNode
-	arguments: Array<IExpressionNode>
-	position: Position
-}
-
-export interface IPartialMethodInvocationNode {
-	nodeType: "PartialMethodInvocation"
-	member: IIdentifierNode
-	arguments: IArgumentListNode
-	position: Position
-}
-
-export interface IMethodInvocationNode {
-	nodeType: "MethodInvocation"
-	name: IMethodLookupNode
-	arguments: Array<IExpressionNode>
-	position: Position
-}
-
-export interface IReturnStatementNode {
-	nodeType: "ReturnStatement"
-	expression: IExpressionNode
-	position: Position
-}
-
-export interface IDeclarationStatementNode {
-	nodeType: "DeclarationStatement"
-	name: IIdentifierNode
-	type: ITypeDeclarationNode | null
-	value: IExpressionNode
-	position: Position
-}
-
-export interface IAssignmentStatementNode {
-	nodeType: "AssignmentStatement"
-	name: IIdentifierNode
-	value: IExpressionNode
-	position: Position
-}
-
-export interface IIfStatementNode {
-	nodeType: "IfStatement"
-	condition: IExpressionNode
-	body: IBlockNode
-	position: Position
-}
-
-export interface IIfElseStatementNode {
-	nodeType: "IfElseStatement"
-	condition: IExpressionNode
-	trueBody: IBlockNode
-	falseBody: IBlockNode
-	position: Position
-}
-
-export interface ITypeDefinitionStatementNode {
+export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
-	name: IIdentifierNode
+	name: IdentifierNode
 	properties: {
-		[key: string]: ITypeDeclarationNode
+		[key: string]: TypeDeclarationNode
 	}
-	members: {
-		[key: string]: IValueNode
+	methods: {
+		[key: string]: { method: FunctionValueNode; isStatic: boolean }
 	}
 	position: Position
 }
 
-export interface ITypePropertyNode {
-	nodeType: "TypeProperty"
-	name: IIdentifierNode
-	type: ITypeDeclarationNode
+export interface IfElseStatementNode {
+	nodeType: "IfElseStatement"
+	condition: ExpressionNode
+	trueBody: Array<Node>
+	falseBody: Array<Node>
 	position: Position
 }
 
-export interface ITypeMethodNode {
-	nodeType: "TypeMethod"
-	name: IIdentifierNode
-	func: IFunctionDefinitionNode
+export interface IfStatementNode {
+	nodeType: "IfStatement"
+	condition: ExpressionNode
+	body: Array<Node>
 	position: Position
 }
 
-export type IExpressionNode =
-	| IValueNode
-	| IIdentifierNode
-	| ILookupNode
-	| IMethodLookupNode
-	| IFunctionInvocationNode
-	| INativeFunctionInvocationNode
-	| IMethodInvocationNode
+export interface ReturnStatementNode {
+	nodeType: "ReturnStatement"
+	expression: ExpressionNode
+	position: Position
+}
 
-export type IStatementNode =
-	| IDeclarationStatementNode
-	| IAssignmentStatementNode
-	| IReturnStatementNode
-	| IIfStatementNode
-	| IIfElseStatementNode
-	| ITypeDefinitionStatementNode
+export interface FunctionStatementNode {
+	nodeType: "FunctionStatement"
+	name: IdentifierNode
+	value: FunctionDefinitionNode
+	position: Position
+}
 
-export type IASTNode =
-	| IExpressionNode
-	| IStatementNode
-	| ITypeDeclarationNode
-	| IParameterNode
-	| IParameterListNode
-	| IArgumentListNode
-	| IFunctionDefinitionNode
-	| IBlockNode
-	| ITypePropertyNode
-	| ITypeMethodNode
-	| INativeLookupNode
-	| IKeyValuePairNode
-	| ITypeConstructorNode
-	| IPartialLookupNode
-	| IPartialMethodLookupNode
-	| IPartialMethodInvocationNode
+/////////////
+/* Helpers */
+/////////////
+
+export type TypeDeclarationNode = IdentifierTypeDeclarationNode | ArrayTypeDeclarationNode
+
+export interface IdentifierTypeDeclarationNode {
+	nodeType: "IdentifierTypeDeclaration"
+	type: IdentifierNode
+	position: Position
+}
+
+export interface ArrayTypeDeclarationNode {
+	nodeType: "ArrayTypeDeclaration"
+	type: TypeDeclarationNode
+	position: Position
+}
+
+export interface FunctionDefinitionNode {
+	nodeType: "FunctionDefinition"
+	parameters: Array<ParameterNode>
+	returnType: TypeDeclarationNode
+	body: Array<Node>
+}
+
+export interface ParameterNode {
+	nodeType: "Parameter"
+	externalName: IdentifierNode | null
+	internalName: IdentifierNode
+	type: TypeDeclarationNode
+	position: Position
+}
+
+export interface ArgumentNode {
+	nodeType: "Argument"
+	name: IdentifierNode | null
+	value: ExpressionNode
+}

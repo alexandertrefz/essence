@@ -24,7 +24,7 @@
 		"prettier": "1.5.3"
 	},
 	"dependencies": {
-		"nearley": "alexandertrefz/nearley#8fbb3f8024927b12e638c7dbd4b6b301648bd67f",
+		"nearley": "alexandertrefz/nearley#71e22ead8330e06138da3a4bcd642988dee2b056",
 		"llvmc": "1.0.2"
 	},
 	"repository": {

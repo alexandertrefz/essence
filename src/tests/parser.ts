@@ -1,1564 +1,1012 @@
-import { lex } from "../lexer"
 import { parse } from "../parser"
+
+// Infinitely deep console.logs for convenience
+const util = require("util")
+util.inspect.defaultOptions.depth = null
+
+// prettier-ignore
+type ParserNode = any;
 
 describe("Parser", () => {
 	describe("Expressions", () => {
-		it("should parse identifiers", () => {
-			let input = `identifier`
-			let output = [
-				{
-					nodeType: "Identifier",
-					content: "identifier",
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+		describe("NativeInvocations", () => {
+			it("should not parse NativePrefix without Identifier", () => {
+				let input = `__`
 
-			expect(parse(lex(input))).toEqual(output)
-		})
+				expect(() => parse(input)).toThrow()
+			})
 
-		it('should parse "true" literals', () => {
-			let input = `true`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Bool",
-					value: true,
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+			it("should not parse NativeLookups without second Identifier", () => {
+				let input = `__lookup.`
 
-			expect(parse(lex(input))).toEqual(output)
-		})
+				expect(() => parse(input)).toThrow()
+			})
 
-		it('should parse "false" literals', () => {
-			let input = `false`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Bool",
-					value: false,
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty string literals", () => {
-			let input = `''`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "String",
-					value: "",
-					members: {},
-					position: {
-						line: 1,
-						column: 2,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse filled string literals", () => {
-			let input = `'string'`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "String",
-					value: "string",
-					members: {},
-					position: {
-						line: 1,
-						column: 2,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse simple number literals", () => {
-			let input = `123`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Number",
-					value: "123",
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse simple number literals with underscores", () => {
-			let input = `1_000`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Number",
-					value: "1000",
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse float number literals", () => {
-			let input = `1.5`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Number",
-					value: "1.5",
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse float number literals with underscores", () => {
-			let input = `1_000.5`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Number",
-					value: "1000.5",
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty function literals", () => {
-			let input = `() -> Type {}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 6,
-								},
-							},
-							position: {
-								line: 1,
-								column: 6,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [],
-							position: {
-								line: 1,
-								column: 12,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty function literals with some linebreaks", () => {
-			let input = `() -> Type {
-			}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 6,
-								},
-							},
-							position: {
-								line: 1,
-								column: 6,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [],
-							position: {
-								line: 1,
-								column: 12,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty function literals with one parameter", () => {
-			let input = `(parameter Type) -> Type {}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [
-							{
-								nodeType: "Parameter",
-								name: "parameter",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 12,
-										},
-									},
-									position: {
-										line: 1,
-										column: 12,
-									},
-								},
-								position: {
-									line: 1,
-									column: 2,
-								},
-							},
-						],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 21,
-								},
-							},
-							position: {
-								line: 1,
-								column: 21,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [],
-							position: {
-								line: 1,
-								column: 27,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty function literals with two parameters", () => {
-			let input = `(parameter Type, parameter2 Type) -> Type {}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [
-							{
-								nodeType: "Parameter",
-								name: "parameter",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 12,
-										},
-									},
-									position: {
-										line: 1,
-										column: 12,
-									},
-								},
-								position: {
-									line: 1,
-									column: 2,
-								},
-							},
-							{
-								nodeType: "Parameter",
-								name: "parameter2",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 30,
-										},
-									},
-									position: {
-										line: 1,
-										column: 30,
-									},
-								},
-								position: {
-									line: 1,
-									column: 18,
-								},
-							},
-						],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 39,
-								},
-							},
-							position: {
-								line: 1,
-								column: 39,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [],
-							position: {
-								line: 1,
-								column: 45,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse empty function literals with more than two parameters", () => {
-			let input = `(parameter Type, parameter2 Type, parameter3 Type) -> Type {}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [
-							{
-								nodeType: "Parameter",
-								name: "parameter",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 12,
-										},
-									},
-									position: {
-										line: 1,
-										column: 12,
-									},
-								},
-								position: {
-									line: 1,
-									column: 2,
-								},
-							},
-							{
-								nodeType: "Parameter",
-								name: "parameter2",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 30,
-										},
-									},
-									position: {
-										line: 1,
-										column: 30,
-									},
-								},
-								position: {
-									line: 1,
-									column: 18,
-								},
-							},
-							{
-								nodeType: "Parameter",
-								name: "parameter3",
-								type: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 1,
-											column: 48,
-										},
-									},
-									position: {
-										line: 1,
-										column: 48,
-									},
-								},
-								position: {
-									line: 1,
-									column: 36,
-								},
-							},
-						],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 57,
-								},
-							},
-							position: {
-								line: 1,
-								column: 57,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [],
-							position: {
-								line: 1,
-								column: 63,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse function literals with statements", () => {
-			let input = `() -> Type {
-				<- identifier
-			}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Function",
-					value: {
-						nodeType: "FunctionDefinition",
-						parameters: [],
-						returnType: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 1,
-									column: 6,
-								},
-							},
-							position: {
-								line: 1,
-								column: 6,
-							},
-						},
-						body: {
-							nodeType: "Block",
-							nodes: [
-								{
-									nodeType: "ReturnStatement",
-									expression: {
-										nodeType: "Identifier",
-										content: "identifier",
-										position: {
-											line: 2,
-											column: 7,
-										},
-									},
-									position: {
-										line: 2,
-										column: 1,
-									},
-								},
-							],
-							position: {
-								line: 1,
-								column: 12,
-							},
-						},
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse function invocations without arguments", () => {
-			let input = `invocation()`
-			let output = [
-				{
-					nodeType: "FunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "invocation",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 12,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse function invocations with one argument", () => {
-			let input = `invocation(argument)`
-			let output = [
-				{
-					nodeType: "FunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "invocation",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					arguments: [
-						{
+			it("should parse NativeFunctionInvocation with one argument", () => {
+				let input = `__lookup(argument)`
+				let output = [
+					{
+						nodeType: "NativeFunctionInvocation",
+						name: {
 							nodeType: "Identifier",
-							content: "argument",
-							position: {
-								line: 1,
-								column: 13,
-							},
-						},
-					],
-					position: {
-						line: 1,
-						column: 12,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse function invocations with two arguments", () => {
-			let input = `invocation(argument, argument2)`
-			let output = [
-				{
-					nodeType: "FunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "invocation",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					arguments: [
-						{
-							nodeType: "Identifier",
-							content: "argument",
-							position: {
-								line: 1,
-								column: 13,
-							},
-						},
-						{
-							nodeType: "Identifier",
-							content: "argument2",
-							position: {
-								line: 1,
-								column: 23,
-							},
-						},
-					],
-					position: {
-						line: 1,
-						column: 12,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse function invocations with more than two arguments", () => {
-			let input = `invocation(argument, argument2, argument3)`
-			let output = [
-				{
-					nodeType: "FunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "invocation",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					arguments: [
-						{
-							nodeType: "Identifier",
-							content: "argument",
-							position: {
-								line: 1,
-								column: 13,
-							},
-						},
-						{
-							nodeType: "Identifier",
-							content: "argument2",
-							position: {
-								line: 1,
-								column: 23,
-							},
-						},
-						{
-							nodeType: "Identifier",
-							content: "argument3",
-							position: {
-								line: 1,
-								column: 35,
-							},
-						},
-					],
-					position: {
-						line: 1,
-						column: 12,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse anonymous empty type constructors", () => {
-			let input = `{}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: null,
-					value: null,
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse anonymous type constructors with a KeyValuePair", () => {
-			let input = `{ key = value, }`
-			let output = [
-				{
-					nodeType: "Value",
-					type: null,
-					value: null,
-					members: {
-						key: {
-							nodeType: "Identifier",
-							content: "value",
-							position: {
-								line: 1,
-								column: 8,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse anonymous type constructors with multiple KeyValuePairs", () => {
-			let input = `{ key = value, key2 = value2, }`
-			let output = [
-				{
-					nodeType: "Value",
-					type: null,
-					value: null,
-					members: {
-						key: {
-							nodeType: "Identifier",
-							content: "value",
-							position: {
-								line: 1,
-								column: 8,
-							},
-						},
-						key2: {
-							nodeType: "Identifier",
-							content: "value2",
-							position: {
-								line: 1,
-								column: 23,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse named empty type constructors", () => {
-			let input = `Type{}`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Type",
-					value: null,
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse named type constructors with a KeyValuePair", () => {
-			let input = `Type{ key = value, }`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Type",
-					value: null,
-					members: {
-						key: {
-							nodeType: "Identifier",
-							content: "value",
-							position: {
-								line: 1,
-								column: 13,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse named type constructors with multiple KeyValuePairs", () => {
-			let input = `Type{ key = value, key2 = value2, }`
-			let output = [
-				{
-					nodeType: "Value",
-					type: "Type",
-					value: null,
-					members: {
-						key: {
-							nodeType: "Identifier",
-							content: "value",
-							position: {
-								line: 1,
-								column: 13,
-							},
-						},
-						key2: {
-							nodeType: "Identifier",
-							content: "value2",
-							position: {
-								line: 1,
-								column: 28,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse simple lookup", () => {
-			let input = `lookup.member`
-			let output = [
-				{
-					nodeType: "Lookup",
-					base: {
-						nodeType: "Identifier",
-						content: "lookup",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					member: {
-						nodeType: "Identifier",
-						content: "member",
-						position: {
-							line: 1,
-							column: 9,
-						},
-					},
-					position: {
-						line: 1,
-						column: 8,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse simple lookup with invocation", () => {
-			let input = `lookup.member()`
-			let output = [
-				{
-					nodeType: "FunctionInvocation",
-					name: {
-						nodeType: "Lookup",
-						base: {
-							nodeType: "Identifier",
-							content: "lookup",
+							content: "__lookup",
 							position: {
 								line: 1,
 								column: 1,
 							},
 						},
-						member: {
-							nodeType: "Identifier",
-							content: "member",
-							position: {
-								line: 1,
-								column: 9,
-							},
-						},
-						position: {
-							line: 1,
-							column: 8,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 16,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse complex lookup", () => {
-			let input = `lookup.member1.member2`
-			let output = [
-				{
-					nodeType: "Lookup",
-					base: {
-						nodeType: "Lookup",
-						base: {
-							nodeType: "Identifier",
-							content: "lookup",
-							position: {
-								line: 1,
-								column: 1,
-							},
-						},
-						member: {
-							nodeType: "Identifier",
-							content: "member1",
-							position: {
-								line: 1,
-								column: 9,
-							},
-						},
-						position: {
-							line: 1,
-							column: 8,
-						},
-					},
-					member: {
-						nodeType: "Identifier",
-						content: "member2",
-						position: {
-							line: 1,
-							column: 18,
-						},
-					},
-					position: {
-						line: 1,
-						column: 17,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse raw method lookups", () => {
-			let input = `lookup::member`
-			let output = [
-				{
-					nodeType: "MethodLookup",
-					base: {
-						nodeType: "Identifier",
-						content: "lookup",
-						position: {
-							line: 1,
-							column: 1,
-						},
-					},
-					member: {
-						nodeType: "Identifier",
-						content: "member",
-						position: {
-							line: 1,
-							column: 10,
-						},
-					},
-					position: {
-						line: 1,
-						column: 8,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse method lookups with invocation", () => {
-			let input = `lookup::member()`
-			let output = [
-				{
-					nodeType: "MethodInvocation",
-					name: {
-						nodeType: "MethodLookup",
-						base: {
-							nodeType: "Identifier",
-							content: "lookup",
-							position: {
-								line: 1,
-								column: 1,
-							},
-						},
-						member: {
-							nodeType: "Identifier",
-							content: "member",
-							position: {
-								line: 1,
-								column: 10,
-							},
-						},
-						position: {
-							line: 1,
-							column: 8,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse multiple method lookups with invocation", () => {
-			let input = `lookup::member()::member()`
-			let output = [
-				{
-					nodeType: "MethodInvocation",
-					name: {
-						nodeType: "MethodLookup",
-						base: {
-							nodeType: "MethodInvocation",
-							name: {
-								nodeType: "MethodLookup",
-								base: {
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
 									nodeType: "Identifier",
-									content: "lookup",
-									position: {
-										line: 1,
-										column: 1,
-									},
-								},
-								member: {
-									nodeType: "Identifier",
-									content: "member",
+									content: "argument",
 									position: {
 										line: 1,
 										column: 10,
 									},
 								},
-								position: {
-									line: 1,
-									column: 8,
-								},
 							},
-							arguments: [],
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse NativeFunctionInvocation with one argument with trailing comma", () => {
+				let input = `__lookup(argument,)`
+				let output = [
+					{
+						nodeType: "NativeFunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "__lookup",
 							position: {
 								line: 1,
 								column: 1,
 							},
 						},
-						member: {
-							nodeType: "Identifier",
-							content: "member",
-							position: {
-								line: 1,
-								column: 21,
-							},
-						},
-						position: {
-							line: 1,
-							column: 19,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should not parse complex raw method lookups", () => {
-			let input = `lookup::member1::member2`
-			let output = [
-				{
-					nodeType: "MethodLookup",
-					base: {
-						nodeType: "MethodLookup",
-						base: {
-							nodeType: "Identifier",
-							content: "lookup",
-							position: {
-								line: 1,
-								column: 1,
-							},
-						},
-						member: "member1",
-						position: {
-							line: 1,
-							column: 8,
-						},
-					},
-					member: "member2",
-					position: {
-						line: 1,
-						column: 18,
-					},
-				},
-			]
-
-			expect(() => parse(lex(input))).toThrow()
-		})
-
-		it("should not parse native prefix without identifier", () => {
-			let input = `__`
-			let output = []
-
-			expect(() => parse(lex(input))).toThrow()
-		})
-
-		it("should not parse native lookups without second identifier", () => {
-			let input = `__lookup.`
-			let output = []
-
-			expect(() => parse(lex(input))).toThrow()
-		})
-
-		it("should parse native function invocation without parameters", () => {
-			let input = `__lookup()`
-			let output = [
-				{
-					nodeType: "NativeFunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "lookup",
-						position: {
-							line: 1,
-							column: 3,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 10,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse native function invocation without parameters after lookup", () => {
-			let input = `__lookup.member()`
-			let output = [
-				{
-					nodeType: "NativeFunctionInvocation",
-					name: {
-						nodeType: "NativeLookup",
-						base: {
-							nodeType: "Identifier",
-							content: "lookup",
-							position: {
-								line: 1,
-								column: 3,
-							},
-						},
-						member: {
-							nodeType: "Identifier",
-							content: "member",
-							position: {
-								line: 1,
-								column: 11,
-							},
-						},
-						position: {
-							line: 1,
-							column: 11,
-						},
-					},
-					arguments: [],
-					position: {
-						line: 1,
-						column: 18,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse native function invocation with single argument", () => {
-			let input = `__lookup(argument)`
-			let output = [
-				{
-					nodeType: "NativeFunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "lookup",
-						position: {
-							line: 1,
-							column: 3,
-						},
-					},
-					arguments: [
-						{
-							nodeType: "Identifier",
-							content: "argument",
-							position: {
-								line: 1,
-								column: 11,
-							},
-						},
-					],
-					position: {
-						line: 1,
-						column: 10,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse native function invocation with multiple arguments", () => {
-			let input = `__lookup(argument, argument2)`
-			let output = [
-				{
-					nodeType: "NativeFunctionInvocation",
-					name: {
-						nodeType: "Identifier",
-						content: "lookup",
-						position: {
-							line: 1,
-							column: 3,
-						},
-					},
-					arguments: [
-						{
-							nodeType: "Identifier",
-							content: "argument",
-							position: {
-								line: 1,
-								column: 11,
-							},
-						},
-						{
-							nodeType: "Identifier",
-							content: "argument2",
-							position: {
-								line: 1,
-								column: 21,
-							},
-						},
-					],
-					position: {
-						line: 1,
-						column: 10,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-	})
-
-	describe("Statements", () => {
-		it("should parse return statements", () => {
-			let input = `<- identifier`
-			let output = [
-				{
-					nodeType: "ReturnStatement",
-					expression: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 3,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse if statements", () => {
-			let input = `if (identifier) {}`
-			let output = [
-				{
-					nodeType: "IfStatement",
-					condition: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 5,
-						},
-					},
-					body: {
-						nodeType: "Block",
-						nodes: [],
-						position: {
-							line: 1,
-							column: 17,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse if else statements", () => {
-			let input = `if (identifier) {} else {}`
-			let output = [
-				{
-					nodeType: "IfElseStatement",
-					condition: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 5,
-						},
-					},
-					trueBody: {
-						nodeType: "Block",
-						nodes: [],
-						position: {
-							line: 1,
-							column: 17,
-						},
-					},
-					falseBody: {
-						nodeType: "Block",
-						nodes: [],
-						position: {
-							line: 1,
-							column: 26,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse if else if statements", () => {
-			let input = `if (identifier) {} else if (identifier2) {}`
-			let output = [
-				{
-					nodeType: "IfElseStatement",
-					condition: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 5,
-						},
-					},
-					trueBody: {
-						nodeType: "Block",
-						nodes: [],
-						position: {
-							line: 1,
-							column: 17,
-						},
-					},
-					falseBody: {
-						nodeType: "Block",
-						nodes: [
+						arguments: [
 							{
-								nodeType: "IfStatement",
-								condition: {
+								nodeType: "Argument",
+								name: null,
+								value: {
 									nodeType: "Identifier",
-									content: "identifier2",
+									content: "argument",
 									position: {
 										line: 1,
-										column: 30,
+										column: 10,
 									},
-								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 1,
-										column: 43,
-									},
-								},
-								position: {
-									line: 1,
-									column: 26,
 								},
 							},
 						],
 						position: {
 							line: 1,
-							column: 20,
+							column: 1,
 						},
 					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
-		})
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 
-		it("should parse declaration statements without typeDeclaration", () => {
-			let input = `let identifier = ''`
-			let output = [
-				{
-					nodeType: "DeclarationStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 5,
-						},
-					},
-					type: null,
-					value: {
-						nodeType: "Value",
-						type: "String",
-						value: "",
-						members: {},
-						position: {
-							line: 1,
-							column: 19,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse declaration statements with typeDeclaration", () => {
-			let input = `let identifier Type = ''`
-			let output = [
-				{
-					nodeType: "DeclarationStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "identifier",
-						position: {
-							line: 1,
-							column: 5,
-						},
-					},
-					type: {
-						nodeType: "TypeDeclaration",
+			it("should parse NativeFunctionInvocation with multiple arguments", () => {
+				let input = `__lookup(argument, argument2)`
+				let output = [
+					{
+						nodeType: "NativeFunctionInvocation",
 						name: {
 							nodeType: "Identifier",
-							content: "Type",
+							content: "__lookup",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 10,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 20,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse NativeFunctionInvocation with multiple arguments with trailing comma", () => {
+				let input = `__lookup(argument, argument2,)`
+				let output = [
+					{
+						nodeType: "NativeFunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "__lookup",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 10,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 20,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("MethodInvocations", () => {
+			it("should parse MethodInvocation with 0 external parameters", () => {
+				let input = `lookup::member()`
+				let output = [
+					{
+						nodeType: "MethodInvocation",
+						name: {
+							nodeType: "MethodLookup",
+							base: {
+								nodeType: "Identifier",
+								content: "lookup",
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "member",
+								position: {
+									line: 1,
+									column: 9,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse MethodInvocation", () => {
+				let input = `lookup::member(argument)`
+				let output = [
+					{
+						nodeType: "MethodInvocation",
+						name: {
+							nodeType: "MethodLookup",
+							base: {
+								nodeType: "Identifier",
+								content: "lookup",
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "member",
+								position: {
+									line: 1,
+									column: 9,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 16,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse chained MethodInvocations", () => {
+				let input = `lookup::member(argument)::member(argument)`
+				let output = [
+					{
+						nodeType: "MethodInvocation",
+						name: {
+							nodeType: "MethodLookup",
+							base: {
+								nodeType: "MethodInvocation",
+								name: {
+									nodeType: "MethodLookup",
+									base: {
+										nodeType: "Identifier",
+										content: "lookup",
+										position: {
+											line: 1,
+											column: 1,
+										},
+									},
+									member: {
+										nodeType: "Identifier",
+										content: "member",
+										position: {
+											line: 1,
+											column: 9,
+										},
+									},
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								arguments: [
+									{
+										nodeType: "Argument",
+										name: null,
+										value: {
+											nodeType: "Identifier",
+											content: "argument",
+											position: {
+												line: 1,
+												column: 16,
+											},
+										},
+									},
+								],
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "member",
+								position: {
+									line: 1,
+									column: 27,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 34,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("MethodLookups", () => {
+			it("should parse Identifier MethodLookups", () => {
+				let input = `identifier::member`
+				let output = [
+					{
+						nodeType: "MethodLookup",
+						base: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						member: {
+							nodeType: "Identifier",
+							content: "member",
+							position: {
+								line: 1,
+								column: 13,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Lookup MethodLookups", () => {
+				let input = `identifier.lookup::member`
+				let output = [
+					{
+						nodeType: "MethodLookup",
+						base: {
+							nodeType: "Lookup",
+							base: {
+								nodeType: "Identifier",
+								content: "identifier",
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "lookup",
+								position: {
+									line: 1,
+									column: 12,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						member: {
+							nodeType: "Identifier",
+							content: "member",
+							position: {
+								line: 1,
+								column: 20,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should not parse chained MethodLookups", () => {
+				let input = `lookup::member1::member2`
+
+				expect(() => parse(input)).toThrow()
+			})
+		})
+
+		describe("FunctionInvocations", () => {
+			it("should parse Identifier FunctionInvocations with one argument", () => {
+				let input = `invocation(argument)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with one labelled argument", () => {
+				let input = `invocation(with argument)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: {
+									nodeType: "Identifier",
+									content: "with",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 17,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with one argument and a trailing comma", () => {
+				let input = `invocation(argument,)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with two arguments", () => {
+				let input = `invocation(argument, argument2)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 22,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with two arguments and a trailing comma", () => {
+				let input = `invocation(argument, argument2,)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 22,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with more than two arguments", () => {
+				let input = `invocation(argument, argument2, argument3)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 22,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument3",
+									position: {
+										line: 1,
+										column: 33,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Identifier FunctionInvocations with more than two arguments and a trailing comma", () => {
+				let input = `invocation(argument, argument2, argument3,)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 22,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument3",
+									position: {
+										line: 1,
+										column: 33,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse Lookup FunctionInvocations with more than two arguments and a trailing comma", () => {
+				let input = `namespace.invocation(argument, argument2, argument3,)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Lookup",
+							base: {
+								nodeType: "Identifier",
+								content: "namespace",
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "invocation",
+								position: {
+									line: 1,
+									column: 11,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 22,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument2",
+									position: {
+										line: 1,
+										column: 32,
+									},
+								},
+							},
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument3",
+									position: {
+										line: 1,
+										column: 43,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse multiple FunctionInvocations in a row", () => {
+				let input = `invocation(argument)
+							 invocation(argument)`
+				let output = [
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 1,
+										column: 12,
+									},
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+					{
+						nodeType: "FunctionInvocation",
+						name: {
+							nodeType: "Identifier",
+							content: "invocation",
+							position: {
+								line: 2,
+								column: 9,
+							},
+						},
+						arguments: [
+							{
+								nodeType: "Argument",
+								name: null,
+								value: {
+									nodeType: "Identifier",
+									content: "argument",
+									position: {
+										line: 2,
+										column: 20,
+									},
+								},
+							},
+						],
+						position: {
+							line: 2,
+							column: 9,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("Lookups", () => {
+			it("should parse simple Lookup", () => {
+				let input = `lookup.member`
+				let output = [
+					{
+						nodeType: "Lookup",
+						base: {
+							nodeType: "Identifier",
+							content: "lookup",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						member: {
+							nodeType: "Identifier",
+							content: "member",
+							position: {
+								line: 1,
+								column: 8,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse complex Lookup", () => {
+				let input = `lookup.member1.member2`
+				let output = [
+					{
+						nodeType: "Lookup",
+						base: {
+							nodeType: "Lookup",
+							base: {
+								nodeType: "Identifier",
+								content: "lookup",
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							member: {
+								nodeType: "Identifier",
+								content: "member1",
+								position: {
+									line: 1,
+									column: 8,
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						member: {
+							nodeType: "Identifier",
+							content: "member2",
 							position: {
 								line: 1,
 								column: 16,
@@ -1566,35 +1014,20 @@ describe("Parser", () => {
 						},
 						position: {
 							line: 1,
-							column: 16,
+							column: 1,
 						},
 					},
-					value: {
-						nodeType: "Value",
-						type: "String",
-						value: "",
-						members: {},
-						position: {
-							line: 1,
-							column: 24,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 		})
 
-		it("should parse assignment statements", () => {
-			let input = `identifier = ''`
-			let output = [
-				{
-					nodeType: "AssignmentStatement",
-					name: {
+		describe("Identifiers", () => {
+			it("should parse Identifiers", () => {
+				let input = `identifier`
+				let output = [
+					{
 						nodeType: "Identifier",
 						content: "identifier",
 						position: {
@@ -1602,369 +1035,909 @@ describe("Parser", () => {
 							column: 1,
 						},
 					},
-					value: {
-						nodeType: "Value",
-						type: "String",
-						value: "",
-						members: {},
-						position: {
-							line: 1,
-							column: 15,
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 		})
 
-		it("should parse empty typeDefinition statements", () => {
-			let input = `type Type {}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
+		describe("Self", () => {
+			it("should parse @", () => {
+				let input = `@`
+				let output = [
+					{
+						nodeType: "Self",
 						position: {
 							line: 1,
-							column: 6,
+							column: 1,
 						},
 					},
-					properties: {},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 		})
 
-		it("should parse typeDefinition statements with one property", () => {
-			let input = `type Type {
-				property Type
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
-						position: {
-							line: 1,
-							column: 6,
-						},
-					},
-					properties: {
-						property: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 2,
-									column: 14,
-								},
-							},
+		describe("Combination", () => {
+			it("should parse 2 identifier combinations", () => {
+				let input = `base <| override`
+				let output = [
+					{
+						nodeType: "Combination",
+						lhs: {
+							nodeType: "Identifier",
+							content: "base",
 							position: {
-								line: 2,
-								column: 14,
+								line: 1,
+								column: 1,
 							},
 						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse typeDefinition statements with multiple properties", () => {
-			let input = `type Type {
-				property Type
-				property2 Type
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
+						rhs: {
+							nodeType: "Identifier",
+							content: "override",
+							position: {
+								line: 1,
+								column: 9,
+							},
+						},
 						position: {
 							line: 1,
-							column: 6,
+							column: 1,
 						},
 					},
-					properties: {
-						property: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 2,
-									column: 14,
-								},
-							},
-							position: {
-								line: 2,
-								column: 14,
-							},
-						},
-						property2: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "Type",
-								position: {
-									line: 3,
-									column: 15,
-								},
-							},
-							position: {
-								line: 3,
-								column: 15,
-							},
-						},
-					},
-					members: {},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 		})
 
-		it("should parse typeDefinition statements with one empty method", () => {
-			let input = `type Type {
-				method() -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
-						position: {
-							line: 1,
-							column: 6,
-						},
-					},
-					properties: {},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
+		describe("Literals", () => {
+			describe("FunctionLiterals", () => {
+				it("should parse FunctionLiterals with no parameters", () => {
+					let input = `() -> Type {}`
+					let output = [
+						{
+							nodeType: "FunctionValue",
 							value: {
 								nodeType: "FunctionDefinition",
 								parameters: [],
 								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
+									nodeType: "IdentifierTypeDeclaration",
+									type: {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 2,
-											column: 17,
+											line: 1,
+											column: 7,
 										},
 									},
 									position: {
-										line: 2,
-										column: 17,
+										line: 1,
+										column: 7,
 									},
 								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 2,
-										column: 23,
-									},
-								},
-								position: {
-									line: 2,
-									column: 12,
-								},
+								body: [],
 							},
-							members: {},
 							position: {
-								line: 2,
+								line: 1,
 								column: 1,
 							},
 						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+					]
 
-			expect(parse(lex(input))).toEqual(output)
-		})
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
 
-		it("should parse typeDefinition statements with multiple empty methods", () => {
-			let input = `type Type {
-				method() -> Type {}
-				method2() -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
-						position: {
-							line: 1,
-							column: 6,
-						},
-					},
-					properties: {},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 2,
-											column: 17,
-										},
-									},
-									position: {
-										line: 2,
-										column: 17,
-									},
-								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 2,
-										column: 23,
-									},
-								},
-								position: {
-									line: 2,
-									column: 12,
-								},
-							},
-							members: {},
-							position: {
-								line: 2,
-								column: 1,
-							},
-						},
-						method2: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 3,
-											column: 18,
-										},
-									},
-									position: {
-										line: 3,
-										column: 18,
-									},
-								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 3,
-										column: 24,
-									},
-								},
-								position: {
-									line: 3,
-									column: 13,
-								},
-							},
-							members: {},
-							position: {
-								line: 3,
-								column: 1,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse typeDefinition statements with one nonempty method", () => {
-			let input = `type Type {
-				method(parameter ParameterType) -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
-						position: {
-							line: 1,
-							column: 6,
-						},
-					},
-					properties: {},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
+				it("should parse FunctionLiterals with one parameter with explicit external name", () => {
+					let input = `(external internal: Type) -> Type {
+						<- internal
+					}`
+					let output = [
+						{
+							nodeType: "FunctionValue",
 							value: {
 								nodeType: "FunctionDefinition",
 								parameters: [
 									{
 										nodeType: "Parameter",
-										name: "parameter",
+										internalName: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 1,
+												column: 11,
+											},
+										},
+										externalName: {
+											nodeType: "Identifier",
+											content: "external",
+											position: {
+												line: 1,
+												column: 2,
+											},
+										},
 										type: {
-											nodeType: "TypeDeclaration",
-											name: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
 												nodeType: "Identifier",
-												content: "ParameterType",
+												content: "Type",
 												position: {
-													line: 2,
-													column: 23,
+													line: 1,
+													column: 21,
 												},
 											},
 											position: {
+												line: 1,
+												column: 21,
+											},
+										},
+										position: {
+											line: 1,
+											column: 2,
+										},
+									},
+								],
+								returnType: {
+									nodeType: "IdentifierTypeDeclaration",
+									type: {
+										nodeType: "Identifier",
+										content: "Type",
+										position: {
+											line: 1,
+											column: 30,
+										},
+									},
+									position: {
+										line: 1,
+										column: 30,
+									},
+								},
+								body: [
+									{
+										nodeType: "ReturnStatement",
+										expression: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
 												line: 2,
-												column: 23,
+												column: 10,
+											},
+										},
+										position: {
+											line: 2,
+											column: 7,
+										},
+									},
+								],
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse FunctionLiterals with one parameter with implicit external name", () => {
+					let input = `(internal: Type) -> Type {
+						<- internal
+					}`
+					let output = [
+						{
+							nodeType: "FunctionValue",
+							value: {
+								nodeType: "FunctionDefinition",
+								parameters: [
+									{
+										nodeType: "Parameter",
+										internalName: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 1,
+												column: 2,
+											},
+										},
+										externalName: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 1,
+												column: 2,
+											},
+										},
+										type: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 1,
+													column: 12,
+												},
+											},
+											position: {
+												line: 1,
+												column: 12,
+											},
+										},
+										position: {
+											line: 1,
+											column: 2,
+										},
+									},
+								],
+								returnType: {
+									nodeType: "IdentifierTypeDeclaration",
+									type: {
+										nodeType: "Identifier",
+										content: "Type",
+										position: {
+											line: 1,
+											column: 21,
+										},
+									},
+									position: {
+										line: 1,
+										column: 21,
+									},
+								},
+								body: [
+									{
+										nodeType: "ReturnStatement",
+										expression: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 2,
+												column: 10,
+											},
+										},
+										position: {
+											line: 2,
+											column: 7,
+										},
+									},
+								],
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse FunctionLiterals with one parameter without external name", () => {
+					let input = `(_ internal: Type) -> Type {
+						<- internal
+					}`
+					let output = [
+						{
+							nodeType: "FunctionValue",
+							value: {
+								nodeType: "FunctionDefinition",
+								parameters: [
+									{
+										nodeType: "Parameter",
+										internalName: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 1,
+												column: 4,
+											},
+										},
+										externalName: null,
+										type: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 1,
+													column: 14,
+												},
+											},
+											position: {
+												line: 1,
+												column: 14,
+											},
+										},
+										position: {
+											line: 1,
+											column: 2,
+										},
+									},
+								],
+								returnType: {
+									nodeType: "IdentifierTypeDeclaration",
+									type: {
+										nodeType: "Identifier",
+										content: "Type",
+										position: {
+											line: 1,
+											column: 23,
+										},
+									},
+									position: {
+										line: 1,
+										column: 23,
+									},
+								},
+								body: [
+									{
+										nodeType: "ReturnStatement",
+										expression: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 2,
+												column: 10,
+											},
+										},
+										position: {
+											line: 2,
+											column: 7,
+										},
+									},
+								],
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse FunctionLiterals with two parameters", () => {
+					let input = `(external internal: Type, external2 internal2: Type) -> Type {
+						<- internal
+					}`
+					let output = [
+						{
+							nodeType: "FunctionValue",
+							value: {
+								nodeType: "FunctionDefinition",
+								parameters: [
+									{
+										nodeType: "Parameter",
+										internalName: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 1,
+												column: 11,
+											},
+										},
+										externalName: {
+											nodeType: "Identifier",
+											content: "external",
+											position: {
+												line: 1,
+												column: 2,
+											},
+										},
+										type: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 1,
+													column: 21,
+												},
+											},
+											position: {
+												line: 1,
+												column: 21,
+											},
+										},
+										position: {
+											line: 1,
+											column: 2,
+										},
+									},
+									{
+										nodeType: "Parameter",
+										internalName: {
+											nodeType: "Identifier",
+											content: "internal2",
+											position: {
+												line: 1,
+												column: 37,
+											},
+										},
+										externalName: {
+											nodeType: "Identifier",
+											content: "external2",
+											position: {
+												line: 1,
+												column: 27,
+											},
+										},
+										type: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 1,
+													column: 48,
+												},
+											},
+											position: {
+												line: 1,
+												column: 48,
+											},
+										},
+										position: {
+											line: 1,
+											column: 27,
+										},
+									},
+								],
+								returnType: {
+									nodeType: "IdentifierTypeDeclaration",
+									type: {
+										nodeType: "Identifier",
+										content: "Type",
+										position: {
+											line: 1,
+											column: 57,
+										},
+									},
+									position: {
+										line: 1,
+										column: 57,
+									},
+								},
+								body: [
+									{
+										nodeType: "ReturnStatement",
+										expression: {
+											nodeType: "Identifier",
+											content: "internal",
+											position: {
+												line: 2,
+												column: 10,
+											},
+										},
+										position: {
+											line: 2,
+											column: 7,
+										},
+									},
+								],
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("AnonymousRecordLiteral", () => {
+				it("should parse AnonymousRecordLiterals with a KeyValuePair", () => {
+					let input = `{ key = value }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 9,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse AnonymousRecordLiterals with a KeyValuePair with a trailing comma", () => {
+					let input = `{ key = value, }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 9,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs", () => {
+					let input = `{ key = value, key2 = value2 }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 9,
+									},
+								},
+								key2: {
+									nodeType: "Identifier",
+									content: "value2",
+									position: {
+										line: 1,
+										column: 23,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
+					let input = `{ key = value, key2 = value2, }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 9,
+									},
+								},
+								key2: {
+									nodeType: "Identifier",
+									content: "value2",
+									position: {
+										line: 1,
+										column: 23,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse AnonymousRecordLiterals with nested KeyValuePairs", () => {
+					let input = `{ key = { key = value } }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "RecordValue",
+									type: null,
+									members: {
+										key: {
+											nodeType: "Identifier",
+											content: "value",
+											position: {
+												line: 1,
+												column: 17,
+											},
+										},
+									},
+									position: {
+										line: 1,
+										column: 9,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse AnonymousRecordLiterals with nested KeyValuePairs and some Linebreaks", () => {
+					let input = `{
+						key = {
+							key = value
+						}
+					}`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: null,
+							members: {
+								key: {
+									nodeType: "RecordValue",
+									type: null,
+									members: {
+										key: {
+											nodeType: "Identifier",
+											content: "value",
+											position: {
+												line: 3,
+												column: 14,
+											},
+										},
+									},
+									position: {
+										line: 2,
+										column: 13,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("TypedRecordLiterals", () => {
+				it("should parse TypedRecordLiterals with a KeyValuePair", () => {
+					let input = `Type ~> { key = value }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 17,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse TypedRecordLiterals with a KeyValuePair with a trailing comma", () => {
+					let input = `Type ~> { key = value, }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 17,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse TypedRecordLiterals with multiple KeyValuePairs", () => {
+					let input = `Type ~> { key = value, key2 = value2 }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 17,
+									},
+								},
+								key2: {
+									nodeType: "Identifier",
+									content: "value2",
+									position: {
+										line: 1,
+										column: 31,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse TypedRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
+					let input = `Type ~> { key = value, key2 = value2, }`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							members: {
+								key: {
+									nodeType: "Identifier",
+									content: "value",
+									position: {
+										line: 1,
+										column: 17,
+									},
+								},
+								key2: {
+									nodeType: "Identifier",
+									content: "value2",
+									position: {
+										line: 1,
+										column: 31,
+									},
+								},
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse TypedRecordLiterals with nested KeyValuePairs and some Linebreaks", () => {
+					let input = `Type ~> {
+						key = Type ~> {
+							key = value
+						}
+					}`
+					let output = [
+						{
+							nodeType: "RecordValue",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 1,
+									},
+								},
+								position: {
+									line: 1,
+									column: 1,
+								},
+							},
+							members: {
+								key: {
+									nodeType: "RecordValue",
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 2,
+												column: 13,
 											},
 										},
 										position: {
@@ -1972,450 +1945,1803 @@ describe("Parser", () => {
 											column: 13,
 										},
 									},
-								],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 2,
-											column: 41,
+									members: {
+										key: {
+											nodeType: "Identifier",
+											content: "value",
+											position: {
+												line: 3,
+												column: 14,
+											},
 										},
 									},
 									position: {
 										line: 2,
-										column: 41,
+										column: 13,
 									},
 								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
+							},
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("BooleanLiterals", () => {
+				it("should parse `true` BooleanLiterals", () => {
+					let input = `true`
+					let output = [
+						{
+							nodeType: "BooleanValue",
+							value: true,
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse `false` BooleanLiterals", () => {
+					let input = `false`
+					let output = [
+						{
+							nodeType: "BooleanValue",
+							value: false,
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("StringLiterals", () => {
+				it("should parse empty StringLiterals", () => {
+					let input = `""`
+					let output = [
+						{
+							nodeType: "StringValue",
+							value: "",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse filled StringLiterals", () => {
+					let input = `"string"`
+					let output = [
+						{
+							nodeType: "StringValue",
+							value: "string",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("NumberLiterals", () => {
+				it("should parse simple NumberLiterals", () => {
+					let input = `123`
+					let output = [
+						{
+							nodeType: "NumberValue",
+							value: "123",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse simple NumberLiterals with underscores", () => {
+					let input = `1_000`
+					let output = [
+						{
+							nodeType: "NumberValue",
+							value: "1000",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse float NumberLiterals", () => {
+					let input = `1.5`
+					let output = [
+						{
+							nodeType: "NumberValue",
+							value: "1.5",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse float NumberLiterals with underscores", () => {
+					let input = `1_000.5`
+					let output = [
+						{
+							nodeType: "NumberValue",
+							value: "1000.5",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+
+			describe("ArrayLiterals", () => {
+				it("should parse an empty Array", () => {
+					let input = `[]`
+					let output = [
+						{
+							nodeType: "ArrayValue",
+							values: [],
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse an Array with a single item", () => {
+					let input = `[0]`
+					let output = [
+						{
+							nodeType: "ArrayValue",
+							values: [
+								{
+									nodeType: "NumberValue",
+									value: "0",
+									position: {
+										line: 1,
+										column: 2,
+									},
+								},
+							],
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+
+				it("should parse an Array with multiple items", () => {
+					let input = `[0, 1, 2,]`
+					let output = [
+						{
+							nodeType: "ArrayValue",
+							values: [
+								{
+									nodeType: "NumberValue",
+									value: "0",
+									position: {
+										line: 1,
+										column: 2,
+									},
+								},
+								{
+									nodeType: "NumberValue",
+									value: "1",
+									position: {
+										line: 1,
+										column: 5,
+									},
+								},
+								{
+									nodeType: "NumberValue",
+									value: "2",
+									position: {
+										line: 1,
+										column: 8,
+									},
+								},
+							],
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+					]
+
+					expect<ParserNode>(parse(input)).toEqual(output)
+				})
+			})
+		})
+	})
+
+	describe("Statements", () => {
+		describe("ReturnStatements", () => {
+			it("should parse ReturnStatements", () => {
+				let input = `<- identifier
+				`
+				let output = [
+					{
+						nodeType: "ReturnStatement",
+						expression: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("IfStatements", () => {
+			it("should parse IfStatements", () => {
+				let input = `if identifier {}
+				`
+				let output = [
+					{
+						nodeType: "IfStatement",
+						condition: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						body: [],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse IfElseStatements", () => {
+				let input = `if identifier {} else {}
+				`
+				let output = [
+					{
+						nodeType: "IfElseStatement",
+						condition: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						trueBody: [],
+						falseBody: [],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse IfElse-If-Statements", () => {
+				let input = `if identifier {} else if identifier2 {}
+				`
+				let output = [
+					{
+						nodeType: "IfElseStatement",
+						condition: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						trueBody: [],
+						falseBody: [
+							{
+								nodeType: "IfStatement",
+								condition: {
+									nodeType: "Identifier",
+									content: "identifier2",
+									position: {
+										line: 1,
+										column: 26,
+									},
+								},
+								body: [],
+								position: {
+									line: 1,
+									column: 23,
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse IfElse-IfElse-Statements", () => {
+				let input = `if identifier {} else if identifier2 {} else {}
+				`
+				let output = [
+					{
+						nodeType: "IfElseStatement",
+						condition: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						trueBody: [],
+						falseBody: [
+							{
+								nodeType: "IfElseStatement",
+								condition: {
+									nodeType: "Identifier",
+									content: "identifier2",
+									position: {
+										line: 1,
+										column: 26,
+									},
+								},
+								trueBody: [],
+								falseBody: [],
+								position: {
+									line: 1,
+									column: 23,
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse IfElse-IfElse-If-Statements", () => {
+				let input = `if identifier {} else if identifier2 {} else if identifier3 {}
+				`
+				let output = [
+					{
+						nodeType: "IfElseStatement",
+						condition: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 4,
+							},
+						},
+						trueBody: [],
+						falseBody: [
+							{
+								nodeType: "IfElseStatement",
+								condition: {
+									nodeType: "Identifier",
+									content: "identifier2",
+									position: {
+										line: 1,
+										column: 26,
+									},
+								},
+								trueBody: [],
+								falseBody: [
+									{
+										nodeType: "IfStatement",
+										condition: {
+											nodeType: "Identifier",
+											content: "identifier3",
+											position: {
+												line: 1,
+												column: 49,
+											},
+										},
+										body: [],
+										position: {
+											line: 1,
+											column: 46,
+										},
+									},
+								],
+								position: {
+									line: 1,
+									column: 23,
+								},
+							},
+						],
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("ConstantDeclarationStatements", () => {
+			it("should parse ConstantDeclarationStatement", () => {
+				let input = `constant identifier = ""`
+				let output = [
+					{
+						nodeType: "ConstantDeclarationStatement",
+						type: null,
+						name: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						value: {
+							nodeType: "StringValue",
+							value: "",
+							position: {
+								line: 1,
+								column: 23,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("VariableDeclarationStatements", () => {
+			it("should parse VariableDeclarationStatement without type", () => {
+				let input = `variable identifier = ""`
+				let output = [
+					{
+						nodeType: "VariableDeclarationStatement",
+						type: null,
+						name: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						value: {
+							nodeType: "StringValue",
+							value: "",
+							position: {
+								line: 1,
+								column: 23,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse VariableDeclarationStatement with Array Type", () => {
+				let input = `variable [String] strings = []`
+				let output = [
+					{
+						nodeType: "VariableDeclarationStatement",
+						type: {
+							nodeType: "ArrayTypeDeclaration",
+							type: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "String",
+									position: {
+										line: 1,
+										column: 11,
+									},
+								},
+								position: {
+									line: 1,
+									column: 11,
+								},
+							},
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						name: {
+							nodeType: "Identifier",
+							content: "strings",
+							position: {
+								line: 1,
+								column: 19,
+							},
+						},
+						value: {
+							nodeType: "ArrayValue",
+							values: [],
+							position: {
+								line: 1,
+								column: 29,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("VariableAssignmentStatements", () => {
+			it("should parse VariableAssignmentStatement", () => {
+				let input = `identifier = ""`
+				let output = [
+					{
+						nodeType: "VariableAssignmentStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "identifier",
+							position: {
+								line: 1,
+								column: 1,
+							},
+						},
+						value: {
+							nodeType: "StringValue",
+							value: "",
+							position: {
+								line: 1,
+								column: 14,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("TypeDefinitionStatements", () => {
+			it("should parse an empty TypeDefinitionStatement", () => {
+				let input = `type Type {}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {},
+						methods: {},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with one Property", () => {
+				let input = `type Type {
+					property: Type
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {
+							property: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
 									position: {
 										line: 2,
-										column: 47,
+										column: 16,
 									},
 								},
 								position: {
 									line: 2,
-									column: 12,
+									column: 16,
 								},
 							},
-							members: {},
-							position: {
-								line: 2,
-								column: 1,
-							},
 						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse typeDefinition statements with multiple nonempty methods", () => {
-			let input = `type Type {
-				method(parameter ParameterType) -> Type {}
-				method2(parameter ParameterType) -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
+						methods: {},
 						position: {
 							line: 1,
-							column: 6,
+							column: 1,
 						},
 					},
-					properties: {},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [
-									{
-										nodeType: "Parameter",
-										name: "parameter",
-										type: {
-											nodeType: "TypeDeclaration",
-											name: {
-												nodeType: "Identifier",
-												content: "ParameterType",
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with multiple Properties", () => {
+				let input = `type Type {
+					property: Type
+					property2: Type2
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {
+							property: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 2,
+										column: 16,
+									},
+								},
+								position: {
+									line: 2,
+									column: 16,
+								},
+							},
+							property2: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type2",
+									position: {
+										line: 3,
+										column: 17,
+									},
+								},
+								position: {
+									line: 3,
+									column: 17,
+								},
+							},
+						},
+						methods: {},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with one Method", () => {
+				let input = `type Type {
+					method(parameter: Type) -> Type {
+						<- parameter
+					}
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {},
+						methods: {
+							method: {
+								method: {
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "FunctionDefinition",
+										parameters: [
+											{
+												nodeType: "Parameter",
+												externalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 13,
+													},
+												},
+												internalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 13,
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Type",
+														position: {
+															line: 2,
+															column: 24,
+														},
+													},
+													position: {
+														line: 2,
+														column: 24,
+													},
+												},
 												position: {
 													line: 2,
-													column: 23,
+													column: 13,
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 2,
+													column: 33,
 												},
 											},
 											position: {
 												line: 2,
-												column: 23,
+												column: 33,
 											},
 										},
-										position: {
-											line: 2,
-											column: 13,
-										},
-									},
-								],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 2,
-											column: 41,
-										},
-									},
-									position: {
-										line: 2,
-										column: 41,
-									},
-								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 2,
-										column: 47,
-									},
-								},
-								position: {
-									line: 2,
-									column: 12,
-								},
-							},
-							members: {},
-							position: {
-								line: 2,
-								column: 1,
-							},
-						},
-						method2: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [
-									{
-										nodeType: "Parameter",
-										name: "parameter",
-										type: {
-											nodeType: "TypeDeclaration",
-											name: {
-												nodeType: "Identifier",
-												content: "ParameterType",
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 3,
+														column: 10,
+													},
+												},
 												position: {
 													line: 3,
-													column: 24,
+													column: 7,
+												},
+											},
+										],
+									},
+									position: {
+										line: 2,
+										column: 12,
+									},
+								},
+								isStatic: false,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with one static Method", () => {
+				let input = `type Type {
+					static method(parameter: Type) -> Type {
+						<- parameter
+					}
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {},
+						methods: {
+							method: {
+								method: {
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "FunctionDefinition",
+										parameters: [
+											{
+												nodeType: "Parameter",
+												externalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 20,
+													},
+												},
+												internalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 20,
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Type",
+														position: {
+															line: 2,
+															column: 31,
+														},
+													},
+													position: {
+														line: 2,
+														column: 31,
+													},
+												},
+												position: {
+													line: 2,
+													column: 20,
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 2,
+													column: 40,
+												},
+											},
+											position: {
+												line: 2,
+												column: 40,
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 3,
+														column: 10,
+													},
+												},
+												position: {
+													line: 3,
+													column: 7,
+												},
+											},
+										],
+									},
+									position: {
+										line: 2,
+										column: 19,
+									},
+								},
+								isStatic: true,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with multiple Methods", () => {
+				let input = `type Type {
+					method(parameter: Type) -> Type {
+						<- parameter
+					}
+					method2(parameter: Type) -> Type {
+						<- parameter
+					}
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {},
+						methods: {
+							method: {
+								method: {
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "FunctionDefinition",
+										parameters: [
+											{
+												nodeType: "Parameter",
+												externalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 13,
+													},
+												},
+												internalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 2,
+														column: 13,
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Type",
+														position: {
+															line: 2,
+															column: 24,
+														},
+													},
+													position: {
+														line: 2,
+														column: 24,
+													},
+												},
+												position: {
+													line: 2,
+													column: 13,
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 2,
+													column: 33,
+												},
+											},
+											position: {
+												line: 2,
+												column: 33,
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 3,
+														column: 10,
+													},
+												},
+												position: {
+													line: 3,
+													column: 7,
+												},
+											},
+										],
+									},
+									position: {
+										line: 2,
+										column: 12,
+									},
+								},
+								isStatic: false,
+							},
+							method2: {
+								method: {
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "FunctionDefinition",
+										parameters: [
+											{
+												nodeType: "Parameter",
+												externalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 5,
+														column: 14,
+													},
+												},
+												internalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 5,
+														column: 14,
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Type",
+														position: {
+															line: 5,
+															column: 25,
+														},
+													},
+													position: {
+														line: 5,
+														column: 25,
+													},
+												},
+												position: {
+													line: 5,
+													column: 14,
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 5,
+													column: 34,
+												},
+											},
+											position: {
+												line: 5,
+												column: 34,
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 6,
+														column: 10,
+													},
+												},
+												position: {
+													line: 6,
+													column: 7,
+												},
+											},
+										],
+									},
+									position: {
+										line: 5,
+										column: 13,
+									},
+								},
+								isStatic: false,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with Methods and Properties", () => {
+				let input = `type Type {
+					property: PropertyType
+					method(parameter: Type) -> Type {
+						<- parameter
+					}
+				}`
+				let output = [
+					{
+						nodeType: "TypeDefinitionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "Type",
+							position: {
+								line: 1,
+								column: 6,
+							},
+						},
+						properties: {
+							property: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "PropertyType",
+									position: {
+										line: 2,
+										column: 16,
+									},
+								},
+								position: {
+									line: 2,
+									column: 16,
+								},
+							},
+						},
+						methods: {
+							method: {
+								method: {
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "FunctionDefinition",
+										parameters: [
+											{
+												nodeType: "Parameter",
+												externalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 3,
+														column: 13,
+													},
+												},
+												internalName: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 3,
+														column: 13,
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Type",
+														position: {
+															line: 3,
+															column: 24,
+														},
+													},
+													position: {
+														line: 3,
+														column: 24,
+													},
+												},
+												position: {
+													line: 3,
+													column: 13,
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Type",
+												position: {
+													line: 3,
+													column: 33,
 												},
 											},
 											position: {
 												line: 3,
-												column: 24,
+												column: 33,
 											},
 										},
-										position: {
-											line: 3,
-											column: 14,
-										},
-									},
-								],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 3,
-											column: 42,
-										},
-									},
-									position: {
-										line: 3,
-										column: 42,
-									},
-								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
-									position: {
-										line: 3,
-										column: 48,
-									},
-								},
-								position: {
-									line: 3,
-									column: 13,
-								},
-							},
-							members: {},
-							position: {
-								line: 3,
-								column: 1,
-							},
-						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse typeDefinition statements with empty & nonempty methods", () => {
-			let input = `type Type {
-				method(parameter ParameterType) -> Type {}
-				method2() -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
-						position: {
-							line: 1,
-							column: 6,
-						},
-					},
-					properties: {},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [
-									{
-										nodeType: "Parameter",
-										name: "parameter",
-										type: {
-											nodeType: "TypeDeclaration",
-											name: {
-												nodeType: "Identifier",
-												content: "ParameterType",
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "parameter",
+													position: {
+														line: 4,
+														column: 10,
+													},
+												},
 												position: {
-													line: 2,
-													column: 23,
+													line: 4,
+													column: 7,
 												},
 											},
-											position: {
-												line: 2,
-												column: 23,
-											},
-										},
-										position: {
-											line: 2,
-											column: 13,
-										},
-									},
-								],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
-										nodeType: "Identifier",
-										content: "Type",
-										position: {
-											line: 2,
-											column: 41,
-										},
+										],
 									},
 									position: {
-										line: 2,
-										column: 41,
+										line: 3,
+										column: 12,
 									},
 								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
+								isStatic: false,
+							},
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+		})
+
+		describe("FunctionStatements", () => {
+			it("should parse FunctionStatements with no parameters", () => {
+				let input = `function name () -> Type {}`
+				let output = [
+					{
+						nodeType: "FunctionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "name",
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: [],
+							returnType: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
 									position: {
-										line: 2,
-										column: 47,
+										line: 1,
+										column: 21,
 									},
 								},
 								position: {
-									line: 2,
-									column: 12,
+									line: 1,
+									column: 21,
 								},
 							},
-							members: {},
+							body: [],
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse FunctionLiterals with one parameter with explicit external name", () => {
+				let input = `function name (external internal: Type) -> Type {
+					<- internal
+				}`
+				let output = [
+					{
+						nodeType: "FunctionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "name",
 							position: {
-								line: 2,
-								column: 1,
+								line: 1,
+								column: 10,
 							},
 						},
-
-						method2: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: [
+								{
+									nodeType: "Parameter",
+									externalName: {
 										nodeType: "Identifier",
-										content: "Type",
+										content: "external",
 										position: {
-											line: 3,
+											line: 1,
+											column: 16,
+										},
+									},
+									internalName: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 1,
+											column: 25,
+										},
+									},
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 1,
+												column: 35,
+											},
+										},
+										position: {
+											line: 1,
+											column: 35,
+										},
+									},
+									position: {
+										line: 1,
+										column: 16,
+									},
+								},
+							],
+							returnType: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 44,
+									},
+								},
+								position: {
+									line: 1,
+									column: 44,
+								},
+							},
+							body: [
+								{
+									nodeType: "ReturnStatement",
+									expression: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 2,
+											column: 9,
+										},
+									},
+									position: {
+										line: 2,
+										column: 6,
+									},
+								},
+							],
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse FunctionLiterals with one parameter with implicit external name", () => {
+				let input = `function name (internal: Type) -> Type {
+					<- internal
+				}`
+				let output = [
+					{
+						nodeType: "FunctionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "name",
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: [
+								{
+									nodeType: "Parameter",
+									externalName: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 1,
+											column: 16,
+										},
+									},
+									internalName: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 1,
+											column: 16,
+										},
+									},
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 1,
+												column: 26,
+											},
+										},
+										position: {
+											line: 1,
+											column: 26,
+										},
+									},
+									position: {
+										line: 1,
+										column: 16,
+									},
+								},
+							],
+							returnType: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										line: 1,
+										column: 35,
+									},
+								},
+								position: {
+									line: 1,
+									column: 35,
+								},
+							},
+							body: [
+								{
+									nodeType: "ReturnStatement",
+									expression: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 2,
+											column: 9,
+										},
+									},
+									position: {
+										line: 2,
+										column: 6,
+									},
+								},
+							],
+						},
+						position: {
+							line: 1,
+							column: 1,
+						},
+					},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse FunctionLiterals with one parameter without external name", () => {
+				let input = `function name (_ internal: Type) -> Type {
+					<- internal
+				}`
+				let output = [
+					{
+						nodeType: "FunctionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "name",
+							position: {
+								line: 1,
+								column: 10,
+							},
+						},
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: [
+								{
+									nodeType: "Parameter",
+									externalName: null,
+									internalName: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 1,
 											column: 18,
 										},
 									},
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 1,
+												column: 28,
+											},
+										},
+										position: {
+											line: 1,
+											column: 28,
+										},
+									},
 									position: {
-										line: 3,
-										column: 18,
+										line: 1,
+										column: 16,
 									},
 								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
+							],
+							returnType: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
 									position: {
-										line: 3,
-										column: 24,
+										line: 1,
+										column: 37,
 									},
 								},
 								position: {
-									line: 3,
-									column: 13,
+									line: 1,
+									column: 37,
 								},
 							},
-							members: {},
-							position: {
-								line: 3,
-								column: 1,
-							},
+							body: [
+								{
+									nodeType: "ReturnStatement",
+									expression: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 2,
+											column: 9,
+										},
+									},
+									position: {
+										line: 2,
+										column: 6,
+									},
+								},
+							],
 						},
-					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
-
-			expect(parse(lex(input))).toEqual(output)
-		})
-
-		it("should parse typeDefinition statements with methods and properties", () => {
-			let input = `type Type {
-				property PropertyType
-				method(parameter ParameterType) -> Type {}
-			}`
-			let output = [
-				{
-					nodeType: "TypeDefinitionStatement",
-					name: {
-						nodeType: "Identifier",
-						content: "Type",
 						position: {
 							line: 1,
-							column: 6,
+							column: 1,
 						},
 					},
-					properties: {
-						property: {
-							nodeType: "TypeDeclaration",
-							name: {
-								nodeType: "Identifier",
-								content: "PropertyType",
-								position: {
-									line: 2,
-									column: 14,
-								},
-							},
+				]
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse FunctionLiterals with two parameters", () => {
+				let input = `function name (external internal: Type, external2 internal2: Type) -> Type {
+					<- internal
+				}`
+				let output = [
+					{
+						nodeType: "FunctionStatement",
+						name: {
+							nodeType: "Identifier",
+							content: "name",
 							position: {
-								line: 2,
-								column: 14,
+								line: 1,
+								column: 10,
 							},
 						},
-					},
-					members: {
-						method: {
-							nodeType: "Value",
-							type: "Method",
-							value: {
-								nodeType: "FunctionDefinition",
-								parameters: [
-									{
-										nodeType: "Parameter",
-										name: "parameter",
-										type: {
-											nodeType: "TypeDeclaration",
-											name: {
-												nodeType: "Identifier",
-												content: "ParameterType",
-												position: {
-													line: 3,
-													column: 23,
-												},
-											},
-											position: {
-												line: 3,
-												column: 23,
-											},
-										},
+						value: {
+							nodeType: "FunctionDefinition",
+							parameters: [
+								{
+									nodeType: "Parameter",
+									externalName: {
+										nodeType: "Identifier",
+										content: "external",
 										position: {
-											line: 3,
-											column: 13,
+											line: 1,
+											column: 16,
 										},
 									},
-								],
-								returnType: {
-									nodeType: "TypeDeclaration",
-									name: {
+									internalName: {
 										nodeType: "Identifier",
-										content: "Type",
+										content: "internal",
 										position: {
-											line: 3,
+											line: 1,
+											column: 25,
+										},
+									},
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 1,
+												column: 35,
+											},
+										},
+										position: {
+											line: 1,
+											column: 35,
+										},
+									},
+									position: {
+										line: 1,
+										column: 16,
+									},
+								},
+								{
+									nodeType: "Parameter",
+									internalName: {
+										nodeType: "Identifier",
+										content: "internal2",
+										position: {
+											line: 1,
+											column: 51,
+										},
+									},
+									externalName: {
+										nodeType: "Identifier",
+										content: "external2",
+										position: {
+											line: 1,
 											column: 41,
 										},
 									},
+									type: {
+										nodeType: "IdentifierTypeDeclaration",
+										type: {
+											nodeType: "Identifier",
+											content: "Type",
+											position: {
+												line: 1,
+												column: 62,
+											},
+										},
+										position: {
+											line: 1,
+											column: 62,
+										},
+									},
 									position: {
-										line: 3,
+										line: 1,
 										column: 41,
 									},
 								},
-								body: {
-									nodeType: "Block",
-									nodes: [],
+							],
+							returnType: {
+								nodeType: "IdentifierTypeDeclaration",
+								type: {
+									nodeType: "Identifier",
+									content: "Type",
 									position: {
-										line: 3,
-										column: 47,
+										line: 1,
+										column: 71,
 									},
 								},
 								position: {
-									line: 3,
-									column: 12,
+									line: 1,
+									column: 71,
 								},
 							},
-							members: {},
-							position: {
-								line: 3,
-								column: 1,
-							},
+							body: [
+								{
+									nodeType: "ReturnStatement",
+									expression: {
+										nodeType: "Identifier",
+										content: "internal",
+										position: {
+											line: 2,
+											column: 9,
+										},
+									},
+									position: {
+										line: 2,
+										column: 6,
+									},
+								},
+							],
+						},
+						position: {
+							line: 1,
+							column: 1,
 						},
 					},
-					position: {
-						line: 1,
-						column: 1,
-					},
-				},
-			]
+				]
 
-			expect(parse(lex(input))).toEqual(output)
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
 		})
 	})
 })

@@ -6,73 +6,25 @@ let path = require("path")
 
 let argv = require("minimist")(process.argv.slice(2), {
 	default: {
-		bare: false,
 		pretty: false,
 	},
 })
 
-let Lexer = require("../lib/lexer")
 let Parser = require("../lib/parser")
 
-let sourceFileTokens = []
-let lexedFiles = []
-let fileCount = 0
-
 let sourceFileName = argv._[0]
-let primitivesPath = "primitives"
+let sourceFileNameParsed = path.parse(sourceFileName)
+let targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
 
-fs.readdir(primitivesPath, (err, files) => {
-	if (err) {
-		throw err
-	}
-
-	files.filter(value => {
-		return path.extname(value) === ".es"
-	})
-
-	if (argv.bare === false) {
-		fileCount = files.length
-
-		files.forEach(value => {
-			fs.readFile(`${primitivesPath}/${value}`, "utf8", (err, data) => {
-				lexedFiles.push(Lexer.lex(data))
-
-				if (sourceFileTokens.length && lexedFiles.length === fileCount) {
-					finishCompilation(lexedFiles, sourceFileTokens)
-				}
-			})
-		})
-	}
-
-	fs.readFile(sourceFileName, "utf8", (err, data) => {
-		sourceFileTokens = Lexer.lex(data)
-
-		if (sourceFileTokens.length && lexedFiles.length === fileCount) {
-			finishCompilation(lexedFiles, sourceFileTokens)
-		}
-	})
-})
-
-function finishCompilation(lexedFiles, sourceFileTokens) {
-	let tokens = []
-
-	for (let fileTokens of lexedFiles) {
-		tokens.push(...fileTokens)
-	}
-
-	tokens.push(...sourceFileTokens)
-
-	let sourceFileNameParsed = path.parse(sourceFileName)
-	let targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".ir"
-
-	let nodes = Parser.parse(tokens)
-	let ir
+fs.readFile(sourceFileName, "utf8", (err, data) => {
+	let module = Parser.parse(data)
+	let js
 
 	if (argv.pretty) {
-		ir = JSON.stringify(nodes, null, "\t")
+		js = JSON.stringify(module, null, "\t")
 	} else {
-		ir = JSON.stringify(nodes)
+		js = JSON.stringify(module)
 	}
 
-	fs.writeFileSync(targetFileName, ir)
-}
+	fs.writeFileSync(targetFileName, js)
+})
