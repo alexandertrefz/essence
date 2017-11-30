@@ -1,4 +1,5 @@
 ![Codeship](https://img.shields.io/codeship/a25dea30-b777-0135-b641-2e2e62b24312/master.svg?style=for-the-badge)
+![Codecov](https://img.shields.io/codecov/c/github/alexandertrefz/essence/master.svg?style=for-the-badge)
 
 # Goals
 The main goal for this language is to allow the authoring of bug-free maintainable code, in a fast and pleasant manner.
