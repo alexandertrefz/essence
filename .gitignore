@@ -14,3 +14,4 @@ testFiles/*.js
 /src/parser/grammar.ts
 /.nyc_output
 /coverage
+/.rpt2_cache
