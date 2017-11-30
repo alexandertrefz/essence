@@ -6,8 +6,10 @@
 	"scripts": {
 		"clean": "make clean",
 		"build": "make all",
+		"ci-build": "make compile-grammar && tsc -p .",
 		"watch": "make watch",
-		"test": "make test"
+		"test": "nyc jasmine",
+		"coverage": "nyc report --reporter=text-lcov > coverage.lcov"
 	},
 	"keywords": [
 		"language",
@@ -27,6 +29,7 @@
 		"@types/nearley": "2.11.0",
 		"@types/node": "8.0.53",
 		"jasmine": "2.8.0",
+		"nyc": "11.3.0",
 		"prettier": "1.8.2"
 	},
 	"dependencies": {
@@ -39,5 +42,17 @@
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",
 		"type": "git"
+	},
+	"nyc": {
+		"per-file": true,
+		"exclude": [
+			"**/grammar.js",
+			"**/tests/**",
+			"testFiles",
+			"wallaby.js",
+			"coverage"
+		],
+		"cache": true,
+		"all": true
 	}
 }
