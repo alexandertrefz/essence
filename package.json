@@ -9,7 +9,8 @@
 		"ci-build": "make compile-grammar && tsc -p .",
 		"watch": "make watch",
 		"test": "nyc jasmine",
-		"coverage": "nyc report --reporter=text-lcov > coverage.lcov"
+		"coverage": "nyc report --reporter=text-lcov > coverage.lcov",
+		"precommit": "make all && jasmine"
 	},
 	"keywords": [
 		"language",
@@ -28,6 +29,7 @@
 		"@types/jasmine": "2.8.2",
 		"@types/nearley": "2.11.0",
 		"@types/node": "8.0.53",
+		"husky": "0.14.3",
 		"jasmine": "2.8.0",
 		"nyc": "11.3.0",
 		"prettier": "1.8.2"
