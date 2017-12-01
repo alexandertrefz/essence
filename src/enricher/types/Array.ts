@@ -18,13 +18,25 @@ function generateType(genericType: common.Type): common.TypeType {
 				returnType: genericType,
 				isStatic: false,
 			},
+			last: {
+				type: "Method",
+				parameterTypes: [{ type: "Self" }],
+				returnType: genericType,
+				isStatic: false,
+			},
+			unique: {
+				type: "Method",
+				parameterTypes: [{ type: "Self" }],
+				returnType: { type: "Self" },
+				isStatic: false,
+			},
 			dropFirst: {
 				type: "Method",
 				parameterTypes: [{ type: "Self" }],
 				returnType: { type: "Self" },
 				isStatic: false,
 			},
-			unique: {
+			dropLast: {
 				type: "Method",
 				parameterTypes: [{ type: "Self" }],
 				returnType: { type: "Self" },
