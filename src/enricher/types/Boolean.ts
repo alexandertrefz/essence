@@ -7,7 +7,7 @@ const type: common.TypeType = {
 	methods: {
 		is: {
 			type: "Method",
-			parameterTypes: [{ type: "Self" }],
+			parameterTypes: [{ type: "Self" }, { type: "Self" }],
 			returnType: { type: "Self" },
 			isStatic: false,
 		},

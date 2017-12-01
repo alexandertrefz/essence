@@ -88,17 +88,25 @@ export function resolveMethodInvocationType(node: parser.MethodInvocationNode, s
 }
 
 export function resolveFunctionInvocationType(node: parser.FunctionInvocationNode, scope: enricher.Scope): common.Type {
-	let type = resolveType(node.name, scope)
+	const type = resolveType(node.name, scope)
 
-	if (type.type === "Function" || (type.type === "Method" && type.isStatic)) {
-		if (type.returnType.type !== "Generic" && type.returnType.type !== "Self") {
-			return type.returnType
-		} else {
+	if (type.type === "Function") {
+		return type.returnType
+	} else if (type.type === "Method") {
+		if (type.returnType.type === "Generic") {
+			console.log(`Expression at ${node.name.position.line}:${node.name.position.column}`)
 			throw new Error(
-				`Expression at ${node.name.position.line}:${
-					node.name.position.column
-				} is a Static Method with a Generic or Self Return Type. - File a bug.`,
+				"Resolving of Generic Return Types on non-static Methods called in a static way is not implemented yet.",
 			)
+		} else if (type.returnType.type === "Self") {
+			if (type.isStatic) {
+				console.log(`Expression at ${node.name.position.line}:${node.name.position.column}`)
+				throw new Error(`Resolving of Self Return Types on Static Methods is not implemented yet.`)
+			} else {
+				return resolveMethodLookupBaseType(node.arguments[0].value, scope)
+			}
+		} else {
+			return type.returnType
 		}
 	} else {
 		throw new Error(`Expression at ${node.name.position.line}:${node.name.position.column} is not a function.`)
@@ -109,7 +117,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 	function isSubType(lhs: common.RecordType | common.TypeType, rhs: common.RecordType | common.TypeType): boolean {
 		if (lhs.type === "Type") {
 			if (lhs.definition.type === "BuiltIn") {
-				throw new Error("You can not combine BuiltIns.")
+				throw new Error(`You can not combine ${lhs.name} with other Types.`)
 			} else {
 				lhs = lhs.definition
 			}
@@ -117,7 +125,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 
 		if (rhs.type === "Type") {
 			if (rhs.definition.type === "BuiltIn") {
-				throw new Error("You can not combine BuiltIns.")
+				throw new Error(`You can not combine ${rhs.name} with other Types.`)
 			} else {
 				rhs = rhs.definition
 			}
@@ -230,7 +238,7 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 			if (baseType.definition.type === "Record") {
 				if (baseType.definition.members[node.member.content] != null) {
 					return baseType.definition.members[node.member.content]
-				} else if (baseType.methods[node.member.content] != null && baseType.methods[node.member.content].isStatic) {
+				} else if (baseType.methods[node.member.content] != null) {
 					return baseType.methods[node.member.content]
 				} else {
 					throw new Error(
@@ -240,7 +248,11 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 					)
 				}
 			} else {
-				throw new Error(`Access to properties of Primitive Types is not allowed.`)
+				if (baseType.methods[node.member.content] != null) {
+					return baseType.methods[node.member.content]
+				} else {
+					throw new Error(`Access to properties of Primitive Types is not allowed.`)
+				}
 			}
 		} else {
 			if (baseType.members[node.member.content] !== null) {
@@ -398,7 +410,7 @@ export function resolveMethodType(
 	scope: enricher.Scope,
 	selfType: common.TypeType,
 ): common.MethodType {
-	let returnType, parameterTypes
+	let returnType
 
 	if (node.method.value.returnType.type.nodeType === "Identifier") {
 		if (selfType.name === node.method.value.returnType.type.content) {
@@ -411,16 +423,19 @@ export function resolveMethodType(
 	}
 
 	if (node.isStatic) {
-		parameterTypes = node.method.value.parameters.map(param => resolveType(param.type, scope))
+		return {
+			type: "Method",
+			parameterTypes: node.method.value.parameters.map(param => resolveType(param.type, scope)),
+			returnType,
+			isStatic: node.isStatic,
+		}
 	} else {
-		parameterTypes = [selfType, ...node.method.value.parameters.map(param => resolveType(param.type, scope))]
-	}
-
-	return {
-		type: "Method",
-		parameterTypes,
-		returnType,
-		isStatic: node.isStatic,
+		return {
+			type: "Method",
+			parameterTypes: [selfType, ...node.method.value.parameters.map(param => resolveType(param.type, scope))],
+			returnType,
+			isStatic: node.isStatic,
+		}
 	}
 }
 

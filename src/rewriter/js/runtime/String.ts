@@ -35,4 +35,8 @@ export class $String {
 	static split(self: StringType, splitter: StringType): ArrayType<StringType> {
 		return $Array.create(self.value.split(splitter.value).map(chunk => $String.create(chunk)))
 	}
+
+	static contains(self: StringType, otherString: StringType): BooleanType {
+		return $Boolean.create(self.value.includes(otherString.value))
+	}
 }
