@@ -22,8 +22,7 @@ type Event {
 	}
 
 	static create (from eventDescription: String) -> Event {
-		constant dotOrColon = [".", ":"]
-		constant splitEvent = eventDescription::split(on dotOrColon)
+		constant splitEvent = eventDescription::split(on ".")
 
 		constant eventName = splitEvent::first()
 		constant namespaces = splitEvent::dropFirst()::unique()
@@ -31,8 +30,12 @@ type Event {
 		<- {
 			eventName = eventName,
 			namespaces = namespaces,
+			isDefaultPrevented = false,
+			isCancelled = false,
+			isPropagationStopped = false,
 		}
 	}
 }
 
 constant event = Event.create("event.namespace")
+__print(event)

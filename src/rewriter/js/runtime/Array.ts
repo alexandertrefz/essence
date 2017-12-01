@@ -27,4 +27,8 @@ export class $Array {
 	static dropFirst<T>(value: ArrayType<T>): ArrayType<T> {
 		return $Array.create(value.value.slice(1))
 	}
+
+	static dropLast<T>(value: ArrayType<T>): ArrayType<T> {
+		return $Array.create(value.value.slice(0, value.value.length - 1))
+	}
 }
