@@ -5,6 +5,7 @@ const functions: {
 } = {
 	__print: {
 		type: "Function",
+		// TODO: Turn into a generic function once generics are implemented.
 		parameterTypes: [
 			{
 				type: "Primitive",
