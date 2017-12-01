@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
-const process = require("process")
 const fs = require("fs")
+const util = require("util")
 const path = require("path")
 
 const meow = require("meow")
+
+const readFile = util.promisify(fs.readFile)
+const writeFile = util.promisify(fs.writeFile)
 
 const Parser = require("../lib/parser")
 const Enricher = require("../lib/enricher")
@@ -13,26 +16,23 @@ const Simplifier = require("../lib/simplifier")
 const Optimiser = require("../lib/optimiser")
 const Rewriter = require("../lib/rewriter")
 
-const compile = (inputFileName, flags) => {
+async function compile(inputFileName, flags) {
 	const sourceFileNameParsed = path.parse(inputFileName)
 	const targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
 
-	fs.readFile(inputFileName, "utf8", (err, data) => {
-		const initialAST = Parser.parse(data)
-		const enrichedAST = Enricher.enrich(initialAST)
-		const validatedAST = Validator.validate(enrichedAST)
-		const simplifiedAST = Simplifier.simplify(validatedAST)
-		const optimisedAST = Optimiser.optimise(simplifiedAST)
-		const result = Rewriter.rewrite(optimisedAST, flags.mode)
+	const data = await readFile(inputFileName, "utf8")
 
-		fs.writeFile(targetFileName, result, err => {
-			if (err) {
-				throw err
-			} else {
-				console.log(`Successfully compiled ${inputFileName} -> ${targetFileName}`)
-			}
-		})
-	})
+	const initialAST = Parser.parse(data)
+	const enrichedAST = Enricher.enrich(initialAST)
+	const validatedAST = Validator.validate(enrichedAST)
+	const simplifiedAST = Simplifier.simplify(validatedAST)
+	const optimisedAST = Optimiser.optimise(simplifiedAST)
+	const result = await Rewriter.rewrite(optimisedAST, flags.mode)
+
+	await writeFile(targetFileName, result)
+
+	console.log(`Successfully compiled ${inputFileName} -> ${targetFileName}`)
+	return Promise.resolve()
 }
 
 const cli = meow(

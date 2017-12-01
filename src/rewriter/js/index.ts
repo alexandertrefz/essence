@@ -1,16 +1,27 @@
-import { common } from "../interfaces"
+import { common } from "../../interfaces"
 import * as estree from "estree"
+
+import { rollup } from "rollup"
+import hypothetical = require("rollup-plugin-hypothetical")
+import typescript = require("rollup-plugin-typescript2")
 
 import { generate } from "escodegen"
 
-export default function rewrite(nodes: Array<common.typedSimple.Node>): string {
+export default async function rewrite(nodes: Array<common.typedSimple.Node>): Promise<string> {
 	const program: estree.Program = {
 		type: "Program",
 		sourceType: "module",
-		body: rewriteProgramNodes(nodes),
+		body: [
+			internalImport([importSpecifier("$String")], "String"),
+			internalImport([importSpecifier("$Number")], "Number"),
+			internalImport([importSpecifier("$Boolean")], "Boolean"),
+			internalImport([importSpecifier("$Array")], "Array"),
+			internalImport([importNamespaceSpecifier("$_")], "functions"),
+			...rewriteProgramNodes(nodes),
+		],
 	}
 
-	return generate(program, {
+	const programText = generate(program, {
 		format: {
 			indent: {
 				style: "\t",
@@ -22,6 +33,27 @@ export default function rewrite(nodes: Array<common.typedSimple.Node>): string {
 			quotes: "double",
 		},
 	})
+
+	const bundle = await rollup({
+		input: "./program.js",
+		plugins: [
+			typescript({
+				tsconfig: "./src/rewriter/js/runtime/tsconfig.json",
+			}),
+			hypothetical({
+				allowFallthrough: true,
+				files: {
+					"./program.js": programText,
+				},
+			}),
+		],
+	})
+
+	const { code } = await bundle.generate({
+		format: "iife",
+	})
+
+	return Promise.resolve(code)
 }
 
 function rewriteProgramNodes(
@@ -102,7 +134,15 @@ function rewriteChoiceStatement(node: common.typedSimple.ChoiceStatementNode): e
 
 	return {
 		type: "IfStatement",
-		test: rewriteExpression(node.condition),
+		test: {
+			type: "MemberExpression",
+			object: rewriteExpression(node.condition),
+			property: {
+				type: "Identifier",
+				name: "value",
+			},
+			computed: false,
+		},
 		consequent: rewriteBlockStatement(node.trueBody),
 		alternate,
 	}
@@ -187,9 +227,12 @@ function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunction
 			type: "MemberExpression",
 			object: {
 				type: "Identifier",
-				name: "__Runtime",
+				name: "$_",
 			},
-			property: rewriteIdentifier(node.name),
+			property: {
+				type: "Identifier",
+				name: node.name.name.slice(2),
+			},
 			computed: false,
 		}
 	} else {
@@ -257,24 +300,75 @@ function rewriteRecordValue(node: common.typedSimple.RecordValueNode): estree.Ob
 	}
 }
 
-function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.Literal {
+function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.CallExpression {
 	return {
-		type: "Literal",
-		value: node.value,
+		type: "CallExpression",
+		callee: {
+			type: "MemberExpression",
+			object: {
+				type: "Identifier",
+				name: nativeName("String"),
+			},
+			property: {
+				type: "Identifier",
+				name: "create",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "Literal",
+				value: node.value,
+			},
+		],
 	}
 }
 
-function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.Literal {
+function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.CallExpression {
 	return {
-		type: "Literal",
-		value: Number.parseFloat(node.value),
+		type: "CallExpression",
+		callee: {
+			type: "MemberExpression",
+			object: {
+				type: "Identifier",
+				name: nativeName("Number"),
+			},
+			property: {
+				type: "Identifier",
+				name: "create",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "Literal",
+				value: node.value,
+			},
+		],
 	}
 }
 
-function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.Literal {
+function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.CallExpression {
 	return {
-		type: "Literal",
-		value: node.value,
+		type: "CallExpression",
+		callee: {
+			type: "MemberExpression",
+			object: {
+				type: "Identifier",
+				name: nativeName("Boolean"),
+			},
+			property: {
+				type: "Identifier",
+				name: "create",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "Literal",
+				value: node.value,
+			},
+		],
 	}
 }
 
@@ -291,25 +385,27 @@ function rewriteArrayValue(node: common.typedSimple.ArrayValueNode): estree.Arra
 
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpression {
 	let object: estree.Expression
+	let property: estree.Expression
 
 	if (node.base.type.type === "Type" && node.base.type.definition.type === "BuiltIn") {
 		object = {
-			type: "MemberExpression",
-			object: {
-				type: "Identifier",
-				name: "__Runtime",
-			},
-			property: rewriteIdentifier(node.base as common.typedSimple.IdentifierNode),
-			computed: false,
+			type: "Identifier",
+			name: nativeName((node.base as any).name),
+		}
+
+		property = {
+			type: "Identifier",
+			name: node.member.name,
 		}
 	} else {
 		object = rewriteExpression(node.base)
+		property = rewriteIdentifier(node.member)
 	}
 
 	return {
 		type: "MemberExpression",
 		object,
-		property: rewriteIdentifier(node.member),
+		property,
 		computed: false,
 	}
 }
@@ -317,7 +413,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpres
 function rewriteIdentifier(node: common.typedSimple.IdentifierNode): estree.Identifier {
 	return {
 		type: "Identifier",
-		name: `$${node.name}`,
+		name: node.name,
 	}
 }
 
@@ -347,4 +443,57 @@ function rewriteFunctionExpression(node: common.typedSimple.FunctionDefinitionNo
 
 function rewriteArgument(node: common.typedSimple.ArgumentNode): estree.Expression {
 	return rewriteExpression(node.value)
+}
+
+function nativeName(name: string) {
+	return `$${name}`
+}
+
+function internalImport(
+	specifiers: Array<estree.ImportSpecifier | estree.ImportDefaultSpecifier | estree.ImportNamespaceSpecifier>,
+	fileName: string,
+): estree.ImportDeclaration {
+	return {
+		type: "ImportDeclaration",
+		specifiers,
+		source: {
+			type: "Literal",
+			value: `./src/rewriter/js/runtime/${fileName}`,
+			raw: `"./src/rewriter/js/runtime/${fileName}"`,
+		},
+	}
+}
+
+function importSpecifier(variableName: string): estree.ImportSpecifier {
+	return {
+		type: "ImportSpecifier",
+		local: {
+			type: "Identifier",
+			name: variableName,
+		},
+		imported: {
+			type: "Identifier",
+			name: variableName,
+		},
+	}
+}
+
+function importDefaultSpecifier(variableName: string): estree.ImportDefaultSpecifier {
+	return {
+		type: "ImportDefaultSpecifier",
+		local: {
+			type: "Identifier",
+			name: variableName,
+		},
+	}
+}
+
+function importNamespaceSpecifier(variableName: string): estree.ImportNamespaceSpecifier {
+	return {
+		type: "ImportNamespaceSpecifier",
+		local: {
+			type: "Identifier",
+			name: variableName,
+		},
+	}
 }
