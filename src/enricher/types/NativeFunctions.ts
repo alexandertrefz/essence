@@ -5,6 +5,7 @@ const functions: {
 } = {
 	__print: {
 		type: "Function",
+		// TODO: We accept all types here, once we can represent this, fix this function.
 		parameterTypes: [
 			{
 				type: "Primitive",

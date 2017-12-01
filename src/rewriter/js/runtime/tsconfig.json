@@ -5,12 +5,7 @@
 		"strict": true,
 		"allowJs": false,
 		"pretty": true,
-		"rootDir": "src",
-		"outDir": "lib",
 		"sourceMap": true
 	},
-	"exclude": [
-		"**/rewriter/js/runtime/*"
-	],
 	"compileOnSave": false
 }

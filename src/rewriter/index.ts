@@ -3,7 +3,7 @@ import rewriteToJS from "./js"
 
 type RewriterMode = "js"
 
-export const rewrite = (nodes: [common.typedSimple.Node], mode: RewriterMode): string => {
+export async function rewrite(nodes: Array<common.typedSimple.Node>, mode: RewriterMode): Promise<string> {
 	if (mode === "js") {
 		return rewriteToJS(nodes)
 	} else {
