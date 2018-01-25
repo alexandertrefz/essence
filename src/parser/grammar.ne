@@ -37,33 +37,33 @@ Statement ->
 
 ConstantDeclarationStatement ->
 	ConstantKeyword Type:? Identifier EqualSign Expression {%
-		([keyword, type, name, _, value]) => generators.constantDeclarationStatement(name, type, value, keyword.position)
+		([keyword, type, name, _, value]) => generators.constantDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
 	%}
 
 VariableDeclarationStatement ->
 	VariableKeyword Type:? Identifier EqualSign Expression {%
-		([keyword, type, name, _, value]) => generators.variableDeclarationStatement(name, type, value, keyword.position)
+		([keyword, type, name, _, value]) => generators.variableDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
 	%}
 
 VariableAssignmentStatement ->
-	Identifier EqualSign Expression {% ([name, _, value]) => generators.variableAssignmentStatement(name, value, name.position) %}
+	Identifier EqualSign Expression {% ([name, _, value]) => generators.variableAssignmentStatement(name, value, { start: name.position.start, end: value.position.end }) %}
 
 TypeDefinitionStatement ->
-	TypeKeyword Identifier TypeDefinitionBody {% ([keyword, name, body]) => generators.typeDefinitionStatement(name, body, keyword.position) %}
+	TypeKeyword Identifier TypeDefinitionBody {% ([keyword, name, body]) => generators.typeDefinitionStatement(name, body.body, { start: keyword.position.start, end: body.position.end }) %}
 
 IfElseStatement ->
-	  IfStatement ElseKeyword Block           {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block) %}
-	| IfStatement ElseKeyword IfStatement     {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block) %}
-	| IfStatement ElseKeyword IfElseStatement {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block) %}
+	  IfStatement ElseKeyword Block           {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block.body, { start: ifStatement.position.start, end: block.position.end }) %}
+	| IfStatement ElseKeyword IfStatement     {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block,      { start: ifStatement.position.start, end: block.position.end }) %}
+	| IfStatement ElseKeyword IfElseStatement {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block,      { start: ifStatement.position.start, end: block.position.end }) %}
 
 IfStatement ->
-	IfKeyword Expression Block {% ([keyword, condition, block]) => generators.ifStatement(condition, block, keyword.position) %}
+	IfKeyword Expression Block {% ([keyword, condition, block]) => generators.ifStatement(condition, block.body, { start: keyword.position.start, end: block.position.end }) %}
 
 ReturnStatement ->
-	ReturnSymbol Expression {% ([symbol, value]) => generators.returnStatement(value, symbol.position) %}
+	ReturnSymbol Expression {% ([symbol, value]) => generators.returnStatement(value, { start: symbol.position.start, end: value.position.end }) %}
 
 FunctionStatement ->
-	FunctionKeyword Identifier FunctionLiteral {% ([keyword, name, value]) => generators.functionStatement(name, value.value, keyword.position) %}
+	FunctionKeyword Identifier FunctionLiteral {% ([keyword, name, value]) => generators.functionStatement(name, value.value, { start: keyword.position.start, end: value.position.end }) %}
 
 # ---------- #
 # Expression #
@@ -85,16 +85,18 @@ ExpressionWithoutMethodLookup ->
 
 
 NativeFunctionInvocation ->
-	NativeLookupSymbol Identifier ArgumentList {% ([symbol, name, args]) => generators.nativeFunctionInvocation(name, args, symbol.position) %}
+	NativeLookupSymbol Identifier ArgumentList {%
+		([symbol, name, args]) => generators.nativeFunctionInvocation(name, args.args, { start: symbol.position.start, end: args.position.end })
+	%}
 
 MethodInvocation ->
-	MethodLookup ArgumentList {% ([lookup, args]) => generators.methodInvocation(lookup, args, lookup.position) %}
+	MethodLookup ArgumentList {% ([lookup, args]) => generators.methodInvocation(lookup, args.args, { start: lookup.position.start, end: args.position.end }) %}
 
 FunctionInvocation ->
-	ExpressionWithoutMethodLookup ArgumentList {% ([expression, args]) => generators.functionInvocation(expression, args, expression.position) %}
+	ExpressionWithoutMethodLookup ArgumentList {% ([expression, args]) => generators.functionInvocation(expression, args.args, { start: expression.position.start, end: args.position.end }) %}
 
 Combination ->
-	Expression CombinationSymbol Expression {% ([lhs, _, rhs]) => generators.combination(lhs, rhs, lhs.position) %}
+	Expression CombinationSymbol Expression {% ([lhs, _, rhs]) => generators.combination(lhs, rhs, { start: lhs.position.start, end: rhs.position.end }) %}
 
 Value ->
 	  TypedRecordLiteral     {% id %}
@@ -106,7 +108,7 @@ Value ->
 	| ArrayLiteral           {% id %}
 
 Lookup ->
-	Expression Dot Identifier {% ([base, _, member]) => generators.lookup(base, member, base.position) %}
+	Expression Dot Identifier {% ([base, _, member]) => generators.lookup(base, member, { start: base.position.start, end: member.position.end }) %}
 
 Identifier ->
 	%Identifier {% ([identifierToken]) => generators.identifier(identifierToken.value, identifierToken.position) %}
@@ -115,7 +117,7 @@ Self ->
 	AtSign {% ([symbol]) => generators.self(symbol.position) %}
 
 MethodLookup ->
-	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, _, member]) => generators.methodLookup(base, member, base.position) %}
+	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, _, member]) => generators.methodLookup(base, member, { start: base.position.start, end: member.position.end }) %}
 
 ###########
 # Helpers #
@@ -126,10 +128,10 @@ MethodLookup ->
 # ------------------ #
 
 Block ->
-	LeftBrace (Statement | Expression):* RightBrace {% t => flatten(t[1]) %}
+	LeftBrace (Statement | Expression):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
 
 TypeDefinitionBody ->
-	LeftBrace (TypeProperty | TypeMethod):* RightBrace {% ([_, body]) => flatten(body) %}
+	LeftBrace (TypeProperty | TypeMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
 
 TypeProperty ->
 	Identifier Colon Type {% ([name, _, type]) => ({ nodeType: "PropertyNode", name, type }) %}
@@ -146,10 +148,10 @@ ReturnSymbol ->
 #          #
 
 TypedRecordLiteral ->
-	TypeHeader AnonymousRecordLiteral {% ([type, record]) => generators.recordValueNode(type, record.members, type.position) %}
+	TypeHeader AnonymousRecordLiteral {% ([type, record]) => generators.recordValueNode(type, record.members, { start: type.position.start, end: record.position.end }) %}
 
 AnonymousRecordLiteral ->
-	LeftBrace KeyValuePairList RightBrace {% ([symbol, kvpList]) => generators.recordValueNode(null, kvpList, symbol.position) %}
+	LeftBrace KeyValuePairList RightBrace {% ([lbrace, kvpList, rbrace]) => generators.recordValueNode(null, kvpList, { start: lbrace.position.start, end: rbrace.position.end }) %}
 
 KeyValuePair ->
 	Identifier EqualSign Expression {% ([identifer, _, value]) => generators.keyValuePair(identifer.content, value) %}
@@ -163,12 +165,12 @@ StringLiteral ->
 Integer ->
 	  %LiteralNumber             {% id %}
 	| Integer Underscore Integer {%
-		([leftPartialNumber, _, rightPartialNumber]) => ({ value: leftPartialNumber.value + rightPartialNumber.value, position: leftPartialNumber.position })
+		([leftPartialNumber, _, rightPartialNumber]) => ({ value: leftPartialNumber.value + rightPartialNumber.value, position: { start: leftPartialNumber.position.start, end: rightPartialNumber.position.end } })
 	%}
 
 NumberLiteral ->
 	  Integer             {% ([integer]) =>           generators.numberValueNode(integer.value,                     integer.position) %}
-	| Integer Dot Integer {% ([integer, _, float]) => generators.numberValueNode(integer.value + "." + float.value, integer.position) %}
+	| Integer Dot Integer {% ([integer, _, float]) => generators.numberValueNode(integer.value + "." + float.value, { start: integer.position.start, end: float.position.end }) %}
 
 BooleanLiteral ->
 	  %LiteralTrue  {% ([booleanToken]) => generators.booleanValueNode(true,  booleanToken.position) %}
@@ -176,12 +178,12 @@ BooleanLiteral ->
 
 FunctionLiteral ->
 	ParameterList ReturnType Block {%
-		([paramList, returnType, block]) => generators.functionValueNode(generators.functionDefinition(paramList.parameters, returnType, block), paramList.position)
+		([paramList, returnType, block]) => generators.functionValueNode(generators.functionDefinition(paramList.parameters, returnType, block.body), { start: paramList.position.start, end: block.position.end })
 	%}
 
 ArrayLiteral ->
-	  LeftBracket RightBracket                {% ([symbol]) =>         generators.arrayValueNode([],     symbol.position) %}
-	| LeftBracket ExpressionList RightBracket {% ([symbol, values]) => generators.arrayValueNode(values, symbol.position) %}
+	  LeftBracket RightBracket                {% ([lbracket,         rbracket]) => generators.arrayValueNode([],     { start: lbracket.position.start, end: rbracket.position.end }) %}
+	| LeftBracket ExpressionList RightBracket {% ([lbracket, values, rbracket]) => generators.arrayValueNode(values, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 ExpressionList ->
 	(Expression Comma):* Expression Comma:? {% ([list, expression]) => ([...list.map(first), expression]) %}
@@ -191,9 +193,9 @@ ExpressionList ->
 #           #
 
 Parameter ->
-	  Identifier Colon Type            {% ([name, _, type]) =>                       generators.parameter(name,         name,         type, name.position) %}
-	| Identifier Identifier Colon Type {% ([externalName, internalName, _, type]) => generators.parameter(externalName, internalName, type, externalName.position) %}
-	| Underscore Identifier Colon Type {% ([symbol, internalName, _, type]) =>       generators.parameter(null,         internalName, type, symbol.position) %}
+	  Identifier Colon Type            {% ([name, _, type]) =>                       generators.parameter(name,         name,         type, { start: name.position.start, end: type.position.end }) %}
+	| Identifier Identifier Colon Type {% ([externalName, internalName, _, type]) => generators.parameter(externalName, internalName, type, { start: externalName.position.start, end: type.position.end }) %}
+	| Underscore Identifier Colon Type {% ([symbol, internalName, _, type]) =>       generators.parameter(null,         internalName, type, { start: symbol.position.start, end: type.position.end }) %}
 
 ParameterList ->
 	  LeftParen RightParen {% ([symbol]) => ({ parameters: [], position: symbol.position }) %}
@@ -206,8 +208,13 @@ Argument ->
 	| Identifier Expression {% ([name, expression]) => generators.argument(name, expression) %}
 
 ArgumentList ->
-	  LeftParen RightParen {% () => ([]) %}
-	| LeftParen (Argument Comma):* Argument Comma:? RightParen {% ([_, argumentCommaList, argument]) => ([...argumentCommaList.map(first), argument]) %}
+	  LeftParen RightParen {% ([leftParen, rightParen]) => ({ args: [], position: { start: leftParen.position.start, end: rightParen.position.end } }) %}
+	| LeftParen (Argument Comma):* Argument Comma:? RightParen {%
+		([leftParen, argumentCommaList, argument, _, rightParen]) => ({
+			args: [...argumentCommaList.map(first), argument],
+			position: { start: leftParen.position.start, end: rightParen.position.end }
+		})
+	%}
 
 #       #
 # Types #
@@ -215,7 +222,7 @@ ArgumentList ->
 
 Type ->
 	  Identifier {% ([identifer]) => generators.identifierTypeDeclaration(identifer, identifer.position) %}
-	| LeftBracket Type RightBracket {% ([symbol, type, _]) => generators.arrayTypeDeclaration(type, symbol.position) %}
+	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.arrayTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 TypeHeader ->
 	Type Tilde RightAngle {% first %}

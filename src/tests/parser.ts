@@ -31,8 +31,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "__lookup",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 9,
+								},
 							},
 						},
 						arguments: [
@@ -43,15 +49,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 10,
+										start: {
+											line: 1,
+											column: 10,
+										},
+										end: {
+											line: 1,
+											column: 18,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 19,
+							},
 						},
 					},
 				]
@@ -68,8 +86,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "__lookup",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 9,
+								},
 							},
 						},
 						arguments: [
@@ -80,15 +104,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 10,
+										start: {
+											line: 1,
+											column: 10,
+										},
+										end: {
+											line: 1,
+											column: 18,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 20,
+							},
 						},
 					},
 				]
@@ -105,8 +141,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "__lookup",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 9,
+								},
 							},
 						},
 						arguments: [
@@ -117,8 +159,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 10,
+										start: {
+											line: 1,
+											column: 10,
+										},
+										end: {
+											line: 1,
+											column: 18,
+										},
 									},
 								},
 							},
@@ -129,15 +177,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 20,
+										start: {
+											line: 1,
+											column: 20,
+										},
+										end: {
+											line: 1,
+											column: 29,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 30,
+							},
 						},
 					},
 				]
@@ -154,8 +214,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "__lookup",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 9,
+								},
 							},
 						},
 						arguments: [
@@ -166,8 +232,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 10,
+										start: {
+											line: 1,
+											column: 10,
+										},
+										end: {
+											line: 1,
+											column: 18,
+										},
 									},
 								},
 							},
@@ -178,15 +250,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 20,
+										start: {
+											line: 1,
+											column: 20,
+										},
+										end: {
+											line: 1,
+											column: 29,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 31,
+							},
 						},
 					},
 				]
@@ -207,27 +291,51 @@ describe("Parser", () => {
 								nodeType: "Identifier",
 								content: "lookup",
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 7,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "member",
 								position: {
-									line: 1,
-									column: 9,
+									start: {
+										line: 1,
+										column: 9,
+									},
+									end: {
+										line: 1,
+										column: 15,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 15,
+								},
 							},
 						},
 						arguments: [],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 17,
+							},
 						},
 					},
 				]
@@ -246,21 +354,39 @@ describe("Parser", () => {
 								nodeType: "Identifier",
 								content: "lookup",
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 7,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "member",
 								position: {
-									line: 1,
-									column: 9,
+									start: {
+										line: 1,
+										column: 9,
+									},
+									end: {
+										line: 1,
+										column: 15,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 15,
+								},
 							},
 						},
 						arguments: [
@@ -271,15 +397,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 16,
+										start: {
+											line: 1,
+											column: 16,
+										},
+										end: {
+											line: 1,
+											column: 24,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 25,
+							},
 						},
 					},
 				]
@@ -302,21 +440,39 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "lookup",
 										position: {
-											line: 1,
-											column: 1,
+											start: {
+												line: 1,
+												column: 1,
+											},
+											end: {
+												line: 1,
+												column: 7,
+											},
 										},
 									},
 									member: {
 										nodeType: "Identifier",
 										content: "member",
 										position: {
-											line: 1,
-											column: 9,
+											start: {
+												line: 1,
+												column: 9,
+											},
+											end: {
+												line: 1,
+												column: 15,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 15,
+										},
 									},
 								},
 								arguments: [
@@ -327,28 +483,52 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "argument",
 											position: {
-												line: 1,
-												column: 16,
+												start: {
+													line: 1,
+													column: 16,
+												},
+												end: {
+													line: 1,
+													column: 24,
+												},
 											},
 										},
 									},
 								],
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 25,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "member",
 								position: {
-									line: 1,
-									column: 27,
+									start: {
+										line: 1,
+										column: 27,
+									},
+									end: {
+										line: 1,
+										column: 33,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 33,
+								},
 							},
 						},
 						arguments: [
@@ -359,15 +539,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 34,
+										start: {
+											line: 1,
+											column: 34,
+										},
+										end: {
+											line: 1,
+											column: 42,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 43,
+							},
 						},
 					},
 				]
@@ -386,21 +578,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						member: {
 							nodeType: "Identifier",
 							content: "member",
 							position: {
-								line: 1,
-								column: 13,
+								start: {
+									line: 1,
+									column: 13,
+								},
+								end: {
+									line: 1,
+									column: 19,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 19,
+							},
 						},
 					},
 				]
@@ -419,34 +629,64 @@ describe("Parser", () => {
 								nodeType: "Identifier",
 								content: "identifier",
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 11,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "lookup",
 								position: {
-									line: 1,
-									column: 12,
+									start: {
+										line: 1,
+										column: 12,
+									},
+									end: {
+										line: 1,
+										column: 18,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 18,
+								},
 							},
 						},
 						member: {
 							nodeType: "Identifier",
 							content: "member",
 							position: {
-								line: 1,
-								column: 20,
+								start: {
+									line: 1,
+									column: 20,
+								},
+								end: {
+									line: 1,
+									column: 26,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 26,
+							},
 						},
 					},
 				]
@@ -471,8 +711,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -483,15 +729,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 21,
+							},
 						},
 					},
 				]
@@ -508,8 +766,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -519,23 +783,41 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "with",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 16,
+										},
 									},
 								},
 								value: {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 17,
+										start: {
+											line: 1,
+											column: 17,
+										},
+										end: {
+											line: 1,
+											column: 25,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 26,
+							},
 						},
 					},
 				]
@@ -552,8 +834,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -564,15 +852,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 22,
+							},
 						},
 					},
 				]
@@ -589,8 +889,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -601,8 +907,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
@@ -613,15 +925,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 22,
+										start: {
+											line: 1,
+											column: 22,
+										},
+										end: {
+											line: 1,
+											column: 31,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 32,
+							},
 						},
 					},
 				]
@@ -638,8 +962,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -650,8 +980,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
@@ -662,15 +998,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 22,
+										start: {
+											line: 1,
+											column: 22,
+										},
+										end: {
+											line: 1,
+											column: 31,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 33,
+							},
 						},
 					},
 				]
@@ -687,8 +1035,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -699,8 +1053,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
@@ -711,8 +1071,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 22,
+										start: {
+											line: 1,
+											column: 22,
+										},
+										end: {
+											line: 1,
+											column: 31,
+										},
 									},
 								},
 							},
@@ -723,15 +1089,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument3",
 									position: {
-										line: 1,
-										column: 33,
+										start: {
+											line: 1,
+											column: 33,
+										},
+										end: {
+											line: 1,
+											column: 42,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 43,
+							},
 						},
 					},
 				]
@@ -748,8 +1126,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -760,8 +1144,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
@@ -772,8 +1162,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 22,
+										start: {
+											line: 1,
+											column: 22,
+										},
+										end: {
+											line: 1,
+											column: 31,
+										},
 									},
 								},
 							},
@@ -784,15 +1180,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument3",
 									position: {
-										line: 1,
-										column: 33,
+										start: {
+											line: 1,
+											column: 33,
+										},
+										end: {
+											line: 1,
+											column: 42,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 44,
+							},
 						},
 					},
 				]
@@ -811,21 +1219,39 @@ describe("Parser", () => {
 								nodeType: "Identifier",
 								content: "namespace",
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 10,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "invocation",
 								position: {
-									line: 1,
-									column: 11,
+									start: {
+										line: 1,
+										column: 11,
+									},
+									end: {
+										line: 1,
+										column: 21,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 21,
+								},
 							},
 						},
 						arguments: [
@@ -836,8 +1262,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 22,
+										start: {
+											line: 1,
+											column: 22,
+										},
+										end: {
+											line: 1,
+											column: 30,
+										},
 									},
 								},
 							},
@@ -848,8 +1280,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument2",
 									position: {
-										line: 1,
-										column: 32,
+										start: {
+											line: 1,
+											column: 32,
+										},
+										end: {
+											line: 1,
+											column: 41,
+										},
 									},
 								},
 							},
@@ -860,15 +1298,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument3",
 									position: {
-										line: 1,
-										column: 43,
+										start: {
+											line: 1,
+											column: 43,
+										},
+										end: {
+											line: 1,
+											column: 52,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 54,
+							},
 						},
 					},
 				]
@@ -886,8 +1336,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						arguments: [
@@ -898,15 +1354,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 1,
-										column: 12,
+										start: {
+											line: 1,
+											column: 12,
+										},
+										end: {
+											line: 1,
+											column: 20,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 21,
+							},
 						},
 					},
 					{
@@ -915,8 +1383,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "invocation",
 							position: {
-								line: 2,
-								column: 9,
+								start: {
+									line: 2,
+									column: 9,
+								},
+								end: {
+									line: 2,
+									column: 19,
+								},
 							},
 						},
 						arguments: [
@@ -927,15 +1401,27 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "argument",
 									position: {
-										line: 2,
-										column: 20,
+										start: {
+											line: 2,
+											column: 20,
+										},
+										end: {
+											line: 2,
+											column: 28,
+										},
 									},
 								},
 							},
 						],
 						position: {
-							line: 2,
-							column: 9,
+							start: {
+								line: 2,
+								column: 9,
+							},
+							end: {
+								line: 2,
+								column: 29,
+							},
 						},
 					},
 				]
@@ -954,21 +1440,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "lookup",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 7,
+								},
 							},
 						},
 						member: {
 							nodeType: "Identifier",
 							content: "member",
 							position: {
-								line: 1,
-								column: 8,
+								start: {
+									line: 1,
+									column: 8,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 14,
+							},
 						},
 					},
 				]
@@ -987,34 +1491,64 @@ describe("Parser", () => {
 								nodeType: "Identifier",
 								content: "lookup",
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 7,
+									},
 								},
 							},
 							member: {
 								nodeType: "Identifier",
 								content: "member1",
 								position: {
-									line: 1,
-									column: 8,
+									start: {
+										line: 1,
+										column: 8,
+									},
+									end: {
+										line: 1,
+										column: 15,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 15,
+								},
 							},
 						},
 						member: {
 							nodeType: "Identifier",
 							content: "member2",
 							position: {
-								line: 1,
-								column: 16,
+								start: {
+									line: 1,
+									column: 16,
+								},
+								end: {
+									line: 1,
+									column: 23,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 23,
+							},
 						},
 					},
 				]
@@ -1031,8 +1565,14 @@ describe("Parser", () => {
 						nodeType: "Identifier",
 						content: "identifier",
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 11,
+							},
 						},
 					},
 				]
@@ -1048,8 +1588,14 @@ describe("Parser", () => {
 					{
 						nodeType: "Self",
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 2,
+							},
 						},
 					},
 				]
@@ -1068,21 +1614,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "base",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 5,
+								},
 							},
 						},
 						rhs: {
 							nodeType: "Identifier",
 							content: "override",
 							position: {
-								line: 1,
-								column: 9,
+								start: {
+									line: 1,
+									column: 9,
+								},
+								end: {
+									line: 1,
+									column: 17,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 17,
+							},
 						},
 					},
 				]
@@ -1107,20 +1671,38 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 1,
-											column: 7,
+											start: {
+												line: 1,
+												column: 7,
+											},
+											end: {
+												line: 1,
+												column: 11,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 7,
+										start: {
+											line: 1,
+											column: 7,
+										},
+										end: {
+											line: 1,
+											column: 11,
+										},
 									},
 								},
 								body: [],
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 					]
@@ -1144,16 +1726,28 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 1,
-												column: 11,
+												start: {
+													line: 1,
+													column: 11,
+												},
+												end: {
+													line: 1,
+													column: 19,
+												},
 											},
 										},
 										externalName: {
 											nodeType: "Identifier",
 											content: "external",
 											position: {
-												line: 1,
-												column: 2,
+												start: {
+													line: 1,
+													column: 2,
+												},
+												end: {
+													line: 1,
+													column: 10,
+												},
 											},
 										},
 										type: {
@@ -1162,18 +1756,36 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 1,
-													column: 21,
+													start: {
+														line: 1,
+														column: 21,
+													},
+													end: {
+														line: 1,
+														column: 25,
+													},
 												},
 											},
 											position: {
-												line: 1,
-												column: 21,
+												start: {
+													line: 1,
+													column: 21,
+												},
+												end: {
+													line: 1,
+													column: 25,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 2,
+											start: {
+												line: 1,
+												column: 2,
+											},
+											end: {
+												line: 1,
+												column: 25,
+											},
 										},
 									},
 								],
@@ -1183,13 +1795,25 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 1,
-											column: 30,
+											start: {
+												line: 1,
+												column: 30,
+											},
+											end: {
+												line: 1,
+												column: 34,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 30,
+										start: {
+											line: 1,
+											column: 30,
+										},
+										end: {
+											line: 1,
+											column: 34,
+										},
 									},
 								},
 								body: [
@@ -1199,20 +1823,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 2,
-												column: 10,
+												start: {
+													line: 2,
+													column: 10,
+												},
+												end: {
+													line: 2,
+													column: 18,
+												},
 											},
 										},
 										position: {
-											line: 2,
-											column: 7,
+											start: {
+												line: 2,
+												column: 7,
+											},
+											end: {
+												line: 2,
+												column: 18,
+											},
 										},
 									},
 								],
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 3,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1236,16 +1878,28 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 1,
-												column: 2,
+												start: {
+													line: 1,
+													column: 2,
+												},
+												end: {
+													line: 1,
+													column: 10,
+												},
 											},
 										},
 										externalName: {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 1,
-												column: 2,
+												start: {
+													line: 1,
+													column: 2,
+												},
+												end: {
+													line: 1,
+													column: 10,
+												},
 											},
 										},
 										type: {
@@ -1254,18 +1908,36 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 1,
-													column: 12,
+													start: {
+														line: 1,
+														column: 12,
+													},
+													end: {
+														line: 1,
+														column: 16,
+													},
 												},
 											},
 											position: {
-												line: 1,
-												column: 12,
+												start: {
+													line: 1,
+													column: 12,
+												},
+												end: {
+													line: 1,
+													column: 16,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 2,
+											start: {
+												line: 1,
+												column: 2,
+											},
+											end: {
+												line: 1,
+												column: 16,
+											},
 										},
 									},
 								],
@@ -1275,13 +1947,25 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 1,
-											column: 21,
+											start: {
+												line: 1,
+												column: 21,
+											},
+											end: {
+												line: 1,
+												column: 25,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 21,
+										start: {
+											line: 1,
+											column: 21,
+										},
+										end: {
+											line: 1,
+											column: 25,
+										},
 									},
 								},
 								body: [
@@ -1291,20 +1975,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 2,
-												column: 10,
+												start: {
+													line: 2,
+													column: 10,
+												},
+												end: {
+													line: 2,
+													column: 18,
+												},
 											},
 										},
 										position: {
-											line: 2,
-											column: 7,
+											start: {
+												line: 2,
+												column: 7,
+											},
+											end: {
+												line: 2,
+												column: 18,
+											},
 										},
 									},
 								],
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 3,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1328,8 +2030,14 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 1,
-												column: 4,
+												start: {
+													line: 1,
+													column: 4,
+												},
+												end: {
+													line: 1,
+													column: 12,
+												},
 											},
 										},
 										externalName: null,
@@ -1339,18 +2047,36 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 1,
-													column: 14,
+													start: {
+														line: 1,
+														column: 14,
+													},
+													end: {
+														line: 1,
+														column: 18,
+													},
 												},
 											},
 											position: {
-												line: 1,
-												column: 14,
+												start: {
+													line: 1,
+													column: 14,
+												},
+												end: {
+													line: 1,
+													column: 18,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 2,
+											start: {
+												line: 1,
+												column: 2,
+											},
+											end: {
+												line: 1,
+												column: 18,
+											},
 										},
 									},
 								],
@@ -1360,13 +2086,25 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 1,
-											column: 23,
+											start: {
+												line: 1,
+												column: 23,
+											},
+											end: {
+												line: 1,
+												column: 27,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 23,
+										start: {
+											line: 1,
+											column: 23,
+										},
+										end: {
+											line: 1,
+											column: 27,
+										},
 									},
 								},
 								body: [
@@ -1376,20 +2114,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 2,
-												column: 10,
+												start: {
+													line: 2,
+													column: 10,
+												},
+												end: {
+													line: 2,
+													column: 18,
+												},
 											},
 										},
 										position: {
-											line: 2,
-											column: 7,
+											start: {
+												line: 2,
+												column: 7,
+											},
+											end: {
+												line: 2,
+												column: 18,
+											},
 										},
 									},
 								],
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 3,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1413,16 +2169,28 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 1,
-												column: 11,
+												start: {
+													line: 1,
+													column: 11,
+												},
+												end: {
+													line: 1,
+													column: 19,
+												},
 											},
 										},
 										externalName: {
 											nodeType: "Identifier",
 											content: "external",
 											position: {
-												line: 1,
-												column: 2,
+												start: {
+													line: 1,
+													column: 2,
+												},
+												end: {
+													line: 1,
+													column: 10,
+												},
 											},
 										},
 										type: {
@@ -1431,18 +2199,36 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 1,
-													column: 21,
+													start: {
+														line: 1,
+														column: 21,
+													},
+													end: {
+														line: 1,
+														column: 25,
+													},
 												},
 											},
 											position: {
-												line: 1,
-												column: 21,
+												start: {
+													line: 1,
+													column: 21,
+												},
+												end: {
+													line: 1,
+													column: 25,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 2,
+											start: {
+												line: 1,
+												column: 2,
+											},
+											end: {
+												line: 1,
+												column: 25,
+											},
 										},
 									},
 									{
@@ -1451,16 +2237,28 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal2",
 											position: {
-												line: 1,
-												column: 37,
+												start: {
+													line: 1,
+													column: 37,
+												},
+												end: {
+													line: 1,
+													column: 46,
+												},
 											},
 										},
 										externalName: {
 											nodeType: "Identifier",
 											content: "external2",
 											position: {
-												line: 1,
-												column: 27,
+												start: {
+													line: 1,
+													column: 27,
+												},
+												end: {
+													line: 1,
+													column: 36,
+												},
 											},
 										},
 										type: {
@@ -1469,18 +2267,36 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 1,
-													column: 48,
+													start: {
+														line: 1,
+														column: 48,
+													},
+													end: {
+														line: 1,
+														column: 52,
+													},
 												},
 											},
 											position: {
-												line: 1,
-												column: 48,
+												start: {
+													line: 1,
+													column: 48,
+												},
+												end: {
+													line: 1,
+													column: 52,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 27,
+											start: {
+												line: 1,
+												column: 27,
+											},
+											end: {
+												line: 1,
+												column: 52,
+											},
 										},
 									},
 								],
@@ -1490,13 +2306,25 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "Type",
 										position: {
-											line: 1,
-											column: 57,
+											start: {
+												line: 1,
+												column: 57,
+											},
+											end: {
+												line: 1,
+												column: 61,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 57,
+										start: {
+											line: 1,
+											column: 57,
+										},
+										end: {
+											line: 1,
+											column: 61,
+										},
 									},
 								},
 								body: [
@@ -1506,20 +2334,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "internal",
 											position: {
-												line: 2,
-												column: 10,
+												start: {
+													line: 2,
+													column: 10,
+												},
+												end: {
+													line: 2,
+													column: 18,
+												},
 											},
 										},
 										position: {
-											line: 2,
-											column: 7,
+											start: {
+												line: 2,
+												column: 7,
+											},
+											end: {
+												line: 2,
+												column: 18,
+											},
 										},
 									},
 								],
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 3,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1540,14 +2386,26 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 9,
+										start: {
+											line: 1,
+											column: 9,
+										},
+										end: {
+											line: 1,
+											column: 14,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 16,
+								},
 							},
 						},
 					]
@@ -1566,14 +2424,26 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 9,
+										start: {
+											line: 1,
+											column: 9,
+										},
+										end: {
+											line: 1,
+											column: 14,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 17,
+								},
 							},
 						},
 					]
@@ -1592,22 +2462,40 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 9,
+										start: {
+											line: 1,
+											column: 9,
+										},
+										end: {
+											line: 1,
+											column: 14,
+										},
 									},
 								},
 								key2: {
 									nodeType: "Identifier",
 									content: "value2",
 									position: {
-										line: 1,
-										column: 23,
+										start: {
+											line: 1,
+											column: 23,
+										},
+										end: {
+											line: 1,
+											column: 29,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 31,
+								},
 							},
 						},
 					]
@@ -1626,22 +2514,40 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 9,
+										start: {
+											line: 1,
+											column: 9,
+										},
+										end: {
+											line: 1,
+											column: 14,
+										},
 									},
 								},
 								key2: {
 									nodeType: "Identifier",
 									content: "value2",
 									position: {
-										line: 1,
-										column: 23,
+										start: {
+											line: 1,
+											column: 23,
+										},
+										end: {
+											line: 1,
+											column: 29,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 32,
+								},
 							},
 						},
 					]
@@ -1664,20 +2570,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "value",
 											position: {
-												line: 1,
-												column: 17,
+												start: {
+													line: 1,
+													column: 17,
+												},
+												end: {
+													line: 1,
+													column: 22,
+												},
 											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 9,
+										start: {
+											line: 1,
+											column: 9,
+										},
+										end: {
+											line: 1,
+											column: 24,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 26,
+								},
 							},
 						},
 					]
@@ -1704,20 +2628,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "value",
 											position: {
-												line: 3,
-												column: 14,
+												start: {
+													line: 3,
+													column: 14,
+												},
+												end: {
+													line: 3,
+													column: 19,
+												},
 											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 13,
+										start: {
+											line: 2,
+											column: 13,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 5,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1738,13 +2680,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 5,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 5,
+									},
 								},
 							},
 							members: {
@@ -1752,14 +2706,26 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 17,
+										start: {
+											line: 1,
+											column: 17,
+										},
+										end: {
+											line: 1,
+											column: 22,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 24,
+								},
 							},
 						},
 					]
@@ -1778,13 +2744,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 5,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 5,
+									},
 								},
 							},
 							members: {
@@ -1792,14 +2770,26 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 17,
+										start: {
+											line: 1,
+											column: 17,
+										},
+										end: {
+											line: 1,
+											column: 22,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 25,
+								},
 							},
 						},
 					]
@@ -1818,13 +2808,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 5,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 5,
+									},
 								},
 							},
 							members: {
@@ -1832,22 +2834,40 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 17,
+										start: {
+											line: 1,
+											column: 17,
+										},
+										end: {
+											line: 1,
+											column: 22,
+										},
 									},
 								},
 								key2: {
 									nodeType: "Identifier",
 									content: "value2",
 									position: {
-										line: 1,
-										column: 31,
+										start: {
+											line: 1,
+											column: 31,
+										},
+										end: {
+											line: 1,
+											column: 37,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 39,
+								},
 							},
 						},
 					]
@@ -1866,13 +2886,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 5,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 5,
+									},
 								},
 							},
 							members: {
@@ -1880,22 +2912,40 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "value",
 									position: {
-										line: 1,
-										column: 17,
+										start: {
+											line: 1,
+											column: 17,
+										},
+										end: {
+											line: 1,
+											column: 22,
+										},
 									},
 								},
 								key2: {
 									nodeType: "Identifier",
 									content: "value2",
 									position: {
-										line: 1,
-										column: 31,
+										start: {
+											line: 1,
+											column: 31,
+										},
+										end: {
+											line: 1,
+											column: 37,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 40,
+								},
 							},
 						},
 					]
@@ -1918,13 +2968,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 1,
+										start: {
+											line: 1,
+											column: 1,
+										},
+										end: {
+											line: 1,
+											column: 5,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 1,
+									start: {
+										line: 1,
+										column: 1,
+									},
+									end: {
+										line: 1,
+										column: 5,
+									},
 								},
 							},
 							members: {
@@ -1936,13 +2998,25 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 2,
-												column: 13,
+												start: {
+													line: 2,
+													column: 13,
+												},
+												end: {
+													line: 2,
+													column: 17,
+												},
 											},
 										},
 										position: {
-											line: 2,
-											column: 13,
+											start: {
+												line: 2,
+												column: 13,
+											},
+											end: {
+												line: 2,
+												column: 17,
+											},
 										},
 									},
 									members: {
@@ -1950,20 +3024,38 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "value",
 											position: {
-												line: 3,
-												column: 14,
+												start: {
+													line: 3,
+													column: 14,
+												},
+												end: {
+													line: 3,
+													column: 19,
+												},
 											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 13,
+										start: {
+											line: 2,
+											column: 13,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
 									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 5,
+									column: 7,
+								},
 							},
 						},
 					]
@@ -1980,8 +3072,14 @@ describe("Parser", () => {
 							nodeType: "BooleanValue",
 							value: true,
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 5,
+								},
 							},
 						},
 					]
@@ -1996,8 +3094,14 @@ describe("Parser", () => {
 							nodeType: "BooleanValue",
 							value: false,
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 6,
+								},
 							},
 						},
 					]
@@ -2014,8 +3118,14 @@ describe("Parser", () => {
 							nodeType: "StringValue",
 							value: "",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 3,
+								},
 							},
 						},
 					]
@@ -2030,8 +3140,14 @@ describe("Parser", () => {
 							nodeType: "StringValue",
 							value: "string",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 9,
+								},
 							},
 						},
 					]
@@ -2048,8 +3164,14 @@ describe("Parser", () => {
 							nodeType: "NumberValue",
 							value: "123",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 4,
+								},
 							},
 						},
 					]
@@ -2064,8 +3186,14 @@ describe("Parser", () => {
 							nodeType: "NumberValue",
 							value: "1000",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 6,
+								},
 							},
 						},
 					]
@@ -2080,8 +3208,14 @@ describe("Parser", () => {
 							nodeType: "NumberValue",
 							value: "1.5",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 4,
+								},
 							},
 						},
 					]
@@ -2096,8 +3230,14 @@ describe("Parser", () => {
 							nodeType: "NumberValue",
 							value: "1000.5",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 8,
+								},
 							},
 						},
 					]
@@ -2114,8 +3254,14 @@ describe("Parser", () => {
 							nodeType: "ArrayValue",
 							values: [],
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 3,
+								},
 							},
 						},
 					]
@@ -2133,14 +3279,26 @@ describe("Parser", () => {
 									nodeType: "NumberValue",
 									value: "0",
 									position: {
-										line: 1,
-										column: 2,
+										start: {
+											line: 1,
+											column: 2,
+										},
+										end: {
+											line: 1,
+											column: 3,
+										},
 									},
 								},
 							],
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 4,
+								},
 							},
 						},
 					]
@@ -2158,30 +3316,54 @@ describe("Parser", () => {
 									nodeType: "NumberValue",
 									value: "0",
 									position: {
-										line: 1,
-										column: 2,
+										start: {
+											line: 1,
+											column: 2,
+										},
+										end: {
+											line: 1,
+											column: 3,
+										},
 									},
 								},
 								{
 									nodeType: "NumberValue",
 									value: "1",
 									position: {
-										line: 1,
-										column: 5,
+										start: {
+											line: 1,
+											column: 5,
+										},
+										end: {
+											line: 1,
+											column: 6,
+										},
 									},
 								},
 								{
 									nodeType: "NumberValue",
 									value: "2",
 									position: {
-										line: 1,
-										column: 8,
+										start: {
+											line: 1,
+											column: 8,
+										},
+										end: {
+											line: 1,
+											column: 9,
+										},
 									},
 								},
 							],
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 					]
@@ -2195,8 +3377,7 @@ describe("Parser", () => {
 	describe("Statements", () => {
 		describe("ReturnStatements", () => {
 			it("should parse ReturnStatements", () => {
-				let input = `<- identifier
-				`
+				let input = `<- identifier`
 				let output = [
 					{
 						nodeType: "ReturnStatement",
@@ -2204,13 +3385,25 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 14,
+							},
 						},
 					},
 				]
@@ -2221,8 +3414,7 @@ describe("Parser", () => {
 
 		describe("IfStatements", () => {
 			it("should parse IfStatements", () => {
-				let input = `if identifier {}
-				`
+				let input = `if identifier {}`
 				let output = [
 					{
 						nodeType: "IfStatement",
@@ -2230,14 +3422,26 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						body: [],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 17,
+							},
 						},
 					},
 				]
@@ -2246,8 +3450,7 @@ describe("Parser", () => {
 			})
 
 			it("should parse IfElseStatements", () => {
-				let input = `if identifier {} else {}
-				`
+				let input = `if identifier {} else {}`
 				let output = [
 					{
 						nodeType: "IfElseStatement",
@@ -2255,15 +3458,27 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						trueBody: [],
 						falseBody: [],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 25,
+							},
 						},
 					},
 				]
@@ -2272,8 +3487,7 @@ describe("Parser", () => {
 			})
 
 			it("should parse IfElse-If-Statements", () => {
-				let input = `if identifier {} else if identifier2 {}
-				`
+				let input = `if identifier {} else if identifier2 {}`
 				let output = [
 					{
 						nodeType: "IfElseStatement",
@@ -2281,8 +3495,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						trueBody: [],
@@ -2293,20 +3513,38 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "identifier2",
 									position: {
-										line: 1,
-										column: 26,
+										start: {
+											line: 1,
+											column: 26,
+										},
+										end: {
+											line: 1,
+											column: 37,
+										},
 									},
 								},
 								body: [],
 								position: {
-									line: 1,
-									column: 23,
+									start: {
+										line: 1,
+										column: 23,
+									},
+									end: {
+										line: 1,
+										column: 40,
+									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 40,
+							},
 						},
 					},
 				]
@@ -2315,8 +3553,7 @@ describe("Parser", () => {
 			})
 
 			it("should parse IfElse-IfElse-Statements", () => {
-				let input = `if identifier {} else if identifier2 {} else {}
-				`
+				let input = `if identifier {} else if identifier2 {} else {}`
 				let output = [
 					{
 						nodeType: "IfElseStatement",
@@ -2324,8 +3561,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						trueBody: [],
@@ -2336,21 +3579,39 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "identifier2",
 									position: {
-										line: 1,
-										column: 26,
+										start: {
+											line: 1,
+											column: 26,
+										},
+										end: {
+											line: 1,
+											column: 37,
+										},
 									},
 								},
 								trueBody: [],
 								falseBody: [],
 								position: {
-									line: 1,
-									column: 23,
+									start: {
+										line: 1,
+										column: 23,
+									},
+									end: {
+										line: 1,
+										column: 48,
+									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 48,
+							},
 						},
 					},
 				]
@@ -2359,8 +3620,7 @@ describe("Parser", () => {
 			})
 
 			it("should parse IfElse-IfElse-If-Statements", () => {
-				let input = `if identifier {} else if identifier2 {} else if identifier3 {}
-				`
+				let input = `if identifier {} else if identifier2 {} else if identifier3 {}`
 				let output = [
 					{
 						nodeType: "IfElseStatement",
@@ -2368,8 +3628,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 4,
+								start: {
+									line: 1,
+									column: 4,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						trueBody: [],
@@ -2380,8 +3646,14 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "identifier2",
 									position: {
-										line: 1,
-										column: 26,
+										start: {
+											line: 1,
+											column: 26,
+										},
+										end: {
+											line: 1,
+											column: 37,
+										},
 									},
 								},
 								trueBody: [],
@@ -2392,26 +3664,50 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "identifier3",
 											position: {
-												line: 1,
-												column: 49,
+												start: {
+													line: 1,
+													column: 49,
+												},
+												end: {
+													line: 1,
+													column: 60,
+												},
 											},
 										},
 										body: [],
 										position: {
-											line: 1,
-											column: 46,
+											start: {
+												line: 1,
+												column: 46,
+											},
+											end: {
+												line: 1,
+												column: 63,
+											},
 										},
 									},
 								],
 								position: {
-									line: 1,
-									column: 23,
+									start: {
+										line: 1,
+										column: 23,
+									},
+									end: {
+										line: 1,
+										column: 63,
+									},
 								},
 							},
 						],
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 63,
+							},
 						},
 					},
 				]
@@ -2431,21 +3727,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 20,
+								},
 							},
 						},
 						value: {
 							nodeType: "StringValue",
 							value: "",
 							position: {
-								line: 1,
-								column: 23,
+								start: {
+									line: 1,
+									column: 23,
+								},
+								end: {
+									line: 1,
+									column: 25,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 25,
+							},
 						},
 					},
 				]
@@ -2465,21 +3779,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 20,
+								},
 							},
 						},
 						value: {
 							nodeType: "StringValue",
 							value: "",
 							position: {
-								line: 1,
-								column: 23,
+								start: {
+									line: 1,
+									column: 23,
+								},
+								end: {
+									line: 1,
+									column: 25,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 25,
+							},
 						},
 					},
 				]
@@ -2500,39 +3832,75 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "String",
 									position: {
-										line: 1,
-										column: 11,
+										start: {
+											line: 1,
+											column: 11,
+										},
+										end: {
+											line: 1,
+											column: 17,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 11,
+									start: {
+										line: 1,
+										column: 11,
+									},
+									end: {
+										line: 1,
+										column: 17,
+									},
 								},
 							},
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 18,
+								},
 							},
 						},
 						name: {
 							nodeType: "Identifier",
 							content: "strings",
 							position: {
-								line: 1,
-								column: 19,
+								start: {
+									line: 1,
+									column: 19,
+								},
+								end: {
+									line: 1,
+									column: 26,
+								},
 							},
 						},
 						value: {
 							nodeType: "ArrayValue",
 							values: [],
 							position: {
-								line: 1,
-								column: 29,
+								start: {
+									line: 1,
+									column: 29,
+								},
+								end: {
+									line: 1,
+									column: 31,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 31,
+							},
 						},
 					},
 				]
@@ -2551,21 +3919,39 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "identifier",
 							position: {
-								line: 1,
-								column: 1,
+								start: {
+									line: 1,
+									column: 1,
+								},
+								end: {
+									line: 1,
+									column: 11,
+								},
 							},
 						},
 						value: {
 							nodeType: "StringValue",
 							value: "",
 							position: {
-								line: 1,
-								column: 14,
+								start: {
+									line: 1,
+									column: 14,
+								},
+								end: {
+									line: 1,
+									column: 16,
+								},
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 16,
+							},
 						},
 					},
 				]
@@ -2584,15 +3970,27 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {},
 						methods: {},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 13,
+							},
 						},
 					},
 				]
@@ -2611,8 +4009,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {
@@ -2622,20 +4026,38 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 2,
-										column: 16,
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 2,
+											column: 20,
+										},
 									},
 								},
 								position: {
-									line: 2,
-									column: 16,
+									start: {
+										line: 2,
+										column: 16,
+									},
+									end: {
+										line: 2,
+										column: 20,
+									},
 								},
 							},
 						},
 						methods: {},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 3,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -2655,8 +4077,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {
@@ -2666,13 +4094,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 2,
-										column: 16,
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 2,
+											column: 20,
+										},
 									},
 								},
 								position: {
-									line: 2,
-									column: 16,
+									start: {
+										line: 2,
+										column: 16,
+									},
+									end: {
+										line: 2,
+										column: 20,
+									},
 								},
 							},
 							property2: {
@@ -2681,20 +4121,38 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type2",
 									position: {
-										line: 3,
-										column: 17,
+										start: {
+											line: 3,
+											column: 17,
+										},
+										end: {
+											line: 3,
+											column: 22,
+										},
 									},
 								},
 								position: {
-									line: 3,
-									column: 17,
+									start: {
+										line: 3,
+										column: 17,
+									},
+									end: {
+										line: 3,
+										column: 22,
+									},
 								},
 							},
 						},
 						methods: {},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 4,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -2715,8 +4173,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {},
@@ -2733,16 +4197,28 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 13,
+														start: {
+															line: 2,
+															column: 13,
+														},
+														end: {
+															line: 2,
+															column: 22,
+														},
 													},
 												},
 												internalName: {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 13,
+														start: {
+															line: 2,
+															column: 13,
+														},
+														end: {
+															line: 2,
+															column: 22,
+														},
 													},
 												},
 												type: {
@@ -2751,18 +4227,36 @@ describe("Parser", () => {
 														nodeType: "Identifier",
 														content: "Type",
 														position: {
-															line: 2,
-															column: 24,
+															start: {
+																line: 2,
+																column: 24,
+															},
+															end: {
+																line: 2,
+																column: 28,
+															},
 														},
 													},
 													position: {
-														line: 2,
-														column: 24,
+														start: {
+															line: 2,
+															column: 24,
+														},
+														end: {
+															line: 2,
+															column: 28,
+														},
 													},
 												},
 												position: {
-													line: 2,
-													column: 13,
+													start: {
+														line: 2,
+														column: 13,
+													},
+													end: {
+														line: 2,
+														column: 28,
+													},
 												},
 											},
 										],
@@ -2772,13 +4266,25 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 2,
-													column: 33,
+													start: {
+														line: 2,
+														column: 33,
+													},
+													end: {
+														line: 2,
+														column: 37,
+													},
 												},
 											},
 											position: {
-												line: 2,
-												column: 33,
+												start: {
+													line: 2,
+													column: 33,
+												},
+												end: {
+													line: 2,
+													column: 37,
+												},
 											},
 										},
 										body: [
@@ -2788,28 +4294,52 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 3,
-														column: 10,
+														start: {
+															line: 3,
+															column: 10,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
 													},
 												},
 												position: {
-													line: 3,
-													column: 7,
+													start: {
+														line: 3,
+														column: 7,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
 												},
 											},
 										],
 									},
 									position: {
-										line: 2,
-										column: 12,
+										start: {
+											line: 2,
+											column: 12,
+										},
+										end: {
+											line: 4,
+											column: 7,
+										},
 									},
 								},
 								isStatic: false,
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 5,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -2830,8 +4360,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {},
@@ -2848,16 +4384,28 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 20,
+														start: {
+															line: 2,
+															column: 20,
+														},
+														end: {
+															line: 2,
+															column: 29,
+														},
 													},
 												},
 												internalName: {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 20,
+														start: {
+															line: 2,
+															column: 20,
+														},
+														end: {
+															line: 2,
+															column: 29,
+														},
 													},
 												},
 												type: {
@@ -2866,18 +4414,36 @@ describe("Parser", () => {
 														nodeType: "Identifier",
 														content: "Type",
 														position: {
-															line: 2,
-															column: 31,
+															start: {
+																line: 2,
+																column: 31,
+															},
+															end: {
+																line: 2,
+																column: 35,
+															},
 														},
 													},
 													position: {
-														line: 2,
-														column: 31,
+														start: {
+															line: 2,
+															column: 31,
+														},
+														end: {
+															line: 2,
+															column: 35,
+														},
 													},
 												},
 												position: {
-													line: 2,
-													column: 20,
+													start: {
+														line: 2,
+														column: 20,
+													},
+													end: {
+														line: 2,
+														column: 35,
+													},
 												},
 											},
 										],
@@ -2887,13 +4453,25 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 2,
-													column: 40,
+													start: {
+														line: 2,
+														column: 40,
+													},
+													end: {
+														line: 2,
+														column: 44,
+													},
 												},
 											},
 											position: {
-												line: 2,
-												column: 40,
+												start: {
+													line: 2,
+													column: 40,
+												},
+												end: {
+													line: 2,
+													column: 44,
+												},
 											},
 										},
 										body: [
@@ -2903,28 +4481,52 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 3,
-														column: 10,
+														start: {
+															line: 3,
+															column: 10,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
 													},
 												},
 												position: {
-													line: 3,
-													column: 7,
+													start: {
+														line: 3,
+														column: 7,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
 												},
 											},
 										],
 									},
 									position: {
-										line: 2,
-										column: 19,
+										start: {
+											line: 2,
+											column: 19,
+										},
+										end: {
+											line: 4,
+											column: 7,
+										},
 									},
 								},
 								isStatic: true,
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 5,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -2948,8 +4550,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {},
@@ -2966,16 +4574,28 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 13,
+														start: {
+															line: 2,
+															column: 13,
+														},
+														end: {
+															line: 2,
+															column: 22,
+														},
 													},
 												},
 												internalName: {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 2,
-														column: 13,
+														start: {
+															line: 2,
+															column: 13,
+														},
+														end: {
+															line: 2,
+															column: 22,
+														},
 													},
 												},
 												type: {
@@ -2984,18 +4604,36 @@ describe("Parser", () => {
 														nodeType: "Identifier",
 														content: "Type",
 														position: {
-															line: 2,
-															column: 24,
+															start: {
+																line: 2,
+																column: 24,
+															},
+															end: {
+																line: 2,
+																column: 28,
+															},
 														},
 													},
 													position: {
-														line: 2,
-														column: 24,
+														start: {
+															line: 2,
+															column: 24,
+														},
+														end: {
+															line: 2,
+															column: 28,
+														},
 													},
 												},
 												position: {
-													line: 2,
-													column: 13,
+													start: {
+														line: 2,
+														column: 13,
+													},
+													end: {
+														line: 2,
+														column: 28,
+													},
 												},
 											},
 										],
@@ -3005,13 +4643,25 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 2,
-													column: 33,
+													start: {
+														line: 2,
+														column: 33,
+													},
+													end: {
+														line: 2,
+														column: 37,
+													},
 												},
 											},
 											position: {
-												line: 2,
-												column: 33,
+												start: {
+													line: 2,
+													column: 33,
+												},
+												end: {
+													line: 2,
+													column: 37,
+												},
 											},
 										},
 										body: [
@@ -3021,20 +4671,38 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 3,
-														column: 10,
+														start: {
+															line: 3,
+															column: 10,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
 													},
 												},
 												position: {
-													line: 3,
-													column: 7,
+													start: {
+														line: 3,
+														column: 7,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
 												},
 											},
 										],
 									},
 									position: {
-										line: 2,
-										column: 12,
+										start: {
+											line: 2,
+											column: 12,
+										},
+										end: {
+											line: 4,
+											column: 7,
+										},
 									},
 								},
 								isStatic: false,
@@ -3051,16 +4719,28 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 5,
-														column: 14,
+														start: {
+															line: 5,
+															column: 14,
+														},
+														end: {
+															line: 5,
+															column: 23,
+														},
 													},
 												},
 												internalName: {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 5,
-														column: 14,
+														start: {
+															line: 5,
+															column: 14,
+														},
+														end: {
+															line: 5,
+															column: 23,
+														},
 													},
 												},
 												type: {
@@ -3069,18 +4749,36 @@ describe("Parser", () => {
 														nodeType: "Identifier",
 														content: "Type",
 														position: {
-															line: 5,
-															column: 25,
+															start: {
+																line: 5,
+																column: 25,
+															},
+															end: {
+																line: 5,
+																column: 29,
+															},
 														},
 													},
 													position: {
-														line: 5,
-														column: 25,
+														start: {
+															line: 5,
+															column: 25,
+														},
+														end: {
+															line: 5,
+															column: 29,
+														},
 													},
 												},
 												position: {
-													line: 5,
-													column: 14,
+													start: {
+														line: 5,
+														column: 14,
+													},
+													end: {
+														line: 5,
+														column: 29,
+													},
 												},
 											},
 										],
@@ -3090,13 +4788,25 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 5,
-													column: 34,
+													start: {
+														line: 5,
+														column: 34,
+													},
+													end: {
+														line: 5,
+														column: 38,
+													},
 												},
 											},
 											position: {
-												line: 5,
-												column: 34,
+												start: {
+													line: 5,
+													column: 34,
+												},
+												end: {
+													line: 5,
+													column: 38,
+												},
 											},
 										},
 										body: [
@@ -3106,28 +4816,52 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 6,
-														column: 10,
+														start: {
+															line: 6,
+															column: 10,
+														},
+														end: {
+															line: 6,
+															column: 19,
+														},
 													},
 												},
 												position: {
-													line: 6,
-													column: 7,
+													start: {
+														line: 6,
+														column: 7,
+													},
+													end: {
+														line: 6,
+														column: 19,
+													},
 												},
 											},
 										],
 									},
 									position: {
-										line: 5,
-										column: 13,
+										start: {
+											line: 5,
+											column: 13,
+										},
+										end: {
+											line: 7,
+											column: 7,
+										},
 									},
 								},
 								isStatic: false,
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 8,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -3149,8 +4883,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "Type",
 							position: {
-								line: 1,
-								column: 6,
+								start: {
+									line: 1,
+									column: 6,
+								},
+								end: {
+									line: 1,
+									column: 10,
+								},
 							},
 						},
 						properties: {
@@ -3160,13 +4900,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "PropertyType",
 									position: {
-										line: 2,
-										column: 16,
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 2,
+											column: 28,
+										},
 									},
 								},
 								position: {
-									line: 2,
-									column: 16,
+									start: {
+										line: 2,
+										column: 16,
+									},
+									end: {
+										line: 2,
+										column: 28,
+									},
 								},
 							},
 						},
@@ -3183,16 +4935,28 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 3,
-														column: 13,
+														start: {
+															line: 3,
+															column: 13,
+														},
+														end: {
+															line: 3,
+															column: 22,
+														},
 													},
 												},
 												internalName: {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 3,
-														column: 13,
+														start: {
+															line: 3,
+															column: 13,
+														},
+														end: {
+															line: 3,
+															column: 22,
+														},
 													},
 												},
 												type: {
@@ -3201,18 +4965,36 @@ describe("Parser", () => {
 														nodeType: "Identifier",
 														content: "Type",
 														position: {
-															line: 3,
-															column: 24,
+															start: {
+																line: 3,
+																column: 24,
+															},
+															end: {
+																line: 3,
+																column: 28,
+															},
 														},
 													},
 													position: {
-														line: 3,
-														column: 24,
+														start: {
+															line: 3,
+															column: 24,
+														},
+														end: {
+															line: 3,
+															column: 28,
+														},
 													},
 												},
 												position: {
-													line: 3,
-													column: 13,
+													start: {
+														line: 3,
+														column: 13,
+													},
+													end: {
+														line: 3,
+														column: 28,
+													},
 												},
 											},
 										],
@@ -3222,13 +5004,25 @@ describe("Parser", () => {
 												nodeType: "Identifier",
 												content: "Type",
 												position: {
-													line: 3,
-													column: 33,
+													start: {
+														line: 3,
+														column: 33,
+													},
+													end: {
+														line: 3,
+														column: 37,
+													},
 												},
 											},
 											position: {
-												line: 3,
-												column: 33,
+												start: {
+													line: 3,
+													column: 33,
+												},
+												end: {
+													line: 3,
+													column: 37,
+												},
 											},
 										},
 										body: [
@@ -3238,28 +5032,52 @@ describe("Parser", () => {
 													nodeType: "Identifier",
 													content: "parameter",
 													position: {
-														line: 4,
-														column: 10,
+														start: {
+															line: 4,
+															column: 10,
+														},
+														end: {
+															line: 4,
+															column: 19,
+														},
 													},
 												},
 												position: {
-													line: 4,
-													column: 7,
+													start: {
+														line: 4,
+														column: 7,
+													},
+													end: {
+														line: 4,
+														column: 19,
+													},
 												},
 											},
 										],
 									},
 									position: {
-										line: 3,
-										column: 12,
+										start: {
+											line: 3,
+											column: 12,
+										},
+										end: {
+											line: 5,
+											column: 7,
+										},
 									},
 								},
 								isStatic: false,
 							},
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 6,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -3278,8 +5096,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "name",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						value: {
@@ -3291,20 +5115,38 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 21,
+										start: {
+											line: 1,
+											column: 21,
+										},
+										end: {
+											line: 1,
+											column: 25,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 21,
+									start: {
+										line: 1,
+										column: 21,
+									},
+									end: {
+										line: 1,
+										column: 25,
+									},
 								},
 							},
 							body: [],
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 1,
+								column: 28,
+							},
 						},
 					},
 				]
@@ -3323,8 +5165,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "name",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						value: {
@@ -3336,16 +5184,28 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "external",
 										position: {
-											line: 1,
-											column: 16,
+											start: {
+												line: 1,
+												column: 16,
+											},
+											end: {
+												line: 1,
+												column: 24,
+											},
 										},
 									},
 									internalName: {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 1,
-											column: 25,
+											start: {
+												line: 1,
+												column: 25,
+											},
+											end: {
+												line: 1,
+												column: 33,
+											},
 										},
 									},
 									type: {
@@ -3354,18 +5214,36 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 1,
-												column: 35,
+												start: {
+													line: 1,
+													column: 35,
+												},
+												end: {
+													line: 1,
+													column: 39,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 35,
+											start: {
+												line: 1,
+												column: 35,
+											},
+											end: {
+												line: 1,
+												column: 39,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 16,
+										start: {
+											line: 1,
+											column: 16,
+										},
+										end: {
+											line: 1,
+											column: 39,
+										},
 									},
 								},
 							],
@@ -3375,13 +5253,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 44,
+										start: {
+											line: 1,
+											column: 44,
+										},
+										end: {
+											line: 1,
+											column: 48,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 44,
+									start: {
+										line: 1,
+										column: 44,
+									},
+									end: {
+										line: 1,
+										column: 48,
+									},
 								},
 							},
 							body: [
@@ -3391,20 +5281,38 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 2,
-											column: 9,
+											start: {
+												line: 2,
+												column: 9,
+											},
+											end: {
+												line: 2,
+												column: 17,
+											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 6,
+										start: {
+											line: 2,
+											column: 6,
+										},
+										end: {
+											line: 2,
+											column: 17,
+										},
 									},
 								},
 							],
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 3,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -3423,8 +5331,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "name",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						value: {
@@ -3436,16 +5350,28 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 1,
-											column: 16,
+											start: {
+												line: 1,
+												column: 16,
+											},
+											end: {
+												line: 1,
+												column: 24,
+											},
 										},
 									},
 									internalName: {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 1,
-											column: 16,
+											start: {
+												line: 1,
+												column: 16,
+											},
+											end: {
+												line: 1,
+												column: 24,
+											},
 										},
 									},
 									type: {
@@ -3454,18 +5380,36 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 1,
-												column: 26,
+												start: {
+													line: 1,
+													column: 26,
+												},
+												end: {
+													line: 1,
+													column: 30,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 26,
+											start: {
+												line: 1,
+												column: 26,
+											},
+											end: {
+												line: 1,
+												column: 30,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 16,
+										start: {
+											line: 1,
+											column: 16,
+										},
+										end: {
+											line: 1,
+											column: 30,
+										},
 									},
 								},
 							],
@@ -3475,13 +5419,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 35,
+										start: {
+											line: 1,
+											column: 35,
+										},
+										end: {
+											line: 1,
+											column: 39,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 35,
+									start: {
+										line: 1,
+										column: 35,
+									},
+									end: {
+										line: 1,
+										column: 39,
+									},
 								},
 							},
 							body: [
@@ -3491,20 +5447,38 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 2,
-											column: 9,
+											start: {
+												line: 2,
+												column: 9,
+											},
+											end: {
+												line: 2,
+												column: 17,
+											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 6,
+										start: {
+											line: 2,
+											column: 6,
+										},
+										end: {
+											line: 2,
+											column: 17,
+										},
 									},
 								},
 							],
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 3,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -3523,8 +5497,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "name",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						value: {
@@ -3537,8 +5517,14 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 1,
-											column: 18,
+											start: {
+												line: 1,
+												column: 18,
+											},
+											end: {
+												line: 1,
+												column: 26,
+											},
 										},
 									},
 									type: {
@@ -3547,18 +5533,36 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 1,
-												column: 28,
+												start: {
+													line: 1,
+													column: 28,
+												},
+												end: {
+													line: 1,
+													column: 32,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 28,
+											start: {
+												line: 1,
+												column: 28,
+											},
+											end: {
+												line: 1,
+												column: 32,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 16,
+										start: {
+											line: 1,
+											column: 16,
+										},
+										end: {
+											line: 1,
+											column: 32,
+										},
 									},
 								},
 							],
@@ -3568,13 +5572,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 37,
+										start: {
+											line: 1,
+											column: 37,
+										},
+										end: {
+											line: 1,
+											column: 41,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 37,
+									start: {
+										line: 1,
+										column: 37,
+									},
+									end: {
+										line: 1,
+										column: 41,
+									},
 								},
 							},
 							body: [
@@ -3584,20 +5600,38 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 2,
-											column: 9,
+											start: {
+												line: 2,
+												column: 9,
+											},
+											end: {
+												line: 2,
+												column: 17,
+											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 6,
+										start: {
+											line: 2,
+											column: 6,
+										},
+										end: {
+											line: 2,
+											column: 17,
+										},
 									},
 								},
 							],
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 3,
+								column: 6,
+							},
 						},
 					},
 				]
@@ -3616,8 +5650,14 @@ describe("Parser", () => {
 							nodeType: "Identifier",
 							content: "name",
 							position: {
-								line: 1,
-								column: 10,
+								start: {
+									line: 1,
+									column: 10,
+								},
+								end: {
+									line: 1,
+									column: 14,
+								},
 							},
 						},
 						value: {
@@ -3629,16 +5669,28 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "external",
 										position: {
-											line: 1,
-											column: 16,
+											start: {
+												line: 1,
+												column: 16,
+											},
+											end: {
+												line: 1,
+												column: 24,
+											},
 										},
 									},
 									internalName: {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 1,
-											column: 25,
+											start: {
+												line: 1,
+												column: 25,
+											},
+											end: {
+												line: 1,
+												column: 33,
+											},
 										},
 									},
 									type: {
@@ -3647,18 +5699,36 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 1,
-												column: 35,
+												start: {
+													line: 1,
+													column: 35,
+												},
+												end: {
+													line: 1,
+													column: 39,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 35,
+											start: {
+												line: 1,
+												column: 35,
+											},
+											end: {
+												line: 1,
+												column: 39,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 16,
+										start: {
+											line: 1,
+											column: 16,
+										},
+										end: {
+											line: 1,
+											column: 39,
+										},
 									},
 								},
 								{
@@ -3667,16 +5737,28 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal2",
 										position: {
-											line: 1,
-											column: 51,
+											start: {
+												line: 1,
+												column: 51,
+											},
+											end: {
+												line: 1,
+												column: 60,
+											},
 										},
 									},
 									externalName: {
 										nodeType: "Identifier",
 										content: "external2",
 										position: {
-											line: 1,
-											column: 41,
+											start: {
+												line: 1,
+												column: 41,
+											},
+											end: {
+												line: 1,
+												column: 50,
+											},
 										},
 									},
 									type: {
@@ -3685,18 +5767,36 @@ describe("Parser", () => {
 											nodeType: "Identifier",
 											content: "Type",
 											position: {
-												line: 1,
-												column: 62,
+												start: {
+													line: 1,
+													column: 62,
+												},
+												end: {
+													line: 1,
+													column: 66,
+												},
 											},
 										},
 										position: {
-											line: 1,
-											column: 62,
+											start: {
+												line: 1,
+												column: 62,
+											},
+											end: {
+												line: 1,
+												column: 66,
+											},
 										},
 									},
 									position: {
-										line: 1,
-										column: 41,
+										start: {
+											line: 1,
+											column: 41,
+										},
+										end: {
+											line: 1,
+											column: 66,
+										},
 									},
 								},
 							],
@@ -3706,13 +5806,25 @@ describe("Parser", () => {
 									nodeType: "Identifier",
 									content: "Type",
 									position: {
-										line: 1,
-										column: 71,
+										start: {
+											line: 1,
+											column: 71,
+										},
+										end: {
+											line: 1,
+											column: 75,
+										},
 									},
 								},
 								position: {
-									line: 1,
-									column: 71,
+									start: {
+										line: 1,
+										column: 71,
+									},
+									end: {
+										line: 1,
+										column: 75,
+									},
 								},
 							},
 							body: [
@@ -3722,20 +5834,38 @@ describe("Parser", () => {
 										nodeType: "Identifier",
 										content: "internal",
 										position: {
-											line: 2,
-											column: 9,
+											start: {
+												line: 2,
+												column: 9,
+											},
+											end: {
+												line: 2,
+												column: 17,
+											},
 										},
 									},
 									position: {
-										line: 2,
-										column: 6,
+										start: {
+											line: 2,
+											column: 6,
+										},
+										end: {
+											line: 2,
+											column: 17,
+										},
 									},
 								},
 							],
 						},
 						position: {
-							line: 1,
-							column: 1,
+							start: {
+								line: 1,
+								column: 1,
+							},
+							end: {
+								line: 3,
+								column: 6,
+							},
 						},
 					},
 				]

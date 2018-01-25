@@ -27,7 +27,9 @@ describe("Helpers", () => {
 
 	describe("symbol", () => {
 		it("should return a position object", () => {
-			expect(symbol([{ position: { line: 0, column: 0 } }])).toEqual({ position: { line: 0, column: 0 } })
+			expect(symbol([{ position: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } } }])).toEqual({
+				position: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
+			})
 		})
 	})
 
@@ -42,13 +44,13 @@ describe("Helpers", () => {
 	})
 
 	describe("stripPosition", () => {
-		it("should strip line and column", () => {
+		it("should strip position", () => {
 			let input: Token = {
 				value: "",
 				type: TokenType.LiteralString,
 				position: {
-					line: 1,
-					column: 1,
+					start: { line: 0, column: 0 },
+					end: { line: 0, column: 0 },
 				},
 			}
 
@@ -62,14 +64,14 @@ describe("Helpers", () => {
 	})
 
 	describe("stripPositionFromArray", () => {
-		it("should strip line and column from all values", () => {
+		it("should strip position from all values", () => {
 			let input: Array<Token> = [
 				{
 					value: "",
 					type: TokenType.LiteralString,
 					position: {
-						line: 1,
-						column: 1,
+						start: { line: 0, column: 0 },
+						end: { line: 0, column: 0 },
 					},
 				},
 			]
