@@ -80,8 +80,8 @@ export function resolveMethodInvocationType(node: parser.MethodInvocationNode, s
 		}
 	} else {
 		throw new Error(
-			`${node.name.member.content} is not a function on Type at ${node.name.base.position.line}:${
-				node.name.base.position.column
+			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${
+				node.name.base.position.start.column
 			}.`,
 		)
 	}
@@ -94,13 +94,13 @@ export function resolveFunctionInvocationType(node: parser.FunctionInvocationNod
 		return type.returnType
 	} else if (type.type === "Method") {
 		if (type.returnType.type === "Generic") {
-			console.log(`Expression at ${node.name.position.line}:${node.name.position.column}`)
+			console.log(`Expression at ${node.name.position.start.line}:${node.name.position.start.column}`)
 			throw new Error(
 				"Resolving of Generic Return Types on non-static Methods called in a static way is not implemented yet.",
 			)
 		} else if (type.returnType.type === "Self") {
 			if (type.isStatic) {
-				console.log(`Expression at ${node.name.position.line}:${node.name.position.column}`)
+				console.log(`Expression at ${node.name.position.start.line}:${node.name.position.start.column}`)
 				throw new Error(`Resolving of Self Return Types on Static Methods is not implemented yet.`)
 			} else {
 				return resolveMethodLookupBaseType(node.arguments[0].value, scope)
@@ -109,7 +109,9 @@ export function resolveFunctionInvocationType(node: parser.FunctionInvocationNod
 			return type.returnType
 		}
 	} else {
-		throw new Error(`Expression at ${node.name.position.line}:${node.name.position.column} is not a function.`)
+		throw new Error(
+			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
+		)
 	}
 }
 
@@ -232,7 +234,11 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 	let baseType = resolveType(node.base, scope)
 
 	if (baseType.type !== "Record" && baseType.type !== "Type") {
-		throw new Error(`Node starting at ${node.base.position.line}:${node.base.position.column} is not a Record or Type.`)
+		throw new Error(
+			`Node starting at ${node.base.position.start.line}:${
+				node.base.position.start.column
+			} is not a Record or Type.`,
+		)
 	} else {
 		if (baseType.type === "Type") {
 			if (baseType.definition.type === "Record") {
@@ -242,9 +248,9 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 					return baseType.methods[node.member.content]
 				} else {
 					throw new Error(
-						`Object starting at ${node.base.position.line}:${node.base.position.column} has no member '${
-							node.member.content
-						}'.`,
+						`Object starting at ${node.base.position.start.line}:${
+							node.base.position.start.column
+						} has no member '${node.member.content}'.`,
 					)
 				}
 			} else {
@@ -259,9 +265,9 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 				return baseType.members[node.member.content]
 			} else {
 				throw new Error(
-					`Object starting at ${node.base.position.line}:${node.base.position.column} has no member '${
-						node.member.content
-					}'.`,
+					`Object starting at ${node.base.position.start.line}:${
+						node.base.position.start.column
+					} has no member '${node.member.content}'.`,
 				)
 			}
 		}
@@ -273,7 +279,9 @@ export function resolveIdentifierType(node: parser.IdentifierNode, scope: enrich
 	let result = findVariableInScope(name, scope)
 
 	if (result === null) {
-		throw new Error(`Variable '${name}' at ${node.position.line}:${node.position.column} is not declared.`)
+		throw new Error(
+			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
+		)
 	} else {
 		return result
 	}
@@ -295,9 +303,9 @@ export function resolveMethodLookupType(node: parser.MethodLookupNode, scope: en
 
 	if (result == null) {
 		throw new Error(
-			`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.line}:${
-				node.base.position.column
-			}.`,
+			`Could not resolve Method ${node.member.content} on Type of Expression at ${
+				node.base.position.start.line
+			}:${node.base.position.start.column}.`,
 		)
 	}
 
@@ -353,7 +361,9 @@ export function resolveIdentifierTypeDeclarationType(
 	let result = findVariableInScope(name, scope)
 
 	if (result === null) {
-		throw new Error(`Variable '${name}' at ${node.position.line}:${node.position.column} is not declared.`)
+		throw new Error(
+			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
+		)
 	} else {
 		return result
 	}
@@ -401,7 +411,9 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 		case "Type":
 			return baseType
 		default:
-			throw new Error(`Could not resolve Member on a Type at ${node.position.line}:${node.position.column}.`)
+			throw new Error(
+				`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.`,
+			)
 	}
 }
 

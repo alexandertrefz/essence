@@ -22,7 +22,9 @@ export let parse = (chunk: string) => {
 			value = `"${value}"`
 		}
 
-		throw new ParseError(`Unexpected ${value} at ${error.token.position.line}:${error.token.position.column}`)
+		throw new ParseError(
+			`Unexpected ${value} at ${error.token.position.start.line}:${error.token.position.start.column}`,
+		)
 	}
 
 	if (parser.results.length === 0) {

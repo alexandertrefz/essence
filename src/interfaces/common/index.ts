@@ -1,9 +1,14 @@
 import * as typed from "./typedNodes"
 import * as typedSimple from "./typedSimpleNodes"
 
-export type Position = {
+export type Cursor = {
 	line: number
 	column: number
+}
+
+export type Position = {
+	start: Cursor
+	end: Cursor
 }
 
 export type RecordType = {

@@ -13,8 +13,11 @@ export function nativeFunctionInvocation(
 			nodeType: "Identifier",
 			content: `__${name.content}`,
 			position: {
-				line: name.position.line,
-				column: name.position.column - 2,
+				start: {
+					line: name.position.start.line,
+					column: name.position.start.column - 2,
+				},
+				end: name.position.end,
 			},
 		},
 		arguments: args,
@@ -201,6 +204,7 @@ export function typeDefinitionStatement(
 export function ifElseStatementNode(
 	ifStatement: parser.IfStatementNode,
 	falseBody: Array<parser.Node> | parser.IfStatementNode | parser.IfElseStatementNode,
+	position: common.Position,
 ): parser.IfElseStatementNode {
 	if (!Array.isArray(falseBody)) {
 		falseBody = [falseBody]
@@ -211,7 +215,7 @@ export function ifElseStatementNode(
 		condition: ifStatement.condition,
 		trueBody: ifStatement.body,
 		falseBody,
-		position: ifStatement.position,
+		position,
 	}
 }
 

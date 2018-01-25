@@ -5,17 +5,18 @@ import { createIsHelper, orHelper } from "./helpers"
 const TokenType = lexer.TokenType
 type Token = lexer.Token
 type Position = common.Position
+type Cursor = common.Cursor
 
 type SubLexingResult = {
 	input: string
 	token: Token
-	position: Position
+	cursor: Cursor
 }
 
 type LexingResult = {
 	input: string
 	token: Token | undefined
-	position: Position
+	cursor: Cursor
 }
 
 const linebreak = "\n"
@@ -120,65 +121,80 @@ const getSymbolType = (value: string) => {
 
 const isEOF = (input: string, index: number): boolean => input.length - 1 === index
 
-const updatePosition = (char: string, position: Position): Position => {
-	position = {
-		line: position.line,
-		column: position.column,
+const moveCursor = (char: string, cursor: Cursor): Cursor => {
+	cursor = {
+		line: cursor.line,
+		column: cursor.column,
 	}
 
 	if (char === "\n") {
-		position.column = 1
-		position.line++
+		cursor.column = 1
+		cursor.line++
 	} else {
-		position.column++
+		cursor.column++
 	}
 
-	return position
+	return cursor
 }
 
-const lexLinebreak = (input: string, position: Position): SubLexingResult => {
+const lexLinebreak = (input: string, cursor: Cursor): SubLexingResult => {
 	const firstChar = input[0]
+
+	const startCursor = cursor
+	const endCurser = moveCursor(firstChar, cursor)
 
 	const token: Token = {
 		value: firstChar,
 		type: TokenType.Linebreak,
-		position,
+		position: {
+			start: startCursor,
+			end: endCurser,
+		},
 	}
 
-	position = updatePosition(firstChar, position)
+	cursor = moveCursor(firstChar, cursor)
 	input = input.slice(1)
 
 	return {
 		input,
 		token,
-		position,
+		cursor: endCurser,
 	}
 }
 
-const lexSymbol = (input: string, position: Position): SubLexingResult => {
+const lexSymbol = (input: string, cursor: Cursor): SubLexingResult => {
 	const firstChar = input[0]
+
+	const startCursor = cursor
+	const endCurser = moveCursor(firstChar, cursor)
 
 	const token: Token = {
 		value: firstChar,
 		type: getSymbolType(firstChar),
-		position,
+		position: {
+			start: startCursor,
+			end: endCurser,
+		},
 	}
 
-	position = updatePosition(firstChar, position)
+	cursor = moveCursor(firstChar, cursor)
 	input = input.slice(1)
 
 	return {
 		input,
 		token,
-		position,
+		cursor: endCurser,
 	}
 }
 
-const lexString = (input: string, position: Position): SubLexingResult => {
+const lexString = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
 		value: "",
 		type: TokenType.LiteralString,
-		position,
+		position: {
+			start: cursor,
+			end: cursor,
+		},
 	}
 
 	let inputSliced = false
@@ -188,7 +204,7 @@ const lexString = (input: string, position: Position): SubLexingResult => {
 	for (let i = 0; i < input.length; i++) {
 		token.value += input[i]
 
-		position = updatePosition(input[i], position)
+		cursor = moveCursor(input[i], cursor)
 
 		if (token.value.startsWith(stringLiteral) && token.value.length === 1) {
 			balanceWasChanged = true
@@ -209,21 +225,26 @@ const lexString = (input: string, position: Position): SubLexingResult => {
 	}
 
 	if (!inputSliced) {
-		throw new Error(`String Token not closed at line: ${position.line}, column: ${position.column}`)
+		throw new Error(`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`)
 	}
+
+	token.position.end = cursor
 
 	return {
 		input,
 		token,
-		position,
+		cursor,
 	}
 }
 
-const lexComment = (input: string, position: Position): SubLexingResult => {
+const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
 		value: "",
 		type: TokenType.Comment,
-		position,
+		position: {
+			start: cursor,
+			end: cursor,
+		},
 	}
 
 	let i: number
@@ -237,7 +258,7 @@ const lexComment = (input: string, position: Position): SubLexingResult => {
 		}
 
 		token.value += currentChar
-		position = updatePosition(currentChar, position)
+		cursor = moveCursor(currentChar, cursor)
 
 		if (isEOF(input, i)) {
 			break
@@ -245,19 +266,23 @@ const lexComment = (input: string, position: Position): SubLexingResult => {
 	}
 
 	input = input.slice(i + 1)
+	token.position.end = cursor
 
 	return {
 		input,
 		token,
-		position,
+		cursor,
 	}
 }
 
-const lexNumber = (input: string, position: Position): SubLexingResult => {
+const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
 		value: "",
 		type: TokenType.LiteralNumber,
-		position,
+		position: {
+			start: cursor,
+			end: cursor,
+		},
 	}
 
 	let i: number
@@ -271,7 +296,7 @@ const lexNumber = (input: string, position: Position): SubLexingResult => {
 		}
 
 		token.value += currentChar
-		position = updatePosition(currentChar, position)
+		cursor = moveCursor(currentChar, cursor)
 
 		if (isEOF(input, i)) {
 			break
@@ -279,19 +304,23 @@ const lexNumber = (input: string, position: Position): SubLexingResult => {
 	}
 
 	input = input.slice(i + 1)
+	token.position.end = cursor
 
 	return {
 		input,
 		token,
-		position,
+		cursor,
 	}
 }
 
-const lexIdentifier = (input: string, position: Position): SubLexingResult => {
+const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 	const token: Token = {
 		value: "",
 		type: TokenType.Identifier,
-		position,
+		position: {
+			start: cursor,
+			end: cursor,
+		},
 	}
 
 	let i: number
@@ -304,7 +333,7 @@ const lexIdentifier = (input: string, position: Position): SubLexingResult => {
 			break
 		}
 
-		position = updatePosition(currentChar, position)
+		cursor = moveCursor(currentChar, cursor)
 		token.value += currentChar
 
 		if (isEOF(input, i)) {
@@ -313,21 +342,22 @@ const lexIdentifier = (input: string, position: Position): SubLexingResult => {
 	}
 
 	input = input.slice(i + 1)
+	token.position.end = cursor
 
 	return {
 		input,
 		token,
-		position,
+		cursor,
 	}
 }
 
-const lexToken = (input: string, position: Position, ignoreList: Array<string>): LexingResult => {
+const lexToken = (input: string, cursor: Cursor, ignoreList: Array<string>): LexingResult => {
 	let token: Token | undefined = undefined
 
 	if (input.length === 0) {
 		return {
 			input,
-			position,
+			cursor,
 			token: undefined,
 		}
 	}
@@ -335,21 +365,21 @@ const lexToken = (input: string, position: Position, ignoreList: Array<string>):
 	let firstChar = input[0]
 
 	if (isWhitespace(firstChar)) {
-		return lexToken(input.slice(1), updatePosition(firstChar, position), ignoreList)
+		return lexToken(input.slice(1), moveCursor(firstChar, cursor), ignoreList)
 	}
 
 	if (isLinebreak(firstChar)) {
-		;({ input, token, position } = lexLinebreak(input, position))
+		;({ input, token, cursor } = lexLinebreak(input, cursor))
 	} else if (isSymbol(firstChar)) {
-		;({ input, token, position } = lexSymbol(input, position))
+		;({ input, token, cursor } = lexSymbol(input, cursor))
 	} else if (isCommentLiteral(firstChar)) {
-		;({ input, token, position } = lexComment(input, position))
+		;({ input, token, cursor } = lexComment(input, cursor))
 	} else if (isStringLiteral(firstChar)) {
-		;({ input, token, position } = lexString(input, position))
+		;({ input, token, cursor } = lexString(input, cursor))
 	} else if (isNumberLiteral(firstChar)) {
-		;({ input, token, position } = lexNumber(input, position))
+		;({ input, token, cursor } = lexNumber(input, cursor))
 	} else {
-		;({ input, token, position } = lexIdentifier(input, position))
+		;({ input, token, cursor } = lexIdentifier(input, cursor))
 
 		if (isKeyword(token.value)) {
 			token.type = getKeywordType(token.value)
@@ -359,20 +389,20 @@ const lexToken = (input: string, position: Position, ignoreList: Array<string>):
 	}
 
 	if (ignoreList.includes(token.type)) {
-		return lexToken(input, position, ignoreList)
+		return lexToken(input, cursor, ignoreList)
 	}
 
 	return {
 		input,
 		token,
-		position,
+		cursor,
 	}
 }
 
 export class Lexer {
 	protected data: string
 	protected index: number
-	protected state: Position
+	protected state: Cursor
 	protected ignoreList: Array<string>
 
 	constructor() {
@@ -382,7 +412,7 @@ export class Lexer {
 		this.ignoreList = []
 	}
 
-	reset(data: string, state: Position = { line: 1, column: 1 }) {
+	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
 		this.data = data
 		this.index = 0
 		this.state = state
@@ -391,9 +421,9 @@ export class Lexer {
 	next(): lexer.Token | undefined {
 		const data = this.data.slice(this.index)
 
-		const { input, token, position } = lexToken(data, this.state, this.ignoreList)
+		const { input, token, cursor } = lexToken(data, this.state, this.ignoreList)
 
-		this.state = position
+		this.state = cursor
 		this.index = this.data.length - input.length
 
 		return token
