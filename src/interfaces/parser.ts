@@ -2,9 +2,7 @@ import { Position } from "./common"
 
 export type Node = ExpressionNode | StatementNode
 
-/////////////////
-/* Expressions */
-/////////////////
+// #region Expressions
 
 export type ExpressionNode =
 	| NativeFunctionInvocationNode
@@ -116,9 +114,9 @@ export interface CombinationNode {
 	position: Position
 }
 
-////////////////
-/* Statements */
-////////////////
+// #endregion
+
+// #region Statements
 
 export type StatementNode =
 	| ConstantDeclarationStatementNode
@@ -193,9 +191,9 @@ export interface FunctionStatementNode {
 	position: Position
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 export type TypeDeclarationNode = IdentifierTypeDeclarationNode | ArrayTypeDeclarationNode
 
@@ -231,3 +229,5 @@ export interface ArgumentNode {
 	name: IdentifierNode | null
 	value: ExpressionNode
 }
+
+// #endregion

@@ -1,8 +1,6 @@
 import { parser, common } from "../interfaces"
 
-/////////////////
-/* Expressions */
-/////////////////
+// #region Expressions
 
 export function nativeFunctionInvocation(
 	name: parser.IdentifierNode,
@@ -142,9 +140,9 @@ export function combination(
 	}
 }
 
-////////////////
-/* Statements */
-////////////////
+// #endregion
+
+// #region Statements
 
 export function constantDeclarationStatement(
 	name: parser.IdentifierNode,
@@ -240,9 +238,9 @@ export function functionStatement(
 	return { nodeType: "FunctionStatement", name, value, position }
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 export function identifierTypeDeclaration(
 	type: parser.IdentifierNode,
@@ -326,3 +324,5 @@ type TypeMethod = {
 }
 type TypeMethods = { [key: string]: { method: parser.FunctionValueNode; isStatic: boolean } }
 type TypeProperties = { [key: string]: parser.TypeDeclarationNode }
+
+// #endregion

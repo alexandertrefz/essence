@@ -31,9 +31,7 @@ export function enrichNode(node: parser.Node, scope: enricher.Scope): common.typ
 	}
 }
 
-/////////////////
-/* Expressions */
-/////////////////
+// #region Expressions
 
 export function enrichExpression(node: parser.ExpressionNode, scope: enricher.Scope): common.typed.ExpressionNode {
 	switch (node.nodeType) {
@@ -271,9 +269,9 @@ export function enrichMethodLookup(
 	}
 }
 
-////////////////
-/* Statements */
-////////////////
+// #endregion
+
+// #region Statements
 
 export function enrichStatement(node: parser.StatementNode, scope: enricher.Scope): common.typed.StatementNode {
 	switch (node.nodeType) {
@@ -445,9 +443,9 @@ export function enrichFunctionStatement(
 	}
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 function declareVariableInScope(
 	identifier: parser.IdentifierNode | string,
@@ -534,3 +532,5 @@ function enrichMember(node: parser.LookupNode, scope: enricher.Scope): common.ty
 		type: resolveType(node, scope),
 	}
 }
+
+// #endregion
