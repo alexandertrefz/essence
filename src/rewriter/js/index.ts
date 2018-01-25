@@ -62,9 +62,7 @@ function rewriteProgramNodes(
 	return nodes.map(node => rewriteStatement(node))
 }
 
-////////////////
-/* Statements */
-////////////////
+// #region Statements
 
 function rewriteStatement(node: common.typedSimple.Node): estree.Statement {
 	switch (node.nodeType) {
@@ -173,9 +171,9 @@ function rewriteExpressionStatement(
 	}
 }
 
-/////////////////
-/* Expressions */
-/////////////////
+// #endregion
+
+// #region Expressions
 
 function rewriteExpression(
 	node: common.typedSimple.ExpressionNode | common.typedSimple.VariableAssignmentStatementNode,
@@ -417,9 +415,9 @@ function rewriteIdentifier(node: common.typedSimple.IdentifierNode): estree.Iden
 	}
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 function rewriteBlockStatement(nodes: Array<common.typedSimple.Node>): estree.BlockStatement {
 	return {
@@ -497,3 +495,5 @@ function importNamespaceSpecifier(variableName: string): estree.ImportNamespaceS
 		},
 	}
 }
+
+// #endregion

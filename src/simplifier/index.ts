@@ -33,9 +33,7 @@ function simplifyNode(node: common.typed.Node): common.typedSimple.Node {
 	}
 }
 
-/////////////////
-/* Expressions */
-/////////////////
+// #region Expressions
 
 function simplifyExpression(node: common.typed.ExpressionNode): common.typedSimple.ExpressionNode {
 	switch (node.nodeType) {
@@ -211,9 +209,9 @@ function simplifyMethodLookup(node: common.typed.MethodLookupNode): common.typed
 	}
 }
 
-////////////////
-/* Statements */
-////////////////
+// #endregion
+
+// #region Statements
 
 function simplifyStatement(node: common.typed.StatementNode): common.typedSimple.StatementNode {
 	switch (node.nodeType) {
@@ -321,9 +319,9 @@ function simplifyFunctionStatement(node: common.typed.FunctionStatementNode): co
 	}
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 function simplifyMembers(members: {
 	[key: string]: common.typed.ExpressionNode
@@ -395,3 +393,5 @@ function simplifyArgument(node: common.typed.ArgumentNode): common.typedSimple.A
 		value: simplifyExpression(node.value),
 	}
 }
+
+// #endregion

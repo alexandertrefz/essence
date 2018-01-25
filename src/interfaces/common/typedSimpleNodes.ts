@@ -2,9 +2,7 @@ import { Type, ArrayType } from "./index"
 
 export type Node = ExpressionNode | StatementNode
 
-/////////////////
-/* Expressions */
-/////////////////
+// #region Expressions
 
 export type ExpressionNode =
 	| NativeFunctionInvocationNode
@@ -94,9 +92,9 @@ export interface CombinationNode {
 	type: Type
 }
 
-////////////////
-/* Statements */
-////////////////
+// #endregion
+
+// #region Statements
 
 export type StatementNode =
 	| VariableDeclarationStatementNode
@@ -150,9 +148,9 @@ export interface FunctionStatementNode {
 	value: FunctionDefinitionNode
 }
 
-/////////////
-/* Helpers */
-/////////////
+// #endregion
+
+// #region Helpers
 
 export interface FunctionDefinitionNode {
 	nodeType: "FunctionDefinition"
@@ -171,3 +169,5 @@ export interface ArgumentNode {
 	name: string | null
 	value: ExpressionNode
 }
+
+// #endregion
