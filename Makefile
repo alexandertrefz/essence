@@ -12,7 +12,7 @@ JS_TESTS = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_
 
 # Commands
 TSC := ./node_modules/.bin/tsc
-TSC_ARGS := -t es2017 -m commonjs --moduleResolution Node --strict --pretty --sourceMap --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)/ $(TS_SOURCE_DIR)/modules.d.ts
+TSC_ARGS := -t es2017 -m commonjs --moduleResolution Node --strict --pretty --skipLibCheck --sourceMap --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)/ $(TS_SOURCE_DIR)/modules.d.ts
 
 JASMINE := ./node_modules/.bin/jasmine
 NEARLEYC := ./node_modules/.bin/nearleyc

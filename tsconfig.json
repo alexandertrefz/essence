@@ -7,7 +7,8 @@
 		"pretty": true,
 		"rootDir": "src",
 		"outDir": "lib",
-		"sourceMap": true
+		"sourceMap": true,
+		"skipLibCheck": true
 	},
 	"exclude": [
 		"**/rewriter/js/runtime/*"
