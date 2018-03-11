@@ -5,19 +5,19 @@ export class $Number {
 		return { $type: "Number", value }
 	}
 
-	static add(self: NumberType, other: NumberType): NumberType {
-		return $Number.create((Number.parseFloat(self.value) + Number.parseFloat(other.value)).toString())
+	static add(originalNumber: NumberType, other: NumberType): NumberType {
+		return $Number.create((Number.parseFloat(originalNumber.value) + Number.parseFloat(other.value)).toString())
 	}
 
-	static subtract(self: NumberType, other: NumberType): NumberType {
-		return $Number.create((Number.parseFloat(self.value) - Number.parseFloat(other.value)).toString())
+	static subtract(originalNumber: NumberType, other: NumberType): NumberType {
+		return $Number.create((Number.parseFloat(originalNumber.value) - Number.parseFloat(other.value)).toString())
 	}
 
-	static divide(self: NumberType, other: NumberType): NumberType {
-		return $Number.create((Number.parseFloat(self.value) / Number.parseFloat(other.value)).toString())
+	static divide(originalNumber: NumberType, other: NumberType): NumberType {
+		return $Number.create((Number.parseFloat(originalNumber.value) / Number.parseFloat(other.value)).toString())
 	}
 
-	static multiply(self: NumberType, other: NumberType): NumberType {
-		return $Number.create((Number.parseFloat(self.value) * Number.parseFloat(other.value)).toString())
+	static multiply(originalNumber: NumberType, other: NumberType): NumberType {
+		return $Number.create((Number.parseFloat(originalNumber.value) * Number.parseFloat(other.value)).toString())
 	}
 }

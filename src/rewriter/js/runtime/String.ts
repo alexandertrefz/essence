@@ -8,35 +8,35 @@ export class $String {
 		return { $type: "String", value }
 	}
 
-	static isEmpty(self: StringType): BooleanType {
-		return $Boolean.create(self.value.length === 0)
+	static isEmpty(originalString: StringType): BooleanType {
+		return $Boolean.create(originalString.value.length === 0)
 	}
 
-	static hasContent(self: StringType): BooleanType {
-		return $Boolean.create(self.value.length !== 0)
+	static hasContent(originalString: StringType): BooleanType {
+		return $Boolean.create(originalString.value.length !== 0)
 	}
 
-	static is(self: StringType, otherString: StringType): BooleanType {
-		return $Boolean.create(self.value === otherString.value)
+	static is(originalString: StringType, otherString: StringType): BooleanType {
+		return $Boolean.create(originalString.value === otherString.value)
 	}
 
-	static isnt(self: StringType, otherString: StringType): BooleanType {
-		return $Boolean.create(self.value !== otherString.value)
+	static isnt(originalString: StringType, otherString: StringType): BooleanType {
+		return $Boolean.create(originalString.value !== otherString.value)
 	}
 
-	static prepend(self: StringType, otherString: StringType): StringType {
-		return $String.create(otherString.value + self.value)
+	static prepend(originalString: StringType, otherString: StringType): StringType {
+		return $String.create(otherString.value + originalString.value)
 	}
 
-	static append(self: StringType, otherString: StringType): StringType {
-		return $String.create(self.value + otherString.value)
+	static append(originalString: StringType, otherString: StringType): StringType {
+		return $String.create(originalString.value + otherString.value)
 	}
 
-	static split(self: StringType, splitter: StringType): ArrayType<StringType> {
-		return $Array.create(self.value.split(splitter.value).map(chunk => $String.create(chunk)))
+	static split(originalString: StringType, splitterString: StringType): ArrayType<StringType> {
+		return $Array.create(originalString.value.split(splitterString.value).map(chunk => $String.create(chunk)))
 	}
 
-	static contains(self: StringType, otherString: StringType): BooleanType {
-		return $Boolean.create(self.value.includes(otherString.value))
+	static contains(originalString: StringType, otherString: StringType): BooleanType {
+		return $Boolean.create(originalString.value.includes(otherString.value))
 	}
 }
