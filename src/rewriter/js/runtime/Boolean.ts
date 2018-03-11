@@ -5,11 +5,11 @@ export class $Boolean {
 		return { $type: "Boolean", value }
 	}
 
-	static negate(self: BooleanType): BooleanType {
-		return $Boolean.create(!self.value)
+	static negate(originalBoolean: BooleanType): BooleanType {
+		return $Boolean.create(!originalBoolean.value)
 	}
 
-	static is(self: BooleanType, other: BooleanType): BooleanType {
-		return $Boolean.create(self.value === other.value)
+	static is(originalBoolean: BooleanType, other: BooleanType): BooleanType {
+		return $Boolean.create(originalBoolean.value === other.value)
 	}
 }

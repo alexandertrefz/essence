@@ -1,34 +1,61 @@
 import { $Boolean, BooleanType } from "./Boolean"
+import { NumberType, $Number } from "./Number"
+import { getRawNumber } from "./internalHelpers"
 
 export type ArrayType<T> = { $type: "Array"; value: Array<T> }
 
 export class $Array {
-	static create<T>(value: Array<T>): ArrayType<T> {
-		return { $type: "Array", value }
+	static create<T>(originalArray: Array<T>): ArrayType<T> {
+		return { $type: "Array", value: originalArray }
 	}
 
-	static hasItems<T>(value: ArrayType<T>): BooleanType {
-		return $Boolean.create(value.value.length !== 0)
+	static hasItems<T>(originalArray: ArrayType<T>): BooleanType {
+		return $Boolean.create(originalArray.value.length !== 0)
 	}
 
-	static first<T>(value: ArrayType<T>): T {
-		return value.value[0]
+	static first<T>(originalArray: ArrayType<T>): T {
+		return originalArray.value[0]
 	}
 
-	static last<T>(value: ArrayType<T>): T {
-		return value.value[value.value.length - 1]
+	static last<T>(originalArray: ArrayType<T>): T {
+		return originalArray.value[originalArray.value.length - 1]
 	}
 
-	static unique<T>(value: ArrayType<T>): ArrayType<T> {
-		let cache: Array<T> = []
-		return $Array.create(value.value.filter(value => !~cache.indexOf(value)))
+	static unique<T>(originalArray: ArrayType<T>): ArrayType<T> {
+		let results: Array<T> = []
+
+		originalArray.value.map(value => {
+			if (!results.includes(value)) {
+				results.push(value)
+			}
+		})
+
+		return $Array.create(results)
 	}
 
-	static dropFirst<T>(value: ArrayType<T>): ArrayType<T> {
-		return $Array.create(value.value.slice(1))
+	static dropFirst<T>(originalArray: ArrayType<T>): ArrayType<T> {
+		return $Array.create(originalArray.value.slice(1))
 	}
 
-	static dropLast<T>(value: ArrayType<T>): ArrayType<T> {
-		return $Array.create(value.value.slice(0, value.value.length - 1))
+	static dropLast<T>(originalArray: ArrayType<T>): ArrayType<T> {
+		return $Array.create(originalArray.value.slice(0, originalArray.value.length - 1))
+	}
+
+	static insert$1<T>(originalArray: ArrayType<T>, item: T, index: NumberType): ArrayType<T> {
+		return $Array.create(originalArray.value.splice(getRawNumber(index), 1, item))
+	}
+
+	static insert$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>, index: NumberType): ArrayType<T> {
+		return $Array.create(
+			originalArray.value.splice(getRawNumber(index), contentsOf.value.length, ...contentsOf.value),
+		)
+	}
+
+	static append$1<T>(originalArray: ArrayType<T>, item: T): ArrayType<T> {
+		return $Array.create([...originalArray.value, item])
+	}
+
+	static append$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>): ArrayType<T> {
+		return $Array.create([...originalArray.value, ...contentsOf.value])
 	}
 }
