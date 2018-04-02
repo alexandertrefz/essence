@@ -20,16 +20,71 @@ async function compile(inputFileName, flags) {
 	const sourceFileNameParsed = path.parse(inputFileName)
 	const targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
 
+	if (flags.debug) {
+		console.time("Total")
+		console.time("Reading Input File")
+	}
+
 	const data = await readFile(inputFileName, "utf8")
 
+	if (flags.debug) {
+		console.log()
+		console.timeEnd("Reading Input File")
+		console.log()
+		console.time("Parsing")
+	}
+
 	const initialAST = Parser.parse(data)
+
+	if (flags.debug) {
+		console.timeEnd("Parsing")
+		console.time("Enriching")
+	}
+
 	const enrichedAST = Enricher.enrich(initialAST)
+
+	if (flags.debug) {
+		console.timeEnd("Enriching")
+		console.time("Validating")
+	}
+
 	const validatedAST = Validator.validate(enrichedAST)
+
+	if (flags.debug) {
+		console.timeEnd("Validating")
+		console.time("Simplifying")
+	}
+
 	const simplifiedAST = Simplifier.simplify(validatedAST)
+
+	if (flags.debug) {
+		console.timeEnd("Simplifying")
+		console.time("Optimising")
+	}
+
 	const optimisedAST = Optimiser.optimise(simplifiedAST)
+
+	if (flags.debug) {
+		console.timeEnd("Optimising")
+		console.time("Rewriting")
+	}
+
 	const result = await Rewriter.rewrite(optimisedAST, flags.mode)
 
+	if (flags.debug) {
+		console.timeEnd("Rewriting")
+		console.time("Writing Output File")
+	}
+
 	await writeFile(targetFileName, result)
+
+	if (flags.debug) {
+		console.log()
+		console.timeEnd("Writing Output File")
+		console.log()
+		console.timeEnd("Total")
+		console.log()
+	}
 
 	console.log(`Successfully compiled ${inputFileName} -> ${targetFileName}`)
 	return Promise.resolve()
@@ -42,7 +97,8 @@ const cli = meow(
 			    $ esc <fileName>
 
 			Options
-			    --mode Set the rewriter mode
+				--mode Set the rewriter mode
+				--debug Outputs various debugging information
 
 			Examples
 			    $ foo HelloWorld.es --mode js
@@ -55,8 +111,12 @@ const cli = meow(
 				type: "string",
 				default: "js",
 			},
+			debug: {
+				type: "boolean",
+				default: false,
+			},
 		},
 	},
 )
 
-compile(cli.input[0], Object.assign({ mode: "js" }, cli.flags))
+compile(cli.input[0], Object.assign({ mode: "js", debug: false }, cli.flags))
