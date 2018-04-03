@@ -1,17 +1,17 @@
 .DS_Store
-node_modules
 .vscode
-yarn-error.log
+
+.nyc_output
 
 Scrapbook.md
 Notes.md
 TODO.md
 
 lib
-
+node_modules
+.rpt2_cache
+yarn-error.log
 testFiles/local
 testFiles/*.js
-/src/parser/grammar.ts
-/.nyc_output
-/coverage
-/.rpt2_cache
+src/parser/grammar.ts
+coverage
