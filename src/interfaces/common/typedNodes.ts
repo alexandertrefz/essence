@@ -17,7 +17,7 @@ export type ExpressionNode =
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation"
-	name: IdentifierNode | LookupNode
+	name: IdentifierNode
 	arguments: Array<ArgumentNode>
 	position: Position
 	type: Type
