@@ -71,17 +71,9 @@ function simplifyExpression(node: common.typed.ExpressionNode): common.typedSimp
 function simplifyNativeFunctionInvocation(
 	node: common.typed.NativeFunctionInvocationNode,
 ): common.typedSimple.NativeFunctionInvocationNode {
-	let name
-
-	if (node.name.nodeType === "Identifier") {
-		name = simplifyIdentifier(node.name)
-	} else {
-		name = simplifyLookup(node.name)
-	}
-
 	return {
 		nodeType: "NativeFunctionInvocation",
-		name,
+		name: simplifyIdentifier(node.name),
 		arguments: node.arguments.map(arg => simplifyArgument(arg)),
 		type: node.type,
 	}
