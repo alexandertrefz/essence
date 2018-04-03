@@ -37,5 +37,5 @@ type Event {
 	}
 }
 
-constant event = Event.create(from "event.namespace")
-__print(event)
+variable event = Event.create(from "event.namespace")
+event = event::stopPropagation()
