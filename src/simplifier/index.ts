@@ -375,6 +375,7 @@ function simplifyFunctionDefinition(
 		nodeType: "FunctionDefinition",
 		parameters: node.parameters.map(param => simplifyParameter(param)),
 		body: node.body.map(node => simplifyNode(node)),
+		returnType: node.returnType,
 	}
 }
 

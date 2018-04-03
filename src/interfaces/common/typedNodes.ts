@@ -229,6 +229,7 @@ export interface FunctionDefinitionNode {
 	nodeType: "FunctionDefinition"
 	parameters: Array<ParameterNode>
 	body: Array<Node>
+	returnType: Type
 }
 
 export interface ArgumentNode {

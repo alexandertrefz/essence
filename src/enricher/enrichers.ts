@@ -130,6 +130,7 @@ export function enrichMethodFunctionDefinition(
 		nodeType: "FunctionDefinition",
 		parameters: node.method.value.parameters.map(parameter => enrichParameter(parameter, newScope)),
 		body: node.method.value.body.map(node => enrichNode(node, newScope)),
+		returnType: resolveType(node.method.value.returnType, scope),
 	}
 }
 
@@ -143,6 +144,7 @@ export function enrichFunctionDefinition(
 		nodeType: "FunctionDefinition",
 		parameters: node.parameters.map(parameter => enrichParameter(parameter, newScope)),
 		body: node.body.map(node => enrichNode(node, newScope)),
+		returnType: resolveType(node.returnType, scope),
 	}
 }
 
