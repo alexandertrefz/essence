@@ -13,7 +13,7 @@ function isRecord(obj: any): obj is RecordType {
 	return obj.$type == null
 }
 
-function getNativeValue(obj: ArrayType<any> | StringType | NumberType | BooleanType): any {
+function getNativeValue(obj: ArrayType<any> | StringType | NumberType | BooleanType | RecordType): any {
 	if (isRecord(obj)) {
 		let result: { [key: string]: any } = {}
 
@@ -32,7 +32,7 @@ function getNativeValue(obj: ArrayType<any> | StringType | NumberType | BooleanT
 }
 
 // TODO: Recursive type definitions?
-export function print(message: ArrayType<any> | StringType | NumberType | BooleanType) {
+export function print(message: ArrayType<any> | StringType | NumberType | BooleanType | RecordType) {
 	console.log(getNativeValue(message))
 
 	return message
