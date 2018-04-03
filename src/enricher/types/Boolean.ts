@@ -3,18 +3,18 @@ import { common } from "../../interfaces"
 const type: common.TypeType = {
 	type: "Type",
 	name: "Boolean",
-	definition: { type: "BuiltIn" },
+	definition: { type: "Primitive", primitive: "Boolean" },
 	methods: {
 		is: {
 			type: "Method",
-			parameterTypes: [{ type: "Self" }, { type: "Self" }],
-			returnType: { type: "Self" },
+			parameterTypes: [{ type: "Primitive", primitive: "Boolean" }, { type: "Primitive", primitive: "Boolean" }],
+			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		negate: {
 			type: "Method",
-			parameterTypes: [{ type: "Self" }],
-			returnType: { type: "Self" },
+			parameterTypes: [{ type: "Primitive", primitive: "Boolean" }],
+			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 	},

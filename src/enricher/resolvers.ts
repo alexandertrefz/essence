@@ -71,13 +71,7 @@ export function resolveMethodInvocationType(node: parser.MethodInvocationNode, s
 	let type = resolveMethodLookupType(node.name, scope)
 
 	if (type.type === "Method") {
-		if (type.returnType.type === "Self") {
-			return resolveMethodLookupBaseType(node.name.base, scope)
-		} else if (type.returnType.type === "Generic") {
-			throw new Error("Implement resolveMethodInvocation for Generic Return Types")
-		} else {
-			return type.returnType
-		}
+		return type.returnType
 	} else {
 		throw new Error(
 			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${
@@ -93,21 +87,7 @@ export function resolveFunctionInvocationType(node: parser.FunctionInvocationNod
 	if (type.type === "Function") {
 		return type.returnType
 	} else if (type.type === "Method") {
-		if (type.returnType.type === "Generic") {
-			console.log(`Expression at ${node.name.position.start.line}:${node.name.position.start.column}`)
-			throw new Error(
-				"Resolving of Generic Return Types on non-static Methods called in a static way is not implemented yet.",
-			)
-		} else if (type.returnType.type === "Self") {
-			if (type.isStatic) {
-				console.log(`Expression at ${node.name.position.start.line}:${node.name.position.start.column}`)
-				throw new Error(`Resolving of Self Return Types on Static Methods is not implemented yet.`)
-			} else {
-				return resolveMethodLookupBaseType(node.arguments[0].value, scope)
-			}
-		} else {
-			return type.returnType
-		}
+		return type.returnType
 	} else {
 		throw new Error(
 			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
@@ -118,7 +98,7 @@ export function resolveFunctionInvocationType(node: parser.FunctionInvocationNod
 export function resolveCombinationType(node: parser.CombinationNode, scope: enricher.Scope): common.Type {
 	function isSubType(lhs: common.RecordType | common.TypeType, rhs: common.RecordType | common.TypeType): boolean {
 		if (lhs.type === "Type") {
-			if (lhs.definition.type === "BuiltIn") {
+			if (lhs.definition.type === "Primitive" || lhs.definition.type === "BuiltIn") {
 				throw new Error(`You can not combine ${lhs.name} with other Types.`)
 			} else {
 				lhs = lhs.definition
@@ -126,7 +106,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		}
 
 		if (rhs.type === "Type") {
-			if (rhs.definition.type === "BuiltIn") {
+			if (rhs.definition.type === "Primitive" || rhs.definition.type === "BuiltIn") {
 				throw new Error(`You can not combine ${rhs.name} with other Types.`)
 			} else {
 				rhs = rhs.definition
@@ -221,6 +201,10 @@ export function resolveArrayValueType(node: parser.ArrayValueNode, scope: enrich
 			if (!deepEqual(itemType, resolveType(expression, scope))) {
 				throw new Error("Mixed Array Types are not supported yet.")
 			}
+		}
+
+		if (itemType.type === "Method") {
+			throw new Error("Methods can not be Array Item Types.")
 		}
 
 		return {
@@ -340,7 +324,11 @@ export function resolveTypeDefinitionStatementType(
 	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
-		methods[methodName] = resolveMethodType(methodValue, scope, resultType)
+		methods[methodName] = resolveMethodType(
+			methodValue,
+			{ parent: scope, members: { [node.name.content]: resultType } },
+			resultType,
+		)
 	}
 
 	resultType.definition = {
@@ -372,8 +360,14 @@ export function resolveIdentifierTypeDeclarationType(
 export function resolveArrayTypeDeclarationType(
 	node: parser.ArrayTypeDeclarationNode,
 	scope: enricher.Scope,
-): common.Type {
-	return resolveArrayTypeType(resolveType(node.type, scope))
+): common.ArrayType {
+	const itemType = resolveType(node.type, scope)
+
+	if (itemType.type === "Method") {
+		throw new Error("Methods can not be Array Item Types.")
+	}
+
+	return { type: "Array", itemType }
 }
 
 /////////////
@@ -396,10 +390,6 @@ export function findVariableInScope(name: string, scope: enricher.Scope): common
 	}
 }
 
-export function resolveArrayTypeType(genericType: common.Type): common.TypeType {
-	return generateArray(genericType)
-}
-
 export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: enricher.Scope): common.TypeType {
 	let baseType = resolveType(node, scope)
 
@@ -407,7 +397,11 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 		case "Primitive":
 			return resolvePrimitiveTypeType(baseType, scope)
 		case "Array":
-			return resolveArrayTypeType(baseType)
+			if (baseType.itemType.type === "Never") {
+				return generateArray({ type: "Record", members: {} })
+			} else {
+				return generateArray(baseType.itemType)
+			}
 		case "Type":
 			return baseType
 		default:
@@ -422,17 +416,7 @@ export function resolveMethodType(
 	scope: enricher.Scope,
 	selfType: common.TypeType,
 ): common.MethodType {
-	let returnType
-
-	if (node.method.value.returnType.type.nodeType === "Identifier") {
-		if (selfType.name === node.method.value.returnType.type.content) {
-			returnType = selfType
-		} else {
-			returnType = resolveType(node.method.value.returnType, scope)
-		}
-	} else {
-		returnType = resolveType(node.method.value.returnType, scope)
-	}
+	const returnType = resolveType(node.method.value.returnType, scope)
 
 	if (node.isStatic) {
 		return {
