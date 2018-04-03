@@ -19,24 +19,24 @@ export type RecordType = {
 }
 
 // TODO: Represent Parameter Labels as part of the type
+type Parameter = Type
+
 export type FunctionType = {
 	type: "Function"
-	parameterTypes: Array<Type>
+	parameterTypes: Array<Parameter>
 	returnType: Type
 }
 
-// TODO: Represent Parameter Labels as part of the type
 export type UnstaticMethodType = {
 	type: "Method"
-	parameterTypes: Array<Type>
+	parameterTypes: Array<Parameter>
 	returnType: Type
 	isStatic: false
 }
 
-// TODO: Represent Parameter Labels as part of the type
 export type StaticMethodType = {
 	type: "Method"
-	parameterTypes: Array<Type>
+	parameterTypes: Array<Parameter>
 	returnType: Type
 	isStatic: true
 }
