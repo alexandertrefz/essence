@@ -28,16 +28,16 @@ export type FunctionType = {
 // TODO: Represent Parameter Labels as part of the type
 export type UnstaticMethodType = {
 	type: "Method"
-	parameterTypes: Array<Type | SelfType>
-	returnType: Type | SelfType | GenericType
+	parameterTypes: Array<Type>
+	returnType: Type
 	isStatic: false
 }
 
 // TODO: Represent Parameter Labels as part of the type
 export type StaticMethodType = {
 	type: "Method"
-	parameterTypes: Array<Type | SelfType>
-	returnType: Type | SelfType
+	parameterTypes: Array<Type>
+	returnType: Type
 	isStatic: true
 }
 
@@ -45,20 +45,12 @@ export type MethodType = UnstaticMethodType | StaticMethodType
 
 export type ArrayType = {
 	type: "Array"
-	itemType: Type | GenericType | NeverType | SelfType
+	itemType: RecordType | FunctionType | PrimitiveType | TypeType | ArrayType | NeverType
 }
 
 export type PrimitiveType = {
 	type: "Primitive"
 	primitive: "String" | "Number" | "Boolean"
-}
-
-export type GenericType = {
-	type: "Generic"
-}
-
-export type SelfType = {
-	type: "Self"
 }
 
 export type NeverType = {
@@ -72,7 +64,7 @@ export type BuiltInType = {
 export type TypeType = {
 	type: "Type"
 	name: string
-	definition: RecordType | BuiltInType
+	definition: RecordType | BuiltInType | PrimitiveType
 	methods: {
 		[key: string]: MethodType
 	}

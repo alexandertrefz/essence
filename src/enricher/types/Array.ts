@@ -1,6 +1,8 @@
 import { common } from "../../interfaces"
 
-function generateType(genericType: common.Type): common.TypeType {
+function generateType(
+	genericType: common.RecordType | common.FunctionType | common.PrimitiveType | common.TypeType | common.ArrayType,
+): common.TypeType {
 	return {
 		type: "Type",
 		name: "Array",
@@ -8,38 +10,38 @@ function generateType(genericType: common.Type): common.TypeType {
 		methods: {
 			hasItems: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
+				parameterTypes: [{ type: "Array", itemType: genericType }],
 				returnType: { type: "Primitive", primitive: "Boolean" },
 				isStatic: false,
 			},
 			first: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
+				parameterTypes: [{ type: "Array", itemType: genericType }],
 				returnType: genericType,
 				isStatic: false,
 			},
 			last: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
+				parameterTypes: [{ type: "Array", itemType: genericType }],
 				returnType: genericType,
 				isStatic: false,
 			},
 			unique: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
-				returnType: { type: "Self" },
+				parameterTypes: [{ type: "Array", itemType: genericType }],
+				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
 			dropFirst: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
-				returnType: { type: "Self" },
+				parameterTypes: [{ type: "Array", itemType: genericType }],
+				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
 			dropLast: {
 				type: "Method",
-				parameterTypes: [{ type: "Self" }],
-				returnType: { type: "Self" },
+				parameterTypes: [{ type: "Array", itemType: genericType }],
+				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
 		},
