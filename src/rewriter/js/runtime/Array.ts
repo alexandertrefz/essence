@@ -45,6 +45,7 @@ export default class $Array {
 		return $Array.create(originalArray.value.splice(getRawNumber(index), 1, item))
 	}
 
+	// TODO: Figure out overrides
 	static insert$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>, index: NumberType): ArrayType<T> {
 		return $Array.create(
 			originalArray.value.splice(getRawNumber(index), contentsOf.value.length, ...contentsOf.value),

@@ -130,6 +130,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		lhs: common.RecordType | common.TypeType,
 		rhs: common.RecordType | common.TypeType,
 	): common.RecordType | common.TypeType {
+		// TODO: Implement `applyType`
 		throw new Error("Implement applyType")
 	}
 
@@ -199,7 +200,8 @@ export function resolveArrayValueType(node: parser.ArrayValueNode, scope: enrich
 
 		for (let expression of node.values) {
 			if (!deepEqual(itemType, resolveType(expression, scope))) {
-				throw new Error("Mixed Array Types are not supported yet.")
+				// TODO: Implement Union Types
+				throw new Error("Union Types are not implemented yet.")
 			}
 		}
 
@@ -311,6 +313,7 @@ export function resolveTypeDefinitionStatementType(
 	node: parser.TypeDefinitionStatementNode,
 	scope: enricher.Scope,
 ): common.TypeType {
+	// TODO: Find a better way of implementing this without depending on object reference behaviour & type forcing
 	let resultType: common.TypeType = {
 		type: "Type",
 		name: node.name.content,
@@ -398,6 +401,7 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 			return resolvePrimitiveTypeType(baseType, scope)
 		case "Array":
 			if (baseType.itemType.type === "Never") {
+				// TODO: Check wether this is a scalable approach, shouldnt this just pass Never?
 				return generateArray({ type: "Record", members: {} })
 			} else {
 				return generateArray(baseType.itemType)
