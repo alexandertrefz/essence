@@ -1,9 +1,9 @@
-import { $Boolean, BooleanType } from "./Boolean"
-import { $Array, ArrayType } from "./Array"
+import $Boolean, { BooleanType } from "./Boolean"
+import $Array, { ArrayType } from "./Array"
 
 export type StringType = { $type: "String"; value: string }
 
-export class $String {
+export default class $String {
 	static create(value: string): StringType {
 		return { $type: "String", value }
 	}

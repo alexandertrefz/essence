@@ -12,10 +12,10 @@ export default async function rewrite(nodes: Array<common.typedSimple.Node>): Pr
 		type: "Program",
 		sourceType: "module",
 		body: [
-			internalImport([importSpecifier("$String")], "String"),
-			internalImport([importSpecifier("$Number")], "Number"),
-			internalImport([importSpecifier("$Boolean")], "Boolean"),
-			internalImport([importSpecifier("$Array")], "Array"),
+			internalImport([importDefaultSpecifier("String")], "String"),
+			internalImport([importDefaultSpecifier("Number")], "Number"),
+			internalImport([importDefaultSpecifier("Boolean")], "Boolean"),
+			internalImport([importDefaultSpecifier("Array")], "Array"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			...rewriteProgramNodes(nodes),
 		],
@@ -305,7 +305,7 @@ function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.Ca
 			type: "MemberExpression",
 			object: {
 				type: "Identifier",
-				name: nativeName("String"),
+				name: "String",
 			},
 			property: {
 				type: "Identifier",
@@ -329,7 +329,7 @@ function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.Ca
 			type: "MemberExpression",
 			object: {
 				type: "Identifier",
-				name: nativeName("Number"),
+				name: "Number",
 			},
 			property: {
 				type: "Identifier",
@@ -353,7 +353,7 @@ function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.
 			type: "MemberExpression",
 			object: {
 				type: "Identifier",
-				name: nativeName("Boolean"),
+				name: "Boolean",
 			},
 			property: {
 				type: "Identifier",
@@ -388,7 +388,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpres
 	if (node.base.type.type === "Type" && node.base.type.definition.type === "BuiltIn") {
 		object = {
 			type: "Identifier",
-			name: nativeName((node.base as any).name),
+			name: (node.base as any).name,
 		}
 
 		property = {
@@ -441,10 +441,6 @@ function rewriteFunctionExpression(node: common.typedSimple.FunctionDefinitionNo
 
 function rewriteArgument(node: common.typedSimple.ArgumentNode): estree.Expression {
 	return rewriteExpression(node.value)
-}
-
-function nativeName(name: string) {
-	return `$${name}`
 }
 
 function internalImport(

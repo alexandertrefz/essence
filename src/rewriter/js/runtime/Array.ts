@@ -1,10 +1,10 @@
-import { $Boolean, BooleanType } from "./Boolean"
-import { NumberType, $Number } from "./Number"
+import $Boolean, { BooleanType } from "./Boolean"
+import $Number, { NumberType } from "./Number"
 import { getRawNumber } from "./internalHelpers"
 
 export type ArrayType<T> = { $type: "Array"; value: Array<T> }
 
-export class $Array {
+export default class $Array {
 	static create<T>(originalArray: Array<T>): ArrayType<T> {
 		return { $type: "Array", value: originalArray }
 	}
