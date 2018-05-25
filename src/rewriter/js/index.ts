@@ -1,7 +1,7 @@
 import { common } from "../../interfaces"
 import * as estree from "estree"
 
-import { rollup, OutputChunk } from "rollup"
+import { rollup } from "rollup"
 import hypothetical = require("rollup-plugin-hypothetical")
 import typescript = require("rollup-plugin-typescript2")
 
@@ -34,7 +34,7 @@ export default async function rewrite(nodes: Array<common.typedSimple.Node>): Pr
 		},
 	})
 
-	const bundle = (await rollup({
+	const bundle = await rollup({
 		input: "./program.js",
 		plugins: [
 			typescript({
@@ -47,7 +47,7 @@ export default async function rewrite(nodes: Array<common.typedSimple.Node>): Pr
 				},
 			}),
 		],
-	})) as OutputChunk // Weird typing error oriniating in rollup
+	})
 
 	const { code } = await bundle.generate({
 		format: "iife",
