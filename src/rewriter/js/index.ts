@@ -382,28 +382,10 @@ function rewriteArrayValue(node: common.typedSimple.ArrayValueNode): estree.Arra
 }
 
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpression {
-	let object: estree.Expression
-	let property: estree.Expression
-
-	if (node.base.type.type === "Type" && node.base.type.definition.type === "BuiltIn") {
-		object = {
-			type: "Identifier",
-			name: (node.base as any).name,
-		}
-
-		property = {
-			type: "Identifier",
-			name: node.member.name,
-		}
-	} else {
-		object = rewriteExpression(node.base)
-		property = rewriteIdentifier(node.member)
-	}
-
 	return {
 		type: "MemberExpression",
-		object,
-		property,
+		object: rewriteExpression(node.base),
+		property: rewriteIdentifier(node.member),
 		computed: false,
 	}
 }
