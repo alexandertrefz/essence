@@ -45,7 +45,7 @@ export type MethodType = UnstaticMethodType | StaticMethodType
 
 export type ArrayType = {
 	type: "Array"
-	itemType: RecordType | FunctionType | PrimitiveType | TypeType | ArrayType | NeverType
+	itemType: Type | NeverType
 }
 
 export type PrimitiveType = {

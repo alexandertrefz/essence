@@ -1,8 +1,6 @@
 import { common } from "../../interfaces"
 
-function generateType(
-	genericType: common.RecordType | common.FunctionType | common.PrimitiveType | common.TypeType | common.ArrayType,
-): common.TypeType {
+function generateType(genericType: common.Type): common.TypeType {
 	return {
 		type: "Type",
 		name: "Array",
