@@ -205,10 +205,6 @@ export function resolveArrayValueType(node: parser.ArrayValueNode, scope: enrich
 			}
 		}
 
-		if (itemType.type === "Method") {
-			throw new Error("Methods can not be Array Item Types.")
-		}
-
 		return {
 			type: "Array",
 			itemType,
