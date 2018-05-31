@@ -16,92 +16,43 @@ const Simplifier = require("../lib/simplifier")
 const Optimiser = require("../lib/optimiser")
 const Rewriter = require("../lib/rewriter")
 
-async function compile(inputFileName, flags) {
+function constructTargetFileName(inputFileName) {
 	const sourceFileNameParsed = path.parse(inputFileName)
-	const targetFileName = sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
+	return sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
+}
 
-	if (flags.debug) {
-		console.time("Total")
-		console.time("Reading Input File")
-	}
+async function compile(inputFileName, flags) {
+	const targetFileName = constructTargetFileName(inputFileName)
 
 	const data = await readFile(inputFileName, "utf8")
 
-	if (flags.debug) {
-		console.log()
-		console.timeEnd("Reading Input File")
-		console.log()
-		console.time("Parsing")
+	try {
+		const initialAST = Parser.parse(data)
+		const enrichedAST = Enricher.enrich(initialAST)
+		const validatedAST = Validator.validate(enrichedAST)
+		const simplifiedAST = Simplifier.simplify(validatedAST)
+		const optimisedAST = Optimiser.optimise(simplifiedAST)
+		const result = await Rewriter.rewrite(optimisedAST, flags.mode)
+		await writeFile(targetFileName, result)
+	} catch (error) {
+		return Promise.reject(error)
 	}
 
-	const initialAST = Parser.parse(data)
-
-	if (flags.debug) {
-		console.timeEnd("Parsing")
-		console.time("Enriching")
-	}
-
-	const enrichedAST = Enricher.enrich(initialAST)
-
-	if (flags.debug) {
-		console.timeEnd("Enriching")
-		console.time("Validating")
-	}
-
-	const validatedAST = Validator.validate(enrichedAST)
-
-	if (flags.debug) {
-		console.timeEnd("Validating")
-		console.time("Simplifying")
-	}
-
-	const simplifiedAST = Simplifier.simplify(validatedAST)
-
-	if (flags.debug) {
-		console.timeEnd("Simplifying")
-		console.time("Optimising")
-	}
-
-	const optimisedAST = Optimiser.optimise(simplifiedAST)
-
-	if (flags.debug) {
-		console.timeEnd("Optimising")
-		console.time("Rewriting")
-	}
-
-	const result = await Rewriter.rewrite(optimisedAST, flags.mode)
-
-	if (flags.debug) {
-		console.timeEnd("Rewriting")
-		console.time("Writing Output File")
-	}
-
-	await writeFile(targetFileName, result)
-
-	if (flags.debug) {
-		console.log()
-		console.timeEnd("Writing Output File")
-		console.log()
-		console.timeEnd("Total")
-		console.log()
-	}
-
-	console.log(`Successfully compiled ${inputFileName} -> ${targetFileName}`)
-	return Promise.resolve()
+	return Promise.resolve(inputFileName)
 }
 
 const cli = meow(
 	{
 		help: `
 			Usage
-			    $ esc <fileName>
+				$ esc <fileName>
 
 			Options
 				--mode Set the rewriter mode
 				--debug Outputs various debugging information
 
 			Examples
-			    $ foo HelloWorld.es --mode js
+				$ foo HelloWorld.es --mode js
 		`,
 		description: false,
 	},
@@ -119,4 +70,11 @@ const cli = meow(
 	},
 )
 
-compile(cli.input[0], Object.assign({ mode: "js", debug: false }, cli.flags))
+compile(cli.input[0], Object.assign({ mode: "js", debug: false }, cli.flags)).then(
+	inputFileName => {
+		console.log(`Successfully compiled ${inputFileName} -> ${constructTargetFileName(inputFileName)}`)
+	},
+	reason => {
+		console.log(reason)
+	},
+)
