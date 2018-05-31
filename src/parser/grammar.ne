@@ -143,9 +143,9 @@ TypeMethod ->
 ReturnSymbol ->
 	LeftAngle Dash {% symbol %}
 
-#          #
+# -------- #
 # Literals #
-#          #
+# -------- #
 
 TypedRecordLiteral ->
 	TypeHeader AnonymousRecordLiteral {% ([type, record]) => generators.recordValueNode(type, record.members, { start: type.position.start, end: record.position.end }) %}
@@ -216,9 +216,9 @@ ArgumentList ->
 		})
 	%}
 
-#       #
+# ----- #
 # Types #
-#       #
+# ----- #
 
 Type ->
 	  Identifier {% ([identifer]) => generators.identifierTypeDeclaration(identifer, identifer.position) %}
