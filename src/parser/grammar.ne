@@ -16,10 +16,18 @@ lexer.ignore(lexerInterfaces.TokenType.Linebreak)
 @lexer lexer
 
 Program ->
+	ImplementationSection {% ([implementation]) => generators.program(implementation, implementation.position) %}
+
+ImplementationSection ->
+	ImplementationKeyword LeftBrace ImplementationNodes:? RightBrace {%
+		([keyword, lbrace, implementationNodes, rbrace]) => generators.implementationSection(implementationNodes, { start: keyword.position.start, end: rbrace.position.end })
+	%}
+
+ImplementationNodes ->
 	  Statement
 	| Expression
-	| Program Statement  {% t => ([...t[0], t[1]]) %}
-	| Program Expression {% t => ([...t[0], t[1]]) %}
+	| ImplementationNodes Statement  {% t => ([...t[0], t[1]]) %}
+	| ImplementationNodes Expression {% t => ([...t[0], t[1]]) %}
 
 # --------- #
 # Statement #
@@ -234,13 +242,14 @@ ReturnType ->
 # Keywords #
 # -------- #
 
-TypeKeyword     -> %KeywordType     {% id %}
-IfKeyword       -> %KeywordIf       {% id %}
-ElseKeyword     -> %KeywordElse     {% id %}
-VariableKeyword -> %KeywordVariable {% id %}
-ConstantKeyword -> %KeywordConstant {% id %}
-FunctionKeyword -> %KeywordFunction {% id %}
-StaticKeyword   -> %KeywordStatic   {% id %}
+TypeKeyword           -> %KeywordType           {% id %}
+IfKeyword             -> %KeywordIf             {% id %}
+ElseKeyword           -> %KeywordElse           {% id %}
+VariableKeyword       -> %KeywordVariable       {% id %}
+ConstantKeyword       -> %KeywordConstant       {% id %}
+FunctionKeyword       -> %KeywordFunction       {% id %}
+StaticKeyword         -> %KeywordStatic         {% id %}
+ImplementationKeyword -> %KeywordImplementation {% id %}
 
 # ---------------- #
 # Compound Symbols #

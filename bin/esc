@@ -27,13 +27,14 @@ async function compile(inputFileName, flags) {
 	const data = await readFile(inputFileName, "utf8")
 
 	try {
-		const initialAST = Parser.parse(data)
-		const enrichedAST = Enricher.enrich(initialAST)
-		const validatedAST = Validator.validate(enrichedAST)
-		const simplifiedAST = Simplifier.simplify(validatedAST)
-		const optimisedAST = Optimiser.optimise(simplifiedAST)
-		const result = await Rewriter.rewrite(optimisedAST, flags.mode)
-		await writeFile(targetFileName, result)
+		const initialProgram = Parser.parse(data)
+		const enrichedProgram = Enricher.enrich(initialProgram)
+		const validatedProgram = Validator.validate(enrichedProgram)
+		const simplifiedProgram = Simplifier.simplify(validatedProgram)
+		const optimisedProgram = Optimiser.optimise(simplifiedProgram)
+		const rewrittenProgram = await Rewriter.rewrite(optimisedProgram, flags.mode)
+
+		await writeFile(targetFileName, rewrittenProgram)
 	} catch (error) {
 		return Promise.reject(error)
 	}

@@ -1,5 +1,28 @@
 import { parser, common } from "../interfaces"
 
+// #region Program & Sections
+
+export function program(implementation: parser.ImplementationSectionNode, position: common.Position): parser.Program {
+	return {
+		nodeType: "Program",
+		implementation,
+		position,
+	}
+}
+
+export function implementationSection(
+	nodes: Array<parser.ImplementationNode>,
+	position: common.Position,
+): parser.ImplementationSectionNode {
+	return {
+		nodeType: "ImplementationSection",
+		nodes,
+		position,
+	}
+}
+
+// #endregion
+
 // #region Expressions
 
 export function nativeFunctionInvocation(
@@ -203,7 +226,7 @@ export function typeDefinitionStatement(
 
 export function ifElseStatementNode(
 	ifStatement: parser.IfStatementNode,
-	falseBody: Array<parser.Node> | parser.IfStatementNode | parser.IfElseStatementNode,
+	falseBody: Array<parser.ImplementationNode> | parser.IfStatementNode | parser.IfElseStatementNode,
 	position: common.Position,
 ): parser.IfElseStatementNode {
 	if (!Array.isArray(falseBody)) {
@@ -221,7 +244,7 @@ export function ifElseStatementNode(
 
 export function ifStatement(
 	condition: parser.ExpressionNode,
-	body: parser.Node[],
+	body: parser.ImplementationNode[],
 	position: common.Position,
 ): parser.IfStatementNode {
 	return { nodeType: "IfStatement", condition, body, position }
@@ -271,7 +294,7 @@ export function arrayTypeDeclaration(
 export function functionDefinition(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
-	body: Array<parser.Node>,
+	body: Array<parser.ImplementationNode>,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",

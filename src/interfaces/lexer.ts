@@ -31,6 +31,7 @@ export enum TokenType {
 	KeywordConstant = "KeywordConstant",
 	KeywordVariable = "KeywordVariable",
 	KeywordFunction = "KeywordFunction",
+	KeywordImplementation = "KeywordImplementation",
 
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",

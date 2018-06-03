@@ -1,13 +1,15 @@
 import { common } from "../interfaces"
 
-export const validate = (nodes: Array<common.typed.Node>): Array<common.typed.Node> => {
-	return nodes.map(node => validateNode(node, null))
+export const validate = (program: common.typed.Program): common.typed.Program => {
+	program.implementation.nodes.map(node => validateImplementationNode(node, null))
+
+	return program
 }
 
-function validateNode(
-	node: common.typed.Node,
+function validateImplementationNode(
+	node: common.typed.ImplementationNode,
 	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
-): common.typed.Node {
+): common.typed.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation":
@@ -130,13 +132,13 @@ function validateMethodFunctionDefinition(method: {
 	method: common.typed.FunctionValueNode
 	isStatic: boolean
 } {
-	method.method.value.body.map(bodyNode => validateNode(bodyNode, method.method.value))
+	method.method.value.body.map(bodyNode => validateImplementationNode(bodyNode, method.method.value))
 
 	return method
 }
 
 function validateFunctionDefinition(node: common.typed.FunctionDefinitionNode): common.typed.FunctionDefinitionNode {
-	node.body.map(bodyNode => validateNode(bodyNode, node))
+	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
 
 	return node
 }
@@ -223,8 +225,8 @@ function validateIfElseStatementNode(
 		throw new Error("If Condition has to be a Boolean")
 	}
 
-	node.trueBody.map(node => validateNode(node, currentFunctionContext))
-	node.falseBody.map(node => validateNode(node, currentFunctionContext))
+	node.trueBody.map(node => validateImplementationNode(node, currentFunctionContext))
+	node.falseBody.map(node => validateImplementationNode(node, currentFunctionContext))
 
 	return node
 }
@@ -237,7 +239,7 @@ function validateIfStatement(
 		throw new Error("If Condition has to be a Boolean")
 	}
 
-	node.body.map(node => validateNode(node, currentFunctionContext))
+	node.body.map(node => validateImplementationNode(node, currentFunctionContext))
 
 	return node
 }

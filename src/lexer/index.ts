@@ -23,7 +23,7 @@ const linebreak = "\n"
 const stringLiteral = '"'
 const commentLiteral = "§"
 const booleans = ["true", "false"]
-const keywords = ["if", "else", "type", "constant", "variable", "function", "static"]
+const keywords = ["if", "else", "type", "constant", "variable", "function", "static", "implementation"]
 const symbols = ["(", ")", "{", "}", "[", "]", "<", ">", "|", "@", ",", ".", ":", "=", "-", "~", "_"]
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 const whitespaces = [" ", "\t"]
@@ -64,6 +64,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordConstant
 	} else if (value === "function") {
 		return TokenType.KeywordFunction
+	} else if (value === "implementation") {
+		return TokenType.KeywordImplementation
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */
@@ -290,7 +292,7 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 	for (i = 0; i < input.length; i++) {
 		let currentChar = input[i]
 
-		if (orHelper([isLinebreak, isSymbol, isCommentLiteral], currentChar)) {
+		if (orHelper([isLinebreak, isSymbol, isCommentLiteral, isWhitespace], currentChar)) {
 			i-- // Fix Index for the token slice
 			break
 		}
