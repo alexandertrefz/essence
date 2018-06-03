@@ -1,10 +1,22 @@
 import { common } from "../interfaces"
 
-export const simplify = (nodes: Array<common.typed.Node>): Array<common.typedSimple.Node> => {
-	return nodes.map(node => simplifyNode(node))
+export const simplify = (program: common.typed.Program): common.typedSimple.Program => {
+	return {
+		nodeType: "Program",
+		implementation: simplifyImplementationSection(program.implementation),
+	}
 }
 
-function simplifyNode(node: common.typed.Node): common.typedSimple.Node {
+function simplifyImplementationSection(
+	implementation: common.typed.ImplementationSectionNode,
+): common.typedSimple.ImplementationSectionNode {
+	return {
+		nodeType: "ImplementationSection",
+		nodes: implementation.nodes.map(node => simplifyImplementationNode(node)),
+	}
+}
+
+function simplifyImplementationNode(node: common.typed.ImplementationNode): common.typedSimple.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation":
@@ -291,8 +303,8 @@ function simplifyChoice(
 	return {
 		nodeType: "ChoiceStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		trueBody: convertedNode.trueBody.map(node => simplifyNode(node)),
-		falseBody: convertedNode.falseBody.map(node => simplifyNode(node)),
+		trueBody: convertedNode.trueBody.map(node => simplifyImplementationNode(node)),
+		falseBody: convertedNode.falseBody.map(node => simplifyImplementationNode(node)),
 	}
 }
 
@@ -374,7 +386,7 @@ function simplifyFunctionDefinition(
 	return {
 		nodeType: "FunctionDefinition",
 		parameters: node.parameters.map(param => simplifyParameter(param)),
-		body: node.body.map(node => simplifyNode(node)),
+		body: node.body.map(node => simplifyImplementationNode(node)),
 		returnType: node.returnType,
 	}
 }

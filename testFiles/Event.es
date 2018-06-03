@@ -1,41 +1,45 @@
-type Event {
-	eventName:            String
-	namespaces:           [String]
-	isDefaultPrevented:   Boolean
-	isCancelled:          Boolean
-	isPropagationStopped: Boolean
+implementation {
 
-	preventDefault () -> Event {
-		<- @ <| { isDefaultPrevented = true }
-	}
+	type Event {
+		eventName:            String
+		namespaces:           [String]
+		isDefaultPrevented:   Boolean
+		isCancelled:          Boolean
+		isPropagationStopped: Boolean
 
-	cancel () -> Event {
-		<- @ <| { isCancelled = true }
-	}
+		preventDefault () -> Event {
+			<- @ <| { isDefaultPrevented = true }
+		}
 
-	stopPropagation () -> Event {
-		<- @ <| { isPropagationStopped = true }
-	}
+		cancel () -> Event {
+			<- @ <| { isCancelled = true }
+		}
 
-	hasNamespaces () -> Boolean {
-		<- @.namespaces::hasItems()
-	}
+		stopPropagation () -> Event {
+			<- @ <| { isPropagationStopped = true }
+		}
 
-	static create (from eventDescription: String) -> Event {
-		constant splitEvent = eventDescription::split(on ".")
+		hasNamespaces () -> Boolean {
+			<- @.namespaces::hasItems()
+		}
 
-		constant eventName = splitEvent::first()
-		constant namespaces = splitEvent::dropFirst()::unique()
+		static create (from eventDescription: String) -> Event {
+			constant splitEvent = eventDescription::split(on ".")
 
-		<- {
-			eventName = eventName,
-			namespaces = namespaces,
-			isDefaultPrevented = false,
-			isCancelled = false,
-			isPropagationStopped = false,
+			constant eventName = splitEvent::first()
+			constant namespaces = splitEvent::dropFirst()::unique()
+
+			<- {
+				eventName = eventName,
+				namespaces = namespaces,
+				isDefaultPrevented = false,
+				isCancelled = false,
+				isPropagationStopped = false,
+			}
 		}
 	}
-}
 
-variable event = Event.create(from "event.namespace")
-event = event::stopPropagation()
+	variable event = Event.create(from "event.namespace")
+	event = event::stopPropagation()
+
+}

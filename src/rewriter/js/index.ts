@@ -7,8 +7,8 @@ import typescript = require("rollup-plugin-typescript2")
 
 import { generate } from "escodegen"
 
-export default async function rewrite(nodes: Array<common.typedSimple.Node>): Promise<string> {
-	const program: estree.Program = {
+export default async function rewrite(program: common.typedSimple.Program): Promise<string> {
+	const rewrittenProgram: estree.Program = {
 		type: "Program",
 		sourceType: "module",
 		body: [
@@ -17,11 +17,11 @@ export default async function rewrite(nodes: Array<common.typedSimple.Node>): Pr
 			internalImport([importDefaultSpecifier("Boolean")], "Boolean"),
 			internalImport([importDefaultSpecifier("Array")], "Array"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
-			...rewriteProgramNodes(nodes),
+			...rewriteImplementationSection(program.implementation),
 		],
 	}
 
-	const programText = generate(program, {
+	const programText = generate(rewrittenProgram, {
 		format: {
 			indent: {
 				style: "\t",
@@ -56,15 +56,15 @@ export default async function rewrite(nodes: Array<common.typedSimple.Node>): Pr
 	return Promise.resolve(code)
 }
 
-function rewriteProgramNodes(
-	nodes: Array<common.typedSimple.Node>,
+function rewriteImplementationSection(
+	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	return nodes.map(node => rewriteStatement(node))
+	return implementation.nodes.map(node => rewriteStatement(node))
 }
 
 // #region Statements
 
-function rewriteStatement(node: common.typedSimple.Node): estree.Statement {
+function rewriteStatement(node: common.typedSimple.ImplementationNode): estree.Statement {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
 			return rewriteVariableDeclarationStatement(node)
@@ -401,7 +401,7 @@ function rewriteIdentifier(node: common.typedSimple.IdentifierNode): estree.Iden
 
 // #region Helpers
 
-function rewriteBlockStatement(nodes: Array<common.typedSimple.Node>): estree.BlockStatement {
+function rewriteBlockStatement(nodes: Array<common.typedSimple.ImplementationNode>): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
 		body: nodes.map(node => rewriteStatement(node)).filter(value => !!value),

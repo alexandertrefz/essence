@@ -2,7 +2,7 @@ import { parser, common, enricher } from "../interfaces"
 
 import { resolveType, resolveArrayValueType, resolveMethodLookupBaseType } from "./resolvers"
 
-export function enrichNode(node: parser.Node, scope: enricher.Scope): common.typed.Node {
+export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scope): common.typed.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation":

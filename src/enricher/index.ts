@@ -7,7 +7,7 @@ import { parser, common, enricher } from "../interfaces"
 
 import { enrichNode } from "./enrichers"
 
-export const enrich = (nodes: Array<parser.Node>): Array<common.typed.Node> => {
+export const enrich = (program: parser.Program): common.typed.Program => {
 	let topLevelScope: enricher.Scope = {
 		parent: null,
 		members: {
@@ -18,5 +18,20 @@ export const enrich = (nodes: Array<parser.Node>): Array<common.typed.Node> => {
 		},
 	}
 
-	return nodes.map(node => enrichNode(node, topLevelScope))
+	return {
+		nodeType: "Program",
+		implementation: enrichImplementation(program.implementation, topLevelScope),
+		position: program.position,
+	}
+}
+
+const enrichImplementation = (
+	implementation: parser.ImplementationSectionNode,
+	scope: enricher.Scope,
+): common.typed.ImplementationSectionNode => {
+	return {
+		nodeType: "ImplementationSection",
+		nodes: implementation.nodes.map(node => enrichNode(node, scope)),
+		position: implementation.position,
+	}
 }

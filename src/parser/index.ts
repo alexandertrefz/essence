@@ -27,6 +27,7 @@ export let parse = (chunk: string) => {
 		)
 	}
 
+	/* istanbul ignore if */
 	if (parser.results.length === 0) {
 		throw new Error("Could not parse input!")
 	}

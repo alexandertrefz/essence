@@ -1,6 +1,22 @@
 import { Position, Type, TypeType, ArrayType } from "./index"
 
-export type Node = ExpressionNode | StatementNode
+//#region Program & Sections
+
+export type Program = {
+	nodeType: "Program"
+	implementation: ImplementationSectionNode
+	position: Position
+}
+
+export type ImplementationSectionNode = {
+	nodeType: "ImplementationSection"
+	nodes: Array<ImplementationNode>
+	position: Position
+}
+
+//#endregion
+
+export type ImplementationNode = ExpressionNode | StatementNode
 
 // #region Expressions
 
@@ -188,15 +204,15 @@ export interface TypeDefinitionStatementNode {
 export interface IfElseStatementNode {
 	nodeType: "IfElseStatement"
 	condition: ExpressionNode
-	trueBody: Array<Node>
-	falseBody: Array<Node>
+	trueBody: Array<ImplementationNode>
+	falseBody: Array<ImplementationNode>
 	position: Position
 }
 
 export interface IfStatementNode {
 	nodeType: "IfStatement"
 	condition: ExpressionNode
-	body: Array<Node>
+	body: Array<ImplementationNode>
 	position: Position
 }
 
@@ -228,7 +244,7 @@ export interface ParameterNode {
 export interface FunctionDefinitionNode {
 	nodeType: "FunctionDefinition"
 	parameters: Array<ParameterNode>
-	body: Array<Node>
+	body: Array<ImplementationNode>
 	returnType: Type
 }
 

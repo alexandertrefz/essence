@@ -388,6 +388,22 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
+
+		it("should lex implementation", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "implementation"
+			output = {
+				value: "implementation",
+				type: TokenType.KeywordImplementation,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
 	})
 
 	describe("Symbols", () => {
@@ -703,6 +719,22 @@ describe("Lexer", () => {
 			let output: SimpleToken
 
 			input = "1000\n"
+			output = {
+				value: "1000",
+				type: TokenType.LiteralNumber,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex 1000 with a space following", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "1000 "
 			output = {
 				value: "1000",
 				type: TokenType.LiteralNumber,
