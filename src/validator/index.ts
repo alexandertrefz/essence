@@ -92,7 +92,11 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 
 	for (let i = 0; i < methodType.parameterTypes.length; i++) {
 		if (!matchesType(methodType.parameterTypes[i], methodArguments[i].type)) {
-			throw new Error(`MethodInvocation: ArgumentType mismatch at argument ${i + 1}`)
+			if (i === 0) {
+				throw new Error(`MethodInvocation: BaseType mismatch`)
+			} else {
+				throw new Error(`MethodInvocation: ArgumentType mismatch at argument ${i}`)
+			}
 		}
 	}
 
