@@ -7,13 +7,16 @@ const type: common.TypeType = {
 	methods: {
 		is: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "Boolean" }, { type: "Primitive", primitive: "Boolean" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		negate: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "Boolean" }],
+			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "Boolean" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},

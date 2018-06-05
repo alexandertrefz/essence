@@ -80,7 +80,7 @@ function validateNativeFunctionInvocation(
 
 function validateMethodInvocation(node: common.typed.MethodInvocationNode): common.typed.MethodInvocationNode {
 	const methodType = node.name.type
-	const methodArguments = [node.name.base, ...node.arguments]
+	const methodArguments = [{ name: null, type: node.name.base.type }, ...node.arguments]
 
 	if (methodType.type !== "Method") {
 		throw new Error("MethodInvocation: Identifier isn't a function")
@@ -91,7 +91,10 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 	}
 
 	for (let i = 0; i < methodType.parameterTypes.length; i++) {
-		if (!matchesType(methodType.parameterTypes[i], methodArguments[i].type)) {
+		if (
+			methodType.parameterTypes[i].name !== methodArguments[i].name ||
+			!matchesType(methodType.parameterTypes[i].type, methodArguments[i].type)
+		) {
 			if (i === 0) {
 				throw new Error(`MethodInvocation: BaseType mismatch`)
 			} else {
@@ -120,7 +123,10 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 		}
 
 		for (let i = 0; i < functionType.parameterTypes.length; i++) {
-			if (!matchesType(functionType.parameterTypes[i], node.arguments[i].type)) {
+			if (
+				functionType.parameterTypes[i].name !== node.arguments[i].name ||
+				!matchesType(functionType.parameterTypes[i].type, node.arguments[i].type)
+			) {
 				throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
 			}
 		}
@@ -294,7 +300,10 @@ function validateSimpleFunctionInvocation(
 	}
 
 	for (let i = 0; i < functionType.parameterTypes.length; i++) {
-		if (!matchesType(functionType.parameterTypes[i], argumentTypes[i].type)) {
+		if (
+			functionType.parameterTypes[i].name !== argumentTypes[i].name ||
+			!matchesType(functionType.parameterTypes[i].type, argumentTypes[i].type)
+		) {
 			throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
 		}
 	}
@@ -349,7 +358,10 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		}
 
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (!matchesType(lhs.parameterTypes[i], rhs.parameterTypes[i])) {
+			if (
+				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+			) {
 				return false
 			}
 		}
@@ -367,7 +379,10 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		}
 
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (!matchesType(lhs.parameterTypes[i], rhs.parameterTypes[i])) {
+			if (
+				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+			) {
 				return false
 			}
 		}

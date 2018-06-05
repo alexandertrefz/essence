@@ -7,52 +7,67 @@ const type: common.TypeType = {
 	methods: {
 		isEmpty: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }],
+			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		hasContent: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }],
+			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		is: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }, { type: "Primitive", primitive: "String" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		isnt: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }, { type: "Primitive", primitive: "String" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},
 		prepend: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }, { type: "Primitive", primitive: "String" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "String" },
 			isStatic: false,
 		},
 		append: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }, { type: "Primitive", primitive: "String" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "String" },
 			isStatic: false,
 		},
 		split: {
 			type: "Method",
 			parameterTypes: [
-				{ type: "Primitive", primitive: "String" },
-				{ type: "Array", itemType: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: "on", type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Array", itemType: { type: "Primitive", primitive: "String" } },
 			isStatic: false,
 		},
 		contains: {
 			type: "Method",
-			parameterTypes: [{ type: "Primitive", primitive: "String" }, { type: "Primitive", primitive: "String" }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
 		},

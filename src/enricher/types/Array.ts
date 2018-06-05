@@ -8,37 +8,37 @@ function generateType(genericType: common.Type): common.TypeType {
 		methods: {
 			hasItems: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: { type: "Primitive", primitive: "Boolean" },
 				isStatic: false,
 			},
 			first: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: genericType,
 				isStatic: false,
 			},
 			last: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: genericType,
 				isStatic: false,
 			},
 			unique: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
 			dropFirst: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
 			dropLast: {
 				type: "Method",
-				parameterTypes: [{ type: "Array", itemType: genericType }],
+				parameterTypes: [{ name: null, type: { type: "Array", itemType: genericType } }],
 				returnType: { type: "Array", itemType: genericType },
 				isStatic: false,
 			},
