@@ -180,6 +180,8 @@ function validateConstantDeclarationStatement(
 		}
 	}
 
+	validateExpression(node.value)
+
 	return node
 }
 
@@ -192,6 +194,8 @@ function validateVariableDeclarationStatement(
 		}
 	}
 
+	validateExpression(node.value)
+
 	return node
 }
 
@@ -201,6 +205,8 @@ function validateVariableAssignmentStatement(
 	if (!matchesType(node.name.type, node.value.type)) {
 		throw new Error(`Wrong Assignment Value Type for Variable ${node.name.content}`)
 	}
+
+	validateExpression(node.value)
 
 	return node
 }
@@ -225,6 +231,8 @@ function validateIfElseStatementNode(
 		throw new Error("If Condition has to be a Boolean")
 	}
 
+	validateExpression(node.condition)
+
 	node.trueBody.map(node => validateImplementationNode(node, currentFunctionContext))
 	node.falseBody.map(node => validateImplementationNode(node, currentFunctionContext))
 
@@ -238,6 +246,8 @@ function validateIfStatement(
 	if (!(node.condition.type.type === "Primitive" && node.condition.type.primitive === "Boolean")) {
 		throw new Error("If Condition has to be a Boolean")
 	}
+
+	validateExpression(node.condition)
 
 	node.body.map(node => validateImplementationNode(node, currentFunctionContext))
 
@@ -255,6 +265,8 @@ function validateReturnStatement(
 	if (!matchesType(currentFunctionContext.returnType, node.expression.type)) {
 		throw new Error("Type of returned expression doesnt match declared return type")
 	}
+
+	validateExpression(node.expression)
 
 	return node
 }
