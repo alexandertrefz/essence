@@ -18,8 +18,10 @@ export type RecordType = {
 	}
 }
 
-// TODO: Represent Parameter Labels as part of the type
-type Parameter = Type
+type Parameter = {
+	type: Type
+	name: string | null
+}
 
 export type FunctionType = {
 	type: "Function"

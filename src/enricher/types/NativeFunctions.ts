@@ -8,8 +8,11 @@ const functions: {
 		// TODO: Turn into a generic function once generics are implemented.
 		parameterTypes: [
 			{
-				type: "Primitive",
-				primitive: "String",
+				name: null,
+				type: {
+					type: "Primitive",
+					primitive: "String",
+				},
 			},
 		],
 		returnType: {

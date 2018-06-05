@@ -300,7 +300,18 @@ export function resolveFunctionDefinitionType(
 ): common.FunctionType {
 	return {
 		type: "Function",
-		parameterTypes: node.parameters.map(parameter => resolveType(parameter.type, scope)),
+		parameterTypes: node.parameters.map(parameter => {
+			let name = null
+
+			if (parameter.externalName !== null) {
+				name = parameter.externalName.content
+			}
+
+			return {
+				name,
+				type: resolveType(parameter.type, scope),
+			}
+		}),
 		returnType: resolveType(node.returnType, scope),
 	}
 }
@@ -421,14 +432,39 @@ export function resolveMethodType(
 	if (node.isStatic) {
 		return {
 			type: "Method",
-			parameterTypes: node.method.value.parameters.map(param => resolveType(param.type, scope)),
+			parameterTypes: node.method.value.parameters.map(param => {
+				let name = null
+
+				if (param.externalName !== null) {
+					name = param.externalName.content
+				}
+
+				return {
+					name,
+					type: resolveType(param.type, scope),
+				}
+			}),
 			returnType,
 			isStatic: node.isStatic,
 		}
 	} else {
 		return {
 			type: "Method",
-			parameterTypes: [selfType, ...node.method.value.parameters.map(param => resolveType(param.type, scope))],
+			parameterTypes: [
+				{ name: null, type: selfType },
+				...node.method.value.parameters.map(param => {
+					let name = null
+
+					if (param.externalName !== null) {
+						name = param.externalName.content
+					}
+
+					return {
+						name,
+						type: resolveType(param.type, scope),
+					}
+				}),
+			],
 			returnType,
 			isStatic: node.isStatic,
 		}
