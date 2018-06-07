@@ -13,12 +13,14 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		negate: {
 			type: "Method",
 			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "Boolean" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 	},
 }

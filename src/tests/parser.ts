@@ -5235,6 +5235,7 @@ describe("Parser", () => {
 											},
 										},
 										isStatic: false,
+										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5438,6 +5439,7 @@ describe("Parser", () => {
 											},
 										},
 										isStatic: true,
+										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5645,6 +5647,7 @@ describe("Parser", () => {
 											},
 										},
 										isStatic: false,
+										isOverloaded: false,
 									},
 									method2: {
 										method: {
@@ -5790,6 +5793,7 @@ describe("Parser", () => {
 											},
 										},
 										isStatic: false,
+										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5812,6 +5816,853 @@ describe("Parser", () => {
 					position: {
 						start: { line: 1, column: 1 },
 						end: { line: 11, column: 6 },
+					},
+				}
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with overloaded Methods", () => {
+				let input = `implementation {
+					type Type {
+						overload method(parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload method(name parameter: Type) -> Type {
+							<- parameter
+						}
+					}
+				}`
+				let output = {
+					nodeType: "Program",
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "TypeDefinitionStatement",
+								name: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										start: {
+											line: 2,
+											column: 11,
+										},
+										end: {
+											line: 2,
+											column: 15,
+										},
+									},
+								},
+								properties: {},
+								methods: {
+									method: {
+										methods: [
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 23,
+																	},
+																	end: {
+																		line: 3,
+																		column: 32,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 23,
+																	},
+																	end: {
+																		line: 3,
+																		column: 32,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 3,
+																			column: 34,
+																		},
+																		end: {
+																			line: 3,
+																			column: 38,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 3,
+																		column: 34,
+																	},
+																	end: {
+																		line: 3,
+																		column: 38,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 3,
+																	column: 23,
+																},
+																end: {
+																	line: 3,
+																	column: 38,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 3,
+																	column: 43,
+																},
+																end: {
+																	line: 3,
+																	column: 47,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 3,
+																column: 43,
+															},
+															end: {
+																line: 3,
+																column: 47,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 4,
+																		column: 11,
+																	},
+																	end: {
+																		line: 4,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 4,
+																	column: 8,
+																},
+																end: {
+																	line: 4,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 22,
+													},
+													end: {
+														line: 5,
+														column: 8,
+													},
+												},
+											},{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "name",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 23,
+																	},
+																	end: {
+																		line: 7,
+																		column: 27,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 28,
+																	},
+																	end: {
+																		line: 7,
+																		column: 37,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 7,
+																			column: 39,
+																		},
+																		end: {
+																			line: 7,
+																			column: 43,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 7,
+																		column: 39,
+																	},
+																	end: {
+																		line: 7,
+																		column: 43,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 7,
+																	column: 23,
+																},
+																end: {
+																	line: 7,
+																	column: 43,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 7,
+																	column: 48,
+																},
+																end: {
+																	line: 7,
+																	column: 52,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 7,
+																column: 48,
+															},
+															end: {
+																line: 7,
+																column: 52,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 8,
+																		column: 11,
+																	},
+																	end: {
+																		line: 8,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 8,
+																	column: 8,
+																},
+																end: {
+																	line: 8,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 7,
+														column: 22,
+													},
+													end: {
+														line: 9,
+														column: 8,
+													},
+												},
+											}
+										],
+										isStatic: false,
+										isOverloaded: true,
+									},
+								},
+								position: {
+									start: {
+										line: 2,
+										column: 6,
+									},
+									end: {
+										line: 10,
+										column: 7,
+									},
+								},
+							},
+						],
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 11, column: 6 },
+						},
+					},
+					position: {
+						start: { line: 1, column: 1 },
+						end: { line: 11, column: 6 },
+					},
+				}
+
+				expect<ParserNode>(parse(input)).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with twice overloaded Methods", () => {
+				let input = `implementation {
+					type Type {
+						overload method(parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload method(name parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload method(item parameter: Type) -> Type {
+							<- parameter
+						}
+					}
+				}`
+				let output = {
+					nodeType: "Program",
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "TypeDefinitionStatement",
+								name: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										start: {
+											line: 2,
+											column: 11,
+										},
+										end: {
+											line: 2,
+											column: 15,
+										},
+									},
+								},
+								properties: {},
+								methods: {
+									method: {
+										methods: [
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 23,
+																	},
+																	end: {
+																		line: 3,
+																		column: 32,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 23,
+																	},
+																	end: {
+																		line: 3,
+																		column: 32,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 3,
+																			column: 34,
+																		},
+																		end: {
+																			line: 3,
+																			column: 38,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 3,
+																		column: 34,
+																	},
+																	end: {
+																		line: 3,
+																		column: 38,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 3,
+																	column: 23,
+																},
+																end: {
+																	line: 3,
+																	column: 38,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 3,
+																	column: 43,
+																},
+																end: {
+																	line: 3,
+																	column: 47,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 3,
+																column: 43,
+															},
+															end: {
+																line: 3,
+																column: 47,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 4,
+																		column: 11,
+																	},
+																	end: {
+																		line: 4,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 4,
+																	column: 8,
+																},
+																end: {
+																	line: 4,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 22,
+													},
+													end: {
+														line: 5,
+														column: 8,
+													},
+												},
+											}, {
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "name",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 23,
+																	},
+																	end: {
+																		line: 7,
+																		column: 27,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 28,
+																	},
+																	end: {
+																		line: 7,
+																		column: 37,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 7,
+																			column: 39,
+																		},
+																		end: {
+																			line: 7,
+																			column: 43,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 7,
+																		column: 39,
+																	},
+																	end: {
+																		line: 7,
+																		column: 43,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 7,
+																	column: 23,
+																},
+																end: {
+																	line: 7,
+																	column: 43,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 7,
+																	column: 48,
+																},
+																end: {
+																	line: 7,
+																	column: 52,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 7,
+																column: 48,
+															},
+															end: {
+																line: 7,
+																column: 52,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 8,
+																		column: 11,
+																	},
+																	end: {
+																		line: 8,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 8,
+																	column: 8,
+																},
+																end: {
+																	line: 8,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 7,
+														column: 22,
+													},
+													end: {
+														line: 9,
+														column: 8,
+													},
+												},
+											}, {
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "item",
+																position: {
+																	start: {
+																		line: 11,
+																		column: 23,
+																	},
+																	end: {
+																		line: 11,
+																		column: 27,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 11,
+																		column: 28,
+																	},
+																	end: {
+																		line: 11,
+																		column: 37,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 11,
+																			column: 39,
+																		},
+																		end: {
+																			line: 11,
+																			column: 43,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 11,
+																		column: 39,
+																	},
+																	end: {
+																		line: 11,
+																		column: 43,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 11,
+																	column: 23,
+																},
+																end: {
+																	line: 11,
+																	column: 43,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 11,
+																	column: 48,
+																},
+																end: {
+																	line: 11,
+																	column: 52,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 11,
+																column: 48,
+															},
+															end: {
+																line: 11,
+																column: 52,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 12,
+																		column: 11,
+																	},
+																	end: {
+																		line: 12,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 12,
+																	column: 8,
+																},
+																end: {
+																	line: 12,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 11,
+														column: 22,
+													},
+													end: {
+														line: 13,
+														column: 8,
+													},
+												},
+											}
+										],
+										isStatic: false,
+										isOverloaded: true,
+									},
+								},
+								position: {
+									start: {
+										line: 2,
+										column: 6,
+									},
+									end: {
+										line: 14,
+										column: 7,
+									},
+								},
+							},
+						],
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 15, column: 6 },
+						},
+					},
+					position: {
+						start: { line: 1, column: 1 },
+						end: { line: 15, column: 6 },
 					},
 				}
 
@@ -6022,6 +6873,7 @@ describe("Parser", () => {
 											},
 										},
 										isStatic: false,
+										isOverloaded: false,
 									},
 								},
 								position: {

@@ -89,6 +89,7 @@ export function enrichMethodInvocation(
 		arguments: node.arguments.map(argument => enrichArgument(argument, scope)),
 		position: node.position,
 		type: resolveType(node, scope),
+		overloadedMethodIndex: null,
 	}
 }
 
@@ -116,21 +117,22 @@ export function enrichCombination(node: parser.CombinationNode, scope: enricher.
 }
 
 export function enrichMethodFunctionDefinition(
-	node: { method: parser.FunctionValueNode; isStatic: boolean },
+	method: parser.FunctionValueNode,
+	isStatic: boolean,
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionDefinitionNode {
 	let newScope = { parent: scope, members: {} }
 
-	if (!node.isStatic) {
+	if (!isStatic) {
 		declareVariableInScope("@", selfType, newScope)
 	}
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.method.value.parameters.map(parameter => enrichParameter(parameter, newScope)),
-		body: node.method.value.body.map(node => enrichNode(node, newScope)),
-		returnType: resolveType(node.method.value.returnType, scope),
+		parameters: method.value.parameters.map(parameter => enrichParameter(parameter, newScope)),
+		body: method.value.body.map(node => enrichNode(node, newScope)),
+		returnType: resolveType(method.value.returnType, scope),
 	}
 }
 
@@ -149,16 +151,35 @@ export function enrichFunctionDefinition(
 }
 
 export function enrichMethodFunctionValue(
-	node: { method: parser.FunctionValueNode; isStatic: boolean },
+	node: { method: parser.FunctionValueNode; isStatic: boolean; isOverloaded: false },
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionValueNode {
 	return {
 		nodeType: "FunctionValue",
-		value: enrichMethodFunctionDefinition(node, scope, selfType),
+		value: enrichMethodFunctionDefinition(node.method, node.isStatic, scope, selfType),
 		position: node.method.position,
 		type: resolveType(node.method, scope),
 	}
+}
+
+export function enrichMethodsFunctionValue(
+	node: parser.OverloadedMethod,
+	scope: enricher.Scope,
+	selfType: common.Type,
+): Array<common.typed.FunctionValueNode> {
+	let results: Array<common.typed.FunctionValueNode> = []
+
+	for (let [, method] of Object.entries(node.methods)) {
+		results.push({
+			nodeType: "FunctionValue",
+			value: enrichMethodFunctionDefinition(method, node.isStatic, scope, selfType),
+			position: method.position,
+			type: resolveType(method, scope),
+		})
+	}
+
+	return results
 }
 
 export function enrichRecordValue(node: parser.RecordValueNode, scope: enricher.Scope): common.typed.RecordValueNode {
@@ -496,17 +517,22 @@ function enrichMembers(
 	return result
 }
 
-function enrichMethods(
-	members: { [key: string]: { method: parser.FunctionValueNode; isStatic: boolean } },
-	scope: enricher.Scope,
-	selfType: common.Type,
-): { [key: string]: { method: common.typed.FunctionValueNode; isStatic: boolean } } {
-	let result: { [key: string]: { method: common.typed.FunctionValueNode; isStatic: boolean } } = {}
+function enrichMethods(members: parser.Methods, scope: enricher.Scope, selfType: common.Type): common.typed.Methods {
+	let result: common.typed.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		result[memberKey] = {
-			method: enrichMethodFunctionValue(memberValue, scope, selfType),
-			isStatic: memberValue.isStatic,
+		if (memberValue.isOverloaded) {
+			result[memberKey] = {
+				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+				isStatic: memberValue.isStatic,
+				isOverloaded: true,
+			}
+		} else {
+			result[memberKey] = {
+				method: enrichMethodFunctionValue(memberValue, scope, selfType),
+				isStatic: memberValue.isStatic,
+				isOverloaded: false,
+			}
 		}
 	}
 

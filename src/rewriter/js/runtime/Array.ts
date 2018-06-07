@@ -41,22 +41,25 @@ export default class $Array {
 		return $Array.create(originalArray.value.slice(0, originalArray.value.length - 1))
 	}
 
-	static insert$1<T>(originalArray: ArrayType<T>, item: T, index: NumberType): ArrayType<T> {
+	static insert__overload$1<T>(originalArray: ArrayType<T>, item: T, index: NumberType): ArrayType<T> {
 		return $Array.create(originalArray.value.splice(getRawNumber(index), 1, item))
 	}
 
-	// TODO: Figure out overrides
-	static insert$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>, index: NumberType): ArrayType<T> {
+	static insert__overload$2<T>(
+		originalArray: ArrayType<T>,
+		contentsOf: ArrayType<T>,
+		index: NumberType,
+	): ArrayType<T> {
 		return $Array.create(
 			originalArray.value.splice(getRawNumber(index), contentsOf.value.length, ...contentsOf.value),
 		)
 	}
 
-	static append$1<T>(originalArray: ArrayType<T>, item: T): ArrayType<T> {
+	static append__overload$1<T>(originalArray: ArrayType<T>, item: T): ArrayType<T> {
 		return $Array.create([...originalArray.value, item])
 	}
 
-	static append$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>): ArrayType<T> {
+	static append__overload$2<T>(originalArray: ArrayType<T>, contentsOf: ArrayType<T>): ArrayType<T> {
 		return $Array.create([...originalArray.value, ...contentsOf.value])
 	}
 }

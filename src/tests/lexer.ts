@@ -404,6 +404,22 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
+
+		it("should lex overload", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "overload"
+			output = {
+				value: "overload",
+				type: TokenType.KeywordOverload,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
 	})
 
 	describe("Symbols", () => {

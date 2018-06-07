@@ -132,15 +132,22 @@ export interface VariableAssignmentStatementNode {
 	value: ExpressionNode
 }
 
+export interface Method {
+	method: FunctionValueNode
+	isStatic: boolean
+}
+
+export type Methods = {
+	[key: string]: Method
+}
+
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
 	properties: {
 		[key: string]: Type
 	}
-	methods: {
-		[key: string]: { method: FunctionValueNode; isStatic: boolean }
-	}
+	methods: Methods
 	type: Type
 }
 

@@ -10,12 +10,14 @@ const type: common.TypeType = {
 			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		hasContent: {
 			type: "Method",
 			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		is: {
 			type: "Method",
@@ -25,6 +27,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		isnt: {
 			type: "Method",
@@ -34,6 +37,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		prepend: {
 			type: "Method",
@@ -43,6 +47,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		append: {
 			type: "Method",
@@ -52,6 +57,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		split: {
 			type: "Method",
@@ -61,6 +67,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Array", itemType: { type: "Primitive", primitive: "String" } },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		contains: {
 			type: "Method",
@@ -70,6 +77,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 	},
 }

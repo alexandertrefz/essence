@@ -1,4 +1,5 @@
 import { common } from "../interfaces"
+import { resolveOverloadedMethodName } from "../helpers"
 
 export const simplify = (program: common.typed.Program): common.typedSimple.Program => {
 	return {
@@ -92,6 +93,10 @@ function simplifyNativeFunctionInvocation(
 }
 
 function simplifyMethodInvocation(node: common.typed.MethodInvocationNode): common.typedSimple.FunctionInvocationNode {
+	if (node.overloadedMethodIndex !== null) {
+		node.name.member.content = resolveOverloadedMethodName(node.name.member.content, node.overloadedMethodIndex)
+	}
+
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),
@@ -339,34 +344,51 @@ function simplifyMembers(members: {
 	return result
 }
 
-function simplifyMethods(
-	methods: {
-		[key: string]: { method: common.typed.FunctionValueNode; isStatic: boolean }
-	},
-	type: common.Type,
-): { [key: string]: { method: common.typedSimple.FunctionValueNode; isStatic: boolean } } {
-	let result: { [key: string]: { method: common.typedSimple.FunctionValueNode; isStatic: boolean } } = {}
+function simplifyMethods(methods: common.typed.Methods, type: common.Type): common.typedSimple.Methods {
+	let result: common.typedSimple.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(methods)) {
-		let newMethod = { method: simplifyFunctionValue(memberValue.method), isStatic: memberValue.isStatic }
+		if (memberValue.isOverloaded) {
+			let methods = memberValue.methods.forEach((method, index) => {
+				let newMethod = simplifyFunctionValue(method)
 
-		if (!memberValue.isStatic) {
-			newMethod.method.value.parameters.unshift({
-				nodeType: "Parameter",
-				externalName: {
-					nodeType: "Identifier",
-					name: "@",
-					type,
-				},
-				internalName: {
-					nodeType: "Identifier",
-					name: "_self",
-					type,
-				},
+				if (!memberValue.isStatic) {
+					newMethod.value.parameters.unshift({
+						nodeType: "Parameter",
+						externalName: null,
+						internalName: {
+							nodeType: "Identifier",
+							name: "_self",
+							type,
+						},
+					})
+				}
+
+				result[resolveOverloadedMethodName(memberKey, index)] = {
+					method: newMethod,
+					isStatic: memberValue.isStatic,
+				}
 			})
-		}
+		} else {
+			let method = simplifyFunctionValue(memberValue.method)
 
-		result[memberKey] = newMethod
+			if (!memberValue.isStatic) {
+				method.value.parameters.unshift({
+					nodeType: "Parameter",
+					externalName: null,
+					internalName: {
+						nodeType: "Identifier",
+						name: "_self",
+						type,
+					},
+				})
+			}
+
+			result[memberKey] = {
+				method,
+				isStatic: memberValue.isStatic,
+			}
+		}
 	}
 
 	return result

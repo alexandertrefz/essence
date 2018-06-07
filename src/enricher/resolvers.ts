@@ -380,9 +380,9 @@ export function resolveArrayTypeDeclarationType(
 	return { type: "Array", itemType }
 }
 
-/////////////
+/***********/
 /* Helpers */
-/////////////
+/***********/
 
 export function findVariableInScope(name: string, scope: enricher.Scope): common.Type | null {
 	let searchScope: enricher.Scope | null = scope
@@ -423,36 +423,80 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 }
 
 export function resolveMethodType(
-	node: { method: parser.FunctionValueNode; isStatic: boolean },
+	node: parser.Method | parser.OverloadedMethod,
 	scope: enricher.Scope,
 	selfType: common.TypeType,
 ): common.MethodType {
-	const returnType = resolveType(node.method.value.returnType, scope)
+	if (node.isOverloaded) {
+		const returnType = node.methods.reduce<common.Type | null>((prev, curr) => {
+			let currType = resolveType(curr.value.returnType, scope)
 
-	if (node.isStatic) {
-		return {
-			type: "Method",
-			parameterTypes: node.method.value.parameters.map(param => {
-				let name = null
+			if (prev === null) {
+				return currType
+			} else if (deepEqual(prev, currType)) {
+				return currType
+			} else {
+				return null
+			}
+		}, null)
 
-				if (param.externalName !== null) {
-					name = param.externalName.content
-				}
+		if (returnType === null) {
+			throw new Error("Overloaded Methods need to have the same return type")
+		}
 
-				return {
-					name,
-					type: resolveType(param.type, scope),
-				}
-			}),
-			returnType,
-			isStatic: node.isStatic,
+		if (node.isStatic) {
+			return {
+				type: "Method",
+				parameterTypes: node.methods.map(method =>
+					method.value.parameters.map(parameter => {
+						let name: string | null
+
+						if (parameter.externalName !== null) {
+							name = parameter.externalName.content
+						} else {
+							name = null
+						}
+
+						return {
+							name,
+							type: resolveType(parameter.type, scope),
+						}
+					}),
+				),
+				returnType,
+				isStatic: true,
+				isOverloaded: true,
+			}
+		} else {
+			return {
+				type: "Method",
+				parameterTypes: node.methods.map(method => [
+					{ name: null, type: selfType },
+					...method.value.parameters.map(parameter => {
+						let name: string | null
+
+						if (parameter.externalName !== null) {
+							name = parameter.externalName.content
+						} else {
+							name = null
+						}
+
+						return {
+							name,
+							type: resolveType(parameter.type, scope),
+						}
+					}),
+				]),
+				returnType,
+				isStatic: node.isStatic,
+				isOverloaded: node.isOverloaded,
+			}
 		}
 	} else {
-		return {
-			type: "Method",
-			parameterTypes: [
-				{ name: null, type: selfType },
-				...node.method.value.parameters.map(param => {
+		if (node.isStatic) {
+			return {
+				type: "Method",
+				parameterTypes: node.method.value.parameters.map(param => {
 					let name = null
 
 					if (param.externalName !== null) {
@@ -464,9 +508,32 @@ export function resolveMethodType(
 						type: resolveType(param.type, scope),
 					}
 				}),
-			],
-			returnType,
-			isStatic: node.isStatic,
+				returnType: resolveType(node.method.value.returnType, scope),
+				isStatic: node.isStatic,
+				isOverloaded: node.isOverloaded,
+			}
+		} else {
+			return {
+				type: "Method",
+				parameterTypes: [
+					{ name: null, type: selfType },
+					...node.method.value.parameters.map(param => {
+						let name = null
+
+						if (param.externalName !== null) {
+							name = param.externalName.content
+						}
+
+						return {
+							name,
+							type: resolveType(param.type, scope),
+						}
+					}),
+				],
+				returnType: resolveType(node.method.value.returnType, scope),
+				isStatic: node.isStatic,
+				isOverloaded: node.isOverloaded,
+			}
 		}
 	}
 }

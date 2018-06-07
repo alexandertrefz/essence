@@ -88,19 +88,56 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 		throw new Error("MethodInvocation: Identifier isn't a function")
 	}
 
-	if (methodType.parameterTypes.length !== methodArguments.length) {
-		throw new Error("MethodInvocation: Amount of arguments doesn't match")
-	}
+	validateMethodLookup(node.name)
 
-	for (let i = 0; i < methodType.parameterTypes.length; i++) {
-		if (
-			methodType.parameterTypes[i].name !== methodArguments[i].name ||
-			!matchesType(methodType.parameterTypes[i].type, methodArguments[i].type)
-		) {
-			if (i === 0) {
-				throw new Error(`MethodInvocation: BaseType mismatch`)
-			} else {
-				throw new Error(`MethodInvocation: ArgumentType mismatch at argument ${i}`)
+	if (methodType.isOverloaded) {
+		let lastIterationHadError = false
+		let index = 0
+
+		for (let parameterTypes of methodType.parameterTypes) {
+			lastIterationHadError = false
+
+			if (parameterTypes.length !== methodArguments.length) {
+				lastIterationHadError = true
+				continue
+			}
+
+			for (let i = 0; i < parameterTypes.length; i++) {
+				if (
+					parameterTypes[i].name !== methodArguments[i].name ||
+					!matchesType(parameterTypes[i].type, methodArguments[i].type)
+				) {
+					lastIterationHadError = true
+					break
+				}
+			}
+
+			if (lastIterationHadError === false) {
+				break
+			}
+			index++
+		}
+
+		if (lastIterationHadError) {
+			throw new Error("MethodInvocation: Passed arguments do not match any overload")
+		} else {
+			node.overloadedMethodIndex = index
+		}
+	} else {
+		if (methodType.parameterTypes.length !== methodArguments.length) {
+			throw new Error("MethodInvocation: Amount of arguments doesn't match")
+		}
+
+		for (let i = 0; i < methodType.parameterTypes.length; i++) {
+			if (
+				methodType.parameterTypes[i].name !== methodArguments[i].name ||
+				!matchesType(methodType.parameterTypes[i].type, methodArguments[i].type)
+			) {
+				if (i === 0) {
+					throw new Error(`MethodInvocation: BaseType mismatch`)
+				} else {
+					throw new Error(`MethodInvocation: ArgumentType mismatch at argument ${i}`)
+				}
 			}
 		}
 	}
@@ -120,16 +157,47 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 	} else {
 		// Dynamic methods, being called in a manually via `.` are being validated here,
 		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
-		if (functionType.parameterTypes.length !== node.arguments.length) {
-			throw new Error("FunctionInvocation: Amount of arguments doesn't match")
-		}
+		if (functionType.isOverloaded) {
+			let lastIterationHadError = false
 
-		for (let i = 0; i < functionType.parameterTypes.length; i++) {
-			if (
-				functionType.parameterTypes[i].name !== node.arguments[i].name ||
-				!matchesType(functionType.parameterTypes[i].type, node.arguments[i].type)
-			) {
-				throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
+			for (let parameterTypes of functionType.parameterTypes) {
+				lastIterationHadError = false
+
+				if (parameterTypes.length !== node.arguments.length) {
+					lastIterationHadError = true
+					continue
+				}
+
+				for (let i = 0; i < parameterTypes.length; i++) {
+					if (
+						parameterTypes[i].name !== node.arguments[i].name ||
+						!matchesType(parameterTypes[i].type, node.arguments[i].type)
+					) {
+						lastIterationHadError = true
+						break
+					}
+				}
+
+				if (lastIterationHadError === false) {
+					break
+				}
+			}
+
+			if (lastIterationHadError) {
+				throw new Error("MethodInvocation: Passed arguments do not match any overload")
+			}
+		} else {
+			if (functionType.parameterTypes.length !== node.arguments.length) {
+				throw new Error("FunctionInvocation: Amount of arguments doesn't match")
+			}
+
+			for (let i = 0; i < functionType.parameterTypes.length; i++) {
+				if (
+					functionType.parameterTypes[i].name !== node.arguments[i].name ||
+					!matchesType(functionType.parameterTypes[i].type, node.arguments[i].type)
+				) {
+					throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
+				}
 			}
 		}
 	}
@@ -137,20 +205,12 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 	return node
 }
 
-function validateMethodFunctionDefinition(method: {
-	method: common.typed.FunctionValueNode
-	isStatic: boolean
-}): {
-	method: common.typed.FunctionValueNode
-	isStatic: boolean
-} {
-	method.method.value.body.map(bodyNode => validateImplementationNode(bodyNode, method.method.value))
-
-	return method
-}
-
 function validateFunctionDefinition(node: common.typed.FunctionDefinitionNode): common.typed.FunctionDefinitionNode {
 	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
+
+	return node
+}
+
 function validateLookup(node: common.typed.LookupNode): common.typed.LookupNode {
 	validateExpression(node.base)
 
@@ -235,9 +295,13 @@ function validateTypeDefinitionStatement(
 	node: common.typed.TypeDefinitionStatementNode,
 ): common.typed.TypeDefinitionStatementNode {
 	for (let methodName in node.methods) {
-		const method = node.methods[methodName]
+		let method = node.methods[methodName]
 
-		validateMethodFunctionDefinition(method)
+		if (method.isOverloaded) {
+			method.methods.map(overloadedMethod => validateFunctionDefinition(overloadedMethod.value))
+		} else {
+			validateFunctionDefinition(method.method.value)
+		}
 	}
 
 	return node
@@ -302,19 +366,50 @@ function validateFunctionStatement(node: common.typed.FunctionStatementNode): co
 // #region Helpers
 
 function validateSimpleFunctionInvocation(
-	functionType: common.FunctionType | common.StaticMethodType,
+	functionType: common.FunctionType | common.StaticMethodType | common.StaticOverloadedMethodType,
 	argumentTypes: common.typed.ArgumentNode[],
 ) {
-	if (functionType.parameterTypes.length !== argumentTypes.length) {
-		throw new Error("FunctionInvocation: Amount of arguments doesn't match")
-	}
+	if (functionType.type === "Method" && functionType.isOverloaded) {
+		let lastIterationHadError = false
 
-	for (let i = 0; i < functionType.parameterTypes.length; i++) {
-		if (
-			functionType.parameterTypes[i].name !== argumentTypes[i].name ||
-			!matchesType(functionType.parameterTypes[i].type, argumentTypes[i].type)
-		) {
-			throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
+		for (let parameterTypes of functionType.parameterTypes) {
+			lastIterationHadError = false
+
+			if (parameterTypes.length !== argumentTypes.length) {
+				lastIterationHadError = true
+				continue
+			}
+
+			for (let i = 0; i < parameterTypes.length; i++) {
+				if (
+					parameterTypes[i].name !== argumentTypes[i].name ||
+					!matchesType(parameterTypes[i].type, argumentTypes[i].type)
+				) {
+					lastIterationHadError = true
+					break
+				}
+			}
+
+			if (lastIterationHadError === false) {
+				break
+			}
+		}
+
+		if (lastIterationHadError) {
+			throw new Error("FunctionInvocation: Passed arguments do not match any overload")
+		}
+	} else {
+		if (functionType.parameterTypes.length !== argumentTypes.length) {
+			throw new Error("FunctionInvocation: Amount of arguments doesn't match")
+		}
+
+		for (let i = 0; i < functionType.parameterTypes.length; i++) {
+			if (
+				functionType.parameterTypes[i].name !== argumentTypes[i].name ||
+				!matchesType(functionType.parameterTypes[i].type, argumentTypes[i].type)
+			) {
+				throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
+			}
 		}
 	}
 }
@@ -384,24 +479,53 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	}
 
 	if (lhs.type === "Method" && rhs.type === "Method") {
-		if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (
-				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
-			) {
+		if (lhs.isOverloaded === false && rhs.isOverloaded === false) {
+			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
 				return false
 			}
-		}
 
-		if (!matchesType(lhs.returnType, rhs.returnType)) {
+			if (!matchesType(lhs.returnType, rhs.returnType)) {
+				return false
+			}
+
+			for (let i = 0; i < lhs.parameterTypes.length; i++) {
+				if (
+					lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+					!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+				) {
+					return false
+				}
+			}
+
+			return true
+		} else if (lhs.isOverloaded === true && rhs.isOverloaded === true) {
+			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
+				return false
+			}
+
+			if (!matchesType(lhs.returnType, rhs.returnType)) {
+				return false
+			}
+
+			for (let i = 0; i < lhs.parameterTypes.length; i++) {
+				if (lhs.parameterTypes[i].length !== rhs.parameterTypes[i].length) {
+					return false
+				}
+
+				for (let j = 0; j < lhs.parameterTypes.length; j++) {
+					if (
+						lhs.parameterTypes[i][j].name !== rhs.parameterTypes[i][j].name ||
+						!matchesType(lhs.parameterTypes[i][j].type, rhs.parameterTypes[i][j].type)
+					) {
+						return false
+					}
+				}
+			}
+
+			return true
+		} else {
 			return false
 		}
-
-		return true
 	}
 
 	// #endregion
