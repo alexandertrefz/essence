@@ -49,7 +49,9 @@ function validateExpression(node: common.typed.ExpressionNode): common.typed.Exp
 		case "FunctionInvocation":
 			return validateFunctionInvocation(node)
 		case "MethodLookup":
+			return validateMethodLookup(node)
 		case "Lookup":
+			return validateLookup(node)
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
@@ -149,6 +151,14 @@ function validateMethodFunctionDefinition(method: {
 
 function validateFunctionDefinition(node: common.typed.FunctionDefinitionNode): common.typed.FunctionDefinitionNode {
 	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
+function validateLookup(node: common.typed.LookupNode): common.typed.LookupNode {
+	validateExpression(node.base)
+
+	return node
+}
+
+function validateMethodLookup(node: common.typed.MethodLookupNode): common.typed.MethodLookupNode {
+	validateExpression(node.base)
 
 	return node
 }
