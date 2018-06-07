@@ -8,7 +8,7 @@
 		"build": "make all",
 		"ci-build": "make compile-grammar && tsc -p .",
 		"watch": "make watch",
-		"test": "nyc jasmine",
+		"test": "make all && nyc jasmine",
 		"coverage": "nyc report --reporter=text-lcov > coverage.lcov",
 		"precommit": "make all && jasmine"
 	},
