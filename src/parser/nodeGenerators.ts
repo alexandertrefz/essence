@@ -200,18 +200,38 @@ export function typeDefinitionStatement(
 	name: parser.IdentifierNode,
 	body: Array<TypeProperty | TypeMethod>,
 	position: common.Position,
-) {
+): parser.TypeDefinitionStatementNode {
 	const properties = body.reduce<TypeProperties>((prev, curr) => {
 		if (curr.nodeType === "PropertyNode") {
 			prev[curr.name.content] = curr.type
 		}
+
 		return prev
 	}, {})
 
-	const methods = body.reduce<TypeMethods>((prev, curr) => {
+	const methods = body.reduce<parser.Methods>((prev, curr) => {
 		if (curr.nodeType === "MethodNode") {
-			prev[curr.name.content] = { method: curr.method, isStatic: curr.isStatic }
+			const overloadedMethod = prev[curr.name.content]
+
+			if (overloadedMethod) {
+				if (overloadedMethod.isOverloaded) {
+					prev[curr.name.content] = {
+						methods: [...overloadedMethod.methods, curr.method],
+						isStatic: overloadedMethod.isStatic,
+						isOverloaded: true,
+					}
+				} else {
+					prev[curr.name.content] = {
+						methods: [overloadedMethod.method, curr.method],
+						isStatic: overloadedMethod.isStatic,
+						isOverloaded: true,
+					}
+				}
+			} else {
+				prev[curr.name.content] = { method: curr.method, isStatic: curr.isStatic, isOverloaded: false }
+			}
 		}
+
 		return prev
 	}, {})
 
@@ -349,7 +369,7 @@ type TypeMethod = {
 	method: parser.FunctionValueNode
 	isStatic: boolean
 }
-type TypeMethods = { [key: string]: { method: parser.FunctionValueNode; isStatic: boolean } }
+
 type TypeProperties = { [key: string]: parser.TypeDeclarationNode }
 
 // #endregion

@@ -39,3 +39,7 @@ export function flatten<T = any>(array: Array<T | Array<T>>): Array<T> {
 		return result
 	}, [])
 }
+
+export function resolveOverloadedMethodName(name: string, index: number) {
+	return `${name}__overload$${index + 1}`
+}

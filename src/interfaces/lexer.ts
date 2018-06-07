@@ -32,6 +32,7 @@ export enum TokenType {
 	KeywordVariable = "KeywordVariable",
 	KeywordFunction = "KeywordFunction",
 	KeywordImplementation = "KeywordImplementation",
+	KeywordOverload = "KeywordOverload",
 
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",

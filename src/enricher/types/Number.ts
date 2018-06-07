@@ -13,6 +13,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		subtract: {
 			type: "Method",
@@ -22,6 +23,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		divide: {
 			type: "Method",
@@ -31,6 +33,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 		multiply: {
 			type: "Method",
@@ -40,6 +43,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
 			isStatic: false,
+			isOverloaded: false,
 		},
 	},
 }

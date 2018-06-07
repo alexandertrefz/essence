@@ -125,7 +125,7 @@ Self ->
 	AtSign {% ([symbol]) => generators.self(symbol.position) %}
 
 MethodLookup ->
-	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, _, member]) => generators.methodLookup(base, member, { start: base.position.start, end: member.position.end }) %}
+	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, , member]) => generators.methodLookup(base, member, { start: base.position.start, end: member.position.end }) %}
 
 ###########
 # Helpers #
@@ -145,8 +145,10 @@ TypeProperty ->
 	Identifier Colon Type {% ([name, _, type]) => ({ nodeType: "PropertyNode", name, type }) %}
 
 TypeMethod ->
-	  Identifier FunctionLiteral               {% ([name, method]) =>    ({ nodeType: "MethodNode", name, method, isStatic: false }) %}
-	| StaticKeyword Identifier FunctionLiteral {% ([_, name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: true }) %}
+	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: false }) %}
+	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: true  }) %}
+	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: false }) %}
+	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: true  }) %}
 
 ReturnSymbol ->
 	LeftAngle Dash {% symbol %}
@@ -250,6 +252,7 @@ ConstantKeyword       -> %KeywordConstant       {% id %}
 FunctionKeyword       -> %KeywordFunction       {% id %}
 StaticKeyword         -> %KeywordStatic         {% id %}
 ImplementationKeyword -> %KeywordImplementation {% id %}
+OverloadKeyword       -> %KeywordOverload       {% id %}
 
 # ---------------- #
 # Compound Symbols #

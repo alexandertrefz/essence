@@ -34,6 +34,7 @@ export type UnstaticMethodType = {
 	parameterTypes: Array<Parameter>
 	returnType: Type
 	isStatic: false
+	isOverloaded: false
 }
 
 export type StaticMethodType = {
@@ -41,9 +42,26 @@ export type StaticMethodType = {
 	parameterTypes: Array<Parameter>
 	returnType: Type
 	isStatic: true
+	isOverloaded: false
 }
 
-export type MethodType = UnstaticMethodType | StaticMethodType
+export type StaticOverloadedMethodType = {
+	type: "Method"
+	parameterTypes: Array<Array<Parameter>>
+	returnType: Type
+	isStatic: true
+	isOverloaded: true
+}
+
+export type UnstaticOverloadedMethodType = {
+	type: "Method"
+	parameterTypes: Array<Array<Parameter>>
+	returnType: Type
+	isStatic: false
+	isOverloaded: true
+}
+
+export type MethodType = UnstaticMethodType | StaticMethodType | StaticOverloadedMethodType | UnstaticOverloadedMethodType
 
 export type ArrayType = {
 	type: "Array"

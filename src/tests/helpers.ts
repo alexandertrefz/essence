@@ -1,5 +1,14 @@
 import { lexer } from "../interfaces"
-import { first, second, third, symbol, flatten, stripPosition, stripPositionFromArray } from "../helpers"
+import {
+	first,
+	second,
+	third,
+	symbol,
+	flatten,
+	stripPosition,
+	stripPositionFromArray,
+	resolveOverloadedMethodName,
+} from "../helpers"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -84,6 +93,42 @@ describe("Helpers", () => {
 			]
 
 			expect(stripPositionFromArray(input)).toEqual(output)
+		})
+	})
+
+	describe("stripPositionFromArray", () => {
+		it("should strip position from all values", () => {
+			let input: Array<Token> = [
+				{
+					value: "",
+					type: TokenType.LiteralString,
+					position: {
+						start: { line: 0, column: 0 },
+						end: { line: 0, column: 0 },
+					},
+				},
+			]
+
+			let output: Array<SimpleToken> = [
+				{
+					value: "",
+					type: TokenType.LiteralString,
+				},
+			]
+
+			expect(stripPositionFromArray(input)).toEqual(output)
+		})
+	})
+
+	describe("stripPositionFromArray", () => {
+		it("should strip position from all values", () => {
+			const name = "Test"
+			const index = 1
+
+			let input = resolveOverloadedMethodName(name, index)
+			let output = `${name}__overload$${index + 1}`
+
+			expect(input).toEqual(output)
 		})
 	})
 })

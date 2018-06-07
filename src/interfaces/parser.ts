@@ -167,15 +167,29 @@ export interface VariableAssignmentStatementNode {
 	position: Position
 }
 
+export interface Method {
+	method: FunctionValueNode
+	isStatic: boolean
+	isOverloaded: false
+}
+
+export interface OverloadedMethod {
+	methods: Array<FunctionValueNode>
+	isStatic: boolean
+	isOverloaded: true
+}
+
+export type Methods = {
+	[key: string]: Method | OverloadedMethod
+}
+
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
 	properties: {
 		[key: string]: TypeDeclarationNode
 	}
-	methods: {
-		[key: string]: { method: FunctionValueNode; isStatic: boolean }
-	}
+	methods: Methods
 	position: Position
 }
 
