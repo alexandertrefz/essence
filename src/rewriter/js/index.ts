@@ -374,10 +374,27 @@ function rewriteFunctionValue(node: common.typedSimple.FunctionValueNode): estre
 	return rewriteFunctionExpression(node.value)
 }
 
-function rewriteArrayValue(node: common.typedSimple.ArrayValueNode): estree.ArrayExpression {
+function rewriteArrayValue(node: common.typedSimple.ArrayValueNode): estree.CallExpression {
 	return {
-		type: "ArrayExpression",
-		elements: node.values.map(expr => rewriteExpression(expr)),
+		type: "CallExpression",
+		callee: {
+			type: "MemberExpression",
+			object: {
+				type: "Identifier",
+				name: "Array",
+			},
+			property: {
+				type: "Identifier",
+				name: "create",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "ArrayExpression",
+				elements: node.values.map(expr => rewriteExpression(expr)),
+			},
+		],
 	}
 }
 
