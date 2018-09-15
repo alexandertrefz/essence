@@ -126,14 +126,6 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		return true
 	}
 
-	function applyType(
-		lhs: common.RecordType | common.TypeType,
-		rhs: common.RecordType | common.TypeType,
-	): common.RecordType | common.TypeType {
-		// TODO: Implement `applyType`
-		throw new Error("Implement applyType")
-	}
-
 	let lhsType = resolveType(node.lhs, scope)
 	let rhsType = resolveType(node.rhs, scope)
 
@@ -163,7 +155,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		if (isSubType(lhsType, rhsType)) {
 			return lhsType
 		} else {
-			return applyType(lhsType, rhsType)
+			throw new Error("The right hand side Type must be a Partial of the left hand side Type.")
 		}
 	}
 }
