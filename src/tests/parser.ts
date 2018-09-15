@@ -4,8 +4,7 @@ import { parse } from "../parser"
 const util = require("util")
 util.inspect.defaultOptions.depth = null
 
-// prettier-ignore
-type ParserNode = any;
+type ParserNode = any
 
 describe("Parser", () => {
 	describe("Expressions", () => {
