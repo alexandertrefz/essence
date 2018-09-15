@@ -12,8 +12,7 @@ import {
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
-// prettier-ignore
-type SimpleToken = lexer.SimpleToken;
+type SimpleToken = lexer.SimpleToken
 
 describe("Helpers", () => {
 	describe("first", () => {
