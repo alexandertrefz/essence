@@ -1,6 +1,5 @@
 import { common, lexer } from "../interfaces"
 import { Token as NearleyToken } from "nearley"
-import { createIsHelper, orHelper } from "./helpers"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -17,6 +16,20 @@ type LexingResult = {
 	input: string
 	token: Token | undefined
 	cursor: Cursor
+}
+
+const createIsHelper = (tester: string | Array<string>) => {
+	return (input: string): boolean => {
+		if (typeof tester === "string") {
+			return tester === input
+		} else {
+			return !!~tester.indexOf(input)
+		}
+	}
+}
+
+const orHelper = (funcs: Array<(input: string) => boolean>, input: string): boolean => {
+	return funcs.map(func => func(input)).reduce((prev, curr) => prev || curr, false)
 }
 
 const linebreak = "\n"
