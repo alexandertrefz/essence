@@ -6,7 +6,7 @@ export type Program = {
 	position: Position
 }
 
-//#region Sections
+// #region Sections
 
 export type ImplementationSectionNode = {
 	nodeType: "ImplementationSection"
@@ -14,7 +14,7 @@ export type ImplementationSectionNode = {
 	position: Position
 }
 
-//#endregion
+// #endregion
 
 export type ImplementationNode = ExpressionNode | StatementNode
 
