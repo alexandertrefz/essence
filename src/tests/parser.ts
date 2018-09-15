@@ -1,29 +1,24 @@
 import { parse } from "../parser"
+import { parser } from "../interfaces"
 
 // Infinitely deep console.logs for convenience
 const util = require("util")
 util.inspect.defaultOptions.depth = null
 
-type ParserNode = any
-
 describe("Parser", () => {
 	describe("Expressions", () => {
 		describe("NativeInvocations", () => {
 			it("should not parse NativePrefix without Identifier", () => {
-				let input = `implementation { __ }`
-
-				expect(() => parse(input)).toThrow()
+				expect(() => parse(`implementation { __ }`)).toThrow()
 			})
 
 			it("should not parse NativeLookups without second Identifier", () => {
-				let input = `implementation { __lookup. }`
-
-				expect(() => parse(input)).toThrow()
+				expect(() => parse(`implementation { __lookup. }`)).toThrow()
 			})
 
 			it("should parse NativeFunctionInvocation with one argument", () => {
-				let input = `implementation { __lookup(argument) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { __lookup(argument) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -87,12 +82,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse NativeFunctionInvocation with one argument with trailing comma", () => {
-				let input = `implementation { __lookup(argument,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { __lookup(argument,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -156,12 +151,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse NativeFunctionInvocation with multiple arguments", () => {
-				let input = `implementation { __lookup(argument, argument2) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { __lookup(argument, argument2) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -243,12 +238,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse NativeFunctionInvocation with multiple arguments with trailing comma", () => {
-				let input = `implementation { __lookup(argument, argument2,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { __lookup(argument, argument2,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -330,14 +325,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("MethodInvocations", () => {
 			it("should parse MethodInvocation with 0 external parameters", () => {
-				let input = `implementation { lookup::member() }`
-				let output = {
+				let input: parser.Program = parse(`implementation { lookup::member() }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -409,12 +404,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse MethodInvocation", () => {
-				let input = `implementation { lookup::member(argument) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { lookup::member(argument) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -505,12 +500,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse chained MethodInvocations", () => {
-				let input = `implementation { lookup::member(argument)::member(argument) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { lookup::member(argument)::member(argument) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -661,14 +656,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("MethodLookups", () => {
 			it("should parse Identifier MethodLookups", () => {
-				let input = `implementation { identifier::member }`
-				let output = {
+				let input: parser.Program = parse(`implementation { identifier::member }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -726,12 +721,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Lookup MethodLookups", () => {
-				let input = `implementation { identifier.lookup::member }`
-				let output = {
+				let input: parser.Program = parse(`implementation { identifier.lookup::member }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -816,20 +811,18 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should not parse chained MethodLookups", () => {
-				let input = `implementation { lookup::member1::member2 }`
-
-				expect(() => parse(input)).toThrow()
+				expect(() => parse(`implementation { lookup::member1::member2 }`)).toThrow()
 			})
 		})
 
 		describe("FunctionInvocations", () => {
 			it("should parse Identifier FunctionInvocations with one argument", () => {
-				let input = `implementation { invocation(argument) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -893,12 +886,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with one labelled argument", () => {
-				let input = `implementation { invocation(with argument) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(with argument) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -975,12 +968,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with one argument and a trailing comma", () => {
-				let input = `implementation { invocation(argument,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1044,12 +1037,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with two arguments", () => {
-				let input = `implementation { invocation(argument, argument2) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument, argument2) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1131,12 +1124,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with two arguments and a trailing comma", () => {
-				let input = `implementation { invocation(argument, argument2,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument, argument2,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1218,12 +1211,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with more than two arguments", () => {
-				let input = `implementation { invocation(argument, argument2, argument3) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument, argument2, argument3) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1323,12 +1316,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Identifier FunctionInvocations with more than two arguments and a trailing comma", () => {
-				let input = `implementation { invocation(argument, argument2, argument3,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { invocation(argument, argument2, argument3,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1428,12 +1421,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse Lookup FunctionInvocations with more than two arguments and a trailing comma", () => {
-				let input = `implementation { namespace.invocation(argument, argument2, argument3,) }`
-				let output = {
+				let input: parser.Program = parse(`implementation { namespace.invocation(argument, argument2, argument3,) }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1560,15 +1553,15 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse multiple FunctionInvocations in a row", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					invocation(argument)
 					invocation(argument)
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1679,14 +1672,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("Lookups", () => {
 			it("should parse simple Lookup", () => {
-				let input = `implementation { lookup.member }`
-				let output = {
+				let input: parser.Program = parse(`implementation { lookup.member }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1744,12 +1737,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse complex Lookup", () => {
-				let input = `implementation { lookup.member1.member2 }`
-				let output = {
+				let input: parser.Program = parse(`implementation { lookup.member1.member2 }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1834,14 +1827,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("Identifiers", () => {
 			it("should parse Identifiers", () => {
-				let input = `implementation { identifier }`
-				let output = {
+				let input: parser.Program = parse(`implementation { identifier }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1872,14 +1865,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("Self", () => {
 			it("should parse @", () => {
-				let input = `implementation { @ }`
-				let output = {
+				let input: parser.Program = parse(`implementation { @ }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1909,14 +1902,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("Combination", () => {
 			it("should parse 2 identifier combinations", () => {
-				let input = `implementation { base <| override }`
-				let output = {
+				let input: parser.Program = parse(`implementation { base <| override }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -1974,15 +1967,15 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("Literals", () => {
 			describe("FunctionLiterals", () => {
 				it("should parse FunctionLiterals with no parameters", () => {
-					let input = `implementation { () -> Type {} }`
-					let output = {
+					let input: parser.Program = parse(`implementation { () -> Type {} }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2044,16 +2037,16 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse FunctionLiterals with one parameter with explicit external name", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						(external internal: Type) -> Type {
 							<- internal
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2212,16 +2205,16 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse FunctionLiterals with one parameter with implicit external name", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						(internal: Type) -> Type {
 							<- internal
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2380,16 +2373,16 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse FunctionLiterals with one parameter without external name", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						(_ internal: Type) -> Type {
 							<- internal
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2535,16 +2528,16 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse FunctionLiterals with two parameters", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						(external internal: Type, external2 internal2: Type) -> Type {
 							<- internal
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2771,14 +2764,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("AnonymousRecordLiteral", () => {
 				it("should parse AnonymousRecordLiterals with a KeyValuePair", () => {
-					let input = `implementation { { key = value } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { { key = value } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2825,12 +2818,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse AnonymousRecordLiterals with a KeyValuePair with a trailing comma", () => {
-					let input = `implementation { { key = value, } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { { key = value, } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2877,12 +2870,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs", () => {
-					let input = `implementation { { key = value, key2 = value2 } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { { key = value, key2 = value2 } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -2943,12 +2936,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
-					let input = `implementation { { key = value, key2 = value2, } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { { key = value, key2 = value2, } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3009,12 +3002,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse AnonymousRecordLiterals with nested KeyValuePairs", () => {
-					let input = `implementation { { key = { key = value } } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { { key = { key = value } } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3077,18 +3070,18 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse AnonymousRecordLiterals with nested KeyValuePairs and some Linebreaks", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						{
 							key = {
 								key = value
 							}
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3151,14 +3144,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("TypedRecordLiterals", () => {
 				it("should parse TypedRecordLiterals with a KeyValuePair", () => {
-					let input = `implementation { Type ~> { key = value } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { Type ~> { key = value } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3231,12 +3224,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse TypedRecordLiterals with a KeyValuePair with a trailing comma", () => {
-					let input = `implementation { Type ~> { key = value, } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { Type ~> { key = value, } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3309,12 +3302,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse TypedRecordLiterals with multiple KeyValuePairs", () => {
-					let input = `implementation { Type ~> { key = value, key2 = value2 } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { Type ~> { key = value, key2 = value2 } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3401,12 +3394,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse TypedRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
-					let input = `implementation { Type ~> { key = value, key2 = value2, } }`
-					let output = {
+					let input: parser.Program = parse(`implementation { Type ~> { key = value, key2 = value2, } }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3493,18 +3486,18 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse TypedRecordLiterals with nested KeyValuePairs and some Linebreaks", () => {
-					let input = `implementation {
+					let input: parser.Program = parse(`implementation {
 						Type ~> {
 							key = Type ~> {
 								key = value
 							}
 						}
-					}`
-					let output = {
+					}`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3619,14 +3612,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("BooleanLiterals", () => {
 				it("should parse `true` BooleanLiterals", () => {
-					let input = `implementation { true }`
-					let output = {
+					let input: parser.Program = parse(`implementation { true }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3657,12 +3650,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse `false` BooleanLiterals", () => {
-					let input = `implementation { false }`
-					let output = {
+					let input: parser.Program = parse(`implementation { false }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3693,14 +3686,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("StringLiterals", () => {
 				it("should parse empty StringLiterals", () => {
-					let input = `implementation { "" }`
-					let output = {
+					let input: parser.Program = parse(`implementation { "" }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3731,12 +3724,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse filled StringLiterals", () => {
-					let input = `implementation { "string" }`
-					let output = {
+					let input: parser.Program = parse(`implementation { "string" }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3767,14 +3760,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("NumberLiterals", () => {
 				it("should parse simple NumberLiterals", () => {
-					let input = `implementation { 123 }`
-					let output = {
+					let input: parser.Program = parse(`implementation { 123 }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3805,12 +3798,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse simple NumberLiterals with underscores", () => {
-					let input = `implementation { 1_000 }`
-					let output = {
+					let input: parser.Program = parse(`implementation { 1_000 }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3841,12 +3834,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse float NumberLiterals", () => {
-					let input = `implementation { 1.5 }`
-					let output = {
+					let input: parser.Program = parse(`implementation { 1.5 }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3877,12 +3870,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse float NumberLiterals with underscores", () => {
-					let input = `implementation { 1_000.5 }`
-					let output = {
+					let input: parser.Program = parse(`implementation { 1_000.5 }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3913,14 +3906,14 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 
 			describe("ArrayLiterals", () => {
 				it("should parse an empty Array", () => {
-					let input = `implementation { [] }`
-					let output = {
+					let input: parser.Program = parse(`implementation { [] }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -3951,12 +3944,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse an Array with a single item", () => {
-					let input = `implementation { [0] }`
-					let output = {
+					let input: parser.Program = parse(`implementation { [0] }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -4002,12 +3995,12 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 
 				it("should parse an Array with multiple items", () => {
-					let input = `implementation { [0, 1, 2,] }`
-					let output = {
+					let input: parser.Program = parse(`implementation { [0, 1, 2,] }`)
+					let output: parser.Program = {
 						nodeType: "Program",
 						implementation: {
 							nodeType: "ImplementationSection",
@@ -4081,7 +4074,7 @@ describe("Parser", () => {
 						},
 					}
 
-					expect<ParserNode>(parse(input)).toEqual(output)
+					expect(input).toEqual(output)
 				})
 			})
 		})
@@ -4090,8 +4083,8 @@ describe("Parser", () => {
 	describe("Statements", () => {
 		describe("ReturnStatements", () => {
 			it("should parse ReturnStatements", () => {
-				let input = `implementation { <- identifier }`
-				let output = {
+				let input: parser.Program = parse(`implementation { <- identifier }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4135,14 +4128,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("IfStatements", () => {
 			it("should parse IfStatements", () => {
-				let input = `implementation { if identifier {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { if identifier {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4187,12 +4180,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse IfElseStatements", () => {
-				let input = `implementation { if identifier {} else {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { if identifier {} else {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4238,12 +4231,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse IfElse-If-Statements", () => {
-				let input = `implementation { if identifier {} else if identifier2 {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { if identifier {} else if identifier2 {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4318,12 +4311,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse IfElse-IfElse-Statements", () => {
-				let input = `implementation { if identifier {} else if identifier2 {} else {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { if identifier {} else if identifier2 {} else {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4399,12 +4392,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse IfElse-IfElse-If-Statements", () => {
-				let input = `implementation { if identifier {} else if identifier2 {} else if identifier3 {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { if identifier {} else if identifier2 {} else if identifier3 {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4509,14 +4502,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("ConstantDeclarationStatements", () => {
 			it("should parse ConstantDeclarationStatement", () => {
-				let input = `implementation { constant identifier = "" }`
-				let output = {
+				let input: parser.Program = parse(`implementation { constant identifier = "" }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4575,14 +4568,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("VariableDeclarationStatements", () => {
 			it("should parse VariableDeclarationStatement without type", () => {
-				let input = `implementation { variable identifier = "" }`
-				let output = {
+				let input: parser.Program = parse(`implementation { variable identifier = "" }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4641,12 +4634,12 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse VariableDeclarationStatement with Array Type", () => {
-				let input = `implementation { variable [String] strings = [] }`
-				let output = {
+				let input: parser.Program = parse(`implementation { variable [String] strings = [] }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4744,14 +4737,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("VariableAssignmentStatements", () => {
 			it("should parse VariableAssignmentStatement", () => {
-				let input = `implementation { identifier = "" }`
-				let output = {
+				let input: parser.Program = parse(`implementation { identifier = "" }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4809,14 +4802,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("TypeDefinitionStatements", () => {
 			it("should parse an empty TypeDefinitionStatement", () => {
-				let input = `implementation { type Type {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { type Type {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4862,16 +4855,16 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with one Property", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						property: Type
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -4945,17 +4938,17 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with multiple Properties", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						property: Type
 						property2: Type2
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -5056,18 +5049,18 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with one Method", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						method(parameter: Type) -> Type {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -5260,18 +5253,18 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with one static Method", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						static method(parameter: Type) -> Type {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -5464,11 +5457,11 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with multiple Methods", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						method(parameter: Type) -> Type {
 							<- parameter
@@ -5478,8 +5471,8 @@ describe("Parser", () => {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -5818,11 +5811,11 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with overloaded Methods", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						overload method(parameter: Type) -> Type {
 							<- parameter
@@ -5832,8 +5825,8 @@ describe("Parser", () => {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -5999,7 +5992,8 @@ describe("Parser", () => {
 														column: 8,
 													},
 												},
-											},{
+											},
+											{
 												nodeType: "FunctionValue",
 												value: {
 													nodeType: "FunctionDefinition",
@@ -6140,7 +6134,7 @@ describe("Parser", () => {
 														column: 8,
 													},
 												},
-											}
+											},
 										],
 										isStatic: false,
 										isOverloaded: true,
@@ -6169,11 +6163,11 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with twice overloaded Methods", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						overload method(parameter: Type) -> Type {
 							<- parameter
@@ -6187,8 +6181,8 @@ describe("Parser", () => {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -6354,7 +6348,8 @@ describe("Parser", () => {
 														column: 8,
 													},
 												},
-											}, {
+											},
+											{
 												nodeType: "FunctionValue",
 												value: {
 													nodeType: "FunctionDefinition",
@@ -6495,7 +6490,8 @@ describe("Parser", () => {
 														column: 8,
 													},
 												},
-											}, {
+											},
+											{
 												nodeType: "FunctionValue",
 												value: {
 													nodeType: "FunctionDefinition",
@@ -6636,7 +6632,7 @@ describe("Parser", () => {
 														column: 8,
 													},
 												},
-											}
+											},
 										],
 										isStatic: false,
 										isOverloaded: true,
@@ -6665,19 +6661,19 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse TypeDefinitionStatements with Methods and Properties", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					type Type {
 						property: PropertyType
 						method(parameter: Type) -> Type {
 							<- parameter
 						}
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -6898,14 +6894,14 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 
 		describe("FunctionStatements", () => {
 			it("should parse FunctionStatements with no parameters", () => {
-				let input = `implementation { function name () -> Type {} }`
-				let output = {
+				let input: parser.Program = parse(`implementation { function name () -> Type {} }`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -6981,16 +6977,16 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse FunctionLiterals with one parameter with explicit external name", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					function name (external internal: Type) -> Type {
 						<- internal
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -7163,16 +7159,16 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse FunctionLiterals with one parameter with implicit external name", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					function name (internal: Type) -> Type {
 						<- internal
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -7345,16 +7341,16 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse FunctionLiterals with one parameter without external name", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					function name (_ internal: Type) -> Type {
 						<- internal
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -7514,16 +7510,16 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 
 			it("should parse FunctionLiterals with two parameters", () => {
-				let input = `implementation {
+				let input: parser.Program = parse(`implementation {
 					function name (external internal: Type, external2 internal2: Type) -> Type {
 						<- internal
 					}
-				}`
-				let output = {
+				}`)
+				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
 						nodeType: "ImplementationSection",
@@ -7764,7 +7760,7 @@ describe("Parser", () => {
 					},
 				}
 
-				expect<ParserNode>(parse(input)).toEqual(output)
+				expect(input).toEqual(output)
 			})
 		})
 	})
