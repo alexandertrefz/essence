@@ -137,6 +137,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Arrays.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
+		case "Never":
+			throw new Error("You can not combine Nevers.")
 	}
 
 	switch (rhsType.type) {
@@ -147,6 +149,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Arrays.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
+		case "Never":
+			throw new Error("You can not combine Nevers.")
 	}
 
 	if (deepEqual(lhsType, rhsType)) {
@@ -399,12 +403,7 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 		case "Primitive":
 			return resolvePrimitiveTypeType(baseType, scope)
 		case "Array":
-			if (baseType.itemType.type === "Never") {
-				// TODO: Check wether this is a scalable approach, shouldnt this just pass Never?
-				return generateArray({ type: "Record", members: {} })
-			} else {
-				return generateArray(baseType.itemType)
-			}
+			return generateArray(baseType.itemType)
 		case "Type":
 			return baseType
 		default:
