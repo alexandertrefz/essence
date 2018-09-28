@@ -10,8 +10,8 @@ Its syntax and features are designed with modern IDE's in mind, allowing for gre
 Essence will also compile to multiple targets, including the Web (via JS or WASM), LLVM and possibly even .NET.
 
 # The Essence
-* Extensibility is better than completeness.
 * Explicit is better than implicit.
+* Extensibility is better than completeness.
 * Creating correct code must be enjoyable.
 * Prototyping must be fast – thus refactoring must be painless.
 * Readability counts.
