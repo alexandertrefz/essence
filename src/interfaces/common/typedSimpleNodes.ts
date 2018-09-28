@@ -1,6 +1,6 @@
 import { Type, ListType } from "./index"
 
-//#region Program & Sections
+// #region Program & Sections
 
 export type Program = {
 	nodeType: "Program"
@@ -12,9 +12,9 @@ export type ImplementationSectionNode = {
 	nodes: Array<ImplementationNode>
 }
 
-//#endregion
-
 export type ImplementationNode = ExpressionNode | StatementNode
+
+// #endregion
 
 // #region Expressions
 

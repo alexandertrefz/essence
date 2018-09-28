@@ -61,7 +61,11 @@ export type UnstaticOverloadedMethodType = {
 	isOverloaded: true
 }
 
-export type MethodType = UnstaticMethodType | StaticMethodType | StaticOverloadedMethodType | UnstaticOverloadedMethodType
+export type MethodType =
+	| UnstaticMethodType
+	| StaticMethodType
+	| StaticOverloadedMethodType
+	| UnstaticOverloadedMethodType
 
 export type ListType = {
 	type: "List"
