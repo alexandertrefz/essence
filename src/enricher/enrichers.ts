@@ -329,7 +329,7 @@ export function enrichConstantDeclarationStatement(
 		type = resolveType(node.type, scope)
 	}
 
-	let newScope = declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -353,7 +353,7 @@ export function enrichVariableDeclarationStatement(
 		type = resolveType(node.type, scope)
 	}
 
-	let newScope = declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope)
 
 	return {
 		nodeType: "VariableDeclarationStatement",
@@ -400,7 +400,7 @@ export function enrichTypeDefinitionStatement(
 
 	let type = resolveType(node, scope)
 
-	scope = declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope)
 
 	return {
 		nodeType: "TypeDefinitionStatement",
@@ -455,7 +455,7 @@ export function enrichFunctionStatement(
 	scope: enricher.Scope,
 ): common.typed.FunctionStatementNode {
 	let type = resolveType(node.value, scope)
-	let newScope = declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope)
 
 	return {
 		nodeType: "FunctionStatement",
