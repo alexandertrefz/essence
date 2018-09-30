@@ -77,8 +77,8 @@ export type PrimitiveType = {
 	primitive: "String" | "Number" | "Boolean"
 }
 
-export type NeverType = {
-	type: "Never"
+export type UnknownType = {
+	type: "Unknown"
 }
 
 export type BuiltInType = {
@@ -94,6 +94,6 @@ export type TypeType = {
 	}
 }
 
-export type Type = RecordType | FunctionType | MethodType | PrimitiveType | TypeType | ListType | NeverType
+export type Type = RecordType | FunctionType | MethodType | PrimitiveType | TypeType | ListType | UnknownType
 
 export { typed, typedSimple }

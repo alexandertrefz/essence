@@ -428,6 +428,9 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	// #endregion
 
 	// #region Even Types
+	if (lhs.type === "Unknown") {
+		return true
+	}
 
 	if (lhs.type === "Primitive" && rhs.type === "Primitive") {
 		return lhs.primitive === rhs.primitive
@@ -448,9 +451,7 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	}
 
 	if (lhs.type === "List" && rhs.type === "List") {
-		if (lhs.itemType.type === "Never") {
-			return false
-		} else if (rhs.itemType.type === "Never") {
+		if (rhs.itemType.type === "Unknown") {
 			return true
 		} else {
 			return matchesType(lhs.itemType, rhs.itemType)

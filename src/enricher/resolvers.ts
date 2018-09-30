@@ -137,8 +137,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Lists.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
-		case "Never":
-			throw new Error("You can not combine Nevers.")
+		case "Unknown":
+			throw new Error("You can not combine Unknowns.")
 	}
 
 	switch (rhsType.type) {
@@ -149,8 +149,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Lists.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
-		case "Never":
-			throw new Error("You can not combine Nevers.")
+		case "Unknown":
+			throw new Error("You can not combine Unknowns.")
 	}
 
 	if (deepEqual(lhsType, rhsType)) {
@@ -189,7 +189,7 @@ export function resolveListValueType(node: parser.ListValueNode, scope: enricher
 	if (node.values.length === 0) {
 		return {
 			type: "List",
-			itemType: { type: "Never" },
+			itemType: { type: "Unknown" },
 		}
 	} else {
 		let itemType = resolveType(node.values[0], scope)
