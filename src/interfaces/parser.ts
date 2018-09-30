@@ -65,7 +65,7 @@ export type ValueNode =
 	| NumberValueNode
 	| BooleanValueNode
 	| FunctionValueNode
-	| ArrayValueNode
+	| ListValueNode
 
 export type RecordValueNode = {
 	nodeType: "RecordValue"
@@ -99,8 +99,8 @@ export type FunctionValueNode = {
 	position: Position
 }
 
-export type ArrayValueNode = {
-	nodeType: "ArrayValue"
+export type ListValueNode = {
+	nodeType: "ListValue"
 	values: Array<ExpressionNode>
 	position: Position
 }
@@ -225,7 +225,7 @@ export interface FunctionStatementNode {
 
 // #region Helpers
 
-export type TypeDeclarationNode = IdentifierTypeDeclarationNode | ArrayTypeDeclarationNode
+export type TypeDeclarationNode = IdentifierTypeDeclarationNode | ListTypeDeclarationNode
 
 export interface IdentifierTypeDeclarationNode {
 	nodeType: "IdentifierTypeDeclaration"
@@ -233,8 +233,8 @@ export interface IdentifierTypeDeclarationNode {
 	position: Position
 }
 
-export interface ArrayTypeDeclarationNode {
-	nodeType: "ArrayTypeDeclaration"
+export interface ListTypeDeclarationNode {
+	nodeType: "ListTypeDeclaration"
 	type: TypeDeclarationNode
 	position: Position
 }

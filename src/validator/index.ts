@@ -20,7 +20,7 @@ function validateImplementationNode(
 		case "NumberValue":
 		case "BooleanValue":
 		case "FunctionValue":
-		case "ArrayValue":
+		case "ListValue":
 		case "Lookup":
 		case "Identifier":
 		case "Self":
@@ -58,7 +58,7 @@ function validateExpression(node: common.typed.ExpressionNode): common.typed.Exp
 		case "NumberValue":
 		case "BooleanValue":
 		case "FunctionValue":
-		case "ArrayValue":
+		case "ListValue":
 		case "Identifier":
 		case "Self":
 			// these nodes dont need any validation
@@ -447,7 +447,7 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return true
 	}
 
-	if (lhs.type === "Array" && rhs.type === "Array") {
+	if (lhs.type === "List" && rhs.type === "List") {
 		if (lhs.itemType.type === "Never") {
 			return false
 		} else if (rhs.itemType.type === "Never") {

@@ -63,8 +63,8 @@ export type UnstaticOverloadedMethodType = {
 
 export type MethodType = UnstaticMethodType | StaticMethodType | StaticOverloadedMethodType | UnstaticOverloadedMethodType
 
-export type ArrayType = {
-	type: "Array"
+export type ListType = {
+	type: "List"
 	itemType: Type
 }
 
@@ -90,6 +90,6 @@ export type TypeType = {
 	}
 }
 
-export type Type = RecordType | FunctionType | MethodType | PrimitiveType | TypeType | ArrayType | NeverType
+export type Type = RecordType | FunctionType | MethodType | PrimitiveType | TypeType | ListType | NeverType
 
 export { typed, typedSimple }

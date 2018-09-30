@@ -28,7 +28,7 @@ function simplifyImplementationNode(node: common.typed.ImplementationNode): comm
 		case "NumberValue":
 		case "BooleanValue":
 		case "FunctionValue":
-		case "ArrayValue":
+		case "ListValue":
 		case "Lookup":
 		case "Identifier":
 		case "Self":
@@ -68,8 +68,8 @@ function simplifyExpression(node: common.typed.ExpressionNode): common.typedSimp
 			return simplifyBooleanValue(node)
 		case "FunctionValue":
 			return simplifyFunctionValue(node)
-		case "ArrayValue":
-			return simplifyArrayValue(node)
+		case "ListValue":
+			return simplifyListValue(node)
 		case "Lookup":
 			return simplifyLookup(node)
 		case "Identifier":
@@ -172,9 +172,9 @@ function simplifyFunctionValue(node: common.typed.FunctionValueNode): common.typ
 	}
 }
 
-function simplifyArrayValue(node: common.typed.ArrayValueNode): common.typedSimple.ArrayValueNode {
+function simplifyListValue(node: common.typed.ListValueNode): common.typedSimple.ListValueNode {
 	return {
-		nodeType: "ArrayValue",
+		nodeType: "ListValue",
 		values: node.values.map(expr => simplifyExpression(expr)),
 		type: node.type,
 	}

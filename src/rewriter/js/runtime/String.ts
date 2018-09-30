@@ -1,5 +1,5 @@
 import $Boolean, { BooleanType } from "./Boolean"
-import $Array, { ArrayType } from "./Array"
+import $List, { ListType } from "./List"
 
 export type StringType = { $type: "String"; value: string }
 
@@ -32,8 +32,8 @@ export default class $String {
 		return $String.create(originalString.value + otherString.value)
 	}
 
-	static split(originalString: StringType, splitterString: StringType): ArrayType<StringType> {
-		return $Array.create(originalString.value.split(splitterString.value).map(chunk => $String.create(chunk)))
+	static split(originalString: StringType, splitterString: StringType): ListType<StringType> {
+		return $List.create(originalString.value.split(splitterString.value).map(chunk => $String.create(chunk)))
 	}
 
 	static contains(originalString: StringType, otherString: StringType): BooleanType {

@@ -5,7 +5,7 @@ import { parser, enricher, common } from "../interfaces"
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
 import numberType from "./types/Number"
-import generateArray from "./types/Array"
+import generateListType from "./types/List"
 
 export function resolveType(
 	node:
@@ -34,8 +34,8 @@ export function resolveType(
 			return { type: "Primitive", primitive: "Boolean" }
 		case "FunctionValue":
 			return resolveFunctionDefinitionType(node.value, scope)
-		case "ArrayValue":
-			return resolveArrayValueType(node, scope)
+		case "ListValue":
+			return resolveListValueType(node, scope)
 		case "Lookup":
 			return resolveLookupType(node, scope)
 		case "Identifier":
@@ -50,8 +50,8 @@ export function resolveType(
 			return resolveTypeDefinitionStatementType(node, scope)
 		case "IdentifierTypeDeclaration":
 			return resolveIdentifierTypeDeclarationType(node, scope)
-		case "ArrayTypeDeclaration":
-			return resolveArrayTypeDeclarationType(node, scope)
+		case "ListTypeDeclaration":
+			return resolveListTypeDeclarationType(node, scope)
 	}
 }
 export function resolveNativeFunctionInvocationType(
@@ -133,8 +133,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "Method":
 		case "Function":
 			throw new Error("You can not combine Functions.")
-		case "Array":
-			throw new Error("You can not combine Arrays.")
+		case "List":
+			throw new Error("You can not combine Lists.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
 		case "Never":
@@ -145,8 +145,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "Method":
 		case "Function":
 			throw new Error("You can not combine Functions.")
-		case "Array":
-			throw new Error("You can not combine Arrays.")
+		case "List":
+			throw new Error("You can not combine Lists.")
 		case "Primitive":
 			throw new Error("You can not combine Primitives.")
 		case "Never":
@@ -185,10 +185,10 @@ export function resolveFunctionValueType(node: parser.FunctionValueNode, scope: 
 	return resolveFunctionDefinitionType(node.value, scope)
 }
 
-export function resolveArrayValueType(node: parser.ArrayValueNode, scope: enricher.Scope): common.ArrayType {
+export function resolveListValueType(node: parser.ListValueNode, scope: enricher.Scope): common.ListType {
 	if (node.values.length === 0) {
 		return {
-			type: "Array",
+			type: "List",
 			itemType: { type: "Never" },
 		}
 	} else {
@@ -202,7 +202,7 @@ export function resolveArrayValueType(node: parser.ArrayValueNode, scope: enrich
 		}
 
 		return {
-			type: "Array",
+			type: "List",
 			itemType,
 		}
 	}
@@ -363,17 +363,17 @@ export function resolveIdentifierTypeDeclarationType(
 	}
 }
 
-export function resolveArrayTypeDeclarationType(
-	node: parser.ArrayTypeDeclarationNode,
+export function resolveListTypeDeclarationType(
+	node: parser.ListTypeDeclarationNode,
 	scope: enricher.Scope,
-): common.ArrayType {
+): common.ListType {
 	const itemType = resolveType(node.type, scope)
 
 	if (itemType.type === "Method") {
-		throw new Error("Methods can not be Array Item Types.")
+		throw new Error("Methods can not be List Item Types.")
 	}
 
-	return { type: "Array", itemType }
+	return { type: "List", itemType }
 }
 
 /***********/
@@ -402,8 +402,8 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 	switch (baseType.type) {
 		case "Primitive":
 			return resolvePrimitiveTypeType(baseType, scope)
-		case "Array":
-			return generateArray(baseType.itemType)
+		case "List":
+			return generateListType(baseType.itemType)
 		case "Type":
 			return baseType
 		default:

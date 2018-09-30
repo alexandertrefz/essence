@@ -113,7 +113,7 @@ Value ->
 	| NumberLiteral          {% id %}
 	| BooleanLiteral         {% id %}
 	| FunctionLiteral        {% id %}
-	| ArrayLiteral           {% id %}
+	| ListLiteral           {% id %}
 
 Lookup ->
 	Expression Dot Identifier {% ([base, _, member]) => generators.lookup(base, member, { start: base.position.start, end: member.position.end }) %}
@@ -191,9 +191,9 @@ FunctionLiteral ->
 		([paramList, returnType, block]) => generators.functionValueNode(generators.functionDefinition(paramList.parameters, returnType, block.body), { start: paramList.position.start, end: block.position.end })
 	%}
 
-ArrayLiteral ->
-	  LeftBracket RightBracket                {% ([lbracket,         rbracket]) => generators.arrayValueNode([],     { start: lbracket.position.start, end: rbracket.position.end }) %}
-	| LeftBracket ExpressionList RightBracket {% ([lbracket, values, rbracket]) => generators.arrayValueNode(values, { start: lbracket.position.start, end: rbracket.position.end }) %}
+ListLiteral ->
+	  LeftBracket RightBracket                {% ([lbracket,         rbracket]) => generators.listValueNode([],     { start: lbracket.position.start, end: rbracket.position.end }) %}
+	| LeftBracket ExpressionList RightBracket {% ([lbracket, values, rbracket]) => generators.listValueNode(values, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 ExpressionList ->
 	(Expression Comma):* Expression Comma:? {% ([list, expression]) => ([...list.map(first), expression]) %}
@@ -232,7 +232,7 @@ ArgumentList ->
 
 Type ->
 	  Identifier {% ([identifer]) => generators.identifierTypeDeclaration(identifer, identifer.position) %}
-	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.arrayTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
+	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.listTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 TypeHeader ->
 	Type Tilde RightAngle {% first %}
