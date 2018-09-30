@@ -65,7 +65,7 @@ const type: common.TypeType = {
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: "on", type: { type: "Primitive", primitive: "String" } },
 			],
-			returnType: { type: "Array", itemType: { type: "Primitive", primitive: "String" } },
+			returnType: { type: "List", itemType: { type: "Primitive", primitive: "String" } },
 			isStatic: false,
 			isOverloaded: false,
 		},

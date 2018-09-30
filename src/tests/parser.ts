@@ -3910,8 +3910,8 @@ describe("Parser", () => {
 				})
 			})
 
-			describe("ArrayLiterals", () => {
-				it("should parse an empty Array", () => {
+			describe("ListLiterals", () => {
+				it("should parse an empty List", () => {
 					let input: parser.Program = parse(`implementation { [] }`)
 					let output: parser.Program = {
 						nodeType: "Program",
@@ -3919,7 +3919,7 @@ describe("Parser", () => {
 							nodeType: "ImplementationSection",
 							nodes: [
 								{
-									nodeType: "ArrayValue",
+									nodeType: "ListValue",
 									values: [],
 									position: {
 										start: {
@@ -3947,7 +3947,7 @@ describe("Parser", () => {
 					expect(input).toEqual(output)
 				})
 
-				it("should parse an Array with a single item", () => {
+				it("should parse an List with a single item", () => {
 					let input: parser.Program = parse(`implementation { [0] }`)
 					let output: parser.Program = {
 						nodeType: "Program",
@@ -3955,7 +3955,7 @@ describe("Parser", () => {
 							nodeType: "ImplementationSection",
 							nodes: [
 								{
-									nodeType: "ArrayValue",
+									nodeType: "ListValue",
 									values: [
 										{
 											nodeType: "NumberValue",
@@ -3998,7 +3998,7 @@ describe("Parser", () => {
 					expect(input).toEqual(output)
 				})
 
-				it("should parse an Array with multiple items", () => {
+				it("should parse an List with multiple items", () => {
 					let input: parser.Program = parse(`implementation { [0, 1, 2,] }`)
 					let output: parser.Program = {
 						nodeType: "Program",
@@ -4006,7 +4006,7 @@ describe("Parser", () => {
 							nodeType: "ImplementationSection",
 							nodes: [
 								{
-									nodeType: "ArrayValue",
+									nodeType: "ListValue",
 									values: [
 										{
 											nodeType: "NumberValue",
@@ -4637,7 +4637,7 @@ describe("Parser", () => {
 				expect(input).toEqual(output)
 			})
 
-			it("should parse VariableDeclarationStatement with Array Type", () => {
+			it("should parse VariableDeclarationStatement with List Type", () => {
 				let input: parser.Program = parse(`implementation { variable [String] strings = [] }`)
 				let output: parser.Program = {
 					nodeType: "Program",
@@ -4647,7 +4647,7 @@ describe("Parser", () => {
 							{
 								nodeType: "VariableDeclarationStatement",
 								type: {
-									nodeType: "ArrayTypeDeclaration",
+									nodeType: "ListTypeDeclaration",
 									type: {
 										nodeType: "IdentifierTypeDeclaration",
 										type: {
@@ -4701,7 +4701,7 @@ describe("Parser", () => {
 									},
 								},
 								value: {
-									nodeType: "ArrayValue",
+									nodeType: "ListValue",
 									values: [],
 									position: {
 										start: {

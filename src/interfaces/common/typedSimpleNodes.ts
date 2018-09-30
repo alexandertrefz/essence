@@ -1,4 +1,4 @@
-import { Type, ArrayType } from "./index"
+import { Type, ListType } from "./index"
 
 //#region Program & Sections
 
@@ -46,7 +46,7 @@ export type ValueNode =
 	| NumberValueNode
 	| BooleanValueNode
 	| FunctionValueNode
-	| ArrayValueNode
+	| ListValueNode
 
 export type RecordValueNode = {
 	nodeType: "RecordValue"
@@ -80,10 +80,10 @@ export type FunctionValueNode = {
 	type: Type
 }
 
-export type ArrayValueNode = {
-	nodeType: "ArrayValue"
+export type ListValueNode = {
+	nodeType: "ListValue"
 	values: Array<ExpressionNode>
-	type: ArrayType
+	type: ListType
 }
 
 export interface LookupNode {

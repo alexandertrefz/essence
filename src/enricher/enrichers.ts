@@ -1,6 +1,6 @@
 import { parser, common, enricher } from "../interfaces"
 
-import { resolveType, resolveArrayValueType, resolveMethodLookupBaseType } from "./resolvers"
+import { resolveType, resolveListValueType, resolveMethodLookupBaseType } from "./resolvers"
 
 export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scope): common.typed.ImplementationNode {
 	switch (node.nodeType) {
@@ -13,7 +13,7 @@ export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scop
 		case "NumberValue":
 		case "BooleanValue":
 		case "FunctionValue":
-		case "ArrayValue":
+		case "ListValue":
 		case "Lookup":
 		case "Identifier":
 		case "Self":
@@ -53,8 +53,8 @@ export function enrichExpression(node: parser.ExpressionNode, scope: enricher.Sc
 			return enrichBooleanValue(node, scope)
 		case "FunctionValue":
 			return enrichFunctionValue(node, scope)
-		case "ArrayValue":
-			return enrichArrayValue(node, scope)
+		case "ListValue":
+			return enrichListValue(node, scope)
 		case "Lookup":
 			return enrichLookup(node, scope)
 		case "Identifier":
@@ -234,12 +234,12 @@ export function enrichFunctionValue(
 	}
 }
 
-export function enrichArrayValue(node: parser.ArrayValueNode, scope: enricher.Scope): common.typed.ArrayValueNode {
+export function enrichListValue(node: parser.ListValueNode, scope: enricher.Scope): common.typed.ListValueNode {
 	return {
-		nodeType: "ArrayValue",
+		nodeType: "ListValue",
 		values: node.values.map(expr => enrichExpression(expr, scope)),
 		position: node.position,
-		type: resolveArrayValueType(node, scope),
+		type: resolveListValueType(node, scope),
 	}
 }
 

@@ -122,9 +122,9 @@ export function functionValueNode(
 	}
 }
 
-export function arrayValueNode(values: Array<parser.ExpressionNode>, position: common.Position): parser.ArrayValueNode {
+export function listValueNode(values: Array<parser.ExpressionNode>, position: common.Position): parser.ListValueNode {
 	return {
-		nodeType: "ArrayValue",
+		nodeType: "ListValue",
 		values,
 		position,
 	}
@@ -300,12 +300,12 @@ export function identifierTypeDeclaration(
 	}
 }
 
-export function arrayTypeDeclaration(
+export function listTypeDeclaration(
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
-): parser.ArrayTypeDeclarationNode {
+): parser.ListTypeDeclarationNode {
 	return {
-		nodeType: "ArrayTypeDeclaration",
+		nodeType: "ListTypeDeclaration",
 		type,
 		position,
 	}

@@ -15,7 +15,7 @@ export default async function rewrite(program: common.typedSimple.Program): Prom
 			internalImport([importDefaultSpecifier("String")], "String"),
 			internalImport([importDefaultSpecifier("Number")], "Number"),
 			internalImport([importDefaultSpecifier("Boolean")], "Boolean"),
-			internalImport([importDefaultSpecifier("Array")], "Array"),
+			internalImport([importDefaultSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			...rewriteImplementationSection(program.implementation),
 		],
@@ -197,8 +197,8 @@ function rewriteExpression(
 			return rewriteBooleanValue(node)
 		case "FunctionValue":
 			return rewriteFunctionValue(node)
-		case "ArrayValue":
-			return rewriteArrayValue(node)
+		case "ListValue":
+			return rewriteListValue(node)
 		case "Lookup":
 			return rewriteLookup(node)
 		case "Identifier":
@@ -374,14 +374,14 @@ function rewriteFunctionValue(node: common.typedSimple.FunctionValueNode): estre
 	return rewriteFunctionExpression(node.value)
 }
 
-function rewriteArrayValue(node: common.typedSimple.ArrayValueNode): estree.CallExpression {
+function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		callee: {
 			type: "MemberExpression",
 			object: {
 				type: "Identifier",
-				name: "Array",
+				name: "List",
 			},
 			property: {
 				type: "Identifier",
