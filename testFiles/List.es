@@ -1,5 +1,5 @@
 implementation {
     constant Tao = 6.28
     variable [Number] list = []
-    variable Number myNumber = list::append(item Tao)::first()
+    variable Number myNumber = list::append(Tao)::first()
 }

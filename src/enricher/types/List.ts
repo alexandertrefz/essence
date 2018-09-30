@@ -53,7 +53,7 @@ function generateType(genericType: common.Type): common.TypeType {
 				parameterTypes: [
 					[
 						{ name: null, type: { type: "List", itemType: genericType } },
-						{ name: "item", type: genericType },
+						{ name: null, type: genericType },
 						{ name: "atIndex", type: { type: "Primitive", primitive: "Number" } },
 					],
 					[
@@ -69,10 +69,7 @@ function generateType(genericType: common.Type): common.TypeType {
 			append: {
 				type: "Method",
 				parameterTypes: [
-					[
-						{ name: null, type: { type: "List", itemType: genericType } },
-						{ name: "item", type: genericType },
-					],
+					[{ name: null, type: { type: "List", itemType: genericType } }, { name: null, type: genericType }],
 					[
 						{ name: null, type: { type: "List", itemType: genericType } },
 						{ name: "contentsOf", type: { type: "List", itemType: genericType } },
