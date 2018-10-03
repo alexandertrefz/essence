@@ -3,6 +3,5 @@
 	"useTabs": true,
 	"semi": false,
 	"singleQuote": false,
-	"trailingComma": "all",
-	"parser": "typescript"
+	"trailingComma": "all"
 }
