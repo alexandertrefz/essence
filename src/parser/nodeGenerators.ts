@@ -210,25 +210,43 @@ export function typeDefinitionStatement(
 	}, {})
 
 	const methods = body.reduce<parser.Methods>((prev, curr) => {
-		if (curr.nodeType === "MethodNode") {
+		if (curr.nodeType !== "PropertyNode") {
 			const overloadedMethod = prev[curr.name.content]
 
 			if (overloadedMethod) {
-				if (overloadedMethod.isOverloaded) {
+				if (overloadedMethod.nodeType === "OverloadedMethod") {
 					prev[curr.name.content] = {
+						nodeType: "OverloadedMethod",
 						methods: [...overloadedMethod.methods, curr.method],
-						isStatic: overloadedMethod.isStatic,
-						isOverloaded: true,
 					}
-				} else {
+				} else if (overloadedMethod.nodeType === "OverloadedStaticMethod") {
 					prev[curr.name.content] = {
-						methods: [overloadedMethod.method, curr.method],
-						isStatic: overloadedMethod.isStatic,
-						isOverloaded: true,
+						nodeType: "OverloadedStaticMethod",
+						methods: [...overloadedMethod.methods, curr.method],
 					}
 				}
 			} else {
-				prev[curr.name.content] = { method: curr.method, isStatic: curr.isStatic, isOverloaded: false }
+				if (curr.nodeType === "SimpleMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "SimpleMethod",
+						method: curr.method,
+					}
+				} else if (curr.nodeType === "StaticMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "StaticMethod",
+						method: curr.method,
+					}
+				} else if (curr.nodeType === "OverloadedMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "OverloadedMethod",
+						methods: [curr.method],
+					}
+				} else if (curr.nodeType === "OverloadedStaticMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "OverloadedStaticMethod",
+						methods: [curr.method],
+					}
+				}
 			}
 		}
 
@@ -362,13 +380,32 @@ export function argument(name: parser.IdentifierNode | null, value: parser.Expre
 	}
 }
 
-type TypeProperty = { nodeType: "PropertyNode"; name: parser.IdentifierNode; type: parser.TypeDeclarationNode }
-type TypeMethod = {
-	nodeType: "MethodNode"
+type SimpleMethodNode = {
+	nodeType: "SimpleMethodNode"
 	name: parser.IdentifierNode
 	method: parser.FunctionValueNode
-	isStatic: boolean
 }
+
+type StaticMethodNode = {
+	nodeType: "StaticMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
+
+type OverloadedMethodNode = {
+	nodeType: "OverloadedMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
+
+type OverloadedStaticMethodNode = {
+	nodeType: "OverloadedStaticMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
+
+type TypeProperty = { nodeType: "PropertyNode"; name: parser.IdentifierNode; type: parser.TypeDeclarationNode }
+type TypeMethod = SimpleMethodNode | StaticMethodNode | OverloadedMethodNode | OverloadedStaticMethodNode
 
 type TypeProperties = { [key: string]: parser.TypeDeclarationNode }
 

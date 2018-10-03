@@ -29,43 +29,31 @@ export type FunctionType = {
 	returnType: Type
 }
 
-export type UnstaticMethodType = {
-	type: "Method"
+export type SimpleMethodType = {
+	type: "SimpleMethod"
 	parameterTypes: Array<Parameter>
 	returnType: Type
-	isStatic: false
-	isOverloaded: false
 }
 
 export type StaticMethodType = {
-	type: "Method"
+	type: "StaticMethod"
 	parameterTypes: Array<Parameter>
 	returnType: Type
-	isStatic: true
-	isOverloaded: false
 }
 
-export type StaticOverloadedMethodType = {
-	type: "Method"
+export type OverloadedStaticMethodType = {
+	type: "OverloadedStaticMethod"
 	parameterTypes: Array<Array<Parameter>>
 	returnType: Type
-	isStatic: true
-	isOverloaded: true
 }
 
-export type UnstaticOverloadedMethodType = {
-	type: "Method"
+export type OverloadedMethodType = {
+	type: "OverloadedMethod"
 	parameterTypes: Array<Array<Parameter>>
 	returnType: Type
-	isStatic: false
-	isOverloaded: true
 }
 
-export type MethodType =
-	| UnstaticMethodType
-	| StaticMethodType
-	| StaticOverloadedMethodType
-	| UnstaticOverloadedMethodType
+export type MethodType = SimpleMethodType | StaticMethodType | OverloadedStaticMethodType | OverloadedMethodType
 
 export type ListType = {
 	type: "List"

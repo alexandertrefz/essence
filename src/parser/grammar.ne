@@ -145,10 +145,10 @@ TypeProperty ->
 	Identifier Colon Type {% ([name, _, type]) => ({ nodeType: "PropertyNode", name, type }) %}
 
 TypeMethod ->
-	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: false }) %}
-	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: true  }) %}
-	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: false }) %}
-	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "MethodNode", name, method, isStatic: true  }) %}
+	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "SimpleMethodNode",           name, method }) %}
+	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
+	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
+	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
 
 ReturnSymbol ->
 	LeftAngle Dash {% symbol %}

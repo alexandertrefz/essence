@@ -1425,7 +1425,9 @@ describe("Parser", () => {
 			})
 
 			it("should parse Lookup FunctionInvocations with more than two arguments and a trailing comma", () => {
-				let input: parser.Program = parse(`implementation { namespace.invocation(argument, argument2, argument3,) }`)
+				let input: parser.Program = parse(
+					`implementation { namespace.invocation(argument, argument2, argument3,) }`,
+				)
 				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
@@ -4396,7 +4398,9 @@ describe("Parser", () => {
 			})
 
 			it("should parse IfElse-IfElse-If-Statements", () => {
-				let input: parser.Program = parse(`implementation { if identifier {} else if identifier2 {} else if identifier3 {} }`)
+				let input: parser.Program = parse(
+					`implementation { if identifier {} else if identifier2 {} else if identifier3 {} }`,
+				)
 				let output: parser.Program = {
 					nodeType: "Program",
 					implementation: {
@@ -5084,6 +5088,7 @@ describe("Parser", () => {
 								properties: {},
 								methods: {
 									method: {
+										nodeType: "SimpleMethod",
 										method: {
 											nodeType: "FunctionValue",
 											value: {
@@ -5226,8 +5231,6 @@ describe("Parser", () => {
 												},
 											},
 										},
-										isStatic: false,
-										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5288,6 +5291,7 @@ describe("Parser", () => {
 								properties: {},
 								methods: {
 									method: {
+										nodeType: "StaticMethod",
 										method: {
 											nodeType: "FunctionValue",
 											value: {
@@ -5430,8 +5434,6 @@ describe("Parser", () => {
 												},
 											},
 										},
-										isStatic: true,
-										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5496,6 +5498,7 @@ describe("Parser", () => {
 								properties: {},
 								methods: {
 									method: {
+										nodeType: "SimpleMethod",
 										method: {
 											nodeType: "FunctionValue",
 											value: {
@@ -5638,10 +5641,9 @@ describe("Parser", () => {
 												},
 											},
 										},
-										isStatic: false,
-										isOverloaded: false,
 									},
 									method2: {
+										nodeType: "SimpleMethod",
 										method: {
 											nodeType: "FunctionValue",
 											value: {
@@ -5784,8 +5786,6 @@ describe("Parser", () => {
 												},
 											},
 										},
-										isStatic: false,
-										isOverloaded: false,
 									},
 								},
 								position: {
@@ -5850,6 +5850,7 @@ describe("Parser", () => {
 								properties: {},
 								methods: {
 									method: {
+										nodeType: "OverloadedMethod",
 										methods: [
 											{
 												nodeType: "FunctionValue",
@@ -6136,8 +6137,6 @@ describe("Parser", () => {
 												},
 											},
 										],
-										isStatic: false,
-										isOverloaded: true,
 									},
 								},
 								position: {
@@ -6206,6 +6205,7 @@ describe("Parser", () => {
 								properties: {},
 								methods: {
 									method: {
+										nodeType: "OverloadedMethod",
 										methods: [
 											{
 												nodeType: "FunctionValue",
@@ -6634,8 +6634,854 @@ describe("Parser", () => {
 												},
 											},
 										],
-										isStatic: false,
-										isOverloaded: true,
+									},
+								},
+								position: {
+									start: {
+										line: 2,
+										column: 6,
+									},
+									end: {
+										line: 14,
+										column: 7,
+									},
+								},
+							},
+						],
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 15, column: 6 },
+						},
+					},
+					position: {
+						start: { line: 1, column: 1 },
+						end: { line: 15, column: 6 },
+					},
+				}
+
+				expect(input).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with overloaded static Methods", () => {
+				let input: parser.Program = parse(`implementation {
+					type Type {
+						overload static method(parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload static method(name parameter: Type) -> Type {
+							<- parameter
+						}
+					}
+				}`)
+				let output: parser.Program = {
+					nodeType: "Program",
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "TypeDefinitionStatement",
+								name: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										start: {
+											line: 2,
+											column: 11,
+										},
+										end: {
+											line: 2,
+											column: 15,
+										},
+									},
+								},
+								properties: {},
+								methods: {
+									method: {
+										nodeType: "OverloadedStaticMethod",
+										methods: [
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 30,
+																	},
+																	end: {
+																		line: 3,
+																		column: 39,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 30,
+																	},
+																	end: {
+																		line: 3,
+																		column: 39,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 3,
+																			column: 41,
+																		},
+																		end: {
+																			line: 3,
+																			column: 45,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 3,
+																		column: 41,
+																	},
+																	end: {
+																		line: 3,
+																		column: 45,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 3,
+																	column: 30,
+																},
+																end: {
+																	line: 3,
+																	column: 45,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 3,
+																	column: 50,
+																},
+																end: {
+																	line: 3,
+																	column: 54,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 3,
+																column: 50,
+															},
+															end: {
+																line: 3,
+																column: 54,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 4,
+																		column: 11,
+																	},
+																	end: {
+																		line: 4,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 4,
+																	column: 8,
+																},
+																end: {
+																	line: 4,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 29,
+													},
+													end: {
+														line: 5,
+														column: 8,
+													},
+												},
+											},
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "name",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 30,
+																	},
+																	end: {
+																		line: 7,
+																		column: 34,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 35,
+																	},
+																	end: {
+																		line: 7,
+																		column: 44,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 7,
+																			column: 46,
+																		},
+																		end: {
+																			line: 7,
+																			column: 50,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 7,
+																		column: 46,
+																	},
+																	end: {
+																		line: 7,
+																		column: 50,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 7,
+																	column: 30,
+																},
+																end: {
+																	line: 7,
+																	column: 50,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 7,
+																	column: 55,
+																},
+																end: {
+																	line: 7,
+																	column: 59,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 7,
+																column: 55,
+															},
+															end: {
+																line: 7,
+																column: 59,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 8,
+																		column: 11,
+																	},
+																	end: {
+																		line: 8,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 8,
+																	column: 8,
+																},
+																end: {
+																	line: 8,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 7,
+														column: 29,
+													},
+													end: {
+														line: 9,
+														column: 8,
+													},
+												},
+											},
+										],
+									},
+								},
+								position: {
+									start: {
+										line: 2,
+										column: 6,
+									},
+									end: {
+										line: 10,
+										column: 7,
+									},
+								},
+							},
+						],
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 11, column: 6 },
+						},
+					},
+					position: {
+						start: { line: 1, column: 1 },
+						end: { line: 11, column: 6 },
+					},
+				}
+
+				expect(input).toEqual(output)
+			})
+
+			it("should parse TypeDefinitionStatements with twice overloaded static Methods", () => {
+				let input: parser.Program = parse(`implementation {
+					type Type {
+						overload static method(parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload static method(name parameter: Type) -> Type {
+							<- parameter
+						}
+
+						overload static method(item parameter: Type) -> Type {
+							<- parameter
+						}
+					}
+				}`)
+				let output: parser.Program = {
+					nodeType: "Program",
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "TypeDefinitionStatement",
+								name: {
+									nodeType: "Identifier",
+									content: "Type",
+									position: {
+										start: {
+											line: 2,
+											column: 11,
+										},
+										end: {
+											line: 2,
+											column: 15,
+										},
+									},
+								},
+								properties: {},
+								methods: {
+									method: {
+										nodeType: "OverloadedStaticMethod",
+										methods: [
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 30,
+																	},
+																	end: {
+																		line: 3,
+																		column: 39,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 3,
+																		column: 30,
+																	},
+																	end: {
+																		line: 3,
+																		column: 39,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 3,
+																			column: 41,
+																		},
+																		end: {
+																			line: 3,
+																			column: 45,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 3,
+																		column: 41,
+																	},
+																	end: {
+																		line: 3,
+																		column: 45,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 3,
+																	column: 30,
+																},
+																end: {
+																	line: 3,
+																	column: 45,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 3,
+																	column: 50,
+																},
+																end: {
+																	line: 3,
+																	column: 54,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 3,
+																column: 50,
+															},
+															end: {
+																line: 3,
+																column: 54,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 4,
+																		column: 11,
+																	},
+																	end: {
+																		line: 4,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 4,
+																	column: 8,
+																},
+																end: {
+																	line: 4,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 29,
+													},
+													end: {
+														line: 5,
+														column: 8,
+													},
+												},
+											},
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "name",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 30,
+																	},
+																	end: {
+																		line: 7,
+																		column: 34,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 7,
+																		column: 35,
+																	},
+																	end: {
+																		line: 7,
+																		column: 44,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 7,
+																			column: 46,
+																		},
+																		end: {
+																			line: 7,
+																			column: 50,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 7,
+																		column: 46,
+																	},
+																	end: {
+																		line: 7,
+																		column: 50,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 7,
+																	column: 30,
+																},
+																end: {
+																	line: 7,
+																	column: 50,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 7,
+																	column: 55,
+																},
+																end: {
+																	line: 7,
+																	column: 59,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 7,
+																column: 55,
+															},
+															end: {
+																line: 7,
+																column: 59,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 8,
+																		column: 11,
+																	},
+																	end: {
+																		line: 8,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 8,
+																	column: 8,
+																},
+																end: {
+																	line: 8,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 7,
+														column: 29,
+													},
+													end: {
+														line: 9,
+														column: 8,
+													},
+												},
+											},
+											{
+												nodeType: "FunctionValue",
+												value: {
+													nodeType: "FunctionDefinition",
+													parameters: [
+														{
+															nodeType: "Parameter",
+															externalName: {
+																nodeType: "Identifier",
+																content: "item",
+																position: {
+																	start: {
+																		line: 11,
+																		column: 30,
+																	},
+																	end: {
+																		line: 11,
+																		column: 34,
+																	},
+																},
+															},
+															internalName: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 11,
+																		column: 35,
+																	},
+																	end: {
+																		line: 11,
+																		column: 44,
+																	},
+																},
+															},
+															type: {
+																nodeType: "IdentifierTypeDeclaration",
+																type: {
+																	nodeType: "Identifier",
+																	content: "Type",
+																	position: {
+																		start: {
+																			line: 11,
+																			column: 46,
+																		},
+																		end: {
+																			line: 11,
+																			column: 50,
+																		},
+																	},
+																},
+																position: {
+																	start: {
+																		line: 11,
+																		column: 46,
+																	},
+																	end: {
+																		line: 11,
+																		column: 50,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 11,
+																	column: 30,
+																},
+																end: {
+																	line: 11,
+																	column: 50,
+																},
+															},
+														},
+													],
+													returnType: {
+														nodeType: "IdentifierTypeDeclaration",
+														type: {
+															nodeType: "Identifier",
+															content: "Type",
+															position: {
+																start: {
+																	line: 11,
+																	column: 55,
+																},
+																end: {
+																	line: 11,
+																	column: 59,
+																},
+															},
+														},
+														position: {
+															start: {
+																line: 11,
+																column: 55,
+															},
+															end: {
+																line: 11,
+																column: 59,
+															},
+														},
+													},
+													body: [
+														{
+															nodeType: "ReturnStatement",
+															expression: {
+																nodeType: "Identifier",
+																content: "parameter",
+																position: {
+																	start: {
+																		line: 12,
+																		column: 11,
+																	},
+																	end: {
+																		line: 12,
+																		column: 20,
+																	},
+																},
+															},
+															position: {
+																start: {
+																	line: 12,
+																	column: 8,
+																},
+																end: {
+																	line: 12,
+																	column: 20,
+																},
+															},
+														},
+													],
+												},
+												position: {
+													start: {
+														line: 11,
+														column: 29,
+													},
+													end: {
+														line: 13,
+														column: 8,
+													},
+												},
+											},
+										],
 									},
 								},
 								position: {
@@ -6725,6 +7571,7 @@ describe("Parser", () => {
 								},
 								methods: {
 									method: {
+										nodeType: "SimpleMethod",
 										method: {
 											nodeType: "FunctionValue",
 											value: {
@@ -6867,8 +7714,6 @@ describe("Parser", () => {
 												},
 											},
 										},
-										isStatic: false,
-										isOverloaded: false,
 									},
 								},
 								position: {

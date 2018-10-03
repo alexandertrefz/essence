@@ -151,29 +151,43 @@ export function enrichFunctionDefinition(
 }
 
 export function enrichMethodFunctionValue(
-	node: { method: parser.FunctionValueNode; isStatic: boolean; isOverloaded: false },
+	node: parser.SimpleMethod | parser.StaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionValueNode {
+	let isStatic: boolean
+	if (node.nodeType === "SimpleMethod") {
+		isStatic = false
+	} else {
+		isStatic = true
+	}
+
 	return {
 		nodeType: "FunctionValue",
-		value: enrichMethodFunctionDefinition(node.method, node.isStatic, scope, selfType),
+		value: enrichMethodFunctionDefinition(node.method, isStatic, scope, selfType),
 		position: node.method.position,
 		type: resolveType(node.method, scope),
 	}
 }
 
 export function enrichMethodsFunctionValue(
-	node: parser.OverloadedMethod,
+	node: parser.OverloadedMethod | parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): Array<common.typed.FunctionValueNode> {
 	let results: Array<common.typed.FunctionValueNode> = []
+	let isStatic: boolean
+
+	if (node.nodeType === "OverloadedMethod") {
+		isStatic = false
+	} else {
+		isStatic = true
+	}
 
 	for (let [, method] of Object.entries(node.methods)) {
 		results.push({
 			nodeType: "FunctionValue",
-			value: enrichMethodFunctionDefinition(method, node.isStatic, scope, selfType),
+			value: enrichMethodFunctionDefinition(method, isStatic, scope, selfType),
 			position: method.position,
 			type: resolveType(method, scope),
 		})
@@ -345,7 +359,7 @@ export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
-	let type
+	let type: common.Type
 
 	if (node.type === null) {
 		type = resolveType(node.value, scope)
@@ -521,17 +535,25 @@ function enrichMethods(members: parser.Methods, scope: enricher.Scope, selfType:
 	let result: common.typed.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		if (memberValue.isOverloaded) {
+		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {
+				nodeType: "SimpleMethod",
+				method: enrichMethodFunctionValue(memberValue, scope, selfType),
+			}
+		} else if (memberValue.nodeType === "StaticMethod") {
+			result[memberKey] = {
+				nodeType: "StaticMethod",
+				method: enrichMethodFunctionValue(memberValue, scope, selfType),
+			}
+		} else if (memberValue.nodeType === "OverloadedMethod") {
+			result[memberKey] = {
+				nodeType: "OverloadedMethod",
 				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
-				isStatic: memberValue.isStatic,
-				isOverloaded: true,
 			}
 		} else {
 			result[memberKey] = {
-				method: enrichMethodFunctionValue(memberValue, scope, selfType),
-				isStatic: memberValue.isStatic,
-				isOverloaded: false,
+				nodeType: "OverloadedStaticMethod",
+				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
 			}
 		}
 	}
