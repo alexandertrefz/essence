@@ -106,9 +106,9 @@
   version "10.1.2"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-10.1.2.tgz#1b928a0baa408fc8ae3ac012cc81375addc147c6"
 
-"@types/node@10.9.4":
-  version "10.9.4"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-10.9.4.tgz#0f4cb2dc7c1de6096055357f70179043c33e9897"
+"@types/node@10.11.3":
+  version "10.11.3"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-10.11.3.tgz#c055536ac8a5e871701aa01914be5731539d01ee"
 
 ansi-regex@^2.0.0:
   version "2.1.1"
@@ -1210,9 +1210,9 @@ preserve@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/preserve/-/preserve-0.2.0.tgz#815ed1f6ebc65926f865b310c0713bcb3315ce4b"
 
-prettier@1.14.2:
-  version "1.14.2"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.14.2.tgz#0ac1c6e1a90baa22a62925f41963c841983282f9"
+prettier@1.14.3:
+  version "1.14.3"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.14.3.tgz#90238dd4c0684b7edce5f83b0fb7328e48bd0895"
 
 pretty-quick@1.7.0:
   version "1.7.0"
@@ -1343,25 +1343,25 @@ rollup-plugin-hypothetical@2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/rollup-plugin-hypothetical/-/rollup-plugin-hypothetical-2.1.0.tgz#7fec9a865ed7d0eac14ca6ee2b2c4088acdb1955"
 
-rollup-plugin-typescript2@0.17.0:
-  version "0.17.0"
-  resolved "https://registry.yarnpkg.com/rollup-plugin-typescript2/-/rollup-plugin-typescript2-0.17.0.tgz#a540eecfe9ad8ff5e8e86eaf5069bb2a7f84f33a"
+rollup-plugin-typescript2@0.17.1:
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/rollup-plugin-typescript2/-/rollup-plugin-typescript2-0.17.1.tgz#298099f372270ae3f41fa63188400c3df2dbdb2b"
   dependencies:
     fs-extra "7.0.0"
     resolve "1.8.1"
-    rollup-pluginutils "2.3.1"
+    rollup-pluginutils "2.3.3"
     tslib "1.9.3"
 
-rollup-pluginutils@2.3.1:
-  version "2.3.1"
-  resolved "https://registry.yarnpkg.com/rollup-pluginutils/-/rollup-pluginutils-2.3.1.tgz#760d185ccc237dedc12d7ae48c6bcd127b4892d0"
+rollup-pluginutils@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/rollup-pluginutils/-/rollup-pluginutils-2.3.3.tgz#3aad9b1eb3e7fe8262820818840bf091e5ae6794"
   dependencies:
     estree-walker "^0.5.2"
     micromatch "^2.3.11"
 
-rollup@0.65.2:
-  version "0.65.2"
-  resolved "https://registry.yarnpkg.com/rollup/-/rollup-0.65.2.tgz#e1532e3c1a2e102c89d99289a184fcbbc7cd4b4a"
+rollup@0.66.3:
+  version "0.66.3"
+  resolved "https://registry.yarnpkg.com/rollup/-/rollup-0.66.3.tgz#42dfff885fa267262c45ad160979d862a5df1f42"
   dependencies:
     "@types/estree" "0.0.39"
     "@types/node" "*"
@@ -1523,9 +1523,9 @@ type-check@~0.3.2:
   dependencies:
     prelude-ls "~1.1.2"
 
-typescript@3.0.3:
-  version "3.0.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.0.3.tgz#4853b3e275ecdaa27f78fda46dc273a7eb7fc1c8"
+typescript@3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.1.1.tgz#3362ba9dd1e482ebb2355b02dfe8bcd19a2c7c96"
 
 uglify-js@^3.1.4:
   version "3.4.9"
