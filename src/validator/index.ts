@@ -84,13 +84,13 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 	const methodType = node.name.type
 	const methodArguments = [{ name: null, type: node.name.base.type }, ...node.arguments]
 
-	if (methodType.type !== "Method") {
+	if (methodType.type !== "SimpleMethod" && methodType.type !== "OverloadedMethod") {
 		throw new Error("MethodInvocation: Identifier isn't a function")
 	}
 
 	validateMethodLookup(node.name)
 
-	if (methodType.isOverloaded) {
+	if (methodType.type === "OverloadedMethod") {
 		let lastIterationHadError = false
 		let index = 0
 
@@ -148,16 +148,26 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): common.typed.FunctionInvocationNode {
 	const functionType = node.name.type
 
-	if (!(functionType.type === "Function" || functionType.type === "Method")) {
+	if (
+		functionType.type !== "Function" &&
+		functionType.type !== "SimpleMethod" &&
+		functionType.type !== "StaticMethod" &&
+		functionType.type !== "OverloadedMethod" &&
+		functionType.type !== "OverloadedStaticMethod"
+	) {
 		throw new Error("FunctionInvocation: Identifier isn't a Function or Method")
 	}
 
-	if (functionType.type === "Function" || (functionType.type === "Method" && functionType.isStatic)) {
+	if (
+		functionType.type === "Function" ||
+		functionType.type === "StaticMethod" ||
+		functionType.type === "OverloadedStaticMethod"
+	) {
 		validateSimpleFunctionInvocation(functionType, node.arguments)
 	} else {
 		// Dynamic methods, being called in a manually via `.` are being validated here,
 		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
-		if (functionType.isOverloaded) {
+		if (functionType.type === "OverloadedMethod") {
 			let lastIterationHadError = false
 
 			for (let parameterTypes of functionType.parameterTypes) {
@@ -297,10 +307,10 @@ function validateTypeDefinitionStatement(
 	for (let methodName in node.methods) {
 		let method = node.methods[methodName]
 
-		if (method.isOverloaded) {
-			method.methods.map(overloadedMethod => validateFunctionDefinition(overloadedMethod.value))
-		} else {
+		if (method.nodeType === "SimpleMethod" || method.nodeType === "StaticMethod") {
 			validateFunctionDefinition(method.method.value)
+		} else {
+			method.methods.map(overloadedMethod => validateFunctionDefinition(overloadedMethod.value))
 		}
 	}
 
@@ -366,10 +376,10 @@ function validateFunctionStatement(node: common.typed.FunctionStatementNode): co
 // #region Helpers
 
 function validateSimpleFunctionInvocation(
-	functionType: common.FunctionType | common.StaticMethodType | common.StaticOverloadedMethodType,
+	functionType: common.FunctionType | common.StaticMethodType | common.OverloadedStaticMethodType,
 	argumentTypes: common.typed.ArgumentNode[],
 ) {
-	if (functionType.type === "Method" && functionType.isOverloaded) {
+	if (functionType.type === "OverloadedStaticMethod") {
 		let lastIterationHadError = false
 
 		for (let parameterTypes of functionType.parameterTypes) {
@@ -479,8 +489,8 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return true
 	}
 
-	if (lhs.type === "Method" && rhs.type === "Method") {
-		if (lhs.isOverloaded === false && rhs.isOverloaded === false) {
+	if (lhs.type === "SimpleMethod") {
+		if (rhs.type === "SimpleMethod") {
 			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
 				return false
 			}
@@ -499,7 +509,69 @@ function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			}
 
 			return true
-		} else if (lhs.isOverloaded === true && rhs.isOverloaded === true) {
+		} else {
+			return false
+		}
+	}
+
+	if (lhs.type === "StaticMethod") {
+		if (rhs.type === "StaticMethod") {
+			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
+				return false
+			}
+
+			if (!matchesType(lhs.returnType, rhs.returnType)) {
+				return false
+			}
+
+			for (let i = 0; i < lhs.parameterTypes.length; i++) {
+				if (
+					lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+					!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+				) {
+					return false
+				}
+			}
+
+			return true
+		} else {
+			return false
+		}
+	}
+
+	if (lhs.type === "OverloadedMethod") {
+		if (rhs.type === "OverloadedMethod") {
+			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
+				return false
+			}
+
+			if (!matchesType(lhs.returnType, rhs.returnType)) {
+				return false
+			}
+
+			for (let i = 0; i < lhs.parameterTypes.length; i++) {
+				if (lhs.parameterTypes[i].length !== rhs.parameterTypes[i].length) {
+					return false
+				}
+
+				for (let j = 0; j < lhs.parameterTypes.length; j++) {
+					if (
+						lhs.parameterTypes[i][j].name !== rhs.parameterTypes[i][j].name ||
+						!matchesType(lhs.parameterTypes[i][j].type, rhs.parameterTypes[i][j].type)
+					) {
+						return false
+					}
+				}
+			}
+
+			return true
+		} else {
+			return false
+		}
+	}
+
+	if (lhs.type === "OverloadedStaticMethod") {
+		if (rhs.type === "OverloadedStaticMethod") {
 			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
 				return false
 			}

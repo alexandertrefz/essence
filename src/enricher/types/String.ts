@@ -6,78 +6,62 @@ const type: common.TypeType = {
 	definition: { type: "Primitive", primitive: "String" },
 	methods: {
 		isEmpty: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		hasContent: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
 			returnType: { type: "Primitive", primitive: "Boolean" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		is: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		isnt: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		prepend: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Primitive", primitive: "String" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		append: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Primitive", primitive: "String" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		split: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: "on", type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "List", itemType: { type: "Primitive", primitive: "String" } },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		contains: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 	},
 }

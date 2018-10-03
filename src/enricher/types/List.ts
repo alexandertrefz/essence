@@ -7,49 +7,37 @@ function generateType(genericType: common.Type): common.TypeType {
 		definition: { type: "BuiltIn" },
 		methods: {
 			hasItems: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: { type: "Primitive", primitive: "Boolean" },
-				isStatic: false,
-				isOverloaded: false,
 			},
 			first: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: genericType,
-				isStatic: false,
-				isOverloaded: false,
 			},
 			last: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: genericType,
-				isStatic: false,
-				isOverloaded: false,
 			},
 			unique: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: { type: "List", itemType: genericType },
-				isStatic: false,
-				isOverloaded: false,
 			},
 			dropFirst: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: { type: "List", itemType: genericType },
-				isStatic: false,
-				isOverloaded: false,
 			},
 			dropLast: {
-				type: "Method",
+				type: "SimpleMethod",
 				parameterTypes: [{ name: null, type: { type: "List", itemType: genericType } }],
 				returnType: { type: "List", itemType: genericType },
-				isStatic: false,
-				isOverloaded: false,
 			},
 			insert: {
-				type: "Method",
+				type: "OverloadedMethod",
 				parameterTypes: [
 					[
 						{ name: null, type: { type: "List", itemType: genericType } },
@@ -63,11 +51,9 @@ function generateType(genericType: common.Type): common.TypeType {
 					],
 				],
 				returnType: { type: "List", itemType: genericType },
-				isStatic: false,
-				isOverloaded: true,
 			},
 			append: {
-				type: "Method",
+				type: "OverloadedMethod",
 				parameterTypes: [
 					[{ name: null, type: { type: "List", itemType: genericType } }, { name: null, type: genericType }],
 					[
@@ -76,8 +62,6 @@ function generateType(genericType: common.Type): common.TypeType {
 					],
 				],
 				returnType: { type: "List", itemType: genericType },
-				isStatic: false,
-				isOverloaded: true,
 			},
 		},
 	}

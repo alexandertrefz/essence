@@ -348,11 +348,11 @@ function simplifyMethods(methods: common.typed.Methods, type: common.Type): comm
 	let result: common.typedSimple.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(methods)) {
-		if (memberValue.isOverloaded) {
-			let methods = memberValue.methods.forEach((method, index) => {
+		if (memberValue.nodeType === "OverloadedMethod" || memberValue.nodeType === "OverloadedStaticMethod") {
+			memberValue.methods.forEach((method, index) => {
 				let newMethod = simplifyFunctionValue(method)
 
-				if (!memberValue.isStatic) {
+				if (memberValue.nodeType === "OverloadedMethod") {
 					newMethod.value.parameters.unshift({
 						nodeType: "Parameter",
 						externalName: null,
@@ -366,13 +366,13 @@ function simplifyMethods(methods: common.typed.Methods, type: common.Type): comm
 
 				result[resolveOverloadedMethodName(memberKey, index)] = {
 					method: newMethod,
-					isStatic: memberValue.isStatic,
+					isStatic: memberValue.nodeType === "OverloadedStaticMethod",
 				}
 			})
 		} else {
 			let method = simplifyFunctionValue(memberValue.method)
 
-			if (!memberValue.isStatic) {
+			if (memberValue.nodeType === "SimpleMethod") {
 				method.value.parameters.unshift({
 					nodeType: "Parameter",
 					externalName: null,
@@ -386,7 +386,7 @@ function simplifyMethods(methods: common.typed.Methods, type: common.Type): comm
 
 			result[memberKey] = {
 				method,
-				isStatic: memberValue.isStatic,
+				isStatic: memberValue.nodeType === "StaticMethod",
 			}
 		}
 	}

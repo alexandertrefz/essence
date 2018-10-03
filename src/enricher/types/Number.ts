@@ -6,44 +6,36 @@ const type: common.TypeType = {
 	definition: { type: "Primitive", primitive: "Number" },
 	methods: {
 		add: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		subtract: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		divide: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 		multiply: {
-			type: "Method",
+			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 				{ name: null, type: { type: "Primitive", primitive: "Number" } },
 			],
 			returnType: { type: "Primitive", primitive: "Number" },
-			isStatic: false,
-			isOverloaded: false,
 		},
 	},
 }
