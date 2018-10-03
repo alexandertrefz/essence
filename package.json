@@ -27,22 +27,22 @@
 		"@types/estree": "0.0.39",
 		"@types/jasmine": "2.8.8",
 		"@types/nearley": "2.11.0",
-		"@types/node": "10.9.4",
+		"@types/node": "10.11.3",
 		"husky": "1.1.0",
 		"jasmine": "3.2.0",
 		"nyc": "13.0.1",
 		"pretty-quick": "1.7.0",
-		"prettier": "1.14.2"
+		"prettier": "1.14.3"
 	},
 	"dependencies": {
 		"deep-equal": "1.0.1",
 		"escodegen": "1.11.0",
 		"meow": "5.0.0",
 		"nearley": "alexandertrefz/nearley#65545ddfdd499b4b31ac525fead4ed9ce3ab3b3f",
-		"rollup": "0.65.2",
+		"rollup": "0.66.3",
 		"rollup-plugin-hypothetical": "2.1.0",
-		"rollup-plugin-typescript2": "0.17.0",
-		"typescript": "3.0.3"
+		"rollup-plugin-typescript2": "0.17.1",
+		"typescript": "3.1.1"
 	},
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",
