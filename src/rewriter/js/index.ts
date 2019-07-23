@@ -49,11 +49,11 @@ export default async function rewrite(program: common.typedSimple.Program): Prom
 		],
 	})
 
-	const { code } = await bundle.generate({
+	const { output } = await bundle.generate({
 		format: "iife",
 	})
 
-	return Promise.resolve(code)
+	return Promise.resolve(output[0].code)
 }
 
 function rewriteImplementationSection(
