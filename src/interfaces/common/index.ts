@@ -11,6 +11,11 @@ export type Position = {
 	end: Cursor
 }
 
+export type GenericType = {
+	type: "Generic"
+	name: string
+}
+
 export type RecordType = {
 	type: "Record"
 	members: {
@@ -25,6 +30,13 @@ type Parameter = {
 
 export type FunctionType = {
 	type: "Function"
+	parameterTypes: Array<Parameter>
+	returnType: Type
+}
+
+export type GenericFunctionType = {
+	type: "GenericFunction"
+	generics: Array<String>
 	parameterTypes: Array<Parameter>
 	returnType: Type
 }
@@ -82,6 +94,26 @@ export type TypeType = {
 	}
 }
 
-export type Type = RecordType | FunctionType | MethodType | PrimitiveType | TypeType | ListType | UnknownType
+export type GenericTypeType = {
+	type: "GenericType"
+	name: string
+	definition: RecordType | BuiltInType | PrimitiveType
+	generics: Array<String>
+	methods: {
+		[key: string]: MethodType
+	}
+}
+
+export type Type =
+	| RecordType
+	| FunctionType
+	| GenericFunctionType
+	| MethodType
+	| PrimitiveType
+	| TypeType
+	| GenericTypeType
+	| ListType
+	| UnknownType
+	| GenericType
 
 export { typed, typedSimple }

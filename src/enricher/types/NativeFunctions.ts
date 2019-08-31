@@ -4,20 +4,20 @@ const functions: {
 	[key: string]: common.Type
 } = {
 	__print: {
-		type: "Function",
-		// TODO: Turn into a generic function once generics are implemented.
+		type: "GenericFunction",
+		generics: ["Item"],
 		parameterTypes: [
 			{
 				name: null,
 				type: {
-					type: "Primitive",
-					primitive: "String",
+					type: "Generic",
+					name: "Item",
 				},
 			},
 		],
 		returnType: {
-			type: "Primitive",
-			primitive: "String",
+			type: "Generic",
+			name: "Item",
 		},
 	},
 }
