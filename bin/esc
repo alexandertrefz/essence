@@ -53,7 +53,7 @@ const cli = meow(
 				--debug Outputs various debugging information
 
 			Examples
-				$ foo HelloWorld.es --mode js
+				$ esc HelloWorld.es --mode js
 		`,
 		description: false,
 	},
