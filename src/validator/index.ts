@@ -71,11 +71,11 @@ function validateNativeFunctionInvocation(
 ): common.typed.NativeFunctionInvocationNode {
 	const functionType = node.name.type
 
-	if (functionType.type !== "Function") {
+	if (functionType.type === "Function" || functionType.type === "GenericFunction") {
+		validateSimpleFunctionInvocation(functionType, node.arguments)
+	} else {
 		throw new Error("NativeFunctionInvocation: Identifier isn't a function")
 	}
-
-	validateSimpleFunctionInvocation(functionType, node.arguments)
 
 	return node
 }
@@ -376,7 +376,11 @@ function validateFunctionStatement(node: common.typed.FunctionStatementNode): co
 // #region Helpers
 
 function validateSimpleFunctionInvocation(
-	functionType: common.FunctionType | common.StaticMethodType | common.OverloadedStaticMethodType,
+	functionType:
+		| common.FunctionType
+		| common.StaticMethodType
+		| common.OverloadedStaticMethodType
+		| common.GenericFunctionType,
 	argumentTypes: common.typed.ArgumentNode[],
 ) {
 	if (functionType.type === "OverloadedStaticMethod") {
@@ -409,6 +413,10 @@ function validateSimpleFunctionInvocation(
 			throw new Error("FunctionInvocation: Passed arguments do not match any overload")
 		}
 	} else {
+		if (functionType.type === "GenericFunction") {
+			functionType = inferFunctionType(functionType, argumentTypes)
+		}
+
 		if (functionType.parameterTypes.length !== argumentTypes.length) {
 			throw new Error("FunctionInvocation: Amount of arguments doesn't match")
 		}
@@ -422,6 +430,49 @@ function validateSimpleFunctionInvocation(
 			}
 		}
 	}
+}
+
+// TODO: The enricher should probably replace GenericFunctionNodes with the Resolved Variants so we dont have to duplicate this function
+function inferFunctionType(
+	genericFunctionType: common.GenericFunctionType,
+	argumentTypes: common.typed.ArgumentNode[],
+): common.FunctionType {
+	let inferredGenerics: { [key: string]: common.Type } = {}
+
+	let inferredFunctionType: common.FunctionType = {
+		type: "Function",
+		parameterTypes: JSON.parse(JSON.stringify(genericFunctionType.parameterTypes)),
+		returnType: JSON.parse(JSON.stringify(genericFunctionType.returnType)),
+	}
+
+	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
+		let parameter = genericFunctionType.parameterTypes[i]
+		if (parameter.type.type === "Generic") {
+			if (parameter.type.name in inferredGenerics) {
+				continue
+			} else {
+				inferredGenerics[parameter.type.name] = argumentTypes[i].type
+			}
+		}
+	}
+
+	if (Object.entries(inferredGenerics).length !== genericFunctionType.generics.length) {
+		throw new Error("Mismatch in amount of defined and declared Generics.")
+	}
+
+	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
+		let parameter = inferredFunctionType.parameterTypes[i]
+
+		if (parameter.type.type === "Generic") {
+			parameter.type = inferredGenerics[parameter.type.name]
+		}
+	}
+
+	if (inferredFunctionType.returnType.type === "Generic") {
+		inferredFunctionType.returnType = inferredGenerics[inferredFunctionType.returnType.name]
+	}
+
+	return inferredFunctionType
 }
 
 function matchesType(lhs: common.Type, rhs: common.Type): boolean {

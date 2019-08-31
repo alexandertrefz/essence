@@ -5,7 +5,7 @@ import { parser, enricher, common } from "../interfaces"
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
 import numberType from "./types/Number"
-import generateListType from "./types/List"
+import listType from "./types/List"
 
 export function resolveType(
 	node:
@@ -62,9 +62,55 @@ export function resolveNativeFunctionInvocationType(
 
 	if (type.type === "Function") {
 		return type.returnType
+	} else if (type.type === "GenericFunction") {
+		let inferredType = inferGenericFunctionInvocation(type, node.arguments, scope)
+		return inferredType.returnType
 	} else {
 		throw new Error(`${node.name.content} is not a native function.`)
 	}
+}
+
+function inferGenericFunctionInvocation(
+	genericFunctionType: common.GenericFunctionType,
+	argumentTypes: parser.ArgumentNode[],
+	scope: enricher.Scope,
+): common.FunctionType {
+	let inferredGenerics: { [key: string]: common.Type } = {}
+
+	let inferredFunctionType: common.FunctionType = {
+		type: "Function",
+		parameterTypes: JSON.parse(JSON.stringify(genericFunctionType.parameterTypes)),
+		returnType: JSON.parse(JSON.stringify(genericFunctionType.returnType)),
+	}
+
+	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
+		let parameter = genericFunctionType.parameterTypes[i]
+		if (parameter.type.type === "Generic") {
+			if (parameter.type.name in inferredGenerics) {
+				continue
+			} else {
+				inferredGenerics[parameter.type.name] = resolveType(argumentTypes[i].value, scope)
+			}
+		}
+	}
+
+	if (Object.entries(inferredGenerics).length !== genericFunctionType.generics.length) {
+		throw new Error("Mismatch in amount of defined and declared Generics.")
+	}
+
+	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
+		let parameter = inferredFunctionType.parameterTypes[i]
+
+		if (parameter.type.type === "Generic") {
+			parameter.type = inferredGenerics[parameter.type.name]
+		}
+	}
+
+	if (inferredFunctionType.returnType.type === "Generic") {
+		inferredFunctionType.returnType = inferredGenerics[inferredFunctionType.returnType.name]
+	}
+
+	return inferredFunctionType
 }
 
 export function resolveMethodInvocationType(node: parser.MethodInvocationNode, scope: enricher.Scope): common.Type {
@@ -79,9 +125,7 @@ export function resolveMethodInvocationType(node: parser.MethodInvocationNode, s
 		return type.returnType
 	} else {
 		throw new Error(
-			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${
-				node.name.base.position.start.column
-			}.`,
+			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${node.name.base.position.start.column}.`,
 		)
 	}
 }
@@ -106,7 +150,10 @@ export function resolveFunctionInvocationType(node: parser.FunctionInvocationNod
 }
 
 export function resolveCombinationType(node: parser.CombinationNode, scope: enricher.Scope): common.Type {
-	function isSubType(lhs: common.RecordType | common.TypeType, rhs: common.RecordType | common.TypeType): boolean {
+	function isSubType(
+		lhs: common.RecordType | common.TypeType | common.GenericTypeType,
+		rhs: common.RecordType | common.TypeType | common.GenericTypeType,
+	): boolean {
 		if (lhs.type === "Type") {
 			if (lhs.definition.type === "Primitive" || lhs.definition.type === "BuiltIn") {
 				throw new Error(`You can not combine ${lhs.name} with other Types.`)
@@ -116,6 +163,24 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		}
 
 		if (rhs.type === "Type") {
+			if (rhs.definition.type === "Primitive" || rhs.definition.type === "BuiltIn") {
+				throw new Error(`You can not combine ${rhs.name} with other Types.`)
+			} else {
+				rhs = rhs.definition
+			}
+		}
+
+		// TODO: Check if this is enough checking - shouldnt we compare the generics as well, at least in Number?
+
+		if (lhs.type === "GenericType") {
+			if (lhs.definition.type === "Primitive" || lhs.definition.type === "BuiltIn") {
+				throw new Error(`You can not combine ${lhs.name} with other Types.`)
+			} else {
+				lhs = lhs.definition
+			}
+		}
+
+		if (rhs.type === "GenericType") {
 			if (rhs.definition.type === "Primitive" || rhs.definition.type === "BuiltIn") {
 				throw new Error(`You can not combine ${rhs.name} with other Types.`)
 			} else {
@@ -145,6 +210,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
 		case "Function":
+		case "GenericFunction":
 			throw new Error("You can not combine Functions.")
 		case "List":
 			throw new Error("You can not combine Lists.")
@@ -152,6 +218,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Primitives.")
 		case "Unknown":
 			throw new Error("You can not combine Unknowns.")
+		case "Generic":
+			throw new Error("You can not combine Generics.")
 	}
 
 	switch (rhsType.type) {
@@ -160,6 +228,7 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
 		case "Function":
+		case "GenericFunction":
 			throw new Error("You can not combine Functions.")
 		case "List":
 			throw new Error("You can not combine Lists.")
@@ -167,6 +236,8 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 			throw new Error("You can not combine Primitives.")
 		case "Unknown":
 			throw new Error("You can not combine Unknowns.")
+		case "Generic":
+			throw new Error("You can not combine Generics.")
 	}
 
 	if (deepEqual(lhsType, rhsType)) {
@@ -229,9 +300,7 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 
 	if (baseType.type !== "Record" && baseType.type !== "Type") {
 		throw new Error(
-			`Node starting at ${node.base.position.start.line}:${
-				node.base.position.start.column
-			} is not a Record or Type.`,
+			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is not a Record or Type.`,
 		)
 	} else {
 		if (baseType.type === "Type") {
@@ -242,9 +311,7 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 					return baseType.methods[node.member.content]
 				} else {
 					throw new Error(
-						`Object starting at ${node.base.position.start.line}:${
-							node.base.position.start.column
-						} has no member '${node.member.content}'.`,
+						`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
 					)
 				}
 			} else {
@@ -259,9 +326,7 @@ export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope
 				return baseType.members[node.member.content]
 			} else {
 				throw new Error(
-					`Object starting at ${node.base.position.start.line}:${
-						node.base.position.start.column
-					} has no member '${node.member.content}'.`,
+					`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
 				)
 			}
 		}
@@ -297,9 +362,7 @@ export function resolveMethodLookupType(node: parser.MethodLookupNode, scope: en
 
 	if (result == null) {
 		throw new Error(
-			`Could not resolve Method ${node.member.content} on Type of Expression at ${
-				node.base.position.start.line
-			}:${node.base.position.start.column}.`,
+			`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.start.line}:${node.base.position.start.column}.`,
 		)
 	}
 
@@ -424,7 +487,7 @@ export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: 
 		case "Primitive":
 			return resolvePrimitiveTypeType(baseType, scope)
 		case "List":
-			return generateListType(baseType.itemType)
+			return resolveGenericType(listType, { ItemType: baseType.itemType })
 		case "Type":
 			return baseType
 		default:
@@ -563,4 +626,96 @@ export function resolvePrimitiveTypeType(type: common.PrimitiveType, scope: enri
 		case "String":
 			return stringType
 	}
+}
+
+export function resolveGenericType(
+	type: common.GenericTypeType,
+	types: { [key: string]: common.Type },
+): common.TypeType {
+	let resolvedType: common.TypeType = {
+		type: "Type",
+		name: type.name,
+		definition: JSON.parse(JSON.stringify(type.definition)),
+		methods: JSON.parse(JSON.stringify(type.methods)),
+	}
+	const passedTypes = Object.entries(types)
+
+	if (type.generics.length !== passedTypes.length) {
+		// TODO: Throw error, declaring which generics are missing
+	}
+
+	if (resolvedType.definition.type === "Record") {
+		for (let [propertyKey, propertyValue] of Object.entries(resolvedType.definition.members)) {
+			if (propertyValue.type === "Generic") {
+				if (propertyValue.name in types) {
+					resolvedType.definition.members[propertyKey] = types[propertyValue.name]
+				}
+			}
+		}
+	}
+
+	// TODO: Figure out if we can generalise the case for ListType
+	for (let [methodName, methodValue] of Object.entries(resolvedType.methods)) {
+		if (methodValue.type === "SimpleMethod" || methodValue.type === "StaticMethod") {
+			for (let parameter of methodValue.parameterTypes) {
+				if (parameter.type.type === "Generic") {
+					if (parameter.type.name in types) {
+						parameter.type = types[parameter.type.name]
+					}
+				}
+
+				if (parameter.type.type === "List" && parameter.type.itemType.type === "Generic") {
+					if (parameter.type.itemType.name in types) {
+						parameter.type.itemType = types[parameter.type.itemType.name]
+					}
+				}
+			}
+
+			if (methodValue.returnType.type === "Generic") {
+				if (methodValue.returnType.name in types) {
+					methodValue.returnType = types[methodValue.returnType.name]
+				}
+			}
+
+			if (methodValue.returnType.type === "List" && methodValue.returnType.itemType.type === "Generic") {
+				if (methodValue.returnType.itemType.name in types) {
+					methodValue.returnType.itemType = types[methodValue.returnType.itemType.name]
+				}
+			}
+		}
+
+		if (methodValue.type === "OverloadedMethod" || methodValue.type === "OverloadedStaticMethod") {
+			for (let parameterList of methodValue.parameterTypes) {
+				for (let parameter of parameterList) {
+					if (parameter.type.type === "Generic") {
+						if (parameter.type.name in types) {
+							parameter.type = types[parameter.type.name]
+						}
+					}
+
+					if (parameter.type.type === "List" && parameter.type.itemType.type === "Generic") {
+						if (parameter.type.itemType.name in types) {
+							parameter.type.itemType = types[parameter.type.itemType.name]
+						}
+					}
+				}
+			}
+
+			if (methodValue.returnType.type === "Generic") {
+				if (methodValue.returnType.name in types) {
+					methodValue.returnType = types[methodValue.returnType.name]
+				}
+			}
+
+			if (methodValue.returnType.type === "List" && methodValue.returnType.itemType.type === "Generic") {
+				if (methodValue.returnType.itemType.name in types) {
+					methodValue.returnType.itemType = types[methodValue.returnType.itemType.name]
+				}
+			}
+		}
+
+		resolvedType.methods[methodName] = methodValue
+	}
+
+	return resolvedType
 }
