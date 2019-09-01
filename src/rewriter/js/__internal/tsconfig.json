@@ -3,9 +3,8 @@
 		"target": "es2017",
 		"module": "es6",
 		"strict": true,
-		"allowJs": false,
-		"pretty": true,
-		"sourceMap": true
+		"allowJs": true,
+		"pretty": true
 	},
 	"compileOnSave": false
 }

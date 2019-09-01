@@ -1,3 +1,5 @@
+import * as path from "path"
+
 import { common } from "../../interfaces"
 import * as estree from "estree"
 
@@ -38,7 +40,7 @@ export default async function rewrite(program: common.typedSimple.Program): Prom
 		input: "./program.js",
 		plugins: [
 			typescript({
-				tsconfig: "./src/rewriter/js/runtime/tsconfig.json",
+				tsconfig: path.resolve(__dirname, "./__internal/tsconfig.json"),
 			}),
 			hypothetical({
 				allowFallthrough: true,
@@ -451,8 +453,8 @@ function internalImport(
 		specifiers,
 		source: {
 			type: "Literal",
-			value: `./src/rewriter/js/runtime/${fileName}`,
-			raw: `"./src/rewriter/js/runtime/${fileName}"`,
+			value: `${path.resolve(__dirname, "./__internal", fileName) + ".ts"}`,
+			raw: `"${path.resolve(__dirname, "./__internal", fileName) + ".ts"}"`,
 		},
 	}
 }
