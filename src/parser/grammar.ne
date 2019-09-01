@@ -113,7 +113,7 @@ Value ->
 	| NumberLiteral          {% id %}
 	| BooleanLiteral         {% id %}
 	| FunctionLiteral        {% id %}
-	| ListLiteral           {% id %}
+	| ListLiteral            {% id %}
 
 Lookup ->
 	Expression Dot Identifier {% ([base, _, member]) => generators.lookup(base, member, { start: base.position.start, end: member.position.end }) %}
@@ -208,9 +208,14 @@ Parameter ->
 	| Underscore Identifier Colon Type {% ([symbol, internalName, _, type]) =>       generators.parameter(null,         internalName, type, { start: symbol.position.start, end: type.position.end }) %}
 
 ParameterList ->
-	  LeftParen RightParen {% ([symbol]) => ({ parameters: [], position: symbol.position }) %}
+	  LeftParen RightParen {% ([leftParen, rightParen]) => ({ parameters: [], position: { start: leftParen.position.start, end: rightParen.position.end } }) %}
 	| LeftParen (Parameter Comma):* Parameter Comma:? RightParen {%
-		([symbol, paramCommaList, param]) => ({ parameters: [...paramCommaList.map(first), param], position: symbol.position })
+		([leftParen, paramCommaList, param, _, rightParen]) => ({
+			parameters: [...paramCommaList.map(first), param], 
+			position: { start: leftParen.position.start, end: rightParen.position.end }
+		})
+	%}
+
 	%}
 
 Argument ->
