@@ -3,12 +3,14 @@ TS_SOURCE_DIR = src
 JS_BUILD_DIR = lib
 
 # Sources
-TYPESCRIPT_SRC   = $(shell find $(TS_SOURCE_DIR) ! -path "$(TS_SOURCE_DIR)/rewriter/js/runtime/*" -name "*.ts" ! -path "$(TS_SOURCE_DIR)/modules.d.ts" ! -path "$(TS_SOURCE_DIR)/tests/*" -name "*.ts")
+TYPESCRIPT_SRC   = $(shell find $(TS_SOURCE_DIR) ! -path "$(TS_SOURCE_DIR)/rewriter/js/__internal/*" -name "*" ! -path "$(TS_SOURCE_DIR)/modules.d.ts" ! -path "$(TS_SOURCE_DIR)/tests/*" -name "*.ts")
 TYPESCRIPT_TESTS = $(shell find $(TS_SOURCE_DIR)/tests -name '*.ts')
+SOURCE_INTERNALS = $(shell find $(TS_SOURCE_DIR)/rewriter/js/__internal -name "*")
 
 # Targets
-JS_SRC   = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_SRC))
-JS_TESTS = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_TESTS))
+JS_SRC           = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_SRC))
+JS_TESTS         = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYPESCRIPT_TESTS))
+TARGET_INTERNALS = $(patsubst $(TS_SOURCE_DIR)/rewriter/js/__internal/%, $(JS_BUILD_DIR)/rewriter/js/__internal/%, $(SOURCE_INTERNALS))
 
 # Commands
 TSC := ./node_modules/.bin/tsc
@@ -23,6 +25,10 @@ $(TS_SOURCE_DIR)/parser/grammar.ts: $(TS_SOURCE_DIR)/parser/grammar.ne
 $(JS_BUILD_DIR)/%.js: $(TS_SOURCE_DIR)/%.ts
 	- $(TSC) $(TSC_ARGS) $<
 
+$(JS_BUILD_DIR)/rewriter/js/__internal/%: $(TS_SOURCE_DIR)/rewriter/js/__internal/%
+	@[ -d $(@D) ] || mkdir -p $(@D)
+	cp $< $@
+
 $(JS_BUILD_DIR)/tests/%.js: $(TS_SOURCE_DIR)/tests/%.ts
 	- $(TSC) $(TSC_ARGS) $<
 
@@ -32,7 +38,9 @@ compile-grammar: $(TS_SOURCE_DIR)/parser/grammar.ts
 
 compile-src: $(JS_SRC)
 
-build: compile-grammar compile-src
+copy-internals: $(TARGET_INTERNALS)
+
+build: compile-grammar compile-src copy-internals
 
 build-tests: $(JS_TESTS)
 
@@ -51,4 +59,3 @@ dev:
 clean:
 	- rm -rf $(JS_BUILD_DIR)
 	- rm $(TS_SOURCE_DIR)/parser/grammar.ts
-

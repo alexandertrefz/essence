@@ -10,8 +10,6 @@
 		"sourceMap": true,
 		"skipLibCheck": true
 	},
-	"exclude": [
-		"**/rewriter/js/runtime/*"
-	],
+	"exclude": ["**/rewriter/js/__internal/*"],
 	"compileOnSave": false
 }
