@@ -1,5 +1,5 @@
 {
 	"hooks": {
-		"pre-commit": "pretty-quick --staged && make all && jasmine"
+		"pre-commit": "pretty-quick --staged && make compile-grammar && jest"
 	}
 }

@@ -8,6 +8,6 @@ module.exports = function(wallaby) {
 			type: "node",
 		},
 
-		testFramework: "jasmine",
+		testFramework: "jest",
 	}
 }
