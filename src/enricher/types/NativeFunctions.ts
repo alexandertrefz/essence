@@ -5,7 +5,7 @@ const functions: {
 } = {
 	__print: {
 		type: "GenericFunction",
-		generics: ["Item"],
+		generics: [{ name: "Item", defaultType: null }],
 		parameterTypes: [
 			{
 				name: null,

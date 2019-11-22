@@ -28,6 +28,11 @@ type Parameter = {
 	name: string | null
 }
 
+type GenericDeclaration = {
+	name: string
+	defaultType: Type | null
+}
+
 export type FunctionType = {
 	type: "Function"
 	parameterTypes: Array<Parameter>
@@ -36,7 +41,7 @@ export type FunctionType = {
 
 export type GenericFunctionType = {
 	type: "GenericFunction"
-	generics: Array<String>
+	generics: Array<GenericDeclaration>
 	parameterTypes: Array<Parameter>
 	returnType: Type
 }
@@ -98,7 +103,7 @@ export type GenericTypeType = {
 	type: "GenericType"
 	name: string
 	definition: RecordType | BuiltInType | PrimitiveType
-	generics: Array<String>
+	generics: Array<GenericDeclaration>
 	methods: {
 		[key: string]: MethodType
 	}

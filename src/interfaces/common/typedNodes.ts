@@ -106,7 +106,7 @@ export type BooleanValueNode = {
 
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
-	value: FunctionDefinitionNode
+	value: FunctionDefinitionNode | GenericFunctionDefinitionNode
 	position: Position
 	type: Type
 }
@@ -260,6 +260,22 @@ export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode
+	position: Position
+}
+
+export interface GenericDeclarationNode {
+	nodeType: "GenericDeclaration"
+	name: string
+	defaultType: Type | null
+	position: Position
+}
+
+export interface GenericFunctionDefinitionNode {
+	nodeType: "GenericFunctionDefinition"
+	generics: Array<GenericDeclarationNode>
+	parameters: Array<ParameterNode>
+	body: Array<ImplementationNode>
+	returnType: Type
 	position: Position
 }
 

@@ -11,6 +11,7 @@ class ParseError extends Error {
 
 export let parse = (chunk: string) => {
 	let parser = new Parser(Grammar.fromCompiled(grammar))
+
 	try {
 		parser.feed(chunk)
 	} catch (error) {

@@ -2770,6 +2770,950 @@ describe("Parser", () => {
 				})
 			})
 
+			describe("GenericFunctionLiterals", () => {
+				it("should parse GenericFunctionLiterals with no parameters", () => {
+					let input: parser.Program = parse(`implementation { <Generic>() -> Generic {} }`)
+					let output: parser.Program = {
+						nodeType: "Program",
+						implementation: {
+							nodeType: "ImplementationSection",
+							nodes: [
+								{
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "GenericFunctionDefinition",
+										generics: [
+											{
+												nodeType: "GenericDeclarationNode",
+												defaultType: null,
+												name: {
+													nodeType: "Identifier",
+													content: "Generic",
+													position: {
+														start: {
+															line: 1,
+															column: 19,
+														},
+														end: {
+															line: 1,
+															column: 26,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 1,
+														column: 19,
+													},
+													end: {
+														line: 1,
+														column: 26,
+													},
+												},
+											},
+										],
+										parameters: [],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Generic",
+												position: {
+													start: {
+														line: 1,
+														column: 33,
+													},
+													end: {
+														line: 1,
+														column: 40,
+													},
+												},
+											},
+											position: {
+												start: {
+													line: 1,
+													column: 33,
+												},
+												end: {
+													line: 1,
+													column: 40,
+												},
+											},
+										},
+										body: [],
+									},
+									position: {
+										start: {
+											line: 1,
+											column: 27,
+										},
+										end: {
+											line: 1,
+											column: 43,
+										},
+									},
+								},
+							],
+							position: {
+								start: { line: 1, column: 1 },
+								end: { line: 1, column: 45 },
+							},
+						},
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 1, column: 45 },
+						},
+					}
+
+					util.inspect(input)
+
+					expect(input).toEqual(output)
+				})
+
+				it("should parse GenericFunctionLiterals with one parameter with explicit external name", () => {
+					let input: parser.Program = parse(`implementation {
+						<Generic>(external internal: Generic) -> Generic {
+							<- internal
+						}
+					}`)
+					let output: parser.Program = {
+						nodeType: "Program",
+						implementation: {
+							nodeType: "ImplementationSection",
+							nodes: [
+								{
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "GenericFunctionDefinition",
+										generics: [
+											{
+												nodeType: "GenericDeclarationNode",
+												defaultType: null,
+												name: {
+													nodeType: "Identifier",
+													content: "Generic",
+													position: {
+														start: {
+															line: 2,
+															column: 8,
+														},
+														end: {
+															line: 2,
+															column: 15,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 8,
+													},
+													end: {
+														line: 2,
+														column: 15,
+													},
+												},
+											},
+										],
+										parameters: [
+											{
+												nodeType: "Parameter",
+												internalName: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 2,
+															column: 26,
+														},
+														end: {
+															line: 2,
+															column: 34,
+														},
+													},
+												},
+												externalName: {
+													nodeType: "Identifier",
+													content: "external",
+													position: {
+														start: {
+															line: 2,
+															column: 17,
+														},
+														end: {
+															line: 2,
+															column: 25,
+														},
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Generic",
+														position: {
+															start: {
+																line: 2,
+																column: 36,
+															},
+															end: {
+																line: 2,
+																column: 43,
+															},
+														},
+													},
+													position: {
+														start: {
+															line: 2,
+															column: 36,
+														},
+														end: {
+															line: 2,
+															column: 43,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 17,
+													},
+													end: {
+														line: 2,
+														column: 43,
+													},
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Generic",
+												position: {
+													start: {
+														line: 2,
+														column: 48,
+													},
+													end: {
+														line: 2,
+														column: 55,
+													},
+												},
+											},
+											position: {
+												start: {
+													line: 2,
+													column: 48,
+												},
+												end: {
+													line: 2,
+													column: 55,
+												},
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 3,
+															column: 11,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 8,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
+												},
+											},
+										],
+									},
+									position: {
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
+									},
+								},
+							],
+							position: {
+								start: { line: 1, column: 1 },
+								end: { line: 5, column: 7 },
+							},
+						},
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 5, column: 7 },
+						},
+					}
+					expect(input).toEqual(output)
+				})
+
+				it("should parse GenericFunctionLiterals with one parameter with implicit external name", () => {
+					let input: parser.Program = parse(`implementation {
+						<Generic>(internal: Generic) -> Generic {
+							<- internal
+						}
+					}`)
+					let output: parser.Program = {
+						nodeType: "Program",
+						implementation: {
+							nodeType: "ImplementationSection",
+							nodes: [
+								{
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "GenericFunctionDefinition",
+										generics: [
+											{
+												nodeType: "GenericDeclarationNode",
+												defaultType: null,
+												name: {
+													nodeType: "Identifier",
+													content: "Generic",
+													position: {
+														start: {
+															line: 2,
+															column: 8,
+														},
+														end: {
+															line: 2,
+															column: 15,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 8,
+													},
+													end: {
+														line: 2,
+														column: 15,
+													},
+												},
+											},
+										],
+										parameters: [
+											{
+												nodeType: "Parameter",
+												internalName: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 2,
+															column: 17,
+														},
+														end: {
+															line: 2,
+															column: 25,
+														},
+													},
+												},
+												externalName: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 2,
+															column: 17,
+														},
+														end: {
+															line: 2,
+															column: 25,
+														},
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Generic",
+														position: {
+															start: {
+																line: 2,
+																column: 27,
+															},
+															end: {
+																line: 2,
+																column: 34,
+															},
+														},
+													},
+													position: {
+														start: {
+															line: 2,
+															column: 27,
+														},
+														end: {
+															line: 2,
+															column: 34,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 17,
+													},
+													end: {
+														line: 2,
+														column: 34,
+													},
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Generic",
+												position: {
+													start: {
+														line: 2,
+														column: 39,
+													},
+													end: {
+														line: 2,
+														column: 46,
+													},
+												},
+											},
+											position: {
+												start: {
+													line: 2,
+													column: 39,
+												},
+												end: {
+													line: 2,
+													column: 46,
+												},
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 3,
+															column: 11,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 8,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
+												},
+											},
+										],
+									},
+									position: {
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
+									},
+								},
+							],
+							position: {
+								start: { line: 1, column: 1 },
+								end: { line: 5, column: 7 },
+							},
+						},
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 5, column: 7 },
+						},
+					}
+					expect(input).toEqual(output)
+				})
+
+				it("should parse GenericFunctionLiterals with one parameter without external name", () => {
+					let input: parser.Program = parse(`implementation {
+						<Generic>(_ internal: Generic) -> Generic {
+							<- internal
+						}
+					}`)
+					let output: parser.Program = {
+						nodeType: "Program",
+						implementation: {
+							nodeType: "ImplementationSection",
+							nodes: [
+								{
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "GenericFunctionDefinition",
+										generics: [
+											{
+												nodeType: "GenericDeclarationNode",
+												defaultType: null,
+												name: {
+													nodeType: "Identifier",
+													content: "Generic",
+													position: {
+														start: {
+															line: 2,
+															column: 8,
+														},
+														end: {
+															line: 2,
+															column: 15,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 8,
+													},
+													end: {
+														line: 2,
+														column: 15,
+													},
+												},
+											},
+										],
+										parameters: [
+											{
+												nodeType: "Parameter",
+												internalName: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 2,
+															column: 19,
+														},
+														end: {
+															line: 2,
+															column: 27,
+														},
+													},
+												},
+												externalName: null,
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Generic",
+														position: {
+															start: {
+																line: 2,
+																column: 29,
+															},
+															end: {
+																line: 2,
+																column: 36,
+															},
+														},
+													},
+													position: {
+														start: {
+															line: 2,
+															column: 29,
+														},
+														end: {
+															line: 2,
+															column: 36,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 17,
+													},
+													end: {
+														line: 2,
+														column: 36,
+													},
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Generic",
+												position: {
+													start: {
+														line: 2,
+														column: 41,
+													},
+													end: {
+														line: 2,
+														column: 48,
+													},
+												},
+											},
+											position: {
+												start: {
+													line: 2,
+													column: 41,
+												},
+												end: {
+													line: 2,
+													column: 48,
+												},
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 3,
+															column: 11,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 8,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
+												},
+											},
+										],
+									},
+									position: {
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
+									},
+								},
+							],
+							position: {
+								start: { line: 1, column: 1 },
+								end: { line: 5, column: 7 },
+							},
+						},
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 5, column: 7 },
+						},
+					}
+					expect(input).toEqual(output)
+				})
+
+				it("should parse FunctionLiterals with two parameters", () => {
+					let input: parser.Program = parse(`implementation {
+						<Generic>(external internal: Generic, external2 internal2: Generic) -> Generic {
+							<- internal
+						}
+					}`)
+					let output: parser.Program = {
+						nodeType: "Program",
+						implementation: {
+							nodeType: "ImplementationSection",
+							nodes: [
+								{
+									nodeType: "FunctionValue",
+									value: {
+										nodeType: "GenericFunctionDefinition",
+										generics: [
+											{
+												nodeType: "GenericDeclarationNode",
+												defaultType: null,
+												name: {
+													nodeType: "Identifier",
+													content: "Generic",
+													position: {
+														start: {
+															line: 2,
+															column: 8,
+														},
+														end: {
+															line: 2,
+															column: 15,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 8,
+													},
+													end: {
+														line: 2,
+														column: 15,
+													},
+												},
+											},
+										],
+										parameters: [
+											{
+												nodeType: "Parameter",
+												internalName: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 2,
+															column: 26,
+														},
+														end: {
+															line: 2,
+															column: 34,
+														},
+													},
+												},
+												externalName: {
+													nodeType: "Identifier",
+													content: "external",
+													position: {
+														start: {
+															line: 2,
+															column: 17,
+														},
+														end: {
+															line: 2,
+															column: 25,
+														},
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Generic",
+														position: {
+															start: {
+																line: 2,
+																column: 36,
+															},
+															end: {
+																line: 2,
+																column: 43,
+															},
+														},
+													},
+													position: {
+														start: {
+															line: 2,
+															column: 36,
+														},
+														end: {
+															line: 2,
+															column: 43,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 17,
+													},
+													end: {
+														line: 2,
+														column: 43,
+													},
+												},
+											},
+											{
+												nodeType: "Parameter",
+												internalName: {
+													nodeType: "Identifier",
+													content: "internal2",
+													position: {
+														start: {
+															line: 2,
+															column: 55,
+														},
+														end: {
+															line: 2,
+															column: 64,
+														},
+													},
+												},
+												externalName: {
+													nodeType: "Identifier",
+													content: "external2",
+													position: {
+														start: {
+															line: 2,
+															column: 45,
+														},
+														end: {
+															line: 2,
+															column: 54,
+														},
+													},
+												},
+												type: {
+													nodeType: "IdentifierTypeDeclaration",
+													type: {
+														nodeType: "Identifier",
+														content: "Generic",
+														position: {
+															start: {
+																line: 2,
+																column: 66,
+															},
+															end: {
+																line: 2,
+																column: 73,
+															},
+														},
+													},
+													position: {
+														start: {
+															line: 2,
+															column: 66,
+														},
+														end: {
+															line: 2,
+															column: 73,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 2,
+														column: 45,
+													},
+													end: {
+														line: 2,
+														column: 73,
+													},
+												},
+											},
+										],
+										returnType: {
+											nodeType: "IdentifierTypeDeclaration",
+											type: {
+												nodeType: "Identifier",
+												content: "Generic",
+												position: {
+													start: {
+														line: 2,
+														column: 78,
+													},
+													end: {
+														line: 2,
+														column: 85,
+													},
+												},
+											},
+											position: {
+												start: {
+													line: 2,
+													column: 78,
+												},
+												end: {
+													line: 2,
+													column: 85,
+												},
+											},
+										},
+										body: [
+											{
+												nodeType: "ReturnStatement",
+												expression: {
+													nodeType: "Identifier",
+													content: "internal",
+													position: {
+														start: {
+															line: 3,
+															column: 11,
+														},
+														end: {
+															line: 3,
+															column: 19,
+														},
+													},
+												},
+												position: {
+													start: {
+														line: 3,
+														column: 8,
+													},
+													end: {
+														line: 3,
+														column: 19,
+													},
+												},
+											},
+										],
+									},
+									position: {
+										start: {
+											line: 2,
+											column: 16,
+										},
+										end: {
+											line: 4,
+											column: 8,
+										},
+									},
+								},
+							],
+							position: {
+								start: { line: 1, column: 1 },
+								end: { line: 5, column: 7 },
+							},
+						},
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 5, column: 7 },
+						},
+					}
+					expect(input).toEqual(output)
+				})
+			})
+
 			describe("AnonymousRecordLiteral", () => {
 				it("should parse AnonymousRecordLiterals with a KeyValuePair", () => {
 					let input: parser.Program = parse(`implementation { { key = value } }`)

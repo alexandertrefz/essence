@@ -165,9 +165,17 @@ function simplifyBooleanValue(node: common.typed.BooleanValueNode): common.typed
 }
 
 function simplifyFunctionValue(node: common.typed.FunctionValueNode): common.typedSimple.FunctionValueNode {
+	let value
+
+	if (node.value.nodeType === "FunctionDefinition") {
+		value = simplifyFunctionDefinition(node.value)
+	} else {
+		value = simplifyGenericFunctionDefinition(node.value)
+	}
+
 	return {
 		nodeType: "FunctionValue",
-		value: simplifyFunctionDefinition(node.value),
+		value,
 		type: node.type,
 	}
 }
@@ -399,6 +407,28 @@ function simplifyParameter(node: common.typed.ParameterNode): common.typedSimple
 		nodeType: "Parameter",
 		externalName: node.externalName ? simplifyIdentifier(node.externalName) : null,
 		internalName: simplifyIdentifier(node.internalName),
+	}
+}
+
+function simplifyGenericDeclaration(
+	node: common.typed.GenericDeclarationNode,
+): common.typedSimple.GenericDeclarationNode {
+	return {
+		nodeType: "GenericDeclaration",
+		name: node.name,
+		defaultType: node.defaultType,
+	}
+}
+
+function simplifyGenericFunctionDefinition(
+	node: common.typed.GenericFunctionDefinitionNode,
+): common.typedSimple.GenericFunctionDefinitionNode {
+	return {
+		nodeType: "GenericFunctionDefinition",
+		generics: node.generics.map(param => simplifyGenericDeclaration(param)),
+		parameters: node.parameters.map(param => simplifyParameter(param)),
+		body: node.body.map(node => simplifyImplementationNode(node)),
+		returnType: node.returnType,
 	}
 }
 

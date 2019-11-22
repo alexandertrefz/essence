@@ -33,7 +33,7 @@ export function resolveType(
 		case "BooleanValue":
 			return { type: "Primitive", primitive: "Boolean" }
 		case "FunctionValue":
-			return resolveFunctionDefinitionType(node.value, scope)
+			return resolveFunctionValueType(node, scope)
 		case "ListValue":
 			return resolveListValueType(node, scope)
 		case "Lookup":
@@ -268,8 +268,15 @@ export function resolveRecordValueType(node: parser.RecordValueNode, scope: enri
 	}
 }
 
-export function resolveFunctionValueType(node: parser.FunctionValueNode, scope: enricher.Scope): common.FunctionType {
-	return resolveFunctionDefinitionType(node.value, scope)
+export function resolveFunctionValueType(
+	node: parser.FunctionValueNode,
+	scope: enricher.Scope,
+): common.FunctionType | common.GenericFunctionType {
+	if (node.value.nodeType === "FunctionDefinition") {
+		return resolveFunctionDefinitionType(node.value, scope)
+	} else {
+		return resolveGenericFunctionDefinitionType(node.value, scope)
+	}
 }
 
 export function resolveListValueType(node: parser.ListValueNode, scope: enricher.Scope): common.ListType {
@@ -367,6 +374,40 @@ export function resolveMethodLookupType(node: parser.MethodLookupNode, scope: en
 	}
 
 	return result
+}
+
+export function resolveGenericFunctionDefinitionType(
+	node: parser.GenericFunctionDefinitionNode,
+	scope: enricher.Scope,
+): common.GenericFunctionType {
+	return {
+		type: "GenericFunction",
+		generics: node.generics.map(generic => {
+			let defaultType = null
+
+			if (generic.defaultType) {
+				defaultType = resolveType(generic.defaultType, scope)
+			}
+
+			return {
+				name: generic.name.content,
+				defaultType,
+			}
+		}),
+		parameterTypes: node.parameters.map(parameter => {
+			let name = null
+
+			if (parameter.externalName !== null) {
+				name = parameter.externalName.content
+			}
+
+			return {
+				name,
+				type: resolveType(parameter.type, scope),
+			}
+		}),
+		returnType: resolveType(node.returnType, scope),
+	}
 }
 
 export function resolveFunctionDefinitionType(

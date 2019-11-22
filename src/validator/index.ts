@@ -1,5 +1,7 @@
 import { common } from "../interfaces"
 
+type CurrentFunctionContext = common.typed.FunctionDefinitionNode | common.typed.GenericFunctionDefinitionNode | null
+
 export const validate = (program: common.typed.Program): common.typed.Program => {
 	program.implementation.nodes.map(node => validateImplementationNode(node, null))
 
@@ -8,7 +10,7 @@ export const validate = (program: common.typed.Program): common.typed.Program =>
 
 function validateImplementationNode(
 	node: common.typed.ImplementationNode,
-	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
+	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
@@ -215,6 +217,14 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 	return node
 }
 
+function validateGenericFunctionDefinition(
+	node: common.typed.GenericFunctionDefinitionNode,
+): common.typed.GenericFunctionDefinitionNode {
+	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
+
+	return node
+}
+
 function validateFunctionDefinition(node: common.typed.FunctionDefinitionNode): common.typed.FunctionDefinitionNode {
 	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
 
@@ -239,7 +249,7 @@ function validateMethodLookup(node: common.typed.MethodLookupNode): common.typed
 
 function validateStatement(
 	node: common.typed.StatementNode,
-	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
+	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.StatementNode {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
@@ -308,9 +318,19 @@ function validateTypeDefinitionStatement(
 		let method = node.methods[methodName]
 
 		if (method.nodeType === "SimpleMethod" || method.nodeType === "StaticMethod") {
-			validateFunctionDefinition(method.method.value)
+			if (method.method.value.nodeType === "FunctionDefinition") {
+				validateFunctionDefinition(method.method.value)
+			} else {
+				validateGenericFunctionDefinition(method.method.value)
+			}
 		} else {
-			method.methods.map(overloadedMethod => validateFunctionDefinition(overloadedMethod.value))
+			method.methods.map(overloadedMethod => {
+				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
+					validateFunctionDefinition(overloadedMethod.value)
+				} else {
+					validateGenericFunctionDefinition(overloadedMethod.value)
+				}
+			})
 		}
 	}
 
@@ -319,7 +339,7 @@ function validateTypeDefinitionStatement(
 
 function validateIfElseStatementNode(
 	node: common.typed.IfElseStatementNode,
-	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
+	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfElseStatementNode {
 	if (!(node.condition.type.type === "Primitive" && node.condition.type.primitive === "Boolean")) {
 		throw new Error("If Condition has to be a Boolean")
@@ -335,7 +355,7 @@ function validateIfElseStatementNode(
 
 function validateIfStatement(
 	node: common.typed.IfStatementNode,
-	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
+	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfStatementNode {
 	if (!(node.condition.type.type === "Primitive" && node.condition.type.primitive === "Boolean")) {
 		throw new Error("If Condition has to be a Boolean")
@@ -350,7 +370,7 @@ function validateIfStatement(
 
 function validateReturnStatement(
 	node: common.typed.ReturnStatementNode,
-	currentFunctionContext: common.typed.FunctionDefinitionNode | null,
+	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
 		throw new Error("Top level returns are not permitted.")

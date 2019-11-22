@@ -4,7 +4,7 @@ const type: common.GenericTypeType = {
 	type: "GenericType",
 	name: "List",
 	definition: { type: "BuiltIn" },
-	generics: ["ItemType"],
+	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 	methods: {
 		hasItems: {
 			type: "SimpleMethod",

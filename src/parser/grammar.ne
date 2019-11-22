@@ -112,6 +112,7 @@ Value ->
 	| StringLiteral          {% id %}
 	| NumberLiteral          {% id %}
 	| BooleanLiteral         {% id %}
+	| GenericFunctionLiteral {% id %}
 	| FunctionLiteral        {% id %}
 	| ListLiteral            {% id %}
 
@@ -191,6 +192,13 @@ FunctionLiteral ->
 		([paramList, returnType, block]) => generators.functionValueNode(generators.functionDefinition(paramList.parameters, returnType, block.body), { start: paramList.position.start, end: block.position.end })
 	%}
 
+GenericFunctionLiteral ->
+	GenericList ParameterList ReturnType Block {%
+		([genericList, paramList, returnType, block]) => generators.functionValueNode(
+			generators.genericFunctionDefinition(genericList.generics, paramList.parameters, returnType, block.body), { start: paramList.position.start, end: block.position.end }
+		)
+	%}
+
 ListLiteral ->
 	  LeftBracket RightBracket                {% ([lbracket,         rbracket]) => generators.listValueNode([],     { start: lbracket.position.start, end: rbracket.position.end }) %}
 	| LeftBracket ExpressionList RightBracket {% ([lbracket, values, rbracket]) => generators.listValueNode(values, { start: lbracket.position.start, end: rbracket.position.end }) %}
@@ -216,6 +224,13 @@ ParameterList ->
 		})
 	%}
 
+GenericDeclaration ->
+	  Identifier                {% ([name]) =>          generators.genericDeclarationNode(name, null, name.position) %}
+	| Identifier EqualSign Type {% ([name, _, type]) => generators.genericDeclarationNode(name, type, { start: name.position.start, end: type.position.end }) %}
+
+GenericList ->
+	LeftAngle (GenericDeclaration Comma):* GenericDeclaration Comma:? RightAngle {%
+		([leftAngle, genericCommaList, generic, _, rightAngle]) => ({ generics: [...genericCommaList.map(first), generic], position: { start: leftAngle.position.start, end: rightAngle.position.end } })
 	%}
 
 Argument ->
