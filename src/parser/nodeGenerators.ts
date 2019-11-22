@@ -112,7 +112,7 @@ export function booleanValueNode(value: boolean, position: common.Position): par
 }
 
 export function functionValueNode(
-	value: parser.FunctionDefinitionNode,
+	value: parser.FunctionDefinitionNode | parser.GenericFunctionDefinitionNode,
 	position: common.Position,
 ): parser.FunctionValueNode {
 	return {
@@ -326,6 +326,34 @@ export function listTypeDeclaration(
 		nodeType: "ListTypeDeclaration",
 		type,
 		position,
+	}
+}
+
+export function genericDeclarationNode(
+	name: parser.IdentifierNode,
+	defaultType: parser.TypeDeclarationNode | null,
+	position: common.Position,
+): parser.GenericDeclarationNode {
+	return {
+		nodeType: "GenericDeclarationNode",
+		name,
+		defaultType,
+		position,
+	}
+}
+
+export function genericFunctionDefinition(
+	generics: Array<parser.GenericDeclarationNode>,
+	parameters: Array<parser.ParameterNode>,
+	returnType: parser.TypeDeclarationNode,
+	body: Array<parser.ImplementationNode>,
+): parser.GenericFunctionDefinitionNode {
+	return {
+		nodeType: "GenericFunctionDefinition",
+		generics,
+		parameters,
+		returnType,
+		body,
 	}
 }
 

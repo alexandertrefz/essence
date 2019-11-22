@@ -136,6 +136,20 @@ export function enrichMethodFunctionDefinition(
 	}
 }
 
+export function enrichGenericFunctionDefinition(
+	node: parser.GenericFunctionDefinitionNode,
+	scope: enricher.Scope,
+): common.typed.FunctionDefinitionNode {
+	let newScope = { parent: scope, members: {} }
+
+	return {
+		nodeType: "FunctionDefinition",
+		parameters: node.parameters.map(parameter => enrichParameter(parameter, newScope)),
+		body: node.body.map(node => enrichNode(node, newScope)),
+		returnType: resolveType(node.returnType, scope),
+	}
+}
+
 export function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
@@ -240,9 +254,17 @@ export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
+	let value
+
+	if (node.value.nodeType === "FunctionDefinition") {
+		value = enrichFunctionDefinition(node.value, scope)
+	} else {
+		value = enrichGenericFunctionDefinition(node.value, scope)
+	}
+
 	return {
 		nodeType: "FunctionValue",
-		value: enrichFunctionDefinition(node.value, scope),
+		value,
 		position: node.position,
 		type: resolveType(node, scope),
 	}

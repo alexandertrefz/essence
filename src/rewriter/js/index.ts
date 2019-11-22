@@ -431,7 +431,9 @@ function rewriteParameter(parameter: common.typedSimple.ParameterNode): estree.P
 	return rewriteIdentifier(parameter.internalName)
 }
 
-function rewriteFunctionExpression(node: common.typedSimple.FunctionDefinitionNode): estree.FunctionExpression {
+function rewriteFunctionExpression(
+	node: common.typedSimple.FunctionDefinitionNode | common.typedSimple.GenericFunctionDefinitionNode,
+): estree.FunctionExpression {
 	return {
 		type: "FunctionExpression",
 		id: null,
