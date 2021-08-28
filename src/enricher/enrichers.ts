@@ -73,7 +73,7 @@ export function enrichNativeFunctionInvocation(
 	return {
 		nodeType: "NativeFunctionInvocation",
 		name: enrichIdentifier(node.name, scope),
-		arguments: node.arguments.map(argument => enrichArgument(argument, scope)),
+		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
 		position: node.position,
 		type: resolveType(node, scope),
 	}
@@ -86,7 +86,7 @@ export function enrichMethodInvocation(
 	return {
 		nodeType: "MethodInvocation",
 		name: enrichMethodLookup(node.name, scope),
-		arguments: node.arguments.map(argument => enrichArgument(argument, scope)),
+		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
 		position: node.position,
 		type: resolveType(node, scope),
 		overloadedMethodIndex: null,
@@ -100,7 +100,7 @@ export function enrichFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: enrichExpression(node.name, scope),
-		arguments: node.arguments.map(argument => enrichArgument(argument, scope)),
+		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
 		position: node.position,
 		type: resolveType(node, scope),
 	}
@@ -130,8 +130,8 @@ export function enrichMethodFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: method.value.parameters.map(parameter => enrichParameter(parameter, newScope)),
-		body: method.value.body.map(node => enrichNode(node, newScope)),
+		parameters: method.value.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		body: method.value.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(method.value.returnType, scope),
 	}
 }
@@ -144,8 +144,8 @@ export function enrichGenericFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map(parameter => enrichParameter(parameter, newScope)),
-		body: node.body.map(node => enrichNode(node, newScope)),
+		parameters: node.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(node.returnType, scope),
 	}
 }
@@ -158,8 +158,8 @@ export function enrichFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map(parameter => enrichParameter(parameter, newScope)),
-		body: node.body.map(node => enrichNode(node, newScope)),
+		parameters: node.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(node.returnType, scope),
 	}
 }
@@ -273,7 +273,7 @@ export function enrichFunctionValue(
 export function enrichListValue(node: parser.ListValueNode, scope: enricher.Scope): common.typed.ListValueNode {
 	return {
 		nodeType: "ListValue",
-		values: node.values.map(expr => enrichExpression(expr, scope)),
+		values: node.values.map((expr) => enrichExpression(expr, scope)),
 		position: node.position,
 		type: resolveListValueType(node, scope),
 	}
@@ -458,8 +458,8 @@ export function enrichIfElseStatementNode(
 	return {
 		nodeType: "IfElseStatement",
 		condition: enrichExpression(node.condition, scope),
-		trueBody: node.trueBody.map(node => enrichNode(node, trueScope)),
-		falseBody: node.falseBody.map(node => enrichNode(node, falseScope)),
+		trueBody: node.trueBody.map((node) => enrichNode(node, trueScope)),
+		falseBody: node.falseBody.map((node) => enrichNode(node, falseScope)),
 		position: node.position,
 	}
 }
@@ -470,7 +470,7 @@ export function enrichIfStatement(node: parser.IfStatementNode, scope: enricher.
 	return {
 		nodeType: "IfStatement",
 		condition: enrichExpression(node.condition, scope),
-		body: node.body.map(node => enrichNode(node, bodyScope)),
+		body: node.body.map((node) => enrichNode(node, bodyScope)),
 		position: node.position,
 	}
 }

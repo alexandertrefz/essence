@@ -29,7 +29,7 @@ const createIsHelper = (tester: string | Array<string>) => {
 }
 
 const orHelper = (funcs: Array<(input: string) => boolean>, input: string): boolean => {
-	return funcs.map(func => func(input)).reduce((prev, curr) => prev || curr, false)
+	return funcs.map((func) => func(input)).reduce((prev, curr) => prev || curr, false)
 }
 
 const linebreak = "\n"

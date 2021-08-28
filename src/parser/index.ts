@@ -14,7 +14,7 @@ export let parse = (chunk: string) => {
 
 	try {
 		parser.feed(chunk)
-	} catch (error) {
+	} catch (error: any) {
 		/* istanbul ignore next */
 		let value = error.token.value
 

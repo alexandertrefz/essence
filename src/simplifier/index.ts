@@ -13,7 +13,7 @@ function simplifyImplementationSection(
 ): common.typedSimple.ImplementationSectionNode {
 	return {
 		nodeType: "ImplementationSection",
-		nodes: implementation.nodes.map(node => simplifyImplementationNode(node)),
+		nodes: implementation.nodes.map((node) => simplifyImplementationNode(node)),
 	}
 }
 
@@ -87,7 +87,7 @@ function simplifyNativeFunctionInvocation(
 	return {
 		nodeType: "NativeFunctionInvocation",
 		name: simplifyIdentifier(node.name),
-		arguments: node.arguments.map(arg => simplifyArgument(arg)),
+		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
 	}
 }
@@ -106,7 +106,7 @@ function simplifyMethodInvocation(node: common.typed.MethodInvocationNode): comm
 				name: "@",
 				value: simplifyExpression(node.name.base),
 			},
-			...node.arguments.map(arg => simplifyArgument(arg)),
+			...node.arguments.map((arg) => simplifyArgument(arg)),
 		],
 		type: node.type,
 	}
@@ -118,7 +118,7 @@ function simplifyFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),
-		arguments: node.arguments.map(arg => simplifyArgument(arg)),
+		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
 	}
 }
@@ -183,7 +183,7 @@ function simplifyFunctionValue(node: common.typed.FunctionValueNode): common.typ
 function simplifyListValue(node: common.typed.ListValueNode): common.typedSimple.ListValueNode {
 	return {
 		nodeType: "ListValue",
-		values: node.values.map(expr => simplifyExpression(expr)),
+		values: node.values.map((expr) => simplifyExpression(expr)),
 		type: node.type,
 	}
 }
@@ -316,8 +316,8 @@ function simplifyChoice(
 	return {
 		nodeType: "ChoiceStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		trueBody: convertedNode.trueBody.map(node => simplifyImplementationNode(node)),
-		falseBody: convertedNode.falseBody.map(node => simplifyImplementationNode(node)),
+		trueBody: convertedNode.trueBody.map((node) => simplifyImplementationNode(node)),
+		falseBody: convertedNode.falseBody.map((node) => simplifyImplementationNode(node)),
 	}
 }
 
@@ -340,9 +340,9 @@ function simplifyFunctionStatement(node: common.typed.FunctionStatementNode): co
 
 // #region Helpers
 
-function simplifyMembers(members: {
-	[key: string]: common.typed.ExpressionNode
-}): { [key: string]: common.typedSimple.ExpressionNode } {
+function simplifyMembers(members: { [key: string]: common.typed.ExpressionNode }): {
+	[key: string]: common.typedSimple.ExpressionNode
+} {
 	let result: { [key: string]: common.typedSimple.ExpressionNode } = {}
 
 	for (let [memberKey, memberExpression] of Object.entries(members)) {
@@ -425,9 +425,9 @@ function simplifyGenericFunctionDefinition(
 ): common.typedSimple.GenericFunctionDefinitionNode {
 	return {
 		nodeType: "GenericFunctionDefinition",
-		generics: node.generics.map(param => simplifyGenericDeclaration(param)),
-		parameters: node.parameters.map(param => simplifyParameter(param)),
-		body: node.body.map(node => simplifyImplementationNode(node)),
+		generics: node.generics.map((param) => simplifyGenericDeclaration(param)),
+		parameters: node.parameters.map((param) => simplifyParameter(param)),
+		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
 	}
 }
@@ -437,8 +437,8 @@ function simplifyFunctionDefinition(
 ): common.typedSimple.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map(param => simplifyParameter(param)),
-		body: node.body.map(node => simplifyImplementationNode(node)),
+		parameters: node.parameters.map((param) => simplifyParameter(param)),
+		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
 	}
 }
