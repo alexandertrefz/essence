@@ -61,7 +61,7 @@ export default async function rewrite(program: common.typedSimple.Program): Prom
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	return implementation.nodes.map(node => rewriteStatement(node))
+	return implementation.nodes.map((node) => rewriteStatement(node))
 }
 
 // #region Statements
@@ -136,6 +136,7 @@ function rewriteChoiceStatement(node: common.typedSimple.ChoiceStatementNode): e
 		type: "IfStatement",
 		test: {
 			type: "MemberExpression",
+			optional: false,
 			object: rewriteExpression(node.condition),
 			property: {
 				type: "Identifier",
@@ -159,7 +160,7 @@ function rewriteFunctionStatement(node: common.typedSimple.FunctionStatementNode
 	return {
 		type: "FunctionDeclaration",
 		id: rewriteIdentifier(node.name),
-		params: node.value.parameters.map(param => rewriteParameter(param)),
+		params: node.value.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.value.body),
 	}
 }
@@ -225,6 +226,7 @@ function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunction
 	if (node.name.nodeType === "Identifier") {
 		callee = {
 			type: "MemberExpression",
+			optional: false,
 			object: {
 				type: "Identifier",
 				name: "$_",
@@ -241,24 +243,28 @@ function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunction
 
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee,
-		arguments: node.arguments.map(arg => rewriteArgument(arg)),
+		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
 
 function rewriteFunctionInvocation(node: common.typedSimple.FunctionInvocationNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: rewriteExpression(node.name),
-		arguments: node.arguments.map(arg => rewriteArgument(arg)),
+		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
 
 function rewriteCombination(node: common.typedSimple.CombinationNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: {
 			type: "MemberExpression",
+			optional: false,
 			computed: false,
 			object: {
 				type: "Identifier",
@@ -303,8 +309,10 @@ function rewriteRecordValue(node: common.typedSimple.RecordValueNode): estree.Ob
 function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: {
 			type: "MemberExpression",
+			optional: false,
 			object: {
 				type: "Identifier",
 				name: "String",
@@ -327,8 +335,10 @@ function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.Ca
 function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: {
 			type: "MemberExpression",
+			optional: false,
 			object: {
 				type: "Identifier",
 				name: "Number",
@@ -351,8 +361,10 @@ function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.Ca
 function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: {
 			type: "MemberExpression",
+			optional: false,
 			object: {
 				type: "Identifier",
 				name: "Boolean",
@@ -379,8 +391,10 @@ function rewriteFunctionValue(node: common.typedSimple.FunctionValueNode): estre
 function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
+		optional: false,
 		callee: {
 			type: "MemberExpression",
+			optional: false,
 			object: {
 				type: "Identifier",
 				name: "List",
@@ -394,7 +408,7 @@ function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallEx
 		arguments: [
 			{
 				type: "ArrayExpression",
-				elements: node.values.map(expr => rewriteExpression(expr)),
+				elements: node.values.map((expr) => rewriteExpression(expr)),
 			},
 		],
 	}
@@ -403,6 +417,7 @@ function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallEx
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpression {
 	return {
 		type: "MemberExpression",
+		optional: false,
 		object: rewriteExpression(node.base),
 		property: rewriteIdentifier(node.member),
 		computed: false,
@@ -423,7 +438,7 @@ function rewriteIdentifier(node: common.typedSimple.IdentifierNode): estree.Iden
 function rewriteBlockStatement(nodes: Array<common.typedSimple.ImplementationNode>): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		body: nodes.map(node => rewriteStatement(node)).filter(value => !!value),
+		body: nodes.map((node) => rewriteStatement(node)).filter((value) => !!value),
 	}
 }
 
@@ -437,7 +452,7 @@ function rewriteFunctionExpression(
 	return {
 		type: "FunctionExpression",
 		id: null,
-		params: node.parameters.map(param => rewriteParameter(param)),
+		params: node.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.body),
 	}
 }
