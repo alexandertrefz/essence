@@ -18,31 +18,31 @@
 	"author": "Alexander Trefz",
 	"license": "MIT",
 	"engines": {
-		"node": "^13.1.0",
+		"node": ">= 14.0.0",
 		"yarn": "^1.16.0"
 	},
 	"devDependencies": {
 		"@types/deep-equal": "1.0.1",
-		"@types/escodegen": "0.0.6",
-		"@types/estree": "0.0.39",
-		"@types/jest": "24.0.23",
-		"@types/nearley": "2.11.0",
-		"@types/node": "12.12.11",
-		"husky": "3.1.0",
-		"jest": "24.9.0",
-		"prettier": "1.19.1",
-		"pretty-quick": "2.0.1",
-		"ts-jest": "24.2.0"
+		"@types/escodegen": "0.0.7",
+		"@types/estree": "0.0.50",
+		"@types/jest": "27.0.2",
+		"@types/nearley": "2.11.2",
+		"@types/node": "16.10.2",
+		"husky": "7.0.2",
+		"jest": "27.2.4",
+		"prettier": "2.4.1",
+		"pretty-quick": "3.1.1",
+		"ts-jest": "27.0.5"
 	},
 	"dependencies": {
-		"deep-equal": "1.1.1",
-		"escodegen": "1.12.0",
-		"meow": "5.0.0",
-		"nearley": "2.19.0",
-		"rollup": "1.27.4",
-		"rollup-plugin-hypothetical": "2.1.0",
-		"rollup-plugin-typescript2": "0.25.2",
-		"typescript": "3.7.2"
+		"deep-equal": "2.0.5",
+		"escodegen": "2.0.0",
+		"meow": "9.0.0",
+		"nearley": "2.20.1",
+		"rollup": "2.58.0",
+		"rollup-plugin-hypothetical": "2.1.1",
+		"rollup-plugin-typescript2": "0.30.0",
+		"typescript": "4.4.3"
 	},
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",

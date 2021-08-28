@@ -43,7 +43,12 @@ describe("Helpers", () => {
 
 	describe("flatten", () => {
 		it("should flatten array of arrays", () => {
-			expect(flatten([[0, 1], [2, 3]])).toEqual([0, 1, 2, 3])
+			expect(
+				flatten([
+					[0, 1],
+					[2, 3],
+				]),
+			).toEqual([0, 1, 2, 3])
 		})
 
 		it("should flatten mixed array of arrays and items", () => {

@@ -382,7 +382,7 @@ export function resolveGenericFunctionDefinitionType(
 ): common.GenericFunctionType {
 	return {
 		type: "GenericFunction",
-		generics: node.generics.map(generic => {
+		generics: node.generics.map((generic) => {
 			let defaultType = null
 
 			if (generic.defaultType) {
@@ -394,7 +394,7 @@ export function resolveGenericFunctionDefinitionType(
 				defaultType,
 			}
 		}),
-		parameterTypes: node.parameters.map(parameter => {
+		parameterTypes: node.parameters.map((parameter) => {
 			let name = null
 
 			if (parameter.externalName !== null) {
@@ -416,7 +416,7 @@ export function resolveFunctionDefinitionType(
 ): common.FunctionType {
 	return {
 		type: "Function",
-		parameterTypes: node.parameters.map(parameter => {
+		parameterTypes: node.parameters.map((parameter) => {
 			let name = null
 
 			if (parameter.externalName !== null) {
@@ -548,7 +548,7 @@ export function resolveMethodType(
 			type: "SimpleMethod",
 			parameterTypes: [
 				{ name: null, type: selfType },
-				...node.method.value.parameters.map(param => {
+				...node.method.value.parameters.map((param) => {
 					let name = null
 
 					if (param.externalName !== null) {
@@ -566,7 +566,7 @@ export function resolveMethodType(
 	} else if (node.nodeType === "StaticMethod") {
 		return {
 			type: "StaticMethod",
-			parameterTypes: node.method.value.parameters.map(param => {
+			parameterTypes: node.method.value.parameters.map((param) => {
 				let name = null
 
 				if (param.externalName !== null) {
@@ -599,9 +599,9 @@ export function resolveMethodType(
 
 		return {
 			type: "OverloadedMethod",
-			parameterTypes: node.methods.map(method => [
+			parameterTypes: node.methods.map((method) => [
 				{ name: null, type: selfType },
-				...method.value.parameters.map(parameter => {
+				...method.value.parameters.map((parameter) => {
 					let name: string | null
 
 					if (parameter.externalName !== null) {
@@ -637,8 +637,8 @@ export function resolveMethodType(
 
 		return {
 			type: "OverloadedStaticMethod",
-			parameterTypes: node.methods.map(method =>
-				method.value.parameters.map(parameter => {
+			parameterTypes: node.methods.map((method) =>
+				method.value.parameters.map((parameter) => {
 					let name: string | null
 
 					if (parameter.externalName !== null) {

@@ -65,7 +65,10 @@ describe("Lexer", () => {
 			let output: Array<SimpleToken>
 
 			input = "identifier\n"
-			output = [{ value: "identifier", type: TokenType.Identifier }, { value: "\n", type: TokenType.Linebreak }]
+			output = [
+				{ value: "identifier", type: TokenType.Identifier },
+				{ value: "\n", type: TokenType.Linebreak },
+			]
 
 			lexer.reset(input)
 

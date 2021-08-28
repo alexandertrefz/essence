@@ -3,7 +3,7 @@ import { common } from "../interfaces"
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | common.typed.GenericFunctionDefinitionNode | null
 
 export const validate = (program: common.typed.Program): common.typed.Program => {
-	program.implementation.nodes.map(node => validateImplementationNode(node, null))
+	program.implementation.nodes.map((node) => validateImplementationNode(node, null))
 
 	return program
 }
@@ -220,13 +220,13 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 function validateGenericFunctionDefinition(
 	node: common.typed.GenericFunctionDefinitionNode,
 ): common.typed.GenericFunctionDefinitionNode {
-	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
+	node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 
 	return node
 }
 
 function validateFunctionDefinition(node: common.typed.FunctionDefinitionNode): common.typed.FunctionDefinitionNode {
-	node.body.map(bodyNode => validateImplementationNode(bodyNode, node))
+	node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 
 	return node
 }
@@ -324,7 +324,7 @@ function validateTypeDefinitionStatement(
 				validateGenericFunctionDefinition(method.method.value)
 			}
 		} else {
-			method.methods.map(overloadedMethod => {
+			method.methods.map((overloadedMethod) => {
 				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
 					validateFunctionDefinition(overloadedMethod.value)
 				} else {
@@ -347,8 +347,8 @@ function validateIfElseStatementNode(
 
 	validateExpression(node.condition)
 
-	node.trueBody.map(node => validateImplementationNode(node, currentFunctionContext))
-	node.falseBody.map(node => validateImplementationNode(node, currentFunctionContext))
+	node.trueBody.map((node) => validateImplementationNode(node, currentFunctionContext))
+	node.falseBody.map((node) => validateImplementationNode(node, currentFunctionContext))
 
 	return node
 }
@@ -363,7 +363,7 @@ function validateIfStatement(
 
 	validateExpression(node.condition)
 
-	node.body.map(node => validateImplementationNode(node, currentFunctionContext))
+	node.body.map((node) => validateImplementationNode(node, currentFunctionContext))
 
 	return node
 }

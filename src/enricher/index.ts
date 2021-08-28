@@ -31,7 +31,7 @@ const enrichImplementation = (
 ): common.typed.ImplementationSectionNode => {
 	return {
 		nodeType: "ImplementationSection",
-		nodes: implementation.nodes.map(node => enrichNode(node, scope)),
+		nodes: implementation.nodes.map((node) => enrichNode(node, scope)),
 		position: implementation.position,
 	}
 }

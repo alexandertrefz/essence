@@ -1,7 +1,7 @@
 import { lexer, common } from "../interfaces"
 
 export function stripPositionFromArray(tokens: Array<lexer.Token | undefined>): Array<lexer.SimpleToken> {
-	return tokens.map(value => stripPosition(value))
+	return tokens.map((value) => stripPosition(value))
 }
 
 export function stripPosition(token: lexer.Token | undefined): lexer.SimpleToken {
