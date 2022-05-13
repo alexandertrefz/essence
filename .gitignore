@@ -15,3 +15,11 @@ testFiles/local
 testFiles/*.js
 src/parser/grammar.ts
 coverage
+
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
