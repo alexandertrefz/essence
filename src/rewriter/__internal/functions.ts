@@ -1,7 +1,7 @@
-import { ListType } from "./List"
-import { StringType } from "./String"
-import { NumberType } from "./Number"
-import { BooleanType } from "./Boolean"
+import type { ListType } from "./List"
+import type { StringType } from "./String"
+import type { NumberType } from "./Number"
+import type { BooleanType } from "./Boolean"
 
 // TODO: Move Record into own proper type
 type RecordType = {
@@ -24,7 +24,7 @@ function getNativeValue(obj: ListType<any> | StringType | NumberType | BooleanTy
 		return result
 	} else {
 		if (obj.$type === "List") {
-			return obj.value.map(value => getNativeValue(value))
+			return obj.value.map((value) => getNativeValue(value))
 		} else {
 			return obj.value
 		}

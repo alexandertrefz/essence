@@ -7,9 +7,8 @@
 		"pretty": true,
 		"rootDir": "src",
 		"outDir": "lib",
-		"sourceMap": true,
-		"skipLibCheck": true
+		"sourceMap": true
 	},
-	"exclude": ["**/rewriter/js/__internal/*"],
+	"exclude": ["**/rewriter/__internal/*"],
 	"compileOnSave": false
 }

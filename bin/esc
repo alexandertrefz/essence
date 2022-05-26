@@ -7,7 +7,6 @@ const path = require("path")
 const meow = require("meow")
 
 const readFile = util.promisify(fs.readFile)
-const writeFile = util.promisify(fs.writeFile)
 
 const Parser = require("../lib/parser")
 const Enricher = require("../lib/enricher")
@@ -16,15 +15,16 @@ const Simplifier = require("../lib/simplifier")
 const Optimiser = require("../lib/optimiser")
 const Rewriter = require("../lib/rewriter")
 
-function constructTargetFileName(inputFileName) {
-	const sourceFileNameParsed = path.parse(inputFileName)
-	return sourceFileNameParsed.dir + "/" + sourceFileNameParsed.name + ".js"
+function generateOutputFilePath(inputFileName, outputFileName) {
+	if (outputFileName === undefined) {
+		outputFileName = path.basename(cli.input[0], path.extname(cli.input[0])) + ".js"
+	}
+
+	return path.join(path.dirname(inputFileName), outputFileName)
 }
 
-async function compile(inputFileName, flags) {
-	const targetFileName = constructTargetFileName(inputFileName)
-
-	const data = await readFile(inputFileName, "utf8")
+async function compile(flags) {
+	const data = await readFile(flags.inputFileName, "utf8")
 
 	try {
 		const initialProgram = Parser.parse(data)
@@ -32,14 +32,12 @@ async function compile(inputFileName, flags) {
 		const validatedProgram = Validator.validate(enrichedProgram)
 		const simplifiedProgram = Simplifier.simplify(validatedProgram)
 		const optimisedProgram = Optimiser.optimise(simplifiedProgram)
-		const rewrittenProgram = await Rewriter.rewrite(optimisedProgram, flags.mode)
-
-		await writeFile(targetFileName, rewrittenProgram)
+		await Rewriter.rewrite(optimisedProgram, flags)
 	} catch (error) {
 		return Promise.reject(error)
 	}
 
-	return Promise.resolve(inputFileName)
+	return Promise.resolve(flags)
 }
 
 const cli = meow(
@@ -49,19 +47,19 @@ const cli = meow(
 				$ esc <fileName>
 
 			Options
-				--mode Set the rewriter mode
-				--debug Outputs various debugging information
+				--outputFileName The name of the output file. If not provided, defaults to the name of the input file.
+				--debug Outputs various debugging information.
 
 			Examples
-				$ esc HelloWorld.es --mode js
+				$ esc HelloWorld.es
 		`,
 		description: false,
 	},
 	{
 		flags: {
-			mode: {
+			outputFileName: {
 				type: "string",
-				default: "js",
+				default: "",
 			},
 			debug: {
 				type: "boolean",
@@ -71,11 +69,15 @@ const cli = meow(
 	},
 )
 
-compile(cli.input[0], Object.assign({ mode: "js", debug: false }, cli.flags)).then(
-	inputFileName => {
-		console.log(`Successfully compiled ${inputFileName} -> ${constructTargetFileName(inputFileName)}`)
+compile({
+	inputFileName: cli.input[0],
+	debug: cli.flags ?? false,
+	outputFileName: generateOutputFilePath(cli.input[0], cli.flags.outputFileName),
+}).then(
+	(flags) => {
+		console.log(`Successfully compiled ${flags.inputFileName} -> ${flags.outputFileName}`)
 	},
-	reason => {
+	(reason) => {
 		console.log(reason)
 	},
 )

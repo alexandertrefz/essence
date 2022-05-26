@@ -36,13 +36,11 @@
 	},
 	"dependencies": {
 		"deep-equal": "2.0.5",
+		"esbuild": "0.14.39",
 		"escodegen": "2.0.0",
 		"meow": "9.0.0",
 		"nearley": "2.20.1",
-		"rollup": "2.72.1",
-		"rollup-plugin-hypothetical": "2.1.1",
-		"rollup-plugin-typescript2": "0.31.2",
-		"typescript": "4.6.4"
+		"typescript": "4.7.2"
 	},
 	"repository": {
 		"url": "https://atrefz@github.com/atrefz/essence.git",
