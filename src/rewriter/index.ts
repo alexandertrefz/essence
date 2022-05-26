@@ -350,7 +350,8 @@ function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.Ca
 		arguments: [
 			{
 				type: "Literal",
-				value: node.value,
+				bigint: node.value,
+				value: BigInt(node.value),
 			},
 		],
 	}

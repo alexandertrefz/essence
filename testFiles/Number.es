@@ -18,4 +18,8 @@ implementation {
 
 	§ You can chain and nest these calls as well, of course.
 	__print(100::add(11)::multiply(5)::divide(1110::divide(2)))
+
+	§ And you can use numbers of any size, even exceeding the limits of IEEE 754.
+	__print(9007199254740991::multiply(500))
+
 }

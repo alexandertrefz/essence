@@ -22,12 +22,10 @@ function getNativeValue(obj: ListType<any> | StringType | NumberType | BooleanTy
 		}
 
 		return result
+	} else if (obj.$type === "List") {
+		return obj.value.map((value) => getNativeValue(value))
 	} else {
-		if (obj.$type === "List") {
-			return obj.value.map((value) => getNativeValue(value))
-		} else {
-			return obj.value
-		}
+		return obj.value
 	}
 }
 
