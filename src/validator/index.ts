@@ -90,6 +90,10 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 		throw new Error("MethodInvocation: Identifier isn't a function")
 	}
 
+	for (let argumentNode of node.arguments) {
+		validateExpression(argumentNode.value)
+	}
+
 	validateMethodLookup(node.name)
 
 	if (methodType.type === "OverloadedMethod") {
@@ -149,6 +153,10 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 
 function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): common.typed.FunctionInvocationNode {
 	const functionType = node.name.type
+
+	for (let argumentNode of node.arguments) {
+		validateExpression(argumentNode.value)
+	}
 
 	if (
 		functionType.type !== "Function" &&
@@ -401,23 +409,27 @@ function validateSimpleFunctionInvocation(
 		| common.StaticMethodType
 		| common.OverloadedStaticMethodType
 		| common.GenericFunctionType,
-	argumentTypes: common.typed.ArgumentNode[],
+	argumentNodes: common.typed.ArgumentNode[],
 ) {
+	for (let argumentNode of argumentNodes) {
+		validateExpression(argumentNode.value)
+	}
+
 	if (functionType.type === "OverloadedStaticMethod") {
 		let lastIterationHadError = false
 
 		for (let parameterTypes of functionType.parameterTypes) {
 			lastIterationHadError = false
 
-			if (parameterTypes.length !== argumentTypes.length) {
+			if (parameterTypes.length !== argumentNodes.length) {
 				lastIterationHadError = true
 				continue
 			}
 
 			for (let i = 0; i < parameterTypes.length; i++) {
 				if (
-					parameterTypes[i].name !== argumentTypes[i].name ||
-					!matchesType(parameterTypes[i].type, argumentTypes[i].type)
+					parameterTypes[i].name !== argumentNodes[i].name ||
+					!matchesType(parameterTypes[i].type, argumentNodes[i].type)
 				) {
 					lastIterationHadError = true
 					break
@@ -434,17 +446,17 @@ function validateSimpleFunctionInvocation(
 		}
 	} else {
 		if (functionType.type === "GenericFunction") {
-			functionType = inferFunctionType(functionType, argumentTypes)
+			functionType = inferFunctionType(functionType, argumentNodes)
 		}
 
-		if (functionType.parameterTypes.length !== argumentTypes.length) {
+		if (functionType.parameterTypes.length !== argumentNodes.length) {
 			throw new Error("FunctionInvocation: Amount of arguments doesn't match")
 		}
 
 		for (let i = 0; i < functionType.parameterTypes.length; i++) {
 			if (
-				functionType.parameterTypes[i].name !== argumentTypes[i].name ||
-				!matchesType(functionType.parameterTypes[i].type, argumentTypes[i].type)
+				functionType.parameterTypes[i].name !== argumentNodes[i].name ||
+				!matchesType(functionType.parameterTypes[i].type, argumentNodes[i].type)
 			) {
 				throw new Error(`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`)
 			}
