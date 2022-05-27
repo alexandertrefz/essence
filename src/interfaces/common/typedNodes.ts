@@ -54,6 +54,7 @@ export interface FunctionInvocationNode {
 	arguments: Array<ArgumentNode>
 	position: Position
 	type: Type
+	overloadedMethodIndex: number | null
 }
 
 export interface MethodLookupNode {

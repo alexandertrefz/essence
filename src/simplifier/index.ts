@@ -115,6 +115,10 @@ function simplifyMethodInvocation(node: common.typed.MethodInvocationNode): comm
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
+	if (node.overloadedMethodIndex !== null && node.name.nodeType === "Lookup") {
+		node.name.member.content = resolveOverloadedMethodName(node.name.member.content, node.overloadedMethodIndex)
+	}
+
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),

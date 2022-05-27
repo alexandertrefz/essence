@@ -179,6 +179,7 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
 		if (functionType.type === "OverloadedMethod") {
 			let lastIterationHadError = false
+			let index = 0
 
 			for (let parameterTypes of functionType.parameterTypes) {
 				lastIterationHadError = false
@@ -201,10 +202,13 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 				if (lastIterationHadError === false) {
 					break
 				}
+				index++
 			}
 
 			if (lastIterationHadError) {
 				throw new Error("MethodInvocation: Passed arguments do not match any overload")
+			} else {
+				node.overloadedMethodIndex = index
 			}
 		} else {
 			if (functionType.parameterTypes.length !== node.arguments.length) {

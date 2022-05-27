@@ -103,6 +103,7 @@ export function enrichFunctionInvocation(
 		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
 		position: node.position,
 		type: resolveType(node, scope),
+		overloadedMethodIndex: null,
 	}
 }
 
