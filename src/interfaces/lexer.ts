@@ -10,6 +10,7 @@ export enum TokenType {
 	SymbolUnderscore = "SymbolUnderscore",
 	SymbolDash = "SymbolDash",
 	SymbolPipe = "SymbolPipe",
+	SymbolSlash = "SymbolSlash",
 	SymbolLeftParen = "SymbolLeftParen",
 	SymbolRightParen = "SymbolRightParen",
 	SymbolLeftBrace = "SymbolLeftBrace",

@@ -3,6 +3,7 @@ import listType from "./types/List"
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
 import integerType from "./types/Integer"
+import fractionType from "./types/Fraction"
 
 import { parser, common, enricher } from "../interfaces"
 
@@ -17,6 +18,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			String: stringType,
 			Boolean: booleanType,
 			Integer: integerType,
+			Fraction: fractionType,
 		},
 	}
 

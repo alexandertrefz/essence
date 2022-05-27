@@ -63,6 +63,7 @@ export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
 	| IntegerValueNode
+	| FractionValueNode
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
@@ -87,6 +88,14 @@ export type IntegerValueNode = {
 	value: string
 	position: Position
 }
+
+export type FractionValueNode = {
+	nodeType: "FractionValue"
+	numerator: string
+	denominator: string
+	position: Position
+}
+
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean

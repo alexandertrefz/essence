@@ -5,6 +5,7 @@ import { parser, enricher, common } from "../interfaces"
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
 import integerType from "./types/Integer"
+import fractionType from "./types/Fraction"
 import listType from "./types/List"
 
 export function resolveType(
@@ -30,6 +31,8 @@ export function resolveType(
 			return { type: "Primitive", primitive: "String" }
 		case "IntegerValue":
 			return { type: "Primitive", primitive: "Integer" }
+		case "FractionValue":
+			return { type: "Primitive", primitive: "Fraction" }
 		case "BooleanValue":
 			return { type: "Primitive", primitive: "Boolean" }
 		case "FunctionValue":
@@ -662,6 +665,8 @@ export function resolvePrimitiveTypeType(type: common.PrimitiveType, scope: enri
 	switch (type.primitive) {
 		case "Integer":
 			return integerType
+		case "Fraction":
+			return fractionType
 		case "Boolean":
 			return booleanType
 		case "String":

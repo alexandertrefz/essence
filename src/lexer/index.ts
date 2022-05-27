@@ -37,7 +37,7 @@ const stringLiteral = '"'
 const commentLiteral = "§"
 const booleans = ["true", "false"]
 const keywords = ["if", "else", "type", "constant", "variable", "function", "static", "implementation", "overload"]
-const symbols = ["(", ")", "{", "}", "[", "]", "<", ">", "|", "@", ",", ".", ":", "=", "-", "~", "_"]
+const symbols = ["(", ")", "{", "}", "[", "]", "<", ">", "|", "/", "@", ",", ".", ":", "=", "-", "~", "_"]
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 const whitespaces = [" ", "\t"]
 
@@ -109,6 +109,8 @@ const getSymbolType = (value: string) => {
 		return TokenType.SymbolRightBracket
 	} else if (value === "|") {
 		return TokenType.SymbolPipe
+	} else if (value === "/") {
+		return TokenType.SymbolSlash
 	} else if (value === ",") {
 		return TokenType.SymbolComma
 	} else if (value === ".") {

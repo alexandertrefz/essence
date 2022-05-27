@@ -103,6 +103,19 @@ export function integerValueNode(value: string, position: common.Position): pars
 	}
 }
 
+export function fractionValueNode(
+	numerator: string,
+	denominator: string,
+	position: common.Position,
+): parser.FractionValueNode {
+	return {
+		nodeType: "FractionValue",
+		numerator,
+		denominator,
+		position,
+	}
+}
+
 export function booleanValueNode(value: boolean, position: common.Position): parser.BooleanValueNode {
 	return {
 		nodeType: "BooleanValue",
