@@ -1,3 +1,4 @@
+import * as util from "util"
 import { common } from "../interfaces"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | common.typed.GenericFunctionDefinitionNode | null
@@ -302,7 +303,18 @@ function validateVariableDeclarationStatement(
 ): common.typed.VariableDeclarationStatementNode {
 	if (node.declaredType !== null) {
 		if (!matchesType(node.declaredType, node.value.type)) {
-			throw new Error(`Wrong Assignment Value Type for Variable ${node.name.content}`)
+			throw new Error(
+				`Wrong Assignment Value Type for Variable ${node.name.content}
+Expected
+
+${util.inspect(node.declaredType)}
+
+but received
+
+${util.inspect(node.value.type)}
+
+`,
+			)
 		}
 	}
 
@@ -315,7 +327,18 @@ function validateVariableAssignmentStatement(
 	node: common.typed.VariableAssignmentStatementNode,
 ): common.typed.VariableAssignmentStatementNode {
 	if (!matchesType(node.name.type, node.value.type)) {
-		throw new Error(`Wrong Assignment Value Type for Variable ${node.name.content}`)
+		throw new Error(
+			`Wrong Assignment Value Type for Variable ${node.name.content}
+Expected
+
+${util.inspect(node.name.type)}
+
+but received
+
+${util.inspect(node.value.type)}
+
+`,
+		)
 	}
 
 	validateExpression(node.value)
