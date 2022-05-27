@@ -62,7 +62,7 @@ export interface MethodLookupNode {
 export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
-	| NumberValueNode
+	| IntegerValueNode
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
@@ -82,8 +82,8 @@ export type StringValueNode = {
 	position: Position
 }
 
-export type NumberValueNode = {
-	nodeType: "NumberValue"
+export type IntegerValueNode = {
+	nodeType: "IntegerValue"
 	value: string
 	position: Position
 }

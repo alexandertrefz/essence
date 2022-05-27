@@ -20,7 +20,7 @@ function validateImplementationNode(
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
-		case "NumberValue":
+		case "IntegerValue":
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
@@ -58,7 +58,7 @@ function validateExpression(node: common.typed.ExpressionNode): common.typed.Exp
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
-		case "NumberValue":
+		case "IntegerValue":
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":

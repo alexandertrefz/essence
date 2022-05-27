@@ -79,7 +79,7 @@ export type ListType = {
 
 export type PrimitiveType = {
 	type: "Primitive"
-	primitive: "String" | "Number" | "Boolean"
+	primitive: "String" | "Integer" | "Boolean"
 }
 
 export type UnknownType = {

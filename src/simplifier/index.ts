@@ -25,7 +25,7 @@ function simplifyImplementationNode(node: common.typed.ImplementationNode): comm
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
-		case "NumberValue":
+		case "IntegerValue":
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
@@ -62,8 +62,8 @@ function simplifyExpression(node: common.typed.ExpressionNode): common.typedSimp
 			return simplifyRecordValue(node)
 		case "StringValue":
 			return simplifyStringValue(node)
-		case "NumberValue":
-			return simplifyNumberValue(node)
+		case "IntegerValue":
+			return simplifyIntegerValue(node)
 		case "BooleanValue":
 			return simplifyBooleanValue(node)
 		case "FunctionValue":
@@ -152,9 +152,9 @@ function simplifyStringValue(node: common.typed.StringValueNode): common.typedSi
 	}
 }
 
-function simplifyNumberValue(node: common.typed.NumberValueNode): common.typedSimple.NumberValueNode {
+function simplifyIntegerValue(node: common.typed.IntegerValueNode): common.typedSimple.IntegerValueNode {
 	return {
-		nodeType: "NumberValue",
+		nodeType: "IntegerValue",
 		value: node.value,
 		type: node.type,
 	}

@@ -110,7 +110,7 @@ Value ->
 	  TypedRecordLiteral     {% id %}
 	| AnonymousRecordLiteral {% id %}
 	| StringLiteral          {% id %}
-	| NumberLiteral          {% id %}
+	| IntegerLiteral         {% id %}
 	| BooleanLiteral         {% id %}
 	| GenericFunctionLiteral {% id %}
 	| FunctionLiteral        {% id %}
@@ -179,9 +179,8 @@ Integer ->
 		([leftPartialNumber, _, rightPartialNumber]) => ({ value: leftPartialNumber.value + rightPartialNumber.value, position: { start: leftPartialNumber.position.start, end: rightPartialNumber.position.end } })
 	%}
 
-NumberLiteral ->
-	  Integer             {% ([integer]) =>           generators.numberValueNode(integer.value,                     integer.position) %}
-	| Integer Dot Integer {% ([integer, _, float]) => generators.numberValueNode(integer.value + "." + float.value, { start: integer.position.start, end: float.position.end }) %}
+IntegerLiteral ->
+	  Integer {% ([integer]) => generators.integerValueNode(integer.value, integer.position) %}
 
 BooleanLiteral ->
 	  %LiteralTrue  {% ([booleanToken]) => generators.booleanValueNode(true,  booleanToken.position) %}

@@ -95,9 +95,9 @@ export function stringValueNode(value: string, position: common.Position): parse
 	}
 }
 
-export function numberValueNode(value: string, position: common.Position): parser.NumberValueNode {
+export function integerValueNode(value: string, position: common.Position): parser.IntegerValueNode {
 	return {
-		nodeType: "NumberValue",
+		nodeType: "IntegerValue",
 		value,
 		position,
 	}

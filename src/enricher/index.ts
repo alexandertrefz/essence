@@ -2,7 +2,7 @@ import nativeFunctions from "./types/NativeFunctions"
 import listType from "./types/List"
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
-import numberType from "./types/Number"
+import integerType from "./types/Integer"
 
 import { parser, common, enricher } from "../interfaces"
 
@@ -16,7 +16,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			List: listType,
 			String: stringType,
 			Boolean: booleanType,
-			Number: numberType,
+			Integer: integerType,
 		},
 	}
 

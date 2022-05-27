@@ -16,7 +16,7 @@ export async function rewrite(
 		sourceType: "module",
 		body: [
 			internalImport([importNamespaceSpecifier("String")], "String"),
-			internalImport([importNamespaceSpecifier("Number")], "Number"),
+			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
@@ -192,8 +192,8 @@ function rewriteExpression(
 			return rewriteRecordValue(node)
 		case "StringValue":
 			return rewriteStringValue(node)
-		case "NumberValue":
-			return rewriteNumberValue(node)
+		case "IntegerValue":
+			return rewriteIntegerValue(node)
 		case "BooleanValue":
 			return rewriteBooleanValue(node)
 		case "FunctionValue":
@@ -330,7 +330,7 @@ function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.Ca
 	}
 }
 
-function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.CallExpression {
+function rewriteIntegerValue(node: common.typedSimple.IntegerValueNode): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -339,11 +339,11 @@ function rewriteNumberValue(node: common.typedSimple.NumberValueNode): estree.Ca
 			optional: false,
 			object: {
 				type: "Identifier",
-				name: "Number",
+				name: "Integer",
 			},
 			property: {
 				type: "Identifier",
-				name: "createNumber",
+				name: "createInteger",
 			},
 			computed: false,
 		},
