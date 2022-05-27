@@ -11,6 +11,7 @@ export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scop
 		case "RecordValue":
 		case "StringValue":
 		case "IntegerValue":
+		case "FractionValue":
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
@@ -49,6 +50,8 @@ export function enrichExpression(node: parser.ExpressionNode, scope: enricher.Sc
 			return enrichStringValue(node, scope)
 		case "IntegerValue":
 			return enrichIntegerValue(node, scope)
+		case "FractionValue":
+			return enrichFractionValue(node, scope)
 		case "BooleanValue":
 			return enrichBooleanValue(node, scope)
 		case "FunctionValue":
@@ -237,6 +240,19 @@ export function enrichIntegerValue(
 	return {
 		nodeType: "IntegerValue",
 		value: node.value,
+		position: node.position,
+		type: resolveType(node, scope),
+	}
+}
+
+export function enrichFractionValue(
+	node: parser.FractionValueNode,
+	scope: enricher.Scope,
+): common.typed.FractionValueNode {
+	return {
+		nodeType: "FractionValue",
+		numerator: node.numerator,
+		denominator: node.denominator,
 		position: node.position,
 		type: resolveType(node, scope),
 	}

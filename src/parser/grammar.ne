@@ -110,6 +110,7 @@ Value ->
 	  TypedRecordLiteral     {% id %}
 	| AnonymousRecordLiteral {% id %}
 	| StringLiteral          {% id %}
+	| FractionLiteral        {% id %}
 	| IntegerLiteral         {% id %}
 	| BooleanLiteral         {% id %}
 	| GenericFunctionLiteral {% id %}
@@ -181,6 +182,9 @@ Integer ->
 
 IntegerLiteral ->
 	  Integer {% ([integer]) => generators.integerValueNode(integer.value, integer.position) %}
+
+FractionLiteral ->
+	  Integer Slash Integer {% ([numerator, _, denominator]) => generators.fractionValueNode(numerator.value, denominator.value, { start: numerator.position.start, end: denominator.position.end }) %}
 
 BooleanLiteral ->
 	  %LiteralTrue  {% ([booleanToken]) => generators.booleanValueNode(true,  booleanToken.position) %}
@@ -302,6 +306,7 @@ Tilde        -> %SymbolTilde        {% id %}
 Underscore   -> %SymbolUnderscore   {% id %}
 Dash         -> %SymbolDash         {% id %}
 Pipe         -> %SymbolPipe         {% id %}
+Slash        -> %SymbolSlash        {% id %}
 LeftBrace    -> %SymbolLeftBrace    {% id %}
 RightBrace   -> %SymbolRightBrace   {% id %}
 LeftBracket  -> %SymbolLeftBracket  {% id %}

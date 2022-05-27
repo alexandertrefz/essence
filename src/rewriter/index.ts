@@ -17,6 +17,7 @@ export async function rewrite(
 		body: [
 			internalImport([importNamespaceSpecifier("String")], "String"),
 			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
+			internalImport([importNamespaceSpecifier("Fraction")], "Fraction"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
@@ -194,6 +195,8 @@ function rewriteExpression(
 			return rewriteStringValue(node)
 		case "IntegerValue":
 			return rewriteIntegerValue(node)
+		case "FractionValue":
+			return rewriteFractionValue(node)
 		case "BooleanValue":
 			return rewriteBooleanValue(node)
 		case "FunctionValue":
@@ -352,6 +355,38 @@ function rewriteIntegerValue(node: common.typedSimple.IntegerValueNode): estree.
 				type: "Literal",
 				bigint: node.value,
 				value: BigInt(node.value),
+			},
+		],
+	}
+}
+
+function rewriteFractionValue(node: common.typedSimple.FractionValueNode): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: {
+				type: "Identifier",
+				name: "Fraction",
+			},
+			property: {
+				type: "Identifier",
+				name: "createFraction",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "Literal",
+				bigint: node.numerator,
+				value: BigInt(node.numerator),
+			},
+			{
+				type: "Literal",
+				bigint: node.denominator,
+				value: BigInt(node.denominator),
 			},
 		],
 	}

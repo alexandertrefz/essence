@@ -35,9 +35,10 @@
 		"ts-jest": "28.0.2"
 	},
 	"dependencies": {
+		"bigint-fraction": "1.0.4",
 		"deep-equal": "2.0.5",
 		"esbuild": "0.14.39",
-		"escodegen": "2.0.0",
+		"escodegen": "estools/escodegen.git#commit=7a48a218cff99cd38e38e54ac8f310196314702e",
 		"meow": "9.0.0",
 		"nearley": "2.20.1",
 		"typescript": "4.7.2"

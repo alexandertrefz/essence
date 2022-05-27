@@ -50,7 +50,6 @@ The current runtime implementation is rudimentary however:
 
 - Strings are UTF-16 rather than UTF-8
 - There are generally very few methods implemented yet
-- Fractions are not implemented yet
 
 # Disclaimer
 This language is still a work in progress. It is not ready for use yet and there is no documentation as most things are in flux. Generally: Here be dragons!

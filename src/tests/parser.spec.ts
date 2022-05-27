@@ -399,6 +399,20 @@ describe("Parser", () => {
 				})
 			})
 
+			describe("FractionLiterals", () => {
+				it("should parse FractionLiterals", () => {
+					let input: parser.Program = parse(`implementation { 3 / 2 }`)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse FractionLiterals with underscores", () => {
+					let input: parser.Program = parse(`implementation { 1_000 / 9 }`)
+
+					expect(input).toMatchSnapshot()
+				})
+			})
+
 			describe("ListLiterals", () => {
 				it("should parse an empty List", () => {
 					let input: parser.Program = parse(`implementation { [] }`)

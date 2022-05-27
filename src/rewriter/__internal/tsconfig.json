@@ -2,6 +2,7 @@
 	"compilerOptions": {
 		"target": "esnext",
 		"module": "es6",
+		"moduleResolution": "node",
 		"strict": true,
 		"allowJs": true,
 		"pretty": true

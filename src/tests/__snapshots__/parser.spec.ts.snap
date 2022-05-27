@@ -1566,6 +1566,98 @@ Object {
 }
 `;
 
+exports[`Parser Expressions Literals FractionLiterals should parse FractionLiterals 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "denominator": "2",
+        "nodeType": "FractionValue",
+        "numerator": "3",
+        "position": Object {
+          "end": Object {
+            "column": 23,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 25,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 25,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals FractionLiterals should parse FractionLiterals with underscores 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "denominator": "9",
+        "nodeType": "FractionValue",
+        "numerator": "1000",
+        "position": Object {
+          "end": Object {
+            "column": 27,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 29,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 29,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with no parameters 1`] = `
 Object {
   "implementation": Object {
