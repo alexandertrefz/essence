@@ -2,7 +2,7 @@ import type { BooleanType } from "./Boolean"
 import type { NumberType } from "./Number"
 
 import * as $Boolean from "./Boolean"
-import { getRawNumber } from "./internalHelpers"
+import { getInt32 } from "./internalHelpers"
 
 export type ListType<T> = { $type: "List"; value: Array<T> }
 
@@ -43,7 +43,10 @@ export function dropLast<T>(originalList: ListType<T>): ListType<T> {
 }
 
 export function insert__overload$1<T>(originalList: ListType<T>, item: T, index: NumberType): ListType<T> {
-	return createList(originalList.value.splice(getRawNumber(index), 1, item))
+	let copy = originalList.value.slice(0)
+	copy.splice(getInt32(index), 1, item)
+
+	return createList(copy)
 }
 
 export function insert__overload$2<T>(
@@ -51,7 +54,10 @@ export function insert__overload$2<T>(
 	contentsOf: ListType<T>,
 	index: NumberType,
 ): ListType<T> {
-	return createList(originalList.value.splice(getRawNumber(index), contentsOf.value.length, ...contentsOf.value))
+	let copy = originalList.value.slice(0)
+	copy.splice(getInt32(index), contentsOf.value.length, ...contentsOf.value)
+
+	return createList(copy)
 }
 
 export function append__overload$1<T>(originalList: ListType<T>, item: T): ListType<T> {
