@@ -305,12 +305,12 @@ export function resolveListValueType(node: parser.ListValueNode, scope: enricher
 export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope): common.Type {
 	let baseType = resolveType(node.base, scope)
 
-	if (baseType.type !== "Record" && baseType.type !== "Type") {
+	if (baseType.type !== "Record" && baseType.type !== "Type" && baseType.type !== "GenericType") {
 		throw new Error(
-			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is not a Record or Type.`,
+			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Type, or GenericType.`,
 		)
 	} else {
-		if (baseType.type === "Type") {
+		if (baseType.type === "Type" || baseType.type === "GenericType") {
 			if (baseType.definition.type === "Record") {
 				if (baseType.definition.members[node.member.content] != null) {
 					return baseType.definition.members[node.member.content]
