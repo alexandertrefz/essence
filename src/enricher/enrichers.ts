@@ -10,7 +10,7 @@ export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scop
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
-		case "NumberValue":
+		case "IntegerValue":
 		case "BooleanValue":
 		case "FunctionValue":
 		case "ListValue":
@@ -47,8 +47,8 @@ export function enrichExpression(node: parser.ExpressionNode, scope: enricher.Sc
 			return enrichRecordValue(node, scope)
 		case "StringValue":
 			return enrichStringValue(node, scope)
-		case "NumberValue":
-			return enrichNumberValue(node, scope)
+		case "IntegerValue":
+			return enrichIntegerValue(node, scope)
 		case "BooleanValue":
 			return enrichBooleanValue(node, scope)
 		case "FunctionValue":
@@ -230,9 +230,12 @@ export function enrichStringValue(node: parser.StringValueNode, scope: enricher.
 	}
 }
 
-export function enrichNumberValue(node: parser.NumberValueNode, scope: enricher.Scope): common.typed.NumberValueNode {
+export function enrichIntegerValue(
+	node: parser.IntegerValueNode,
+	scope: enricher.Scope,
+): common.typed.IntegerValueNode {
 	return {
-		nodeType: "NumberValue",
+		nodeType: "IntegerValue",
 		value: node.value,
 		position: node.position,
 		type: resolveType(node, scope),

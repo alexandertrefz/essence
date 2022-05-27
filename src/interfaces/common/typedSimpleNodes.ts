@@ -43,7 +43,7 @@ export interface FunctionInvocationNode {
 export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
-	| NumberValueNode
+	| IntegerValueNode
 	| BooleanValueNode
 	| FunctionValueNode
 	| ListValueNode
@@ -62,8 +62,8 @@ export type StringValueNode = {
 	type: Type
 }
 
-export type NumberValueNode = {
-	nodeType: "NumberValue"
+export type IntegerValueNode = {
+	nodeType: "IntegerValue"
 	value: string
 	type: Type
 }

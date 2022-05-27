@@ -3362,6 +3362,96 @@ Object {
 }
 `;
 
+exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "nodeType": "IntegerValue",
+        "position": Object {
+          "end": Object {
+            "column": 21,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "value": "123",
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 23,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 23,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with underscores 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "nodeType": "IntegerValue",
+        "position": Object {
+          "end": Object {
+            "column": 23,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "value": "1000",
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 25,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 25,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions Literals ListLiterals should parse an List with a single item 1`] = `
 Object {
   "implementation": Object {
@@ -3381,7 +3471,7 @@ Object {
         },
         "values": Array [
           Object {
-            "nodeType": "NumberValue",
+            "nodeType": "IntegerValue",
             "position": Object {
               "end": Object {
                 "column": 20,
@@ -3441,7 +3531,7 @@ Object {
         },
         "values": Array [
           Object {
-            "nodeType": "NumberValue",
+            "nodeType": "IntegerValue",
             "position": Object {
               "end": Object {
                 "column": 20,
@@ -3455,7 +3545,7 @@ Object {
             "value": "0",
           },
           Object {
-            "nodeType": "NumberValue",
+            "nodeType": "IntegerValue",
             "position": Object {
               "end": Object {
                 "column": 23,
@@ -3469,7 +3559,7 @@ Object {
             "value": "1",
           },
           Object {
-            "nodeType": "NumberValue",
+            "nodeType": "IntegerValue",
             "position": Object {
               "end": Object {
                 "column": 26,
@@ -3545,186 +3635,6 @@ Object {
   "position": Object {
     "end": Object {
       "column": 22,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals NumberLiterals should parse float NumberLiterals 1`] = `
-Object {
-  "implementation": Object {
-    "nodeType": "ImplementationSection",
-    "nodes": Array [
-      Object {
-        "nodeType": "NumberValue",
-        "position": Object {
-          "end": Object {
-            "column": 21,
-            "line": 1,
-          },
-          "start": Object {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "value": "1.5",
-      },
-    ],
-    "position": Object {
-      "end": Object {
-        "column": 23,
-        "line": 1,
-      },
-      "start": Object {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": Object {
-    "end": Object {
-      "column": 23,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals NumberLiterals should parse float NumberLiterals with underscores 1`] = `
-Object {
-  "implementation": Object {
-    "nodeType": "ImplementationSection",
-    "nodes": Array [
-      Object {
-        "nodeType": "NumberValue",
-        "position": Object {
-          "end": Object {
-            "column": 25,
-            "line": 1,
-          },
-          "start": Object {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "value": "1000.5",
-      },
-    ],
-    "position": Object {
-      "end": Object {
-        "column": 27,
-        "line": 1,
-      },
-      "start": Object {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": Object {
-    "end": Object {
-      "column": 27,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals NumberLiterals should parse simple NumberLiterals 1`] = `
-Object {
-  "implementation": Object {
-    "nodeType": "ImplementationSection",
-    "nodes": Array [
-      Object {
-        "nodeType": "NumberValue",
-        "position": Object {
-          "end": Object {
-            "column": 21,
-            "line": 1,
-          },
-          "start": Object {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "value": "123",
-      },
-    ],
-    "position": Object {
-      "end": Object {
-        "column": 23,
-        "line": 1,
-      },
-      "start": Object {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": Object {
-    "end": Object {
-      "column": 23,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals NumberLiterals should parse simple NumberLiterals with underscores 1`] = `
-Object {
-  "implementation": Object {
-    "nodeType": "ImplementationSection",
-    "nodes": Array [
-      Object {
-        "nodeType": "NumberValue",
-        "position": Object {
-          "end": Object {
-            "column": 23,
-            "line": 1,
-          },
-          "start": Object {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "value": "1000",
-      },
-    ],
-    "position": Object {
-      "end": Object {
-        "column": 25,
-        "line": 1,
-      },
-      "start": Object {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": Object {
-    "end": Object {
-      "column": 25,
       "line": 1,
     },
     "start": Object {

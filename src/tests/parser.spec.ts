@@ -385,27 +385,15 @@ describe("Parser", () => {
 				})
 			})
 
-			describe("NumberLiterals", () => {
-				it("should parse simple NumberLiterals", () => {
+			describe("IntegerLiterals", () => {
+				it("should parse IntegerLiterals", () => {
 					let input: parser.Program = parse(`implementation { 123 }`)
 
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse simple NumberLiterals with underscores", () => {
+				it("should parse IntegerLiterals with underscores", () => {
 					let input: parser.Program = parse(`implementation { 1_000 }`)
-
-					expect(input).toMatchSnapshot()
-				})
-
-				it("should parse float NumberLiterals", () => {
-					let input: parser.Program = parse(`implementation { 1.5 }`)
-
-					expect(input).toMatchSnapshot()
-				})
-
-				it("should parse float NumberLiterals with underscores", () => {
-					let input: parser.Program = parse(`implementation { 1_000.5 }`)
 
 					expect(input).toMatchSnapshot()
 				})

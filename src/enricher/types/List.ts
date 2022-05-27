@@ -42,12 +42,12 @@ const type: common.GenericTypeType = {
 				[
 					{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
 					{ name: null, type: { type: "Generic", name: "ItemType" } },
-					{ name: "atIndex", type: { type: "Primitive", primitive: "Number" } },
+					{ name: "atIndex", type: { type: "Primitive", primitive: "Integer" } },
 				],
 				[
 					{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
 					{ name: "contentsOf", type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
-					{ name: "atIndex", type: { type: "Primitive", primitive: "Number" } },
+					{ name: "atIndex", type: { type: "Primitive", primitive: "Integer" } },
 				],
 			],
 			returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },

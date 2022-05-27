@@ -4,7 +4,7 @@ import { parser, enricher, common } from "../interfaces"
 
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
-import numberType from "./types/Number"
+import integerType from "./types/Integer"
 import listType from "./types/List"
 
 export function resolveType(
@@ -28,8 +28,8 @@ export function resolveType(
 			return resolveRecordValueType(node, scope)
 		case "StringValue":
 			return { type: "Primitive", primitive: "String" }
-		case "NumberValue":
-			return { type: "Primitive", primitive: "Number" }
+		case "IntegerValue":
+			return { type: "Primitive", primitive: "Integer" }
 		case "BooleanValue":
 			return { type: "Primitive", primitive: "Boolean" }
 		case "FunctionValue":
@@ -660,8 +660,8 @@ export function resolveMethodType(
 
 export function resolvePrimitiveTypeType(type: common.PrimitiveType, scope: enricher.Scope): common.TypeType {
 	switch (type.primitive) {
-		case "Number":
-			return numberType
+		case "Integer":
+			return integerType
 		case "Boolean":
 			return booleanType
 		case "String":
