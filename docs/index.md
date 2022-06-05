@@ -4,11 +4,11 @@ Essence features a strong typing system combined with a mixture of functional an
 
 Its syntax and features are designed with modern IDE's in mind, allowing for great code completion & inline documentation features.
 
-Essence will also compile to multiple targets, including the Web (via JS or WASM), LLVM and possibly even .NET.
+Essence compiles to modern ECMAScript versions, allowing execution in both Node.js as well as Browsers.
 
 # The Essence
-* Extensibility is better than completeness.
 * Explicit is better than implicit.
+* Extensibility is better than completeness.
 * Creating correct code must be enjoyable.
 * Prototyping must be fast – thus refactoring must be painless.
 * Readability counts.
@@ -45,7 +45,6 @@ You can compile the testFiles with the `esc` executable in `bin` (after building
 
 The current runtime implementation is rudimentary however:
 
-- Numbers are IEEE 754 rather than Arbitrary Precision Integers
 - Strings are UTF-16 rather than UTF-8
 - There are generally very few methods implemented yet
 
