@@ -1,6 +1,8 @@
 import deepEqual = require("deep-equal")
+import * as util from "util"
 
 import { parser, enricher, common } from "../interfaces"
+import { matchesType } from "../helpers"
 
 import stringType from "./types/String"
 import booleanType from "./types/Boolean"
@@ -119,13 +121,34 @@ function inferGenericFunctionInvocation(
 export function resolveMethodInvocationType(node: parser.MethodInvocationNode, scope: enricher.Scope): common.Type {
 	let type = resolveMethodLookupType(node.name, scope)
 
-	if (
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod" ||
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	) {
+	if (type.type === "SimpleMethod" || type.type === "StaticMethod") {
 		return type.returnType
+	} else if (type.type === "OverloadedMethod" || type.type === "OverloadedStaticMethod") {
+		const methodArguments = [{ name: null, value: node.name.base }, ...node.arguments]
+
+		for (let overload of type.overloads) {
+			if (overload.parameterTypes.length !== methodArguments.length) {
+				continue
+			}
+
+			for (let i = 1; i < overload.parameterTypes.length; i++) {
+				if (
+					!(
+						overload.parameterTypes[i].name === methodArguments[i].name &&
+						matchesType(overload.parameterTypes[i].type, resolveType(methodArguments[i].value, scope))
+					)
+				) {
+					continue
+				}
+			}
+
+			return overload.returnType
+		}
+
+		console.log(util.inspect(node.arguments, { depth: null }))
+		console.log(util.inspect(type, { depth: null }))
+
+		throw new Error("MethodInvocation: Passed arguments do not match any overload")
 	} else {
 		throw new Error(
 			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${node.name.base.position.start.column}.`,
@@ -136,15 +159,31 @@ export function resolveMethodInvocationType(node: parser.MethodInvocationNode, s
 export function resolveFunctionInvocationType(node: parser.FunctionInvocationNode, scope: enricher.Scope): common.Type {
 	const type = resolveType(node.name, scope)
 
-	if (type.type === "Function") {
+	if (type.type === "Function" || type.type === "SimpleMethod" || type.type === "StaticMethod") {
 		return type.returnType
-	} else if (
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod" ||
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	) {
-		return type.returnType
+	} else if (type.type === "OverloadedMethod" || type.type === "OverloadedStaticMethod") {
+		const methodArguments = node.arguments
+
+		for (let overload of type.overloads) {
+			if (overload.parameterTypes.length !== methodArguments.length) {
+				continue
+			}
+
+			for (let i = 0; i < overload.parameterTypes.length; i++) {
+				if (
+					!(
+						overload.parameterTypes[i].name === methodArguments[i].name &&
+						matchesType(overload.parameterTypes[i].type, resolveType(methodArguments[i].value, scope))
+					)
+				) {
+					continue
+				}
+			}
+
+			return overload.returnType
+		}
+
+		throw new Error("MethodInvocation: Passed arguments do not match any overload")
 	} else {
 		throw new Error(
 			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
@@ -584,42 +623,30 @@ export function resolveMethodType(
 			returnType: resolveType(node.method.value.returnType, scope),
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
-		const returnType = node.methods.reduce<common.Type | null>((prev, curr) => {
-			let currType = resolveType(curr.value.returnType, scope)
-
-			if (prev === null) {
-				return currType
-			} else if (deepEqual(prev, currType)) {
-				return currType
-			} else {
-				return null
-			}
-		}, null)
-
-		if (returnType === null) {
-			throw new Error("Overloaded Methods need to have the same return type")
-		}
-
 		return {
 			type: "OverloadedMethod",
-			parameterTypes: node.methods.map((method) => [
-				{ name: null, type: selfType },
-				...method.value.parameters.map((parameter) => {
-					let name: string | null
+			overloads: node.methods.map((method) => {
+				return {
+					parameterTypes: [
+						{ name: null, type: selfType },
+						...method.value.parameters.map((parameter) => {
+							let name: string | null
 
-					if (parameter.externalName !== null) {
-						name = parameter.externalName.content
-					} else {
-						name = null
-					}
+							if (parameter.externalName !== null) {
+								name = parameter.externalName.content
+							} else {
+								name = null
+							}
 
-					return {
-						name,
-						type: resolveType(parameter.type, scope),
-					}
-				}),
-			]),
-			returnType,
+							return {
+								name,
+								type: resolveType(parameter.type, scope),
+							}
+						}),
+					],
+					returnType: resolveType(method.value.returnType, scope),
+				}
+			}),
 		}
 	} else {
 		const returnType = node.methods.reduce<common.Type | null>((prev, curr) => {
@@ -640,23 +667,27 @@ export function resolveMethodType(
 
 		return {
 			type: "OverloadedStaticMethod",
-			parameterTypes: node.methods.map((method) =>
-				method.value.parameters.map((parameter) => {
-					let name: string | null
+			overloads: node.methods.map((method) => {
+				return {
+					parameterTypes: [
+						...method.value.parameters.map((parameter) => {
+							let name: string | null
 
-					if (parameter.externalName !== null) {
-						name = parameter.externalName.content
-					} else {
-						name = null
-					}
+							if (parameter.externalName !== null) {
+								name = parameter.externalName.content
+							} else {
+								name = null
+							}
 
-					return {
-						name,
-						type: resolveType(parameter.type, scope),
-					}
-				}),
-			),
-			returnType,
+							return {
+								name,
+								type: resolveType(parameter.type, scope),
+							}
+						}),
+					],
+					returnType: resolveType(method.value.returnType, scope),
+				}
+			}),
 		}
 	}
 }
@@ -731,8 +762,8 @@ export function resolveGenericType(
 		}
 
 		if (methodValue.type === "OverloadedMethod" || methodValue.type === "OverloadedStaticMethod") {
-			for (let parameterList of methodValue.parameterTypes) {
-				for (let parameter of parameterList) {
+			for (let overload of methodValue.overloads) {
+				for (let parameter of overload.parameterTypes) {
 					if (parameter.type.type === "Generic") {
 						if (parameter.type.name in types) {
 							parameter.type = types[parameter.type.name]
@@ -745,17 +776,17 @@ export function resolveGenericType(
 						}
 					}
 				}
-			}
 
-			if (methodValue.returnType.type === "Generic") {
-				if (methodValue.returnType.name in types) {
-					methodValue.returnType = types[methodValue.returnType.name]
+				if (overload.returnType.type === "Generic") {
+					if (overload.returnType.name in types) {
+						overload.returnType = types[overload.returnType.name]
+					}
 				}
-			}
 
-			if (methodValue.returnType.type === "List" && methodValue.returnType.itemType.type === "Generic") {
-				if (methodValue.returnType.itemType.name in types) {
-					methodValue.returnType.itemType = types[methodValue.returnType.itemType.name]
+				if (overload.returnType.type === "List" && overload.returnType.itemType.type === "Generic") {
+					if (overload.returnType.itemType.name in types) {
+						overload.returnType.itemType = types[overload.returnType.itemType.name]
+					}
 				}
 			}
 		}

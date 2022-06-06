@@ -23,17 +23,22 @@ const type: common.TypeType = {
 		},
 		divide: {
 			type: "OverloadedMethod",
-			parameterTypes: [
-				[
-					{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-					{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-				],
-				[
-					{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-					{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-				],
+			overloads: [
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+					],
+					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+					],
+					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
 			],
-			returnType: { type: "Primitive", primitive: "Fraction" },
 		},
 		multiply: {
 			type: "SimpleMethod",
