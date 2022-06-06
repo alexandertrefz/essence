@@ -175,9 +175,21 @@ StringLiteral ->
 	%LiteralString {% ([stringToken]) => generators.stringValueNode(stringToken.value, stringToken.position) %}
 
 Integer ->
-	  %LiteralNumber             {% id %}
-	| Integer Underscore Integer {%
-		([leftPartialNumber, _, rightPartialNumber]) => ({ value: leftPartialNumber.value + rightPartialNumber.value, position: { start: leftPartialNumber.position.start, end: rightPartialNumber.position.end } })
+	%LiteralNumber (Underscore %LiteralNumber):* {%
+		([leftPartialNumber, otherPartialNumbers]) => {
+			let end 
+			
+			if (otherPartialNumbers.length > 0) {
+				end = otherPartialNumbers[otherPartialNumbers.length - 1][1].position.end;
+			} else {
+				end = leftPartialNumber.position.end;
+			}
+
+			return {
+				value: [leftPartialNumber, ...otherPartialNumbers.map(second)].map(partial => partial.value).join(""), 
+				position: { start: leftPartialNumber.position.start, end: end }
+			}
+		}
 	%}
 
 IntegerLiteral ->
