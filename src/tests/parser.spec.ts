@@ -392,8 +392,14 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse IntegerLiterals with underscores", () => {
+				it("should parse IntegerLiterals with an underscore", () => {
 					let input: parser.Program = parse(`implementation { 1_000 }`)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse IntegerLiterals with multiple underscores", () => {
+					let input: parser.Program = parse(`implementation { 1_000_000 }`)
 
 					expect(input).toMatchSnapshot()
 				})

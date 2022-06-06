@@ -3499,7 +3499,7 @@ Object {
 }
 `;
 
-exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with underscores 1`] = `
+exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with an underscore 1`] = `
 Object {
   "implementation": Object {
     "nodeType": "ImplementationSection",
@@ -3534,6 +3534,51 @@ Object {
   "position": Object {
     "end": Object {
       "column": 25,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with multiple underscores 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "nodeType": "IntegerValue",
+        "position": Object {
+          "end": Object {
+            "column": 27,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "value": "1000000",
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 29,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 29,
       "line": 1,
     },
     "start": Object {
