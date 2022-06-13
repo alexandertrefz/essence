@@ -6,20 +6,42 @@ const type: common.TypeType = {
 	definition: { type: "Primitive", primitive: "Integer" },
 	methods: {
 		add: {
-			type: "SimpleMethod",
-			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+					],
+					returnType: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+					],
+					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
 			],
-			returnType: { type: "Primitive", primitive: "Integer" },
 		},
 		subtract: {
-			type: "SimpleMethod",
-			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+					],
+					returnType: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+					],
+					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
 			],
-			returnType: { type: "Primitive", primitive: "Integer" },
 		},
 		divide: {
 			type: "OverloadedMethod",
@@ -41,12 +63,23 @@ const type: common.TypeType = {
 			],
 		},
 		multiply: {
-			type: "SimpleMethod",
-			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
-				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+					],
+					returnType: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+					],
+					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
 			],
-			returnType: { type: "Primitive", primitive: "Integer" },
 		},
 	},
 }
