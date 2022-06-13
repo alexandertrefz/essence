@@ -11,3 +11,7 @@ export function negate(originalBoolean: BooleanType): BooleanType {
 export function is(originalBoolean: BooleanType, other: BooleanType): BooleanType {
 	return createBoolean(originalBoolean.value === other.value)
 }
+
+export function isnt(originalBoolean: BooleanType, other: BooleanType): BooleanType {
+	return createBoolean(originalBoolean.value !== other.value)
+}
