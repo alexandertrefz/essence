@@ -12,7 +12,7 @@ TARGET_INTERNALS = $(patsubst $(TS_SOURCE_DIR)/rewriter/__internal/%, $(JS_BUILD
 
 # Commands
 TSC := ./node_modules/.bin/tsc
-TSC_ARGS := -t es2017 -m commonjs --moduleResolution Node --strict --pretty --sourceMap --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)
+TSC_ARGS := -t es2020 -m commonjs --moduleResolution Node --strict --pretty --sourceMap --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)
 
 JEST := ./node_modules/.bin/jest
 NEARLEYC := ./node_modules/.bin/nearleyc
