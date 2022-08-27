@@ -47,5 +47,5 @@
 		"url": "https://atrefz@github.com/atrefz/essence.git",
 		"type": "git"
 	},
-	"packageManager": "yarn@3.2.1"
+	"packageManager": "yarn@3.2.3"
 }
