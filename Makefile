@@ -11,17 +11,18 @@ JS_SRC           = $(patsubst $(TS_SOURCE_DIR)/%.ts, $(JS_BUILD_DIR)/%.js, $(TYP
 TARGET_INTERNALS = $(patsubst $(TS_SOURCE_DIR)/rewriter/__internal/%, $(JS_BUILD_DIR)/rewriter/__internal/%, $(SOURCE_INTERNALS))
 
 # Commands
-TSC := ./node_modules/.bin/tsc
-TSC_ARGS := -t es2020 -m commonjs --moduleResolution Node --strict --pretty --sourceMap --rootDir $(TS_SOURCE_DIR)/ --outDir $(JS_BUILD_DIR)
+ESBUILD      := ./node_modules/.bin/esbuild
+ESBUILD_ARGS := --log-level=warning --platform=node --format=cjs
 
-JEST := ./node_modules/.bin/jest
+JEST     := ./node_modules/.bin/jest
 NEARLEYC := ./node_modules/.bin/nearleyc
 
 $(TS_SOURCE_DIR)/parser/grammar.ts: $(TS_SOURCE_DIR)/parser/grammar.ne
 	$(NEARLEYC) $< -o $@
+	$(ESBUILD) $(ESBUILD_ARGS) $@ --outfile=$(JS_BUILD_DIR)/parser/grammar.js
 
 $(JS_BUILD_DIR)/%.js: $(TS_SOURCE_DIR)/%.ts
-	- $(TSC) $(TSC_ARGS) $<
+	- $(ESBUILD) $(ESBUILD_ARGS) $< --outfile=$@
 
 $(JS_BUILD_DIR)/rewriter/__internal/%: $(TS_SOURCE_DIR)/rewriter/__internal/%
 	@[ -d $(@D) ] || mkdir -p $(@D)
