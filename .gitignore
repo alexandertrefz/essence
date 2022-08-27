@@ -1,11 +1,8 @@
 .DS_Store
 .vscode
+.nova
 
 .nyc_output
-
-Scrapbook.md
-Notes.md
-TODO.md
 
 lib
 node_modules
