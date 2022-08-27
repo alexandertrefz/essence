@@ -18,8 +18,7 @@
 	"author": "Alexander Trefz",
 	"license": "MIT",
 	"engines": {
-		"node": ">= 14.0.0 < 18.0.0",
-		"yarn": ">= 1.16.0"
+		"node": ">= 14.0.0 < 18.0.0"
 	},
 	"devDependencies": {
 		"@types/deep-equal": "1.0.1",
