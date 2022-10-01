@@ -97,9 +97,7 @@ function inferGenericFunctionInvocation(
 	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
 		let parameter = genericFunctionType.parameterTypes[i];
 		if (parameter.type.type === "Generic") {
-			if (parameter.type.name in inferredGenerics) {
-				continue;
-			} else {
+			if (!(parameter.type.name in inferredGenerics)) {
 				inferredGenerics[parameter.type.name] = resolveType(
 					argumentTypes[i].value,
 					scope,
@@ -148,7 +146,7 @@ export function resolveMethodInvocationType(
 			...node.arguments,
 		];
 
-		for (let overload of type.overloads) {
+		overloadLoop: for (let overload of type.overloads) {
 			if (overload.parameterTypes.length !== methodArguments.length) {
 				continue;
 			}
@@ -163,7 +161,7 @@ export function resolveMethodInvocationType(
 						)
 					)
 				) {
-					continue;
+					continue overloadLoop;
 				}
 			}
 
@@ -201,7 +199,7 @@ export function resolveFunctionInvocationType(
 	) {
 		const methodArguments = node.arguments;
 
-		for (let overload of type.overloads) {
+		overloadLoop: for (let overload of type.overloads) {
 			if (overload.parameterTypes.length !== methodArguments.length) {
 				continue;
 			}
@@ -216,7 +214,7 @@ export function resolveFunctionInvocationType(
 						)
 					)
 				) {
-					continue;
+					continue overloadLoop;
 				}
 			}
 
@@ -440,7 +438,7 @@ export function resolveLookupType(
 					return baseType.methods[node.member.content];
 				} else {
 					throw new Error(
-						`Access to properties of Primitive Types is not allowed.`,
+						"Access to properties of Primitive Types is not allowed.",
 					);
 				}
 			}
@@ -473,13 +471,13 @@ export function resolveIdentifierType(
 }
 
 export function resolveSelfType(
-	node: parser.SelfNode,
+	_node: parser.SelfNode,
 	scope: enricher.Scope,
 ): common.Type {
 	let result = findVariableInScope("@", scope);
 
 	if (result === null) {
-		throw new Error(`@-Expressions can not be used outside of methods.`);
+		throw new Error("@-Expressions can not be used outside of methods.");
 	} else {
 		return result;
 	}
@@ -787,7 +785,7 @@ export function resolveMethodType(
 
 export function resolvePrimitiveTypeType(
 	type: common.PrimitiveType,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.TypeType {
 	switch (type.primitive) {
 		case "Integer":

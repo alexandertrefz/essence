@@ -10,7 +10,7 @@ export function stripPosition(
 	token: lexer.Token | undefined,
 ): lexer.SimpleToken {
 	let tokenCopy = JSON.parse(JSON.stringify(token));
-	delete tokenCopy.position;
+	tokenCopy.position = undefined;
 	return tokenCopy;
 }
 

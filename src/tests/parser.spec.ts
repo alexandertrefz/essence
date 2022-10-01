@@ -9,16 +9,16 @@ describe("Parser", () => {
 	describe("Expressions", () => {
 		describe("NativeInvocations", () => {
 			it("should not parse NativePrefix without Identifier", () => {
-				expect(() => parse(`implementation { __ }`)).toThrow();
+				expect(() => parse("implementation { __ }")).toThrow();
 			});
 
 			it("should not parse NativeLookups without second Identifier", () => {
-				expect(() => parse(`implementation { __lookup. }`)).toThrow();
+				expect(() => parse("implementation { __lookup. }")).toThrow();
 			});
 
 			it("should parse NativeFunctionInvocation with one argument", () => {
 				let input: parser.Program = parse(
-					`implementation { __lookup(arguments) }`,
+					"implementation { __lookup(arguments) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -26,7 +26,7 @@ describe("Parser", () => {
 
 			it("should parse NativeFunctionInvocation with one argument with trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { __lookup(argument,) }`,
+					"implementation { __lookup(argument,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -34,7 +34,7 @@ describe("Parser", () => {
 
 			it("should parse NativeFunctionInvocation with multiple arguments", () => {
 				let input: parser.Program = parse(
-					`implementation { __lookup(argument, argument2) }`,
+					"implementation { __lookup(argument, argument2) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -42,7 +42,7 @@ describe("Parser", () => {
 
 			it("should parse NativeFunctionInvocation with multiple arguments with trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { __lookup(argument, argument2,) }`,
+					"implementation { __lookup(argument, argument2,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -52,7 +52,7 @@ describe("Parser", () => {
 		describe("MethodInvocations", () => {
 			it("should parse MethodInvocation with 0 external parameters", () => {
 				let input: parser.Program = parse(
-					`implementation { lookup::member() }`,
+					"implementation { lookup::member() }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -60,7 +60,7 @@ describe("Parser", () => {
 
 			it("should parse MethodInvocation", () => {
 				let input: parser.Program = parse(
-					`implementation { lookup::member(argument) }`,
+					"implementation { lookup::member(argument) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -68,7 +68,7 @@ describe("Parser", () => {
 
 			it("should parse chained MethodInvocations", () => {
 				let input: parser.Program = parse(
-					`implementation { lookup::member(argument)::member(argument) }`,
+					"implementation { lookup::member(argument)::member(argument) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -78,7 +78,7 @@ describe("Parser", () => {
 		describe("MethodLookups", () => {
 			it("should parse Identifier MethodLookups", () => {
 				let input: parser.Program = parse(
-					`implementation { identifier::member }`,
+					"implementation { identifier::member }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -86,7 +86,7 @@ describe("Parser", () => {
 
 			it("should parse Lookup MethodLookups", () => {
 				let input: parser.Program = parse(
-					`implementation { identifier.lookup::member }`,
+					"implementation { identifier.lookup::member }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -94,7 +94,7 @@ describe("Parser", () => {
 
 			it("should not parse chained MethodLookups", () => {
 				expect(
-					() => parse(`implementation { lookup::member1::member2 }`),
+					() => parse("implementation { lookup::member1::member2 }"),
 				).toThrow();
 			});
 		});
@@ -102,7 +102,7 @@ describe("Parser", () => {
 		describe("FunctionInvocations", () => {
 			it("should parse Identifier FunctionInvocations with one argument", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument) }`,
+					"implementation { invocation(argument) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -110,7 +110,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with one labelled argument", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(with argument) }`,
+					"implementation { invocation(with argument) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -118,7 +118,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with one argument and a trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument,) }`,
+					"implementation { invocation(argument,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -126,7 +126,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with two arguments", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument, argument2) }`,
+					"implementation { invocation(argument, argument2) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -134,7 +134,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with two arguments and a trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument, argument2,) }`,
+					"implementation { invocation(argument, argument2,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -142,7 +142,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with more than two arguments", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument, argument2, argument3) }`,
+					"implementation { invocation(argument, argument2, argument3) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -150,7 +150,7 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with more than two arguments and a trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { invocation(argument, argument2, argument3,) }`,
+					"implementation { invocation(argument, argument2, argument3,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -158,7 +158,7 @@ describe("Parser", () => {
 
 			it("should parse Lookup FunctionInvocations with more than two arguments and a trailing comma", () => {
 				let input: parser.Program = parse(
-					`implementation { namespace.invocation(argument, argument2, argument3,) }`,
+					"implementation { namespace.invocation(argument, argument2, argument3,) }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -178,14 +178,14 @@ describe("Parser", () => {
 
 		describe("Lookups", () => {
 			it("should parse simple Lookup", () => {
-				let input: parser.Program = parse(`implementation { lookup.member }`);
+				let input: parser.Program = parse("implementation { lookup.member }");
 
 				expect(input).toMatchSnapshot();
 			});
 
 			it("should parse complex Lookup", () => {
 				let input: parser.Program = parse(
-					`implementation { lookup.member1.member2 }`,
+					"implementation { lookup.member1.member2 }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -194,7 +194,7 @@ describe("Parser", () => {
 
 		describe("Identifiers", () => {
 			it("should parse Identifiers", () => {
-				let input: parser.Program = parse(`implementation { identifier }`);
+				let input: parser.Program = parse("implementation { identifier }");
 
 				expect(input).toMatchSnapshot();
 			});
@@ -202,7 +202,7 @@ describe("Parser", () => {
 
 		describe("Self", () => {
 			it("should parse @", () => {
-				let input: parser.Program = parse(`implementation { @ }`);
+				let input: parser.Program = parse("implementation { @ }");
 
 				expect(input).toMatchSnapshot();
 			});
@@ -211,7 +211,7 @@ describe("Parser", () => {
 		describe("Combination", () => {
 			it("should parse 2 identifier combinations", () => {
 				let input: parser.Program = parse(
-					`implementation { base <| override }`,
+					"implementation { base <| override }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -221,7 +221,7 @@ describe("Parser", () => {
 		describe("Literals", () => {
 			describe("FunctionLiterals", () => {
 				it("should parse FunctionLiterals with no parameters", () => {
-					let input: parser.Program = parse(`implementation { () -> Type {} }`);
+					let input: parser.Program = parse("implementation { () -> Type {} }");
 
 					expect(input).toMatchSnapshot();
 				});
@@ -278,7 +278,7 @@ describe("Parser", () => {
 			describe("GenericFunctionLiterals", () => {
 				it("should parse GenericFunctionLiterals with no parameters", () => {
 					let input: parser.Program = parse(
-						`implementation { <Generic>() -> Generic {} }`,
+						"implementation { <Generic>() -> Generic {} }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -336,7 +336,7 @@ describe("Parser", () => {
 			describe("AnonymousRecordLiteral", () => {
 				it("should parse AnonymousRecordLiterals with a KeyValuePair", () => {
 					let input: parser.Program = parse(
-						`implementation { { key = value } }`,
+						"implementation { { key = value } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -344,7 +344,7 @@ describe("Parser", () => {
 
 				it("should parse AnonymousRecordLiterals with a KeyValuePair with a trailing comma", () => {
 					let input: parser.Program = parse(
-						`implementation { { key = value, } }`,
+						"implementation { { key = value, } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -352,7 +352,7 @@ describe("Parser", () => {
 
 				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs", () => {
 					let input: parser.Program = parse(
-						`implementation { { key = value, key2 = value2 } }`,
+						"implementation { { key = value, key2 = value2 } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -360,7 +360,7 @@ describe("Parser", () => {
 
 				it("should parse AnonymousRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
 					let input: parser.Program = parse(
-						`implementation { { key = value, key2 = value2, } }`,
+						"implementation { { key = value, key2 = value2, } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -368,7 +368,7 @@ describe("Parser", () => {
 
 				it("should parse AnonymousRecordLiterals with nested KeyValuePairs", () => {
 					let input: parser.Program = parse(
-						`implementation { { key = { key = value } } }`,
+						"implementation { { key = { key = value } } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -392,7 +392,7 @@ describe("Parser", () => {
 			describe("TypedRecordLiterals", () => {
 				it("should parse TypedRecordLiterals with a KeyValuePair", () => {
 					let input: parser.Program = parse(
-						`implementation { Type ~> { key = value } }`,
+						"implementation { Type ~> { key = value } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -400,7 +400,7 @@ describe("Parser", () => {
 
 				it("should parse TypedRecordLiterals with a KeyValuePair with a trailing comma", () => {
 					let input: parser.Program = parse(
-						`implementation { Type ~> { key = value, } }`,
+						"implementation { Type ~> { key = value, } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -408,7 +408,7 @@ describe("Parser", () => {
 
 				it("should parse TypedRecordLiterals with multiple KeyValuePairs", () => {
 					let input: parser.Program = parse(
-						`implementation { Type ~> { key = value, key2 = value2 } }`,
+						"implementation { Type ~> { key = value, key2 = value2 } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -416,7 +416,7 @@ describe("Parser", () => {
 
 				it("should parse TypedRecordLiterals with multiple KeyValuePairs with a trailing comma", () => {
 					let input: parser.Program = parse(
-						`implementation { Type ~> { key = value, key2 = value2, } }`,
+						"implementation { Type ~> { key = value, key2 = value2, } }",
 					);
 
 					expect(input).toMatchSnapshot();
@@ -439,13 +439,13 @@ describe("Parser", () => {
 
 			describe("BooleanLiterals", () => {
 				it("should parse `true` BooleanLiterals", () => {
-					let input: parser.Program = parse(`implementation { true }`);
+					let input: parser.Program = parse("implementation { true }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse `false` BooleanLiterals", () => {
-					let input: parser.Program = parse(`implementation { false }`);
+					let input: parser.Program = parse("implementation { false }");
 
 					expect(input).toMatchSnapshot();
 				});
@@ -467,19 +467,19 @@ describe("Parser", () => {
 
 			describe("IntegerLiterals", () => {
 				it("should parse IntegerLiterals", () => {
-					let input: parser.Program = parse(`implementation { 123 }`);
+					let input: parser.Program = parse("implementation { 123 }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse IntegerLiterals with an underscore", () => {
-					let input: parser.Program = parse(`implementation { 1_000 }`);
+					let input: parser.Program = parse("implementation { 1_000 }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse IntegerLiterals with multiple underscores", () => {
-					let input: parser.Program = parse(`implementation { 1_000_000 }`);
+					let input: parser.Program = parse("implementation { 1_000_000 }");
 
 					expect(input).toMatchSnapshot();
 				});
@@ -487,13 +487,13 @@ describe("Parser", () => {
 
 			describe("FractionLiterals", () => {
 				it("should parse FractionLiterals", () => {
-					let input: parser.Program = parse(`implementation { 3 / 2 }`);
+					let input: parser.Program = parse("implementation { 3 / 2 }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse FractionLiterals with underscores", () => {
-					let input: parser.Program = parse(`implementation { 1_000 / 9 }`);
+					let input: parser.Program = parse("implementation { 1_000 / 9 }");
 
 					expect(input).toMatchSnapshot();
 				});
@@ -501,19 +501,19 @@ describe("Parser", () => {
 
 			describe("ListLiterals", () => {
 				it("should parse an empty List", () => {
-					let input: parser.Program = parse(`implementation { [] }`);
+					let input: parser.Program = parse("implementation { [] }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse an List with a single item", () => {
-					let input: parser.Program = parse(`implementation { [0] }`);
+					let input: parser.Program = parse("implementation { [0] }");
 
 					expect(input).toMatchSnapshot();
 				});
 
 				it("should parse an List with multiple items", () => {
-					let input: parser.Program = parse(`implementation { [0, 1, 2,] }`);
+					let input: parser.Program = parse("implementation { [0, 1, 2,] }");
 
 					expect(input).toMatchSnapshot();
 				});
@@ -524,7 +524,7 @@ describe("Parser", () => {
 	describe("Statements", () => {
 		describe("ReturnStatements", () => {
 			it("should parse ReturnStatements", () => {
-				let input: parser.Program = parse(`implementation { <- identifier }`);
+				let input: parser.Program = parse("implementation { <- identifier }");
 
 				expect(input).toMatchSnapshot();
 			});
@@ -533,7 +533,7 @@ describe("Parser", () => {
 		describe("IfStatements", () => {
 			it("should parse IfStatements", () => {
 				let input: parser.Program = parse(
-					`implementation { if identifier {} }`,
+					"implementation { if identifier {} }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -541,7 +541,7 @@ describe("Parser", () => {
 
 			it("should parse IfElseStatements", () => {
 				let input: parser.Program = parse(
-					`implementation { if identifier {} else {} }`,
+					"implementation { if identifier {} else {} }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -549,7 +549,7 @@ describe("Parser", () => {
 
 			it("should parse IfElse-If-Statements", () => {
 				let input: parser.Program = parse(
-					`implementation { if identifier {} else if identifier2 {} }`,
+					"implementation { if identifier {} else if identifier2 {} }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -557,7 +557,7 @@ describe("Parser", () => {
 
 			it("should parse IfElse-IfElse-Statements", () => {
 				let input: parser.Program = parse(
-					`implementation { if identifier {} else if identifier2 {} else {} }`,
+					"implementation { if identifier {} else if identifier2 {} else {} }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -565,7 +565,7 @@ describe("Parser", () => {
 
 			it("should parse IfElse-IfElse-If-Statements", () => {
 				let input: parser.Program = parse(
-					`implementation { if identifier {} else if identifier2 {} else if identifier3 {} }`,
+					"implementation { if identifier {} else if identifier2 {} else if identifier3 {} }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -593,7 +593,7 @@ describe("Parser", () => {
 
 			it("should parse VariableDeclarationStatement with List Type", () => {
 				let input: parser.Program = parse(
-					`implementation { variable [String] strings = [] }`,
+					"implementation { variable [String] strings = [] }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -610,7 +610,7 @@ describe("Parser", () => {
 
 		describe("TypeDefinitionStatements", () => {
 			it("should parse an empty TypeDefinitionStatement", () => {
-				let input: parser.Program = parse(`implementation { type Type {} }`);
+				let input: parser.Program = parse("implementation { type Type {} }");
 
 				expect(input).toMatchSnapshot();
 			});
@@ -785,7 +785,7 @@ describe("Parser", () => {
 		describe("FunctionStatements", () => {
 			it("should parse FunctionStatements with no parameters", () => {
 				let input: parser.Program = parse(
-					`implementation { function name () -> Type {} }`,
+					"implementation { function name () -> Type {} }",
 				);
 
 				expect(input).toMatchSnapshot();

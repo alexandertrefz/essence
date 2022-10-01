@@ -17,8 +17,10 @@ const Rewriter = require("../lib/rewriter");
 
 function generateOutputFilePath(inputFileName, outputFileName) {
 	if (outputFileName === undefined) {
-		outputFileName =
-			path.basename(cli.input[0], path.extname(cli.input[0])) + ".js";
+		outputFileName = `${path.basename(
+			cli.input[0],
+			path.extname(cli.input[0]),
+		)}.js`;
 	}
 
 	return path.join(path.dirname(inputFileName), outputFileName);

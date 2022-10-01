@@ -504,7 +504,7 @@ export class Lexer {
 	}
 
 	// TODO: Implement formatError
-	formatError(token: NearleyToken) {
+	formatError(_token: NearleyToken) {
 		return "";
 		// nb. this gets called after consuming the offending token,
 		// so the culprit is index-1

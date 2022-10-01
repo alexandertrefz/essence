@@ -167,7 +167,7 @@ function validateMethodInvocation(
 				!matchesType(methodType.parameterTypes[i].type, methodArguments[i].type)
 			) {
 				if (i === 0) {
-					throw new Error(`MethodInvocation: BaseType mismatch`);
+					throw new Error("MethodInvocation: BaseType mismatch");
 				} else {
 					throw new Error(
 						`MethodInvocation: ArgumentType mismatch at argument ${i}`,
@@ -588,9 +588,7 @@ function inferFunctionType(
 	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
 		let parameter = genericFunctionType.parameterTypes[i];
 		if (parameter.type.type === "Generic") {
-			if (parameter.type.name in inferredGenerics) {
-				continue;
-			} else {
+			if (!(parameter.type.name in inferredGenerics)) {
 				inferredGenerics[parameter.type.name] = argumentTypes[i].type;
 			}
 		}

@@ -565,12 +565,13 @@ function internalImport(
 		specifiers,
 		source: {
 			type: "Literal",
-			value: `${path.resolve(__dirname, "./__internal", fileName) + ".ts"}`,
-			raw: `"${path.resolve(__dirname, "./__internal", fileName) + ".ts"}"`,
+			value: `${path.resolve(__dirname, "./__internal", fileName)}.ts`,
+			raw: `"${path.resolve(__dirname, "./__internal", fileName)}.ts"`,
 		},
 	};
 }
 
+// rome-ignore lint(js/noUnusedVariables): Maybe useful later, added for completeness
 function importSpecifier(variableName: string): estree.ImportSpecifier {
 	return {
 		type: "ImportSpecifier",
@@ -585,6 +586,7 @@ function importSpecifier(variableName: string): estree.ImportSpecifier {
 	};
 }
 
+// rome-ignore lint(js/noUnusedVariables): Maybe useful later, added for completeness
 function importDefaultSpecifier(
 	variableName: string,
 ): estree.ImportDefaultSpecifier {
