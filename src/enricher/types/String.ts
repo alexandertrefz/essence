@@ -1,4 +1,4 @@
-import { common } from "../../interfaces"
+import { common } from "../../interfaces";
 
 const type: common.TypeType = {
 	type: "Type",
@@ -7,12 +7,16 @@ const type: common.TypeType = {
 	methods: {
 		isEmpty: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		hasContent: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "String" } }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "String" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		is: {
@@ -53,7 +57,10 @@ const type: common.TypeType = {
 				{ name: null, type: { type: "Primitive", primitive: "String" } },
 				{ name: "on", type: { type: "Primitive", primitive: "String" } },
 			],
-			returnType: { type: "List", itemType: { type: "Primitive", primitive: "String" } },
+			returnType: {
+				type: "List",
+				itemType: { type: "Primitive", primitive: "String" },
+			},
 		},
 		contains: {
 			type: "SimpleMethod",
@@ -64,6 +71,6 @@ const type: common.TypeType = {
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 	},
-}
+};
 
-export default type
+export default type;

@@ -1,7 +1,7 @@
-import { common } from "../../interfaces"
+import { common } from "../../interfaces";
 
 const functions: {
-	[key: string]: common.Type
+	[key: string]: common.Type;
 } = {
 	__print: {
 		type: "GenericFunction",
@@ -20,6 +20,6 @@ const functions: {
 			name: "Item",
 		},
 	},
-}
+};
 
-export default functions
+export default functions;

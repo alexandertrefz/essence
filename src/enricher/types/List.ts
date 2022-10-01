@@ -1,4 +1,4 @@
-import { common } from "../../interfaces"
+import { common } from "../../interfaces";
 
 const type: common.GenericTypeType = {
 	type: "GenericType",
@@ -8,53 +8,140 @@ const type: common.GenericTypeType = {
 	methods: {
 		hasItems: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		first: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
 			returnType: { type: "Generic", name: "ItemType" },
 		},
 		last: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
 			returnType: { type: "Generic", name: "ItemType" },
 		},
 		unique: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
-			returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: { type: "Generic", name: "ItemType" },
+			},
 		},
 		dropFirst: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
-			returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: { type: "Generic", name: "ItemType" },
+			},
 		},
 		dropLast: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } }],
-			returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: { type: "Generic", name: "ItemType" },
+			},
 		},
 		insert: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
 						{ name: null, type: { type: "Generic", name: "ItemType" } },
-						{ name: "atIndex", type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: "atIndex",
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
-					returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
-						{ name: "contentsOf", type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
-						{ name: "atIndex", type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: "contentsOf",
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: "atIndex",
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
 
-					returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
 				},
 			],
 		},
@@ -63,21 +150,45 @@ const type: common.GenericTypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
 						{ name: null, type: { type: "Generic", name: "ItemType" } },
 					],
-					returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
-						{ name: "contentsOf", type: { type: "List", itemType: { type: "Generic", name: "ItemType" } } },
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: "contentsOf",
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
 					],
-					returnType: { type: "List", itemType: { type: "Generic", name: "ItemType" } },
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
 				},
 			],
 		},
 	},
-}
+};
 
-export default type
+export default type;

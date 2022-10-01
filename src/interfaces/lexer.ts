@@ -1,4 +1,4 @@
-import { Position } from "./common"
+import { Position } from "./common";
 
 export enum TokenType {
 	SymbolAt = "SymbolAt",
@@ -19,12 +19,12 @@ export enum TokenType {
 	SymbolRightBracket = "SymbolRightBracket",
 	SymbolLeftAngle = "SymbolLeftAngle",
 	SymbolRightAngle = "SymbolRightAngle",
-
+	//
 	LiteralTrue = "LiteralTrue",
 	LiteralFalse = "LiteralFalse",
 	LiteralString = "LiteralString",
 	LiteralNumber = "LiteralNumber",
-
+	//
 	KeywordType = "KeywordType",
 	KeywordIf = "KeywordIf",
 	KeywordElse = "KeywordElse",
@@ -34,19 +34,19 @@ export enum TokenType {
 	KeywordFunction = "KeywordFunction",
 	KeywordImplementation = "KeywordImplementation",
 	KeywordOverload = "KeywordOverload",
-
+	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",
 	Comment = "Comment",
 }
 
 export interface Token {
-	value: string
-	type: TokenType
-	position: Position
+	value: string;
+	type: TokenType;
+	position: Position;
 }
 
 export interface SimpleToken {
-	type: TokenType
-	value: string
+	type: TokenType;
+	value: string;
 }
