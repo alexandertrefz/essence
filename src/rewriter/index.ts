@@ -1,11 +1,11 @@
-import * as path from "path"
+import * as path from "path";
 
-import { generate } from "escodegen"
-import * as estree from "estree"
+import { generate } from "escodegen";
+import * as estree from "estree";
 
-const esbuild = require("esbuild")
+const esbuild = require("esbuild");
 
-import { common } from "../interfaces"
+import { common } from "../interfaces";
 
 export async function rewrite(
 	program: common.typedSimple.Program,
@@ -23,7 +23,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			...rewriteImplementationSection(program.implementation),
 		],
-	}
+	};
 
 	const programText = generate(rewrittenProgram, {
 		format: {
@@ -36,7 +36,7 @@ export async function rewrite(
 			space: " ",
 			quotes: "double",
 		},
-	})
+	});
 
 	esbuild.buildSync({
 		stdin: {
@@ -52,33 +52,35 @@ export async function rewrite(
 		bundle: true,
 		format: "iife",
 		outfile: flags.outputFileName,
-	})
+	});
 
-	return Promise.resolve()
+	return Promise.resolve();
 }
 
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	return implementation.nodes.map((node) => rewriteStatement(node))
+	return implementation.nodes.map((node) => rewriteStatement(node));
 }
 
 // #region Statements
 
-function rewriteStatement(node: common.typedSimple.ImplementationNode): estree.Statement {
+function rewriteStatement(
+	node: common.typedSimple.ImplementationNode,
+): estree.Statement {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
-			return rewriteVariableDeclarationStatement(node)
+			return rewriteVariableDeclarationStatement(node);
 		case "TypeDefinitionStatement":
-			return rewriteTypeDefinitionStatement(node)
+			return rewriteTypeDefinitionStatement(node);
 		case "ChoiceStatement":
-			return rewriteChoiceStatement(node)
+			return rewriteChoiceStatement(node);
 		case "ReturnStatement":
-			return rewriteReturnStatement(node)
+			return rewriteReturnStatement(node);
 		case "FunctionStatement":
-			return rewriteFunctionStatement(node)
+			return rewriteFunctionStatement(node);
 		default:
-			return rewriteExpressionStatement(node)
+			return rewriteExpressionStatement(node);
 	}
 }
 
@@ -95,17 +97,22 @@ function rewriteVariableDeclarationStatement(
 			},
 		],
 		kind: node.isConstant ? "const" : "let",
-	}
+	};
 }
 
-function rewriteTypeDefinitionStatement(node: common.typedSimple.TypeDefinitionStatementNode): estree.ClassDeclaration {
+function rewriteTypeDefinitionStatement(
+	node: common.typedSimple.TypeDefinitionStatementNode,
+): estree.ClassDeclaration {
 	return {
 		type: "ClassDeclaration",
 		id: rewriteIdentifier(node.name),
 		superClass: null,
 		body: {
 			type: "ClassBody",
-			body: Object.entries(node.methods).map<estree.MethodDefinition>(([name, method]) => {
+			body: Object.entries(node.methods).map<estree.MethodDefinition>(([
+				name,
+				method,
+			]) => {
 				return {
 					type: "MethodDefinition",
 					key: {
@@ -116,19 +123,24 @@ function rewriteTypeDefinitionStatement(node: common.typedSimple.TypeDefinitionS
 					kind: "method",
 					computed: false,
 					static: true,
-				}
+				};
 			}),
 		},
-	}
+	};
 }
 
-function rewriteChoiceStatement(node: common.typedSimple.ChoiceStatementNode): estree.IfStatement {
-	let alternate
+function rewriteChoiceStatement(
+	node: common.typedSimple.ChoiceStatementNode,
+): estree.IfStatement {
+	let alternate;
 
-	if (node.falseBody.length === 1 && node.falseBody[0].nodeType === "ChoiceStatement") {
-		alternate = rewriteStatement(node.falseBody[0])
+	if (
+		node.falseBody.length === 1 &&
+		node.falseBody[0].nodeType === "ChoiceStatement"
+	) {
+		alternate = rewriteStatement(node.falseBody[0]);
 	} else {
-		alternate = rewriteBlockStatement(node.falseBody)
+		alternate = rewriteBlockStatement(node.falseBody);
 	}
 
 	return {
@@ -145,32 +157,38 @@ function rewriteChoiceStatement(node: common.typedSimple.ChoiceStatementNode): e
 		},
 		consequent: rewriteBlockStatement(node.trueBody),
 		alternate,
-	}
+	};
 }
 
-function rewriteReturnStatement(node: common.typedSimple.ReturnStatementNode): estree.ReturnStatement {
+function rewriteReturnStatement(
+	node: common.typedSimple.ReturnStatementNode,
+): estree.ReturnStatement {
 	return {
 		type: "ReturnStatement",
 		argument: rewriteExpression(node.expression),
-	}
+	};
 }
 
-function rewriteFunctionStatement(node: common.typedSimple.FunctionStatementNode): estree.FunctionDeclaration {
+function rewriteFunctionStatement(
+	node: common.typedSimple.FunctionStatementNode,
+): estree.FunctionDeclaration {
 	return {
 		type: "FunctionDeclaration",
 		id: rewriteIdentifier(node.name),
 		params: node.value.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.value.body),
-	}
+	};
 }
 
 function rewriteExpressionStatement(
-	node: common.typedSimple.ExpressionNode | common.typedSimple.VariableAssignmentStatementNode,
+	node:
+		| common.typedSimple.ExpressionNode
+		| common.typedSimple.VariableAssignmentStatementNode,
 ): estree.ExpressionStatement {
 	return {
 		type: "ExpressionStatement",
 		expression: rewriteExpression(node),
-	}
+	};
 }
 
 // #endregion
@@ -178,35 +196,37 @@ function rewriteExpressionStatement(
 // #region Expressions
 
 function rewriteExpression(
-	node: common.typedSimple.ExpressionNode | common.typedSimple.VariableAssignmentStatementNode,
+	node:
+		| common.typedSimple.ExpressionNode
+		| common.typedSimple.VariableAssignmentStatementNode,
 ): estree.Expression {
 	switch (node.nodeType) {
 		case "VariableAssignmentStatement":
-			return rewriteVariableAssignmentStatement(node)
+			return rewriteVariableAssignmentStatement(node);
 		case "NativeFunctionInvocation":
-			return rewriteNativeFunctionInvocation(node)
+			return rewriteNativeFunctionInvocation(node);
 		case "FunctionInvocation":
-			return rewriteFunctionInvocation(node)
+			return rewriteFunctionInvocation(node);
 		case "Combination":
-			return rewriteCombination(node)
+			return rewriteCombination(node);
 		case "RecordValue":
-			return rewriteRecordValue(node)
+			return rewriteRecordValue(node);
 		case "StringValue":
-			return rewriteStringValue(node)
+			return rewriteStringValue(node);
 		case "IntegerValue":
-			return rewriteIntegerValue(node)
+			return rewriteIntegerValue(node);
 		case "FractionValue":
-			return rewriteFractionValue(node)
+			return rewriteFractionValue(node);
 		case "BooleanValue":
-			return rewriteBooleanValue(node)
+			return rewriteBooleanValue(node);
 		case "FunctionValue":
-			return rewriteFunctionValue(node)
+			return rewriteFunctionValue(node);
 		case "ListValue":
-			return rewriteListValue(node)
+			return rewriteListValue(node);
 		case "Lookup":
-			return rewriteLookup(node)
+			return rewriteLookup(node);
 		case "Identifier":
-			return rewriteIdentifier(node)
+			return rewriteIdentifier(node);
 	}
 }
 
@@ -218,11 +238,13 @@ function rewriteVariableAssignmentStatement(
 		operator: "=",
 		left: rewriteIdentifier(node.name),
 		right: rewriteExpression(node.value),
-	}
+	};
 }
 
-function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunctionInvocationNode): estree.CallExpression {
-	let callee: estree.MemberExpression
+function rewriteNativeFunctionInvocation(
+	node: common.typedSimple.NativeFunctionInvocationNode,
+): estree.CallExpression {
+	let callee: estree.MemberExpression;
 
 	if (node.name.nodeType === "Identifier") {
 		callee = {
@@ -237,9 +259,9 @@ function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunction
 				name: node.name.name.slice(2),
 			},
 			computed: false,
-		}
+		};
 	} else {
-		throw Error("Lookups on NativeFunctionIvocations are not implemented yet.")
+		throw Error("Lookups on NativeFunctionIvocations are not implemented yet.");
 	}
 
 	return {
@@ -247,19 +269,23 @@ function rewriteNativeFunctionInvocation(node: common.typedSimple.NativeFunction
 		optional: false,
 		callee,
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
-	}
+	};
 }
 
-function rewriteFunctionInvocation(node: common.typedSimple.FunctionInvocationNode): estree.CallExpression {
+function rewriteFunctionInvocation(
+	node: common.typedSimple.FunctionInvocationNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
 		callee: rewriteExpression(node.name),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
-	}
+	};
 }
 
-function rewriteCombination(node: common.typedSimple.CombinationNode): estree.CallExpression {
+function rewriteCombination(
+	node: common.typedSimple.CombinationNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -284,13 +310,18 @@ function rewriteCombination(node: common.typedSimple.CombinationNode): estree.Ca
 			rewriteExpression(node.lhs),
 			rewriteExpression(node.rhs),
 		],
-	}
+	};
 }
 
-function rewriteRecordValue(node: common.typedSimple.RecordValueNode): estree.ObjectExpression {
+function rewriteRecordValue(
+	node: common.typedSimple.RecordValueNode,
+): estree.ObjectExpression {
 	return {
 		type: "ObjectExpression",
-		properties: Object.entries(node.members).map<estree.Property>(([key, value]) => {
+		properties: Object.entries(node.members).map<estree.Property>(([
+			key,
+			value,
+		]) => {
 			return {
 				type: "Property",
 				key: {
@@ -302,12 +333,14 @@ function rewriteRecordValue(node: common.typedSimple.RecordValueNode): estree.Ob
 				computed: false,
 				method: false,
 				shorthand: false,
-			}
+			};
 		}),
-	}
+	};
 }
 
-function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.CallExpression {
+function rewriteStringValue(
+	node: common.typedSimple.StringValueNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -330,10 +363,12 @@ function rewriteStringValue(node: common.typedSimple.StringValueNode): estree.Ca
 				value: node.value,
 			},
 		],
-	}
+	};
 }
 
-function rewriteIntegerValue(node: common.typedSimple.IntegerValueNode): estree.CallExpression {
+function rewriteIntegerValue(
+	node: common.typedSimple.IntegerValueNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -357,10 +392,12 @@ function rewriteIntegerValue(node: common.typedSimple.IntegerValueNode): estree.
 				value: BigInt(node.value),
 			},
 		],
-	}
+	};
 }
 
-function rewriteFractionValue(node: common.typedSimple.FractionValueNode): estree.CallExpression {
+function rewriteFractionValue(
+	node: common.typedSimple.FractionValueNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -389,10 +426,12 @@ function rewriteFractionValue(node: common.typedSimple.FractionValueNode): estre
 				value: BigInt(node.denominator),
 			},
 		],
-	}
+	};
 }
 
-function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.CallExpression {
+function rewriteBooleanValue(
+	node: common.typedSimple.BooleanValueNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -415,14 +454,18 @@ function rewriteBooleanValue(node: common.typedSimple.BooleanValueNode): estree.
 				value: node.value,
 			},
 		],
-	}
+	};
 }
 
-function rewriteFunctionValue(node: common.typedSimple.FunctionValueNode): estree.FunctionExpression {
-	return rewriteFunctionExpression(node.value)
+function rewriteFunctionValue(
+	node: common.typedSimple.FunctionValueNode,
+): estree.FunctionExpression {
+	return rewriteFunctionExpression(node.value);
 }
 
-function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallExpression {
+function rewriteListValue(
+	node: common.typedSimple.ListValueNode,
+): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -445,58 +488,76 @@ function rewriteListValue(node: common.typedSimple.ListValueNode): estree.CallEx
 				elements: node.values.map((expr) => rewriteExpression(expr)),
 			},
 		],
-	}
+	};
 }
 
-function rewriteLookup(node: common.typedSimple.LookupNode): estree.MemberExpression {
+function rewriteLookup(
+	node: common.typedSimple.LookupNode,
+): estree.MemberExpression {
 	return {
 		type: "MemberExpression",
 		optional: false,
 		object: rewriteExpression(node.base),
 		property: rewriteIdentifier(node.member),
 		computed: false,
-	}
+	};
 }
 
-function rewriteIdentifier(node: common.typedSimple.IdentifierNode): estree.Identifier {
+function rewriteIdentifier(
+	node: common.typedSimple.IdentifierNode,
+): estree.Identifier {
 	return {
 		type: "Identifier",
 		name: node.name,
-	}
+	};
 }
 
 // #endregion
 
 // #region Helpers
 
-function rewriteBlockStatement(nodes: Array<common.typedSimple.ImplementationNode>): estree.BlockStatement {
+function rewriteBlockStatement(
+	nodes: Array<common.typedSimple.ImplementationNode>,
+): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		body: nodes.map((node) => rewriteStatement(node)).filter((value) => !!value),
-	}
+		body: nodes.map((node) => rewriteStatement(node)).filter(
+			(value) => !!value,
+		),
+	};
 }
 
-function rewriteParameter(parameter: common.typedSimple.ParameterNode): estree.Pattern {
-	return rewriteIdentifier(parameter.internalName)
+function rewriteParameter(
+	parameter: common.typedSimple.ParameterNode,
+): estree.Pattern {
+	return rewriteIdentifier(parameter.internalName);
 }
 
 function rewriteFunctionExpression(
-	node: common.typedSimple.FunctionDefinitionNode | common.typedSimple.GenericFunctionDefinitionNode,
+	node:
+		| common.typedSimple.FunctionDefinitionNode
+		| common.typedSimple.GenericFunctionDefinitionNode,
 ): estree.FunctionExpression {
 	return {
 		type: "FunctionExpression",
 		id: null,
 		params: node.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.body),
-	}
+	};
 }
 
-function rewriteArgument(node: common.typedSimple.ArgumentNode): estree.Expression {
-	return rewriteExpression(node.value)
+function rewriteArgument(
+	node: common.typedSimple.ArgumentNode,
+): estree.Expression {
+	return rewriteExpression(node.value);
 }
 
 function internalImport(
-	specifiers: Array<estree.ImportSpecifier | estree.ImportDefaultSpecifier | estree.ImportNamespaceSpecifier>,
+	specifiers: Array<
+			| estree.ImportSpecifier
+			| estree.ImportDefaultSpecifier
+			| estree.ImportNamespaceSpecifier
+	>,
 	fileName: string,
 ): estree.ImportDeclaration {
 	return {
@@ -507,7 +568,7 @@ function internalImport(
 			value: `${path.resolve(__dirname, "./__internal", fileName) + ".ts"}`,
 			raw: `"${path.resolve(__dirname, "./__internal", fileName) + ".ts"}"`,
 		},
-	}
+	};
 }
 
 function importSpecifier(variableName: string): estree.ImportSpecifier {
@@ -521,27 +582,30 @@ function importSpecifier(variableName: string): estree.ImportSpecifier {
 			type: "Identifier",
 			name: variableName,
 		},
-	}
+	};
 }
 
-function importDefaultSpecifier(variableName: string): estree.ImportDefaultSpecifier {
+function importDefaultSpecifier(
+	variableName: string,
+): estree.ImportDefaultSpecifier {
 	return {
 		type: "ImportDefaultSpecifier",
 		local: {
 			type: "Identifier",
 			name: variableName,
 		},
-	}
+	};
 }
 
-function importNamespaceSpecifier(variableName: string): estree.ImportNamespaceSpecifier {
+function importNamespaceSpecifier(
+	variableName: string,
+): estree.ImportNamespaceSpecifier {
 	return {
 		type: "ImportNamespaceSpecifier",
 		local: {
 			type: "Identifier",
 			name: variableName,
 		},
-	}
+	};
 }
-
 // #endregion

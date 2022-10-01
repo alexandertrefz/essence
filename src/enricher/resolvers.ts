@@ -1,14 +1,14 @@
-import deepEqual = require("deep-equal")
-import * as util from "util"
+import deepEqual = require("deep-equal");
+import * as util from "util";
 
-import { parser, enricher, common } from "../interfaces"
-import { matchesType } from "../helpers"
+import { parser, enricher, common } from "../interfaces";
+import { matchesType } from "../helpers";
 
-import stringType from "./types/String"
-import booleanType from "./types/Boolean"
-import integerType from "./types/Integer"
-import fractionType from "./types/Fraction"
-import listType from "./types/List"
+import stringType from "./types/String";
+import booleanType from "./types/Boolean";
+import integerType from "./types/Integer";
+import fractionType from "./types/Fraction";
+import listType from "./types/List";
 
 export function resolveType(
 	node:
@@ -20,58 +20,62 @@ export function resolveType(
 ): common.Type {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
-			return resolveNativeFunctionInvocationType(node, scope)
+			return resolveNativeFunctionInvocationType(node, scope);
 		case "MethodInvocation":
-			return resolveMethodInvocationType(node, scope)
+			return resolveMethodInvocationType(node, scope);
 		case "FunctionInvocation":
-			return resolveFunctionInvocationType(node, scope)
+			return resolveFunctionInvocationType(node, scope);
 		case "Combination":
-			return resolveCombinationType(node, scope)
+			return resolveCombinationType(node, scope);
 		case "RecordValue":
-			return resolveRecordValueType(node, scope)
+			return resolveRecordValueType(node, scope);
 		case "StringValue":
-			return { type: "Primitive", primitive: "String" }
+			return { type: "Primitive", primitive: "String" };
 		case "IntegerValue":
-			return { type: "Primitive", primitive: "Integer" }
+			return { type: "Primitive", primitive: "Integer" };
 		case "FractionValue":
-			return { type: "Primitive", primitive: "Fraction" }
+			return { type: "Primitive", primitive: "Fraction" };
 		case "BooleanValue":
-			return { type: "Primitive", primitive: "Boolean" }
+			return { type: "Primitive", primitive: "Boolean" };
 		case "FunctionValue":
-			return resolveFunctionValueType(node, scope)
+			return resolveFunctionValueType(node, scope);
 		case "ListValue":
-			return resolveListValueType(node, scope)
+			return resolveListValueType(node, scope);
 		case "Lookup":
-			return resolveLookupType(node, scope)
+			return resolveLookupType(node, scope);
 		case "Identifier":
-			return resolveIdentifierType(node, scope)
+			return resolveIdentifierType(node, scope);
 		case "Self":
-			return resolveSelfType(node, scope)
+			return resolveSelfType(node, scope);
 		case "MethodLookup":
-			return resolveMethodLookupType(node, scope)
+			return resolveMethodLookupType(node, scope);
 		case "FunctionDefinition":
-			return resolveFunctionDefinitionType(node, scope)
+			return resolveFunctionDefinitionType(node, scope);
 		case "TypeDefinitionStatement":
-			return resolveTypeDefinitionStatementType(node, scope)
+			return resolveTypeDefinitionStatementType(node, scope);
 		case "IdentifierTypeDeclaration":
-			return resolveIdentifierTypeDeclarationType(node, scope)
+			return resolveIdentifierTypeDeclarationType(node, scope);
 		case "ListTypeDeclaration":
-			return resolveListTypeDeclarationType(node, scope)
+			return resolveListTypeDeclarationType(node, scope);
 	}
 }
 export function resolveNativeFunctionInvocationType(
 	node: parser.NativeFunctionInvocationNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let type = resolveType(node.name, scope)
+	let type = resolveType(node.name, scope);
 
 	if (type.type === "Function") {
-		return type.returnType
+		return type.returnType;
 	} else if (type.type === "GenericFunction") {
-		let inferredType = inferGenericFunctionInvocation(type, node.arguments, scope)
-		return inferredType.returnType
+		let inferredType = inferGenericFunctionInvocation(
+			type,
+			node.arguments,
+			scope,
+		);
+		return inferredType.returnType;
 	} else {
-		throw new Error(`${node.name.content} is not a native function.`)
+		throw new Error(`${node.name.content} is not a native function.`);
 	}
 }
 
@@ -80,171 +84,224 @@ function inferGenericFunctionInvocation(
 	argumentTypes: parser.ArgumentNode[],
 	scope: enricher.Scope,
 ): common.FunctionType {
-	let inferredGenerics: { [key: string]: common.Type } = {}
+	let inferredGenerics: { [key: string]: common.Type } = {};
 
 	let inferredFunctionType: common.FunctionType = {
 		type: "Function",
-		parameterTypes: JSON.parse(JSON.stringify(genericFunctionType.parameterTypes)),
+		parameterTypes: JSON.parse(
+			JSON.stringify(genericFunctionType.parameterTypes),
+		),
 		returnType: JSON.parse(JSON.stringify(genericFunctionType.returnType)),
-	}
+	};
 
 	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
-		let parameter = genericFunctionType.parameterTypes[i]
+		let parameter = genericFunctionType.parameterTypes[i];
 		if (parameter.type.type === "Generic") {
 			if (parameter.type.name in inferredGenerics) {
-				continue
+				continue;
 			} else {
-				inferredGenerics[parameter.type.name] = resolveType(argumentTypes[i].value, scope)
+				inferredGenerics[parameter.type.name] = resolveType(
+					argumentTypes[i].value,
+					scope,
+				);
 			}
 		}
 	}
 
-	if (Object.entries(inferredGenerics).length !== genericFunctionType.generics.length) {
-		throw new Error("Mismatch in amount of defined and declared Generics.")
+	if (
+		Object.entries(inferredGenerics).length !==
+		genericFunctionType.generics.length
+	) {
+		throw new Error("Mismatch in amount of defined and declared Generics.");
 	}
 
 	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
-		let parameter = inferredFunctionType.parameterTypes[i]
+		let parameter = inferredFunctionType.parameterTypes[i];
 
 		if (parameter.type.type === "Generic") {
-			parameter.type = inferredGenerics[parameter.type.name]
+			parameter.type = inferredGenerics[parameter.type.name];
 		}
 	}
 
 	if (inferredFunctionType.returnType.type === "Generic") {
-		inferredFunctionType.returnType = inferredGenerics[inferredFunctionType.returnType.name]
+		inferredFunctionType.returnType =
+			inferredGenerics[inferredFunctionType.returnType.name];
 	}
 
-	return inferredFunctionType
+	return inferredFunctionType;
 }
 
-export function resolveMethodInvocationType(node: parser.MethodInvocationNode, scope: enricher.Scope): common.Type {
-	let type = resolveMethodLookupType(node.name, scope)
+export function resolveMethodInvocationType(
+	node: parser.MethodInvocationNode,
+	scope: enricher.Scope,
+): common.Type {
+	let type = resolveMethodLookupType(node.name, scope);
 
 	if (type.type === "SimpleMethod" || type.type === "StaticMethod") {
-		return type.returnType
-	} else if (type.type === "OverloadedMethod" || type.type === "OverloadedStaticMethod") {
-		const methodArguments = [{ name: null, value: node.name.base }, ...node.arguments]
+		return type.returnType;
+	} else if (
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+	) {
+		const methodArguments = [
+			{ name: null, value: node.name.base },
+			...node.arguments,
+		];
 
 		for (let overload of type.overloads) {
 			if (overload.parameterTypes.length !== methodArguments.length) {
-				continue
+				continue;
 			}
 
 			for (let i = 1; i < overload.parameterTypes.length; i++) {
 				if (
 					!(
 						overload.parameterTypes[i].name === methodArguments[i].name &&
-						matchesType(overload.parameterTypes[i].type, resolveType(methodArguments[i].value, scope))
+						matchesType(
+							overload.parameterTypes[i].type,
+							resolveType(methodArguments[i].value, scope),
+						)
 					)
 				) {
-					continue
+					continue;
 				}
 			}
 
-			return overload.returnType
+			return overload.returnType;
 		}
 
-		console.log(util.inspect(node.arguments, { depth: null }))
-		console.log(util.inspect(type, { depth: null }))
+		console.log(util.inspect(node.arguments, { depth: null }));
+		console.log(util.inspect(type, { depth: null }));
 
-		throw new Error("MethodInvocation: Passed arguments do not match any overload")
+		throw new Error(
+			"MethodInvocation: Passed arguments do not match any overload",
+		);
 	} else {
 		throw new Error(
 			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${node.name.base.position.start.column}.`,
-		)
+		);
 	}
 }
 
-export function resolveFunctionInvocationType(node: parser.FunctionInvocationNode, scope: enricher.Scope): common.Type {
-	const type = resolveType(node.name, scope)
+export function resolveFunctionInvocationType(
+	node: parser.FunctionInvocationNode,
+	scope: enricher.Scope,
+): common.Type {
+	const type = resolveType(node.name, scope);
 
-	if (type.type === "Function" || type.type === "SimpleMethod" || type.type === "StaticMethod") {
-		return type.returnType
-	} else if (type.type === "OverloadedMethod" || type.type === "OverloadedStaticMethod") {
-		const methodArguments = node.arguments
+	if (
+		type.type === "Function" ||
+		type.type === "SimpleMethod" ||
+		type.type === "StaticMethod"
+	) {
+		return type.returnType;
+	} else if (
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+	) {
+		const methodArguments = node.arguments;
 
 		for (let overload of type.overloads) {
 			if (overload.parameterTypes.length !== methodArguments.length) {
-				continue
+				continue;
 			}
 
 			for (let i = 0; i < overload.parameterTypes.length; i++) {
 				if (
 					!(
 						overload.parameterTypes[i].name === methodArguments[i].name &&
-						matchesType(overload.parameterTypes[i].type, resolveType(methodArguments[i].value, scope))
+						matchesType(
+							overload.parameterTypes[i].type,
+							resolveType(methodArguments[i].value, scope),
+						)
 					)
 				) {
-					continue
+					continue;
 				}
 			}
 
-			return overload.returnType
+			return overload.returnType;
 		}
 
-		throw new Error("MethodInvocation: Passed arguments do not match any overload")
+		throw new Error(
+			"MethodInvocation: Passed arguments do not match any overload",
+		);
 	} else {
 		throw new Error(
 			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
-		)
+		);
 	}
 }
 
-export function resolveCombinationType(node: parser.CombinationNode, scope: enricher.Scope): common.Type {
+export function resolveCombinationType(
+	node: parser.CombinationNode,
+	scope: enricher.Scope,
+): common.Type {
 	function isSubType(
 		lhs: common.RecordType | common.TypeType | common.GenericTypeType,
 		rhs: common.RecordType | common.TypeType | common.GenericTypeType,
 	): boolean {
 		if (lhs.type === "Type") {
-			if (lhs.definition.type === "Primitive" || lhs.definition.type === "BuiltIn") {
-				throw new Error(`You can not combine ${lhs.name} with other Types.`)
+			if (
+				lhs.definition.type === "Primitive" ||
+				lhs.definition.type === "BuiltIn"
+			) {
+				throw new Error(`You can not combine ${lhs.name} with other Types.`);
 			} else {
-				lhs = lhs.definition
+				lhs = lhs.definition;
 			}
 		}
 
 		if (rhs.type === "Type") {
-			if (rhs.definition.type === "Primitive" || rhs.definition.type === "BuiltIn") {
-				throw new Error(`You can not combine ${rhs.name} with other Types.`)
+			if (
+				rhs.definition.type === "Primitive" ||
+				rhs.definition.type === "BuiltIn"
+			) {
+				throw new Error(`You can not combine ${rhs.name} with other Types.`);
 			} else {
-				rhs = rhs.definition
+				rhs = rhs.definition;
 			}
 		}
 
 		// TODO: Check if this is enough checking - shouldnt we compare the generics as well, at least in Number?
 
 		if (lhs.type === "GenericType") {
-			if (lhs.definition.type === "Primitive" || lhs.definition.type === "BuiltIn") {
-				throw new Error(`You can not combine ${lhs.name} with other Types.`)
+			if (
+				lhs.definition.type === "Primitive" ||
+				lhs.definition.type === "BuiltIn"
+			) {
+				throw new Error(`You can not combine ${lhs.name} with other Types.`);
 			} else {
-				lhs = lhs.definition
+				lhs = lhs.definition;
 			}
 		}
 
 		if (rhs.type === "GenericType") {
-			if (rhs.definition.type === "Primitive" || rhs.definition.type === "BuiltIn") {
-				throw new Error(`You can not combine ${rhs.name} with other Types.`)
+			if (
+				rhs.definition.type === "Primitive" ||
+				rhs.definition.type === "BuiltIn"
+			) {
+				throw new Error(`You can not combine ${rhs.name} with other Types.`);
 			} else {
-				rhs = rhs.definition
+				rhs = rhs.definition;
 			}
 		}
 
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
 			if (rhsType.type === "Primitive") {
-				rhsType = resolvePrimitiveTypeType(rhsType, scope)
+				rhsType = resolvePrimitiveTypeType(rhsType, scope);
 			}
 
 			if (!deepEqual(lhs.members[rhsName], rhsType)) {
-				return false
+				return false;
 			}
 		}
 
-		return true
+		return true;
 	}
 
-	let lhsType = resolveType(node.lhs, scope)
-	let rhsType = resolveType(node.rhs, scope)
+	let lhsType = resolveType(node.lhs, scope);
+	let rhsType = resolveType(node.rhs, scope);
 
 	switch (lhsType.type) {
 		case "SimpleMethod":
@@ -253,15 +310,15 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "OverloadedStaticMethod":
 		case "Function":
 		case "GenericFunction":
-			throw new Error("You can not combine Functions.")
+			throw new Error("You can not combine Functions.");
 		case "List":
-			throw new Error("You can not combine Lists.")
+			throw new Error("You can not combine Lists.");
 		case "Primitive":
-			throw new Error("You can not combine Primitives.")
+			throw new Error("You can not combine Primitives.");
 		case "Unknown":
-			throw new Error("You can not combine Unknowns.")
+			throw new Error("You can not combine Unknowns.");
 		case "Generic":
-			throw new Error("You can not combine Generics.")
+			throw new Error("You can not combine Generics.");
 	}
 
 	switch (rhsType.type) {
@@ -271,42 +328,47 @@ export function resolveCombinationType(node: parser.CombinationNode, scope: enri
 		case "OverloadedStaticMethod":
 		case "Function":
 		case "GenericFunction":
-			throw new Error("You can not combine Functions.")
+			throw new Error("You can not combine Functions.");
 		case "List":
-			throw new Error("You can not combine Lists.")
+			throw new Error("You can not combine Lists.");
 		case "Primitive":
-			throw new Error("You can not combine Primitives.")
+			throw new Error("You can not combine Primitives.");
 		case "Unknown":
-			throw new Error("You can not combine Unknowns.")
+			throw new Error("You can not combine Unknowns.");
 		case "Generic":
-			throw new Error("You can not combine Generics.")
+			throw new Error("You can not combine Generics.");
 	}
 
 	if (deepEqual(lhsType, rhsType)) {
-		return lhsType
+		return lhsType;
 	} else {
 		if (isSubType(lhsType, rhsType)) {
-			return lhsType
+			return lhsType;
 		} else {
-			throw new Error("The right hand side Type must be a Partial of the left hand side Type.")
+			throw new Error(
+				"The right hand side Type must be a Partial of the left hand side Type.",
+			);
 		}
 	}
 }
 
-export function resolveRecordValueType(node: parser.RecordValueNode, scope: enricher.Scope): common.Type {
+export function resolveRecordValueType(
+	node: parser.RecordValueNode,
+	scope: enricher.Scope,
+): common.Type {
 	if (node.type !== null) {
-		return resolveType(node.type, scope)
+		return resolveType(node.type, scope);
 	} else {
-		let members: { [key: string]: common.Type } = {}
+		let members: { [key: string]: common.Type } = {};
 
 		for (let [memberKey, memberValue] of Object.entries(node.members)) {
-			members[memberKey] = resolveType(memberValue, scope)
+			members[memberKey] = resolveType(memberValue, scope);
 		}
 
 		return {
 			type: "Record",
 			members,
-		}
+		};
 	}
 }
 
@@ -315,107 +377,128 @@ export function resolveFunctionValueType(
 	scope: enricher.Scope,
 ): common.FunctionType | common.GenericFunctionType {
 	if (node.value.nodeType === "FunctionDefinition") {
-		return resolveFunctionDefinitionType(node.value, scope)
+		return resolveFunctionDefinitionType(node.value, scope);
 	} else {
-		return resolveGenericFunctionDefinitionType(node.value, scope)
+		return resolveGenericFunctionDefinitionType(node.value, scope);
 	}
 }
 
-export function resolveListValueType(node: parser.ListValueNode, scope: enricher.Scope): common.ListType {
+export function resolveListValueType(
+	node: parser.ListValueNode,
+	scope: enricher.Scope,
+): common.ListType {
 	if (node.values.length === 0) {
 		return {
 			type: "List",
 			itemType: { type: "Unknown" },
-		}
+		};
 	} else {
-		let itemType = resolveType(node.values[0], scope)
+		let itemType = resolveType(node.values[0], scope);
 
 		for (let expression of node.values) {
 			if (!deepEqual(itemType, resolveType(expression, scope))) {
 				// TODO: Implement Union Types
-				throw new Error("Union Types are not implemented yet.")
+				throw new Error("Union Types are not implemented yet.");
 			}
 		}
 
 		return {
 			type: "List",
 			itemType,
-		}
+		};
 	}
 }
 
-export function resolveLookupType(node: parser.LookupNode, scope: enricher.Scope): common.Type {
-	let baseType = resolveType(node.base, scope)
+export function resolveLookupType(
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+): common.Type {
+	let baseType = resolveType(node.base, scope);
 
-	if (baseType.type !== "Record" && baseType.type !== "Type" && baseType.type !== "GenericType") {
+	if (
+		baseType.type !== "Record" &&
+		baseType.type !== "Type" &&
+		baseType.type !== "GenericType"
+	) {
 		throw new Error(
 			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Type, or GenericType.`,
-		)
+		);
 	} else {
 		if (baseType.type === "Type" || baseType.type === "GenericType") {
 			if (baseType.definition.type === "Record") {
 				if (baseType.definition.members[node.member.content] != null) {
-					return baseType.definition.members[node.member.content]
+					return baseType.definition.members[node.member.content];
 				} else if (baseType.methods[node.member.content] != null) {
-					return baseType.methods[node.member.content]
+					return baseType.methods[node.member.content];
 				} else {
 					throw new Error(
 						`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
-					)
+					);
 				}
 			} else {
 				if (baseType.methods[node.member.content] != null) {
-					return baseType.methods[node.member.content]
+					return baseType.methods[node.member.content];
 				} else {
-					throw new Error(`Access to properties of Primitive Types is not allowed.`)
+					throw new Error(
+						`Access to properties of Primitive Types is not allowed.`,
+					);
 				}
 			}
 		} else {
 			if (baseType.members[node.member.content] !== null) {
-				return baseType.members[node.member.content]
+				return baseType.members[node.member.content];
 			} else {
 				throw new Error(
 					`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
-				)
+				);
 			}
 		}
 	}
 }
 
-export function resolveIdentifierType(node: parser.IdentifierNode, scope: enricher.Scope): common.Type {
-	let name = node.content
-	let result = findVariableInScope(name, scope)
+export function resolveIdentifierType(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+): common.Type {
+	let name = node.content;
+	let result = findVariableInScope(name, scope);
 
 	if (result === null) {
 		throw new Error(
 			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
-		)
+		);
 	} else {
-		return result
+		return result;
 	}
 }
 
-export function resolveSelfType(node: parser.SelfNode, scope: enricher.Scope): common.Type {
-	let result = findVariableInScope("@", scope)
+export function resolveSelfType(
+	node: parser.SelfNode,
+	scope: enricher.Scope,
+): common.Type {
+	let result = findVariableInScope("@", scope);
 
 	if (result === null) {
-		throw new Error(`@-Expressions can not be used outside of methods.`)
+		throw new Error(`@-Expressions can not be used outside of methods.`);
 	} else {
-		return result
+		return result;
 	}
 }
 
-export function resolveMethodLookupType(node: parser.MethodLookupNode, scope: enricher.Scope): common.MethodType {
-	let baseType = resolveMethodLookupBaseType(node.base, scope)
-	let result = baseType.methods[node.member.content]
+export function resolveMethodLookupType(
+	node: parser.MethodLookupNode,
+	scope: enricher.Scope,
+): common.MethodType {
+	let baseType = resolveMethodLookupBaseType(node.base, scope);
+	let result = baseType.methods[node.member.content];
 
 	if (result == null) {
 		throw new Error(
 			`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.start.line}:${node.base.position.start.column}.`,
-		)
+		);
 	}
 
-	return result
+	return result;
 }
 
 export function resolveGenericFunctionDefinitionType(
@@ -425,31 +508,31 @@ export function resolveGenericFunctionDefinitionType(
 	return {
 		type: "GenericFunction",
 		generics: node.generics.map((generic) => {
-			let defaultType = null
+			let defaultType = null;
 
 			if (generic.defaultType) {
-				defaultType = resolveType(generic.defaultType, scope)
+				defaultType = resolveType(generic.defaultType, scope);
 			}
 
 			return {
 				name: generic.name.content,
 				defaultType,
-			}
+			};
 		}),
 		parameterTypes: node.parameters.map((parameter) => {
-			let name = null
+			let name = null;
 
 			if (parameter.externalName !== null) {
-				name = parameter.externalName.content
+				name = parameter.externalName.content;
 			}
 
 			return {
 				name,
 				type: resolveType(parameter.type, scope),
-			}
+			};
 		}),
 		returnType: resolveType(node.returnType, scope),
-	}
+	};
 }
 
 export function resolveFunctionDefinitionType(
@@ -459,19 +542,19 @@ export function resolveFunctionDefinitionType(
 	return {
 		type: "Function",
 		parameterTypes: node.parameters.map((parameter) => {
-			let name = null
+			let name = null;
 
 			if (parameter.externalName !== null) {
-				name = parameter.externalName.content
+				name = parameter.externalName.content;
 			}
 
 			return {
 				name,
 				type: resolveType(parameter.type, scope),
-			}
+			};
 		}),
 		returnType: resolveType(node.returnType, scope),
-	}
+	};
 }
 
 export function resolveTypeDefinitionStatementType(
@@ -482,13 +565,13 @@ export function resolveTypeDefinitionStatementType(
 	let resultType: common.TypeType = {
 		type: "Type",
 		name: node.name.content,
-	} as common.TypeType
+	} as common.TypeType;
 
-	let definitionMembers: { [key: string]: common.Type } = {}
-	let methods: { [key: string]: common.MethodType } = {}
+	let definitionMembers: { [key: string]: common.Type } = {};
+	let methods: { [key: string]: common.MethodType } = {};
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		definitionMembers[memberKey] = resolveType(memberValue, scope)
+		definitionMembers[memberKey] = resolveType(memberValue, scope);
 	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
@@ -496,32 +579,32 @@ export function resolveTypeDefinitionStatementType(
 			methodValue,
 			{ parent: scope, members: { [node.name.content]: resultType } },
 			resultType,
-		)
+		);
 	}
 
 	resultType.definition = {
 		type: "Record",
 		members: definitionMembers,
-	}
+	};
 
-	resultType.methods = methods
+	resultType.methods = methods;
 
-	return resultType
+	return resultType;
 }
 
 export function resolveIdentifierTypeDeclarationType(
 	node: parser.IdentifierTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let name = node.type.content
-	let result = findVariableInScope(name, scope)
+	let name = node.type.content;
+	let result = findVariableInScope(name, scope);
 
 	if (result === null) {
 		throw new Error(
 			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
-		)
+		);
 	} else {
-		return result
+		return result;
 	}
 }
 
@@ -529,7 +612,7 @@ export function resolveListTypeDeclarationType(
 	node: parser.ListTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.ListType {
-	const itemType = resolveType(node.type, scope)
+	const itemType = resolveType(node.type, scope);
 
 	if (
 		itemType.type === "SimpleMethod" ||
@@ -537,51 +620,61 @@ export function resolveListTypeDeclarationType(
 		itemType.type === "OverloadedMethod" ||
 		itemType.type === "OverloadedStaticMethod"
 	) {
-		throw new Error("Methods can not be List Item Types.")
+		throw new Error("Methods can not be List Item Types.");
 	}
 
-	return { type: "List", itemType }
+	return { type: "List", itemType };
 }
 
 /***********/
 /* Helpers */
 /***********/
 
-export function findVariableInScope(name: string, scope: enricher.Scope): common.Type | null {
-	let searchScope: enricher.Scope | null = scope
+export function findVariableInScope(
+	name: string,
+	scope: enricher.Scope,
+): common.Type | null {
+	let searchScope: enricher.Scope | null = scope;
 
 	while (true) {
 		if (searchScope === null) {
-			return null
+			return null;
 		}
 
 		if (searchScope.members[name] != null) {
-			return searchScope.members[name]
+			return searchScope.members[name];
 		} else {
-			searchScope = searchScope.parent
+			searchScope = searchScope.parent;
 		}
 	}
 }
 
-export function resolveMethodLookupBaseType(node: parser.ExpressionNode, scope: enricher.Scope): common.TypeType {
-	let baseType = resolveType(node, scope)
+export function resolveMethodLookupBaseType(
+	node: parser.ExpressionNode,
+	scope: enricher.Scope,
+): common.TypeType {
+	let baseType = resolveType(node, scope);
 
 	switch (baseType.type) {
 		case "Primitive":
-			return resolvePrimitiveTypeType(baseType, scope)
+			return resolvePrimitiveTypeType(baseType, scope);
 		case "List":
-			return resolveGenericType(listType, { ItemType: baseType.itemType })
+			return resolveGenericType(listType, { ItemType: baseType.itemType });
 		case "Type":
-			return baseType
+			return baseType;
 		default:
 			throw new Error(
 				`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.`,
-			)
+			);
 	}
 }
 
 export function resolveMethodType(
-	node: parser.SimpleMethod | parser.StaticMethod | parser.OverloadedMethod | parser.OverloadedStaticMethod,
+	node:
+		| parser.SimpleMethod
+		| parser.StaticMethod
+		| parser.OverloadedMethod
+		| parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.TypeType,
 ): common.MethodType {
@@ -591,37 +684,37 @@ export function resolveMethodType(
 			parameterTypes: [
 				{ name: null, type: selfType },
 				...node.method.value.parameters.map((param) => {
-					let name = null
+					let name = null;
 
 					if (param.externalName !== null) {
-						name = param.externalName.content
+						name = param.externalName.content;
 					}
 
 					return {
 						name,
 						type: resolveType(param.type, scope),
-					}
+					};
 				}),
 			],
 			returnType: resolveType(node.method.value.returnType, scope),
-		}
+		};
 	} else if (node.nodeType === "StaticMethod") {
 		return {
 			type: "StaticMethod",
 			parameterTypes: node.method.value.parameters.map((param) => {
-				let name = null
+				let name = null;
 
 				if (param.externalName !== null) {
-					name = param.externalName.content
+					name = param.externalName.content;
 				}
 
 				return {
 					name,
 					type: resolveType(param.type, scope),
-				}
+				};
 			}),
 			returnType: resolveType(node.method.value.returnType, scope),
-		}
+		};
 	} else if (node.nodeType === "OverloadedMethod") {
 		return {
 			type: "OverloadedMethod",
@@ -630,39 +723,39 @@ export function resolveMethodType(
 					parameterTypes: [
 						{ name: null, type: selfType },
 						...method.value.parameters.map((parameter) => {
-							let name: string | null
+							let name: string | null;
 
 							if (parameter.externalName !== null) {
-								name = parameter.externalName.content
+								name = parameter.externalName.content;
 							} else {
-								name = null
+								name = null;
 							}
 
 							return {
 								name,
 								type: resolveType(parameter.type, scope),
-							}
+							};
 						}),
 					],
 					returnType: resolveType(method.value.returnType, scope),
-				}
+				};
 			}),
-		}
+		};
 	} else {
 		const returnType = node.methods.reduce<common.Type | null>((prev, curr) => {
-			let currType = resolveType(curr.value.returnType, scope)
+			let currType = resolveType(curr.value.returnType, scope);
 
 			if (prev === null) {
-				return currType
+				return currType;
 			} else if (deepEqual(prev, currType)) {
-				return currType
+				return currType;
 			} else {
-				return null
+				return null;
 			}
-		}, null)
+		}, null);
 
 		if (returnType === null) {
-			throw new Error("Overloaded Methods need to have the same return type")
+			throw new Error("Overloaded Methods need to have the same return type");
 		}
 
 		return {
@@ -671,37 +764,40 @@ export function resolveMethodType(
 				return {
 					parameterTypes: [
 						...method.value.parameters.map((parameter) => {
-							let name: string | null
+							let name: string | null;
 
 							if (parameter.externalName !== null) {
-								name = parameter.externalName.content
+								name = parameter.externalName.content;
 							} else {
-								name = null
+								name = null;
 							}
 
 							return {
 								name,
 								type: resolveType(parameter.type, scope),
-							}
+							};
 						}),
 					],
 					returnType: resolveType(method.value.returnType, scope),
-				}
+				};
 			}),
-		}
+		};
 	}
 }
 
-export function resolvePrimitiveTypeType(type: common.PrimitiveType, scope: enricher.Scope): common.TypeType {
+export function resolvePrimitiveTypeType(
+	type: common.PrimitiveType,
+	scope: enricher.Scope,
+): common.TypeType {
 	switch (type.primitive) {
 		case "Integer":
-			return integerType
+			return integerType;
 		case "Fraction":
-			return fractionType
+			return fractionType;
 		case "Boolean":
-			return booleanType
+			return booleanType;
 		case "String":
-			return stringType
+			return stringType;
 	}
 }
 
@@ -714,18 +810,21 @@ export function resolveGenericType(
 		name: type.name,
 		definition: JSON.parse(JSON.stringify(type.definition)),
 		methods: JSON.parse(JSON.stringify(type.methods)),
-	}
-	const passedTypes = Object.entries(types)
+	};
+	const passedTypes = Object.entries(types);
 
 	if (type.generics.length !== passedTypes.length) {
 		// TODO: Throw error, declaring which generics are missing
 	}
 
 	if (resolvedType.definition.type === "Record") {
-		for (let [propertyKey, propertyValue] of Object.entries(resolvedType.definition.members)) {
+		for (let [propertyKey, propertyValue] of Object.entries(
+			resolvedType.definition.members,
+		)) {
 			if (propertyValue.type === "Generic") {
 				if (propertyValue.name in types) {
-					resolvedType.definition.members[propertyKey] = types[propertyValue.name]
+					resolvedType.definition.members[propertyKey] =
+						types[propertyValue.name];
 				}
 			}
 		}
@@ -733,66 +832,86 @@ export function resolveGenericType(
 
 	// TODO: Figure out if we can generalise the case for ListType
 	for (let [methodName, methodValue] of Object.entries(resolvedType.methods)) {
-		if (methodValue.type === "SimpleMethod" || methodValue.type === "StaticMethod") {
+		if (
+			methodValue.type === "SimpleMethod" ||
+			methodValue.type === "StaticMethod"
+		) {
 			for (let parameter of methodValue.parameterTypes) {
 				if (parameter.type.type === "Generic") {
 					if (parameter.type.name in types) {
-						parameter.type = types[parameter.type.name]
+						parameter.type = types[parameter.type.name];
 					}
 				}
 
-				if (parameter.type.type === "List" && parameter.type.itemType.type === "Generic") {
+				if (
+					parameter.type.type === "List" &&
+					parameter.type.itemType.type === "Generic"
+				) {
 					if (parameter.type.itemType.name in types) {
-						parameter.type.itemType = types[parameter.type.itemType.name]
+						parameter.type.itemType = types[parameter.type.itemType.name];
 					}
 				}
 			}
 
 			if (methodValue.returnType.type === "Generic") {
 				if (methodValue.returnType.name in types) {
-					methodValue.returnType = types[methodValue.returnType.name]
+					methodValue.returnType = types[methodValue.returnType.name];
 				}
 			}
 
-			if (methodValue.returnType.type === "List" && methodValue.returnType.itemType.type === "Generic") {
+			if (
+				methodValue.returnType.type === "List" &&
+				methodValue.returnType.itemType.type === "Generic"
+			) {
 				if (methodValue.returnType.itemType.name in types) {
-					methodValue.returnType.itemType = types[methodValue.returnType.itemType.name]
+					methodValue.returnType.itemType =
+						types[methodValue.returnType.itemType.name];
 				}
 			}
 		}
 
-		if (methodValue.type === "OverloadedMethod" || methodValue.type === "OverloadedStaticMethod") {
+		if (
+			methodValue.type === "OverloadedMethod" ||
+			methodValue.type === "OverloadedStaticMethod"
+		) {
 			for (let overload of methodValue.overloads) {
 				for (let parameter of overload.parameterTypes) {
 					if (parameter.type.type === "Generic") {
 						if (parameter.type.name in types) {
-							parameter.type = types[parameter.type.name]
+							parameter.type = types[parameter.type.name];
 						}
 					}
 
-					if (parameter.type.type === "List" && parameter.type.itemType.type === "Generic") {
+					if (
+						parameter.type.type === "List" &&
+						parameter.type.itemType.type === "Generic"
+					) {
 						if (parameter.type.itemType.name in types) {
-							parameter.type.itemType = types[parameter.type.itemType.name]
+							parameter.type.itemType = types[parameter.type.itemType.name];
 						}
 					}
 				}
 
 				if (overload.returnType.type === "Generic") {
 					if (overload.returnType.name in types) {
-						overload.returnType = types[overload.returnType.name]
+						overload.returnType = types[overload.returnType.name];
 					}
 				}
 
-				if (overload.returnType.type === "List" && overload.returnType.itemType.type === "Generic") {
+				if (
+					overload.returnType.type === "List" &&
+					overload.returnType.itemType.type === "Generic"
+				) {
 					if (overload.returnType.itemType.name in types) {
-						overload.returnType.itemType = types[overload.returnType.itemType.name]
+						overload.returnType.itemType =
+							types[overload.returnType.itemType.name];
 					}
 				}
 			}
 		}
 
-		resolvedType.methods[methodName] = methodValue
+		resolvedType.methods[methodName] = methodValue;
 	}
 
-	return resolvedType
+	return resolvedType;
 }

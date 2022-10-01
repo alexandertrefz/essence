@@ -9,5 +9,5 @@ module.exports = function (wallaby) {
 		},
 
 		testFramework: "jest",
-	}
-}
+	};
+};

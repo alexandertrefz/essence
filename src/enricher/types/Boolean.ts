@@ -1,4 +1,4 @@
-import { common } from "../../interfaces"
+import { common } from "../../interfaces";
 
 const type: common.TypeType = {
 	type: "Type",
@@ -23,10 +23,12 @@ const type: common.TypeType = {
 		},
 		negate: {
 			type: "SimpleMethod",
-			parameterTypes: [{ name: null, type: { type: "Primitive", primitive: "Boolean" } }],
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 	},
-}
+};
 
-export default type
+export default type;

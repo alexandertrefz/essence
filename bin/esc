@@ -1,43 +1,44 @@
 #!/usr/bin/env node
 
-const fs = require("fs")
-const util = require("util")
-const path = require("path")
+const fs = require("fs");
+const util = require("util");
+const path = require("path");
 
-const meow = require("meow")
+const meow = require("meow");
 
-const readFile = util.promisify(fs.readFile)
+const readFile = util.promisify(fs.readFile);
 
-const Parser = require("../lib/parser")
-const Enricher = require("../lib/enricher")
-const Validator = require("../lib/validator")
-const Simplifier = require("../lib/simplifier")
-const Optimiser = require("../lib/optimiser")
-const Rewriter = require("../lib/rewriter")
+const Parser = require("../lib/parser");
+const Enricher = require("../lib/enricher");
+const Validator = require("../lib/validator");
+const Simplifier = require("../lib/simplifier");
+const Optimiser = require("../lib/optimiser");
+const Rewriter = require("../lib/rewriter");
 
 function generateOutputFilePath(inputFileName, outputFileName) {
 	if (outputFileName === undefined) {
-		outputFileName = path.basename(cli.input[0], path.extname(cli.input[0])) + ".js"
+		outputFileName =
+			path.basename(cli.input[0], path.extname(cli.input[0])) + ".js";
 	}
 
-	return path.join(path.dirname(inputFileName), outputFileName)
+	return path.join(path.dirname(inputFileName), outputFileName);
 }
 
 async function compile(flags) {
-	const data = await readFile(flags.inputFileName, "utf8")
+	const data = await readFile(flags.inputFileName, "utf8");
 
 	try {
-		const initialProgram = Parser.parse(data)
-		const enrichedProgram = Enricher.enrich(initialProgram)
-		const validatedProgram = Validator.validate(enrichedProgram)
-		const simplifiedProgram = Simplifier.simplify(validatedProgram)
-		const optimisedProgram = Optimiser.optimise(simplifiedProgram)
-		await Rewriter.rewrite(optimisedProgram, flags)
+		const initialProgram = Parser.parse(data);
+		const enrichedProgram = Enricher.enrich(initialProgram);
+		const validatedProgram = Validator.validate(enrichedProgram);
+		const simplifiedProgram = Simplifier.simplify(validatedProgram);
+		const optimisedProgram = Optimiser.optimise(simplifiedProgram);
+		await Rewriter.rewrite(optimisedProgram, flags);
 	} catch (error) {
-		return Promise.reject(error)
+		return Promise.reject(error);
 	}
 
-	return Promise.resolve(flags)
+	return Promise.resolve(flags);
 }
 
 const cli = meow(
@@ -67,17 +68,22 @@ const cli = meow(
 			},
 		},
 	},
-)
+);
 
 compile({
 	inputFileName: cli.input[0],
 	debug: cli.flags ?? false,
-	outputFileName: generateOutputFilePath(cli.input[0], cli.flags.outputFileName),
+	outputFileName: generateOutputFilePath(
+		cli.input[0],
+		cli.flags.outputFileName,
+	),
 }).then(
 	(flags) => {
-		console.log(`Successfully compiled ${flags.inputFileName} -> ${flags.outputFileName}`)
+		console.log(
+			`Successfully compiled ${flags.inputFileName} -> ${flags.outputFileName}`,
+		);
 	},
 	(reason) => {
-		console.log(reason)
+		console.log(reason);
 	},
-)
+);

@@ -1,8 +1,8 @@
-import * as common from "./common"
+import * as common from "./common";
 
 export type Scope = {
-	parent: Scope | null
+	parent: Scope | null;
 	members: {
-		[key: string]: common.Type
-	}
-}
+		[key: string]: common.Type;
+	};
+};
