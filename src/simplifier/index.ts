@@ -1,12 +1,14 @@
-import { common } from "../interfaces"
-import { resolveOverloadedMethodName } from "../helpers"
+import { common } from "../interfaces";
+import { resolveOverloadedMethodName } from "../helpers";
 
-export const simplify = (program: common.typed.Program): common.typedSimple.Program => {
+export const simplify = (
+	program: common.typed.Program,
+): common.typedSimple.Program => {
 	return {
 		nodeType: "Program",
 		implementation: simplifyImplementationSection(program.implementation),
-	}
-}
+	};
+};
 
 function simplifyImplementationSection(
 	implementation: common.typed.ImplementationSectionNode,
@@ -14,10 +16,12 @@ function simplifyImplementationSection(
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.map((node) => simplifyImplementationNode(node)),
-	}
+	};
 }
 
-function simplifyImplementationNode(node: common.typed.ImplementationNode): common.typedSimple.ImplementationNode {
+function simplifyImplementationNode(
+	node: common.typed.ImplementationNode,
+): common.typedSimple.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation":
@@ -34,7 +38,7 @@ function simplifyImplementationNode(node: common.typed.ImplementationNode): comm
 		case "Identifier":
 		case "Self":
 		case "MethodLookup":
-			return simplifyExpression(node)
+			return simplifyExpression(node);
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
@@ -43,44 +47,46 @@ function simplifyImplementationNode(node: common.typed.ImplementationNode): comm
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
-			return simplifyStatement(node)
+			return simplifyStatement(node);
 	}
 }
 
 // #region Expressions
 
-function simplifyExpression(node: common.typed.ExpressionNode): common.typedSimple.ExpressionNode {
+function simplifyExpression(
+	node: common.typed.ExpressionNode,
+): common.typedSimple.ExpressionNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
-			return simplifyNativeFunctionInvocation(node)
+			return simplifyNativeFunctionInvocation(node);
 		case "MethodInvocation":
-			return simplifyMethodInvocation(node)
+			return simplifyMethodInvocation(node);
 		case "FunctionInvocation":
-			return simplifyFunctionInvocation(node)
+			return simplifyFunctionInvocation(node);
 		case "Combination":
-			return simplifyCombination(node)
+			return simplifyCombination(node);
 		case "RecordValue":
-			return simplifyRecordValue(node)
+			return simplifyRecordValue(node);
 		case "StringValue":
-			return simplifyStringValue(node)
+			return simplifyStringValue(node);
 		case "IntegerValue":
-			return simplifyIntegerValue(node)
+			return simplifyIntegerValue(node);
 		case "FractionValue":
-			return simplifyFractionValue(node)
+			return simplifyFractionValue(node);
 		case "BooleanValue":
-			return simplifyBooleanValue(node)
+			return simplifyBooleanValue(node);
 		case "FunctionValue":
-			return simplifyFunctionValue(node)
+			return simplifyFunctionValue(node);
 		case "ListValue":
-			return simplifyListValue(node)
+			return simplifyListValue(node);
 		case "Lookup":
-			return simplifyLookup(node)
+			return simplifyLookup(node);
 		case "Identifier":
-			return simplifyIdentifier(node)
+			return simplifyIdentifier(node);
 		case "Self":
-			return simplifySelf(node)
+			return simplifySelf(node);
 		case "MethodLookup":
-			return simplifyMethodLookup(node)
+			return simplifyMethodLookup(node);
 	}
 }
 
@@ -92,12 +98,17 @@ function simplifyNativeFunctionInvocation(
 		name: simplifyIdentifier(node.name),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
-	}
+	};
 }
 
-function simplifyMethodInvocation(node: common.typed.MethodInvocationNode): common.typedSimple.FunctionInvocationNode {
+function simplifyMethodInvocation(
+	node: common.typed.MethodInvocationNode,
+): common.typedSimple.FunctionInvocationNode {
 	if (node.overloadedMethodIndex !== null) {
-		node.name.member.content = resolveOverloadedMethodName(node.name.member.content, node.overloadedMethodIndex)
+		node.name.member.content = resolveOverloadedMethodName(
+			node.name.member.content,
+			node.overloadedMethodIndex,
+		);
 	}
 
 	return {
@@ -112,14 +123,17 @@ function simplifyMethodInvocation(node: common.typed.MethodInvocationNode): comm
 			...node.arguments.map((arg) => simplifyArgument(arg)),
 		],
 		type: node.type,
-	}
+	};
 }
 
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
 	if (node.overloadedMethodIndex !== null && node.name.nodeType === "Lookup") {
-		node.name.member.content = resolveOverloadedMethodName(node.name.member.content, node.overloadedMethodIndex)
+		node.name.member.content = resolveOverloadedMethodName(
+			node.name.member.content,
+			node.overloadedMethodIndex,
+		);
 	}
 
 	return {
@@ -127,109 +141,133 @@ function simplifyFunctionInvocation(
 		name: simplifyExpression(node.name),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
-	}
+	};
 }
 
-function simplifyCombination(node: common.typed.CombinationNode): common.typedSimple.CombinationNode {
+function simplifyCombination(
+	node: common.typed.CombinationNode,
+): common.typedSimple.CombinationNode {
 	return {
 		nodeType: "Combination",
 		lhs: simplifyExpression(node.lhs),
 		rhs: simplifyExpression(node.rhs),
 		type: node.type,
-	}
+	};
 }
 
-function simplifyRecordValue(node: common.typed.RecordValueNode): common.typedSimple.RecordValueNode {
+function simplifyRecordValue(
+	node: common.typed.RecordValueNode,
+): common.typedSimple.RecordValueNode {
 	return {
 		nodeType: "RecordValue",
 		type: node.declaredType !== null ? node.declaredType : node.type,
 		members: simplifyMembers(node.members),
-	}
+	};
 }
 
-function simplifyStringValue(node: common.typed.StringValueNode): common.typedSimple.StringValueNode {
+function simplifyStringValue(
+	node: common.typed.StringValueNode,
+): common.typedSimple.StringValueNode {
 	return {
 		nodeType: "StringValue",
 		value: node.value,
 		type: node.type,
-	}
+	};
 }
 
-function simplifyIntegerValue(node: common.typed.IntegerValueNode): common.typedSimple.IntegerValueNode {
+function simplifyIntegerValue(
+	node: common.typed.IntegerValueNode,
+): common.typedSimple.IntegerValueNode {
 	return {
 		nodeType: "IntegerValue",
 		value: node.value,
 		type: node.type,
-	}
+	};
 }
 
-function simplifyFractionValue(node: common.typed.FractionValueNode): common.typedSimple.FractionValueNode {
+function simplifyFractionValue(
+	node: common.typed.FractionValueNode,
+): common.typedSimple.FractionValueNode {
 	return {
 		nodeType: "FractionValue",
 		numerator: node.numerator,
 		denominator: node.denominator,
 		type: node.type,
-	}
+	};
 }
 
-function simplifyBooleanValue(node: common.typed.BooleanValueNode): common.typedSimple.BooleanValueNode {
+function simplifyBooleanValue(
+	node: common.typed.BooleanValueNode,
+): common.typedSimple.BooleanValueNode {
 	return {
 		nodeType: "BooleanValue",
 		value: node.value,
 		type: node.type,
-	}
+	};
 }
 
-function simplifyFunctionValue(node: common.typed.FunctionValueNode): common.typedSimple.FunctionValueNode {
-	let value
+function simplifyFunctionValue(
+	node: common.typed.FunctionValueNode,
+): common.typedSimple.FunctionValueNode {
+	let value;
 
 	if (node.value.nodeType === "FunctionDefinition") {
-		value = simplifyFunctionDefinition(node.value)
+		value = simplifyFunctionDefinition(node.value);
 	} else {
-		value = simplifyGenericFunctionDefinition(node.value)
+		value = simplifyGenericFunctionDefinition(node.value);
 	}
 
 	return {
 		nodeType: "FunctionValue",
 		value,
 		type: node.type,
-	}
+	};
 }
 
-function simplifyListValue(node: common.typed.ListValueNode): common.typedSimple.ListValueNode {
+function simplifyListValue(
+	node: common.typed.ListValueNode,
+): common.typedSimple.ListValueNode {
 	return {
 		nodeType: "ListValue",
 		values: node.values.map((expr) => simplifyExpression(expr)),
 		type: node.type,
-	}
+	};
 }
 
-function simplifyLookup(node: common.typed.LookupNode): common.typedSimple.LookupNode {
+function simplifyLookup(
+	node: common.typed.LookupNode,
+): common.typedSimple.LookupNode {
 	return {
 		nodeType: "Lookup",
 		base: simplifyExpression(node.base),
 		member: simplifyIdentifier(node.member),
 		type: node.type,
-	}
+	};
 }
 
-function simplifyIdentifier(node: common.typed.IdentifierNode): common.typedSimple.IdentifierNode {
+function simplifyIdentifier(
+	node: common.typed.IdentifierNode,
+): common.typedSimple.IdentifierNode {
 	return {
 		nodeType: "Identifier",
 		name: node.content,
 		type: node.type,
-	}
+	};
 }
 
-function simplifySelf(node: common.typed.SelfNode): common.typedSimple.IdentifierNode {
+function simplifySelf(
+	node: common.typed.SelfNode,
+): common.typedSimple.IdentifierNode {
 	return {
 		nodeType: "Identifier",
 		name: "_self",
 		type: node.type,
-	}
+	};
 }
 
-function simplifyMethodLookup(node: common.typed.MethodLookupNode): common.typedSimple.LookupNode {
+function simplifyMethodLookup(
+	node: common.typed.MethodLookupNode,
+): common.typedSimple.LookupNode {
 	return {
 		nodeType: "Lookup",
 		base: {
@@ -239,31 +277,33 @@ function simplifyMethodLookup(node: common.typed.MethodLookupNode): common.typed
 		},
 		member: simplifyIdentifier(node.member),
 		type: node.type,
-	}
+	};
 }
 
 // #endregion
 
 // #region Statements
 
-function simplifyStatement(node: common.typed.StatementNode): common.typedSimple.StatementNode {
+function simplifyStatement(
+	node: common.typed.StatementNode,
+): common.typedSimple.StatementNode {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
-			return simplifyConstantDeclarationStatement(node)
+			return simplifyConstantDeclarationStatement(node);
 		case "VariableDeclarationStatement":
-			return simplifyVariableDeclarationStatement(node)
+			return simplifyVariableDeclarationStatement(node);
 		case "VariableAssignmentStatement":
-			return simplifyVariableAssignmentStatement(node)
+			return simplifyVariableAssignmentStatement(node);
 		case "TypeDefinitionStatement":
-			return simplifyTypeDefinitionStatement(node)
+			return simplifyTypeDefinitionStatement(node);
 		case "IfElseStatement":
-			return simplifyChoice(node)
+			return simplifyChoice(node);
 		case "IfStatement":
-			return simplifyChoice(node)
+			return simplifyChoice(node);
 		case "ReturnStatement":
-			return simplifyReturnStatement(node)
+			return simplifyReturnStatement(node);
 		case "FunctionStatement":
-			return simplifyFunctionStatement(node)
+			return simplifyFunctionStatement(node);
 	}
 }
 
@@ -276,7 +316,7 @@ function simplifyConstantDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
-	}
+	};
 }
 
 function simplifyVariableDeclarationStatement(
@@ -288,7 +328,7 @@ function simplifyVariableDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: false,
-	}
+	};
 }
 
 function simplifyVariableAssignmentStatement(
@@ -298,7 +338,7 @@ function simplifyVariableAssignmentStatement(
 		nodeType: "VariableAssignmentStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyExpression(node.value),
-	}
+	};
 }
 
 function simplifyTypeDefinitionStatement(
@@ -310,13 +350,13 @@ function simplifyTypeDefinitionStatement(
 		properties: node.properties,
 		methods: simplifyMethods(node.methods, node.type),
 		type: node.type,
-	}
+	};
 }
 
 function simplifyChoice(
 	node: common.typed.IfElseStatementNode | common.typed.IfStatementNode,
 ): common.typedSimple.ChoiceStatementNode {
-	let convertedNode: common.typed.IfElseStatementNode
+	let convertedNode: common.typed.IfElseStatementNode;
 	if (node.nodeType === "IfStatement") {
 		convertedNode = {
 			nodeType: "IfElseStatement",
@@ -324,57 +364,73 @@ function simplifyChoice(
 			trueBody: node.body,
 			falseBody: [],
 			position: node.position,
-		}
+		};
 	} else {
-		convertedNode = node
+		convertedNode = node;
 	}
 
 	return {
 		nodeType: "ChoiceStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		trueBody: convertedNode.trueBody.map((node) => simplifyImplementationNode(node)),
-		falseBody: convertedNode.falseBody.map((node) => simplifyImplementationNode(node)),
-	}
+		trueBody: convertedNode.trueBody.map(
+			(node) => simplifyImplementationNode(node),
+		),
+		falseBody: convertedNode.falseBody.map(
+			(node) => simplifyImplementationNode(node),
+		),
+	};
 }
 
-function simplifyReturnStatement(node: common.typed.ReturnStatementNode): common.typedSimple.ReturnStatementNode {
+function simplifyReturnStatement(
+	node: common.typed.ReturnStatementNode,
+): common.typedSimple.ReturnStatementNode {
 	return {
 		nodeType: "ReturnStatement",
 		expression: simplifyExpression(node.expression),
-	}
+	};
 }
 
-function simplifyFunctionStatement(node: common.typed.FunctionStatementNode): common.typedSimple.FunctionStatementNode {
+function simplifyFunctionStatement(
+	node: common.typed.FunctionStatementNode,
+): common.typedSimple.FunctionStatementNode {
 	return {
 		nodeType: "FunctionStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyFunctionDefinition(node.value),
-	}
+	};
 }
 
 // #endregion
 
 // #region Helpers
 
-function simplifyMembers(members: { [key: string]: common.typed.ExpressionNode }): {
-	[key: string]: common.typedSimple.ExpressionNode
+function simplifyMembers(members: {
+	[key: string]: common.typed.ExpressionNode;
+}): {
+	[key: string]: common.typedSimple.ExpressionNode;
 } {
-	let result: { [key: string]: common.typedSimple.ExpressionNode } = {}
+	let result: { [key: string]: common.typedSimple.ExpressionNode } = {};
 
 	for (let [memberKey, memberExpression] of Object.entries(members)) {
-		result[memberKey] = simplifyExpression(memberExpression)
+		result[memberKey] = simplifyExpression(memberExpression);
 	}
 
-	return result
+	return result;
 }
 
-function simplifyMethods(methods: common.typed.Methods, type: common.Type): common.typedSimple.Methods {
-	let result: common.typedSimple.Methods = {}
+function simplifyMethods(
+	methods: common.typed.Methods,
+	type: common.Type,
+): common.typedSimple.Methods {
+	let result: common.typedSimple.Methods = {};
 
 	for (let [memberKey, memberValue] of Object.entries(methods)) {
-		if (memberValue.nodeType === "OverloadedMethod" || memberValue.nodeType === "OverloadedStaticMethod") {
+		if (
+			memberValue.nodeType === "OverloadedMethod" ||
+			memberValue.nodeType === "OverloadedStaticMethod"
+		) {
 			memberValue.methods.forEach((method, index) => {
-				let newMethod = simplifyFunctionValue(method)
+				let newMethod = simplifyFunctionValue(method);
 
 				if (memberValue.nodeType === "OverloadedMethod") {
 					newMethod.value.parameters.unshift({
@@ -385,16 +441,16 @@ function simplifyMethods(methods: common.typed.Methods, type: common.Type): comm
 							name: "_self",
 							type,
 						},
-					})
+					});
 				}
 
 				result[resolveOverloadedMethodName(memberKey, index)] = {
 					method: newMethod,
 					isStatic: memberValue.nodeType === "OverloadedStaticMethod",
-				}
-			})
+				};
+			});
 		} else {
-			let method = simplifyFunctionValue(memberValue.method)
+			let method = simplifyFunctionValue(memberValue.method);
 
 			if (memberValue.nodeType === "SimpleMethod") {
 				method.value.parameters.unshift({
@@ -405,25 +461,29 @@ function simplifyMethods(methods: common.typed.Methods, type: common.Type): comm
 						name: "_self",
 						type,
 					},
-				})
+				});
 			}
 
 			result[memberKey] = {
 				method,
 				isStatic: memberValue.nodeType === "StaticMethod",
-			}
+			};
 		}
 	}
 
-	return result
+	return result;
 }
 
-function simplifyParameter(node: common.typed.ParameterNode): common.typedSimple.ParameterNode {
+function simplifyParameter(
+	node: common.typed.ParameterNode,
+): common.typedSimple.ParameterNode {
 	return {
 		nodeType: "Parameter",
-		externalName: node.externalName ? simplifyIdentifier(node.externalName) : null,
+		externalName: node.externalName
+			? simplifyIdentifier(node.externalName)
+			: null,
 		internalName: simplifyIdentifier(node.internalName),
-	}
+	};
 }
 
 function simplifyGenericDeclaration(
@@ -433,7 +493,7 @@ function simplifyGenericDeclaration(
 		nodeType: "GenericDeclaration",
 		name: node.name,
 		defaultType: node.defaultType,
-	}
+	};
 }
 
 function simplifyGenericFunctionDefinition(
@@ -445,7 +505,7 @@ function simplifyGenericFunctionDefinition(
 		parameters: node.parameters.map((param) => simplifyParameter(param)),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
-	}
+	};
 }
 
 function simplifyFunctionDefinition(
@@ -456,15 +516,16 @@ function simplifyFunctionDefinition(
 		parameters: node.parameters.map((param) => simplifyParameter(param)),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
-	}
+	};
 }
 
-function simplifyArgument(node: common.typed.ArgumentNode): common.typedSimple.ArgumentNode {
+function simplifyArgument(
+	node: common.typed.ArgumentNode,
+): common.typedSimple.ArgumentNode {
 	return {
 		nodeType: "Argument",
 		name: node.name,
 		value: simplifyExpression(node.value),
-	}
+	};
 }
-
 // #endregion

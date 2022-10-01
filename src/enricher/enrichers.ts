@@ -1,8 +1,15 @@
-import { parser, common, enricher } from "../interfaces"
+import { parser, common, enricher } from "../interfaces";
 
-import { resolveType, resolveListValueType, resolveMethodLookupBaseType } from "./resolvers"
+import {
+	resolveType,
+	resolveListValueType,
+	resolveMethodLookupBaseType,
+} from "./resolvers";
 
-export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scope): common.typed.ImplementationNode {
+export function enrichNode(
+	node: parser.ImplementationNode,
+	scope: enricher.Scope,
+): common.typed.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation":
@@ -19,7 +26,7 @@ export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scop
 		case "Identifier":
 		case "Self":
 		case "MethodLookup":
-			return enrichExpression(node, scope)
+			return enrichExpression(node, scope);
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
@@ -28,44 +35,47 @@ export function enrichNode(node: parser.ImplementationNode, scope: enricher.Scop
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
-			return enrichStatement(node, scope)
+			return enrichStatement(node, scope);
 	}
 }
 
 // #region Expressions
 
-export function enrichExpression(node: parser.ExpressionNode, scope: enricher.Scope): common.typed.ExpressionNode {
+export function enrichExpression(
+	node: parser.ExpressionNode,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
-			return enrichNativeFunctionInvocation(node, scope)
+			return enrichNativeFunctionInvocation(node, scope);
 		case "MethodInvocation":
-			return enrichMethodInvocation(node, scope)
+			return enrichMethodInvocation(node, scope);
 		case "FunctionInvocation":
-			return enrichFunctionInvocation(node, scope)
+			return enrichFunctionInvocation(node, scope);
 		case "Combination":
-			return enrichCombination(node, scope)
+			return enrichCombination(node, scope);
 		case "RecordValue":
-			return enrichRecordValue(node, scope)
+			return enrichRecordValue(node, scope);
 		case "StringValue":
-			return enrichStringValue(node, scope)
+			return enrichStringValue(node, scope);
 		case "IntegerValue":
-			return enrichIntegerValue(node, scope)
+			return enrichIntegerValue(node, scope);
 		case "FractionValue":
-			return enrichFractionValue(node, scope)
+			return enrichFractionValue(node, scope);
 		case "BooleanValue":
-			return enrichBooleanValue(node, scope)
+			return enrichBooleanValue(node, scope);
 		case "FunctionValue":
-			return enrichFunctionValue(node, scope)
+			return enrichFunctionValue(node, scope);
 		case "ListValue":
-			return enrichListValue(node, scope)
+			return enrichListValue(node, scope);
 		case "Lookup":
-			return enrichLookup(node, scope)
+			return enrichLookup(node, scope);
 		case "Identifier":
-			return enrichIdentifier(node, scope)
+			return enrichIdentifier(node, scope);
 		case "Self":
-			return enrichSelf(node, scope)
+			return enrichSelf(node, scope);
 		case "MethodLookup":
-			return enrichMethodLookup(node, scope)
+			return enrichMethodLookup(node, scope);
 	}
 }
 
@@ -76,10 +86,12 @@ export function enrichNativeFunctionInvocation(
 	return {
 		nodeType: "NativeFunctionInvocation",
 		name: enrichIdentifier(node.name, scope),
-		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
+		arguments: node.arguments.map(
+			(argument) => enrichArgument(argument, scope),
+		),
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichMethodInvocation(
@@ -89,11 +101,13 @@ export function enrichMethodInvocation(
 	return {
 		nodeType: "MethodInvocation",
 		name: enrichMethodLookup(node.name, scope),
-		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
+		arguments: node.arguments.map(
+			(argument) => enrichArgument(argument, scope),
+		),
 		position: node.position,
 		type: resolveType(node, scope),
 		overloadedMethodIndex: null,
-	}
+	};
 }
 
 export function enrichFunctionInvocation(
@@ -103,21 +117,26 @@ export function enrichFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: enrichExpression(node.name, scope),
-		arguments: node.arguments.map((argument) => enrichArgument(argument, scope)),
+		arguments: node.arguments.map(
+			(argument) => enrichArgument(argument, scope),
+		),
 		position: node.position,
 		type: resolveType(node, scope),
 		overloadedMethodIndex: null,
-	}
+	};
 }
 
-export function enrichCombination(node: parser.CombinationNode, scope: enricher.Scope): common.typed.CombinationNode {
+export function enrichCombination(
+	node: parser.CombinationNode,
+	scope: enricher.Scope,
+): common.typed.CombinationNode {
 	return {
 		nodeType: "Combination",
 		lhs: enrichExpression(node.lhs, scope),
 		rhs: enrichExpression(node.rhs, scope),
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichMethodFunctionDefinition(
@@ -126,46 +145,52 @@ export function enrichMethodFunctionDefinition(
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = { parent: scope, members: {} };
 
 	if (!isStatic) {
-		declareVariableInScope("@", selfType, newScope)
+		declareVariableInScope("@", selfType, newScope);
 	}
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: method.value.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		parameters: method.value.parameters.map(
+			(parameter) => enrichParameter(parameter, newScope),
+		),
 		body: method.value.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(method.value.returnType, scope),
-	}
+	};
 }
 
 export function enrichGenericFunctionDefinition(
 	node: parser.GenericFunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = { parent: scope, members: {} };
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		parameters: node.parameters.map(
+			(parameter) => enrichParameter(parameter, newScope),
+		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(node.returnType, scope),
-	}
+	};
 }
 
 export function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = { parent: scope, members: {} };
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((parameter) => enrichParameter(parameter, newScope)),
+		parameters: node.parameters.map(
+			(parameter) => enrichParameter(parameter, newScope),
+		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(node.returnType, scope),
-	}
+	};
 }
 
 export function enrichMethodFunctionValue(
@@ -173,19 +198,24 @@ export function enrichMethodFunctionValue(
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionValueNode {
-	let isStatic: boolean
+	let isStatic: boolean;
 	if (node.nodeType === "SimpleMethod") {
-		isStatic = false
+		isStatic = false;
 	} else {
-		isStatic = true
+		isStatic = true;
 	}
 
 	return {
 		nodeType: "FunctionValue",
-		value: enrichMethodFunctionDefinition(node.method, isStatic, scope, selfType),
+		value: enrichMethodFunctionDefinition(
+			node.method,
+			isStatic,
+			scope,
+			selfType,
+		),
 		position: node.method.position,
 		type: resolveType(node.method, scope),
-	}
+	};
 }
 
 export function enrichMethodsFunctionValue(
@@ -193,13 +223,13 @@ export function enrichMethodsFunctionValue(
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): Array<common.typed.FunctionValueNode> {
-	let results: Array<common.typed.FunctionValueNode> = []
-	let isStatic: boolean
+	let results: Array<common.typed.FunctionValueNode> = [];
+	let isStatic: boolean;
 
 	if (node.nodeType === "OverloadedMethod") {
-		isStatic = false
+		isStatic = false;
 	} else {
-		isStatic = true
+		isStatic = true;
 	}
 
 	for (let [, method] of Object.entries(node.methods)) {
@@ -208,29 +238,35 @@ export function enrichMethodsFunctionValue(
 			value: enrichMethodFunctionDefinition(method, isStatic, scope, selfType),
 			position: method.position,
 			type: resolveType(method, scope),
-		})
+		});
 	}
 
-	return results
+	return results;
 }
 
-export function enrichRecordValue(node: parser.RecordValueNode, scope: enricher.Scope): common.typed.RecordValueNode {
+export function enrichRecordValue(
+	node: parser.RecordValueNode,
+	scope: enricher.Scope,
+): common.typed.RecordValueNode {
 	return {
 		nodeType: "RecordValue",
 		members: enrichMembers(node.members, scope),
 		position: node.position,
 		type: resolveType(node, scope),
 		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
-	}
+	};
 }
 
-export function enrichStringValue(node: parser.StringValueNode, scope: enricher.Scope): common.typed.StringValueNode {
+export function enrichStringValue(
+	node: parser.StringValueNode,
+	scope: enricher.Scope,
+): common.typed.StringValueNode {
 	return {
 		nodeType: "StringValue",
 		value: node.value,
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichIntegerValue(
@@ -242,7 +278,7 @@ export function enrichIntegerValue(
 		value: node.value,
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichFractionValue(
@@ -255,7 +291,7 @@ export function enrichFractionValue(
 		denominator: node.denominator,
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichBooleanValue(
@@ -267,19 +303,19 @@ export function enrichBooleanValue(
 		value: node.value,
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
-	let value
+	let value;
 
 	if (node.value.nodeType === "FunctionDefinition") {
-		value = enrichFunctionDefinition(node.value, scope)
+		value = enrichFunctionDefinition(node.value, scope);
 	} else {
-		value = enrichGenericFunctionDefinition(node.value, scope)
+		value = enrichGenericFunctionDefinition(node.value, scope);
 	}
 
 	return {
@@ -287,26 +323,32 @@ export function enrichFunctionValue(
 		value,
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
-export function enrichListValue(node: parser.ListValueNode, scope: enricher.Scope): common.typed.ListValueNode {
+export function enrichListValue(
+	node: parser.ListValueNode,
+	scope: enricher.Scope,
+): common.typed.ListValueNode {
 	return {
 		nodeType: "ListValue",
 		values: node.values.map((expr) => enrichExpression(expr, scope)),
 		position: node.position,
 		type: resolveListValueType(node, scope),
-	}
+	};
 }
 
-export function enrichLookup(node: parser.LookupNode, scope: enricher.Scope): common.typed.LookupNode {
+export function enrichLookup(
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+): common.typed.LookupNode {
 	return {
 		nodeType: "Lookup",
 		base: enrichExpression(node.base, scope),
 		member: enrichMember(node, scope),
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 export function enrichIdentifier(
@@ -319,7 +361,7 @@ export function enrichIdentifier(
 		content: node.content,
 		position: node.position,
 		type,
-	}
+	};
 }
 
 export function enrichSelf(
@@ -331,7 +373,7 @@ export function enrichSelf(
 		nodeType: "Self",
 		position: node.position,
 		type,
-	}
+	};
 }
 
 export function enrichMethodLookup(
@@ -345,31 +387,34 @@ export function enrichMethodLookup(
 		member: methodMember(node, scope),
 		position: node.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 // #endregion
 
 // #region Statements
 
-export function enrichStatement(node: parser.StatementNode, scope: enricher.Scope): common.typed.StatementNode {
+export function enrichStatement(
+	node: parser.StatementNode,
+	scope: enricher.Scope,
+): common.typed.StatementNode {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
-			return enrichConstantDeclarationStatement(node, scope)
+			return enrichConstantDeclarationStatement(node, scope);
 		case "VariableDeclarationStatement":
-			return enrichVariableDeclarationStatement(node, scope)
+			return enrichVariableDeclarationStatement(node, scope);
 		case "VariableAssignmentStatement":
-			return enrichVariableAssignmentStatement(node, scope)
+			return enrichVariableAssignmentStatement(node, scope);
 		case "TypeDefinitionStatement":
-			return enrichTypeDefinitionStatement(node, scope)
+			return enrichTypeDefinitionStatement(node, scope);
 		case "IfElseStatement":
-			return enrichIfElseStatementNode(node, scope)
+			return enrichIfElseStatementNode(node, scope);
 		case "IfStatement":
-			return enrichIfStatement(node, scope)
+			return enrichIfStatement(node, scope);
 		case "ReturnStatement":
-			return enrichReturnStatement(node, scope)
+			return enrichReturnStatement(node, scope);
 		case "FunctionStatement":
-			return enrichFunctionStatement(node, scope)
+			return enrichFunctionStatement(node, scope);
 	}
 }
 
@@ -377,15 +422,15 @@ export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
-	let type
+	let type;
 
 	if (node.type === null) {
-		type = resolveType(node.value, scope)
+		type = resolveType(node.value, scope);
 	} else {
-		type = resolveType(node.type, scope)
+		type = resolveType(node.type, scope);
 	}
 
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope);
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -394,22 +439,22 @@ export function enrichConstantDeclarationStatement(
 		position: node.position,
 		type: resolveType(node.value, scope),
 		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
-	}
+	};
 }
 
 export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
-	let type: common.Type
+	let type: common.Type;
 
 	if (node.type === null) {
-		type = resolveType(node.value, scope)
+		type = resolveType(node.value, scope);
 	} else {
-		type = resolveType(node.type, scope)
+		type = resolveType(node.type, scope);
 	}
 
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope);
 
 	return {
 		nodeType: "VariableDeclarationStatement",
@@ -418,7 +463,7 @@ export function enrichVariableDeclarationStatement(
 		position: node.position,
 		type: resolveType(node.value, scope),
 		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
-	}
+	};
 }
 
 export function enrichVariableAssignmentStatement(
@@ -430,7 +475,7 @@ export function enrichVariableAssignmentStatement(
 		name: enrichIdentifier(node.name, scope),
 		value: enrichExpression(node.value, scope),
 		position: node.position,
-	}
+	};
 }
 
 export function enrichTypeDefinitionStatement(
@@ -439,24 +484,24 @@ export function enrichTypeDefinitionStatement(
 ): common.typed.TypeDefinitionStatementNode {
 	function enrichProperties(
 		properties: {
-			[key: string]: parser.TypeDeclarationNode
+			[key: string]: parser.TypeDeclarationNode;
 		},
 		scope: enricher.Scope,
 	): {
-		[key: string]: common.Type
+		[key: string]: common.Type;
 	} {
-		let result: { [key: string]: common.Type } = {}
+		let result: { [key: string]: common.Type } = {};
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
-			result[propertyKey] = resolveType(propertyValue, scope)
+			result[propertyKey] = resolveType(propertyValue, scope);
 		}
 
-		return result
+		return result;
 	}
 
-	let type = resolveType(node, scope)
+	let type = resolveType(node, scope);
 
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope);
 
 	return {
 		nodeType: "TypeDefinitionStatement",
@@ -465,15 +510,15 @@ export function enrichTypeDefinitionStatement(
 		methods: enrichMethods(node.methods, scope, type),
 		position: node.position,
 		type,
-	}
+	};
 }
 
 export function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
-	let trueScope = { parent: scope, members: {} }
-	let falseScope = { parent: scope, members: {} }
+	let trueScope = { parent: scope, members: {} };
+	let falseScope = { parent: scope, members: {} };
 
 	return {
 		nodeType: "IfElseStatement",
@@ -481,18 +526,21 @@ export function enrichIfElseStatementNode(
 		trueBody: node.trueBody.map((node) => enrichNode(node, trueScope)),
 		falseBody: node.falseBody.map((node) => enrichNode(node, falseScope)),
 		position: node.position,
-	}
+	};
 }
 
-export function enrichIfStatement(node: parser.IfStatementNode, scope: enricher.Scope): common.typed.IfStatementNode {
-	let bodyScope = { parent: scope, members: {} }
+export function enrichIfStatement(
+	node: parser.IfStatementNode,
+	scope: enricher.Scope,
+): common.typed.IfStatementNode {
+	let bodyScope = { parent: scope, members: {} };
 
 	return {
 		nodeType: "IfStatement",
 		condition: enrichExpression(node.condition, scope),
 		body: node.body.map((node) => enrichNode(node, bodyScope)),
 		position: node.position,
-	}
+	};
 }
 
 export function enrichReturnStatement(
@@ -503,15 +551,15 @@ export function enrichReturnStatement(
 		nodeType: "ReturnStatement",
 		expression: enrichExpression(node.expression, scope),
 		position: node.position,
-	}
+	};
 }
 
 export function enrichFunctionStatement(
 	node: parser.FunctionStatementNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionStatementNode {
-	let type = resolveType(node.value, scope)
-	declareVariableInScope(node.name, type, scope)
+	let type = resolveType(node.value, scope);
+	declareVariableInScope(node.name, type, scope);
 
 	return {
 		nodeType: "FunctionStatement",
@@ -519,7 +567,7 @@ export function enrichFunctionStatement(
 		value: enrichFunctionDefinition(node.value, scope),
 		position: node.position,
 		type,
-	}
+	};
 }
 
 // #endregion
@@ -531,98 +579,116 @@ function declareVariableInScope(
 	type: common.Type,
 	scope: enricher.Scope,
 ): enricher.Scope {
-	const variableName = typeof identifier === "string" ? identifier : identifier.content
+	const variableName =
+		typeof identifier === "string" ? identifier : identifier.content;
 
 	if (scope.members[variableName] != null) {
-		throw new Error(`Variable ${variableName} is already declared.`)
+		throw new Error(`Variable ${variableName} is already declared.`);
 	}
 
-	scope.members[variableName] = type
+	scope.members[variableName] = type;
 
-	return scope
+	return scope;
 }
 
-function enrichArgument(node: parser.ArgumentNode, scope: enricher.Scope): common.typed.ArgumentNode {
+function enrichArgument(
+	node: parser.ArgumentNode,
+	scope: enricher.Scope,
+): common.typed.ArgumentNode {
 	return {
 		nodeType: "Argument",
 		name: node.name ? node.name.content : null,
 		value: enrichExpression(node.value, scope),
 		type: resolveType(node.value, scope),
-	}
+	};
 }
 
-function methodMember(node: parser.MethodLookupNode, scope: enricher.Scope): common.typed.IdentifierNode {
+function methodMember(
+	node: parser.MethodLookupNode,
+	scope: enricher.Scope,
+): common.typed.IdentifierNode {
 	return {
 		nodeType: "Identifier",
 		content: node.member.content,
 		position: node.member.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
 
 function enrichMembers(
 	members: { [key: string]: parser.ExpressionNode },
 	scope: enricher.Scope,
 ): { [key: string]: common.typed.ExpressionNode } {
-	let result: { [key: string]: common.typed.ExpressionNode } = {}
+	let result: { [key: string]: common.typed.ExpressionNode } = {};
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		result[memberKey] = enrichExpression(memberValue, scope)
+		result[memberKey] = enrichExpression(memberValue, scope);
 	}
 
-	return result
+	return result;
 }
 
-function enrichMethods(members: parser.Methods, scope: enricher.Scope, selfType: common.Type): common.typed.Methods {
-	let result: common.typed.Methods = {}
+function enrichMethods(
+	members: parser.Methods,
+	scope: enricher.Scope,
+	selfType: common.Type,
+): common.typed.Methods {
+	let result: common.typed.Methods = {};
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
 		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {
 				nodeType: "SimpleMethod",
 				method: enrichMethodFunctionValue(memberValue, scope, selfType),
-			}
+			};
 		} else if (memberValue.nodeType === "StaticMethod") {
 			result[memberKey] = {
 				nodeType: "StaticMethod",
 				method: enrichMethodFunctionValue(memberValue, scope, selfType),
-			}
+			};
 		} else if (memberValue.nodeType === "OverloadedMethod") {
 			result[memberKey] = {
 				nodeType: "OverloadedMethod",
 				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
-			}
+			};
 		} else {
 			result[memberKey] = {
 				nodeType: "OverloadedStaticMethod",
 				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
-			}
+			};
 		}
 	}
 
-	return result
+	return result;
 }
 
-function enrichParameter(node: parser.ParameterNode, scope: enricher.Scope): common.typed.ParameterNode {
-	let type = resolveType(node.type, scope)
+function enrichParameter(
+	node: parser.ParameterNode,
+	scope: enricher.Scope,
+): common.typed.ParameterNode {
+	let type = resolveType(node.type, scope);
 
-	declareVariableInScope(node.internalName, type, scope)
+	declareVariableInScope(node.internalName, type, scope);
 
 	return {
 		nodeType: "Parameter",
-		externalName: node.externalName ? enrichIdentifier(node.externalName, scope, type) : null,
+		externalName: node.externalName
+			? enrichIdentifier(node.externalName, scope, type)
+			: null,
 		internalName: enrichIdentifier(node.internalName, scope),
 		position: node.position,
-	}
+	};
 }
 
-function enrichMember(node: parser.LookupNode, scope: enricher.Scope): common.typed.IdentifierNode {
+function enrichMember(
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+): common.typed.IdentifierNode {
 	return {
 		nodeType: "Identifier",
 		content: node.member.content,
 		position: node.member.position,
 		type: resolveType(node, scope),
-	}
+	};
 }
-
 // #endregion

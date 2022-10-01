@@ -1,36 +1,36 @@
-import grammar from "./grammar"
-import { Parser, Grammar } from "nearley"
+import grammar from "./grammar";
+import { Parser, Grammar } from "nearley";
 
 class ParseError extends Error {
 	constructor(public message: string) {
-		super(message)
-		Error.captureStackTrace(this, ParseError)
-		this.name = this.constructor.name
+		super(message);
+		Error.captureStackTrace(this, ParseError);
+		this.name = this.constructor.name;
 	}
 }
 
 export let parse = (chunk: string) => {
-	let parser = new Parser(Grammar.fromCompiled(grammar))
+	let parser = new Parser(Grammar.fromCompiled(grammar));
 
 	try {
-		parser.feed(chunk)
+		parser.feed(chunk);
 	} catch (error: any) {
 		/* istanbul ignore next */
-		let value = error.token.value
+		let value = error.token.value;
 
 		/* istanbul ignore if */
 		if (error.token.type === "LiteralString") {
-			value = `"${value}"`
+			value = `"${value}"`;
 		}
 
 		throw new ParseError(
 			`Unexpected ${value} at ${error.token.position.start.line}:${error.token.position.start.column}`,
-		)
+		);
 	}
 
 	/* istanbul ignore if */
 	if (parser.results.length === 0) {
-		throw new Error("Could not parse input!")
+		throw new Error("Could not parse input!");
 	}
 
 	/* istanbul ignore if */
@@ -51,8 +51,8 @@ export let parse = (chunk: string) => {
 		console.log()
 		//*/
 
-		throw new Error("Input was ambiguous! - File a bug!")
+		throw new Error("Input was ambiguous! - File a bug!");
 	}
 
-	return parser.results[0]
-}
+	return parser.results[0];
+};

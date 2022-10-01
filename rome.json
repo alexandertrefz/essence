@@ -1,0 +1,13 @@
+{
+	"formatter": {
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"ts": {
+				"useShorthandArrayType": "off"
+			}
+		}
+	}
+}

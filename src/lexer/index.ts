@@ -1,166 +1,202 @@
-import { common, lexer } from "../interfaces"
-import { Token as NearleyToken } from "nearley"
+import { common, lexer } from "../interfaces";
+import { Token as NearleyToken } from "nearley";
 
-const TokenType = lexer.TokenType
-type Token = lexer.Token
-type Position = common.Position
-type Cursor = common.Cursor
+const TokenType = lexer.TokenType;
+type Token = lexer.Token;
+type Position = common.Position;
+type Cursor = common.Cursor;
 
 type SubLexingResult = {
-	input: string
-	token: Token
-	cursor: Cursor
-}
+	input: string;
+	token: Token;
+	cursor: Cursor;
+};
 
 type LexingResult = {
-	input: string
-	token: Token | undefined
-	cursor: Cursor
-}
+	input: string;
+	token: Token | undefined;
+	cursor: Cursor;
+};
 
 const createIsHelper = (tester: string | Array<string>) => {
 	return (input: string): boolean => {
 		if (typeof tester === "string") {
-			return tester === input
+			return tester === input;
 		} else {
-			return !!~tester.indexOf(input)
+			return !!~tester.indexOf(input);
 		}
-	}
-}
+	};
+};
 
-const orHelper = (funcs: Array<(input: string) => boolean>, input: string): boolean => {
-	return funcs.map((func) => func(input)).reduce((prev, curr) => prev || curr, false)
-}
+const orHelper = (
+	funcs: Array<(input: string) => boolean>,
+	input: string,
+): boolean => {
+	return funcs.map((func) => func(input)).reduce(
+		(prev, curr) => prev || curr,
+		false,
+	);
+};
 
-const linebreak = "\n"
-const stringLiteral = '"'
-const commentLiteral = "§"
-const booleans = ["true", "false"]
-const keywords = ["if", "else", "type", "constant", "variable", "function", "static", "implementation", "overload"]
-const symbols = ["(", ")", "{", "}", "[", "]", "<", ">", "|", "/", "@", ",", ".", ":", "=", "-", "~", "_"]
-const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-const whitespaces = [" ", "\t"]
+const linebreak = "\n";
+const stringLiteral = '"';
+const commentLiteral = "§";
+const booleans = ["true", "false"];
+const keywords = [
+	"if",
+	"else",
+	"type",
+	"constant",
+	"variable",
+	"function",
+	"static",
+	"implementation",
+	"overload",
+];
+const symbols = [
+	"(",
+	")",
+	"{",
+	"}",
+	"[",
+	"]",
+	"<",
+	">",
+	"|",
+	"/",
+	"@",
+	",",
+	".",
+	":",
+	"=",
+	"-",
+	"~",
+	"_",
+];
+const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const whitespaces = [" ", "\t"];
 
-const isWhitespace = createIsHelper(whitespaces)
-const isLinebreak = createIsHelper(linebreak)
-const isSymbol = createIsHelper(symbols)
-const isKeyword = createIsHelper(keywords)
-const isBooleanLiteral = createIsHelper(booleans)
-const isStringLiteral = createIsHelper(stringLiteral)
-const isNumberLiteral = createIsHelper(numbers)
-const isCommentLiteral = createIsHelper(commentLiteral)
+const isWhitespace = createIsHelper(whitespaces);
+const isLinebreak = createIsHelper(linebreak);
+const isSymbol = createIsHelper(symbols);
+const isKeyword = createIsHelper(keywords);
+const isBooleanLiteral = createIsHelper(booleans);
+const isStringLiteral = createIsHelper(stringLiteral);
+const isNumberLiteral = createIsHelper(numbers);
+const isCommentLiteral = createIsHelper(commentLiteral);
 
 const getBooleanType = (value: string) => {
 	if (value === "true") {
-		return TokenType.LiteralTrue
+		return TokenType.LiteralTrue;
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */
 		if (value === "false") {
-			return TokenType.LiteralFalse
+			return TokenType.LiteralFalse;
 		} else {
-			throw new Error(`${value} is not a valid value for BooleanLiterals`)
+			throw new Error(`${value} is not a valid value for BooleanLiterals`);
 		}
 	}
-}
+};
 
 const getKeywordType = (value: string) => {
 	if (value === "if") {
-		return TokenType.KeywordIf
+		return TokenType.KeywordIf;
 	} else if (value === "else") {
-		return TokenType.KeywordElse
+		return TokenType.KeywordElse;
 	} else if (value === "type") {
-		return TokenType.KeywordType
+		return TokenType.KeywordType;
 	} else if (value === "variable") {
-		return TokenType.KeywordVariable
+		return TokenType.KeywordVariable;
 	} else if (value === "constant") {
-		return TokenType.KeywordConstant
+		return TokenType.KeywordConstant;
 	} else if (value === "function") {
-		return TokenType.KeywordFunction
+		return TokenType.KeywordFunction;
 	} else if (value === "implementation") {
-		return TokenType.KeywordImplementation
+		return TokenType.KeywordImplementation;
 	} else if (value === "overload") {
-		return TokenType.KeywordOverload
+		return TokenType.KeywordOverload;
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */
 		if (value === "static") {
-			return TokenType.KeywordStatic
+			return TokenType.KeywordStatic;
 		} else {
-			throw new Error(`${value} is not a valid value for Keywords`)
+			throw new Error(`${value} is not a valid value for Keywords`);
 		}
 	}
-}
+};
 
 const getSymbolType = (value: string) => {
 	if (value === "@") {
-		return TokenType.SymbolAt
+		return TokenType.SymbolAt;
 	} else if (value === "(") {
-		return TokenType.SymbolLeftParen
+		return TokenType.SymbolLeftParen;
 	} else if (value === ")") {
-		return TokenType.SymbolRightParen
+		return TokenType.SymbolRightParen;
 	} else if (value === "{") {
-		return TokenType.SymbolLeftBrace
+		return TokenType.SymbolLeftBrace;
 	} else if (value === "}") {
-		return TokenType.SymbolRightBrace
+		return TokenType.SymbolRightBrace;
 	} else if (value === "[") {
-		return TokenType.SymbolLeftBracket
+		return TokenType.SymbolLeftBracket;
 	} else if (value === "]") {
-		return TokenType.SymbolRightBracket
+		return TokenType.SymbolRightBracket;
 	} else if (value === "|") {
-		return TokenType.SymbolPipe
+		return TokenType.SymbolPipe;
 	} else if (value === "/") {
-		return TokenType.SymbolSlash
+		return TokenType.SymbolSlash;
 	} else if (value === ",") {
-		return TokenType.SymbolComma
+		return TokenType.SymbolComma;
 	} else if (value === ".") {
-		return TokenType.SymbolDot
+		return TokenType.SymbolDot;
 	} else if (value === ":") {
-		return TokenType.SymbolColon
+		return TokenType.SymbolColon;
 	} else if (value === "=") {
-		return TokenType.SymbolEqual
+		return TokenType.SymbolEqual;
 	} else if (value === "-") {
-		return TokenType.SymbolDash
+		return TokenType.SymbolDash;
 	} else if (value === ">") {
-		return TokenType.SymbolRightAngle
+		return TokenType.SymbolRightAngle;
 	} else if (value === "<") {
-		return TokenType.SymbolLeftAngle
+		return TokenType.SymbolLeftAngle;
 	} else if (value === "_") {
-		return TokenType.SymbolUnderscore
+		return TokenType.SymbolUnderscore;
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */
 		if (value === "~") {
-			return TokenType.SymbolTilde
+			return TokenType.SymbolTilde;
 		} else {
-			throw new Error(`${value} is not a valid value for Symbols`)
+			throw new Error(`${value} is not a valid value for Symbols`);
 		}
 	}
-}
+};
 
-const isEOF = (input: string, index: number): boolean => input.length - 1 === index
+const isEOF = (input: string, index: number): boolean =>
+	input.length - 1 === index;
 
 const moveCursor = (char: string, cursor: Cursor): Cursor => {
 	cursor = {
 		line: cursor.line,
 		column: cursor.column,
-	}
+	};
 
 	if (char === "\n") {
-		cursor.column = 1
-		cursor.line++
+		cursor.column = 1;
+		cursor.line++;
 	} else {
-		cursor.column++
+		cursor.column++;
 	}
 
-	return cursor
-}
+	return cursor;
+};
 
 const lexLinebreak = (input: string, cursor: Cursor): SubLexingResult => {
-	const firstChar = input[0]
+	const firstChar = input[0];
 
-	const startCursor = cursor
-	const endCurser = moveCursor(firstChar, cursor)
+	const startCursor = cursor;
+	const endCurser = moveCursor(firstChar, cursor);
 
 	const token: Token = {
 		value: firstChar,
@@ -169,23 +205,23 @@ const lexLinebreak = (input: string, cursor: Cursor): SubLexingResult => {
 			start: startCursor,
 			end: endCurser,
 		},
-	}
+	};
 
-	cursor = moveCursor(firstChar, cursor)
-	input = input.slice(1)
+	cursor = moveCursor(firstChar, cursor);
+	input = input.slice(1);
 
 	return {
 		input,
 		token,
 		cursor: endCurser,
-	}
-}
+	};
+};
 
 const lexSymbol = (input: string, cursor: Cursor): SubLexingResult => {
-	const firstChar = input[0]
+	const firstChar = input[0];
 
-	const startCursor = cursor
-	const endCurser = moveCursor(firstChar, cursor)
+	const startCursor = cursor;
+	const endCurser = moveCursor(firstChar, cursor);
 
 	const token: Token = {
 		value: firstChar,
@@ -194,17 +230,17 @@ const lexSymbol = (input: string, cursor: Cursor): SubLexingResult => {
 			start: startCursor,
 			end: endCurser,
 		},
-	}
+	};
 
-	cursor = moveCursor(firstChar, cursor)
-	input = input.slice(1)
+	cursor = moveCursor(firstChar, cursor);
+	input = input.slice(1);
 
 	return {
 		input,
 		token,
 		cursor: endCurser,
-	}
-}
+	};
+};
 
 const lexString = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
@@ -214,47 +250,49 @@ const lexString = (input: string, cursor: Cursor): SubLexingResult => {
 			start: cursor,
 			end: cursor,
 		},
-	}
+	};
 
-	let inputSliced = false
-	let balance = 0
-	let balanceWasChanged = false
+	let inputSliced = false;
+	let balance = 0;
+	let balanceWasChanged = false;
 
 	for (let i = 0; i < input.length; i++) {
-		token.value += input[i]
+		token.value += input[i];
 
-		cursor = moveCursor(input[i], cursor)
+		cursor = moveCursor(input[i], cursor);
 
 		if (token.value.startsWith(stringLiteral) && token.value.length === 1) {
-			balanceWasChanged = true
-			balance++
-			continue
+			balanceWasChanged = true;
+			balance++;
+			continue;
 		}
 
 		if (token.value.endsWith(stringLiteral)) {
-			balance--
+			balance--;
 		}
 
 		if (balanceWasChanged && balance === 0) {
-			token.value = token.value.slice(1, token.value.length - 1)
-			input = input.slice(i + 1)
-			inputSliced = true
-			break
+			token.value = token.value.slice(1, token.value.length - 1);
+			input = input.slice(i + 1);
+			inputSliced = true;
+			break;
 		}
 	}
 
 	if (!inputSliced) {
-		throw new Error(`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`)
+		throw new Error(
+			`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`,
+		);
 	}
 
-	token.position.end = cursor
+	token.position.end = cursor;
 
 	return {
 		input,
 		token,
 		cursor,
-	}
-}
+	};
+};
 
 const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
@@ -264,35 +302,35 @@ const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 			start: cursor,
 			end: cursor,
 		},
-	}
+	};
 
-	let i: number
+	let i: number;
 
 	for (i = 0; i < input.length; i++) {
-		let currentChar = input[i]
+		let currentChar = input[i];
 
 		if (isLinebreak(currentChar)) {
-			i--
-			break
+			i--;
+			break;
 		}
 
-		token.value += currentChar
-		cursor = moveCursor(currentChar, cursor)
+		token.value += currentChar;
+		cursor = moveCursor(currentChar, cursor);
 
 		if (isEOF(input, i)) {
-			break
+			break;
 		}
 	}
 
-	input = input.slice(i + 1)
-	token.position.end = cursor
+	input = input.slice(i + 1);
+	token.position.end = cursor;
 
 	return {
 		input,
 		token,
 		cursor,
-	}
-}
+	};
+};
 
 const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
@@ -302,35 +340,40 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 			start: cursor,
 			end: cursor,
 		},
-	}
+	};
 
-	let i: number
+	let i: number;
 
 	for (i = 0; i < input.length; i++) {
-		let currentChar = input[i]
+		let currentChar = input[i];
 
-		if (orHelper([isLinebreak, isSymbol, isCommentLiteral, isWhitespace], currentChar)) {
-			i-- // Fix Index for the token slice
-			break
+		if (
+			orHelper(
+				[isLinebreak, isSymbol, isCommentLiteral, isWhitespace],
+				currentChar,
+			)
+		) {
+			i--; // Fix Index for the token slice
+			break;
 		}
 
-		token.value += currentChar
-		cursor = moveCursor(currentChar, cursor)
+		token.value += currentChar;
+		cursor = moveCursor(currentChar, cursor);
 
 		if (isEOF(input, i)) {
-			break
+			break;
 		}
 	}
 
-	input = input.slice(i + 1)
-	token.position.end = cursor
+	input = input.slice(i + 1);
+	token.position.end = cursor;
 
 	return {
 		input,
 		token,
 		cursor,
-	}
-}
+	};
+};
 
 const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 	const token: Token = {
@@ -340,121 +383,129 @@ const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 			start: cursor,
 			end: cursor,
 		},
-	}
+	};
 
-	let i: number
+	let i: number;
 
 	for (i = 0; i < input.length; i++) {
-		let currentChar = input[i]
+		let currentChar = input[i];
 
 		if (orHelper([isSymbol, isLinebreak, isWhitespace], currentChar)) {
-			i--
-			break
+			i--;
+			break;
 		}
 
-		cursor = moveCursor(currentChar, cursor)
-		token.value += currentChar
+		cursor = moveCursor(currentChar, cursor);
+		token.value += currentChar;
 
 		if (isEOF(input, i)) {
-			break
+			break;
 		}
 	}
 
-	input = input.slice(i + 1)
-	token.position.end = cursor
+	input = input.slice(i + 1);
+	token.position.end = cursor;
 
 	return {
 		input,
 		token,
 		cursor,
-	}
-}
+	};
+};
 
-const lexToken = (input: string, cursor: Cursor, ignoreList: Array<string>): LexingResult => {
-	let token: Token | undefined = undefined
+const lexToken = (
+	input: string,
+	cursor: Cursor,
+	ignoreList: Array<string>,
+): LexingResult => {
+	let token: Token | undefined = undefined;
 
 	if (input.length === 0) {
 		return {
 			input,
 			cursor,
 			token: undefined,
-		}
+		};
 	}
 
-	let firstChar = input[0]
+	let firstChar = input[0];
 
 	if (isWhitespace(firstChar)) {
-		return lexToken(input.slice(1), moveCursor(firstChar, cursor), ignoreList)
+		return lexToken(input.slice(1), moveCursor(firstChar, cursor), ignoreList);
 	}
 
 	if (isLinebreak(firstChar)) {
-		;({ input, token, cursor } = lexLinebreak(input, cursor))
+		({ input, token, cursor } = lexLinebreak(input, cursor));
 	} else if (isSymbol(firstChar)) {
-		;({ input, token, cursor } = lexSymbol(input, cursor))
+		({ input, token, cursor } = lexSymbol(input, cursor));
 	} else if (isCommentLiteral(firstChar)) {
-		;({ input, token, cursor } = lexComment(input, cursor))
+		({ input, token, cursor } = lexComment(input, cursor));
 	} else if (isStringLiteral(firstChar)) {
-		;({ input, token, cursor } = lexString(input, cursor))
+		({ input, token, cursor } = lexString(input, cursor));
 	} else if (isNumberLiteral(firstChar)) {
-		;({ input, token, cursor } = lexNumber(input, cursor))
+		({ input, token, cursor } = lexNumber(input, cursor));
 	} else {
-		;({ input, token, cursor } = lexIdentifier(input, cursor))
+		({ input, token, cursor } = lexIdentifier(input, cursor));
 
 		if (isKeyword(token.value)) {
-			token.type = getKeywordType(token.value)
+			token.type = getKeywordType(token.value);
 		} else if (isBooleanLiteral(token.value)) {
-			token.type = getBooleanType(token.value)
+			token.type = getBooleanType(token.value);
 		}
 	}
 
 	if (ignoreList.includes(token.type)) {
-		return lexToken(input, cursor, ignoreList)
+		return lexToken(input, cursor, ignoreList);
 	}
 
 	return {
 		input,
 		token,
 		cursor,
-	}
-}
+	};
+};
 
 export class Lexer {
-	protected data: string
-	protected index: number
-	protected state: Cursor
-	protected ignoreList: Array<string>
+	protected data: string;
+	protected index: number;
+	protected state: Cursor;
+	protected ignoreList: Array<string>;
 
 	constructor() {
-		this.data = ""
-		this.index = 0
-		this.state = { line: 1, column: 1 }
-		this.ignoreList = []
+		this.data = "";
+		this.index = 0;
+		this.state = { line: 1, column: 1 };
+		this.ignoreList = [];
 	}
 
 	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
-		this.data = data
-		this.index = 0
-		this.state = state
+		this.data = data;
+		this.index = 0;
+		this.state = state;
 	}
 
 	next(): lexer.Token | undefined {
-		const data = this.data.slice(this.index)
+		const data = this.data.slice(this.index);
 
-		const { input, token, cursor } = lexToken(data, this.state, this.ignoreList)
+		const { input, token, cursor } = lexToken(
+			data,
+			this.state,
+			this.ignoreList,
+		);
 
-		this.state = cursor
-		this.index = this.data.length - input.length
+		this.state = cursor;
+		this.index = this.data.length - input.length;
 
-		return token
+		return token;
 	}
 
 	save() {
-		return this.state
+		return this.state;
 	}
 
 	// TODO: Implement formatError
-	formatError(token: NearleyToken) {
-		return ""
+	formatError(_token: NearleyToken) {
+		return "";
 		// nb. this gets called after consuming the offending token,
 		// so the culprit is index-1
 		// var buffer = this.buffer;
@@ -473,10 +524,10 @@ export class Lexer {
 	}
 
 	has(name: string) {
-		return name in TokenType
+		return name in TokenType;
 	}
 
 	ignore(name: lexer.TokenType) {
-		this.ignoreList.push(name)
+		this.ignoreList.push(name);
 	}
 }
