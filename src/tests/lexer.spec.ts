@@ -430,6 +430,38 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output);
 		});
+
+		it("should lex match", () => {
+			let lexer = new Lexer();
+			let input: string;
+			let output: SimpleToken;
+
+			input = "match";
+			output = {
+				value: "match",
+				type: TokenType.KeywordMatch,
+			};
+
+			lexer.reset(input);
+
+			expect(stripPosition(lexer.next())).toEqual(output);
+		});
+
+		it("should lex case", () => {
+			let lexer = new Lexer();
+			let input: string;
+			let output: SimpleToken;
+
+			input = "case";
+			output = {
+				value: "case",
+				type: TokenType.KeywordCase,
+			};
+
+			lexer.reset(input);
+
+			expect(stripPosition(lexer.next())).toEqual(output);
+		});
 	});
 
 	describe("Symbols", () => {

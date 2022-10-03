@@ -34,6 +34,8 @@ export enum TokenType {
 	KeywordFunction = "KeywordFunction",
 	KeywordImplementation = "KeywordImplementation",
 	KeywordOverload = "KeywordOverload",
+	KeywordMatch = "KeywordMatch",
+	KeywordCase = "KeywordCase",
 	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",

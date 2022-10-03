@@ -4,6 +4,7 @@ import {
 	resolveType,
 	resolveListValueType,
 	resolveMethodLookupBaseType,
+	resolveMatchType,
 } from "./resolvers";
 
 export function enrichNode(
@@ -26,6 +27,7 @@ export function enrichNode(
 		case "Identifier":
 		case "Self":
 		case "MethodLookup":
+		case "Match":
 			return enrichExpression(node, scope);
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -76,6 +78,8 @@ export function enrichExpression(
 			return enrichSelf(node, scope);
 		case "MethodLookup":
 			return enrichMethodLookup(node, scope);
+		case "Match":
+			return enrichMatch(node, scope);
 	}
 }
 
@@ -387,6 +391,30 @@ export function enrichMethodLookup(
 		member: methodMember(node, scope),
 		position: node.position,
 		type: resolveType(node, scope),
+	};
+}
+
+export function enrichMatch(
+	node: parser.MatchNode,
+	scope: enricher.Scope,
+): common.typed.MatchNode {
+	return {
+		nodeType: "Match",
+		value: enrichExpression(node.value, scope),
+		handlers: node.handlers.map((handler) => {
+			let bodyScope = { parent: scope, members: {} };
+			let matcher = resolveType(handler.matcher, scope);
+
+			declareVariableInScope("@", matcher, bodyScope);
+
+			return {
+				body: handler.body.map((node) => enrichNode(node, bodyScope)),
+				matcher,
+				returnType: resolveType(handler.returnType, scope),
+			};
+		}),
+		position: node.position,
+		type: resolveMatchType(node, scope),
 	};
 }
 

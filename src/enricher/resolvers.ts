@@ -57,6 +57,10 @@ export function resolveType(
 			return resolveIdentifierTypeDeclarationType(node, scope)
 		case "ListTypeDeclaration":
 			return resolveListTypeDeclarationType(node, scope)
+		case "UnionTypeDeclaration":
+			return resolveUnionTypeDeclarationType(node, scope)
+		case "Match":
+			return resolveMatchType(node, scope)
 	}
 }
 export function resolveNativeFunctionInvocationType(
@@ -317,6 +321,8 @@ export function resolveCombinationType(
 			throw new Error("You can not combine Unknowns.")
 		case "Generic":
 			throw new Error("You can not combine Generics.")
+		case "UnionType":
+			throw new Error("You can not combine Unions.")
 	}
 
 	switch (rhsType.type) {
@@ -335,6 +341,8 @@ export function resolveCombinationType(
 			throw new Error("You can not combine Unknowns.")
 		case "Generic":
 			throw new Error("You can not combine Generics.")
+		case "UnionType":
+			throw new Error("You can not combine Unions.")
 	}
 
 	if (deepEqual(lhsType, rhsType)) {
@@ -477,7 +485,9 @@ export function resolveSelfType(
 	let result = findVariableInScope("@", scope)
 
 	if (result === null) {
-		throw new Error("@-Expressions can not be used outside of methods.")
+		throw new Error(
+			"@-Expressions can not be used outside of methods and match expressions.",
+		)
 	} else {
 		return result
 	}
@@ -622,6 +632,55 @@ export function resolveListTypeDeclarationType(
 	}
 
 	return { type: "List", itemType }
+}
+
+export function resolveUnionTypeDeclarationType(
+	node: parser.UnionTypeDeclarationNode,
+	scope: enricher.Scope,
+): common.UnionType {
+	let resolvedTypes = []
+
+	for (let type of node.types) {
+		resolvedTypes.push(resolveType(type, scope))
+	}
+
+	return { type: "UnionType", types: resolvedTypes }
+}
+
+export function resolveMatchType(
+	node: parser.MatchNode,
+	scope: enricher.Scope,
+): common.Type {
+	let returnTypes = []
+
+	for (let handler of node.handlers) {
+		const resolvedReturnType = resolveType(handler.returnType, scope)
+
+		if (returnTypes.length === 0) {
+			returnTypes.push(resolvedReturnType)
+		} else {
+			let typeAlreadyNoted = false
+
+			for (let returnType of returnTypes) {
+				if (matchesType(returnType, resolvedReturnType)) {
+					typeAlreadyNoted = true
+					break
+				}
+			}
+
+			if (!typeAlreadyNoted) {
+				returnTypes.push(resolvedReturnType)
+			}
+		}
+	}
+
+	if (returnTypes.length === 0) {
+		return { type: "Unknown" }
+	} else if (returnTypes.length === 1) {
+		return returnTypes[0]
+	} else {
+		return { type: "UnionType", types: returnTypes }
+	}
 }
 
 /***********/

@@ -19,6 +19,7 @@ import {
 	SimpleMethodType,
 	StaticMethodType,
 	Type,
+	UnionType,
 	UnknownType,
 } from "../interfaces/common";
 
@@ -233,14 +234,35 @@ describe("Helpers", () => {
 			type: "List",
 			itemType: { type: "Unknown" },
 		};
+
 		const stringList: ListType = {
 			type: "List",
 			itemType: { type: "Primitive", primitive: "String" },
 		};
+
 		const integerList: ListType = {
 			type: "List",
 			itemType: { type: "Primitive", primitive: "Integer" },
 		};
+
+		// #region Unions
+
+		const unionTypeStringInteger: UnionType = {
+			type: "UnionType",
+			types: [stringPrimitive, integerPrimitive],
+		};
+
+		const unionTypeIntegerString: UnionType = {
+			type: "UnionType",
+			types: [integerPrimitive, stringPrimitive],
+		};
+
+		const unionTypeIntegerFraction: UnionType = {
+			type: "UnionType",
+			types: [integerPrimitive, fractionPrimitive],
+		};
+
+		// #endregion
 
 		// #region Functions
 
@@ -516,6 +538,8 @@ describe("Helpers", () => {
 			expect(matchesType(unknown, fractionPrimitive)).toBe(true);
 			expect(matchesType(unknown, stringPrimitive)).toBe(true);
 
+			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true);
+
 			expect(matchesType(unknown, builtInType)).toBe(true);
 
 			expect(matchesType(unknown, recordType)).toBe(true);
@@ -558,6 +582,38 @@ describe("Helpers", () => {
 			expect(matchesType(fractionPrimitive, stringPrimitive)).toBe(false);
 			expect(matchesType(fractionPrimitive, integerPrimitive)).toBe(false);
 			expect(matchesType(fractionPrimitive, booleanPrimitive)).toBe(false);
+		});
+
+		it("should match UnionTypes", () => {
+			expect(matchesType(unionTypeStringInteger, unionTypeStringInteger)).toBe(
+				true,
+			);
+			expect(matchesType(unionTypeStringInteger, unionTypeIntegerString)).toBe(
+				true,
+			);
+			expect(matchesType(unionTypeIntegerString, unionTypeStringInteger)).toBe(
+				true,
+			);
+
+			expect(matchesType(unionTypeStringInteger, stringPrimitive)).toBe(true);
+			expect(matchesType(unionTypeStringInteger, integerPrimitive)).toBe(true);
+
+			expect(matchesType(unionTypeIntegerString, stringPrimitive)).toBe(true);
+			expect(matchesType(unionTypeIntegerString, integerPrimitive)).toBe(true);
+		});
+
+		it("should not match mismatched UnionTypes", () => {
+			expect(
+				matchesType(unionTypeStringInteger, unionTypeIntegerFraction),
+			).toBe(false);
+			expect(
+				matchesType(unionTypeIntegerFraction, unionTypeStringInteger),
+			).toBe(false);
+			expect(matchesType(unionTypeStringInteger, fractionPrimitive)).toBe(
+				false,
+			);
+			expect(matchesType(unionTypeStringInteger, builtInType)).toBe(false);
+			expect(matchesType(unionTypeStringInteger, recordType)).toBe(false);
 		});
 
 		it("should match matching TypeTypes", () => {
