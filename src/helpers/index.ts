@@ -57,6 +57,35 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return lhs.primitive === rhs.primitive;
 	}
 
+	if (lhs.type === "UnionType") {
+		if (rhs.type === "UnionType") {
+			for (let lhsType of lhs.types) {
+				let foundMatch = false;
+
+				for (let rhsType of rhs.types) {
+					if (matchesType(lhsType, rhsType)) {
+						foundMatch = true;
+						break;
+					}
+				}
+
+				if (!foundMatch) {
+					return false;
+				}
+			}
+
+			return true;
+		} else {
+			for (let type of lhs.types) {
+				if (matchesType(type, rhs)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	if (lhs.type === "Type" && rhs.type === "Type") {
 		if (
 			lhs.definition.type === "BuiltIn" &&

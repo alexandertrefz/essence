@@ -29,7 +29,8 @@ export type ExpressionNode =
 	| LookupNode
 	| SelfNode
 	| IdentifierNode
-	| CombinationNode;
+	| CombinationNode
+	| MatchNode;
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation";
@@ -136,6 +137,19 @@ export interface CombinationNode {
 	nodeType: "Combination";
 	lhs: ExpressionNode;
 	rhs: ExpressionNode;
+	position: Position;
+}
+
+export interface MatchNode {
+	nodeType: "Match";
+	value: ExpressionNode;
+	handlers: Array<
+		{
+			matcher: TypeDeclarationNode;
+			returnType: TypeDeclarationNode;
+			body: Array<ImplementationNode>;
+		}
+	>;
 	position: Position;
 }
 
@@ -248,7 +262,8 @@ export interface FunctionStatementNode {
 
 export type TypeDeclarationNode =
 	| IdentifierTypeDeclarationNode
-	| ListTypeDeclarationNode;
+	| ListTypeDeclarationNode
+	| UnionTypeDeclarationNode;
 
 export interface GenericDeclarationNode {
 	nodeType: "GenericDeclarationNode";
@@ -266,6 +281,12 @@ export interface IdentifierTypeDeclarationNode {
 export interface ListTypeDeclarationNode {
 	nodeType: "ListTypeDeclaration";
 	type: TypeDeclarationNode;
+	position: Position;
+}
+
+export interface UnionTypeDeclarationNode {
+	nodeType: "UnionTypeDeclaration";
+	types: Array<TypeDeclarationNode>;
 	position: Position;
 }
 

@@ -4548,6 +4548,250 @@ Object {
 }
 `;
 
+exports[`Parser Expressions Match should parse match expression with function invocation 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "handlers": Array [
+          Object {
+            "body": Array [
+              Object {
+                "expression": Object {
+                  "nodeType": "IntegerValue",
+                  "position": Object {
+                    "end": Object {
+                      "column": 13,
+                      "line": 4,
+                    },
+                    "start": Object {
+                      "column": 12,
+                      "line": 4,
+                    },
+                  },
+                  "value": "1",
+                },
+                "nodeType": "ReturnStatement",
+                "position": Object {
+                  "end": Object {
+                    "column": 13,
+                    "line": 4,
+                  },
+                  "start": Object {
+                    "column": 9,
+                    "line": 4,
+                  },
+                },
+              },
+            ],
+            "matcher": Object {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": Object {
+                "end": Object {
+                  "column": 20,
+                  "line": 3,
+                },
+                "start": Object {
+                  "column": 13,
+                  "line": 3,
+                },
+              },
+              "type": Object {
+                "content": "Integer",
+                "nodeType": "Identifier",
+                "position": Object {
+                  "end": Object {
+                    "column": 20,
+                    "line": 3,
+                  },
+                  "start": Object {
+                    "column": 13,
+                    "line": 3,
+                  },
+                },
+              },
+            },
+            "returnType": Object {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": Object {
+                "end": Object {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": Object {
+                  "column": 24,
+                  "line": 3,
+                },
+              },
+              "type": Object {
+                "content": "Integer",
+                "nodeType": "Identifier",
+                "position": Object {
+                  "end": Object {
+                    "column": 31,
+                    "line": 3,
+                  },
+                  "start": Object {
+                    "column": 24,
+                    "line": 3,
+                  },
+                },
+              },
+            },
+          },
+          Object {
+            "body": Array [
+              Object {
+                "expression": Object {
+                  "nodeType": "IntegerValue",
+                  "position": Object {
+                    "end": Object {
+                      "column": 13,
+                      "line": 8,
+                    },
+                    "start": Object {
+                      "column": 12,
+                      "line": 8,
+                    },
+                  },
+                  "value": "2",
+                },
+                "nodeType": "ReturnStatement",
+                "position": Object {
+                  "end": Object {
+                    "column": 13,
+                    "line": 8,
+                  },
+                  "start": Object {
+                    "column": 9,
+                    "line": 8,
+                  },
+                },
+              },
+            ],
+            "matcher": Object {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": Object {
+                "end": Object {
+                  "column": 21,
+                  "line": 7,
+                },
+                "start": Object {
+                  "column": 13,
+                  "line": 7,
+                },
+              },
+              "type": Object {
+                "content": "Fraction",
+                "nodeType": "Identifier",
+                "position": Object {
+                  "end": Object {
+                    "column": 21,
+                    "line": 7,
+                  },
+                  "start": Object {
+                    "column": 13,
+                    "line": 7,
+                  },
+                },
+              },
+            },
+            "returnType": Object {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": Object {
+                "end": Object {
+                  "column": 32,
+                  "line": 7,
+                },
+                "start": Object {
+                  "column": 25,
+                  "line": 7,
+                },
+              },
+              "type": Object {
+                "content": "Integer",
+                "nodeType": "Identifier",
+                "position": Object {
+                  "end": Object {
+                    "column": 32,
+                    "line": 7,
+                  },
+                  "start": Object {
+                    "column": 25,
+                    "line": 7,
+                  },
+                },
+              },
+            },
+          },
+        ],
+        "nodeType": "Match",
+        "position": Object {
+          "end": Object {
+            "column": 8,
+            "line": 10,
+          },
+          "start": Object {
+            "column": 7,
+            "line": 2,
+          },
+        },
+        "value": Object {
+          "arguments": Array [],
+          "name": Object {
+            "content": "expression",
+            "nodeType": "Identifier",
+            "position": Object {
+              "end": Object {
+                "column": 23,
+                "line": 2,
+              },
+              "start": Object {
+                "column": 13,
+                "line": 2,
+              },
+            },
+          },
+          "nodeType": "FunctionInvocation",
+          "position": Object {
+            "end": Object {
+              "column": 25,
+              "line": 2,
+            },
+            "start": Object {
+              "column": 13,
+              "line": 2,
+            },
+          },
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 7,
+        "line": 11,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 7,
+      "line": 11,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] = `
 Object {
   "implementation": Object {
@@ -6289,10 +6533,10 @@ Object {
             },
           ],
           "returnType": Object {
-            "nodeType": "IdentifierTypeDeclaration",
+            "nodeType": "UnionTypeDeclaration",
             "position": Object {
               "end": Object {
-                "column": 80,
+                "column": 88,
                 "line": 2,
               },
               "start": Object {
@@ -6300,20 +6544,62 @@ Object {
                 "line": 2,
               },
             },
-            "type": Object {
-              "content": "Type",
-              "nodeType": "Identifier",
-              "position": Object {
-                "end": Object {
-                  "column": 80,
-                  "line": 2,
+            "types": Array [
+              Object {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": Object {
+                  "end": Object {
+                    "column": 80,
+                    "line": 2,
+                  },
+                  "start": Object {
+                    "column": 76,
+                    "line": 2,
+                  },
                 },
-                "start": Object {
-                  "column": 76,
-                  "line": 2,
+                "type": Object {
+                  "content": "Type",
+                  "nodeType": "Identifier",
+                  "position": Object {
+                    "end": Object {
+                      "column": 80,
+                      "line": 2,
+                    },
+                    "start": Object {
+                      "column": 76,
+                      "line": 2,
+                    },
+                  },
                 },
               },
-            },
+              Object {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": Object {
+                  "end": Object {
+                    "column": 88,
+                    "line": 2,
+                  },
+                  "start": Object {
+                    "column": 83,
+                    "line": 2,
+                  },
+                },
+                "type": Object {
+                  "content": "Type1",
+                  "nodeType": "Identifier",
+                  "position": Object {
+                    "end": Object {
+                      "column": 88,
+                      "line": 2,
+                    },
+                    "start": Object {
+                      "column": 83,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            ],
           },
         },
       },

@@ -197,6 +197,25 @@ export function combination(
 	};
 }
 
+export function match(
+	value: parser.ExpressionNode,
+	handlers: Array<
+		{
+			matcher: parser.TypeDeclarationNode;
+			returnType: parser.TypeDeclarationNode;
+			body: Array<parser.ImplementationNode>;
+		}
+	>,
+	position: common.Position,
+): parser.MatchNode {
+	return {
+		nodeType: "Match",
+		value,
+		handlers,
+		position,
+	};
+}
+
 // #endregion
 
 // #region Statements
@@ -371,6 +390,17 @@ export function listTypeDeclaration(
 	return {
 		nodeType: "ListTypeDeclaration",
 		type,
+		position,
+	};
+}
+
+export function unionTypeDeclaration(
+	types: Array<parser.TypeDeclarationNode>,
+	position: common.Position,
+): parser.UnionTypeDeclarationNode {
+	return {
+		nodeType: "UnionTypeDeclaration",
+		types,
 		position,
 	};
 }

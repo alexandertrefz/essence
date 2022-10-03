@@ -52,6 +52,8 @@ const keywords = [
 	"static",
 	"implementation",
 	"overload",
+	"match",
+	"case",
 ];
 const symbols = [
 	"(",
@@ -116,6 +118,10 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordImplementation;
 	} else if (value === "overload") {
 		return TokenType.KeywordOverload;
+	} else if (value === "match") {
+		return TokenType.KeywordMatch;
+	} else if (value === "case") {
+		return TokenType.KeywordCase;
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

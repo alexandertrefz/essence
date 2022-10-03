@@ -24,7 +24,8 @@ export type ExpressionNode =
 	| ValueNode
 	| LookupNode
 	| IdentifierNode
-	| CombinationNode;
+	| CombinationNode
+	| MatchNode;
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation";
@@ -111,6 +112,15 @@ export interface CombinationNode {
 	nodeType: "Combination";
 	lhs: ExpressionNode;
 	rhs: ExpressionNode;
+	type: Type;
+}
+
+export interface MatchNode {
+	nodeType: "Match";
+	value: ExpressionNode;
+	handlers: Array<
+		{ matcher: Type; returnType: Type; body: Array<ImplementationNode> }
+	>;
 	type: Type;
 }
 
