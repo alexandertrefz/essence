@@ -519,6 +519,26 @@ describe("Parser", () => {
 				});
 			});
 		});
+
+		describe("Match", () => {
+			it("should parse match expression with function invocation", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						match expression() {
+							case Integer -> Integer {
+								<- 1
+							}
+
+							case Fraction -> Integer {
+								<- 2
+							}
+						}
+					}`,
+				);
+
+				expect(input).toMatchSnapshot();
+			});
+		});
 	});
 
 	describe("Statements", () => {
@@ -830,7 +850,7 @@ describe("Parser", () => {
 			it("should parse FunctionLiterals with two parameters", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					function name (external internal: Type, external2 internal2: Type) -> Type {
+					function name (external internal: Type, external2 internal2: Type) -> Type | Type1 {
 						<- internal
 					}
 				}`,

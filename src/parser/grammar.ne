@@ -90,7 +90,7 @@ ExpressionWithoutMethodLookup ->
 	| Lookup                   {% id %}
 	| Identifier               {% id %}
 	| Self                     {% id %}
-
+	| Match                    {% id %}
 
 NativeFunctionInvocation ->
 	NativeLookupSymbol Identifier ArgumentList {%
@@ -129,6 +129,11 @@ Self ->
 MethodLookup ->
 	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, , member]) => generators.methodLookup(base, member, { start: base.position.start, end: member.position.end }) %}
 
+Match ->
+	MatchKeyword Expression LeftBrace (MatchHandler):* RightBrace {%
+		([keyword, expression, lbrace, handlers, rbrace]) => generators.match(expression, flatten(handlers), { start: keyword.position.start, end: rbrace.position.end })
+	%}
+
 ###########
 # Helpers #
 ###########
@@ -139,6 +144,9 @@ MethodLookup ->
 
 Block ->
 	LeftBrace (Statement | Expression):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
+
+MatchHandler ->
+	CaseKeyword Type ReturnType Block {% ([_, matcher, returnType, block]) => ({ matcher, returnType, body: block.body }) %}
 
 TypeDefinitionBody ->
 	LeftBrace (TypeProperty | TypeMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
@@ -266,8 +274,15 @@ ArgumentList ->
 # ----- #
 
 Type ->
+	  SimpleType {% id %}
+	| UnionType  {% id %}
+
+SimpleType ->
 	  Identifier {% ([identifer]) => generators.identifierTypeDeclaration(identifer, identifer.position) %}
 	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.listTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
+
+UnionType ->
+	SimpleType (Pipe SimpleType):+ {% ([leftType, otherTypes]) => generators.unionTypeDeclaration([leftType, ...otherTypes.map(second)], { start: leftType.position.start, end: otherTypes[otherTypes.length - 1][1].position.end }) %}
 
 TypeHeader ->
 	Type Tilde RightAngle {% first %}
@@ -288,6 +303,8 @@ FunctionKeyword       -> %KeywordFunction       {% id %}
 StaticKeyword         -> %KeywordStatic         {% id %}
 ImplementationKeyword -> %KeywordImplementation {% id %}
 OverloadKeyword       -> %KeywordOverload       {% id %}
+MatchKeyword          -> %KeywordMatch          {% id %}
+CaseKeyword           -> %KeywordCase           {% id %}
 
 # ---------------- #
 # Compound Symbols #

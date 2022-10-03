@@ -111,6 +111,11 @@ export type GenericTypeType = {
 	};
 };
 
+export type UnionType = {
+	type: "UnionType";
+	types: Array<Type>;
+};
+
 export type Type =
 	| RecordType
 	| FunctionType
@@ -121,6 +126,7 @@ export type Type =
 	| GenericTypeType
 	| ListType
 	| UnknownType
-	| GenericType;
+	| GenericType
+	| UnionType;
 
 export { typed, typedSimple };

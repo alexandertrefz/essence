@@ -37,6 +37,7 @@ function validateImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "MethodLookup":
+		case "Match":
 			return validateExpression(node);
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -66,6 +67,8 @@ function validateExpression(
 			return validateMethodLookup(node);
 		case "Lookup":
 			return validateLookup(node);
+		case "Match":
+			return validateMatch(node);
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
@@ -306,6 +309,27 @@ function validateMethodLookup(
 	return node;
 }
 
+function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
+	validateExpression(node.value);
+
+	if (node.value.type.type !== "UnionType") {
+		throw new Error("You can only use Match-Expressions on Union Types.");
+	}
+
+	for (let handler of node.handlers) {
+		for (let bodyNode of handler.body) {
+			validateImplementationNode(bodyNode, {
+				nodeType: "FunctionDefinition",
+				parameters: [],
+				body: handler.body,
+				returnType: handler.returnType,
+			});
+		}
+	}
+
+	return node;
+}
+
 // #endregion
 
 // #region Statements
@@ -484,7 +508,7 @@ function validateReturnStatement(
 
 	if (!matchesType(currentFunctionContext.returnType, node.expression.type)) {
 		throw new Error(
-			"Type of returned expression doesnt match declared return type",
+			"Type of returned expression doesn't match the declared return type.",
 		);
 	}
 

@@ -38,6 +38,7 @@ function simplifyImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "MethodLookup":
+		case "Match":
 			return simplifyExpression(node);
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -87,6 +88,8 @@ function simplifyExpression(
 			return simplifySelf(node);
 		case "MethodLookup":
 			return simplifyMethodLookup(node);
+		case "Match":
+			return simplifyMatch(node);
 	}
 }
 
@@ -276,6 +279,23 @@ function simplifyMethodLookup(
 			type: node.baseType,
 		},
 		member: simplifyIdentifier(node.member),
+		type: node.type,
+	};
+}
+
+function simplifyMatch(
+	node: common.typed.MatchNode,
+): common.typedSimple.MatchNode {
+	return {
+		nodeType: "Match",
+		value: simplifyExpression(node.value),
+		handlers: node.handlers.map((handler) => {
+			return {
+				matcher: handler.matcher,
+				returnType: handler.returnType,
+				body: handler.body.map(simplifyImplementationNode),
+			};
+		}),
 		type: node.type,
 	};
 }

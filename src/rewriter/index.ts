@@ -21,6 +21,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
+			internalImport([importNamespaceSpecifier("$type")], "type"),
 			...rewriteImplementationSection(program.implementation),
 		],
 	};
@@ -227,6 +228,8 @@ function rewriteExpression(
 			return rewriteLookup(node);
 		case "Identifier":
 			return rewriteIdentifier(node);
+		case "Match":
+			return rewriteMatch(node);
 	}
 }
 
@@ -512,6 +515,82 @@ function rewriteIdentifier(
 	};
 }
 
+function rewriteMatch(
+	node: common.typedSimple.MatchNode,
+): estree.CallExpression {
+	function callIsValueOfType(
+		value: estree.Expression,
+		matcher: common.Type,
+	): estree.CallExpression {
+		let matcherArgument;
+
+		// TODO: Handle Record Types
+		if (matcher.type === "Type") {
+			matcherArgument = convertObjectToObjectExpression(matcher.definition);
+		} else {
+			matcherArgument = convertObjectToObjectExpression(matcher);
+		}
+
+		return {
+			type: "CallExpression",
+			optional: false,
+			callee: {
+				type: "MemberExpression",
+				object: { type: "Identifier", name: "$type" },
+				property: { type: "Identifier", name: "isValueOfType" },
+				optional: false,
+				computed: false,
+			},
+			arguments: [value, matcherArgument],
+		};
+	}
+
+	const valueExpression = rewriteExpression(node.value);
+	const selfParameter: estree.Identifier = {
+		type: "Identifier",
+		name: "_self",
+	};
+
+	let previousIfStatement: estree.IfStatement | undefined = undefined;
+	let finalIfStatement: estree.IfStatement;
+
+	for (let i = node.handlers.length - 1; i >= 0; i--) {
+		const currentHandler = node.handlers[i];
+
+		if (i > 0) {
+			previousIfStatement = {
+				type: "IfStatement",
+				test: callIsValueOfType(selfParameter, currentHandler.matcher),
+				consequent: rewriteBlockStatement(currentHandler.body),
+			};
+		} else {
+			finalIfStatement = {
+				type: "IfStatement",
+				test: callIsValueOfType(selfParameter, currentHandler.matcher),
+				consequent: rewriteBlockStatement(currentHandler.body),
+			};
+
+			if (previousIfStatement) {
+				finalIfStatement.alternate = previousIfStatement;
+			}
+		}
+	}
+
+	return {
+		type: "CallExpression",
+		callee: {
+			type: "FunctionExpression",
+			body: {
+				type: "BlockStatement",
+				body: [finalIfStatement!],
+			},
+			params: [selfParameter],
+		},
+		arguments: [valueExpression],
+		optional: false,
+	};
+}
+
 // #endregion
 
 // #region Helpers
@@ -608,6 +687,34 @@ function importNamespaceSpecifier(
 			type: "Identifier",
 			name: variableName,
 		},
+	};
+}
+
+function convertObjectToObjectExpression(
+	object: object,
+): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: Object.entries(object).map<estree.Property>(([key, value]) => {
+			if (value !== null && typeof value === "object") {
+				value = convertObjectToObjectExpression(value);
+			} else {
+				value = { type: "Literal", value } as estree.Literal;
+			}
+
+			return {
+				type: "Property",
+				key: {
+					type: "Identifier",
+					name: key,
+				},
+				value,
+				kind: "init",
+				computed: false,
+				method: false,
+				shorthand: false,
+			};
+		}),
 	};
 }
 // #endregion
