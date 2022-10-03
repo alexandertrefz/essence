@@ -167,9 +167,9 @@ describe("Parser", () => {
 			it("should parse multiple FunctionInvocations in a row", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					invocation(argument)
-					invocation(argument)
-				}`,
+						invocation(argument)
+						invocation(argument)
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -638,10 +638,10 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with one Property", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						property: Type
-					}
-				}`,
+						type Type {
+							property: Type
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -650,11 +650,11 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with multiple Properties", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						property: Type
-						property2: Type2
-					}
-				}`,
+						type Type {
+							property: Type
+							property2: Type2
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -663,12 +663,12 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with one Method", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						method(parameter: Type) -> Type {
-							<- parameter
+						type Type {
+							method(parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -677,12 +677,12 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with one static Method", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						static method(parameter: Type) -> Type {
-							<- parameter
+						type Type {
+							static method(parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -691,16 +691,16 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with multiple Methods", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						method(parameter: Type) -> Type {
-							<- parameter
-						}
+						type Type {
+							method(parameter: Type) -> Type {
+								<- parameter
+							}
 
-						method2(parameter: Type) -> Type {
-							<- parameter
+							method2(parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -709,16 +709,16 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with overloaded Methods", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						overload method(parameter: Type) -> Type {
-							<- parameter
-						}
+						type Type {
+							overload method(parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload method(name parameter: Type) -> Type {
-							<- parameter
+							overload method(name parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -727,20 +727,20 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with twice overloaded Methods", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						overload method(parameter: Type) -> Type {
-							<- parameter
-						}
+						type Type {
+							overload method(parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload method(name parameter: Type) -> Type {
-							<- parameter
-						}
+							overload method(name parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload method(item parameter: Type) -> Type {
-							<- parameter
+							overload method(item parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -749,16 +749,16 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with overloaded static Methods", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						overload static method(parameter: Type) -> Type {
-							<- parameter
-						}
+						type Type {
+							overload static method(parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload static method(name parameter: Type) -> Type {
-							<- parameter
+							overload static method(name parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -767,20 +767,20 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with twice overloaded static Methods", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						overload static method(parameter: Type) -> Type {
-							<- parameter
-						}
+						type Type {
+							overload static method(parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload static method(name parameter: Type) -> Type {
-							<- parameter
-						}
+							overload static method(name parameter: Type) -> Type {
+								<- parameter
+							}
 
-						overload static method(item parameter: Type) -> Type {
-							<- parameter
+							overload static method(item parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -789,13 +789,13 @@ describe("Parser", () => {
 			it("should parse TypeDefinitionStatements with Methods and Properties", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					type Type {
-						property: PropertyType
-						method(parameter: Type) -> Type {
-							<- parameter
+						type Type {
+							property: PropertyType
+							method(parameter: Type) -> Type {
+								<- parameter
+							}
 						}
-					}
-				}`,
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -814,10 +814,10 @@ describe("Parser", () => {
 			it("should parse FunctionLiterals with one parameter with explicit external name", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					function name (external internal: Type) -> Type {
-						<- internal
-					}
-				}`,
+						function name (external internal: Type) -> Type {
+							<- internal
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -826,10 +826,10 @@ describe("Parser", () => {
 			it("should parse FunctionLiterals with one parameter with implicit external name", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					function name (internal: Type) -> Type {
-						<- internal
-					}
-				}`,
+						function name (internal: Type) -> Type {
+							<- internal
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -838,10 +838,10 @@ describe("Parser", () => {
 			it("should parse FunctionLiterals with one parameter without external name", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					function name (_ internal: Type) -> Type {
-						<- internal
-					}
-				}`,
+						function name (_ internal: Type) -> Type {
+							<- internal
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
@@ -850,10 +850,10 @@ describe("Parser", () => {
 			it("should parse FunctionLiterals with two parameters", () => {
 				let input: parser.Program = parse(
 					`implementation {
-					function name (external internal: Type, external2 internal2: Type) -> Type | Type1 {
-						<- internal
-					}
-				}`,
+						function name (external internal: Type, external2 internal2: Type) -> Type | Type1 {
+							<- internal
+						}
+					}`,
 				);
 
 				expect(input).toMatchSnapshot();
