@@ -5711,7 +5711,218 @@ Object {
 }
 `;
 
-exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement 1`] = `
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with List Type 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "name": Object {
+          "content": "identifiers",
+          "nodeType": "Identifier",
+          "position": Object {
+            "end": Object {
+              "column": 38,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": Object {
+          "end": Object {
+            "column": 53,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": Object {
+          "nodeType": "ListTypeDeclaration",
+          "position": Object {
+            "end": Object {
+              "column": 48,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 40,
+              "line": 1,
+            },
+          },
+          "type": Object {
+            "nodeType": "IdentifierTypeDeclaration",
+            "position": Object {
+              "end": Object {
+                "column": 47,
+                "line": 1,
+              },
+              "start": Object {
+                "column": 41,
+                "line": 1,
+              },
+            },
+            "type": Object {
+              "content": "String",
+              "nodeType": "Identifier",
+              "position": Object {
+                "end": Object {
+                  "column": 47,
+                  "line": 1,
+                },
+                "start": Object {
+                  "column": 41,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        },
+        "value": Object {
+          "nodeType": "ListValue",
+          "position": Object {
+            "end": Object {
+              "column": 53,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 51,
+              "line": 1,
+            },
+          },
+          "values": Array [],
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 55,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 55,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with Type 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "name": Object {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": Object {
+            "end": Object {
+              "column": 37,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": Object {
+          "end": Object {
+            "column": 50,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": Object {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": Object {
+            "end": Object {
+              "column": 45,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 39,
+              "line": 1,
+            },
+          },
+          "type": Object {
+            "content": "String",
+            "nodeType": "Identifier",
+            "position": Object {
+              "end": Object {
+                "column": 45,
+                "line": 1,
+              },
+              "start": Object {
+                "column": 39,
+                "line": 1,
+              },
+            },
+          },
+        },
+        "value": Object {
+          "nodeType": "StringValue",
+          "position": Object {
+            "end": Object {
+              "column": 50,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 48,
+              "line": 1,
+            },
+          },
+          "value": "",
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 52,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 52,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement without Type 1`] = `
 Object {
   "implementation": Object {
     "nodeType": "ImplementationSection",
@@ -10217,15 +10428,15 @@ Object {
     "nodes": Array [
       Object {
         "name": Object {
-          "content": "strings",
+          "content": "identifiers",
           "nodeType": "Identifier",
           "position": Object {
             "end": Object {
-              "column": 43,
+              "column": 38,
               "line": 1,
             },
             "start": Object {
-              "column": 36,
+              "column": 27,
               "line": 1,
             },
           },
@@ -10233,7 +10444,7 @@ Object {
         "nodeType": "VariableDeclarationStatement",
         "position": Object {
           "end": Object {
-            "column": 48,
+            "column": 53,
             "line": 1,
           },
           "start": Object {
@@ -10245,11 +10456,11 @@ Object {
           "nodeType": "ListTypeDeclaration",
           "position": Object {
             "end": Object {
-              "column": 35,
+              "column": 48,
               "line": 1,
             },
             "start": Object {
-              "column": 27,
+              "column": 40,
               "line": 1,
             },
           },
@@ -10257,11 +10468,11 @@ Object {
             "nodeType": "IdentifierTypeDeclaration",
             "position": Object {
               "end": Object {
-                "column": 34,
+                "column": 47,
                 "line": 1,
               },
               "start": Object {
-                "column": 28,
+                "column": 41,
                 "line": 1,
               },
             },
@@ -10270,11 +10481,11 @@ Object {
               "nodeType": "Identifier",
               "position": Object {
                 "end": Object {
-                  "column": 34,
+                  "column": 47,
                   "line": 1,
                 },
                 "start": Object {
-                  "column": 28,
+                  "column": 41,
                   "line": 1,
                 },
               },
@@ -10285,11 +10496,11 @@ Object {
           "nodeType": "ListValue",
           "position": Object {
             "end": Object {
-              "column": 48,
+              "column": 53,
               "line": 1,
             },
             "start": Object {
-              "column": 46,
+              "column": 51,
               "line": 1,
             },
           },
@@ -10299,7 +10510,7 @@ Object {
     ],
     "position": Object {
       "end": Object {
-        "column": 50,
+        "column": 55,
         "line": 1,
       },
       "start": Object {
@@ -10311,7 +10522,7 @@ Object {
   "nodeType": "Program",
   "position": Object {
     "end": Object {
-      "column": 50,
+      "column": 55,
       "line": 1,
     },
     "start": Object {
@@ -10322,7 +10533,106 @@ Object {
 }
 `;
 
-exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement without type 1`] = `
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with Type 1`] = `
+Object {
+  "implementation": Object {
+    "nodeType": "ImplementationSection",
+    "nodes": Array [
+      Object {
+        "name": Object {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": Object {
+            "end": Object {
+              "column": 37,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": Object {
+          "end": Object {
+            "column": 50,
+            "line": 1,
+          },
+          "start": Object {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": Object {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": Object {
+            "end": Object {
+              "column": 45,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 39,
+              "line": 1,
+            },
+          },
+          "type": Object {
+            "content": "String",
+            "nodeType": "Identifier",
+            "position": Object {
+              "end": Object {
+                "column": 45,
+                "line": 1,
+              },
+              "start": Object {
+                "column": 39,
+                "line": 1,
+              },
+            },
+          },
+        },
+        "value": Object {
+          "nodeType": "StringValue",
+          "position": Object {
+            "end": Object {
+              "column": 50,
+              "line": 1,
+            },
+            "start": Object {
+              "column": 48,
+              "line": 1,
+            },
+          },
+          "value": "",
+        },
+      },
+    ],
+    "position": Object {
+      "end": Object {
+        "column": 52,
+        "line": 1,
+      },
+      "start": Object {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": Object {
+    "end": Object {
+      "column": 52,
+      "line": 1,
+    },
+    "start": Object {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement without Type 1`] = `
 Object {
   "implementation": Object {
     "nodeType": "ImplementationSection",

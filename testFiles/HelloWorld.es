@@ -1,6 +1,6 @@
 implementation {
 
-	function greet (_ greetee: String) -> String {
+	function greet(_ greetee: String) -> String {
 		variable message = "Hello, "::append(greetee)
 
 		if greetee::isEmpty() {

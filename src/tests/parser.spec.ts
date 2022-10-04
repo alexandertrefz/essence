@@ -593,9 +593,25 @@ describe("Parser", () => {
 		});
 
 		describe("ConstantDeclarationStatements", () => {
-			it("should parse ConstantDeclarationStatement", () => {
+			it("should parse ConstantDeclarationStatement without Type", () => {
 				let input: parser.Program = parse(
 					`implementation { constant identifier = "" }`,
+				);
+
+				expect(input).toMatchSnapshot();
+			});
+
+			it("should parse ConstantDeclarationStatement with Type", () => {
+				let input: parser.Program = parse(
+					`implementation { constant identifier: String = "" }`,
+				);
+
+				expect(input).toMatchSnapshot();
+			});
+
+			it("should parse ConstantDeclarationStatement with List Type", () => {
+				let input: parser.Program = parse(
+					"implementation { constant identifiers: [String] = [] }",
 				);
 
 				expect(input).toMatchSnapshot();
@@ -603,7 +619,7 @@ describe("Parser", () => {
 		});
 
 		describe("VariableDeclarationStatements", () => {
-			it("should parse VariableDeclarationStatement without type", () => {
+			it("should parse VariableDeclarationStatement without Type", () => {
 				let input: parser.Program = parse(
 					`implementation { variable identifier = "" }`,
 				);
@@ -611,9 +627,17 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot();
 			});
 
+			it("should parse VariableDeclarationStatement with Type", () => {
+				let input: parser.Program = parse(
+					`implementation { variable identifier: String = "" }`,
+				);
+
+				expect(input).toMatchSnapshot();
+			});
+
 			it("should parse VariableDeclarationStatement with List Type", () => {
 				let input: parser.Program = parse(
-					"implementation { variable [String] strings = [] }",
+					"implementation { variable identifiers: [String] = [] }",
 				);
 
 				expect(input).toMatchSnapshot();
