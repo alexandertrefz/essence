@@ -2,16 +2,18 @@ import { lexer, common } from "../interfaces";
 
 export function stripPositionFromArray(
 	tokens: Array<lexer.Token | undefined>,
-): Array<lexer.SimpleToken> {
+): Array<lexer.SimpleToken | undefined> {
 	return tokens.map((value) => stripPosition(value));
 }
 
 export function stripPosition(
 	token: lexer.Token | undefined,
-): lexer.SimpleToken {
-	let tokenCopy = JSON.parse(JSON.stringify(token));
-	tokenCopy.position = undefined;
-	return tokenCopy;
+): lexer.SimpleToken | undefined {
+	let tokenCopy: lexer.SimpleToken | undefined = structuredClone(token);
+	if (tokenCopy) {
+		(tokenCopy as any).position = undefined;
+		return tokenCopy;
+	}
 }
 
 export function symbol(array: Array<{ position: common.Position }>) {
