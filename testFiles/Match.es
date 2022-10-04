@@ -1,6 +1,6 @@
 implementation {
 
-	variable Integer | Fraction union = 1/2
+	variable union: Integer | Fraction = 1/2
 
 	__print(match union {
 		case Integer -> Integer {
