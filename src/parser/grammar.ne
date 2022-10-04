@@ -44,13 +44,13 @@ Statement ->
 	| FunctionStatement            {% id %}
 
 ConstantDeclarationStatement ->
-	ConstantKeyword Type:? Identifier EqualSign Expression {%
-		([keyword, type, name, _, value]) => generators.constantDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
+	ConstantKeyword Identifier DeclarationType:? EqualSign Expression {%
+		([keyword, name, type, _, value]) => generators.constantDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
 	%}
 
 VariableDeclarationStatement ->
-	VariableKeyword Type:? Identifier EqualSign Expression {%
-		([keyword, type, name, _, value]) => generators.variableDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
+	VariableKeyword Identifier DeclarationType:? EqualSign Expression {%
+		([keyword, name, type, _, value]) => generators.variableDeclarationStatement(name, type, value, { start: keyword.position.start, end: value.position.end })
 	%}
 
 VariableAssignmentStatement ->
@@ -162,6 +162,9 @@ TypeMethod ->
 
 ReturnSymbol ->
 	LeftAngle Dash {% symbol %}
+
+DeclarationType ->
+	Colon Type {% second %}
 
 # -------- #
 # Literals #
