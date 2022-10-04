@@ -92,10 +92,8 @@ function inferGenericFunctionInvocation(
 
 	let inferredFunctionType: common.FunctionType = {
 		type: "Function",
-		parameterTypes: JSON.parse(
-			JSON.stringify(genericFunctionType.parameterTypes),
-		),
-		returnType: JSON.parse(JSON.stringify(genericFunctionType.returnType)),
+		parameterTypes: structuredClone(genericFunctionType.parameterTypes),
+		returnType: structuredClone(genericFunctionType.returnType),
 	};
 
 	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
@@ -874,8 +872,8 @@ export function resolveGenericType(
 	let resolvedType: common.TypeType = {
 		type: "Type",
 		name: type.name,
-		definition: JSON.parse(JSON.stringify(type.definition)),
-		methods: JSON.parse(JSON.stringify(type.methods)),
+		definition: structuredClone(type.definition),
+		methods: structuredClone(type.methods),
 	};
 	const passedTypes = Object.entries(types);
 
