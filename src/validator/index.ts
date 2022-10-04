@@ -603,10 +603,8 @@ function inferFunctionType(
 
 	let inferredFunctionType: common.FunctionType = {
 		type: "Function",
-		parameterTypes: JSON.parse(
-			JSON.stringify(genericFunctionType.parameterTypes),
-		),
-		returnType: JSON.parse(JSON.stringify(genericFunctionType.returnType)),
+		parameterTypes: structuredClone(genericFunctionType.parameterTypes),
+		returnType: structuredClone(genericFunctionType.returnType),
 	};
 
 	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
