@@ -158,7 +158,10 @@ export function resolveMethodInvocationType(
 			for (let i = 1; i < overload.parameterTypes.length; i++) {
 				if (
 					!(
-						overload.parameterTypes[i].name === methodArguments[i].name &&
+						((overload.parameterTypes[i].name === null &&
+							methodArguments[i].name === null) ||
+							(overload.parameterTypes[i].name &&
+								methodArguments[i].name?.content)) &&
 						matchesType(
 							overload.parameterTypes[i].type,
 							resolveType(methodArguments[i].value, scope),
@@ -172,8 +175,8 @@ export function resolveMethodInvocationType(
 			return overload.returnType;
 		}
 
-		console.log(util.inspect(node.arguments, { depth: null }));
-		console.log(util.inspect(type, { depth: null }));
+		console.log(util.inspect(methodArguments, { depth: null }));
+		console.log(util.inspect(type.overloads, { depth: null }));
 
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
@@ -211,7 +214,10 @@ export function resolveFunctionInvocationType(
 			for (let i = 0; i < overload.parameterTypes.length; i++) {
 				if (
 					!(
-						overload.parameterTypes[i].name === methodArguments[i].name &&
+						((overload.parameterTypes[i].name === null &&
+							methodArguments[i].name === null) ||
+							(overload.parameterTypes[i].name &&
+								methodArguments[i].name?.content)) &&
 						matchesType(
 							overload.parameterTypes[i].type,
 							resolveType(methodArguments[i].value, scope),
@@ -224,6 +230,9 @@ export function resolveFunctionInvocationType(
 
 			return overload.returnType;
 		}
+
+		console.log(util.inspect(methodArguments, { depth: null }));
+		console.log(util.inspect(type.overloads, { depth: null }));
 
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
