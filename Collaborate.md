@@ -1,4 +1,4 @@
-1. install node >= `v6.2.1`
+1. install node >= `v18.0.0`
 1. `npm i`
 1. install watchman
 	2. `brew update`
