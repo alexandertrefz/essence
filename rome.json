@@ -5,7 +5,7 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"ts": {
+			"style": {
 				"useShorthandArrayType": "off"
 			}
 		}
