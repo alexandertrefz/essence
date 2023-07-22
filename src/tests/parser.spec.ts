@@ -108,7 +108,31 @@ describe("Parser", () => {
 
 			it("should parse Identifier FunctionInvocations with one labelled argument", () => {
 				let input: parser.Program = parse(
+					"implementation { invocation(label argument) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse Identifier FunctionInvocations with labelled arguments that is `with`", () => {
+				let input: parser.Program = parse(
 					"implementation { invocation(with argument) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse Identifier FunctionInvocations with labelled arguments that is `case`", () => {
+				let input: parser.Program = parse(
+					"implementation { invocation(case argument) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse Identifier FunctionInvocations with labelled arguments that is `static`", () => {
+				let input: parser.Program = parse(
+					"implementation { invocation(static argument) }",
 				)
 
 				expect(input).toMatchSnapshot()
@@ -193,6 +217,24 @@ describe("Parser", () => {
 		describe("Identifiers", () => {
 			it("should parse Identifiers", () => {
 				let input: parser.Program = parse("implementation { identifier }")
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse `with` as Identifier", () => {
+				let input: parser.Program = parse("implementation { with }")
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse `static` as Identifier", () => {
+				let input: parser.Program = parse("implementation { static }")
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse `case` as Identifier", () => {
+				let input: parser.Program = parse("implementation { case }")
 
 				expect(input).toMatchSnapshot()
 			})
@@ -632,6 +674,30 @@ describe("Parser", () => {
 			it("should parse VariableDeclarationStatement with List Type", () => {
 				let input: parser.Program = parse(
 					"implementation { variable identifiers: [String] = [] }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with identifier being `with`", () => {
+				let input: parser.Program = parse(
+					`implementation { variable with = "" }`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with identifier being `case`", () => {
+				let input: parser.Program = parse(
+					`implementation { variable case = "" }`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with identifier being `static`", () => {
+				let input: parser.Program = parse(
+					`implementation { variable static = "" }`,
 				)
 
 				expect(input).toMatchSnapshot()

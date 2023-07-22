@@ -72,6 +72,279 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
 }
 `;
 
+exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is \`case\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": {
+              "content": "case",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 33,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "Argument",
+            "value": {
+              "content": "argument",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 42,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 43,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 45,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 45,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is \`static\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": {
+              "content": "static",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 35,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "Argument",
+            "value": {
+              "content": "argument",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 44,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 36,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 45,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 47,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 47,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is \`with\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": {
+              "content": "with",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 33,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "Argument",
+            "value": {
+              "content": "argument",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 42,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 43,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 45,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 45,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with more than two arguments 1`] = `
 {
   "implementation": {
@@ -465,11 +738,11 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
         "arguments": [
           {
             "name": {
-              "content": "with",
+              "content": "label",
               "nodeType": "Identifier",
               "position": {
                 "end": {
-                  "column": 33,
+                  "column": 34,
                   "line": 1,
                 },
                 "start": {
@@ -484,11 +757,11 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
               "nodeType": "Identifier",
               "position": {
                 "end": {
-                  "column": 42,
+                  "column": 43,
                   "line": 1,
                 },
                 "start": {
-                  "column": 34,
+                  "column": 35,
                   "line": 1,
                 },
               },
@@ -512,7 +785,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
         "nodeType": "FunctionInvocation",
         "position": {
           "end": {
-            "column": 43,
+            "column": 44,
             "line": 1,
           },
           "start": {
@@ -524,7 +797,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
     ],
     "position": {
       "end": {
-        "column": 45,
+        "column": 46,
         "line": 1,
       },
       "start": {
@@ -536,7 +809,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 45,
+      "column": 46,
       "line": 1,
     },
     "start": {
@@ -996,6 +1269,141 @@ exports[`Parser Expressions FunctionInvocations should parse multiple FunctionIn
     "end": {
       "column": 7,
       "line": 4,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Identifiers should parse \`case\` as Identifier 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "content": "case",
+        "nodeType": "Identifier",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Identifiers should parse \`static\` as Identifier 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "content": "static",
+        "nodeType": "Identifier",
+        "position": {
+          "end": {
+            "column": 24,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 26,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 26,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Identifiers should parse \`with\` as Identifier 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "content": "with",
+        "nodeType": "Identifier",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
     },
     "start": {
       "column": 1,
@@ -10622,6 +11030,225 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
   "position": {
     "end": {
       "column": 52,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being \`case\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "case",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 31,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 36,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": null,
+        "value": {
+          "nodeType": "StringValue",
+          "position": {
+            "end": {
+              "column": 36,
+              "line": 1,
+            },
+            "start": {
+              "column": 34,
+              "line": 1,
+            },
+          },
+          "value": "",
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 38,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 38,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being \`static\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "static",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 33,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 38,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": null,
+        "value": {
+          "nodeType": "StringValue",
+          "position": {
+            "end": {
+              "column": 38,
+              "line": 1,
+            },
+            "start": {
+              "column": 36,
+              "line": 1,
+            },
+          },
+          "value": "",
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 40,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 40,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being \`with\` 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "with",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 31,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 36,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": null,
+        "value": {
+          "nodeType": "StringValue",
+          "position": {
+            "end": {
+              "column": 36,
+              "line": 1,
+            },
+            "start": {
+              "column": 34,
+              "line": 1,
+            },
+          },
+          "value": "",
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 38,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 38,
       "line": 1,
     },
     "start": {
