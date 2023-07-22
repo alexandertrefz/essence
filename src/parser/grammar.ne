@@ -121,7 +121,10 @@ Lookup ->
 	Expression Dot Identifier {% ([base, _, member]) => generators.lookup(base, member, { start: base.position.start, end: member.position.end }) %}
 
 Identifier ->
-	%Identifier {% ([identifierToken]) => generators.identifier(identifierToken.value, identifierToken.position) %}
+	  %Identifier   {% ([identifierToken]) => generators.identifier(identifierToken.value, identifierToken.position) %}
+	| WithKeyword   {% ([keywordToken]) =>    generators.identifier(keywordToken.value,    keywordToken.position) %}
+	| StaticKeyword {% ([keywordToken]) =>    generators.identifier(keywordToken.value,    keywordToken.position) %}
+	| CaseKeyword   {% ([keywordToken]) =>    generators.identifier(keywordToken.value,    keywordToken.position) %}
 
 Self ->
 	AtSign {% ([symbol]) => generators.self(symbol.position) %}
