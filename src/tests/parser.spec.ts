@@ -250,7 +250,33 @@ describe("Parser", () => {
 
 		describe("Combination", () => {
 			it("should parse 2 identifier combinations", () => {
-				let input: parser.Program = parse("implementation { base <| override }")
+				let input: parser.Program = parse(
+					"implementation { { base with override } }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse inline combinations", () => {
+				let input: parser.Program = parse(
+					"implementation { { base with someKey = someValue } }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse inline combinations with trailing commas", () => {
+				let input: parser.Program = parse(
+					"implementation { { base with someKey = someValue, } }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse inline combinations with multiple keys", () => {
+				let input: parser.Program = parse(
+					"implementation { { base with someKey = someValue, someOtherKey = someOtherValue, } }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})

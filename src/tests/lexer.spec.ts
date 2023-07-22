@@ -462,6 +462,22 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
+
+		it("should lex with", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "with"
+			output = {
+				value: "with",
+				type: TokenType.KeywordWith,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
 	})
 
 	describe("Symbols", () => {

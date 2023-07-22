@@ -8,15 +8,15 @@ implementation {
 		isPropagationStopped: Boolean
 
 		preventDefault () -> Event {
-			<- @ <| { isDefaultPrevented = true }
+			<- { @ with isDefaultPrevented = true }
 		}
 
 		cancel () -> Event {
-			<- @ <| { isCancelled = true }
+			<- { @ with isCancelled = true }
 		}
 
 		stopPropagation () -> Event {
-			<- @ <| { isPropagationStopped = true }
+			<- { @ with isPropagationStopped = true }
 		}
 
 		hasNamespaces () -> Boolean {
