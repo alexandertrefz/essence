@@ -1,49 +1,49 @@
-import type { BooleanType } from "./Boolean";
-import type { ListType } from "./List";
+import type { BooleanType } from "./Boolean"
+import type { ListType } from "./List"
 
-import * as $Boolean from "./Boolean";
-import * as $List from "./List";
+import * as $Boolean from "./Boolean"
+import * as $List from "./List"
 
-export type StringType = { $type: "String"; value: string };
+export type StringType = { $type: "String"; value: string }
 
 export function createString(value: string): StringType {
-	return { $type: "String", value };
+	return { $type: "String", value }
 }
 
 export function isEmpty(originalString: StringType): BooleanType {
-	return $Boolean.createBoolean(originalString.value.length === 0);
+	return $Boolean.createBoolean(originalString.value.length === 0)
 }
 
 export function hasContent(originalString: StringType): BooleanType {
-	return $Boolean.createBoolean(originalString.value.length !== 0);
+	return $Boolean.createBoolean(originalString.value.length !== 0)
 }
 
 export function is(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
-	return $Boolean.createBoolean(originalString.value === otherString.value);
+	return $Boolean.createBoolean(originalString.value === otherString.value)
 }
 
 export function isnt(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
-	return $Boolean.createBoolean(originalString.value !== otherString.value);
+	return $Boolean.createBoolean(originalString.value !== otherString.value)
 }
 
 export function prepend(
 	originalString: StringType,
 	otherString: StringType,
 ): StringType {
-	return createString(otherString.value + originalString.value);
+	return createString(otherString.value + originalString.value)
 }
 
 export function append(
 	originalString: StringType,
 	otherString: StringType,
 ): StringType {
-	return createString(originalString.value + otherString.value);
+	return createString(originalString.value + otherString.value)
 }
 
 export function split(
@@ -51,10 +51,10 @@ export function split(
 	splitterString: StringType,
 ): ListType<StringType> {
 	return $List.createList(
-		originalString.value.split(splitterString.value).map(
-			(chunk) => createString(chunk),
-		),
-	);
+		originalString.value
+			.split(splitterString.value)
+			.map((chunk) => createString(chunk)),
+	)
 }
 
 export function contains(
@@ -63,5 +63,5 @@ export function contains(
 ): BooleanType {
 	return $Boolean.createBoolean(
 		originalString.value.includes(otherString.value),
-	);
+	)
 }

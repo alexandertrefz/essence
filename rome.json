@@ -1,13 +1,39 @@
 {
+	"$schema": "./node_modules/rome/configuration_schema.json",
+	"files": {
+		"ignore": [
+			"./lib/*",
+			"./testFiles/*.js",
+			"./src/coverage/*",
+			"./src/parser/grammar.ts"
+		]
+	},
 	"formatter": {
-		"indentStyle": "tab"
+		"indentStyle": "tab",
+		"indentSize": 4
+	},
+	"javascript": {
+		"formatter": {
+			"semicolons": "asNeeded"
+		}
 	},
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"ts": {
-				"useShorthandArrayType": "off"
+			"style": {
+				"useConst": "off",
+				"useShorthandArrayType": "off",
+				"noParameterAssign": "off"
+			},
+			"complexity": {
+				"noExtraSemicolon": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "off"
 			}
 		}
+	},
+	"organizeImports": {
+		"enabled": true
 	}
 }

@@ -1,4 +1,4 @@
-import { parser, common } from "../interfaces";
+import { common, parser } from "../interfaces"
 
 // #region Program & Sections
 
@@ -10,7 +10,7 @@ export function program(
 		nodeType: "Program",
 		implementation,
 		position,
-	};
+	}
 }
 
 export function implementationSection(
@@ -21,7 +21,7 @@ export function implementationSection(
 		nodeType: "ImplementationSection",
 		nodes,
 		position,
-	};
+	}
 }
 
 // #endregion
@@ -48,7 +48,7 @@ export function nativeFunctionInvocation(
 		},
 		arguments: args,
 		position,
-	};
+	}
 }
 
 export function methodInvocation(
@@ -56,7 +56,7 @@ export function methodInvocation(
 	args: Array<parser.ArgumentNode>,
 	position: common.Position,
 ): parser.MethodInvocationNode {
-	return { nodeType: "MethodInvocation", name, arguments: args, position };
+	return { nodeType: "MethodInvocation", name, arguments: args, position }
 }
 
 export function functionInvocation(
@@ -64,7 +64,7 @@ export function functionInvocation(
 	args: Array<parser.ArgumentNode>,
 	position: common.Position,
 ): parser.FunctionInvocationNode {
-	return { nodeType: "FunctionInvocation", name, arguments: args, position };
+	return { nodeType: "FunctionInvocation", name, arguments: args, position }
 }
 
 export function methodLookup(
@@ -72,13 +72,13 @@ export function methodLookup(
 	member: parser.IdentifierNode,
 	position: common.Position,
 ): parser.MethodLookupNode {
-	return { nodeType: "MethodLookup", base, member, position };
+	return { nodeType: "MethodLookup", base, member, position }
 }
 
 export function recordValueNode(
 	type: parser.TypeDeclarationNode | null,
 	members: {
-		[key: string]: parser.ValueNode;
+		[key: string]: parser.ValueNode
 	},
 	position: common.Position,
 ): parser.RecordValueNode {
@@ -87,7 +87,7 @@ export function recordValueNode(
 		type,
 		members,
 		position,
-	};
+	}
 }
 
 export function stringValueNode(
@@ -98,7 +98,7 @@ export function stringValueNode(
 		nodeType: "StringValue",
 		value,
 		position,
-	};
+	}
 }
 
 export function integerValueNode(
@@ -109,7 +109,7 @@ export function integerValueNode(
 		nodeType: "IntegerValue",
 		value,
 		position,
-	};
+	}
 }
 
 export function fractionValueNode(
@@ -122,7 +122,7 @@ export function fractionValueNode(
 		numerator,
 		denominator,
 		position,
-	};
+	}
 }
 
 export function booleanValueNode(
@@ -133,7 +133,7 @@ export function booleanValueNode(
 		nodeType: "BooleanValue",
 		value,
 		position,
-	};
+	}
 }
 
 export function functionValueNode(
@@ -144,7 +144,7 @@ export function functionValueNode(
 		nodeType: "FunctionValue",
 		value,
 		position,
-	};
+	}
 }
 
 export function listValueNode(
@@ -155,7 +155,7 @@ export function listValueNode(
 		nodeType: "ListValue",
 		values,
 		position,
-	};
+	}
 }
 
 export function lookup(
@@ -163,14 +163,14 @@ export function lookup(
 	member: parser.IdentifierNode,
 	position: common.Position,
 ): parser.LookupNode {
-	return { nodeType: "Lookup", base, member, position };
+	return { nodeType: "Lookup", base, member, position }
 }
 
 export function self(position: common.Position): parser.SelfNode {
 	return {
 		nodeType: "Self",
 		position,
-	};
+	}
 }
 
 export function identifier(
@@ -181,7 +181,7 @@ export function identifier(
 		nodeType: "Identifier",
 		content,
 		position,
-	};
+	}
 }
 
 export function combination(
@@ -194,18 +194,16 @@ export function combination(
 		lhs,
 		rhs,
 		position,
-	};
+	}
 }
 
 export function match(
 	value: parser.ExpressionNode,
-	handlers: Array<
-		{
-			matcher: parser.TypeDeclarationNode;
-			returnType: parser.TypeDeclarationNode;
-			body: Array<parser.ImplementationNode>;
-		}
-	>,
+	handlers: Array<{
+		matcher: parser.TypeDeclarationNode
+		returnType: parser.TypeDeclarationNode
+		body: Array<parser.ImplementationNode>
+	}>,
 	position: common.Position,
 ): parser.MatchNode {
 	return {
@@ -213,7 +211,7 @@ export function match(
 		value,
 		handlers,
 		position,
-	};
+	}
 }
 
 // #endregion
@@ -232,7 +230,7 @@ export function constantDeclarationStatement(
 		name,
 		value,
 		position,
-	};
+	}
 }
 
 export function variableDeclarationStatement(
@@ -247,7 +245,7 @@ export function variableDeclarationStatement(
 		name,
 		value,
 		position,
-	};
+	}
 }
 
 export function variableAssignmentStatement(
@@ -255,7 +253,7 @@ export function variableAssignmentStatement(
 	value: parser.ExpressionNode,
 	position: common.Position,
 ): parser.VariableAssignmentStatementNode {
-	return { nodeType: "VariableAssignmentStatement", name, value, position };
+	return { nodeType: "VariableAssignmentStatement", name, value, position }
 }
 
 export function typeDefinitionStatement(
@@ -265,55 +263,55 @@ export function typeDefinitionStatement(
 ): parser.TypeDefinitionStatementNode {
 	const properties = body.reduce<TypeProperties>((prev, curr) => {
 		if (curr.nodeType === "PropertyNode") {
-			prev[curr.name.content] = curr.type;
+			prev[curr.name.content] = curr.type
 		}
 
-		return prev;
-	}, {});
+		return prev
+	}, {})
 
 	const methods = body.reduce<parser.Methods>((prev, curr) => {
 		if (curr.nodeType !== "PropertyNode") {
-			const overloadedMethod = prev[curr.name.content];
+			const overloadedMethod = prev[curr.name.content]
 
 			if (overloadedMethod) {
 				if (overloadedMethod.nodeType === "OverloadedMethod") {
 					prev[curr.name.content] = {
 						nodeType: "OverloadedMethod",
 						methods: [...overloadedMethod.methods, curr.method],
-					};
+					}
 				} else if (overloadedMethod.nodeType === "OverloadedStaticMethod") {
 					prev[curr.name.content] = {
 						nodeType: "OverloadedStaticMethod",
 						methods: [...overloadedMethod.methods, curr.method],
-					};
+					}
 				}
 			} else {
 				if (curr.nodeType === "SimpleMethodNode") {
 					prev[curr.name.content] = {
 						nodeType: "SimpleMethod",
 						method: curr.method,
-					};
+					}
 				} else if (curr.nodeType === "StaticMethodNode") {
 					prev[curr.name.content] = {
 						nodeType: "StaticMethod",
 						method: curr.method,
-					};
+					}
 				} else if (curr.nodeType === "OverloadedMethodNode") {
 					prev[curr.name.content] = {
 						nodeType: "OverloadedMethod",
 						methods: [curr.method],
-					};
+					}
 				} else if (curr.nodeType === "OverloadedStaticMethodNode") {
 					prev[curr.name.content] = {
 						nodeType: "OverloadedStaticMethod",
 						methods: [curr.method],
-					};
+					}
 				}
 			}
 		}
 
-		return prev;
-	}, {});
+		return prev
+	}, {})
 
 	return {
 		nodeType: "TypeDefinitionStatement",
@@ -321,7 +319,7 @@ export function typeDefinitionStatement(
 		position,
 		properties,
 		methods,
-	};
+	}
 }
 
 export function ifElseStatementNode(
@@ -333,7 +331,7 @@ export function ifElseStatementNode(
 	position: common.Position,
 ): parser.IfElseStatementNode {
 	if (!Array.isArray(falseBody)) {
-		falseBody = [falseBody];
+		falseBody = [falseBody]
 	}
 
 	return {
@@ -342,7 +340,7 @@ export function ifElseStatementNode(
 		trueBody: ifStatement.body,
 		falseBody,
 		position,
-	};
+	}
 }
 
 export function ifStatement(
@@ -350,14 +348,14 @@ export function ifStatement(
 	body: parser.ImplementationNode[],
 	position: common.Position,
 ): parser.IfStatementNode {
-	return { nodeType: "IfStatement", condition, body, position };
+	return { nodeType: "IfStatement", condition, body, position }
 }
 
 export function returnStatement(
 	expression: parser.ExpressionNode,
 	position: common.Position,
 ): parser.ReturnStatementNode {
-	return { nodeType: "ReturnStatement", expression, position };
+	return { nodeType: "ReturnStatement", expression, position }
 }
 
 export function functionStatement(
@@ -365,7 +363,7 @@ export function functionStatement(
 	value: parser.FunctionDefinitionNode,
 	position: common.Position,
 ): parser.FunctionStatementNode {
-	return { nodeType: "FunctionStatement", name, value, position };
+	return { nodeType: "FunctionStatement", name, value, position }
 }
 
 // #endregion
@@ -380,7 +378,7 @@ export function identifierTypeDeclaration(
 		nodeType: "IdentifierTypeDeclaration",
 		type,
 		position,
-	};
+	}
 }
 
 export function listTypeDeclaration(
@@ -391,7 +389,7 @@ export function listTypeDeclaration(
 		nodeType: "ListTypeDeclaration",
 		type,
 		position,
-	};
+	}
 }
 
 export function unionTypeDeclaration(
@@ -402,7 +400,7 @@ export function unionTypeDeclaration(
 		nodeType: "UnionTypeDeclaration",
 		types,
 		position,
-	};
+	}
 }
 
 export function genericDeclarationNode(
@@ -415,7 +413,7 @@ export function genericDeclarationNode(
 		name,
 		defaultType,
 		position,
-	};
+	}
 }
 
 export function genericFunctionDefinition(
@@ -430,7 +428,7 @@ export function genericFunctionDefinition(
 		parameters,
 		returnType,
 		body,
-	};
+	}
 }
 
 export function functionDefinition(
@@ -443,7 +441,7 @@ export function functionDefinition(
 		parameters,
 		returnType,
 		body,
-	};
+	}
 }
 
 export function parameter(
@@ -458,28 +456,28 @@ export function parameter(
 		internalName,
 		type,
 		position,
-	};
+	}
 }
 
-type KeyValuePair = { key: string; value: parser.ExpressionNode };
-type KeyValuePairObject = { [key: string]: parser.ExpressionNode };
+type KeyValuePair = { key: string; value: parser.ExpressionNode }
+type KeyValuePairObject = { [key: string]: parser.ExpressionNode }
 
 export function keyValuePair(
 	key: string,
 	value: parser.ExpressionNode,
 ): KeyValuePair {
-	return { key, value };
+	return { key, value }
 }
 
 export function buildKeyValuePairList(
 	kvpList: KeyValuePair[],
 	kvp: KeyValuePair,
 ): KeyValuePairObject {
-	const keyValuePairList = [...kvpList, kvp];
+	const keyValuePairList = [...kvpList, kvp]
 	return keyValuePairList.reduce<KeyValuePairObject>((prev, curr) => {
-		prev[curr.key] = curr.value;
-		return prev;
-	}, {});
+		prev[curr.key] = curr.value
+		return prev
+	}, {})
 }
 
 export function argument(
@@ -490,43 +488,43 @@ export function argument(
 		nodeType: "Argument",
 		name,
 		value,
-	};
+	}
 }
 
 type SimpleMethodNode = {
-	nodeType: "SimpleMethodNode";
-	name: parser.IdentifierNode;
-	method: parser.FunctionValueNode;
-};
+	nodeType: "SimpleMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
 
 type StaticMethodNode = {
-	nodeType: "StaticMethodNode";
-	name: parser.IdentifierNode;
-	method: parser.FunctionValueNode;
-};
+	nodeType: "StaticMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
 
 type OverloadedMethodNode = {
-	nodeType: "OverloadedMethodNode";
-	name: parser.IdentifierNode;
-	method: parser.FunctionValueNode;
-};
+	nodeType: "OverloadedMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
 
 type OverloadedStaticMethodNode = {
-	nodeType: "OverloadedStaticMethodNode";
-	name: parser.IdentifierNode;
-	method: parser.FunctionValueNode;
-};
+	nodeType: "OverloadedStaticMethodNode"
+	name: parser.IdentifierNode
+	method: parser.FunctionValueNode
+}
 
 type TypeProperty = {
-	nodeType: "PropertyNode";
-	name: parser.IdentifierNode;
-	type: parser.TypeDeclarationNode;
-};
+	nodeType: "PropertyNode"
+	name: parser.IdentifierNode
+	type: parser.TypeDeclarationNode
+}
 type TypeMethod =
 	| SimpleMethodNode
 	| StaticMethodNode
 	| OverloadedMethodNode
-	| OverloadedStaticMethodNode;
+	| OverloadedStaticMethodNode
 
-type TypeProperties = { [key: string]: parser.TypeDeclarationNode };
+type TypeProperties = { [key: string]: parser.TypeDeclarationNode }
 // #endregion
