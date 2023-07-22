@@ -14,12 +14,12 @@ export function program(
 }
 
 export function implementationSection(
-	nodes: Array<parser.ImplementationNode>,
+	nodes: Array<parser.ImplementationNode> | null,
 	position: common.Position,
 ): parser.ImplementationSectionNode {
 	return {
 		nodeType: "ImplementationSection",
-		nodes,
+		nodes: nodes ?? [],
 		position,
 	}
 }
