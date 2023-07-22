@@ -177,10 +177,10 @@ TypedRecordLiteral ->
 	TypeHeader AnonymousRecordLiteral {% ([type, record]) => generators.recordValueNode(type, record.members, { start: type.position.start, end: record.position.end }) %}
 
 AnonymousRecordLiteral ->
-	LeftBrace KeyValuePairList RightBrace {% ([lbrace, kvpList, rbrace]) => generators.recordValueNode(null, kvpList, { start: lbrace.position.start, end: rbrace.position.end }) %}
+	LeftBrace KeyValuePairList RightBrace {% ([lbrace, kvpList, rbrace]) => generators.recordValueNode(null, kvpList.data, { start: lbrace.position.start, end: rbrace.position.end }) %}
 
 KeyValuePair ->
-	Identifier EqualSign Expression {% ([identifer, _, value]) => generators.keyValuePair(identifer.content, value) %}
+	Identifier EqualSign Expression {% ([identifier, _, value]) => generators.keyValuePair(identifier.content, value, { start: identifier.position.start, end: value.position.end }) %}
 
 KeyValuePairList ->
 	(KeyValuePair Comma):* KeyValuePair Comma:? {% ([kvpCommaList, kvp]) => generators.buildKeyValuePairList(kvpCommaList.map(first), kvp) %}
