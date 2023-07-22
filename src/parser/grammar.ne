@@ -188,8 +188,8 @@ StringLiteral ->
 Integer ->
 	%LiteralNumber (Underscore %LiteralNumber):* {%
 		([leftPartialNumber, otherPartialNumbers]) => {
-			let end 
-			
+			let end
+
 			if (otherPartialNumbers.length > 0) {
 				end = otherPartialNumbers[otherPartialNumbers.length - 1][1].position.end;
 			} else {
@@ -281,7 +281,7 @@ Type ->
 	| UnionType  {% id %}
 
 SimpleType ->
-	  Identifier {% ([identifer]) => generators.identifierTypeDeclaration(identifer, identifer.position) %}
+	  Identifier {% ([identifier]) => generators.identifierTypeDeclaration(identifier, identifier.position) %}
 	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.listTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 UnionType ->
