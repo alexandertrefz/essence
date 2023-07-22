@@ -1,72 +1,91 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-const fs = require("fs");
-const util = require("util");
-const path = require("path");
+import { readFile } from "fs/promises"
+import path from "path"
 
-const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
+import chalk from "chalk"
 
-const readFile = util.promisify(fs.readFile);
+import yargs from "yargs/yargs"
+import { hideBin } from "yargs/helpers"
 
-const Parser = require("../lib/parser");
-const Enricher = require("../lib/enricher");
-const Validator = require("../lib/validator");
-const Simplifier = require("../lib/simplifier");
-const Optimiser = require("../lib/optimiser");
-const Rewriter = require("../lib/rewriter");
+import { parse } from "../src/parser"
+import { enrich } from "../src/enricher"
+import { validate } from "../src/validator"
+import { simplify } from "../src/simplifier"
+import { optimise } from "../src/optimiser"
+import { rewrite } from "../src/rewriter"
 
-function generateOutputFilePath(inputFileName, outputFileName) {
-	if (outputFileName === undefined) {
-		outputFileName = `${path.basename(argv._[0], path.extname(argv._[0]))}.js`;
-	}
-
-	return path.join(path.dirname(inputFileName), outputFileName);
-}
-
-async function compile(flags) {
-	const data = await readFile(flags.inputFileName, "utf8");
-
-	try {
-		const initialProgram = Parser.parse(data);
-		const enrichedProgram = Enricher.enrich(initialProgram);
-		const validatedProgram = Validator.validate(enrichedProgram);
-		const simplifiedProgram = Simplifier.simplify(validatedProgram);
-		const optimisedProgram = Optimiser.optimise(simplifiedProgram);
-		await Rewriter.rewrite(optimisedProgram, flags);
-	} catch (error) {
-		return Promise.reject(error);
-	}
-
-	return Promise.resolve(flags);
-}
-
-let argv = yargs(hideBin(process.argv))
+let argv = await yargs(hideBin(process.argv))
 	.usage("Usage: $0 <fileName>")
 	.option("outputFileName", {
 		alias: "-o",
 		type: "string",
 		description:
 			"The name of the output file. If not provided, defaults to the name of the input file.",
+		requiresArg: true,
 	})
 	.option("debug", {
 		alias: "-d",
 		type: "boolean",
 		description: "Outputs various debugging information.",
 	})
-	.parse();
+	.parse()
+
+function generateOutputFilePath(inputFileName, outputFileName) {
+	if (outputFileName === undefined) {
+		outputFileName = `${path.basename(
+			argv._[0].toString(),
+			path.extname(argv._[0].toString()),
+		)}.js`
+	}
+
+	return path.join(path.dirname(inputFileName), outputFileName)
+}
+
+async function compile(flags) {
+	const start = performance.now()
+
+	try {
+		const data = await readFile(flags.inputFileName, "utf8")
+
+		const initialProgram = parse(data)
+
+		const enrichedProgram = enrich(initialProgram)
+
+		const validatedProgram = validate(enrichedProgram)
+
+		const simplifiedProgram = simplify(validatedProgram)
+
+		const optimisedProgram = optimise(simplifiedProgram)
+
+		await rewrite(optimisedProgram, flags)
+
+		const end = performance.now()
+
+		console.log(
+			`Successfully compiled ${chalk.cyan(
+				flags.inputFileName,
+			)} -> ${chalk.green(flags.outputFileName)} in ${chalk.magenta(
+				Math.round(end - start) + "ms",
+			)}`,
+		)
+	} catch (error) {
+		return Promise.reject(error)
+	}
+
+	return Promise.resolve(flags)
+}
 
 compile({
-	inputFileName: argv._[0],
+	inputFileName: argv._[0].toString(),
 	debug: argv.debug ?? false,
-	outputFileName: generateOutputFilePath(argv._[0], argv.outputFileName),
+	outputFileName: generateOutputFilePath(
+		argv._[0].toString(),
+		argv.outputFileName,
+	),
 }).then(
-	(flags) => {
-		console.log(
-			`Successfully compiled ${flags.inputFileName} -> ${flags.outputFileName}`,
-		);
+	() => {},
+	(error) => {
+		console.error(error)
 	},
-	(reason) => {
-		console.log(reason);
-	},
-);
+)
