@@ -53,6 +53,7 @@ const keywords = [
 	"overload",
 	"match",
 	"case",
+	"with",
 ]
 const symbols = [
 	"(",
@@ -121,6 +122,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordMatch
 	} else if (value === "case") {
 		return TokenType.KeywordCase
+	} else if (value === "with") {
+		return TokenType.KeywordWith
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

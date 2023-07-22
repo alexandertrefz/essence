@@ -104,7 +104,8 @@ FunctionInvocation ->
 	ExpressionWithoutMethodLookup ArgumentList {% ([expression, args]) => generators.functionInvocation(expression, args.args, { start: expression.position.start, end: args.position.end }) %}
 
 Combination ->
-	Expression CombinationSymbol Expression {% ([lhs, _, rhs]) => generators.combination(lhs, rhs, { start: lhs.position.start, end: rhs.position.end }) %}
+	  LeftBrace Expression WithKeyword KeyValuePairList RightBrace {% ([lbrace, lhs, withKeyword, rhs, rbrace]) => generators.combination(lhs, generators.recordValueNode(null, rhs.data, rhs.position), { start: lhs.position.start, end: rhs.position.end }) %}
+	| LeftBrace Expression WithKeyword Expression RightBrace       {% ([lbrace, lhs, withKeyword, rhs, rbrace]) => generators.combination(lhs, rhs, { start: lhs.position.start, end: rhs.position.end }) %}
 
 Value ->
 	  TypedRecordLiteral     {% id %}
@@ -311,6 +312,7 @@ ImplementationKeyword -> %KeywordImplementation {% id %}
 OverloadKeyword       -> %KeywordOverload       {% id %}
 MatchKeyword          -> %KeywordMatch          {% id %}
 CaseKeyword           -> %KeywordCase           {% id %}
+WithKeyword           -> %KeywordWith           {% id %}
 
 # ---------------- #
 # Compound Symbols #
