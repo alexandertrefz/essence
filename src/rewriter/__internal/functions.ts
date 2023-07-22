@@ -24,7 +24,7 @@ function getNativeValue(
 		| RecordType,
 ): any {
 	if (isRecord(obj)) {
-		let result: { [key: string]: any } = {}
+		let result: Record<string, any> = {}
 
 		for (let [key, value] of Object.entries(obj)) {
 			result[key] = getNativeValue(value)

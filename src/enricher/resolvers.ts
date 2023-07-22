@@ -88,7 +88,7 @@ function inferGenericFunctionInvocation(
 	argumentTypes: parser.ArgumentNode[],
 	scope: enricher.Scope,
 ): common.FunctionType {
-	let inferredGenerics: { [key: string]: common.Type } = {}
+	let inferredGenerics: Record<string, common.Type> = {}
 
 	let inferredFunctionType: common.FunctionType = {
 		type: "Function",
@@ -372,7 +372,7 @@ export function resolveRecordValueType(
 	if (node.type !== null) {
 		return resolveType(node.type, scope)
 	} else {
-		let members: { [key: string]: common.Type } = {}
+		let members: Record<string, common.Type> = {}
 
 		for (let [memberKey, memberValue] of Object.entries(node.members)) {
 			members[memberKey] = resolveType(memberValue, scope)
@@ -851,7 +851,7 @@ export function resolvePrimitiveTypeType(
 
 export function resolveGenericType(
 	type: common.GenericTypeType,
-	types: { [key: string]: common.Type },
+	types: Record<string, common.Type>,
 ): common.TypeType {
 	let resolvedType: common.TypeType = {
 		type: "Type",

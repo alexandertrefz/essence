@@ -53,9 +53,7 @@ export type ValueNode =
 export type RecordValueNode = {
 	nodeType: "RecordValue"
 	type: Type
-	members: {
-		[key: string]: ExpressionNode
-	}
+	members: Record<string, ExpressionNode>
 }
 
 export type StringValueNode = {
@@ -157,16 +155,12 @@ export interface Method {
 	isStatic: boolean
 }
 
-export type Methods = {
-	[key: string]: Method
-}
+export type Methods = Record<string, Method>
 
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
-	properties: {
-		[key: string]: Type
-	}
+	properties: Record<string, Type>
 	methods: Methods
 	type: Type
 }

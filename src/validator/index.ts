@@ -595,7 +595,7 @@ function inferFunctionType(
 	genericFunctionType: common.GenericFunctionType,
 	argumentTypes: common.typed.ArgumentNode[],
 ): common.FunctionType {
-	let inferredGenerics: { [key: string]: common.Type } = {}
+	let inferredGenerics: Record<string, common.Type> = {}
 
 	let inferredFunctionType: common.FunctionType = {
 		type: "Function",

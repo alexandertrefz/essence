@@ -72,9 +72,7 @@ export type ValueNode =
 export type RecordValueNode = {
 	nodeType: "RecordValue"
 	type: TypeDeclarationNode | null
-	members: {
-		[key: string]: ExpressionNode
-	}
+	members: Record<string, ExpressionNode>
 	position: Position
 }
 
@@ -208,20 +206,15 @@ export interface OverloadedStaticMethod {
 	methods: Array<FunctionValueNode>
 }
 
-export type Methods = {
-	[key: string]:
-		| SimpleMethod
-		| StaticMethod
-		| OverloadedMethod
-		| OverloadedStaticMethod
-}
+export type Methods = Record<
+	string,
+	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
+>
 
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
-	properties: {
-		[key: string]: TypeDeclarationNode
-	}
+	properties: Record<string, TypeDeclarationNode>
 	methods: Methods
 	position: Position
 }
