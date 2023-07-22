@@ -1,14 +1,14 @@
 import deepEqual = require("deep-equal")
 import * as util from "util"
 
-import { parser, enricher, common } from "../interfaces"
 import { matchesType } from "../helpers"
+import { common, enricher, parser } from "../interfaces"
 
-import stringType from "./types/String"
 import booleanType from "./types/Boolean"
-import integerType from "./types/Integer"
 import fractionType from "./types/Fraction"
+import integerType from "./types/Integer"
 import listType from "./types/List"
+import stringType from "./types/String"
 
 export function resolveType(
 	node:
@@ -582,8 +582,8 @@ export function resolveTypeDefinitionStatementType(
 		name: node.name.content,
 	} as common.TypeType
 
-	let definitionMembers: { [key: string]: common.Type } = {}
-	let methods: { [key: string]: common.MethodType } = {}
+	let definitionMembers: Record<string, common.Type> = {}
+	let methods: Record<string, common.MethodType> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
 		definitionMembers[memberKey] = resolveType(memberValue, scope)

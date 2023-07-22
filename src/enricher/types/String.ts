@@ -1,4 +1,4 @@
-import { common } from "../../interfaces";
+import { common } from "../../interfaces"
 
 const type: common.TypeType = {
 	type: "Type",
@@ -71,6 +71,6 @@ const type: common.TypeType = {
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 	},
-};
+}
 
-export default type;
+export default type

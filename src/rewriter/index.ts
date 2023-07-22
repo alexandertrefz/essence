@@ -1,11 +1,11 @@
-import * as path from "path";
+import * as path from "path"
 
-import { generate } from "escodegen";
-import * as estree from "estree";
+import { generate } from "escodegen"
+import * as estree from "estree"
 
-const esbuild = require("esbuild");
+const esbuild = require("esbuild")
 
-import { common } from "../interfaces";
+import { common } from "../interfaces"
 
 export async function rewrite(
 	program: common.typedSimple.Program,
@@ -24,7 +24,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("$type")], "type"),
 			...rewriteImplementationSection(program.implementation),
 		],
-	};
+	}
 
 	const programText = generate(rewrittenProgram, {
 		format: {
@@ -37,7 +37,7 @@ export async function rewrite(
 			space: " ",
 			quotes: "double",
 		},
-	});
+	})
 
 	esbuild.buildSync({
 		stdin: {
@@ -53,15 +53,15 @@ export async function rewrite(
 		bundle: true,
 		format: "iife",
 		outfile: flags.outputFileName,
-	});
+	})
 
-	return Promise.resolve();
+	return Promise.resolve()
 }
 
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	return implementation.nodes.map((node) => rewriteStatement(node));
+	return implementation.nodes.map((node) => rewriteStatement(node))
 }
 
 // #region Statements
@@ -71,17 +71,17 @@ function rewriteStatement(
 ): estree.Statement {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
-			return rewriteVariableDeclarationStatement(node);
+			return rewriteVariableDeclarationStatement(node)
 		case "TypeDefinitionStatement":
-			return rewriteTypeDefinitionStatement(node);
+			return rewriteTypeDefinitionStatement(node)
 		case "ChoiceStatement":
-			return rewriteChoiceStatement(node);
+			return rewriteChoiceStatement(node)
 		case "ReturnStatement":
-			return rewriteReturnStatement(node);
+			return rewriteReturnStatement(node)
 		case "FunctionStatement":
-			return rewriteFunctionStatement(node);
+			return rewriteFunctionStatement(node)
 		default:
-			return rewriteExpressionStatement(node);
+			return rewriteExpressionStatement(node)
 	}
 }
 
@@ -98,7 +98,7 @@ function rewriteVariableDeclarationStatement(
 			},
 		],
 		kind: node.isConstant ? "const" : "let",
-	};
+	}
 }
 
 function rewriteTypeDefinitionStatement(
@@ -110,38 +110,37 @@ function rewriteTypeDefinitionStatement(
 		superClass: null,
 		body: {
 			type: "ClassBody",
-			body: Object.entries(node.methods).map<estree.MethodDefinition>(([
-				name,
-				method,
-			]) => {
-				return {
-					type: "MethodDefinition",
-					key: {
-						type: "Identifier",
-						name,
-					},
-					value: rewriteFunctionExpression(method.method.value),
-					kind: "method",
-					computed: false,
-					static: true,
-				};
-			}),
+			body: Object.entries(node.methods).map<estree.MethodDefinition>(
+				([name, method]) => {
+					return {
+						type: "MethodDefinition",
+						key: {
+							type: "Identifier",
+							name,
+						},
+						value: rewriteFunctionExpression(method.method.value),
+						kind: "method",
+						computed: false,
+						static: true,
+					}
+				},
+			),
 		},
-	};
+	}
 }
 
 function rewriteChoiceStatement(
 	node: common.typedSimple.ChoiceStatementNode,
 ): estree.IfStatement {
-	let alternate;
+	let alternate
 
 	if (
 		node.falseBody.length === 1 &&
 		node.falseBody[0].nodeType === "ChoiceStatement"
 	) {
-		alternate = rewriteStatement(node.falseBody[0]);
+		alternate = rewriteStatement(node.falseBody[0])
 	} else {
-		alternate = rewriteBlockStatement(node.falseBody);
+		alternate = rewriteBlockStatement(node.falseBody)
 	}
 
 	return {
@@ -158,7 +157,7 @@ function rewriteChoiceStatement(
 		},
 		consequent: rewriteBlockStatement(node.trueBody),
 		alternate,
-	};
+	}
 }
 
 function rewriteReturnStatement(
@@ -167,7 +166,7 @@ function rewriteReturnStatement(
 	return {
 		type: "ReturnStatement",
 		argument: rewriteExpression(node.expression),
-	};
+	}
 }
 
 function rewriteFunctionStatement(
@@ -178,7 +177,7 @@ function rewriteFunctionStatement(
 		id: rewriteIdentifier(node.name),
 		params: node.value.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.value.body),
-	};
+	}
 }
 
 function rewriteExpressionStatement(
@@ -189,7 +188,7 @@ function rewriteExpressionStatement(
 	return {
 		type: "ExpressionStatement",
 		expression: rewriteExpression(node),
-	};
+	}
 }
 
 // #endregion
@@ -203,33 +202,33 @@ function rewriteExpression(
 ): estree.Expression {
 	switch (node.nodeType) {
 		case "VariableAssignmentStatement":
-			return rewriteVariableAssignmentStatement(node);
+			return rewriteVariableAssignmentStatement(node)
 		case "NativeFunctionInvocation":
-			return rewriteNativeFunctionInvocation(node);
+			return rewriteNativeFunctionInvocation(node)
 		case "FunctionInvocation":
-			return rewriteFunctionInvocation(node);
+			return rewriteFunctionInvocation(node)
 		case "Combination":
-			return rewriteCombination(node);
+			return rewriteCombination(node)
 		case "RecordValue":
-			return rewriteRecordValue(node);
+			return rewriteRecordValue(node)
 		case "StringValue":
-			return rewriteStringValue(node);
+			return rewriteStringValue(node)
 		case "IntegerValue":
-			return rewriteIntegerValue(node);
+			return rewriteIntegerValue(node)
 		case "FractionValue":
-			return rewriteFractionValue(node);
+			return rewriteFractionValue(node)
 		case "BooleanValue":
-			return rewriteBooleanValue(node);
+			return rewriteBooleanValue(node)
 		case "FunctionValue":
-			return rewriteFunctionValue(node);
+			return rewriteFunctionValue(node)
 		case "ListValue":
-			return rewriteListValue(node);
+			return rewriteListValue(node)
 		case "Lookup":
-			return rewriteLookup(node);
+			return rewriteLookup(node)
 		case "Identifier":
-			return rewriteIdentifier(node);
+			return rewriteIdentifier(node)
 		case "Match":
-			return rewriteMatch(node);
+			return rewriteMatch(node)
 	}
 }
 
@@ -241,13 +240,13 @@ function rewriteVariableAssignmentStatement(
 		operator: "=",
 		left: rewriteIdentifier(node.name),
 		right: rewriteExpression(node.value),
-	};
+	}
 }
 
 function rewriteNativeFunctionInvocation(
 	node: common.typedSimple.NativeFunctionInvocationNode,
 ): estree.CallExpression {
-	let callee: estree.MemberExpression;
+	let callee: estree.MemberExpression
 
 	if (node.name.nodeType === "Identifier") {
 		callee = {
@@ -262,9 +261,9 @@ function rewriteNativeFunctionInvocation(
 				name: node.name.name.slice(2),
 			},
 			computed: false,
-		};
+		}
 	} else {
-		throw Error("Lookups on NativeFunctionIvocations are not implemented yet.");
+		throw Error("Lookups on NativeFunctionIvocations are not implemented yet.")
 	}
 
 	return {
@@ -272,7 +271,7 @@ function rewriteNativeFunctionInvocation(
 		optional: false,
 		callee,
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
-	};
+	}
 }
 
 function rewriteFunctionInvocation(
@@ -283,7 +282,7 @@ function rewriteFunctionInvocation(
 		optional: false,
 		callee: rewriteExpression(node.name),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
-	};
+	}
 }
 
 function rewriteCombination(
@@ -313,7 +312,7 @@ function rewriteCombination(
 			rewriteExpression(node.lhs),
 			rewriteExpression(node.rhs),
 		],
-	};
+	}
 }
 
 function rewriteRecordValue(
@@ -321,24 +320,23 @@ function rewriteRecordValue(
 ): estree.ObjectExpression {
 	return {
 		type: "ObjectExpression",
-		properties: Object.entries(node.members).map<estree.Property>(([
-			key,
-			value,
-		]) => {
-			return {
-				type: "Property",
-				key: {
-					type: "Identifier",
-					name: key,
-				},
-				value: rewriteExpression(value),
-				kind: "init",
-				computed: false,
-				method: false,
-				shorthand: false,
-			};
-		}),
-	};
+		properties: Object.entries(node.members).map<estree.Property>(
+			([key, value]) => {
+				return {
+					type: "Property",
+					key: {
+						type: "Identifier",
+						name: key,
+					},
+					value: rewriteExpression(value),
+					kind: "init",
+					computed: false,
+					method: false,
+					shorthand: false,
+				}
+			},
+		),
+	}
 }
 
 function rewriteStringValue(
@@ -366,7 +364,7 @@ function rewriteStringValue(
 				value: node.value,
 			},
 		],
-	};
+	}
 }
 
 function rewriteIntegerValue(
@@ -395,7 +393,7 @@ function rewriteIntegerValue(
 				value: BigInt(node.value),
 			},
 		],
-	};
+	}
 }
 
 function rewriteFractionValue(
@@ -429,7 +427,7 @@ function rewriteFractionValue(
 				value: BigInt(node.denominator),
 			},
 		],
-	};
+	}
 }
 
 function rewriteBooleanValue(
@@ -457,13 +455,13 @@ function rewriteBooleanValue(
 				value: node.value,
 			},
 		],
-	};
+	}
 }
 
 function rewriteFunctionValue(
 	node: common.typedSimple.FunctionValueNode,
 ): estree.FunctionExpression {
-	return rewriteFunctionExpression(node.value);
+	return rewriteFunctionExpression(node.value)
 }
 
 function rewriteListValue(
@@ -491,7 +489,7 @@ function rewriteListValue(
 				elements: node.values.map((expr) => rewriteExpression(expr)),
 			},
 		],
-	};
+	}
 }
 
 function rewriteLookup(
@@ -503,7 +501,7 @@ function rewriteLookup(
 		object: rewriteExpression(node.base),
 		property: rewriteIdentifier(node.member),
 		computed: false,
-	};
+	}
 }
 
 function rewriteIdentifier(
@@ -512,7 +510,7 @@ function rewriteIdentifier(
 	return {
 		type: "Identifier",
 		name: node.name,
-	};
+	}
 }
 
 function rewriteMatch(
@@ -522,13 +520,13 @@ function rewriteMatch(
 		value: estree.Expression,
 		matcher: common.Type,
 	): estree.CallExpression {
-		let matcherArgument;
+		let matcherArgument
 
 		// TODO: Handle Record Types
 		if (matcher.type === "Type") {
-			matcherArgument = convertObjectToObjectExpression(matcher.definition);
+			matcherArgument = convertObjectToObjectExpression(matcher.definition)
 		} else {
-			matcherArgument = convertObjectToObjectExpression(matcher);
+			matcherArgument = convertObjectToObjectExpression(matcher)
 		}
 
 		return {
@@ -542,36 +540,36 @@ function rewriteMatch(
 				computed: false,
 			},
 			arguments: [value, matcherArgument],
-		};
+		}
 	}
 
-	const valueExpression = rewriteExpression(node.value);
+	const valueExpression = rewriteExpression(node.value)
 	const selfParameter: estree.Identifier = {
 		type: "Identifier",
 		name: "_self",
-	};
+	}
 
-	let previousIfStatement: estree.IfStatement | undefined = undefined;
-	let finalIfStatement: estree.IfStatement;
+	let previousIfStatement: estree.IfStatement | undefined = undefined
+	let finalIfStatement: estree.IfStatement
 
 	for (let i = node.handlers.length - 1; i >= 0; i--) {
-		const currentHandler = node.handlers[i];
+		const currentHandler = node.handlers[i]
 
 		if (i > 0) {
 			previousIfStatement = {
 				type: "IfStatement",
 				test: callIsValueOfType(selfParameter, currentHandler.matcher),
 				consequent: rewriteBlockStatement(currentHandler.body),
-			};
+			}
 		} else {
 			finalIfStatement = {
 				type: "IfStatement",
 				test: callIsValueOfType(selfParameter, currentHandler.matcher),
 				consequent: rewriteBlockStatement(currentHandler.body),
-			};
+			}
 
 			if (previousIfStatement) {
-				finalIfStatement.alternate = previousIfStatement;
+				finalIfStatement.alternate = previousIfStatement
 			}
 		}
 	}
@@ -582,13 +580,14 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
+				// rome-ignore lint/style/noNonNullAssertion: We can guarantee that this will always be set
 				body: [finalIfStatement!],
 			},
 			params: [selfParameter],
 		},
 		arguments: [valueExpression],
 		optional: false,
-	};
+	}
 }
 
 // #endregion
@@ -600,16 +599,16 @@ function rewriteBlockStatement(
 ): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		body: nodes.map((node) => rewriteStatement(node)).filter(
-			(value) => !!value,
-		),
-	};
+		body: nodes
+			.map((node) => rewriteStatement(node))
+			.filter((value) => !!value),
+	}
 }
 
 function rewriteParameter(
 	parameter: common.typedSimple.ParameterNode,
 ): estree.Pattern {
-	return rewriteIdentifier(parameter.internalName);
+	return rewriteIdentifier(parameter.internalName)
 }
 
 function rewriteFunctionExpression(
@@ -622,20 +621,20 @@ function rewriteFunctionExpression(
 		id: null,
 		params: node.parameters.map((param) => rewriteParameter(param)),
 		body: rewriteBlockStatement(node.body),
-	};
+	}
 }
 
 function rewriteArgument(
 	node: common.typedSimple.ArgumentNode,
 ): estree.Expression {
-	return rewriteExpression(node.value);
+	return rewriteExpression(node.value)
 }
 
 function internalImport(
 	specifiers: Array<
-			| estree.ImportSpecifier
-			| estree.ImportDefaultSpecifier
-			| estree.ImportNamespaceSpecifier
+		| estree.ImportSpecifier
+		| estree.ImportDefaultSpecifier
+		| estree.ImportNamespaceSpecifier
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
@@ -647,10 +646,9 @@ function internalImport(
 			value: `${path.resolve(__dirname, "./__internal", fileName)}.ts`,
 			raw: `"${path.resolve(__dirname, "./__internal", fileName)}.ts"`,
 		},
-	};
+	}
 }
 
-// rome-ignore lint(js/noUnusedVariables): Maybe useful later, added for completeness
 function importSpecifier(variableName: string): estree.ImportSpecifier {
 	return {
 		type: "ImportSpecifier",
@@ -662,10 +660,9 @@ function importSpecifier(variableName: string): estree.ImportSpecifier {
 			type: "Identifier",
 			name: variableName,
 		},
-	};
+	}
 }
 
-// rome-ignore lint(js/noUnusedVariables): Maybe useful later, added for completeness
 function importDefaultSpecifier(
 	variableName: string,
 ): estree.ImportDefaultSpecifier {
@@ -675,7 +672,7 @@ function importDefaultSpecifier(
 			type: "Identifier",
 			name: variableName,
 		},
-	};
+	}
 }
 
 function importNamespaceSpecifier(
@@ -687,7 +684,7 @@ function importNamespaceSpecifier(
 			type: "Identifier",
 			name: variableName,
 		},
-	};
+	}
 }
 
 function convertObjectToObjectExpression(
@@ -697,9 +694,9 @@ function convertObjectToObjectExpression(
 		type: "ObjectExpression",
 		properties: Object.entries(object).map<estree.Property>(([key, value]) => {
 			if (value !== null && typeof value === "object") {
-				value = convertObjectToObjectExpression(value);
+				value = convertObjectToObjectExpression(value)
 			} else {
-				value = { type: "Literal", value } as estree.Literal;
+				value = { type: "Literal", value } as estree.Literal
 			}
 
 			return {
@@ -713,8 +710,8 @@ function convertObjectToObjectExpression(
 				computed: false,
 				method: false,
 				shorthand: false,
-			};
+			}
 		}),
-	};
+	}
 }
 // #endregion

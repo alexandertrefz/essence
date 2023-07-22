@@ -1,4 +1,4 @@
-import { Position } from "./common";
+import { Position } from "./common"
 
 export enum TokenType {
 	SymbolAt = "SymbolAt",
@@ -43,12 +43,12 @@ export enum TokenType {
 }
 
 export interface Token {
-	value: string;
-	type: TokenType;
-	position: Position;
+	value: string
+	type: TokenType
+	position: Position
 }
 
 export interface SimpleToken {
-	type: TokenType;
-	value: string;
+	type: TokenType
+	value: string
 }

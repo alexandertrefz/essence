@@ -1,4 +1,4 @@
-import { common } from "../../interfaces";
+import { common } from "../../interfaces"
 
 const type: common.GenericTypeType = {
 	type: "GenericType",
@@ -189,6 +189,6 @@ const type: common.GenericTypeType = {
 			],
 		},
 	},
-};
+}
 
-export default type;
+export default type

@@ -1,120 +1,120 @@
-import * as typed from "./typedNodes";
-import * as typedSimple from "./typedSimpleNodes";
+import * as typed from "./typedNodes"
+import * as typedSimple from "./typedSimpleNodes"
 
 export type Cursor = {
-	line: number;
-	column: number;
-};
+	line: number
+	column: number
+}
 
 export type Position = {
-	start: Cursor;
-	end: Cursor;
-};
+	start: Cursor
+	end: Cursor
+}
 
 export type GenericType = {
-	type: "Generic";
-	name: string;
-};
+	type: "Generic"
+	name: string
+}
 
 export type RecordType = {
-	type: "Record";
+	type: "Record"
 	members: {
-		[key: string]: Type;
-	};
-};
+		[key: string]: Type
+	}
+}
 
 type Parameter = {
-	type: Type;
-	name: string | null;
-};
+	type: Type
+	name: string | null
+}
 
 type GenericDeclaration = {
-	name: string;
-	defaultType: Type | null;
-};
+	name: string
+	defaultType: Type | null
+}
 
 export type FunctionType = {
-	type: "Function";
-	parameterTypes: Array<Parameter>;
-	returnType: Type;
-};
+	type: "Function"
+	parameterTypes: Array<Parameter>
+	returnType: Type
+}
 
 export type GenericFunctionType = {
-	type: "GenericFunction";
-	generics: Array<GenericDeclaration>;
-	parameterTypes: Array<Parameter>;
-	returnType: Type;
-};
+	type: "GenericFunction"
+	generics: Array<GenericDeclaration>
+	parameterTypes: Array<Parameter>
+	returnType: Type
+}
 
 export type SimpleMethodType = {
-	type: "SimpleMethod";
-	parameterTypes: Array<Parameter>;
-	returnType: Type;
-};
+	type: "SimpleMethod"
+	parameterTypes: Array<Parameter>
+	returnType: Type
+}
 
 export type StaticMethodType = {
-	type: "StaticMethod";
-	parameterTypes: Array<Parameter>;
-	returnType: Type;
-};
+	type: "StaticMethod"
+	parameterTypes: Array<Parameter>
+	returnType: Type
+}
 
 export type OverloadedStaticMethodType = {
-	type: "OverloadedStaticMethod";
-	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>;
-};
+	type: "OverloadedStaticMethod"
+	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
+}
 
 export type OverloadedMethodType = {
-	type: "OverloadedMethod";
-	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>;
-};
+	type: "OverloadedMethod"
+	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
+}
 
 export type MethodType =
 	| SimpleMethodType
 	| StaticMethodType
 	| OverloadedStaticMethodType
-	| OverloadedMethodType;
+	| OverloadedMethodType
 
 export type ListType = {
-	type: "List";
-	itemType: Type;
-};
+	type: "List"
+	itemType: Type
+}
 
 export type PrimitiveType = {
-	type: "Primitive";
-	primitive: "String" | "Integer" | "Fraction" | "Boolean";
-};
+	type: "Primitive"
+	primitive: "String" | "Integer" | "Fraction" | "Boolean"
+}
 
 export type UnknownType = {
-	type: "Unknown";
-};
+	type: "Unknown"
+}
 
 export type BuiltInType = {
-	type: "BuiltIn";
-};
+	type: "BuiltIn"
+}
 
 export type TypeType = {
-	type: "Type";
-	name: string;
-	definition: RecordType | BuiltInType | PrimitiveType;
+	type: "Type"
+	name: string
+	definition: RecordType | BuiltInType | PrimitiveType
 	methods: {
-		[key: string]: MethodType;
-	};
-};
+		[key: string]: MethodType
+	}
+}
 
 export type GenericTypeType = {
-	type: "GenericType";
-	name: string;
-	definition: RecordType | BuiltInType | PrimitiveType;
-	generics: Array<GenericDeclaration>;
+	type: "GenericType"
+	name: string
+	definition: RecordType | BuiltInType | PrimitiveType
+	generics: Array<GenericDeclaration>
 	methods: {
-		[key: string]: MethodType;
-	};
-};
+		[key: string]: MethodType
+	}
+}
 
 export type UnionType = {
-	type: "UnionType";
-	types: Array<Type>;
-};
+	type: "UnionType"
+	types: Array<Type>
+}
 
 export type Type =
 	| RecordType
@@ -127,6 +127,6 @@ export type Type =
 	| ListType
 	| UnknownType
 	| GenericType
-	| UnionType;
+	| UnionType
 
-export { typed, typedSimple };
+export { typed, typedSimple }

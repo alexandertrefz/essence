@@ -1,5 +1,5 @@
-import { common } from "../interfaces";
-import { resolveOverloadedMethodName } from "../helpers";
+import { resolveOverloadedMethodName } from "../helpers"
+import { common } from "../interfaces"
 
 export const simplify = (
 	program: common.typed.Program,
@@ -7,8 +7,8 @@ export const simplify = (
 	return {
 		nodeType: "Program",
 		implementation: simplifyImplementationSection(program.implementation),
-	};
-};
+	}
+}
 
 function simplifyImplementationSection(
 	implementation: common.typed.ImplementationSectionNode,
@@ -16,7 +16,7 @@ function simplifyImplementationSection(
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.map((node) => simplifyImplementationNode(node)),
-	};
+	}
 }
 
 function simplifyImplementationNode(
@@ -39,7 +39,7 @@ function simplifyImplementationNode(
 		case "Self":
 		case "MethodLookup":
 		case "Match":
-			return simplifyExpression(node);
+			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
@@ -48,7 +48,7 @@ function simplifyImplementationNode(
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
-			return simplifyStatement(node);
+			return simplifyStatement(node)
 	}
 }
 
@@ -59,37 +59,37 @@ function simplifyExpression(
 ): common.typedSimple.ExpressionNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
-			return simplifyNativeFunctionInvocation(node);
+			return simplifyNativeFunctionInvocation(node)
 		case "MethodInvocation":
-			return simplifyMethodInvocation(node);
+			return simplifyMethodInvocation(node)
 		case "FunctionInvocation":
-			return simplifyFunctionInvocation(node);
+			return simplifyFunctionInvocation(node)
 		case "Combination":
-			return simplifyCombination(node);
+			return simplifyCombination(node)
 		case "RecordValue":
-			return simplifyRecordValue(node);
+			return simplifyRecordValue(node)
 		case "StringValue":
-			return simplifyStringValue(node);
+			return simplifyStringValue(node)
 		case "IntegerValue":
-			return simplifyIntegerValue(node);
+			return simplifyIntegerValue(node)
 		case "FractionValue":
-			return simplifyFractionValue(node);
+			return simplifyFractionValue(node)
 		case "BooleanValue":
-			return simplifyBooleanValue(node);
+			return simplifyBooleanValue(node)
 		case "FunctionValue":
-			return simplifyFunctionValue(node);
+			return simplifyFunctionValue(node)
 		case "ListValue":
-			return simplifyListValue(node);
+			return simplifyListValue(node)
 		case "Lookup":
-			return simplifyLookup(node);
+			return simplifyLookup(node)
 		case "Identifier":
-			return simplifyIdentifier(node);
+			return simplifyIdentifier(node)
 		case "Self":
-			return simplifySelf(node);
+			return simplifySelf(node)
 		case "MethodLookup":
-			return simplifyMethodLookup(node);
+			return simplifyMethodLookup(node)
 		case "Match":
-			return simplifyMatch(node);
+			return simplifyMatch(node)
 	}
 }
 
@@ -101,7 +101,7 @@ function simplifyNativeFunctionInvocation(
 		name: simplifyIdentifier(node.name),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyMethodInvocation(
@@ -111,7 +111,7 @@ function simplifyMethodInvocation(
 		node.name.member.content = resolveOverloadedMethodName(
 			node.name.member.content,
 			node.overloadedMethodIndex,
-		);
+		)
 	}
 
 	return {
@@ -126,7 +126,7 @@ function simplifyMethodInvocation(
 			...node.arguments.map((arg) => simplifyArgument(arg)),
 		],
 		type: node.type,
-	};
+	}
 }
 
 function simplifyFunctionInvocation(
@@ -136,7 +136,7 @@ function simplifyFunctionInvocation(
 		node.name.member.content = resolveOverloadedMethodName(
 			node.name.member.content,
 			node.overloadedMethodIndex,
-		);
+		)
 	}
 
 	return {
@@ -144,7 +144,7 @@ function simplifyFunctionInvocation(
 		name: simplifyExpression(node.name),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyCombination(
@@ -155,7 +155,7 @@ function simplifyCombination(
 		lhs: simplifyExpression(node.lhs),
 		rhs: simplifyExpression(node.rhs),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyRecordValue(
@@ -165,7 +165,7 @@ function simplifyRecordValue(
 		nodeType: "RecordValue",
 		type: node.declaredType !== null ? node.declaredType : node.type,
 		members: simplifyMembers(node.members),
-	};
+	}
 }
 
 function simplifyStringValue(
@@ -175,7 +175,7 @@ function simplifyStringValue(
 		nodeType: "StringValue",
 		value: node.value,
 		type: node.type,
-	};
+	}
 }
 
 function simplifyIntegerValue(
@@ -185,7 +185,7 @@ function simplifyIntegerValue(
 		nodeType: "IntegerValue",
 		value: node.value,
 		type: node.type,
-	};
+	}
 }
 
 function simplifyFractionValue(
@@ -196,7 +196,7 @@ function simplifyFractionValue(
 		numerator: node.numerator,
 		denominator: node.denominator,
 		type: node.type,
-	};
+	}
 }
 
 function simplifyBooleanValue(
@@ -206,25 +206,25 @@ function simplifyBooleanValue(
 		nodeType: "BooleanValue",
 		value: node.value,
 		type: node.type,
-	};
+	}
 }
 
 function simplifyFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typedSimple.FunctionValueNode {
-	let value;
+	let value
 
 	if (node.value.nodeType === "FunctionDefinition") {
-		value = simplifyFunctionDefinition(node.value);
+		value = simplifyFunctionDefinition(node.value)
 	} else {
-		value = simplifyGenericFunctionDefinition(node.value);
+		value = simplifyGenericFunctionDefinition(node.value)
 	}
 
 	return {
 		nodeType: "FunctionValue",
 		value,
 		type: node.type,
-	};
+	}
 }
 
 function simplifyListValue(
@@ -234,7 +234,7 @@ function simplifyListValue(
 		nodeType: "ListValue",
 		values: node.values.map((expr) => simplifyExpression(expr)),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyLookup(
@@ -245,7 +245,7 @@ function simplifyLookup(
 		base: simplifyExpression(node.base),
 		member: simplifyIdentifier(node.member),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyIdentifier(
@@ -255,7 +255,7 @@ function simplifyIdentifier(
 		nodeType: "Identifier",
 		name: node.content,
 		type: node.type,
-	};
+	}
 }
 
 function simplifySelf(
@@ -265,7 +265,7 @@ function simplifySelf(
 		nodeType: "Identifier",
 		name: "_self",
 		type: node.type,
-	};
+	}
 }
 
 function simplifyMethodLookup(
@@ -280,7 +280,7 @@ function simplifyMethodLookup(
 		},
 		member: simplifyIdentifier(node.member),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyMatch(
@@ -294,10 +294,10 @@ function simplifyMatch(
 				matcher: handler.matcher,
 				returnType: handler.returnType,
 				body: handler.body.map(simplifyImplementationNode),
-			};
+			}
 		}),
 		type: node.type,
-	};
+	}
 }
 
 // #endregion
@@ -309,21 +309,21 @@ function simplifyStatement(
 ): common.typedSimple.StatementNode {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
-			return simplifyConstantDeclarationStatement(node);
+			return simplifyConstantDeclarationStatement(node)
 		case "VariableDeclarationStatement":
-			return simplifyVariableDeclarationStatement(node);
+			return simplifyVariableDeclarationStatement(node)
 		case "VariableAssignmentStatement":
-			return simplifyVariableAssignmentStatement(node);
+			return simplifyVariableAssignmentStatement(node)
 		case "TypeDefinitionStatement":
-			return simplifyTypeDefinitionStatement(node);
+			return simplifyTypeDefinitionStatement(node)
 		case "IfElseStatement":
-			return simplifyChoice(node);
+			return simplifyChoice(node)
 		case "IfStatement":
-			return simplifyChoice(node);
+			return simplifyChoice(node)
 		case "ReturnStatement":
-			return simplifyReturnStatement(node);
+			return simplifyReturnStatement(node)
 		case "FunctionStatement":
-			return simplifyFunctionStatement(node);
+			return simplifyFunctionStatement(node)
 	}
 }
 
@@ -336,7 +336,7 @@ function simplifyConstantDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
-	};
+	}
 }
 
 function simplifyVariableDeclarationStatement(
@@ -348,7 +348,7 @@ function simplifyVariableDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: false,
-	};
+	}
 }
 
 function simplifyVariableAssignmentStatement(
@@ -358,7 +358,7 @@ function simplifyVariableAssignmentStatement(
 		nodeType: "VariableAssignmentStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyExpression(node.value),
-	};
+	}
 }
 
 function simplifyTypeDefinitionStatement(
@@ -370,13 +370,13 @@ function simplifyTypeDefinitionStatement(
 		properties: node.properties,
 		methods: simplifyMethods(node.methods, node.type),
 		type: node.type,
-	};
+	}
 }
 
 function simplifyChoice(
 	node: common.typed.IfElseStatementNode | common.typed.IfStatementNode,
 ): common.typedSimple.ChoiceStatementNode {
-	let convertedNode: common.typed.IfElseStatementNode;
+	let convertedNode: common.typed.IfElseStatementNode
 	if (node.nodeType === "IfStatement") {
 		convertedNode = {
 			nodeType: "IfElseStatement",
@@ -384,21 +384,21 @@ function simplifyChoice(
 			trueBody: node.body,
 			falseBody: [],
 			position: node.position,
-		};
+		}
 	} else {
-		convertedNode = node;
+		convertedNode = node
 	}
 
 	return {
 		nodeType: "ChoiceStatement",
 		condition: simplifyExpression(convertedNode.condition),
-		trueBody: convertedNode.trueBody.map(
-			(node) => simplifyImplementationNode(node),
+		trueBody: convertedNode.trueBody.map((node) =>
+			simplifyImplementationNode(node),
 		),
-		falseBody: convertedNode.falseBody.map(
-			(node) => simplifyImplementationNode(node),
+		falseBody: convertedNode.falseBody.map((node) =>
+			simplifyImplementationNode(node),
 		),
-	};
+	}
 }
 
 function simplifyReturnStatement(
@@ -407,7 +407,7 @@ function simplifyReturnStatement(
 	return {
 		nodeType: "ReturnStatement",
 		expression: simplifyExpression(node.expression),
-	};
+	}
 }
 
 function simplifyFunctionStatement(
@@ -417,32 +417,30 @@ function simplifyFunctionStatement(
 		nodeType: "FunctionStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyFunctionDefinition(node.value),
-	};
+	}
 }
 
 // #endregion
 
 // #region Helpers
 
-function simplifyMembers(members: {
-	[key: string]: common.typed.ExpressionNode;
-}): {
-	[key: string]: common.typedSimple.ExpressionNode;
-} {
-	let result: { [key: string]: common.typedSimple.ExpressionNode } = {};
+function simplifyMembers(
+	members: Record<string, common.typed.ExpressionNode>,
+): Record<string, common.typedSimple.ExpressionNode> {
+	let result: { [key: string]: common.typedSimple.ExpressionNode } = {}
 
 	for (let [memberKey, memberExpression] of Object.entries(members)) {
-		result[memberKey] = simplifyExpression(memberExpression);
+		result[memberKey] = simplifyExpression(memberExpression)
 	}
 
-	return result;
+	return result
 }
 
 function simplifyMethods(
 	methods: common.typed.Methods,
 	type: common.Type,
 ): common.typedSimple.Methods {
-	let result: common.typedSimple.Methods = {};
+	let result: common.typedSimple.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(methods)) {
 		if (
@@ -450,7 +448,7 @@ function simplifyMethods(
 			memberValue.nodeType === "OverloadedStaticMethod"
 		) {
 			memberValue.methods.forEach((method, index) => {
-				let newMethod = simplifyFunctionValue(method);
+				let newMethod = simplifyFunctionValue(method)
 
 				if (memberValue.nodeType === "OverloadedMethod") {
 					newMethod.value.parameters.unshift({
@@ -461,16 +459,16 @@ function simplifyMethods(
 							name: "_self",
 							type,
 						},
-					});
+					})
 				}
 
 				result[resolveOverloadedMethodName(memberKey, index)] = {
 					method: newMethod,
 					isStatic: memberValue.nodeType === "OverloadedStaticMethod",
-				};
-			});
+				}
+			})
 		} else {
-			let method = simplifyFunctionValue(memberValue.method);
+			let method = simplifyFunctionValue(memberValue.method)
 
 			if (memberValue.nodeType === "SimpleMethod") {
 				method.value.parameters.unshift({
@@ -481,17 +479,17 @@ function simplifyMethods(
 						name: "_self",
 						type,
 					},
-				});
+				})
 			}
 
 			result[memberKey] = {
 				method,
 				isStatic: memberValue.nodeType === "StaticMethod",
-			};
+			}
 		}
 	}
 
-	return result;
+	return result
 }
 
 function simplifyParameter(
@@ -503,7 +501,7 @@ function simplifyParameter(
 			? simplifyIdentifier(node.externalName)
 			: null,
 		internalName: simplifyIdentifier(node.internalName),
-	};
+	}
 }
 
 function simplifyGenericDeclaration(
@@ -513,7 +511,7 @@ function simplifyGenericDeclaration(
 		nodeType: "GenericDeclaration",
 		name: node.name,
 		defaultType: node.defaultType,
-	};
+	}
 }
 
 function simplifyGenericFunctionDefinition(
@@ -525,7 +523,7 @@ function simplifyGenericFunctionDefinition(
 		parameters: node.parameters.map((param) => simplifyParameter(param)),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
-	};
+	}
 }
 
 function simplifyFunctionDefinition(
@@ -536,7 +534,7 @@ function simplifyFunctionDefinition(
 		parameters: node.parameters.map((param) => simplifyParameter(param)),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
-	};
+	}
 }
 
 function simplifyArgument(
@@ -546,6 +544,6 @@ function simplifyArgument(
 		nodeType: "Argument",
 		name: node.name,
 		value: simplifyExpression(node.value),
-	};
+	}
 }
 // #endregion
