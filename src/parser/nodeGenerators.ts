@@ -77,9 +77,7 @@ export function methodLookup(
 
 export function recordValueNode(
 	type: parser.TypeDeclarationNode | null,
-	members: {
-		[key: string]: parser.ValueNode
-	},
+	members: Record<string, parser.ValueNode>,
 	position: common.Position,
 ): parser.RecordValueNode {
 	return {
@@ -526,5 +524,5 @@ type TypeMethod =
 	| OverloadedMethodNode
 	| OverloadedStaticMethodNode
 
-type TypeProperties = { [key: string]: parser.TypeDeclarationNode }
+type TypeProperties = Record<string, parser.TypeDeclarationNode>
 // #endregion

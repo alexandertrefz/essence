@@ -427,7 +427,7 @@ function simplifyFunctionStatement(
 function simplifyMembers(
 	members: Record<string, common.typed.ExpressionNode>,
 ): Record<string, common.typedSimple.ExpressionNode> {
-	let result: { [key: string]: common.typedSimple.ExpressionNode } = {}
+	let result: Record<string, common.typedSimple.ExpressionNode> = {}
 
 	for (let [memberKey, memberExpression] of Object.entries(members)) {
 		result[memberKey] = simplifyExpression(memberExpression)

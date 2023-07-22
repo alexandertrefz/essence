@@ -1,8 +1,6 @@
 import { common } from "../../interfaces"
 
-const functions: {
-	[key: string]: common.Type
-} = {
+const functions: Record<string, common.Type> = {
 	__print: {
 		type: "GenericFunction",
 		generics: [{ name: "Item", defaultType: null }],

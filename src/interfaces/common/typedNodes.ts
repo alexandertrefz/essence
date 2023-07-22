@@ -80,9 +80,7 @@ export type RecordValueNode = {
 	nodeType: "RecordValue"
 	declaredType: Type | null
 	type: Type
-	members: {
-		[key: string]: ExpressionNode
-	}
+	members: Record<string, ExpressionNode>
 	position: Position
 }
 
@@ -235,16 +233,12 @@ export type Method =
 	| OverloadedMethod
 	| OverloadedStaticMethod
 
-export type Methods = {
-	[key: string]: Method
-}
+export type Methods = Record<string, Method>
 
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
-	properties: {
-		[key: string]: Type
-	}
+	properties: Record<string, Type>
 	methods: Methods
 	position: Position
 	type: Type

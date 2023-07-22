@@ -18,9 +18,7 @@ export type GenericType = {
 
 export type RecordType = {
 	type: "Record"
-	members: {
-		[key: string]: Type
-	}
+	members: Record<string, Type>
 }
 
 type Parameter = {
@@ -96,9 +94,7 @@ export type TypeType = {
 	type: "Type"
 	name: string
 	definition: RecordType | BuiltInType | PrimitiveType
-	methods: {
-		[key: string]: MethodType
-	}
+	methods: Record<string, MethodType>
 }
 
 export type GenericTypeType = {
@@ -106,9 +102,7 @@ export type GenericTypeType = {
 	name: string
 	definition: RecordType | BuiltInType | PrimitiveType
 	generics: Array<GenericDeclaration>
-	methods: {
-		[key: string]: MethodType
-	}
+	methods: Record<string, MethodType>
 }
 
 export type UnionType = {

@@ -514,7 +514,7 @@ export function enrichTypeDefinitionStatement(
 		properties: Record<string, parser.TypeDeclarationNode>,
 		scope: enricher.Scope,
 	): Record<string, common.Type> {
-		let result: { [key: string]: common.Type } = {}
+		let result: Record<string, common.Type> = {}
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
 			result[propertyKey] = resolveType(propertyValue, scope)
