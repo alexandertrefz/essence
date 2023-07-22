@@ -457,14 +457,22 @@ export function parameter(
 	}
 }
 
-type KeyValuePair = { key: string; value: parser.ExpressionNode }
-type KeyValuePairObject = { [key: string]: parser.ExpressionNode }
+type KeyValuePair = {
+	key: string
+	value: parser.ExpressionNode
+	position: common.Position
+}
+type KeyValuePairObject = {
+	data: Record<string, parser.ExpressionNode>
+	position: common.Position
+}
 
 export function keyValuePair(
 	key: string,
 	value: parser.ExpressionNode,
+	position: common.Position,
 ): KeyValuePair {
-	return { key, value }
+	return { key, value, position }
 }
 
 export function buildKeyValuePairList(
@@ -472,10 +480,17 @@ export function buildKeyValuePairList(
 	kvp: KeyValuePair,
 ): KeyValuePairObject {
 	const keyValuePairList = [...kvpList, kvp]
-	return keyValuePairList.reduce<KeyValuePairObject>((prev, curr) => {
-		prev[curr.key] = curr.value
-		return prev
-	}, {})
+
+	return {
+		data: keyValuePairList.reduce<KeyValuePairObject["data"]>((prev, curr) => {
+			prev[curr.key] = curr.value
+			return prev
+		}, {}),
+		position: {
+			start: keyValuePairList[0].position.start,
+			end: keyValuePairList[keyValuePairList.length - 1].position.end,
+		},
+	}
 }
 
 export function argument(
