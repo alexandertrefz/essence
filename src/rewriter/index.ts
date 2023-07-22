@@ -39,7 +39,9 @@ export async function rewrite(
 		},
 	})
 
-	esbuild.buildSync({
+	const __dirname = import.meta.dir
+
+	return esbuild.build({
 		stdin: {
 			contents: programText,
 			loader: "ts",
@@ -54,8 +56,6 @@ export async function rewrite(
 		format: "iife",
 		outfile: flags.outputFileName,
 	})
-
-	return Promise.resolve()
 }
 
 function rewriteImplementationSection(
@@ -638,6 +638,8 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
+	const __dirname = import.meta.dir
+
 	return {
 		type: "ImportDeclaration",
 		specifiers,
