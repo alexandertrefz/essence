@@ -42,6 +42,10 @@ test: compile-grammar |
 	@clear
 	@$(JEST)
 
+update-snapshot: compile-grammar |
+	@clear
+	@$(JEST) --updateSnapshot
+
 ci-test: compile-grammar |
 	@clear
 	@$(JEST) --ci
