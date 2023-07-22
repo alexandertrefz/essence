@@ -1,14 +1,23 @@
 {
 	"compilerOptions": {
-		"target": "es2020",
-		"module": "commonjs",
+		"lib": [
+			"ESNext"
+		],
+		"module": "esnext",
+		"target": "esnext",
+		"moduleResolution": "bundler",
+		"moduleDetection": "force",
+		"allowImportingTsExtensions": true,
 		"strict": true,
-		"allowJs": false,
-		"pretty": true,
-		"rootDir": "src",
-		"outDir": "lib",
-		"sourceMap": true
-	},
-	"exclude": ["**/rewriter/__internal/*"],
-	"compileOnSave": false
+		"downlevelIteration": true,
+		"skipLibCheck": true,
+		"jsx": "preserve",
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowJs": true,
+		"noEmit": true,
+		"types": [
+			"bun-types" // add Bun global
+		]
+	}
 }
