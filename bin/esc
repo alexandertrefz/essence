@@ -4,7 +4,8 @@ const fs = require("fs");
 const util = require("util");
 const path = require("path");
 
-const meow = require("meow");
+const yargs = require("yargs/yargs");
+const { hideBin } = require("yargs/helpers");
 
 const readFile = util.promisify(fs.readFile);
 
@@ -17,10 +18,7 @@ const Rewriter = require("../lib/rewriter");
 
 function generateOutputFilePath(inputFileName, outputFileName) {
 	if (outputFileName === undefined) {
-		outputFileName = `${path.basename(
-			cli.input[0],
-			path.extname(cli.input[0]),
-		)}.js`;
+		outputFileName = `${path.basename(argv._[0], path.extname(argv._[0]))}.js`;
 	}
 
 	return path.join(path.dirname(inputFileName), outputFileName);
@@ -43,42 +41,25 @@ async function compile(flags) {
 	return Promise.resolve(flags);
 }
 
-const cli = meow(
-	{
-		help: `
-			Usage
-				$ esc <fileName>
-
-			Options
-				--outputFileName The name of the output file. If not provided, defaults to the name of the input file.
-				--debug Outputs various debugging information.
-
-			Examples
-				$ esc HelloWorld.es
-		`,
-		description: false,
-	},
-	{
-		flags: {
-			outputFileName: {
-				type: "string",
-				default: "",
-			},
-			debug: {
-				type: "boolean",
-				default: false,
-			},
-		},
-	},
-);
+let argv = yargs(hideBin(process.argv))
+	.usage("Usage: $0 <fileName>")
+	.option("outputFileName", {
+		alias: "-o",
+		type: "string",
+		description:
+			"The name of the output file. If not provided, defaults to the name of the input file.",
+	})
+	.option("debug", {
+		alias: "-d",
+		type: "boolean",
+		description: "Outputs various debugging information.",
+	})
+	.parse();
 
 compile({
-	inputFileName: cli.input[0],
-	debug: cli.flags ?? false,
-	outputFileName: generateOutputFilePath(
-		cli.input[0],
-		cli.flags.outputFileName,
-	),
+	inputFileName: argv._[0],
+	debug: argv.debug ?? false,
+	outputFileName: generateOutputFilePath(argv._[0], argv.outputFileName),
 }).then(
 	(flags) => {
 		console.log(
