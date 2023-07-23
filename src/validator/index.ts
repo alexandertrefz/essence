@@ -240,6 +240,7 @@ function validateFunctionInvocation(
 				if (lastIterationHadError === false) {
 					break
 				}
+
 				index++
 			}
 
