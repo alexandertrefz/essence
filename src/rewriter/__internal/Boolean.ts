@@ -1,3 +1,7 @@
+import type { StringType } from "./String"
+
+import { createString } from "./String"
+
 export type BooleanType = { $type: "Boolean"; value: boolean }
 
 export function createBoolean(value: boolean): BooleanType {
@@ -20,4 +24,9 @@ export function isnt(
 	other: BooleanType,
 ): BooleanType {
 	return createBoolean(originalBoolean.value !== other.value)
+}
+
+// rome-ignore lint/suspicious/noShadowRestrictedNames:
+export function toString(boolean: BooleanType): StringType {
+	return createString(boolean.value.toString())
 }

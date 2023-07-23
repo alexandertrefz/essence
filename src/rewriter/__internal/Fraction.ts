@@ -1,6 +1,9 @@
 import { Fraction } from "bigint-fraction"
 
 import type { IntegerType } from "./Integer"
+import type { StringType } from "./String"
+
+import { createString } from "./String"
 
 export type FractionType = { $type: "Fraction"; fraction: Fraction }
 
@@ -122,4 +125,30 @@ export function multiply__overload$2(
 
 	return { $type: "Fraction", fraction }
 }
+
+// #endregion
+
+function formatAsFraction(fraction: Fraction): string {
+	let clonedFraction = fraction.clone()
+	clonedFraction.reduce()
+	return `${clonedFraction.numerator}/${clonedFraction.denominator}`
+}
+
+// #region toString
+
+export function toString__overload$1(fraction: FractionType): StringType {
+	return createString(formatAsFraction(fraction.fraction))
+}
+
+export function toString__overload$2(
+	fraction: FractionType,
+	formatAs: StringType,
+): StringType {
+	if (formatAs.value === "decimal") {
+		return createString(fraction.fraction.toString())
+	} else {
+		return createString(formatAsFraction(fraction.fraction))
+	}
+}
+
 // #endregion

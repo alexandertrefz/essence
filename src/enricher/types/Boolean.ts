@@ -28,6 +28,13 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
+		toString: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+			],
+			returnType: { type: "Primitive", primitive: "String" },
+		} as common.MethodType,
 	},
 }
 

@@ -81,6 +81,13 @@ const type: common.TypeType = {
 				},
 			],
 		},
+		toString: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+			],
+			returnType: { type: "Primitive", primitive: "String" },
+		} as common.MethodType,
 	},
 }
 
