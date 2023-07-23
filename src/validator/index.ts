@@ -132,6 +132,7 @@ function validateMethodInvocation(
 
 			if (overload.parameterTypes.length !== methodArguments.length) {
 				lastIterationHadError = true
+				index++
 				continue
 			}
 
