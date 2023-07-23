@@ -1,7 +1,7 @@
 import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 
-import * as $Boolean from "./Boolean"
+import { createBoolean } from "./Boolean"
 import { getInt32 } from "./internalHelpers"
 
 export type ListType<T> = { $type: "List"; value: Array<T> }
@@ -11,7 +11,7 @@ export function createList<T>(originalList: Array<T>): ListType<T> {
 }
 
 export function hasItems<T>(originalList: ListType<T>): BooleanType {
-	return $Boolean.createBoolean(originalList.value.length !== 0)
+	return createBoolean(originalList.value.length !== 0)
 }
 
 export function first<T>(originalList: ListType<T>): T {
