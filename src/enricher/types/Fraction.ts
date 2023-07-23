@@ -84,6 +84,28 @@ const type: common.TypeType = {
 				},
 			],
 		},
+
+		toString: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+					],
+					returnType: { type: "Primitive", primitive: "String" },
+				},
+				{
+					parameterTypes: [
+						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: "formatAs",
+							type: { type: "Primitive", primitive: "String" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "String" },
+				},
+			],
+		} as common.OverloadedMethodType,
 	},
 }
 

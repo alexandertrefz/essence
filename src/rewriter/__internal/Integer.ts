@@ -1,4 +1,8 @@
-import { FractionType, createFraction } from "./Fraction"
+import type { FractionType } from "./Fraction"
+import type { StringType } from "./String"
+
+import { createFraction } from "./Fraction"
+import { createString } from "./String"
 
 export type IntegerType = { $type: "Integer"; value: bigint }
 
@@ -89,4 +93,10 @@ export function multiply__overload$2(
 
 	return { $type: "Fraction", fraction: clonedFraction }
 }
+
 // #endregion
+
+// rome-ignore lint/suspicious/noShadowRestrictedNames:
+export function toString(integer: IntegerType): StringType {
+	return createString(integer.value.toString())
+}
