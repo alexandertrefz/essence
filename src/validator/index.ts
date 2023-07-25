@@ -204,14 +204,16 @@ function validateFunctionInvocation(
 
 	if (
 		functionType.type === "Function" ||
-		functionType.type === "StaticMethod" ||
-		functionType.type === "OverloadedStaticMethod"
+		functionType.type === "StaticMethod"
 	) {
 		validateSimpleFunctionInvocation(functionType, node.arguments)
 	} else {
 		// Dynamic methods, being called in a manually via `.` are being validated here,
 		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
-		if (functionType.type === "OverloadedMethod") {
+		if (
+			functionType.type === "OverloadedMethod" ||
+			functionType.type === "OverloadedStaticMethod"
+		) {
 			let lastIterationHadError = false
 			let index = 0
 
@@ -220,6 +222,7 @@ function validateFunctionInvocation(
 
 				if (overload.parameterTypes.length !== node.arguments.length) {
 					lastIterationHadError = true
+					index++
 					continue
 				}
 
@@ -530,7 +533,6 @@ function validateSimpleFunctionInvocation(
 	functionType:
 		| common.FunctionType
 		| common.StaticMethodType
-		| common.OverloadedStaticMethodType
 		| common.GenericFunctionType,
 	argumentNodes: common.typed.ArgumentNode[],
 ) {
@@ -538,55 +540,22 @@ function validateSimpleFunctionInvocation(
 		validateExpression(argumentNode.value)
 	}
 
-	if (functionType.type === "OverloadedStaticMethod") {
-		let lastIterationHadError = false
+	if (functionType.type === "GenericFunction") {
+		functionType = inferFunctionType(functionType, argumentNodes)
+	}
 
-		for (let overload of functionType.overloads) {
-			lastIterationHadError = false
+	if (functionType.parameterTypes.length !== argumentNodes.length) {
+		throw new Error("FunctionInvocation: Amount of arguments doesn't match")
+	}
 
-			if (overload.parameterTypes.length !== argumentNodes.length) {
-				lastIterationHadError = true
-				continue
-			}
-
-			for (let i = 0; i < overload.parameterTypes.length; i++) {
-				if (
-					overload.parameterTypes[i].name !== argumentNodes[i].name ||
-					!matchesType(overload.parameterTypes[i].type, argumentNodes[i].type)
-				) {
-					lastIterationHadError = true
-					break
-				}
-			}
-
-			if (lastIterationHadError === false) {
-				break
-			}
-		}
-
-		if (lastIterationHadError) {
+	for (let i = 0; i < functionType.parameterTypes.length; i++) {
+		if (
+			functionType.parameterTypes[i].name !== argumentNodes[i].name ||
+			!matchesType(functionType.parameterTypes[i].type, argumentNodes[i].type)
+		) {
 			throw new Error(
-				"FunctionInvocation: Passed arguments do not match any overload",
+				`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`,
 			)
-		}
-	} else {
-		if (functionType.type === "GenericFunction") {
-			functionType = inferFunctionType(functionType, argumentNodes)
-		}
-
-		if (functionType.parameterTypes.length !== argumentNodes.length) {
-			throw new Error("FunctionInvocation: Amount of arguments doesn't match")
-		}
-
-		for (let i = 0; i < functionType.parameterTypes.length; i++) {
-			if (
-				functionType.parameterTypes[i].name !== argumentNodes[i].name ||
-				!matchesType(functionType.parameterTypes[i].type, argumentNodes[i].type)
-			) {
-				throw new Error(
-					`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`,
-				)
-			}
 		}
 	}
 }
