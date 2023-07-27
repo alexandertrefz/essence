@@ -406,11 +406,18 @@ export function resolveListValueType(
 		}
 	} else {
 		let itemType = resolveType(node.values[0], scope)
+		let isUnion = false
 
 		for (let expression of node.values) {
-			if (!deepEqual(itemType, resolveType(expression, scope))) {
-				// TODO: Implement Union Types
-				throw new Error("Union Types are not implemented yet.")
+			let expressionType = resolveType(expression, scope)
+			if (!deepEqual(itemType, expressionType)) {
+				if (!isUnion) {
+					isUnion = true
+
+					itemType = { type: "UnionType", types: [itemType, expressionType] }
+				} else {
+					;(itemType as common.UnionType).types.push(expressionType)
+				}
 			}
 		}
 
