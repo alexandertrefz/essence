@@ -11,6 +11,11 @@ export function createFraction(
 	numerator: bigint,
 	denominator: bigint,
 ): FractionType {
+	if (denominator < 0) {
+		numerator = numerator * -1n
+		denominator = denominator * -1n
+	}
+
 	return { $type: "Fraction", fraction: new Fraction(numerator, denominator) }
 }
 
