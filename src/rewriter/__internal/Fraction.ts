@@ -17,13 +17,13 @@ export function createFraction(
 // #region Add
 
 export function add__overload$1(
-	numerator: FractionType,
-	denominator: FractionType,
+	firstFraction: FractionType,
+	secondFraction: FractionType,
 ): FractionType {
-	const numerator1 = numerator.fraction.numerator
-	const denominator1 = numerator.fraction.denominator
-	const numerator2 = denominator.fraction.numerator
-	const denominator2 = denominator.fraction.denominator
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
 
 	return createFraction(
 		numerator1 * denominator2 + numerator2 * denominator1,
@@ -32,14 +32,14 @@ export function add__overload$1(
 }
 
 export function add__overload$2(
-	numerator: FractionType,
-	denominator: IntegerType,
+	fraction: FractionType,
+	integer: IntegerType,
 ): FractionType {
-	let fraction = numerator.fraction.clone()
+	let clonedFraction = fraction.fraction.clone()
 
-	fraction.add(denominator.value)
+	clonedFraction.add(integer.value)
 
-	return { $type: "Fraction", fraction }
+	return { $type: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -47,13 +47,13 @@ export function add__overload$2(
 // #region Subtract
 
 export function subtract__overload$1(
-	numerator: FractionType,
-	denominator: FractionType,
+	firstFraction: FractionType,
+	secondFraction: FractionType,
 ): FractionType {
-	const numerator1 = numerator.fraction.numerator
-	const denominator1 = numerator.fraction.denominator
-	const numerator2 = denominator.fraction.numerator
-	const denominator2 = denominator.fraction.denominator
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
 
 	return createFraction(
 		numerator1 * denominator2 - numerator2 * denominator1,
@@ -62,14 +62,14 @@ export function subtract__overload$1(
 }
 
 export function subtract__overload$2(
-	numerator: FractionType,
-	denominator: IntegerType,
+	fraction: FractionType,
+	integer: IntegerType,
 ): FractionType {
-	let fraction = numerator.fraction.clone()
+	let clonedFraction = fraction.fraction.clone()
 
-	fraction.subtract(denominator.value)
+	clonedFraction.subtract(integer.value)
 
-	return { $type: "Fraction", fraction }
+	return { $type: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -77,26 +77,26 @@ export function subtract__overload$2(
 // #region Divide
 
 export function divide__overload$1(
-	numerator: FractionType,
-	denominator: FractionType,
+	firstFraction: FractionType,
+	secondFraction: FractionType,
 ): FractionType {
-	const numerator1 = numerator.fraction.numerator
-	const denominator1 = numerator.fraction.denominator
-	const numerator2 = denominator.fraction.numerator
-	const denominator2 = denominator.fraction.denominator
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
 
 	return createFraction(numerator1 * denominator2, denominator1 * numerator2)
 }
 
 export function divide__overload$2(
-	numerator: FractionType,
-	denominator: IntegerType,
+	fraction: FractionType,
+	integer: IntegerType,
 ): FractionType {
-	let fraction = numerator.fraction.clone()
+	let clonedFraction = fraction.fraction.clone()
 
-	fraction.divide(denominator.value)
+	clonedFraction.divide(integer.value)
 
-	return { $type: "Fraction", fraction }
+	return { $type: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -104,26 +104,26 @@ export function divide__overload$2(
 // #region Multiply
 
 export function multiply__overload$1(
-	numerator: FractionType,
-	denominator: FractionType,
+	firstFraction: FractionType,
+	secondFraction: FractionType,
 ): FractionType {
-	const numerator1 = numerator.fraction.numerator
-	const denominator1 = numerator.fraction.denominator
-	const numerator2 = denominator.fraction.numerator
-	const denominator2 = denominator.fraction.denominator
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
 
 	return createFraction(numerator1 * numerator2, denominator1 * denominator2)
 }
 
 export function multiply__overload$2(
-	numerator: FractionType,
-	denominator: IntegerType,
+	fraction: FractionType,
+	integer: IntegerType,
 ): FractionType {
-	let fraction = numerator.fraction.clone()
+	let clonedFraction = fraction.fraction.clone()
 
-	fraction.multiply(denominator.value)
+	clonedFraction.multiply(integer.value)
 
-	return { $type: "Fraction", fraction }
+	return { $type: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
