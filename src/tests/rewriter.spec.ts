@@ -5,6 +5,7 @@ import * as fraction from "../rewriter/__internal/Fraction"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
 import { createNothing } from "../rewriter/__internal/Nothing"
+import * as number from "../rewriter/__internal/Number"
 import * as string from "../rewriter/__internal/String"
 
 const booleanTrue = () => boolean.createBoolean(true)
@@ -714,6 +715,194 @@ describe("Rewriter", () => {
 							string.createString("decimal"),
 						),
 					).toEqual(string.createString("0.5"))
+				})
+			})
+		})
+
+		describe("Number", () => {
+			describe("lowestNumber", () => {
+				it("returns the smaller of 2 integers", () => {
+					expect(
+						number.lowestNumber__overload$1(integerOne(), integerTwo()),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$1(integerTwo(), integerOne()),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$1(integerHundred(), integerTwo()),
+					).toEqual(integerTwo())
+
+					expect(
+						number.lowestNumber__overload$1(
+							integer.createInteger(-2n),
+							integerTwo(),
+						),
+					).toEqual(integer.createInteger(-2n))
+				})
+
+				it("returns the smaller of 2 fractions", () => {
+					expect(
+						number.lowestNumber__overload$2(fractionOne(), fractionTwo()),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$2(fractionTwo(), fractionOne()),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$2(fractionHundred(), fractionTwo()),
+					).toEqual(fractionTwo())
+
+					expect(
+						number.lowestNumber__overload$2(fractionOne(), fractionOneHalf()),
+					).toEqual(fractionOneHalf())
+
+					expect(
+						number.lowestNumber__overload$2(
+							fraction.createFraction(-1n, 1n),
+							fractionOne(),
+						),
+					).toEqual(fraction.createFraction(-1n, 1n))
+				})
+
+				it("returns the smaller number of an integer and a fraction", () => {
+					expect(
+						number.lowestNumber__overload$3(integerOne(), fractionTwo()),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$3(integerTwo(), fractionOne()),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$3(integerHundred(), fractionTwo()),
+					).toEqual(fractionTwo())
+
+					expect(
+						number.lowestNumber__overload$3(integerOne(), fractionOneHalf()),
+					).toEqual(fractionOneHalf())
+
+					expect(
+						number.lowestNumber__overload$3(
+							integer.createInteger(-1n),
+							fractionOne(),
+						),
+					).toEqual(integer.createInteger(-1n))
+
+					expect(
+						number.lowestNumber__overload$4(fractionOne(), integerTwo()),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$4(fractionTwo(), integerOne()),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$4(fractionHundred(), integerTwo()),
+					).toEqual(integerTwo())
+
+					expect(
+						number.lowestNumber__overload$4(fractionOneHalf(), integerOne()),
+					).toEqual(fractionOneHalf())
+
+					expect(
+						number.lowestNumber__overload$4(
+							fraction.createFraction(-1n, 1n),
+							integerOne(),
+						),
+					).toEqual(fraction.createFraction(-1n, 1n))
+				})
+
+				it("returns the smallest number of a list", () => {
+					expect(
+						number.lowestNumber__overload$5(
+							list.createList([integerOne(), integerTwo(), integerHundred()]),
+						),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$5(
+							list.createList([integerTwo(), integerOne(), integerHundred()]),
+						),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$5(
+							list.createList([integerHundred(), integerTwo(), integerOne()]),
+						),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$6(
+							list.createList([
+								fractionOne(),
+								fractionTwo(),
+								fractionHundred(),
+							]),
+						),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$6(
+							list.createList([
+								fractionTwo(),
+								fractionOne(),
+								fractionHundred(),
+							]),
+						),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$6(
+							list.createList([
+								fractionHundred(),
+								fractionTwo(),
+								fractionOne(),
+							]),
+						),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$6(
+							list.createList([
+								fractionHundred(),
+								fractionTwo(),
+								fractionOneHalf(),
+								fractionOne(),
+							]),
+						),
+					).toEqual(fractionOneHalf())
+
+					expect(
+						number.lowestNumber__overload$7(
+							list.createList([integerOne(), fractionTwo(), integerHundred()]),
+						),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$7(
+							list.createList([integerTwo(), fractionOne(), integerHundred()]),
+						),
+					).toEqual(fractionOne())
+
+					expect(
+						number.lowestNumber__overload$7(
+							list.createList([fractionHundred(), integerTwo(), integerOne()]),
+						),
+					).toEqual(integerOne())
+
+					expect(
+						number.lowestNumber__overload$7(
+							list.createList([
+								integerHundred(),
+								fractionOne(),
+								fractionOneHalf(),
+								integerOne(),
+							]),
+						),
+					).toEqual(fractionOneHalf())
 				})
 			})
 		})

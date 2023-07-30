@@ -18,6 +18,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("String")], "String"),
 			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
 			internalImport([importNamespaceSpecifier("Fraction")], "Fraction"),
+			internalImport([importNamespaceSpecifier("Number")], "Number"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
 			internalImport([importNamespaceSpecifier("List")], "List"),

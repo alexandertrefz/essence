@@ -4,6 +4,7 @@ import integerType from "./types/Integer"
 import listType from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
 import nothingType from "./types/Nothing"
+import numberType from "./types/Number"
 import stringType from "./types/String"
 
 import { common, enricher, parser } from "../interfaces"
@@ -21,6 +22,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			Nothing: nothingType,
 			Integer: integerType,
 			Fraction: fractionType,
+			Number: numberType,
 		},
 	}
 
