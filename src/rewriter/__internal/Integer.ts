@@ -3,6 +3,7 @@ import type { StringType } from "./String"
 
 import { createFraction } from "./Fraction"
 import { createString } from "./String"
+import { Fraction } from "bigint-fraction"
 
 export type IntegerType = { $type: "Integer"; value: bigint }
 
@@ -44,10 +45,10 @@ export function subtract__overload$2(
 	originalNumber: IntegerType,
 	other: FractionType,
 ): FractionType {
-	let clonedFraction = other.fraction.clone()
-	clonedFraction.subtract(originalNumber.value)
+	let fraction = new Fraction(originalNumber.value, 1)
+	fraction.subtract(other.fraction)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { $type: "Fraction", fraction }
 }
 
 // #endregion
