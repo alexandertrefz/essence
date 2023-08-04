@@ -30,7 +30,13 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Generic", name: "ItemType" },
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Generic", name: "ItemType" },
+					{ type: "Primitive", primitive: "Nothing" },
+				],
+			},
 		},
 		last: {
 			type: "SimpleMethod",
@@ -43,7 +49,13 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Generic", name: "ItemType" },
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Generic", name: "ItemType" },
+					{ type: "Primitive", primitive: "Nothing" },
+				],
+			},
 		},
 		unique: {
 			type: "SimpleMethod",

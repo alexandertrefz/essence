@@ -26,7 +26,15 @@ implementation {
 		static create (from eventDescription: String) -> Event {
 			constant splitEvent = eventDescription::split(on ".")
 
-			constant eventName = splitEvent::first()
+			constant eventName = match splitEvent::first() {
+				case String -> String {
+					<- @
+				}
+
+				case Nothing -> String {
+					<- ""
+				}
+			}
 			constant namespaces = splitEvent::dropFirst()::unique()
 
 			<- {
