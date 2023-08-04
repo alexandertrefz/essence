@@ -1,3 +1,5 @@
+import { describe, expect, it } from "bun:test"
+
 import { stripPosition, stripPositionFromArray } from "../helpers"
 import { lexer } from "../interfaces"
 import { Lexer } from "../lexer"

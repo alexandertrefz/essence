@@ -1,9 +1,7 @@
-import { parser } from "../interfaces"
-import { parse } from "../parser"
+import { describe, expect, it } from "bun:test"
 
-// Infinitely deep console.logs for convenience
-const util = require("util")
-util.inspect.defaultOptions.depth = null
+import type { parser } from "../interfaces"
+import { parse } from "../parser"
 
 describe("Parser", () => {
 	describe("Expressions", () => {
@@ -114,7 +112,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse Identifier FunctionInvocations with labelled arguments that is `with`", () => {
+			it("should parse Identifier FunctionInvocations with labelled arguments that is 'with'", () => {
 				let input: parser.Program = parse(
 					"implementation { invocation(with argument) }",
 				)
@@ -122,7 +120,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse Identifier FunctionInvocations with labelled arguments that is `case`", () => {
+			it("should parse Identifier FunctionInvocations with labelled arguments that is 'case'", () => {
 				let input: parser.Program = parse(
 					"implementation { invocation(case argument) }",
 				)
@@ -130,7 +128,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse Identifier FunctionInvocations with labelled arguments that is `static`", () => {
+			it("should parse Identifier FunctionInvocations with labelled arguments that is 'static'", () => {
 				let input: parser.Program = parse(
 					"implementation { invocation(static argument) }",
 				)
@@ -221,19 +219,19 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse `with` as Identifier", () => {
+			it("should parse 'with' as Identifier", () => {
 				let input: parser.Program = parse("implementation { with }")
 
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse `static` as Identifier", () => {
+			it("should parse 'static' as Identifier", () => {
 				let input: parser.Program = parse("implementation { static }")
 
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse `case` as Identifier", () => {
+			it("should parse 'case' as Identifier", () => {
 				let input: parser.Program = parse("implementation { case }")
 
 				expect(input).toMatchSnapshot()
@@ -502,13 +500,13 @@ describe("Parser", () => {
 			})
 
 			describe("BooleanLiterals", () => {
-				it("should parse `true` BooleanLiterals", () => {
+				it("should parse 'true' BooleanLiterals", () => {
 					let input: parser.Program = parse("implementation { true }")
 
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse `false` BooleanLiterals", () => {
+				it("should parse 'false' BooleanLiterals", () => {
 					let input: parser.Program = parse("implementation { false }")
 
 					expect(input).toMatchSnapshot()
@@ -705,7 +703,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse VariableDeclarationStatement with identifier being `with`", () => {
+			it("should parse VariableDeclarationStatement with identifier being 'with'", () => {
 				let input: parser.Program = parse(
 					`implementation { variable with = "" }`,
 				)
@@ -713,7 +711,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse VariableDeclarationStatement with identifier being `case`", () => {
+			it("should parse VariableDeclarationStatement with identifier being 'case'", () => {
 				let input: parser.Program = parse(
 					`implementation { variable case = "" }`,
 				)
@@ -721,7 +719,7 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
-			it("should parse VariableDeclarationStatement with identifier being `static`", () => {
+			it("should parse VariableDeclarationStatement with identifier being 'static'", () => {
 				let input: parser.Program = parse(
 					`implementation { variable static = "" }`,
 				)

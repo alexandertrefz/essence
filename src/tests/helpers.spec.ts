@@ -1,3 +1,5 @@
+import { describe, expect, it } from "bun:test"
+
 import {
 	first,
 	flatten,
@@ -9,7 +11,9 @@ import {
 	symbol,
 	third,
 } from "../helpers"
+
 import { lexer } from "../interfaces"
+
 import {
 	FunctionType,
 	ListType,

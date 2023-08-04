@@ -1,6 +1,5 @@
 import { matchesType } from "../helpers"
 import { common } from "../interfaces"
-import * as util from "util"
 
 type CurrentFunctionContext =
 	| common.typed.FunctionDefinitionNode
@@ -381,11 +380,11 @@ function validateVariableDeclarationStatement(
 				`Wrong Assignment Value Type for Variable ${node.name.content}
 Expected
 
-${util.inspect(node.declaredType)}
+${Bun.inspect(node.declaredType)}
 
 but received
 
-${util.inspect(node.value.type)}
+${Bun.inspect(node.value.type)}
 
 `,
 			)
@@ -405,11 +404,11 @@ function validateVariableAssignmentStatement(
 			`Wrong Assignment Value Type for Variable ${node.name.content}
 Expected
 
-${util.inspect(node.name.type)}
+${Bun.inspect(node.name.type)}
 
 but received
 
-${util.inspect(node.value.type)}
+${Bun.inspect(node.value.type)}
 
 `,
 		)
