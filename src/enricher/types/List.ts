@@ -105,58 +105,6 @@ const type: common.GenericTypeType = {
 				itemType: { type: "Generic", name: "ItemType" },
 			},
 		},
-		insert: {
-			type: "OverloadedMethod",
-			overloads: [
-				{
-					parameterTypes: [
-						{
-							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
-						},
-						{ name: null, type: { type: "Generic", name: "ItemType" } },
-						{
-							name: "atIndex",
-							type: { type: "Primitive", primitive: "Integer" },
-						},
-					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
-				},
-				{
-					parameterTypes: [
-						{
-							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
-						},
-						{
-							name: "contentsOf",
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
-						},
-						{
-							name: "atIndex",
-							type: { type: "Primitive", primitive: "Integer" },
-						},
-					],
-
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
-				},
-			],
-		},
 		append: {
 			type: "OverloadedMethod",
 			overloads: [
