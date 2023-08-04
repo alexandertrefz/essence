@@ -1,5 +1,4 @@
-import deepEqual = require("deep-equal")
-import * as util from "util"
+import deepEqual from "deep-equal"
 
 import { matchesType } from "../helpers"
 import { common, enricher, parser } from "../interfaces"
@@ -173,8 +172,8 @@ export function resolveMethodInvocationType(
 			return overload.returnType
 		}
 
-		console.log(util.inspect(methodArguments, { depth: null }))
-		console.log(util.inspect(type.overloads, { depth: null }))
+		console.log(Bun.inspect(methodArguments))
+		console.log(Bun.inspect(type.overloads))
 
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
@@ -229,8 +228,8 @@ export function resolveFunctionInvocationType(
 			return overload.returnType
 		}
 
-		console.log(util.inspect(methodArguments, { depth: null }))
-		console.log(util.inspect(type.overloads, { depth: null }))
+		console.log(Bun.inspect(methodArguments))
+		console.log(Bun.inspect(type.overloads))
 
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
