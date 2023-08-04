@@ -30,6 +30,7 @@ function validateImplementationNode(
 		case "IntegerValue":
 		case "FractionValue":
 		case "BooleanValue":
+		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -74,6 +75,7 @@ function validateExpression(
 		case "IntegerValue":
 		case "FractionValue":
 		case "BooleanValue":
+		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Identifier":

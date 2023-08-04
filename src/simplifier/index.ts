@@ -32,6 +32,7 @@ function simplifyImplementationNode(
 		case "IntegerValue":
 		case "FractionValue":
 		case "BooleanValue":
+		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -76,6 +77,8 @@ function simplifyExpression(
 			return simplifyFractionValue(node)
 		case "BooleanValue":
 			return simplifyBooleanValue(node)
+		case "NothingValue":
+			return simplifyNothingValue(node)
 		case "FunctionValue":
 			return simplifyFunctionValue(node)
 		case "ListValue":
@@ -205,6 +208,15 @@ function simplifyBooleanValue(
 	return {
 		nodeType: "BooleanValue",
 		value: node.value,
+		type: node.type,
+	}
+}
+
+function simplifyNothingValue(
+	node: common.typed.NothingValueNode,
+): common.typedSimple.NothingValueNode {
+	return {
+		nodeType: "NothingValue",
 		type: node.type,
 	}
 }

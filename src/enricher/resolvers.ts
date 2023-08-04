@@ -7,6 +7,7 @@ import booleanType from "./types/Boolean"
 import fractionType from "./types/Fraction"
 import integerType from "./types/Integer"
 import listType from "./types/List"
+import nothingType from "./types/Nothing"
 import stringType from "./types/String"
 
 export function resolveType(
@@ -36,6 +37,8 @@ export function resolveType(
 			return { type: "Primitive", primitive: "Fraction" }
 		case "BooleanValue":
 			return { type: "Primitive", primitive: "Boolean" }
+		case "NothingValue":
+			return { type: "Primitive", primitive: "Nothing" }
 		case "FunctionValue":
 			return resolveFunctionValueType(node, scope)
 		case "ListValue":
@@ -62,6 +65,7 @@ export function resolveType(
 			return resolveMatchType(node, scope)
 	}
 }
+
 export function resolveNativeFunctionInvocationType(
 	node: parser.NativeFunctionInvocationNode,
 	scope: enricher.Scope,
@@ -296,7 +300,7 @@ export function resolveCombinationType(
 		}
 
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
-			if (rhsType.type === "Primitive") {
+			if (rhsType.type === "Primitive" && rhsType.primitive !== "Nothing") {
 				rhsType = resolvePrimitiveTypeType(rhsType, scope)
 			}
 
@@ -726,12 +730,14 @@ export function resolveMethodLookupBaseType(
 	let baseType = resolveType(node, scope)
 
 	switch (baseType.type) {
-		case "Primitive":
-			return resolvePrimitiveTypeType(baseType, scope)
 		case "List":
 			return resolveGenericType(listType, { ItemType: baseType.itemType })
 		case "Type":
 			return baseType
+		case "Primitive":
+			if (baseType.primitive !== "Nothing") {
+				return resolvePrimitiveTypeType(baseType, scope)
+			}
 		default:
 			throw new Error(
 				`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.`,
@@ -840,7 +846,7 @@ export function resolveMethodType(
 }
 
 export function resolvePrimitiveTypeType(
-	type: common.PrimitiveType,
+	type: Exclude<common.PrimitiveType, common.NothingPrimitiveType>,
 	_scope: enricher.Scope,
 ): common.TypeType {
 	switch (type.primitive) {

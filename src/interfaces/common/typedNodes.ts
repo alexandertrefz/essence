@@ -73,6 +73,7 @@ export type ValueNode =
 	| IntegerValueNode
 	| FractionValueNode
 	| BooleanValueNode
+	| NothingValueNode
 	| FunctionValueNode
 	| ListValueNode
 
@@ -109,6 +110,12 @@ export type FractionValueNode = {
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
+	position: Position
+	type: Type
+}
+
+export type NothingValueNode = {
+	nodeType: "NothingValue"
 	position: Position
 	type: Type
 }

@@ -499,6 +499,14 @@ describe("Parser", () => {
 				})
 			})
 
+			describe("NothingLiteral", () => {
+				it("should parse NothingLiteral", () => {
+					let input: parser.Program = parse("implementation { nothing }")
+
+					expect(input).toMatchSnapshot()
+				})
+			})
+
 			describe("BooleanLiterals", () => {
 				it("should parse 'true' BooleanLiterals", () => {
 					let input: parser.Program = parse("implementation { true }")

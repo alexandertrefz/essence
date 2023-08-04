@@ -134,6 +134,15 @@ export function booleanValueNode(
 	}
 }
 
+export function nothingValueNode(
+	position: common.Position,
+): parser.NothingValueNode {
+	return {
+		nodeType: "NothingValue",
+		position,
+	}
+}
+
 export function functionValueNode(
 	value: parser.FunctionDefinitionNode | parser.GenericFunctionDefinitionNode,
 	position: common.Position,

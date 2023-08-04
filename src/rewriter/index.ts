@@ -19,6 +19,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
 			internalImport([importNamespaceSpecifier("Fraction")], "Fraction"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
+			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			internalImport([importNamespaceSpecifier("$type")], "type"),
@@ -219,6 +220,8 @@ function rewriteExpression(
 			return rewriteFractionValue(node)
 		case "BooleanValue":
 			return rewriteBooleanValue(node)
+		case "NothingValue":
+			return rewriteNothingValue(node)
 		case "FunctionValue":
 			return rewriteFunctionValue(node)
 		case "ListValue":
@@ -455,6 +458,29 @@ function rewriteBooleanValue(
 				value: node.value,
 			},
 		],
+	}
+}
+
+function rewriteNothingValue(
+	_node: common.typedSimple.NothingValueNode,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: {
+				type: "Identifier",
+				name: "Nothing",
+			},
+			property: {
+				type: "Identifier",
+				name: "createNothing",
+			},
+			computed: false,
+		},
+		arguments: [],
 	}
 }
 
