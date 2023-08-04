@@ -52,28 +52,6 @@ export function dropLast<T>(originalList: ListType<T>): ListType<T> {
 	return createList(originalList.value.slice(0, originalList.value.length - 1))
 }
 
-export function insert__overload$1<T>(
-	originalList: ListType<T>,
-	item: T,
-	index: IntegerType,
-): ListType<T> {
-	let copy = originalList.value.slice(0)
-	copy.splice(getInt32(index), 1, item)
-
-	return createList(copy)
-}
-
-export function insert__overload$2<T>(
-	originalList: ListType<T>,
-	contentsOf: ListType<T>,
-	index: IntegerType,
-): ListType<T> {
-	let copy = originalList.value.slice(0)
-	copy.splice(getInt32(index), contentsOf.value.length, ...contentsOf.value)
-
-	return createList(copy)
-}
-
 export function append__overload$1<T>(
 	originalList: ListType<T>,
 	item: T,

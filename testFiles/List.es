@@ -2,10 +2,10 @@ implementation {
 
 	constant Tao = 710/113
 	variable list: [Fraction] = []
-	variable myFraction: Fraction | Nothing = list::append(Tao)::first()
+	variable myFraction = list::append(Tao)::first()
 
-	list = list::insert(1/1, atIndex 0)
-	list = list::insert(contentsOf [1/1], atIndex 1)
+	list = list::append(1/1)
+	list = list::append(contentsOf [1/1])
 
 	__print(list)
 
