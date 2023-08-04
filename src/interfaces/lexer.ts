@@ -24,6 +24,7 @@ export enum TokenType {
 	LiteralFalse = "LiteralFalse",
 	LiteralString = "LiteralString",
 	LiteralNumber = "LiteralNumber",
+	LiteralNothing = "LiteralNothing",
 	//
 	KeywordType = "KeywordType",
 	KeywordIf = "KeywordIf",

@@ -11882,3 +11882,47 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
   },
 }
 `;
+
+exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "nodeType": "NothingValue",
+        "position": {
+          "end": {
+            "column": 25,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 27,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 27,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;

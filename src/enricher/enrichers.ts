@@ -66,6 +66,8 @@ export function enrichExpression(
 			return enrichFractionValue(node, scope)
 		case "BooleanValue":
 			return enrichBooleanValue(node, scope)
+		case "NothingValue":
+			return enrichNothingValue(node, scope)
 		case "FunctionValue":
 			return enrichFunctionValue(node, scope)
 		case "ListValue":
@@ -305,6 +307,17 @@ export function enrichBooleanValue(
 	return {
 		nodeType: "BooleanValue",
 		value: node.value,
+		position: node.position,
+		type: resolveType(node, scope),
+	}
+}
+
+export function enrichNothingValue(
+	node: parser.NothingValueNode,
+	scope: enricher.Scope,
+): common.typed.NothingValueNode {
+	return {
+		nodeType: "NothingValue",
 		position: node.position,
 		type: resolveType(node, scope),
 	}

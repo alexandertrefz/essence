@@ -114,6 +114,7 @@ Value ->
 	| FractionLiteral        {% id %}
 	| IntegerLiteral         {% id %}
 	| BooleanLiteral         {% id %}
+	| NothingLiteral         {% id %}
 	| GenericFunctionLiteral {% id %}
 	| FunctionLiteral        {% id %}
 	| ListLiteral            {% id %}
@@ -225,6 +226,9 @@ FractionLiteral ->
 BooleanLiteral ->
 	  %LiteralTrue  {% ([booleanToken]) => generators.booleanValueNode(true,  booleanToken.position) %}
 	| %LiteralFalse {% ([booleanToken]) => generators.booleanValueNode(false, booleanToken.position) %}
+
+NothingLiteral ->
+	  %LiteralNothing {% ([nothingToken]) => generators.nothingValueNode(nothingToken.position) %}
 
 FunctionLiteral ->
 	ParameterList ReturnType Block {%
