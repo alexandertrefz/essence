@@ -545,6 +545,24 @@ describe("Parser", () => {
 
 					expect(input).toMatchSnapshot()
 				})
+
+				it("should parse negative IntegerLiterals", () => {
+					let input: parser.Program = parse("implementation { -123 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse negative IntegerLiterals with an underscore", () => {
+					let input: parser.Program = parse("implementation { -1_000 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse negative IntegerLiterals with multiple underscores", () => {
+					let input: parser.Program = parse("implementation { -1_000_000 }")
+
+					expect(input).toMatchSnapshot()
+				})
 			})
 
 			describe("FractionLiterals", () => {
@@ -556,6 +574,24 @@ describe("Parser", () => {
 
 				it("should parse FractionLiterals with underscores", () => {
 					let input: parser.Program = parse("implementation { 1_000 / 9 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse negative numerator FractionLiterals", () => {
+					let input: parser.Program = parse("implementation { -3 / 2 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse negative denominator FractionLiterals", () => {
+					let input: parser.Program = parse("implementation { 3 / -2 }")
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse fully negative FractionLiterals", () => {
+					let input: parser.Program = parse("implementation { -3 / -2 }")
 
 					expect(input).toMatchSnapshot()
 				})
