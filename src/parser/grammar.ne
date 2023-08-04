@@ -190,9 +190,18 @@ StringLiteral ->
 	%LiteralString {% ([stringToken]) => generators.stringValueNode(stringToken.value, stringToken.position) %}
 
 Integer ->
-	%LiteralNumber (Underscore %LiteralNumber):* {%
-		([leftPartialNumber, otherPartialNumbers]) => {
+	Dash:? %LiteralNumber (Underscore %LiteralNumber):* {%
+		([dash, leftPartialNumber, otherPartialNumbers]) => {
 			let end
+			let start
+			let value = [leftPartialNumber, ...otherPartialNumbers.map(second)].map(partial => partial.value).join("")
+
+			if (dash) {
+				value = "-" + value
+				start = dash.position.start
+			} else {
+				start = leftPartialNumber.position.start
+			}
 
 			if (otherPartialNumbers.length > 0) {
 				end = otherPartialNumbers[otherPartialNumbers.length - 1][1].position.end;
@@ -201,8 +210,8 @@ Integer ->
 			}
 
 			return {
-				value: [leftPartialNumber, ...otherPartialNumbers.map(second)].map(partial => partial.value).join(""), 
-				position: { start: leftPartialNumber.position.start, end: end }
+				value: value, 
+				position: { start: start, end: end }
 			}
 		}
 	%}
