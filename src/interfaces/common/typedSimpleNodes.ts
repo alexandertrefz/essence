@@ -1,4 +1,14 @@
-import { ListType, Type } from "./index"
+import {
+	BooleanPrimitiveType,
+	FractionPrimitiveType,
+	FunctionType,
+	GenericFunctionType,
+	IntegerPrimitiveType,
+	ListType,
+	NothingPrimitiveType,
+	StringPrimitiveType,
+	Type,
+} from "./index"
 
 // #region Program & Sections
 
@@ -60,37 +70,37 @@ export type RecordValueNode = {
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
-	type: Type
+	type: StringPrimitiveType
 }
 
 export type IntegerValueNode = {
 	nodeType: "IntegerValue"
 	value: string
-	type: Type
+	type: IntegerPrimitiveType
 }
 
 export type FractionValueNode = {
 	nodeType: "FractionValue"
 	numerator: string
 	denominator: string
-	type: Type
+	type: FractionPrimitiveType
 }
 
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
-	type: Type
+	type: BooleanPrimitiveType
 }
 
 export type NothingValueNode = {
 	nodeType: "NothingValue"
-	type: Type
+	type: NothingPrimitiveType
 }
 
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
 	value: FunctionDefinitionNode | GenericFunctionDefinitionNode
-	type: Type
+	type: FunctionType | GenericFunctionType
 }
 
 export type ListValueNode = {
