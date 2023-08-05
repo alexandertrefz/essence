@@ -1,6 +1,7 @@
 import { common, enricher, parser } from "../interfaces"
 
 import {
+	resolveFunctionValueType,
 	resolveListValueType,
 	resolveMatchType,
 	resolveMethodLookupBaseType,
@@ -21,6 +22,7 @@ export function enrichNode(
 		case "IntegerValue":
 		case "FractionValue":
 		case "BooleanValue":
+		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -205,6 +207,7 @@ export function enrichMethodFunctionValue(
 	selfType: common.Type,
 ): common.typed.FunctionValueNode {
 	let isStatic: boolean
+
 	if (node.nodeType === "SimpleMethod") {
 		isStatic = false
 	} else {
@@ -220,7 +223,7 @@ export function enrichMethodFunctionValue(
 			selfType,
 		),
 		position: node.method.position,
-		type: resolveType(node.method, scope),
+		type: resolveFunctionValueType(node.method, scope),
 	}
 }
 
@@ -243,7 +246,7 @@ export function enrichMethodsFunctionValue(
 			nodeType: "FunctionValue",
 			value: enrichMethodFunctionDefinition(method, isStatic, scope, selfType),
 			position: method.position,
-			type: resolveType(method, scope),
+			type: resolveFunctionValueType(method, scope),
 		})
 	}
 
@@ -265,61 +268,61 @@ export function enrichRecordValue(
 
 export function enrichStringValue(
 	node: parser.StringValueNode,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.typed.StringValueNode {
 	return {
 		nodeType: "StringValue",
 		value: node.value,
 		position: node.position,
-		type: resolveType(node, scope),
+		type: { type: "Primitive", primitive: "String" },
 	}
 }
 
 export function enrichIntegerValue(
 	node: parser.IntegerValueNode,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.typed.IntegerValueNode {
 	return {
 		nodeType: "IntegerValue",
 		value: node.value,
 		position: node.position,
-		type: resolveType(node, scope),
+		type: { type: "Primitive", primitive: "Integer" },
 	}
 }
 
 export function enrichFractionValue(
 	node: parser.FractionValueNode,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.typed.FractionValueNode {
 	return {
 		nodeType: "FractionValue",
 		numerator: node.numerator,
 		denominator: node.denominator,
 		position: node.position,
-		type: resolveType(node, scope),
+		type: { type: "Primitive", primitive: "Fraction" },
 	}
 }
 
 export function enrichBooleanValue(
 	node: parser.BooleanValueNode,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.typed.BooleanValueNode {
 	return {
 		nodeType: "BooleanValue",
 		value: node.value,
 		position: node.position,
-		type: resolveType(node, scope),
+		type: { type: "Primitive", primitive: "Boolean" },
 	}
 }
 
 export function enrichNothingValue(
 	node: parser.NothingValueNode,
-	scope: enricher.Scope,
+	_scope: enricher.Scope,
 ): common.typed.NothingValueNode {
 	return {
 		nodeType: "NothingValue",
 		position: node.position,
-		type: resolveType(node, scope),
+		type: { type: "Primitive", primitive: "Nothing" },
 	}
 }
 
@@ -339,7 +342,7 @@ export function enrichFunctionValue(
 		nodeType: "FunctionValue",
 		value,
 		position: node.position,
-		type: resolveType(node, scope),
+		type: resolveFunctionValueType(node, scope),
 	}
 }
 

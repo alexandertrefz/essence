@@ -77,10 +77,37 @@ export type ListType = {
 	itemType: Type
 }
 
-export type PrimitiveType = {
+export type StringPrimitiveType = {
 	type: "Primitive"
-	primitive: "String" | "Integer" | "Fraction" | "Boolean" | "Nothing"
+	primitive: "String"
 }
+
+export type IntegerPrimitiveType = {
+	type: "Primitive"
+	primitive: "Integer"
+}
+
+export type FractionPrimitiveType = {
+	type: "Primitive"
+	primitive: "Fraction"
+}
+
+export type BooleanPrimitiveType = {
+	type: "Primitive"
+	primitive: "Boolean"
+}
+
+export type NothingPrimitiveType = {
+	type: "Primitive"
+	primitive: "Nothing"
+}
+
+export type PrimitiveType =
+	| StringPrimitiveType
+	| IntegerPrimitiveType
+	| FractionPrimitiveType
+	| BooleanPrimitiveType
+	| NothingPrimitiveType
 
 export type UnknownType = {
 	type: "Unknown"
