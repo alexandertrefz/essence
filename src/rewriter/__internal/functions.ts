@@ -4,6 +4,10 @@ import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { StringType } from "./String"
 
+import * as boolean from "./Boolean"
+import * as fraction from "./Fraction"
+import * as integer from "./Integer"
+
 // TODO: Move Record into own proper type
 type RecordType = {
 	$type: null
@@ -14,7 +18,7 @@ function isRecord(obj: any): obj is RecordType {
 	return obj.$type == null
 }
 
-function getNativeValue(
+function getStringRepresentation(
 	obj:
 		| ListType<any>
 		| StringType
@@ -22,33 +26,46 @@ function getNativeValue(
 		| FractionType
 		| BooleanType
 		| RecordType,
-): any {
+	indentLevel = 0,
+): string {
+	const baseIndent = " ".repeat(4 * indentLevel)
+	const contentIndent = " ".repeat(4 * (indentLevel + 1))
+
 	if (isRecord(obj)) {
-		let result: Record<string, any> = {}
+		let keyValuePairs: Array<string> = []
 
 		for (let [key, value] of Object.entries(obj)) {
-			result[key] = getNativeValue(value)
+			keyValuePairs.push(
+				`${key} = ${getStringRepresentation(value, indentLevel + 1)}`,
+			)
 		}
 
-		return result
-	} else if (obj.$type === "List") {
-		return obj.value.map((value) => getNativeValue(value))
-	} else if (obj.$type === "Fraction") {
-		let clone = obj.fraction.clone()
-		clone.reduce()
-		if (clone.numerator === clone.denominator || clone.denominator === 1n) {
-			return clone.numerator.toString()
+		if (keyValuePairs.length) {
+			return `{\n${contentIndent}${keyValuePairs.join(
+				`,\n${contentIndent}`,
+			)}\n${baseIndent}}`
 		} else {
-			return `${clone.numerator}/${clone.denominator}`
+			return "{}"
 		}
+	} else if (obj.$type === "List") {
+		if (obj.value.length) {
+			return `[\n${contentIndent}${obj.value
+				.map((value) => getStringRepresentation(value, indentLevel + 1))
+				.join(`,\n${contentIndent}`)}\n${baseIndent}]`
+		} else {
+			return "[]"
+		}
+	} else if (obj.$type === "Fraction") {
+		return fraction.toString__overload$1(obj).value
 	} else if (obj.$type === "Integer") {
-		return obj.value.toString()
+		return integer.toString(obj).value
+	} else if (obj.$type === "Boolean") {
+		return boolean.toString(obj).value
 	} else {
-		return obj.value
+		return `"${obj.value}"`
 	}
 }
 
-// TODO: Recursive type definitions?
 export function print(
 	message:
 		| ListType<any>
@@ -58,7 +75,7 @@ export function print(
 		| BooleanType
 		| RecordType,
 ) {
-	console.log(getNativeValue(message))
+	console.log(getStringRepresentation(message))
 
 	return message
 }
