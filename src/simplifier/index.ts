@@ -45,6 +45,7 @@ function simplifyImplementationNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "TypeDefinitionStatement":
+		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -328,6 +329,8 @@ function simplifyStatement(
 			return simplifyVariableAssignmentStatement(node)
 		case "TypeDefinitionStatement":
 			return simplifyTypeDefinitionStatement(node)
+		case "NamespaceDefinitionStatement":
+			return simplifyNamespaceDefinitionStatement(node)
 		case "IfElseStatement":
 			return simplifyChoice(node)
 		case "IfStatement":
@@ -380,6 +383,22 @@ function simplifyTypeDefinitionStatement(
 		nodeType: "TypeDefinitionStatement",
 		name: simplifyIdentifier(node.name),
 		properties: node.properties,
+		methods: simplifyMethods(node.methods, node.type),
+		type: node.type,
+	}
+}
+
+function simplifyNamespaceDefinitionStatement(
+	node: common.typed.NamespaceDefinitionStatementNode,
+): common.typedSimple.NamespaceDefinitionStatementNode {
+	return {
+		nodeType: "NamespaceDefinitionStatement",
+		name: simplifyIdentifier(node.name),
+		properties: Object.fromEntries(
+			Object.entries(node.properties).map(([key, value]) => {
+				return [key, simplifyExpression(value.value)]
+			}),
+		),
 		methods: simplifyMethods(node.methods, node.type),
 		type: node.type,
 	}

@@ -54,6 +54,7 @@ const keywords = [
 	"match",
 	"case",
 	"with",
+	"namespace",
 ]
 const symbols = [
 	"(",
@@ -125,6 +126,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordCase
 	} else if (value === "with") {
 		return TokenType.KeywordWith
+	} else if (value === "namespace") {
+		return TokenType.KeywordNamespace
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

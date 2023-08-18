@@ -329,6 +329,57 @@ export function typeDefinitionStatement(
 	}
 }
 
+export function namespaceDefinitionStatement(
+	name: parser.IdentifierNode,
+	body: Array<NamespaceProperty | NamespaceMethod>,
+	position: common.Position,
+): parser.NamespaceDefinitionStatementNode {
+	const properties = body.reduce<NamespaceProperties>((prev, curr) => {
+		if (curr.nodeType === "NamespacePropertyNode") {
+			prev[curr.name.content] = { type: curr.type, value: curr.value }
+		}
+
+		return prev
+	}, {})
+
+	const methods = body.reduce<parser.NamespaceMethods>((prev, curr) => {
+		if (curr.nodeType !== "NamespacePropertyNode") {
+			const overloadedMethod = prev[curr.name.content]
+
+			if (overloadedMethod) {
+				if (overloadedMethod.nodeType === "OverloadedStaticMethod") {
+					prev[curr.name.content] = {
+						nodeType: "OverloadedStaticMethod",
+						methods: [...overloadedMethod.methods, curr.method],
+					}
+				}
+			} else {
+				if (curr.nodeType === "StaticMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "StaticMethod",
+						method: curr.method,
+					}
+				} else if (curr.nodeType === "OverloadedStaticMethodNode") {
+					prev[curr.name.content] = {
+						nodeType: "OverloadedStaticMethod",
+						methods: [curr.method],
+					}
+				}
+			}
+		}
+
+		return prev
+	}, {})
+
+	return {
+		nodeType: "NamespaceDefinitionStatement",
+		name,
+		position,
+		properties,
+		methods,
+	}
+}
+
 export function ifElseStatementNode(
 	ifStatement: parser.IfStatementNode,
 	falseBody:
@@ -542,11 +593,27 @@ type TypeProperty = {
 	name: parser.IdentifierNode
 	type: parser.TypeDeclarationNode
 }
+
+type TypeProperties = Record<string, parser.TypeDeclarationNode>
+
 type TypeMethod =
 	| SimpleMethodNode
 	| StaticMethodNode
 	| OverloadedMethodNode
 	| OverloadedStaticMethodNode
 
-type TypeProperties = Record<string, parser.TypeDeclarationNode>
+type NamespaceProperty = {
+	nodeType: "NamespacePropertyNode"
+	name: parser.IdentifierNode
+	type: parser.TypeDeclarationNode | null
+	value: parser.ExpressionNode
+}
+
+type NamespaceMethod = StaticMethodNode | OverloadedStaticMethodNode
+
+type NamespaceProperties = Record<
+	string,
+	{ type: parser.TypeDeclarationNode | null; value: parser.ExpressionNode }
+>
+
 // #endregion

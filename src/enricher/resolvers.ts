@@ -15,7 +15,8 @@ export function resolveType(
 		| parser.ExpressionNode
 		| parser.FunctionDefinitionNode
 		| parser.TypeDefinitionStatementNode
-		| parser.TypeDeclarationNode,
+		| parser.TypeDeclarationNode
+		| parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
 ): common.Type {
 	switch (node.nodeType) {
@@ -55,6 +56,8 @@ export function resolveType(
 			return resolveFunctionDefinitionType(node, scope)
 		case "TypeDefinitionStatement":
 			return resolveTypeDefinitionStatementType(node, scope)
+		case "NamespaceDefinitionStatement":
+			return resolveNamespaceDefinitionStatementType(node, scope)
 		case "IdentifierTypeDeclaration":
 			return resolveIdentifierTypeDeclarationType(node, scope)
 		case "ListTypeDeclaration":
@@ -400,6 +403,8 @@ export function resolveCombinationType(
 		case "Function":
 		case "GenericFunction":
 			throw new Error("You can not combine Functions.")
+		case "Namespace":
+			throw new Error("You can not combine Namespaces.")
 		case "List":
 			throw new Error("You can not combine Lists.")
 		case "Primitive":
@@ -420,6 +425,8 @@ export function resolveCombinationType(
 		case "Function":
 		case "GenericFunction":
 			throw new Error("You can not combine Functions.")
+		case "Namespace":
+			throw new Error("You can not combine Namespaces.")
 		case "List":
 			throw new Error("You can not combine Lists.")
 		case "Primitive":
@@ -517,6 +524,7 @@ export function resolveLookupType(
 
 	if (
 		baseType.type !== "Record" &&
+		baseType.type !== "Namespace" &&
 		baseType.type !== "Type" &&
 		baseType.type !== "GenericType"
 	) {
@@ -524,7 +532,11 @@ export function resolveLookupType(
 			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Type, or GenericType.`,
 		)
 	} else {
-		if (baseType.type === "Type" || baseType.type === "GenericType") {
+		if (
+			baseType.type === "Type" ||
+			baseType.type === "GenericType" ||
+			baseType.type === "Namespace"
+		) {
 			if (baseType.definition.type === "Record") {
 				if (baseType.definition.members[node.member.content] != null) {
 					return baseType.definition.members[node.member.content]
@@ -690,6 +702,39 @@ export function resolveTypeDefinitionStatementType(
 	}
 
 	resultType.methods = methods
+
+	return resultType
+}
+
+export function resolveNamespaceDefinitionStatementType(
+	node: parser.NamespaceDefinitionStatementNode,
+	scope: enricher.Scope,
+): common.NamespaceType {
+	let resultType: common.NamespaceType = {
+		type: "Namespace",
+		name: node.name.content,
+		definition: { type: "Record", members: {} },
+		methods: {},
+	}
+
+	let definitionMembers: Record<string, common.Type> = {}
+	let methods: Record<string, common.NamespaceMethodType> = {}
+
+	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
+		definitionMembers[memberKey] = resolveType(memberValue.value, scope)
+	}
+
+	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		methods[methodName] = resolveNamespaceMethodType(methodValue, {
+			parent: scope,
+			members: { [node.name.content]: resultType },
+		})
+	}
+
+	resultType.definition = {
+		type: "Record",
+		members: definitionMembers,
+	}
 
 	return resultType
 }
@@ -893,6 +938,55 @@ export function resolveMethodType(
 					returnType: resolveType(method.value.returnType, scope),
 				}
 			}),
+		}
+	} else {
+		return {
+			type: "OverloadedStaticMethod",
+			overloads: node.methods.map((method) => {
+				return {
+					parameterTypes: [
+						...method.value.parameters.map((parameter) => {
+							let name: string | null
+
+							if (parameter.externalName !== null) {
+								name = parameter.externalName.content
+							} else {
+								name = null
+							}
+
+							return {
+								name,
+								type: resolveType(parameter.type, scope),
+							}
+						}),
+					],
+					returnType: resolveType(method.value.returnType, scope),
+				}
+			}),
+		}
+	}
+}
+
+export function resolveNamespaceMethodType(
+	node: parser.StaticMethod | parser.OverloadedStaticMethod,
+	scope: enricher.Scope,
+): common.NamespaceMethodType {
+	if (node.nodeType === "StaticMethod") {
+		return {
+			type: "StaticMethod",
+			parameterTypes: node.method.value.parameters.map((param) => {
+				let name = null
+
+				if (param.externalName !== null) {
+					name = param.externalName.content
+				}
+
+				return {
+					name,
+					type: resolveType(param.type, scope),
+				}
+			}),
+			returnType: resolveType(node.method.value.returnType, scope),
 		}
 	} else {
 		return {

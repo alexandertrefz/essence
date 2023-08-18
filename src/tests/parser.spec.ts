@@ -178,7 +178,7 @@ describe("Parser", () => {
 
 			it("should parse Lookup FunctionInvocations with more than two arguments and a trailing comma", () => {
 				let input: parser.Program = parse(
-					"implementation { namespace.invocation(argument, argument2, argument3,) }",
+					"implementation { record.invocation(argument, argument2, argument3,) }",
 				)
 
 				expect(input).toMatchSnapshot()
@@ -944,6 +944,128 @@ describe("Parser", () => {
 						type Type {
 							property: PropertyType
 							method(parameter: Type) -> Type {
+								<- parameter
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+		})
+
+		describe("NamespaceDefinitionStatements", () => {
+			it("should parse an empty NamespaceDefinitionStatement", () => {
+				let input: parser.Program = parse(
+					"implementation { namespace Namespace {} }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with one Constant", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							static property = Value
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with multiple Properties", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							static property = Value
+							static property2 = Value2
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with one Method", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							static method(parameter: Type) -> Type {
+								<- parameter
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with multiple Methods", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							static method(parameter: Type) -> Type {
+								<- parameter
+							}
+
+							static method2(parameter: Type) -> Type {
+								<- parameter
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with overloaded Methods", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							overload static method(parameter: Type) -> Type {
+								<- parameter
+							}
+
+							overload static method(name parameter: Type) -> Type {
+								<- parameter
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with twice overloaded Methods", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							overload static method(parameter: Type) -> Type {
+								<- parameter
+							}
+
+							overload static method(name parameter: Type) -> Type {
+								<- parameter
+							}
+
+							overload static method(item parameter: Type) -> Type {
+								<- parameter
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse NamespaceDefinitionStatements with Methods and Constants", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						namespace Namespace {
+							static property = PropertyValue
+							static method(parameter: Type) -> Type {
 								<- parameter
 							}
 						}

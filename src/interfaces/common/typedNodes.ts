@@ -5,6 +5,7 @@ import {
 	GenericFunctionType,
 	IntegerPrimitiveType,
 	ListType,
+	NamespaceType,
 	NothingPrimitiveType,
 	Position,
 	StringPrimitiveType,
@@ -196,6 +197,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| TypeDefinitionStatementNode
+	| NamespaceDefinitionStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -261,6 +263,19 @@ export interface TypeDefinitionStatementNode {
 	methods: Methods
 	position: Position
 	type: TypeType
+}
+
+export type NamespaceMethod = StaticMethod | OverloadedStaticMethod
+
+export type NamespaceMethods = Record<string, NamespaceMethod>
+
+export interface NamespaceDefinitionStatementNode {
+	nodeType: "NamespaceDefinitionStatement"
+	name: IdentifierNode
+	properties: Record<string, { type: Type; value: ExpressionNode }>
+	methods: NamespaceMethods
+	position: Position
+	type: NamespaceType
 }
 
 export interface IfElseStatementNode {

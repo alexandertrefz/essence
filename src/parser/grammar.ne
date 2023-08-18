@@ -38,6 +38,7 @@ Statement ->
 	| VariableDeclarationStatement {% id %}
 	| VariableAssignmentStatement  {% id %}
 	| TypeDefinitionStatement      {% id %}
+	| NamespaceDefinitionStatement {% id %}
 	| IfElseStatement              {% id %}
 	| IfStatement                  {% id %}
 	| ReturnStatement              {% id %}
@@ -58,6 +59,9 @@ VariableAssignmentStatement ->
 
 TypeDefinitionStatement ->
 	TypeKeyword Identifier TypeDefinitionBody {% ([keyword, name, body]) => generators.typeDefinitionStatement(name, body.body, { start: keyword.position.start, end: body.position.end }) %}
+
+NamespaceDefinitionStatement ->
+	NamespaceKeyword Identifier NamespaceDefinitionBody {% ([keyword, name, body]) => generators.namespaceDefinitionStatement(name, body.body, { start: keyword.position.start, end: body.position.end }) %}
 
 IfElseStatement ->
 	  IfStatement ElseKeyword Block           {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block.body, { start: ifStatement.position.start, end: block.position.end }) %}
@@ -163,6 +167,16 @@ TypeMethod ->
 	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "SimpleMethodNode",           name, method }) %}
 	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
 	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
+	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
+
+NamespaceDefinitionBody ->
+	LeftBrace (NamespaceProperty | NamespaceMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
+
+NamespaceProperty ->
+	StaticKeyword Identifier DeclarationType:? EqualSign Expression {% ([, name, type, , value]) => ({ nodeType: "NamespacePropertyNode", name, type, value }) %}
+
+NamespaceMethod ->
+	  StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
 	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
 
 ReturnSymbol ->
@@ -326,6 +340,7 @@ OverloadKeyword       -> %KeywordOverload       {% id %}
 MatchKeyword          -> %KeywordMatch          {% id %}
 CaseKeyword           -> %KeywordCase           {% id %}
 WithKeyword           -> %KeywordWith           {% id %}
+NamespaceKeyword      -> %KeywordNamespace      {% id %}
 
 # ---------------- #
 # Compound Symbols #
