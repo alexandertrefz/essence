@@ -6,6 +6,7 @@ import {
 	resolveMatchType,
 	resolveMethodLookupBaseType,
 	resolveType,
+	resolveTypeDefinitionStatementType,
 } from "./resolvers"
 
 export function enrichNode(
@@ -539,7 +540,7 @@ export function enrichTypeDefinitionStatement(
 		return result
 	}
 
-	let type = resolveType(node, scope)
+	let type = resolveTypeDefinitionStatementType(node, scope)
 
 	declareVariableInScope(node.name, type, scope)
 
