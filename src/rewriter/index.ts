@@ -3,14 +3,14 @@ import * as path from "path"
 import { generate } from "escodegen"
 import * as estree from "estree"
 
-const esbuild = require("esbuild")
+import { build, BuildResult } from "esbuild"
 
 import { common } from "../interfaces"
 
 export async function rewrite(
 	program: common.typedSimple.Program,
 	flags: { inputFileName: string; outputFileName: string; debug: boolean },
-): Promise<void> {
+): Promise<BuildResult> {
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
 		sourceType: "module",
@@ -43,7 +43,7 @@ export async function rewrite(
 
 	const __dirname = import.meta.dir
 
-	return esbuild.build({
+	return build({
 		stdin: {
 			contents: programText,
 			loader: "ts",
@@ -135,46 +135,53 @@ function rewriteTypeDefinitionStatement(
 
 function rewriteNamespaceDefinitionStatement(
 	node: common.typedSimple.NamespaceDefinitionStatementNode,
-): estree.ClassDeclaration {
+): estree.VariableDeclaration {
 	return {
-		type: "ClassDeclaration",
-		id: rewriteIdentifier(node.name),
-		superClass: null,
-		body: {
-			type: "ClassBody",
-			body: {
-				...Object.entries(node.properties).map<estree.PropertyDefinition>(
-					([name, value]) => {
-						return {
-							type: "PropertyDefinition",
-							key: {
-								type: "Identifier",
-								name,
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: rewriteIdentifier(node.name),
+				init: {
+					type: "ObjectExpression",
+					properties: [
+						...Object.entries(node.properties).map<estree.Property>(
+							([name, value]) => {
+								return {
+									type: "Property",
+									key: {
+										type: "Identifier",
+										name,
+									},
+									value: rewriteExpression(value),
+									kind: "init",
+									method: false,
+									shorthand: false,
+									computed: false,
+								}
 							},
-							value: rewriteExpression(value),
-							kind: "method",
-							computed: false,
-							static: true,
-						}
-					},
-				),
-				...Object.entries(node.methods).map<estree.MethodDefinition>(
-					([name, method]) => {
-						return {
-							type: "MethodDefinition",
-							key: {
-								type: "Identifier",
-								name,
+						),
+						...Object.entries(node.methods).map<estree.Property>(
+							([name, method]) => {
+								return {
+									type: "Property",
+									key: {
+										type: "Identifier",
+										name,
+									},
+									value: rewriteFunctionExpression(method.method.value),
+									kind: "init",
+									method: true,
+									computed: false,
+									shorthand: false,
+								}
 							},
-							value: rewriteFunctionExpression(method.method.value),
-							kind: "method",
-							computed: false,
-							static: true,
-						}
-					},
-				),
+						),
+					],
+				},
 			},
-		},
+		],
 	}
 }
 
