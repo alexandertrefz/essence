@@ -260,7 +260,7 @@ export interface TypeDefinitionStatementNode {
 	properties: Record<string, Type>
 	methods: Methods
 	position: Position
-	type: Type
+	type: TypeType
 }
 
 export interface IfElseStatementNode {

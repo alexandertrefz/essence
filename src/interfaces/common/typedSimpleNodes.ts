@@ -8,6 +8,7 @@ import {
 	NothingPrimitiveType,
 	StringPrimitiveType,
 	Type,
+	TypeType,
 } from "./index"
 
 // #region Program & Sections
@@ -178,7 +179,7 @@ export interface TypeDefinitionStatementNode {
 	name: IdentifierNode
 	properties: Record<string, Type>
 	methods: Methods
-	type: Type
+	type: TypeType
 }
 
 export interface ChoiceStatementNode {
