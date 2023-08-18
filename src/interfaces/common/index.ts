@@ -72,6 +72,8 @@ export type MethodType =
 	| OverloadedStaticMethodType
 	| OverloadedMethodType
 
+export type NamespaceMethodType = StaticMethodType | OverloadedStaticMethodType
+
 export type ListType = {
 	type: "List"
 	itemType: Type
@@ -117,6 +119,13 @@ export type BuiltInType = {
 	type: "BuiltIn"
 }
 
+export type NamespaceType = {
+	type: "Namespace"
+	name: string
+	definition: RecordType
+	methods: Record<string, NamespaceMethodType>
+}
+
 export type TypeType = {
 	type: "Type"
 	name: string
@@ -145,6 +154,7 @@ export type Type =
 	| PrimitiveType
 	| TypeType
 	| GenericTypeType
+	| NamespaceType
 	| ListType
 	| UnknownType
 	| GenericType

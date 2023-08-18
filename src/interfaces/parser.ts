@@ -164,6 +164,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| TypeDefinitionStatementNode
+	| NamespaceDefinitionStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -217,11 +218,27 @@ export type Methods = Record<
 	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
 >
 
+export type NamespaceMethods = Record<
+	string,
+	StaticMethod | OverloadedStaticMethod
+>
+
 export interface TypeDefinitionStatementNode {
 	nodeType: "TypeDefinitionStatement"
 	name: IdentifierNode
 	properties: Record<string, TypeDeclarationNode>
 	methods: Methods
+	position: Position
+}
+
+export interface NamespaceDefinitionStatementNode {
+	nodeType: "NamespaceDefinitionStatement"
+	name: IdentifierNode
+	properties: Record<
+		string,
+		{ type: TypeDeclarationNode | null; value: ExpressionNode }
+	>
+	methods: NamespaceMethods
 	position: Position
 }
 

@@ -43,6 +43,7 @@ function validateImplementationNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "TypeDefinitionStatement":
+		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -349,6 +350,8 @@ function validateStatement(
 			return validateVariableAssignmentStatement(node)
 		case "TypeDefinitionStatement":
 			return validateTypeDefinitionStatement(node)
+		case "NamespaceDefinitionStatement":
+			return validateNamespaceDefinitionStatement(node)
 		case "IfElseStatement":
 			return validateIfElseStatementNode(node, currentFunctionContext)
 		case "IfStatement":
@@ -434,6 +437,32 @@ function validateTypeDefinitionStatement(
 			method.nodeType === "SimpleMethod" ||
 			method.nodeType === "StaticMethod"
 		) {
+			if (method.method.value.nodeType === "FunctionDefinition") {
+				validateFunctionDefinition(method.method.value)
+			} else {
+				validateGenericFunctionDefinition(method.method.value)
+			}
+		} else {
+			method.methods.map((overloadedMethod) => {
+				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
+					validateFunctionDefinition(overloadedMethod.value)
+				} else {
+					validateGenericFunctionDefinition(overloadedMethod.value)
+				}
+			})
+		}
+	}
+
+	return node
+}
+
+function validateNamespaceDefinitionStatement(
+	node: common.typed.NamespaceDefinitionStatementNode,
+): common.typed.NamespaceDefinitionStatementNode {
+	for (let methodName in node.methods) {
+		let method = node.methods[methodName]
+
+		if (method.nodeType === "StaticMethod") {
 			if (method.method.value.nodeType === "FunctionDefinition") {
 				validateFunctionDefinition(method.method.value)
 			} else {

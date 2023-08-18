@@ -5,6 +5,7 @@ import {
 	resolveListValueType,
 	resolveMatchType,
 	resolveMethodLookupBaseType,
+	resolveNamespaceDefinitionStatementType,
 	resolveType,
 	resolveTypeDefinitionStatementType,
 } from "./resolvers"
@@ -36,6 +37,7 @@ export function enrichNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "TypeDefinitionStatement":
+		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -452,6 +454,8 @@ export function enrichStatement(
 			return enrichVariableAssignmentStatement(node, scope)
 		case "TypeDefinitionStatement":
 			return enrichTypeDefinitionStatement(node, scope)
+		case "NamespaceDefinitionStatement":
+			return enrichNamespaceDefinitionStatement(node, scope)
 		case "IfElseStatement":
 			return enrichIfElseStatementNode(node, scope)
 		case "IfStatement":
@@ -549,6 +553,52 @@ export function enrichTypeDefinitionStatement(
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
 		methods: enrichMethods(node.methods, scope, type),
+		position: node.position,
+		type,
+	}
+}
+
+export function enrichNamespaceDefinitionStatement(
+	node: parser.NamespaceDefinitionStatementNode,
+	scope: enricher.Scope,
+): common.typed.NamespaceDefinitionStatementNode {
+	function enrichProperties(
+		properties: Record<
+			string,
+			{ type: parser.TypeDeclarationNode | null; value: parser.ExpressionNode }
+		>,
+		scope: enricher.Scope,
+	): Record<string, { type: common.Type; value: common.typed.ExpressionNode }> {
+		let result: Record<
+			string,
+			{ type: common.Type; value: common.typed.ExpressionNode }
+		> = {}
+
+		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
+			let type
+			let value = enrichExpression(propertyValue.value, scope)
+
+			if (propertyValue.type === null) {
+				type = value.type
+			} else {
+				type = resolveType(propertyValue.type, scope)
+			}
+
+			result[propertyKey] = { type, value }
+		}
+
+		return result
+	}
+
+	let type = resolveNamespaceDefinitionStatementType(node, scope)
+
+	declareVariableInScope(node.name, type, scope)
+
+	return {
+		nodeType: "NamespaceDefinitionStatement",
+		name: enrichIdentifier(node.name, scope),
+		properties: enrichProperties(node.properties, scope),
+		methods: enrichNamespaceMethods(node.methods, scope, type),
 		position: node.position,
 		type,
 	}
@@ -691,6 +741,30 @@ function enrichMethods(
 			result[memberKey] = {
 				nodeType: "OverloadedMethod",
 				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+			}
+		} else {
+			result[memberKey] = {
+				nodeType: "OverloadedStaticMethod",
+				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+			}
+		}
+	}
+
+	return result
+}
+
+function enrichNamespaceMethods(
+	members: parser.NamespaceMethods,
+	scope: enricher.Scope,
+	selfType: common.Type,
+): common.typed.NamespaceMethods {
+	let result: common.typed.NamespaceMethods = {}
+
+	for (let [memberKey, memberValue] of Object.entries(members)) {
+		if (memberValue.nodeType === "StaticMethod") {
+			result[memberKey] = {
+				nodeType: "StaticMethod",
+				method: enrichMethodFunctionValue(memberValue, scope, selfType),
 			}
 		} else {
 			result[memberKey] = {

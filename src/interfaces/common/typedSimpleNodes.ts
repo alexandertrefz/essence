@@ -5,6 +5,7 @@ import {
 	GenericFunctionType,
 	IntegerPrimitiveType,
 	ListType,
+	NamespaceType,
 	NothingPrimitiveType,
 	StringPrimitiveType,
 	Type,
@@ -149,6 +150,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| TypeDefinitionStatementNode
+	| NamespaceDefinitionStatementNode
 	| ChoiceStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
@@ -180,6 +182,14 @@ export interface TypeDefinitionStatementNode {
 	properties: Record<string, Type>
 	methods: Methods
 	type: TypeType
+}
+
+export interface NamespaceDefinitionStatementNode {
+	nodeType: "NamespaceDefinitionStatement"
+	name: IdentifierNode
+	properties: Record<string, ExpressionNode>
+	methods: Methods
+	type: NamespaceType
 }
 
 export interface ChoiceStatementNode {

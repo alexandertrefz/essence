@@ -75,6 +75,8 @@ function rewriteStatement(
 			return rewriteVariableDeclarationStatement(node)
 		case "TypeDefinitionStatement":
 			return rewriteTypeDefinitionStatement(node)
+		case "NamespaceDefinitionStatement":
+			return rewriteNamespaceDefinitionStatement(node)
 		case "ChoiceStatement":
 			return rewriteChoiceStatement(node)
 		case "ReturnStatement":
@@ -126,6 +128,51 @@ function rewriteTypeDefinitionStatement(
 					}
 				},
 			),
+		},
+	}
+}
+
+function rewriteNamespaceDefinitionStatement(
+	node: common.typedSimple.NamespaceDefinitionStatementNode,
+): estree.ClassDeclaration {
+	return {
+		type: "ClassDeclaration",
+		id: rewriteIdentifier(node.name),
+		superClass: null,
+		body: {
+			type: "ClassBody",
+			body: {
+				...Object.entries(node.properties).map<estree.PropertyDefinition>(
+					([name, value]) => {
+						return {
+							type: "PropertyDefinition",
+							key: {
+								type: "Identifier",
+								name,
+							},
+							value: rewriteExpression(value),
+							kind: "method",
+							computed: false,
+							static: true,
+						}
+					},
+				),
+				...Object.entries(node.methods).map<estree.MethodDefinition>(
+					([name, method]) => {
+						return {
+							type: "MethodDefinition",
+							key: {
+								type: "Identifier",
+								name,
+							},
+							value: rewriteFunctionExpression(method.method.value),
+							kind: "method",
+							computed: false,
+							static: true,
+						}
+					},
+				),
+			},
 		},
 	}
 }
