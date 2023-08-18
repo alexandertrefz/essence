@@ -1,4 +1,5 @@
 import * as util from "util"
+import { matchesType } from "../helpers"
 import { common } from "../interfaces"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | common.typed.GenericFunctionDefinitionNode | null
@@ -103,18 +104,18 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 		let lastIterationHadError = false
 		let index = 0
 
-		for (let parameterTypes of methodType.parameterTypes) {
+		for (let overload of methodType.overloads) {
 			lastIterationHadError = false
 
-			if (parameterTypes.length !== methodArguments.length) {
+			if (overload.parameterTypes.length !== methodArguments.length) {
 				lastIterationHadError = true
 				continue
 			}
 
-			for (let i = 0; i < parameterTypes.length; i++) {
+			for (let i = 0; i < overload.parameterTypes.length; i++) {
 				if (
-					parameterTypes[i].name !== methodArguments[i].name ||
-					!matchesType(parameterTypes[i].type, methodArguments[i].type)
+					overload.parameterTypes[i].name !== methodArguments[i].name ||
+					!matchesType(overload.parameterTypes[i].type, methodArguments[i].type)
 				) {
 					lastIterationHadError = true
 					break
@@ -124,6 +125,7 @@ function validateMethodInvocation(node: common.typed.MethodInvocationNode): comm
 			if (lastIterationHadError === false) {
 				break
 			}
+
 			index++
 		}
 
@@ -184,18 +186,18 @@ function validateFunctionInvocation(node: common.typed.FunctionInvocationNode): 
 			let lastIterationHadError = false
 			let index = 0
 
-			for (let parameterTypes of functionType.parameterTypes) {
+			for (let overload of functionType.overloads) {
 				lastIterationHadError = false
 
-				if (parameterTypes.length !== node.arguments.length) {
+				if (overload.parameterTypes.length !== node.arguments.length) {
 					lastIterationHadError = true
 					continue
 				}
 
-				for (let i = 0; i < parameterTypes.length; i++) {
+				for (let i = 0; i < overload.parameterTypes.length; i++) {
 					if (
-						parameterTypes[i].name !== node.arguments[i].name ||
-						!matchesType(parameterTypes[i].type, node.arguments[i].type)
+						overload.parameterTypes[i].name !== node.arguments[i].name ||
+						!matchesType(overload.parameterTypes[i].type, node.arguments[i].type)
 					) {
 						lastIterationHadError = true
 						break
@@ -447,18 +449,18 @@ function validateSimpleFunctionInvocation(
 	if (functionType.type === "OverloadedStaticMethod") {
 		let lastIterationHadError = false
 
-		for (let parameterTypes of functionType.parameterTypes) {
+		for (let overload of functionType.overloads) {
 			lastIterationHadError = false
 
-			if (parameterTypes.length !== argumentNodes.length) {
+			if (overload.parameterTypes.length !== argumentNodes.length) {
 				lastIterationHadError = true
 				continue
 			}
 
-			for (let i = 0; i < parameterTypes.length; i++) {
+			for (let i = 0; i < overload.parameterTypes.length; i++) {
 				if (
-					parameterTypes[i].name !== argumentNodes[i].name ||
-					!matchesType(parameterTypes[i].type, argumentNodes[i].type)
+					overload.parameterTypes[i].name !== argumentNodes[i].name ||
+					!matchesType(overload.parameterTypes[i].type, argumentNodes[i].type)
 				) {
 					lastIterationHadError = true
 					break
@@ -534,198 +536,6 @@ function inferFunctionType(
 	}
 
 	return inferredFunctionType
-}
-
-function matchesType(lhs: common.Type, rhs: common.Type): boolean {
-	// #region Type convertions
-
-	if (lhs.type === "Type") {
-		lhs = possiblyConvertTypeToPrimitive(lhs)
-	}
-
-	if (rhs.type === "Type") {
-		rhs = possiblyConvertTypeToPrimitive(rhs)
-	}
-
-	// #endregion
-
-	// #region Even Types
-	if (lhs.type === "Unknown") {
-		return true
-	}
-
-	if (lhs.type === "Primitive" && rhs.type === "Primitive") {
-		return lhs.primitive === rhs.primitive
-	}
-
-	if (lhs.type === "Record" && rhs.type === "Record") {
-		for (let memberName in lhs.members) {
-			if (rhs.members[memberName] === undefined) {
-				return false
-			}
-
-			if (!matchesType(lhs.members[memberName], rhs.members[memberName])) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	if (lhs.type === "List" && rhs.type === "List") {
-		if (rhs.itemType.type === "Unknown") {
-			return true
-		} else {
-			return matchesType(lhs.itemType, rhs.itemType)
-		}
-	}
-
-	if (lhs.type === "Function" && rhs.type === "Function") {
-		if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (
-				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
-			) {
-				return false
-			}
-		}
-
-		if (!matchesType(lhs.returnType, rhs.returnType)) {
-			return false
-		}
-
-		return true
-	}
-
-	if (lhs.type === "SimpleMethod") {
-		if (rhs.type === "SimpleMethod") {
-			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-				return false
-			}
-
-			if (!matchesType(lhs.returnType, rhs.returnType)) {
-				return false
-			}
-
-			for (let i = 0; i < lhs.parameterTypes.length; i++) {
-				if (
-					lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-					!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
-				) {
-					return false
-				}
-			}
-
-			return true
-		} else {
-			return false
-		}
-	}
-
-	if (lhs.type === "StaticMethod") {
-		if (rhs.type === "StaticMethod") {
-			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-				return false
-			}
-
-			if (!matchesType(lhs.returnType, rhs.returnType)) {
-				return false
-			}
-
-			for (let i = 0; i < lhs.parameterTypes.length; i++) {
-				if (
-					lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-					!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
-				) {
-					return false
-				}
-			}
-
-			return true
-		} else {
-			return false
-		}
-	}
-
-	if (lhs.type === "OverloadedMethod") {
-		if (rhs.type === "OverloadedMethod") {
-			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-				return false
-			}
-
-			if (!matchesType(lhs.returnType, rhs.returnType)) {
-				return false
-			}
-
-			for (let i = 0; i < lhs.parameterTypes.length; i++) {
-				if (lhs.parameterTypes[i].length !== rhs.parameterTypes[i].length) {
-					return false
-				}
-
-				for (let j = 0; j < lhs.parameterTypes.length; j++) {
-					if (
-						lhs.parameterTypes[i][j].name !== rhs.parameterTypes[i][j].name ||
-						!matchesType(lhs.parameterTypes[i][j].type, rhs.parameterTypes[i][j].type)
-					) {
-						return false
-					}
-				}
-			}
-
-			return true
-		} else {
-			return false
-		}
-	}
-
-	if (lhs.type === "OverloadedStaticMethod") {
-		if (rhs.type === "OverloadedStaticMethod") {
-			if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-				return false
-			}
-
-			if (!matchesType(lhs.returnType, rhs.returnType)) {
-				return false
-			}
-
-			for (let i = 0; i < lhs.parameterTypes.length; i++) {
-				if (lhs.parameterTypes[i].length !== rhs.parameterTypes[i].length) {
-					return false
-				}
-
-				for (let j = 0; j < lhs.parameterTypes.length; j++) {
-					if (
-						lhs.parameterTypes[i][j].name !== rhs.parameterTypes[i][j].name ||
-						!matchesType(lhs.parameterTypes[i][j].type, rhs.parameterTypes[i][j].type)
-					) {
-						return false
-					}
-				}
-			}
-
-			return true
-		} else {
-			return false
-		}
-	}
-
-	// #endregion
-
-	return false
-}
-
-function possiblyConvertTypeToPrimitive(
-	type: common.TypeType,
-): common.PrimitiveType | common.RecordType | common.TypeType {
-	if (type.definition.type === "BuiltIn") {
-		return type
-	} else {
-		return type.definition
-	}
 }
 
 // #endregion

@@ -60,14 +60,12 @@ export type StaticMethodType = {
 
 export type OverloadedStaticMethodType = {
 	type: "OverloadedStaticMethod"
-	parameterTypes: Array<Array<Parameter>>
-	returnType: Type
+	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
 }
 
 export type OverloadedMethodType = {
 	type: "OverloadedMethod"
-	parameterTypes: Array<Array<Parameter>>
-	returnType: Type
+	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
 }
 
 export type MethodType = SimpleMethodType | StaticMethodType | OverloadedStaticMethodType | OverloadedMethodType
