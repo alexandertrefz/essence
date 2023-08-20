@@ -24,6 +24,11 @@ let argv = await yargs(hideBin(process.argv))
 			"The name of the output file. If not provided, defaults to the name of the input file.",
 		requiresArg: true,
 	})
+	.option("execute", {
+		alias: "-e",
+		type: "boolean",
+		description: "Executes the output with Bun, if set.",
+	})
 	.option("debug", {
 		alias: "-d",
 		type: "boolean",
@@ -69,6 +74,14 @@ async function compile(flags) {
 				Math.round(end - start) + "ms",
 			)}`,
 		)
+
+		if (flags.execute) {
+			const process = Bun.spawn(["bun", flags.outputFileName])
+			console.log()
+			console.log(chalk.magenta("Executing Program now."))
+			console.log()
+			console.log(await new Response(process.stdout).text())
+		}
 	} catch (error) {
 		return Promise.reject(error)
 	}
@@ -78,6 +91,7 @@ async function compile(flags) {
 
 compile({
 	inputFileName: argv._[0].toString(),
+	execute: argv.execute ?? false,
 	debug: argv.debug ?? false,
 	outputFileName: generateOutputFilePath(
 		argv._[0].toString(),
