@@ -70,6 +70,8 @@ function validateExpression(
 			return validateLookup(node)
 		case "Match":
 			return validateMatch(node)
+		case "FunctionValue":
+			return validateFunctionValue(node)
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
@@ -77,7 +79,6 @@ function validateExpression(
 		case "FractionValue":
 		case "BooleanValue":
 		case "NothingValue":
-		case "FunctionValue":
 		case "ListValue":
 		case "Identifier":
 		case "Self":
@@ -328,6 +329,18 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				returnType: handler.returnType,
 			})
 		}
+	}
+
+	return node
+}
+
+function validateFunctionValue(
+	node: common.typed.FunctionValueNode,
+): common.typed.FunctionValueNode {
+	if (node.value.nodeType === "FunctionDefinition") {
+		validateFunctionDefinition(node.value)
+	} else {
+		validateGenericFunctionDefinition(node.value)
 	}
 
 	return node
