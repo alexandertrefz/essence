@@ -3,6 +3,7 @@ import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { StringType } from "./String"
+import type { RecordType } from "./Record"
 
 import { typeKeySymbol } from "./type"
 import * as boolean from "./Boolean"
@@ -10,16 +11,6 @@ import * as fraction from "./Fraction"
 import * as integer from "./Integer"
 
 const singleLineMaxLength = 60
-
-// TODO: Move Record into own proper type
-type RecordType = {
-	[typeKeySymbol]: null
-	[key: string]: any
-}
-
-function isRecord(obj: any): obj is RecordType {
-	return obj[typeKeySymbol] == null
-}
 
 function getStringRepresentation(
 	obj:
@@ -34,7 +25,7 @@ function getStringRepresentation(
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
-	if (isRecord(obj)) {
+	if (obj[typeKeySymbol] === "Record") {
 		let keyValuePairs: Array<string> = []
 
 		if (Object.entries(obj).length > 0) {

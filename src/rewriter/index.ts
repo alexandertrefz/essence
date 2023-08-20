@@ -21,6 +21,7 @@ export async function rewrite(
 			internalImport([importNamespaceSpecifier("Number")], "Number"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
+			internalImport([importNamespaceSpecifier("Record")], "Record"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			internalImport([importNamespaceSpecifier("$type")], "type"),
@@ -375,25 +376,44 @@ function rewriteCombination(
 
 function rewriteRecordValue(
 	node: common.typedSimple.RecordValueNode,
-): estree.ObjectExpression {
+): estree.CallExpression {
 	return {
-		type: "ObjectExpression",
-		properties: Object.entries(node.members).map<estree.Property>(
-			([key, value]) => {
-				return {
-					type: "Property",
-					key: {
-						type: "Identifier",
-						name: key,
-					},
-					value: rewriteExpression(value),
-					kind: "init",
-					computed: false,
-					method: false,
-					shorthand: false,
-				}
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: {
+				type: "Identifier",
+				name: "Record",
 			},
-		),
+			property: {
+				type: "Identifier",
+				name: "createRecord",
+			},
+			computed: false,
+		},
+		arguments: [
+			{
+				type: "ObjectExpression",
+				properties: Object.entries(node.members).map<estree.Property>(
+					([key, value]) => {
+						return {
+							type: "Property",
+							key: {
+								type: "Identifier",
+								name: key,
+							},
+							value: rewriteExpression(value),
+							kind: "init",
+							computed: false,
+							method: false,
+							shorthand: false,
+						}
+					},
+				),
+			},
+		],
 	}
 }
 
