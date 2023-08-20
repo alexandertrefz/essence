@@ -2,14 +2,18 @@ import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 
+import { typeKeySymbol } from "./type"
 import { createBoolean } from "./Boolean"
 import { createNothing } from "./Nothing"
 import { getInt32 } from "./internalHelpers"
 
-export type ListType<T> = { $type: "List"; value: Array<T> }
+export type ListType<T> = {
+	[typeKeySymbol]: "List"
+	value: Array<T>
+}
 
 export function createList<T>(originalList: Array<T>): ListType<T> {
-	return { $type: "List", value: originalList }
+	return { [typeKeySymbol]: "List", value: originalList }
 }
 
 export function hasItems<T>(originalList: ListType<T>): BooleanType {

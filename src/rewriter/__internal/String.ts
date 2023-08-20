@@ -1,13 +1,14 @@
 import type { BooleanType } from "./Boolean"
 import type { ListType } from "./List"
 
+import { typeKeySymbol } from "./type"
 import * as $Boolean from "./Boolean"
 import * as $List from "./List"
 
-export type StringType = { $type: "String"; value: string }
+export type StringType = { [typeKeySymbol]: "String"; value: string }
 
 export function createString(value: string): StringType {
-	return { $type: "String", value }
+	return { [typeKeySymbol]: "String", value }
 }
 
 export function isEmpty(originalString: StringType): BooleanType {

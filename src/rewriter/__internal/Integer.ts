@@ -1,14 +1,16 @@
 import type { FractionType } from "./Fraction"
 import type { StringType } from "./String"
 
-import { createFraction } from "./Fraction"
-import { createString } from "./String"
 import { Fraction } from "bigint-fraction"
 
-export type IntegerType = { $type: "Integer"; value: bigint }
+import { typeKeySymbol } from "./type"
+import { createFraction } from "./Fraction"
+import { createString } from "./String"
+
+export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
 
 export function createInteger(value: bigint): IntegerType {
-	return { $type: "Integer", value }
+	return { [typeKeySymbol]: "Integer", value }
 }
 
 // #region Add
@@ -27,7 +29,7 @@ export function add__overload$2(
 	let clonedFraction = other.fraction.clone()
 	clonedFraction.add(originalNumber.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -48,7 +50,7 @@ export function subtract__overload$2(
 	let fraction = new Fraction(originalNumber.value, 1)
 	fraction.subtract(other.fraction)
 
-	return { $type: "Fraction", fraction }
+	return { [typeKeySymbol]: "Fraction", fraction }
 }
 
 // #endregion
@@ -92,7 +94,7 @@ export function multiply__overload$2(
 	let clonedFraction = other.fraction.clone()
 	clonedFraction.multiply(originalNumber.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion

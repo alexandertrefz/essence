@@ -3,9 +3,10 @@ import { Fraction } from "bigint-fraction"
 import type { IntegerType } from "./Integer"
 import type { StringType } from "./String"
 
+import { typeKeySymbol } from "./type"
 import { createString } from "./String"
 
-export type FractionType = { $type: "Fraction"; fraction: Fraction }
+export type FractionType = { [typeKeySymbol]: "Fraction"; fraction: Fraction }
 
 export function createFraction(
 	numerator: bigint,
@@ -16,7 +17,10 @@ export function createFraction(
 		denominator = denominator * -1n
 	}
 
-	return { $type: "Fraction", fraction: new Fraction(numerator, denominator) }
+	return {
+		[typeKeySymbol]: "Fraction",
+		fraction: new Fraction(numerator, denominator),
+	}
 }
 
 // #region Add
@@ -44,7 +48,7 @@ export function add__overload$2(
 
 	clonedFraction.add(integer.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -74,7 +78,7 @@ export function subtract__overload$2(
 
 	clonedFraction.subtract(integer.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -101,7 +105,7 @@ export function divide__overload$2(
 
 	clonedFraction.divide(integer.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion
@@ -128,7 +132,7 @@ export function multiply__overload$2(
 
 	clonedFraction.multiply(integer.value)
 
-	return { $type: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
 }
 
 // #endregion

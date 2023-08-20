@@ -1,6 +1,8 @@
-export type NothingType = { $type: "Nothing" }
+import { typeKeySymbol } from "./type"
 
-let sharedNothingInstance: NothingType = { $type: "Nothing" }
+export type NothingType = { [typeKeySymbol]: "Nothing" }
+
+let sharedNothingInstance: NothingType = { [typeKeySymbol]: "Nothing" }
 
 export function createNothing(): NothingType {
 	return sharedNothingInstance

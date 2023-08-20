@@ -4,6 +4,7 @@ import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 
+import { typeKeySymbol } from "./type"
 import { createFraction } from "./Fraction"
 import { createInteger } from "./Integer"
 import { isFirstFractionBigger } from "./internalHelpers"
@@ -108,8 +109,8 @@ export function lowestNumber__overload$7(
 	let lowestNumber = numbers.value[0]
 
 	for (let number of numbers.value.slice(1)) {
-		if (number.$type === "Integer") {
-			if (lowestNumber.$type === "Integer") {
+		if (number[typeKeySymbol] === "Integer") {
+			if (lowestNumber[typeKeySymbol] === "Integer") {
 				if (number.value < lowestNumber.value) {
 					lowestNumber = number
 				}
@@ -124,7 +125,7 @@ export function lowestNumber__overload$7(
 				}
 			}
 		} else {
-			if (lowestNumber.$type === "Fraction") {
+			if (lowestNumber[typeKeySymbol] === "Fraction") {
 				if (isFirstFractionBigger(lowestNumber.fraction, number.fraction)) {
 					lowestNumber = number
 				}
@@ -141,7 +142,7 @@ export function lowestNumber__overload$7(
 		}
 	}
 
-	if (lowestNumber.$type === "Fraction") {
+	if (lowestNumber[typeKeySymbol] === "Fraction") {
 		return createFraction(
 			lowestNumber.fraction.numerator,
 			lowestNumber.fraction.denominator,
