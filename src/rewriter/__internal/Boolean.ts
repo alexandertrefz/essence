@@ -1,11 +1,12 @@
 import type { StringType } from "./String"
 
+import { typeKeySymbol } from "./type"
 import { createString } from "./String"
 
-export type BooleanType = { $type: "Boolean"; value: boolean }
+export type BooleanType = { [typeKeySymbol]: "Boolean"; value: boolean }
 
 export function createBoolean(value: boolean): BooleanType {
-	return { $type: "Boolean", value }
+	return { [typeKeySymbol]: "Boolean", value }
 }
 
 export function negate(originalBoolean: BooleanType): BooleanType {
