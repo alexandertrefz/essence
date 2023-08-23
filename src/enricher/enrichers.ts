@@ -175,16 +175,31 @@ export function enrichMethodFunctionDefinition(
 export function enrichGenericFunctionDefinition(
 	node: parser.GenericFunctionDefinitionNode,
 	scope: enricher.Scope,
-): common.typed.FunctionDefinitionNode {
+): common.typed.GenericFunctionDefinitionNode {
 	let newScope = { parent: scope, members: {} }
 
 	return {
-		nodeType: "FunctionDefinition",
+		nodeType: "GenericFunctionDefinition",
 		parameters: node.parameters.map((parameter) =>
 			enrichParameter(parameter, newScope),
 		),
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(node.returnType, scope),
+	}
+}
+
+export function enrichGenericDeclarationNode(
+	node: parser.GenericDeclarationNode,
+	scope: enricher.Scope,
+): common.typed.GenericDeclarationNode {
+	return {
+		nodeType: "GenericDeclaration",
+		defaultType: node.defaultType ? resolveType(node.defaultType, scope) : null,
+		name: node.name.content,
+		position: node.position,
 	}
 }
 
