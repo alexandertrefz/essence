@@ -229,16 +229,14 @@ export function resolveMethodInvocationType(
 			}
 
 			for (let i = 1; i < overload.parameterTypes.length; i++) {
+				const parameter = overload.parameterTypes[i]
+				const argument = methodArguments[i]
+
 				if (
 					!(
-						((overload.parameterTypes[i].name === null &&
-							methodArguments[i].name === null) ||
-							(overload.parameterTypes[i].name &&
-								methodArguments[i].name?.content)) &&
-						matchesType(
-							overload.parameterTypes[i].type,
-							resolveType(methodArguments[i].value, scope),
-						)
+						((parameter.name === null && argument.name === null) ||
+							(parameter.name && argument.name?.content)) &&
+						matchesType(parameter.type, resolveType(argument.value, scope))
 					)
 				) {
 					continue overloadLoop
@@ -248,7 +246,13 @@ export function resolveMethodInvocationType(
 			return overload.returnType
 		}
 
+		console.log("Arguments")
+		console.log("=========")
 		console.log(Bun.inspect(methodArguments))
+		console.log()
+
+		console.log("Overloads")
+		console.log("=========")
 		console.log(Bun.inspect(type.overloads))
 
 		throw new Error(
@@ -285,16 +289,14 @@ export function resolveFunctionInvocationType(
 			}
 
 			for (let i = 0; i < overload.parameterTypes.length; i++) {
+				const parameter = overload.parameterTypes[i]
+				const argument = methodArguments[i]
+
 				if (
 					!(
-						((overload.parameterTypes[i].name === null &&
-							methodArguments[i].name === null) ||
-							(overload.parameterTypes[i].name &&
-								methodArguments[i].name?.content)) &&
-						matchesType(
-							overload.parameterTypes[i].type,
-							resolveType(methodArguments[i].value, scope),
-						)
+						((parameter.name === null && argument.name === null) ||
+							(parameter.name && argument.name?.content)) &&
+						matchesType(parameter.type, resolveType(argument.value, scope))
 					)
 				) {
 					continue overloadLoop
@@ -304,7 +306,13 @@ export function resolveFunctionInvocationType(
 			return overload.returnType
 		}
 
+		console.log("Arguments")
+		console.log("=========")
 		console.log(Bun.inspect(methodArguments))
+		console.log()
+
+		console.log("Overloads")
+		console.log("=========")
 		console.log(Bun.inspect(type.overloads))
 
 		throw new Error(
@@ -675,11 +683,12 @@ export function resolveTypeDefinitionStatementType(
 	node: parser.TypeDefinitionStatementNode,
 	scope: enricher.Scope,
 ): common.TypeType {
-	// TODO: Find a better way of implementing this without depending on object reference behaviour & type forcing
 	let resultType: common.TypeType = {
 		type: "Type",
 		name: node.name.content,
-	} as common.TypeType
+		definition: { type: "Record", members: {} },
+		methods: {},
+	}
 
 	let definitionMembers: Record<string, common.Type> = {}
 	let methods: Record<string, common.MethodType> = {}
