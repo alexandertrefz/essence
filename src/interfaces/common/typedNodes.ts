@@ -331,7 +331,6 @@ export interface GenericFunctionDefinitionNode {
 	parameters: Array<ParameterNode>
 	body: Array<ImplementationNode>
 	returnType: Type
-	position: Position
 }
 
 export interface FunctionDefinitionNode {
