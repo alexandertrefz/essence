@@ -80,10 +80,80 @@ export function resolveNativeFunctionInvocationType(
 			node.arguments,
 			scope,
 		)
+
 		return inferredType.returnType
 	} else {
 		throw new Error(`${node.name.content} is not a native function.`)
 	}
+}
+
+function deeplyResolveGenerics(
+	type: common.Type,
+	inferredGenerics: Record<string, common.Type>,
+): common.Type {
+	if (type.type === "Generic") {
+		return inferredGenerics[type.name]
+	} else if (type.type === "UnionType") {
+		return deeplyResolveGenericsForUnion(type, inferredGenerics)
+	} else if (type.type === "Record") {
+		return deeplyResolveGenericsForRecord(type, inferredGenerics)
+	} else if (type.type === "List") {
+		return {
+			type: "List",
+			itemType: deeplyResolveGenerics(type.itemType, inferredGenerics),
+		}
+	} else {
+		return type
+	}
+}
+
+function deeplyResolveGenericsForUnion(
+	union: common.UnionType,
+	inferredGenerics: Record<string, common.Type>,
+): common.UnionType {
+	union = structuredClone(union)
+
+	for (let i = 0; i < union.types.length; i++) {
+		union.types[i] = deeplyResolveGenerics(union.types[i], inferredGenerics)
+	}
+
+	return union
+}
+
+function deeplyResolveGenericsForRecord(
+	record: common.RecordType,
+	inferredGenerics: Record<string, common.Type>,
+): common.RecordType {
+	record = structuredClone(record)
+
+	let entries = Object.entries(record.members)
+
+	for (let i = 0; i < entries.length; i++) {
+		entries[i][1] = deeplyResolveGenerics(entries[i][1], inferredGenerics)
+	}
+
+	record.members = Object.fromEntries(entries)
+
+	return record
+}
+
+function deeplyInferGenericsForFunction(
+	functionType: common.FunctionType,
+	inferredGenerics: Record<string, common.Type>,
+): common.FunctionType {
+	for (let i = 0; i < functionType.parameterTypes.length; i++) {
+		functionType.parameterTypes[i].type = deeplyResolveGenerics(
+			functionType.parameterTypes[i].type,
+			inferredGenerics,
+		)
+	}
+
+	functionType.returnType = deeplyResolveGenerics(
+		functionType.returnType,
+		inferredGenerics,
+	)
+
+	return functionType
 }
 
 function inferGenericFunctionInvocation(
@@ -119,17 +189,16 @@ function inferGenericFunctionInvocation(
 	}
 
 	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
-		let parameter = inferredFunctionType.parameterTypes[i]
-
-		if (parameter.type.type === "Generic") {
-			parameter.type = inferredGenerics[parameter.type.name]
-		}
+		inferredFunctionType.parameterTypes[i].type = deeplyResolveGenerics(
+			inferredFunctionType.parameterTypes[i].type,
+			inferredGenerics,
+		)
 	}
 
-	if (inferredFunctionType.returnType.type === "Generic") {
-		inferredFunctionType.returnType =
-			inferredGenerics[inferredFunctionType.returnType.name]
-	}
+	inferredFunctionType.returnType = deeplyResolveGenerics(
+		inferredFunctionType.returnType,
+		inferredGenerics,
+	)
 
 	return inferredFunctionType
 }
@@ -238,6 +307,14 @@ export function resolveFunctionInvocationType(
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
 		)
+	} else if (type.type === "GenericFunction") {
+		let inferredType = inferGenericFunctionInvocation(
+			type,
+			node.arguments,
+			scope,
+		)
+
+		return inferredType.returnType
 	} else {
 		throw new Error(
 			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
@@ -886,6 +963,9 @@ export function resolveGenericType(
 					resolvedType.definition.members[propertyKey] =
 						types[propertyValue.name]
 				}
+			} else if (propertyValue.type === "UnionType") {
+				resolvedType.definition.members[propertyKey] =
+					deeplyResolveGenericsForUnion(propertyValue, types)
 			}
 		}
 	}
@@ -897,10 +977,18 @@ export function resolveGenericType(
 			methodValue.type === "StaticMethod"
 		) {
 			for (let parameter of methodValue.parameterTypes) {
+				if (parameter.type.type === "Function") {
+					parameter.type = deeplyInferGenericsForFunction(parameter.type, types)
+				}
+
 				if (parameter.type.type === "Generic") {
 					if (parameter.type.name in types) {
 						parameter.type = types[parameter.type.name]
 					}
+				}
+
+				if (parameter.type.type === "UnionType") {
+					parameter.type = deeplyResolveGenericsForUnion(parameter.type, types)
 				}
 
 				if (
@@ -917,6 +1005,13 @@ export function resolveGenericType(
 				if (methodValue.returnType.name in types) {
 					methodValue.returnType = types[methodValue.returnType.name]
 				}
+			}
+
+			if (methodValue.returnType.type === "UnionType") {
+				methodValue.returnType = deeplyResolveGenericsForUnion(
+					methodValue.returnType,
+					types,
+				)
 			}
 
 			if (
@@ -936,10 +1031,26 @@ export function resolveGenericType(
 		) {
 			for (let overload of methodValue.overloads) {
 				for (let parameter of overload.parameterTypes) {
+					// TODO: Infer genericFunction as well
+
+					if (parameter.type.type === "Function") {
+						parameter.type = deeplyInferGenericsForFunction(
+							parameter.type,
+							types,
+						)
+					}
+
 					if (parameter.type.type === "Generic") {
 						if (parameter.type.name in types) {
 							parameter.type = types[parameter.type.name]
 						}
+					}
+
+					if (parameter.type.type === "UnionType") {
+						parameter.type = deeplyResolveGenericsForUnion(
+							parameter.type,
+							types,
+						)
 					}
 
 					if (
@@ -956,6 +1067,13 @@ export function resolveGenericType(
 					if (overload.returnType.name in types) {
 						overload.returnType = types[overload.returnType.name]
 					}
+				}
+
+				if (overload.returnType.type === "UnionType") {
+					overload.returnType = deeplyResolveGenericsForUnion(
+						overload.returnType,
+						types,
+					)
 				}
 
 				if (
