@@ -227,7 +227,7 @@ export function match(
 
 export function constantDeclarationStatement(
 	name: parser.IdentifierNode,
-	type: parser.TypeDeclarationNode,
+	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
 ): parser.ConstantDeclarationStatementNode {
@@ -242,7 +242,7 @@ export function constantDeclarationStatement(
 
 export function variableDeclarationStatement(
 	name: parser.IdentifierNode,
-	type: parser.TypeDeclarationNode,
+	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
 ): parser.VariableDeclarationStatementNode {
