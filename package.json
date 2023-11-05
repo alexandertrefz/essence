@@ -16,24 +16,25 @@
   "author": "Alexander Trefz",
   "license": "MIT",
   "engines": {
-    "bun": ">=0.7.x"
+    "bun": ">=1.0.x"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.5.2",
-    "@types/deep-equal": "1.0.1",
-    "@types/escodegen": "0.0.7",
-    "@types/estree": "1.0.1",
-    "@types/nearley": "2.11.2",
-    "bun-types": "0.7.3",
-    "husky": "8.0.3"
+    "@biomejs/biome": "1.5.3",
+    "@types/bun": "1.0.5",
+    "@types/deep-equal": "1.0.4",
+    "@types/escodegen": "0.0.10",
+    "@types/estree": "1.0.5",
+    "@types/nearley": "2.11.5",
+    "husky": "9.0.10"
   },
   "dependencies": {
     "bigint-fraction": "1.0.6",
-    "deep-equal": "2.2.2",
-    "esbuild": "0.19.0",
+    "chalk": "5.3.0",
+    "deep-equal": "2.2.3",
+    "esbuild": "0.20.0",
     "escodegen": "2.1.0",
     "nearley": "2.20.1",
-    "typescript": "5.1.6",
+    "typescript": "5.3.3",
     "yargs": "17.7.2"
   },
   "repository": {
