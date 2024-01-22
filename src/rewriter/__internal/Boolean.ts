@@ -1,7 +1,7 @@
 import type { StringType } from "./String"
 
-import { typeKeySymbol } from "./type"
 import { createString } from "./String"
+import { typeKeySymbol } from "./type"
 
 export type BooleanType = { [typeKeySymbol]: "Boolean"; value: boolean }
 
@@ -27,7 +27,7 @@ export function isnt(
 	return createBoolean(originalBoolean.value !== other.value)
 }
 
-// rome-ignore lint/suspicious/noShadowRestrictedNames:
+// biome-ignore lint/suspicious/noShadowRestrictedNames:
 export function toString(boolean: BooleanType): StringType {
 	return createString(boolean.value.toString())
 }

@@ -285,7 +285,10 @@ describe("Helpers", () => {
 		const singleArgumentFunctionType: FunctionType = {
 			type: "Function",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -293,7 +296,10 @@ describe("Helpers", () => {
 		const singleArgumentWithNameFunctionType: FunctionType = {
 			type: "Function",
 			parameterTypes: [
-				{ name: "test", type: { type: "Primitive", primitive: "String" } },
+				{
+					name: "test",
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -318,7 +324,10 @@ describe("Helpers", () => {
 		const singleArgumentSimpleMethodType: SimpleMethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -326,7 +335,10 @@ describe("Helpers", () => {
 		const singleArgumentWithNameSimpleMethodType: SimpleMethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: "test", type: { type: "Primitive", primitive: "String" } },
+				{
+					name: "test",
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -351,7 +363,10 @@ describe("Helpers", () => {
 		const singleArgumentStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -359,7 +374,10 @@ describe("Helpers", () => {
 		const singleArgumentWithNameStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
 			parameterTypes: [
-				{ name: "test", type: { type: "Primitive", primitive: "String" } },
+				{
+					name: "test",
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
@@ -394,30 +412,46 @@ describe("Helpers", () => {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "String" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "String" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "String" },
 				},
 			],
 		}
 
-		const singleArgumentWithNameOverloadedMethodType: OverloadedMethodType = {
-			type: "OverloadedMethod",
-			overloads: [
-				{
-					parameterTypes: [
-						{ name: "test", type: { type: "Primitive", primitive: "String" } },
-					],
-					returnType: { type: "Primitive", primitive: "String" },
-				},
-				{
-					parameterTypes: [
-						{ name: "test2", type: { type: "Primitive", primitive: "String" } },
-					],
-					returnType: { type: "Primitive", primitive: "String" },
-				},
-			],
-		}
+		const singleArgumentWithNameOverloadedMethodType: OverloadedMethodType =
+			{
+				type: "OverloadedMethod",
+				overloads: [
+					{
+						parameterTypes: [
+							{
+								name: "test",
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
+							},
+						],
+						returnType: { type: "Primitive", primitive: "String" },
+					},
+					{
+						parameterTypes: [
+							{
+								name: "test2",
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
+							},
+						],
+						returnType: { type: "Primitive", primitive: "String" },
+					},
+				],
+			}
 
 		const alternativeSingleArgumentWithNameOverloadedMethodType: OverloadedMethodType =
 			{
@@ -427,7 +461,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test2",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -436,7 +473,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test3",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -448,15 +488,16 @@ describe("Helpers", () => {
 
 		// #region Overloaded Static Methods
 
-		const noArgumentOverloadedStaticMethodType: OverloadedStaticMethodType = {
-			type: "OverloadedStaticMethod",
-			overloads: [
-				{
-					parameterTypes: [],
-					returnType: { type: "Primitive", primitive: "String" },
-				},
-			],
-		}
+		const noArgumentOverloadedStaticMethodType: OverloadedStaticMethodType =
+			{
+				type: "OverloadedStaticMethod",
+				overloads: [
+					{
+						parameterTypes: [],
+						returnType: { type: "Primitive", primitive: "String" },
+					},
+				],
+			}
 
 		const noArgumentWithDifferentReturnTypeOverloadedStaticMethodType: OverloadedStaticMethodType =
 			{
@@ -475,7 +516,13 @@ describe("Helpers", () => {
 				overloads: [
 					{
 						parameterTypes: [
-							{ name: null, type: { type: "Primitive", primitive: "String" } },
+							{
+								name: null,
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
+							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
 					},
@@ -490,7 +537,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -499,7 +549,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test2",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -515,7 +568,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test2",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -524,7 +580,10 @@ describe("Helpers", () => {
 						parameterTypes: [
 							{
 								name: "test3",
-								type: { type: "Primitive", primitive: "String" },
+								type: {
+									type: "Primitive",
+									primitive: "String",
+								},
 							},
 						],
 						returnType: { type: "Primitive", primitive: "String" },
@@ -566,8 +625,12 @@ describe("Helpers", () => {
 		})
 
 		it("should match TypeTypes that match PrimitiveTypes", () => {
-			expect(matchesType(unresolvedIntegerType, integerPrimitive)).toBe(true)
-			expect(matchesType(integerPrimitive, unresolvedIntegerType)).toBe(true)
+			expect(matchesType(unresolvedIntegerType, integerPrimitive)).toBe(
+				true,
+			)
+			expect(matchesType(integerPrimitive, unresolvedIntegerType)).toBe(
+				true,
+			)
 		})
 
 		it("should not match mismatched PrimitiveTypes", () => {
@@ -589,21 +652,29 @@ describe("Helpers", () => {
 		})
 
 		it("should match UnionTypes", () => {
-			expect(matchesType(unionTypeStringInteger, unionTypeStringInteger)).toBe(
+			expect(
+				matchesType(unionTypeStringInteger, unionTypeStringInteger),
+			).toBe(true)
+			expect(
+				matchesType(unionTypeStringInteger, unionTypeIntegerString),
+			).toBe(true)
+			expect(
+				matchesType(unionTypeIntegerString, unionTypeStringInteger),
+			).toBe(true)
+
+			expect(matchesType(unionTypeStringInteger, stringPrimitive)).toBe(
 				true,
 			)
-			expect(matchesType(unionTypeStringInteger, unionTypeIntegerString)).toBe(
-				true,
-			)
-			expect(matchesType(unionTypeIntegerString, unionTypeStringInteger)).toBe(
+			expect(matchesType(unionTypeStringInteger, integerPrimitive)).toBe(
 				true,
 			)
 
-			expect(matchesType(unionTypeStringInteger, stringPrimitive)).toBe(true)
-			expect(matchesType(unionTypeStringInteger, integerPrimitive)).toBe(true)
-
-			expect(matchesType(unionTypeIntegerString, stringPrimitive)).toBe(true)
-			expect(matchesType(unionTypeIntegerString, integerPrimitive)).toBe(true)
+			expect(matchesType(unionTypeIntegerString, stringPrimitive)).toBe(
+				true,
+			)
+			expect(matchesType(unionTypeIntegerString, integerPrimitive)).toBe(
+				true,
+			)
 		})
 
 		it("should not match mismatched UnionTypes", () => {
@@ -613,7 +684,9 @@ describe("Helpers", () => {
 			expect(
 				matchesType(unionTypeIntegerFraction, unionTypeStringInteger),
 			).toBe(false)
-			expect(matchesType(unionTypeStringInteger, fractionPrimitive)).toBe(false)
+			expect(matchesType(unionTypeStringInteger, fractionPrimitive)).toBe(
+				false,
+			)
 			expect(matchesType(unionTypeStringInteger, builtInType)).toBe(false)
 			expect(matchesType(unionTypeStringInteger, recordType)).toBe(false)
 		})
@@ -646,11 +719,14 @@ describe("Helpers", () => {
 		})
 
 		it("should match matching FunctionTypes", () => {
-			expect(matchesType(noArgumentFunctionType, noArgumentFunctionType)).toBe(
-				true,
-			)
 			expect(
-				matchesType(singleArgumentFunctionType, singleArgumentFunctionType),
+				matchesType(noArgumentFunctionType, noArgumentFunctionType),
+			).toBe(true)
+			expect(
+				matchesType(
+					singleArgumentFunctionType,
+					singleArgumentFunctionType,
+				),
 			).toBe(true)
 			expect(
 				matchesType(
@@ -686,7 +762,10 @@ describe("Helpers", () => {
 				matchesType(noArgumentFunctionType, singleArgumentFunctionType),
 			).toBe(false)
 			expect(
-				matchesType(noArgumentFunctionType, singleArgumentWithNameFunctionType),
+				matchesType(
+					noArgumentFunctionType,
+					singleArgumentWithNameFunctionType,
+				),
 			).toBe(false)
 			expect(
 				matchesType(
@@ -698,7 +777,10 @@ describe("Helpers", () => {
 
 		it("should match matching SimpleMethodTypes", () => {
 			expect(
-				matchesType(noArgumentSimpleMethodType, noArgumentSimpleMethodType),
+				matchesType(
+					noArgumentSimpleMethodType,
+					noArgumentSimpleMethodType,
+				),
 			).toBe(true)
 			expect(
 				matchesType(
@@ -722,7 +804,10 @@ describe("Helpers", () => {
 
 		it("should not match mismatched SimpleMethodTypes", () => {
 			expect(
-				matchesType(singleArgumentSimpleMethodType, noArgumentSimpleMethodType),
+				matchesType(
+					singleArgumentSimpleMethodType,
+					noArgumentSimpleMethodType,
+				),
 			).toBe(false)
 			expect(
 				matchesType(
@@ -737,7 +822,10 @@ describe("Helpers", () => {
 				),
 			).toBe(false)
 			expect(
-				matchesType(noArgumentSimpleMethodType, singleArgumentSimpleMethodType),
+				matchesType(
+					noArgumentSimpleMethodType,
+					singleArgumentSimpleMethodType,
+				),
 			).toBe(false)
 			expect(
 				matchesType(
@@ -755,7 +843,10 @@ describe("Helpers", () => {
 
 		it("should match matching StaticMethodTypes", () => {
 			expect(
-				matchesType(noArgumentStaticMethodType, noArgumentStaticMethodType),
+				matchesType(
+					noArgumentStaticMethodType,
+					noArgumentStaticMethodType,
+				),
 			).toBe(true)
 			expect(
 				matchesType(
@@ -779,7 +870,10 @@ describe("Helpers", () => {
 
 		it("should not match mismatched StaticMethodTypes", () => {
 			expect(
-				matchesType(singleArgumentStaticMethodType, noArgumentStaticMethodType),
+				matchesType(
+					singleArgumentStaticMethodType,
+					noArgumentStaticMethodType,
+				),
 			).toBe(false)
 			expect(
 				matchesType(
@@ -794,7 +888,10 @@ describe("Helpers", () => {
 				),
 			).toBe(false)
 			expect(
-				matchesType(noArgumentStaticMethodType, singleArgumentStaticMethodType),
+				matchesType(
+					noArgumentStaticMethodType,
+					singleArgumentStaticMethodType,
+				),
 			).toBe(false)
 			expect(
 				matchesType(
@@ -979,7 +1076,10 @@ describe("Helpers", () => {
 				),
 			).toBe(false)
 			expect(
-				matchesType(noArgumentOverloadedStaticMethodType, fractionPrimitive),
+				matchesType(
+					noArgumentOverloadedStaticMethodType,
+					fractionPrimitive,
+				),
 			).toBe(false)
 			expect(
 				matchesType(integerList, noArgumentOverloadedStaticMethodType),

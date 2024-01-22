@@ -8,30 +8,48 @@ const type: common.TypeType = {
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		isnt: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		negate: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		toString: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "Boolean" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		} as common.MethodType,

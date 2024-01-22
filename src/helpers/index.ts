@@ -34,12 +34,13 @@ export function third<T = any>(array: Array<T>) {
 
 export function flatten<T = any>(array: Array<T | Array<T>>): Array<T> {
 	return array.reduce<Array<T>>((prev, curr) => {
-		let result
+		let result: Array<T>
 
 		if (Array.isArray(curr)) {
 			result = prev.concat(curr)
 		} else {
-			result = [...prev, curr]
+			prev.push(curr)
+			result = prev
 		}
 
 		return result
@@ -132,7 +133,9 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 				return false
 			}
 
-			if (!matchesType(lhs.members[memberName], rhs.members[memberName])) {
+			if (
+				!matchesType(lhs.members[memberName], rhs.members[memberName])
+			) {
 				return false
 			}
 		}
@@ -156,7 +159,10 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
 			if (
 				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+				!matchesType(
+					lhs.parameterTypes[i].type,
+					rhs.parameterTypes[i].type,
+				)
 			) {
 				return false
 			}
@@ -181,7 +187,10 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
 			if (
 				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+				!matchesType(
+					lhs.parameterTypes[i].type,
+					rhs.parameterTypes[i].type,
+				)
 			) {
 				return false
 			}
@@ -202,7 +211,10 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
 			if (
 				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(lhs.parameterTypes[i].type, rhs.parameterTypes[i].type)
+				!matchesType(
+					lhs.parameterTypes[i].type,
+					rhs.parameterTypes[i].type,
+				)
 			) {
 				return false
 			}
@@ -221,7 +233,8 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			let rhsOverload = rhs.overloads[i]
 
 			if (
-				lhsOverload.parameterTypes.length !== rhsOverload.parameterTypes.length
+				lhsOverload.parameterTypes.length !==
+				rhsOverload.parameterTypes.length
 			) {
 				return false
 			}
@@ -260,7 +273,8 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			let rhsOverload = rhs.overloads[i]
 
 			if (
-				lhsOverload.parameterTypes.length !== rhsOverload.parameterTypes.length
+				lhsOverload.parameterTypes.length !==
+				rhsOverload.parameterTypes.length
 			) {
 				return false
 			}

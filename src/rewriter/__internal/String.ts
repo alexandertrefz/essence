@@ -1,9 +1,9 @@
 import type { BooleanType } from "./Boolean"
 import type { ListType } from "./List"
 
-import { typeKeySymbol } from "./type"
 import * as $Boolean from "./Boolean"
 import * as $List from "./List"
+import { typeKeySymbol } from "./type"
 
 export type StringType = { [typeKeySymbol]: "String"; value: string }
 

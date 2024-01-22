@@ -15,7 +15,9 @@ function simplifyImplementationSection(
 ): common.typedSimple.ImplementationSectionNode {
 	return {
 		nodeType: "ImplementationSection",
-		nodes: implementation.nodes.map((node) => simplifyImplementationNode(node)),
+		nodes: implementation.nodes.map((node) =>
+			simplifyImplementationNode(node),
+		),
 	}
 }
 
@@ -136,7 +138,10 @@ function simplifyMethodInvocation(
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
-	if (node.overloadedMethodIndex !== null && node.name.nodeType === "Lookup") {
+	if (
+		node.overloadedMethodIndex !== null &&
+		node.name.nodeType === "Lookup"
+	) {
 		node.name.member.content = resolveOverloadedMethodName(
 			node.name.member.content,
 			node.overloadedMethodIndex,
@@ -225,7 +230,9 @@ function simplifyNothingValue(
 function simplifyFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typedSimple.FunctionValueNode {
-	let value
+	let value:
+		| common.typedSimple.FunctionDefinitionNode
+		| common.typedSimple.GenericFunctionDefinitionNode
 
 	if (node.value.nodeType === "FunctionDefinition") {
 		value = simplifyFunctionDefinition(node.value)
@@ -550,7 +557,9 @@ function simplifyGenericFunctionDefinition(
 ): common.typedSimple.GenericFunctionDefinitionNode {
 	return {
 		nodeType: "GenericFunctionDefinition",
-		generics: node.generics.map((param) => simplifyGenericDeclaration(param)),
+		generics: node.generics.map((param) =>
+			simplifyGenericDeclaration(param),
+		),
 		parameters: node.parameters.map((param) => simplifyParameter(param)),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,

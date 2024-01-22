@@ -117,7 +117,10 @@ const type: common.GenericTypeType = {
 								itemType: { type: "Generic", name: "ItemType" },
 							},
 						},
-						{ name: null, type: { type: "Generic", name: "ItemType" } },
+						{
+							name: null,
+							type: { type: "Generic", name: "ItemType" },
+						},
 					],
 					returnType: {
 						type: "List",

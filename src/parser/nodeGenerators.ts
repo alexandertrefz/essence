@@ -286,7 +286,9 @@ export function typeDefinitionStatement(
 						nodeType: "OverloadedMethod",
 						methods: [...overloadedMethod.methods, curr.method],
 					}
-				} else if (overloadedMethod.nodeType === "OverloadedStaticMethod") {
+				} else if (
+					overloadedMethod.nodeType === "OverloadedStaticMethod"
+				) {
 					prev[curr.name.content] = {
 						nodeType: "OverloadedStaticMethod",
 						methods: [...overloadedMethod.methods, curr.method],
@@ -542,10 +544,13 @@ export function buildKeyValuePairList(
 	const keyValuePairList = [...kvpList, kvp]
 
 	return {
-		data: keyValuePairList.reduce<KeyValuePairObject["data"]>((prev, curr) => {
-			prev[curr.key] = curr.value
-			return prev
-		}, {}),
+		data: keyValuePairList.reduce<KeyValuePairObject["data"]>(
+			(prev, curr) => {
+				prev[curr.key] = curr.value
+				return prev
+			},
+			{},
+		),
 		position: {
 			start: keyValuePairList[0].position.start,
 			end: keyValuePairList[keyValuePairList.length - 1].position.end,

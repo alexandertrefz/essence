@@ -141,8 +141,12 @@ function validateMethodInvocation(
 
 			for (let i = 0; i < overload.parameterTypes.length; i++) {
 				if (
-					overload.parameterTypes[i].name !== methodArguments[i].name ||
-					!matchesType(overload.parameterTypes[i].type, methodArguments[i].type)
+					overload.parameterTypes[i].name !==
+						methodArguments[i].name ||
+					!matchesType(
+						overload.parameterTypes[i].type,
+						methodArguments[i].type,
+					)
 				) {
 					lastIterationHadError = true
 					break
@@ -165,13 +169,18 @@ function validateMethodInvocation(
 		}
 	} else {
 		if (methodType.parameterTypes.length !== methodArguments.length) {
-			throw new Error("MethodInvocation: Amount of arguments doesn't match")
+			throw new Error(
+				"MethodInvocation: Amount of arguments doesn't match",
+			)
 		}
 
 		for (let i = 0; i < methodType.parameterTypes.length; i++) {
 			if (
 				methodType.parameterTypes[i].name !== methodArguments[i].name ||
-				!matchesType(methodType.parameterTypes[i].type, methodArguments[i].type)
+				!matchesType(
+					methodType.parameterTypes[i].type,
+					methodArguments[i].type,
+				)
 			) {
 				if (i === 0) {
 					throw new Error("MethodInvocation: BaseType mismatch")
@@ -203,7 +212,9 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedMethod" &&
 		functionType.type !== "OverloadedStaticMethod"
 	) {
-		throw new Error("FunctionInvocation: Identifier isn't a Function or Method")
+		throw new Error(
+			"FunctionInvocation: Identifier isn't a Function or Method",
+		)
 	}
 
 	if (
@@ -232,7 +243,8 @@ function validateFunctionInvocation(
 
 				for (let i = 0; i < overload.parameterTypes.length; i++) {
 					if (
-						overload.parameterTypes[i].name !== node.arguments[i].name ||
+						overload.parameterTypes[i].name !==
+							node.arguments[i].name ||
 						!matchesType(
 							overload.parameterTypes[i].type,
 							node.arguments[i].type,
@@ -259,19 +271,24 @@ function validateFunctionInvocation(
 			}
 		} else {
 			if (functionType.parameterTypes.length !== node.arguments.length) {
-				throw new Error("FunctionInvocation: Amount of arguments doesn't match")
+				throw new Error(
+					"FunctionInvocation: Amount of arguments doesn't match",
+				)
 			}
 
 			for (let i = 0; i < functionType.parameterTypes.length; i++) {
 				if (
-					functionType.parameterTypes[i].name !== node.arguments[i].name ||
+					functionType.parameterTypes[i].name !==
+						node.arguments[i].name ||
 					!matchesType(
 						functionType.parameterTypes[i].type,
 						node.arguments[i].type,
 					)
 				) {
 					throw new Error(
-						`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`,
+						`FunctionInvocation: ArgumentType mismatch at argument ${
+							i + 1
+						}`,
 					)
 				}
 			}
@@ -595,10 +612,15 @@ function validateSimpleFunctionInvocation(
 	for (let i = 0; i < functionType.parameterTypes.length; i++) {
 		if (
 			functionType.parameterTypes[i].name !== argumentNodes[i].name ||
-			!matchesType(functionType.parameterTypes[i].type, argumentNodes[i].type)
+			!matchesType(
+				functionType.parameterTypes[i].type,
+				argumentNodes[i].type,
+			)
 		) {
 			throw new Error(
-				`FunctionInvocation: ArgumentType mismatch at argument ${i + 1}`,
+				`FunctionInvocation: ArgumentType mismatch at argument ${
+					i + 1
+				}`,
 			)
 		}
 	}

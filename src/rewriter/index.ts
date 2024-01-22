@@ -3,7 +3,7 @@ import * as path from "path"
 import { generate } from "escodegen"
 import * as estree from "estree"
 
-import { build, BuildResult } from "esbuild"
+import { BuildResult, build } from "esbuild"
 
 import { common } from "../interfaces"
 
@@ -171,7 +171,9 @@ function rewriteNamespaceDefinitionStatement(
 										type: "Identifier",
 										name,
 									},
-									value: rewriteFunctionExpression(method.method.value),
+									value: rewriteFunctionExpression(
+										method.method.value,
+									),
 									kind: "init",
 									method: true,
 									computed: false,
@@ -189,7 +191,7 @@ function rewriteNamespaceDefinitionStatement(
 function rewriteChoiceStatement(
 	node: common.typedSimple.ChoiceStatementNode,
 ): estree.IfStatement {
-	let alternate
+	let alternate: estree.Statement
 
 	if (
 		node.falseBody.length === 1 &&
@@ -322,7 +324,9 @@ function rewriteNativeFunctionInvocation(
 			computed: false,
 		}
 	} else {
-		throw Error("Lookups on NativeFunctionIvocations are not implemented yet.")
+		throw Error(
+			"Lookups on NativeFunctionIvocations are not implemented yet.",
+		)
 	}
 
 	return {
@@ -621,11 +625,13 @@ function rewriteMatch(
 		value: estree.Expression,
 		matcher: common.Type,
 	): estree.CallExpression {
-		let matcherArgument
+		let matcherArgument: estree.ObjectExpression
 
 		// TODO: Handle Record Types
 		if (matcher.type === "Type") {
-			matcherArgument = convertObjectToObjectExpression(matcher.definition)
+			matcherArgument = convertObjectToObjectExpression(
+				matcher.definition,
+			)
 		} else {
 			matcherArgument = convertObjectToObjectExpression(matcher)
 		}
@@ -681,7 +687,7 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				// rome-ignore lint/style/noNonNullAssertion: We can guarantee that this will always be set
+				// biome-ignore lint/style/noNonNullAssertion: We can guarantee that this will always be set
 				body: [finalIfStatement!],
 			},
 			params: [selfParameter],
@@ -795,26 +801,28 @@ function convertObjectToObjectExpression(
 ): estree.ObjectExpression {
 	return {
 		type: "ObjectExpression",
-		properties: Object.entries(object).map<estree.Property>(([key, value]) => {
-			if (value !== null && typeof value === "object") {
-				value = convertObjectToObjectExpression(value)
-			} else {
-				value = { type: "Literal", value } as estree.Literal
-			}
+		properties: Object.entries(object).map<estree.Property>(
+			([key, value]) => {
+				if (value !== null && typeof value === "object") {
+					value = convertObjectToObjectExpression(value)
+				} else {
+					value = { type: "Literal", value } as estree.Literal
+				}
 
-			return {
-				type: "Property",
-				key: {
-					type: "Identifier",
-					name: key,
-				},
-				value,
-				kind: "init",
-				computed: false,
-				method: false,
-				shorthand: false,
-			}
-		}),
+				return {
+					type: "Property",
+					key: {
+						type: "Identifier",
+						name: key,
+					},
+					value,
+					kind: "init",
+					computed: false,
+					method: false,
+					shorthand: false,
+				}
+			},
+		),
 	}
 }
 // #endregion

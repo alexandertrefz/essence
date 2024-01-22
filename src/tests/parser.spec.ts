@@ -49,7 +49,9 @@ describe("Parser", () => {
 
 		describe("MethodInvocations", () => {
 			it("should parse MethodInvocation with 0 external parameters", () => {
-				let input: parser.Program = parse("implementation { lookup::member() }")
+				let input: parser.Program = parse(
+					"implementation { lookup::member() }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -198,7 +200,9 @@ describe("Parser", () => {
 
 		describe("Lookups", () => {
 			it("should parse simple Lookup", () => {
-				let input: parser.Program = parse("implementation { lookup.member }")
+				let input: parser.Program = parse(
+					"implementation { lookup.member }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -214,7 +218,9 @@ describe("Parser", () => {
 
 		describe("Identifiers", () => {
 			it("should parse Identifiers", () => {
-				let input: parser.Program = parse("implementation { identifier }")
+				let input: parser.Program = parse(
+					"implementation { identifier }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -283,7 +289,9 @@ describe("Parser", () => {
 		describe("Literals", () => {
 			describe("FunctionLiterals", () => {
 				it("should parse FunctionLiterals with no parameters", () => {
-					let input: parser.Program = parse("implementation { () -> Type {} }")
+					let input: parser.Program = parse(
+						"implementation { () -> Type {} }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -501,7 +509,9 @@ describe("Parser", () => {
 
 			describe("NothingLiteral", () => {
 				it("should parse NothingLiteral", () => {
-					let input: parser.Program = parse("implementation { nothing }")
+					let input: parser.Program = parse(
+						"implementation { nothing }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -515,7 +525,9 @@ describe("Parser", () => {
 				})
 
 				it("should parse 'false' BooleanLiterals", () => {
-					let input: parser.Program = parse("implementation { false }")
+					let input: parser.Program = parse(
+						"implementation { false }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -529,7 +541,9 @@ describe("Parser", () => {
 				})
 
 				it("should parse filled StringLiterals", () => {
-					let input: parser.Program = parse(`implementation { "string" }`)
+					let input: parser.Program = parse(
+						`implementation { "string" }`,
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -543,13 +557,17 @@ describe("Parser", () => {
 				})
 
 				it("should parse IntegerLiterals with an underscore", () => {
-					let input: parser.Program = parse("implementation { 1_000 }")
+					let input: parser.Program = parse(
+						"implementation { 1_000 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse IntegerLiterals with multiple underscores", () => {
-					let input: parser.Program = parse("implementation { 1_000_000 }")
+					let input: parser.Program = parse(
+						"implementation { 1_000_000 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -561,13 +579,17 @@ describe("Parser", () => {
 				})
 
 				it("should parse negative IntegerLiterals with an underscore", () => {
-					let input: parser.Program = parse("implementation { -1_000 }")
+					let input: parser.Program = parse(
+						"implementation { -1_000 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse negative IntegerLiterals with multiple underscores", () => {
-					let input: parser.Program = parse("implementation { -1_000_000 }")
+					let input: parser.Program = parse(
+						"implementation { -1_000_000 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -575,31 +597,41 @@ describe("Parser", () => {
 
 			describe("FractionLiterals", () => {
 				it("should parse FractionLiterals", () => {
-					let input: parser.Program = parse("implementation { 3 / 2 }")
+					let input: parser.Program = parse(
+						"implementation { 3 / 2 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse FractionLiterals with underscores", () => {
-					let input: parser.Program = parse("implementation { 1_000 / 9 }")
+					let input: parser.Program = parse(
+						"implementation { 1_000 / 9 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse negative numerator FractionLiterals", () => {
-					let input: parser.Program = parse("implementation { -3 / 2 }")
+					let input: parser.Program = parse(
+						"implementation { -3 / 2 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse negative denominator FractionLiterals", () => {
-					let input: parser.Program = parse("implementation { 3 / -2 }")
+					let input: parser.Program = parse(
+						"implementation { 3 / -2 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse fully negative FractionLiterals", () => {
-					let input: parser.Program = parse("implementation { -3 / -2 }")
+					let input: parser.Program = parse(
+						"implementation { -3 / -2 }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -619,7 +651,9 @@ describe("Parser", () => {
 				})
 
 				it("should parse an List with multiple items", () => {
-					let input: parser.Program = parse("implementation { [0, 1, 2,] }")
+					let input: parser.Program = parse(
+						"implementation { [0, 1, 2,] }",
+					)
 
 					expect(input).toMatchSnapshot()
 				})
@@ -650,7 +684,9 @@ describe("Parser", () => {
 	describe("Statements", () => {
 		describe("ReturnStatements", () => {
 			it("should parse ReturnStatements", () => {
-				let input: parser.Program = parse("implementation { <- identifier }")
+				let input: parser.Program = parse(
+					"implementation { <- identifier }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -658,7 +694,9 @@ describe("Parser", () => {
 
 		describe("IfStatements", () => {
 			it("should parse IfStatements", () => {
-				let input: parser.Program = parse("implementation { if identifier {} }")
+				let input: parser.Program = parse(
+					"implementation { if identifier {} }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -774,7 +812,9 @@ describe("Parser", () => {
 
 		describe("VariableAssignmentStatements", () => {
 			it("should parse VariableAssignmentStatement", () => {
-				let input: parser.Program = parse(`implementation { identifier = "" }`)
+				let input: parser.Program = parse(
+					`implementation { identifier = "" }`,
+				)
 
 				expect(input).toMatchSnapshot()
 			})
@@ -782,7 +822,9 @@ describe("Parser", () => {
 
 		describe("TypeDefinitionStatements", () => {
 			it("should parse an empty TypeDefinitionStatement", () => {
-				let input: parser.Program = parse("implementation { type Type {} }")
+				let input: parser.Program = parse(
+					"implementation { type Type {} }",
+				)
 
 				expect(input).toMatchSnapshot()
 			})

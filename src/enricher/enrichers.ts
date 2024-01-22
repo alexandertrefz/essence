@@ -197,7 +197,9 @@ export function enrichGenericDeclarationNode(
 ): common.typed.GenericDeclarationNode {
 	return {
 		nodeType: "GenericDeclaration",
-		defaultType: node.defaultType ? resolveType(node.defaultType, scope) : null,
+		defaultType: node.defaultType
+			? resolveType(node.defaultType, scope)
+			: null,
 		name: node.name.content,
 		position: node.position,
 	}
@@ -262,7 +264,12 @@ export function enrichMethodsFunctionValue(
 	for (let [, method] of Object.entries(node.methods)) {
 		results.push({
 			nodeType: "FunctionValue",
-			value: enrichMethodFunctionDefinition(method, isStatic, scope, selfType),
+			value: enrichMethodFunctionDefinition(
+				method,
+				isStatic,
+				scope,
+				selfType,
+			),
 			position: method.position,
 			type: resolveFunctionValueType(method, scope),
 		})
@@ -348,7 +355,9 @@ export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
-	let value
+	let value:
+		| common.typed.FunctionDefinitionNode
+		| common.typed.GenericFunctionDefinitionNode
 
 	if (node.value.nodeType === "FunctionDefinition") {
 		value = enrichFunctionDefinition(node.value, scope)
@@ -486,7 +495,7 @@ export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
-	let type
+	let type: common.Type
 
 	if (node.type === null) {
 		type = resolveType(node.value, scope)
@@ -580,18 +589,27 @@ export function enrichNamespaceDefinitionStatement(
 	function enrichProperties(
 		properties: Record<
 			string,
-			{ type: parser.TypeDeclarationNode | null; value: parser.ExpressionNode }
+			{
+				type: parser.TypeDeclarationNode | null
+				value: parser.ExpressionNode
+			}
 		>,
 		scope: enricher.Scope,
-	): Record<string, { type: common.Type; value: common.typed.ExpressionNode }> {
+	): Record<
+		string,
+		{ type: common.Type; value: common.typed.ExpressionNode }
+	> {
 		let result: Record<
 			string,
 			{ type: common.Type; value: common.typed.ExpressionNode }
 		> = {}
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
-			let type
-			let value = enrichExpression(propertyValue.value, scope)
+			let type: common.Type
+			let value: common.typed.ExpressionNode = enrichExpression(
+				propertyValue.value,
+				scope,
+			)
 
 			if (propertyValue.type === null) {
 				type = value.type
@@ -755,12 +773,20 @@ function enrichMethods(
 		} else if (memberValue.nodeType === "OverloadedMethod") {
 			result[memberKey] = {
 				nodeType: "OverloadedMethod",
-				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+				methods: enrichMethodsFunctionValue(
+					memberValue,
+					scope,
+					selfType,
+				),
 			}
 		} else {
 			result[memberKey] = {
 				nodeType: "OverloadedStaticMethod",
-				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+				methods: enrichMethodsFunctionValue(
+					memberValue,
+					scope,
+					selfType,
+				),
 			}
 		}
 	}
@@ -784,7 +810,11 @@ function enrichNamespaceMethods(
 		} else {
 			result[memberKey] = {
 				nodeType: "OverloadedStaticMethod",
-				methods: enrichMethodsFunctionValue(memberValue, scope, selfType),
+				methods: enrichMethodsFunctionValue(
+					memberValue,
+					scope,
+					selfType,
+				),
 			}
 		}
 	}

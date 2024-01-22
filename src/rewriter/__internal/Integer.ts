@@ -3,9 +3,9 @@ import type { StringType } from "./String"
 
 import { Fraction } from "bigint-fraction"
 
-import { typeKeySymbol } from "./type"
 import { createFraction } from "./Fraction"
 import { createString } from "./String"
+import { typeKeySymbol } from "./type"
 
 export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
 
@@ -99,7 +99,7 @@ export function multiply__overload$2(
 
 // #endregion
 
-// rome-ignore lint/suspicious/noShadowRestrictedNames:
+// biome-ignore lint/suspicious/noShadowRestrictedNames:
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }

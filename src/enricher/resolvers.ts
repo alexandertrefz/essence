@@ -236,7 +236,10 @@ export function resolveMethodInvocationType(
 					!(
 						((parameter.name === null && argument.name === null) ||
 							(parameter.name && argument.name?.content)) &&
-						matchesType(parameter.type, resolveType(argument.value, scope))
+						matchesType(
+							parameter.type,
+							resolveType(argument.value, scope),
+						)
 					)
 				) {
 					continue overloadLoop
@@ -296,7 +299,10 @@ export function resolveFunctionInvocationType(
 					!(
 						((parameter.name === null && argument.name === null) ||
 							(parameter.name && argument.name?.content)) &&
-						matchesType(parameter.type, resolveType(argument.value, scope))
+						matchesType(
+							parameter.type,
+							resolveType(argument.value, scope),
+						)
 					)
 				) {
 					continue overloadLoop
@@ -346,7 +352,9 @@ export function resolveCombinationType(
 				lhs.definition.type === "Primitive" ||
 				lhs.definition.type === "BuiltIn"
 			) {
-				throw new Error(`You can not combine ${lhs.name} with other Types.`)
+				throw new Error(
+					`You can not combine ${lhs.name} with other Types.`,
+				)
 			} else {
 				lhs = lhs.definition
 			}
@@ -357,7 +365,9 @@ export function resolveCombinationType(
 				rhs.definition.type === "Primitive" ||
 				rhs.definition.type === "BuiltIn"
 			) {
-				throw new Error(`You can not combine ${rhs.name} with other Types.`)
+				throw new Error(
+					`You can not combine ${rhs.name} with other Types.`,
+				)
 			} else {
 				rhs = rhs.definition
 			}
@@ -370,7 +380,9 @@ export function resolveCombinationType(
 				lhs.definition.type === "Primitive" ||
 				lhs.definition.type === "BuiltIn"
 			) {
-				throw new Error(`You can not combine ${lhs.name} with other Types.`)
+				throw new Error(
+					`You can not combine ${lhs.name} with other Types.`,
+				)
 			} else {
 				lhs = lhs.definition
 			}
@@ -381,14 +393,19 @@ export function resolveCombinationType(
 				rhs.definition.type === "Primitive" ||
 				rhs.definition.type === "BuiltIn"
 			) {
-				throw new Error(`You can not combine ${rhs.name} with other Types.`)
+				throw new Error(
+					`You can not combine ${rhs.name} with other Types.`,
+				)
 			} else {
 				rhs = rhs.definition
 			}
 		}
 
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
-			if (rhsType.type === "Primitive" && rhsType.primitive !== "Nothing") {
+			if (
+				rhsType.type === "Primitive" &&
+				rhsType.primitive !== "Nothing"
+			) {
 				rhsType = resolvePrimitiveTypeType(rhsType, scope)
 			}
 
@@ -510,7 +527,10 @@ export function resolveListValueType(
 				if (!isUnion) {
 					isUnion = true
 
-					itemType = { type: "UnionType", types: [itemType, expressionType] }
+					itemType = {
+						type: "UnionType",
+						types: [itemType, expressionType],
+					}
 				} else {
 					;(itemType as common.UnionType).types.push(expressionType)
 				}
@@ -868,6 +888,10 @@ export function resolveMethodLookupBaseType(
 		case "Primitive":
 			if (baseType.primitive !== "Nothing") {
 				return resolvePrimitiveTypeType(baseType, scope)
+			} else {
+				throw new Error(
+					`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.\nLeft hand side is Nothing.`,
+				)
 			}
 		default:
 			throw new Error(
@@ -1074,14 +1098,19 @@ export function resolveGenericType(
 	}
 
 	// TODO: Figure out if we can generalise the case for ListType
-	for (let [methodName, methodValue] of Object.entries(resolvedType.methods)) {
+	for (let [methodName, methodValue] of Object.entries(
+		resolvedType.methods,
+	)) {
 		if (
 			methodValue.type === "SimpleMethod" ||
 			methodValue.type === "StaticMethod"
 		) {
 			for (let parameter of methodValue.parameterTypes) {
 				if (parameter.type.type === "Function") {
-					parameter.type = deeplyInferGenericsForFunction(parameter.type, types)
+					parameter.type = deeplyInferGenericsForFunction(
+						parameter.type,
+						types,
+					)
 				}
 
 				if (parameter.type.type === "Generic") {
@@ -1091,7 +1120,10 @@ export function resolveGenericType(
 				}
 
 				if (parameter.type.type === "UnionType") {
-					parameter.type = deeplyResolveGenericsForUnion(parameter.type, types)
+					parameter.type = deeplyResolveGenericsForUnion(
+						parameter.type,
+						types,
+					)
 				}
 
 				if (
@@ -1099,7 +1131,8 @@ export function resolveGenericType(
 					parameter.type.itemType.type === "Generic"
 				) {
 					if (parameter.type.itemType.name in types) {
-						parameter.type.itemType = types[parameter.type.itemType.name]
+						parameter.type.itemType =
+							types[parameter.type.itemType.name]
 					}
 				}
 			}
@@ -1161,7 +1194,8 @@ export function resolveGenericType(
 						parameter.type.itemType.type === "Generic"
 					) {
 						if (parameter.type.itemType.name in types) {
-							parameter.type.itemType = types[parameter.type.itemType.name]
+							parameter.type.itemType =
+								types[parameter.type.itemType.name]
 						}
 					}
 				}

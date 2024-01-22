@@ -10,15 +10,27 @@ const type: common.TypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
@@ -30,15 +42,27 @@ const type: common.TypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
@@ -50,15 +74,27 @@ const type: common.TypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
@@ -70,15 +106,27 @@ const type: common.TypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
-						{ name: null, type: { type: "Primitive", primitive: "Integer" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
 				},
@@ -90,13 +138,19 @@ const type: common.TypeType = {
 			overloads: [
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 					],
 					returnType: { type: "Primitive", primitive: "String" },
 				},
 				{
 					parameterTypes: [
-						{ name: null, type: { type: "Primitive", primitive: "Fraction" } },
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
 						{
 							name: "formatAs",
 							type: { type: "Primitive", primitive: "String" },
