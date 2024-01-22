@@ -2,10 +2,10 @@ import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 
-import { typeKeySymbol } from "./type"
 import { createBoolean } from "./Boolean"
 import { createNothing } from "./Nothing"
 import { getInt32 } from "./internalHelpers"
+import { typeKeySymbol } from "./type"
 
 export type ListType<T> = {
 	[typeKeySymbol]: "List"
@@ -53,7 +53,9 @@ export function dropFirst<T>(originalList: ListType<T>): ListType<T> {
 }
 
 export function dropLast<T>(originalList: ListType<T>): ListType<T> {
-	return createList(originalList.value.slice(0, originalList.value.length - 1))
+	return createList(
+		originalList.value.slice(0, originalList.value.length - 1),
+	)
 }
 
 export function append__overload$1<T>(

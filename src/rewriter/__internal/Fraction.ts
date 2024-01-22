@@ -3,8 +3,8 @@ import { Fraction } from "bigint-fraction"
 import type { IntegerType } from "./Integer"
 import type { StringType } from "./String"
 
-import { typeKeySymbol } from "./type"
 import { createString } from "./String"
+import { typeKeySymbol } from "./type"
 
 export type FractionType = { [typeKeySymbol]: "Fraction"; fraction: Fraction }
 

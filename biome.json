@@ -1,5 +1,5 @@
 {
-	"$schema": "./node_modules/rome/configuration_schema.json",
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"files": {
 		"ignore": [
 			"./lib/*",
@@ -10,7 +10,7 @@
 	},
 	"formatter": {
 		"indentStyle": "tab",
-		"indentSize": 4
+		"indentWidth": 4
 	},
 	"javascript": {
 		"formatter": {
@@ -23,10 +23,8 @@
 			"style": {
 				"useConst": "off",
 				"useShorthandArrayType": "off",
-				"noParameterAssign": "off"
-			},
-			"complexity": {
-				"noExtraSemicolon": "off"
+				"noParameterAssign": "off",
+				"noUselessElse": "off"
 			},
 			"suspicious": {
 				"noExplicitAny": "off"

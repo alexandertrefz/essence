@@ -28,7 +28,10 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 
 	return {
 		nodeType: "Program",
-		implementation: enrichImplementation(program.implementation, topLevelScope),
+		implementation: enrichImplementation(
+			program.implementation,
+			topLevelScope,
+		),
 		position: program.position,
 	}
 }

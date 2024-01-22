@@ -8,54 +8,90 @@ const type: common.TypeType = {
 		isEmpty: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		hasContent: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		isnt: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
 		prepend: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		},
 		append: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		},
 		split: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: "on", type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: "on",
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: {
 				type: "List",
@@ -65,8 +101,14 @@ const type: common.TypeType = {
 		contains: {
 			type: "SimpleMethod",
 			parameterTypes: [
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
-				{ name: null, type: { type: "Primitive", primitive: "String" } },
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},

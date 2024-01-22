@@ -1,5 +1,5 @@
-import { common, lexer } from "../interfaces"
 import { Token as NearleyToken } from "nearley"
+import { common, lexer } from "../interfaces"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -443,7 +443,11 @@ const lexToken = (
 	let firstChar = input[0]
 
 	if (isWhitespace(firstChar)) {
-		return lexToken(input.slice(1), moveCursor(firstChar, cursor), ignoreList)
+		return lexToken(
+			input.slice(1),
+			moveCursor(firstChar, cursor),
+			ignoreList,
+		)
 	}
 
 	if (isLinebreak(firstChar)) {
@@ -501,7 +505,11 @@ export class Lexer {
 	next(): lexer.Token | undefined {
 		const data = this.data.slice(this.index)
 
-		const { input, token, cursor } = lexToken(data, this.state, this.ignoreList)
+		const { input, token, cursor } = lexToken(
+			data,
+			this.state,
+			this.ignoreList,
+		)
 
 		this.state = cursor
 		this.index = this.data.length - input.length

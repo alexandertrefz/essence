@@ -58,9 +58,9 @@ describe("Lexer", () => {
 
 			lexer.reset(input)
 
-			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(
-				output,
-			)
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
 		})
 
 		it("should lex linebreak after other tokens", () => {
@@ -76,9 +76,9 @@ describe("Lexer", () => {
 
 			lexer.reset(input)
 
-			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(
-				output,
-			)
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
 		})
 	})
 
@@ -179,9 +179,9 @@ describe("Lexer", () => {
 
 			lexer.reset(input)
 
-			expect(stripPositionFromArray([lexer.next(), lexer.next()])).toEqual(
-				output,
-			)
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
 		})
 	})
 
@@ -249,7 +249,11 @@ describe("Lexer", () => {
 			lexer.reset(input)
 
 			expect(
-				stripPositionFromArray([lexer.next(), lexer.next(), lexer.next()]),
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
 			).toEqual(output)
 		})
 	})

@@ -1,5 +1,5 @@
-import grammar from "./grammar"
 import { Grammar, Parser } from "nearley"
+import grammar from "./grammar"
 
 class ParseError extends Error {
 	constructor(public message: string) {

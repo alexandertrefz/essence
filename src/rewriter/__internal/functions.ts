@@ -2,13 +2,13 @@ import type { BooleanType } from "./Boolean"
 import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
-import type { StringType } from "./String"
 import type { RecordType } from "./Record"
+import type { StringType } from "./String"
 
-import { typeKeySymbol } from "./type"
 import * as boolean from "./Boolean"
 import * as fraction from "./Fraction"
 import * as integer from "./Integer"
+import { typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
 
@@ -32,7 +32,9 @@ function getStringRepresentation(
 			let singleLineString = ""
 
 			for (let [key, value] of Object.entries(obj)) {
-				keyValuePairs.push(`${key} = ${getStringRepresentation(value, 0)}`)
+				keyValuePairs.push(
+					`${key} = ${getStringRepresentation(value, 0)}`,
+				)
 			}
 
 			singleLineString = `{ ${keyValuePairs.join(", ")} }`
@@ -42,7 +44,10 @@ function getStringRepresentation(
 			} else {
 				for (let [key, value] of Object.entries(obj)) {
 					keyValuePairs.push(
-						`${key} = ${getStringRepresentation(value, indentLevel + 1)}`,
+						`${key} = ${getStringRepresentation(
+							value,
+							indentLevel + 1,
+						)}`,
 					)
 				}
 
@@ -63,7 +68,9 @@ function getStringRepresentation(
 				return singleLineString
 			} else {
 				return `[\n${contentIndent}${obj.value
-					.map((value) => getStringRepresentation(value, indentLevel + 1))
+					.map((value) =>
+						getStringRepresentation(value, indentLevel + 1),
+					)
 					.join(`,\n${contentIndent}`)}\n${baseIndent}]`
 			}
 		} else {

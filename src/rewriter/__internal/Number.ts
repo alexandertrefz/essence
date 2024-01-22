@@ -4,10 +4,10 @@ import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 
-import { typeKeySymbol } from "./type"
 import { createFraction } from "./Fraction"
 import { createInteger } from "./Integer"
 import { isFirstFractionBigger } from "./internalHelpers"
+import { typeKeySymbol } from "./type"
 
 export const PI = createFraction(355n, 113n)
 export const TAO = createFraction(710n, 113n)
@@ -126,7 +126,12 @@ export function lowestNumber__overload$7(
 			}
 		} else {
 			if (lowestNumber[typeKeySymbol] === "Fraction") {
-				if (isFirstFractionBigger(lowestNumber.fraction, number.fraction)) {
+				if (
+					isFirstFractionBigger(
+						lowestNumber.fraction,
+						number.fraction,
+					)
+				) {
 					lowestNumber = number
 				}
 			} else {

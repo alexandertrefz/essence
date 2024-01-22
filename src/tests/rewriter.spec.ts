@@ -30,11 +30,15 @@ describe("Rewriter", () => {
 		describe("Boolean", () => {
 			describe("negate", () => {
 				it("turns true to false", () => {
-					expect(boolean.negate(booleanTrue())).toEqual(booleanFalse())
+					expect(boolean.negate(booleanTrue())).toEqual(
+						booleanFalse(),
+					)
 				})
 
 				it("turns false to true", () => {
-					expect(boolean.negate(booleanFalse())).toEqual(booleanTrue())
+					expect(boolean.negate(booleanFalse())).toEqual(
+						booleanTrue(),
+					)
 				})
 			})
 
@@ -63,9 +67,9 @@ describe("Rewriter", () => {
 					expect(boolean.isnt(booleanTrue(), booleanTrue())).toEqual(
 						booleanFalse(),
 					)
-					expect(boolean.isnt(booleanFalse(), booleanFalse())).toEqual(
-						booleanFalse(),
-					)
+					expect(
+						boolean.isnt(booleanFalse(), booleanFalse()),
+					).toEqual(booleanFalse())
 				})
 
 				it("returns true when the sides dont match ", () => {
@@ -119,9 +123,9 @@ describe("Rewriter", () => {
 						booleanTrue(),
 					)
 
-					expect(string.hasContent(string.createString("abc"))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						string.hasContent(string.createString("abc")),
+					).toEqual(booleanTrue())
 
 					expect(string.hasContent(string.createString(" "))).toEqual(
 						booleanTrue(),
@@ -133,78 +137,100 @@ describe("Rewriter", () => {
 				})
 
 				it("returns false when the string is empty", () => {
-					expect(string.hasContent(stringEmpty())).toEqual(booleanFalse())
+					expect(string.hasContent(stringEmpty())).toEqual(
+						booleanFalse(),
+					)
 				})
 			})
 
 			describe("is", () => {
 				it("returns true when the strings are equal", () => {
-					expect(string.is(stringEmpty(), stringEmpty())).toEqual(booleanTrue())
+					expect(string.is(stringEmpty(), stringEmpty())).toEqual(
+						booleanTrue(),
+					)
 
 					expect(
-						string.is(string.createString("a"), string.createString("a")),
+						string.is(
+							string.createString("a"),
+							string.createString("a"),
+						),
 					).toEqual(booleanTrue())
 
 					expect(
-						string.is(string.createString("abc"), string.createString("abc")),
+						string.is(
+							string.createString("abc"),
+							string.createString("abc"),
+						),
 					).toEqual(booleanTrue())
 
 					expect(
-						string.is(string.createString("!"), string.createString("!")),
+						string.is(
+							string.createString("!"),
+							string.createString("!"),
+						),
 					).toEqual(booleanTrue())
 
 					expect(
-						string.is(string.createString(" "), string.createString(" ")),
+						string.is(
+							string.createString(" "),
+							string.createString(" "),
+						),
 					).toEqual(booleanTrue())
 				})
 
 				it("returns false when the strings are not equal", () => {
-					expect(string.is(stringEmpty(), string.createString("a"))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.is(stringEmpty(), string.createString("abc"))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.is(stringEmpty(), string.createString("!"))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.is(stringEmpty(), string.createString(" "))).toEqual(
-						booleanFalse(),
-					)
-
 					expect(
-						string.is(string.createString("abc"), string.createString(" ")),
+						string.is(stringEmpty(), string.createString("a")),
 					).toEqual(booleanFalse())
 
-					expect(string.is(string.createString("abc"), stringEmpty())).toEqual(
-						booleanFalse(),
-					)
+					expect(
+						string.is(stringEmpty(), string.createString("abc")),
+					).toEqual(booleanFalse())
+
+					expect(
+						string.is(stringEmpty(), string.createString("!")),
+					).toEqual(booleanFalse())
+
+					expect(
+						string.is(stringEmpty(), string.createString(" ")),
+					).toEqual(booleanFalse())
+
+					expect(
+						string.is(
+							string.createString("abc"),
+							string.createString(" "),
+						),
+					).toEqual(booleanFalse())
+
+					expect(
+						string.is(string.createString("abc"), stringEmpty()),
+					).toEqual(booleanFalse())
 				})
 			})
 
 			describe("isnt", () => {
 				it("returns true when the strings are not equal", () => {
-					expect(string.isnt(stringEmpty(), string.createString("a"))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						string.isnt(stringEmpty(), string.createString("a")),
+					).toEqual(booleanTrue())
 
 					expect(
 						string.isnt(stringEmpty(), string.createString("abc")),
 					).toEqual(booleanTrue())
 
-					expect(string.isnt(stringEmpty(), string.createString("!"))).toEqual(
-						booleanTrue(),
-					)
-
-					expect(string.isnt(stringEmpty(), string.createString(" "))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						string.isnt(stringEmpty(), string.createString("!")),
+					).toEqual(booleanTrue())
 
 					expect(
-						string.isnt(string.createString("abc"), string.createString(" ")),
+						string.isnt(stringEmpty(), string.createString(" ")),
+					).toEqual(booleanTrue())
+
+					expect(
+						string.isnt(
+							string.createString("abc"),
+							string.createString(" "),
+						),
 					).toEqual(booleanTrue())
 
 					expect(
@@ -218,19 +244,31 @@ describe("Rewriter", () => {
 					)
 
 					expect(
-						string.isnt(string.createString("a"), string.createString("a")),
+						string.isnt(
+							string.createString("a"),
+							string.createString("a"),
+						),
 					).toEqual(booleanFalse())
 
 					expect(
-						string.isnt(string.createString("abc"), string.createString("abc")),
+						string.isnt(
+							string.createString("abc"),
+							string.createString("abc"),
+						),
 					).toEqual(booleanFalse())
 
 					expect(
-						string.isnt(string.createString("!"), string.createString("!")),
+						string.isnt(
+							string.createString("!"),
+							string.createString("!"),
+						),
 					).toEqual(booleanFalse())
 
 					expect(
-						string.isnt(string.createString(" "), string.createString(" ")),
+						string.isnt(
+							string.createString(" "),
+							string.createString(" "),
+						),
 					).toEqual(booleanFalse())
 				})
 			})
@@ -242,7 +280,10 @@ describe("Rewriter", () => {
 					).toEqual(string.createString("a"))
 
 					expect(
-						string.prepend(stringEmpty(), string.createString("abc")),
+						string.prepend(
+							stringEmpty(),
+							string.createString("abc"),
+						),
 					).toEqual(string.createString("abc"))
 
 					expect(
@@ -254,7 +295,10 @@ describe("Rewriter", () => {
 					).toEqual(string.createString(" "))
 
 					expect(
-						string.prepend(string.createString("bc"), string.createString("a")),
+						string.prepend(
+							string.createString("bc"),
+							string.createString("a"),
+						),
 					).toEqual(string.createString("abc"))
 				})
 			})
@@ -266,7 +310,10 @@ describe("Rewriter", () => {
 					).toEqual(string.createString("a"))
 
 					expect(
-						string.append(stringEmpty(), string.createString("abc")),
+						string.append(
+							stringEmpty(),
+							string.createString("abc"),
+						),
 					).toEqual(string.createString("abc"))
 
 					expect(
@@ -278,7 +325,10 @@ describe("Rewriter", () => {
 					).toEqual(string.createString(" "))
 
 					expect(
-						string.append(string.createString("a"), string.createString("bc")),
+						string.append(
+							string.createString("a"),
+							string.createString("bc"),
+						),
 					).toEqual(string.createString("abc"))
 				})
 			})
@@ -286,7 +336,10 @@ describe("Rewriter", () => {
 			describe("split", () => {
 				it("splits correctly when splitting on an empty string", () => {
 					expect(
-						string.split(string.createString("abc"), string.createString("")),
+						string.split(
+							string.createString("abc"),
+							string.createString(""),
+						),
 					).toEqual(
 						list.createList([
 							string.createString("a"),
@@ -315,7 +368,10 @@ describe("Rewriter", () => {
 			describe("contains", () => {
 				it("returns true when the partial string is empty", () => {
 					expect(
-						string.contains(string.createString("abc"), stringEmpty()),
+						string.contains(
+							string.createString("abc"),
+							stringEmpty(),
+						),
 					).toEqual(booleanTrue())
 				})
 
@@ -360,7 +416,10 @@ describe("Rewriter", () => {
 
 				it("returns false when the partial string is not found", () => {
 					expect(
-						string.contains(stringEmpty(), string.createString("abc")),
+						string.contains(
+							stringEmpty(),
+							string.createString("abc"),
+						),
 					).toEqual(booleanFalse())
 
 					expect(
@@ -376,9 +435,9 @@ describe("Rewriter", () => {
 		describe("Integer", () => {
 			describe("add", () => {
 				it("adds 2 integers correctly", () => {
-					expect(integer.add__overload$1(integerOne(), integerOne())).toEqual(
-						integerTwo(),
-					)
+					expect(
+						integer.add__overload$1(integerOne(), integerOne()),
+					).toEqual(integerTwo())
 
 					expect(
 						integer.add__overload$1(integerHundred(), integerOne()),
@@ -391,11 +450,17 @@ describe("Rewriter", () => {
 
 				it("adds an integer and a fraction correctly", () => {
 					expect(
-						integer.add__overload$2(integerOne(), fractionOneHalf()),
+						integer.add__overload$2(
+							integerOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(3n, 2n))
 
 					expect(
-						integer.add__overload$2(integerHundred(), fractionOneHalf()),
+						integer.add__overload$2(
+							integerHundred(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(201n, 2n))
 
 					expect(
@@ -417,25 +482,40 @@ describe("Rewriter", () => {
 			describe("subtract", () => {
 				it("subtract 2 integers correctly", () => {
 					expect(
-						integer.subtract__overload$1(integerTwo(), integerOne()),
+						integer.subtract__overload$1(
+							integerTwo(),
+							integerOne(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						integer.subtract__overload$1(integerHundred(), integerOne()),
+						integer.subtract__overload$1(
+							integerHundred(),
+							integerOne(),
+						),
 					).toEqual(integer.createInteger(99n))
 
 					expect(
-						integer.subtract__overload$1(integerOne(), integerHundred()),
+						integer.subtract__overload$1(
+							integerOne(),
+							integerHundred(),
+						),
 					).toEqual(integer.createInteger(-99n))
 				})
 
 				it("subtracts a fraction from an integer correctly", () => {
 					expect(
-						integer.subtract__overload$2(integerOne(), fractionOneHalf()),
+						integer.subtract__overload$2(
+							integerOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fractionOneHalf())
 
 					expect(
-						integer.subtract__overload$2(integerHundred(), fractionOneHalf()),
+						integer.subtract__overload$2(
+							integerHundred(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(199n, 2n))
 
 					expect(
@@ -450,25 +530,40 @@ describe("Rewriter", () => {
 			describe("multiply", () => {
 				it("multiplies 2 integers correctly", () => {
 					expect(
-						integer.multiplyWith__overload$1(integerOne(), integerOne()),
+						integer.multiplyWith__overload$1(
+							integerOne(),
+							integerOne(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						integer.multiplyWith__overload$1(integerHundred(), integerOne()),
+						integer.multiplyWith__overload$1(
+							integerHundred(),
+							integerOne(),
+						),
 					).toEqual(integerHundred())
 
 					expect(
-						integer.multiplyWith__overload$1(integerTwo(), integerTwo()),
+						integer.multiplyWith__overload$1(
+							integerTwo(),
+							integerTwo(),
+						),
 					).toEqual(integer.createInteger(4n))
 
 					expect(
-						integer.multiplyWith__overload$1(integerTwo(), integerHundred()),
+						integer.multiplyWith__overload$1(
+							integerTwo(),
+							integerHundred(),
+						),
 					).toEqual(integer.createInteger(200n))
 				})
 
 				it("multiplies an integer and a fraction correctly", () => {
 					expect(
-						integer.multiplyWith__overload$2(integerOne(), fractionOneHalf()),
+						integer.multiplyWith__overload$2(
+							integerOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fractionOneHalf())
 
 					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
@@ -481,7 +576,10 @@ describe("Rewriter", () => {
 
 					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						integer.multiplyWith__overload$2(integerTwo(), fractionOneHalf()),
+						integer.multiplyWith__overload$2(
+							integerTwo(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(2n, 2n))
 
 					expect(
@@ -496,21 +594,33 @@ describe("Rewriter", () => {
 			describe("divide", () => {
 				it("divides 2 integers correctly", () => {
 					expect(
-						integer.divideBy__overload$1(integerOne(), integerOne()),
+						integer.divideBy__overload$1(
+							integerOne(),
+							integerOne(),
+						),
 					).toEqual(fraction.createFraction(1n, 1n))
 
 					expect(
-						integer.divideBy__overload$1(integerOne(), integerTwo()),
+						integer.divideBy__overload$1(
+							integerOne(),
+							integerTwo(),
+						),
 					).toEqual(fraction.createFraction(1n, 2n))
 
 					expect(
-						integer.divideBy__overload$1(integerHundred(), integerTwo()),
+						integer.divideBy__overload$1(
+							integerHundred(),
+							integerTwo(),
+						),
 					).toEqual(fraction.createFraction(100n, 2n))
 				})
 
 				it("divides an integer and a fraction correctly", () => {
 					expect(
-						integer.divideBy__overload$2(integerOne(), fractionOneHalf()),
+						integer.divideBy__overload$2(
+							integerOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(2n, 1n))
 
 					expect(
@@ -543,9 +653,9 @@ describe("Rewriter", () => {
 						string.createString("100"),
 					)
 
-					expect(integer.toString(integer.createInteger(1000n))).toEqual(
-						string.createString("1000"),
-					)
+					expect(
+						integer.toString(integer.createInteger(1000n)),
+					).toEqual(string.createString("1000"))
 				})
 			})
 		})
@@ -554,25 +664,40 @@ describe("Rewriter", () => {
 			describe("add", () => {
 				it("adds 2 fractions correctly", () => {
 					expect(
-						fraction.add__overload$1(fractionOneHalf(), fractionOneHalf()),
+						fraction.add__overload$1(
+							fractionOneHalf(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(4n, 4n))
 
 					expect(
-						fraction.add__overload$1(fractionHundred(), fractionOne()),
+						fraction.add__overload$1(
+							fractionHundred(),
+							fractionOne(),
+						),
 					).toEqual(fraction.createFraction(101n, 1n))
 
 					expect(
-						fraction.add__overload$1(fractionOne(), fractionHundred()),
+						fraction.add__overload$1(
+							fractionOne(),
+							fractionHundred(),
+						),
 					).toEqual(fraction.createFraction(101n, 1n))
 				})
 
 				it("adds a fraction and an integer correctly", () => {
 					expect(
-						fraction.add__overload$2(fractionOneHalf(), integerOne()),
+						fraction.add__overload$2(
+							fractionOneHalf(),
+							integerOne(),
+						),
 					).toEqual(fraction.createFraction(3n, 2n))
 
 					expect(
-						fraction.add__overload$2(fractionOneHalf(), integerHundred()),
+						fraction.add__overload$2(
+							fractionOneHalf(),
+							integerHundred(),
+						),
 					).toEqual(fraction.createFraction(201n, 2n))
 
 					expect(
@@ -587,7 +712,10 @@ describe("Rewriter", () => {
 			describe("subtract", () => {
 				it("subtract 2 fractions correctly", () => {
 					expect(
-						fraction.subtract__overload$1(fractionTwo(), fractionOne()),
+						fraction.subtract__overload$1(
+							fractionTwo(),
+							fractionOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
@@ -598,17 +726,26 @@ describe("Rewriter", () => {
 					).toEqual(fraction.createFraction(99n, 1n))
 
 					expect(
-						fraction.subtract__overload$1(fractionOne(), fractionHundred()),
+						fraction.subtract__overload$1(
+							fractionOne(),
+							fractionHundred(),
+						),
 					).toEqual(fraction.createFraction(-99n, 1n))
 				})
 
 				it("subtracts an integer from a fraction correctly", () => {
 					expect(
-						fraction.subtract__overload$2(fractionTwo(), integerOne()),
+						fraction.subtract__overload$2(
+							fractionTwo(),
+							integerOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						fraction.subtract__overload$2(fractionHundred(), integerOne()),
+						fraction.subtract__overload$2(
+							fractionHundred(),
+							integerOne(),
+						),
 					).toEqual(fraction.createFraction(99n, 1n))
 				})
 			})
@@ -616,25 +753,40 @@ describe("Rewriter", () => {
 			describe("multiply", () => {
 				it("multiplies 2 fractions correctly", () => {
 					expect(
-						fraction.multiplyWith__overload$1(fractionOne(), fractionOne()),
+						fraction.multiplyWith__overload$1(
+							fractionOne(),
+							fractionOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						fraction.multiplyWith__overload$1(fractionHundred(), fractionOne()),
+						fraction.multiplyWith__overload$1(
+							fractionHundred(),
+							fractionOne(),
+						),
 					).toEqual(fractionHundred())
 
 					expect(
-						fraction.multiplyWith__overload$1(fractionTwo(), fractionTwo()),
+						fraction.multiplyWith__overload$1(
+							fractionTwo(),
+							fractionTwo(),
+						),
 					).toEqual(fraction.createFraction(4n, 1n))
 
 					expect(
-						fraction.multiplyWith__overload$1(fractionTwo(), fractionHundred()),
+						fraction.multiplyWith__overload$1(
+							fractionTwo(),
+							fractionHundred(),
+						),
 					).toEqual(fraction.createFraction(200n, 1n))
 				})
 
 				it("multiplies a fraction and an integer correctly", () => {
 					expect(
-						fraction.multiplyWith__overload$2(fractionOneHalf(), integerOne()),
+						fraction.multiplyWith__overload$2(
+							fractionOneHalf(),
+							integerOne(),
+						),
 					).toEqual(fractionOneHalf())
 
 					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
@@ -647,7 +799,10 @@ describe("Rewriter", () => {
 
 					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						fraction.multiplyWith__overload$2(fractionOneHalf(), integerTwo()),
+						fraction.multiplyWith__overload$2(
+							fractionOneHalf(),
+							integerTwo(),
+						),
 					).toEqual(fraction.createFraction(2n, 2n))
 
 					expect(
@@ -662,25 +817,40 @@ describe("Rewriter", () => {
 			describe("divide", () => {
 				it("divides 2 fractions correctly", () => {
 					expect(
-						fraction.divideBy__overload$1(fractionOne(), fractionOne()),
+						fraction.divideBy__overload$1(
+							fractionOne(),
+							fractionOne(),
+						),
 					).toEqual(fraction.createFraction(1n, 1n))
 
 					expect(
-						fraction.divideBy__overload$1(fractionOne(), fractionTwo()),
+						fraction.divideBy__overload$1(
+							fractionOne(),
+							fractionTwo(),
+						),
 					).toEqual(fraction.createFraction(1n, 2n))
 
 					expect(
-						fraction.divideBy__overload$1(fractionOne(), fractionOneHalf()),
+						fraction.divideBy__overload$1(
+							fractionOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fraction.createFraction(2n, 1n))
 
 					expect(
-						fraction.divideBy__overload$1(fractionHundred(), fractionTwo()),
+						fraction.divideBy__overload$1(
+							fractionHundred(),
+							fractionTwo(),
+						),
 					).toEqual(fraction.createFraction(100n, 2n))
 				})
 
 				it("divides a fraction and an integer correctly", () => {
 					expect(
-						fraction.divideBy__overload$2(fractionOne(), integerOne()),
+						fraction.divideBy__overload$2(
+							fractionOne(),
+							integerOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
@@ -691,16 +861,19 @@ describe("Rewriter", () => {
 					).toEqual(fraction.createFraction(2n, 2n))
 
 					expect(
-						fraction.divideBy__overload$2(fractionHundred(), integerTwo()),
+						fraction.divideBy__overload$2(
+							fractionHundred(),
+							integerTwo(),
+						),
 					).toEqual(fraction.createFraction(100n, 2n))
 				})
 			})
 
 			describe("toString", () => {
 				it("returns the correct strings", () => {
-					expect(fraction.toString__overload$1(fractionOneHalf())).toEqual(
-						string.createString("1/2"),
-					)
+					expect(
+						fraction.toString__overload$1(fractionOneHalf()),
+					).toEqual(string.createString("1/2"))
 
 					expect(
 						fraction.toString__overload$2(
@@ -723,15 +896,24 @@ describe("Rewriter", () => {
 			describe("lowestNumber", () => {
 				it("returns the smaller of 2 integers", () => {
 					expect(
-						number.lowestNumber__overload$1(integerOne(), integerTwo()),
+						number.lowestNumber__overload$1(
+							integerOne(),
+							integerTwo(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						number.lowestNumber__overload$1(integerTwo(), integerOne()),
+						number.lowestNumber__overload$1(
+							integerTwo(),
+							integerOne(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						number.lowestNumber__overload$1(integerHundred(), integerTwo()),
+						number.lowestNumber__overload$1(
+							integerHundred(),
+							integerTwo(),
+						),
 					).toEqual(integerTwo())
 
 					expect(
@@ -744,19 +926,31 @@ describe("Rewriter", () => {
 
 				it("returns the smaller of 2 fractions", () => {
 					expect(
-						number.lowestNumber__overload$2(fractionOne(), fractionTwo()),
+						number.lowestNumber__overload$2(
+							fractionOne(),
+							fractionTwo(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						number.lowestNumber__overload$2(fractionTwo(), fractionOne()),
+						number.lowestNumber__overload$2(
+							fractionTwo(),
+							fractionOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						number.lowestNumber__overload$2(fractionHundred(), fractionTwo()),
+						number.lowestNumber__overload$2(
+							fractionHundred(),
+							fractionTwo(),
+						),
 					).toEqual(fractionTwo())
 
 					expect(
-						number.lowestNumber__overload$2(fractionOne(), fractionOneHalf()),
+						number.lowestNumber__overload$2(
+							fractionOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fractionOneHalf())
 
 					expect(
@@ -769,19 +963,31 @@ describe("Rewriter", () => {
 
 				it("returns the smaller number of an integer and a fraction", () => {
 					expect(
-						number.lowestNumber__overload$3(integerOne(), fractionTwo()),
+						number.lowestNumber__overload$3(
+							integerOne(),
+							fractionTwo(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						number.lowestNumber__overload$3(integerTwo(), fractionOne()),
+						number.lowestNumber__overload$3(
+							integerTwo(),
+							fractionOne(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						number.lowestNumber__overload$3(integerHundred(), fractionTwo()),
+						number.lowestNumber__overload$3(
+							integerHundred(),
+							fractionTwo(),
+						),
 					).toEqual(fractionTwo())
 
 					expect(
-						number.lowestNumber__overload$3(integerOne(), fractionOneHalf()),
+						number.lowestNumber__overload$3(
+							integerOne(),
+							fractionOneHalf(),
+						),
 					).toEqual(fractionOneHalf())
 
 					expect(
@@ -792,19 +998,31 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(-1n))
 
 					expect(
-						number.lowestNumber__overload$4(fractionOne(), integerTwo()),
+						number.lowestNumber__overload$4(
+							fractionOne(),
+							integerTwo(),
+						),
 					).toEqual(fractionOne())
 
 					expect(
-						number.lowestNumber__overload$4(fractionTwo(), integerOne()),
+						number.lowestNumber__overload$4(
+							fractionTwo(),
+							integerOne(),
+						),
 					).toEqual(integerOne())
 
 					expect(
-						number.lowestNumber__overload$4(fractionHundred(), integerTwo()),
+						number.lowestNumber__overload$4(
+							fractionHundred(),
+							integerTwo(),
+						),
 					).toEqual(integerTwo())
 
 					expect(
-						number.lowestNumber__overload$4(fractionOneHalf(), integerOne()),
+						number.lowestNumber__overload$4(
+							fractionOneHalf(),
+							integerOne(),
+						),
 					).toEqual(fractionOneHalf())
 
 					expect(
@@ -818,19 +1036,31 @@ describe("Rewriter", () => {
 				it("returns the smallest number of a list", () => {
 					expect(
 						number.lowestNumber__overload$5(
-							list.createList([integerOne(), integerTwo(), integerHundred()]),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.lowestNumber__overload$5(
-							list.createList([integerTwo(), integerOne(), integerHundred()]),
+							list.createList([
+								integerTwo(),
+								integerOne(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.lowestNumber__overload$5(
-							list.createList([integerHundred(), integerTwo(), integerOne()]),
+							list.createList([
+								integerHundred(),
+								integerTwo(),
+								integerOne(),
+							]),
 						),
 					).toEqual(integerOne())
 
@@ -877,19 +1107,31 @@ describe("Rewriter", () => {
 
 					expect(
 						number.lowestNumber__overload$7(
-							list.createList([integerOne(), fractionTwo(), integerHundred()]),
+							list.createList([
+								integerOne(),
+								fractionTwo(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.lowestNumber__overload$7(
-							list.createList([integerTwo(), fractionOne(), integerHundred()]),
+							list.createList([
+								integerTwo(),
+								fractionOne(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(fractionOne())
 
 					expect(
 						number.lowestNumber__overload$7(
-							list.createList([fractionHundred(), integerTwo(), integerOne()]),
+							list.createList([
+								fractionHundred(),
+								integerTwo(),
+								integerOne(),
+							]),
 						),
 					).toEqual(integerOne())
 
@@ -910,25 +1152,27 @@ describe("Rewriter", () => {
 		describe("List", () => {
 			describe("hasItems", () => {
 				it("returns true when the list has items", () => {
-					expect(list.hasItems(list.createList([integerOne()]))).toEqual(
-						booleanTrue(),
-					)
-
 					expect(
-						list.hasItems(list.createList([integerOne(), integerTwo()])),
+						list.hasItems(list.createList([integerOne()])),
 					).toEqual(booleanTrue())
 
-					expect(list.hasItems(list.createList([stringEmpty()]))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						list.hasItems(
+							list.createList([integerOne(), integerTwo()]),
+						),
+					).toEqual(booleanTrue())
 
-					expect(list.hasItems(list.createList([fractionOne()]))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						list.hasItems(list.createList([stringEmpty()])),
+					).toEqual(booleanTrue())
 
-					expect(list.hasItems(list.createList([listEmpty()]))).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						list.hasItems(list.createList([fractionOne()])),
+					).toEqual(booleanTrue())
+
+					expect(
+						list.hasItems(list.createList([listEmpty()])),
+					).toEqual(booleanTrue())
 				})
 
 				it("returns false when the list is empty", () => {
@@ -941,23 +1185,29 @@ describe("Rewriter", () => {
 
 			describe("firstItem", () => {
 				it("returns the firstItem item of the list if it isnt empty", () => {
-					expect(list.firstItem(list.createList([integerTwo()]))).toEqual(
-						integerTwo(),
-					)
-
 					expect(
-						list.firstItem(list.createList([integerTwo(), integerOne()])),
+						list.firstItem(list.createList([integerTwo()])),
 					).toEqual(integerTwo())
 
 					expect(
 						list.firstItem(
-							list.createList([integerTwo(), integerOne(), integerHundred()]),
+							list.createList([integerTwo(), integerOne()]),
 						),
 					).toEqual(integerTwo())
 
-					expect(list.firstItem(list.createList([integerHundred()]))).toEqual(
-						integerHundred(),
-					)
+					expect(
+						list.firstItem(
+							list.createList([
+								integerTwo(),
+								integerOne(),
+								integerHundred(),
+							]),
+						),
+					).toEqual(integerTwo())
+
+					expect(
+						list.firstItem(list.createList([integerHundred()])),
+					).toEqual(integerHundred())
 				})
 
 				it("returns nothing if the list is empty", () => {
@@ -967,23 +1217,29 @@ describe("Rewriter", () => {
 
 			describe("lastItemItem", () => {
 				it("returns the lastItem item of the list if it isnt empty", () => {
-					expect(list.lastItem(list.createList([integerTwo()]))).toEqual(
-						integerTwo(),
-					)
+					expect(
+						list.lastItem(list.createList([integerTwo()])),
+					).toEqual(integerTwo())
 
 					expect(
-						list.lastItem(list.createList([integerTwo(), integerOne()])),
+						list.lastItem(
+							list.createList([integerTwo(), integerOne()]),
+						),
 					).toEqual(integerOne())
 
 					expect(
 						list.lastItem(
-							list.createList([integerTwo(), integerOne(), integerHundred()]),
+							list.createList([
+								integerTwo(),
+								integerOne(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(integerHundred())
 
-					expect(list.lastItem(list.createList([integerHundred()]))).toEqual(
-						integerHundred(),
-					)
+					expect(
+						list.lastItem(list.createList([integerHundred()])),
+					).toEqual(integerHundred())
 				})
 
 				it("returns nothing if the list is empty", () => {
@@ -993,7 +1249,9 @@ describe("Rewriter", () => {
 
 			describe("removeDuplicates", () => {
 				it("returns the same list if it is already unique", () => {
-					expect(list.removeDuplicates(listEmpty())).toEqual(listEmpty())
+					expect(list.removeDuplicates(listEmpty())).toEqual(
+						listEmpty(),
+					)
 
 					expect(
 						list.removeDuplicates(list.createList([integerOne()])),
@@ -1007,10 +1265,18 @@ describe("Rewriter", () => {
 
 					expect(
 						list.removeDuplicates(
-							list.createList([integerOne(), integerTwo(), integerHundred()]),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(
-						list.createList([integerOne(), integerTwo(), integerHundred()]),
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
 					)
 				})
 
@@ -1024,7 +1290,11 @@ describe("Rewriter", () => {
 
 					expect(
 						list.removeDuplicates(
-							list.createList([integerOne(), integerTwo(), integerTwo()]),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerTwo(),
+							]),
 						),
 					).toEqual(list.createList([integerOne(), integerTwo()]))
 
@@ -1040,24 +1310,34 @@ describe("Rewriter", () => {
 							]),
 						),
 					).toEqual(
-						list.createList([integerOne(), integerTwo(), integerHundred()]),
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
 					)
 				})
 			})
 
 			describe("removeFirst", () => {
 				it("removed the first item from the list", () => {
-					expect(list.removeFirst(list.createList([integerOne()]))).toEqual(
-						listEmpty(),
-					)
+					expect(
+						list.removeFirst(list.createList([integerOne()])),
+					).toEqual(listEmpty())
 
 					expect(
-						list.removeFirst(list.createList([integerOne(), integerTwo()])),
+						list.removeFirst(
+							list.createList([integerOne(), integerTwo()]),
+						),
 					).toEqual(list.createList([integerTwo()]))
 
 					expect(
 						list.removeFirst(
-							list.createList([integerOne(), integerTwo(), integerHundred()]),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(list.createList([integerTwo(), integerHundred()]))
 
@@ -1071,7 +1351,11 @@ describe("Rewriter", () => {
 							]),
 						),
 					).toEqual(
-						list.createList([integerTwo(), integerHundred(), integerTwo()]),
+						list.createList([
+							integerTwo(),
+							integerHundred(),
+							integerTwo(),
+						]),
 					)
 				})
 
@@ -1082,17 +1366,23 @@ describe("Rewriter", () => {
 
 			describe("removeLast", () => {
 				it("removed the lastItem item from the list", () => {
-					expect(list.removeLast(list.createList([integerOne()]))).toEqual(
-						listEmpty(),
-					)
+					expect(
+						list.removeLast(list.createList([integerOne()])),
+					).toEqual(listEmpty())
 
 					expect(
-						list.removeLast(list.createList([integerOne(), integerTwo()])),
+						list.removeLast(
+							list.createList([integerOne(), integerTwo()]),
+						),
 					).toEqual(list.createList([integerOne()]))
 
 					expect(
 						list.removeLast(
-							list.createList([integerOne(), integerTwo(), integerHundred()]),
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
 						),
 					).toEqual(list.createList([integerOne(), integerTwo()]))
 
@@ -1106,7 +1396,11 @@ describe("Rewriter", () => {
 							]),
 						),
 					).toEqual(
-						list.createList([integerOne(), integerTwo(), integerHundred()]),
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
 					)
 				})
 
@@ -1121,7 +1415,10 @@ describe("Rewriter", () => {
 			describe("append", () => {
 				it("appends individual items to a list correctly", () => {
 					expect(
-						list.append__overload$1(list.createList([]), integerOne()),
+						list.append__overload$1(
+							list.createList([]),
+							integerOne(),
+						),
 					).toEqual(list.createList([integerOne()]))
 
 					expect(
@@ -1137,7 +1434,11 @@ describe("Rewriter", () => {
 							integerHundred(),
 						),
 					).toEqual(
-						list.createList([integerOne(), integerTwo(), integerHundred()]),
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
 					)
 
 					expect(
@@ -1178,7 +1479,11 @@ describe("Rewriter", () => {
 							list.createList([integerHundred()]),
 						),
 					).toEqual(
-						list.createList([integerOne(), integerTwo(), integerHundred()]),
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
 					)
 				})
 			})
