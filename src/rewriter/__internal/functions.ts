@@ -5,23 +5,14 @@ import type { ListType } from "./List"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 
-import * as boolean from "./Boolean"
-import * as fraction from "./Fraction"
-import * as integer from "./Integer"
-import { typeKeySymbol } from "./type"
+import { toString as boolToString } from "./Boolean"
+import { toString__overload$1 as fractionToString } from "./Fraction"
+import { toString as integerToString } from "./Integer"
+import { AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
 
-function getStringRepresentation(
-	obj:
-		| ListType<any>
-		| StringType
-		| IntegerType
-		| FractionType
-		| BooleanType
-		| RecordType,
-	indentLevel = 0,
-): string {
+function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
@@ -77,13 +68,15 @@ function getStringRepresentation(
 			return "[]"
 		}
 	} else if (obj[typeKeySymbol] === "Fraction") {
-		return fraction.toString__overload$1(obj).value
+		return fractionToString(obj).value
 	} else if (obj[typeKeySymbol] === "Integer") {
-		return integer.toString(obj).value
+		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {
-		return boolean.toString(obj).value
-	} else {
+		return boolToString(obj).value
+	} else if (obj[typeKeySymbol] === "String") {
 		return `"${obj.value}"`
+	} else {
+		return "Nothing"
 	}
 }
 

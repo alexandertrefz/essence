@@ -20,11 +20,25 @@ export function is(
 	return createBoolean(originalBoolean.value === other.value)
 }
 
-export function isnt(
+export function isNot(
 	originalBoolean: BooleanType,
 	other: BooleanType,
 ): BooleanType {
 	return createBoolean(originalBoolean.value !== other.value)
+}
+
+export function and(
+	originalBoolean: BooleanType,
+	other: BooleanType,
+): BooleanType {
+	return createBoolean(originalBoolean.value && other.value)
+}
+
+export function or(
+	originalBoolean: BooleanType,
+	other: BooleanType,
+): BooleanType {
+	return createBoolean(originalBoolean.value || other.value)
 }
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames:

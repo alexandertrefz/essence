@@ -23,19 +23,14 @@ implementation {
 			<- @.namespaces::hasItems()
 		}
 
-		static create (from eventDescription: String) -> Event {
-			constant splitEvent = eventDescription::split(on ".")
+		static createFrom (_ eventDescription: String) -> Event {
+			constant splitEvent = eventDescription::splitOn(".")
 
-			constant eventName = match splitEvent::first() {
-				case String -> String {
-					<- @
-				}
-
-				case Nothing -> String {
-					<- ""
-				}
+			constant eventName = match splitEvent::firstItem() {
+				case Nothing -> String { <- "" }
+				case String  -> String { <- @ }
 			}
-			constant namespaces = splitEvent::dropFirst()::unique()
+			constant namespaces = splitEvent::removeFirst()::removeDuplicates()
 
 			<- {
 				eventName = eventName,
@@ -47,7 +42,12 @@ implementation {
 		}
 	}
 
-	variable event = Event.create(from "event.namespace")
+	variable event = Event.createFrom("event.namespace")
 	event = event::stopPropagation()
+
+	§ This will not be true, because we changed the `event` object above
+	if event::is(Event.createFrom("event.namespace")) {
+		__print("The Records are the same!")
+	}
 
 }

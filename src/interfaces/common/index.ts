@@ -79,6 +79,11 @@ export type ListType = {
 	itemType: Type
 }
 
+export type RecordPrimitiveType = {
+	type: "Primitive"
+	primitive: "Record"
+}
+
 export type StringPrimitiveType = {
 	type: "Primitive"
 	primitive: "String"
@@ -105,6 +110,7 @@ export type NothingPrimitiveType = {
 }
 
 export type PrimitiveType =
+	| RecordPrimitiveType
 	| StringPrimitiveType
 	| IntegerPrimitiveType
 	| FractionPrimitiveType

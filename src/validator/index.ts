@@ -626,7 +626,7 @@ function validateSimpleFunctionInvocation(
 	}
 }
 
-// TODO: The enricher should probably replace GenericFunctionNodes with the Resolved Variants so we dont have to duplicate this function
+// TODO: The enricher should probably replace GenericFunctionInvocations with the Resolved Variants so we dont have to duplicate this function
 function inferFunctionType(
 	genericFunctionType: common.GenericFunctionType,
 	argumentTypes: common.typed.ArgumentNode[],

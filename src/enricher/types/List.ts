@@ -6,6 +6,59 @@ const type: common.GenericTypeType = {
 	definition: { type: "BuiltIn" },
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 	methods: {
+		is: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		isNot: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		length: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Integer" },
+		},
 		hasItems: {
 			type: "SimpleMethod",
 			parameterTypes: [
@@ -19,7 +72,54 @@ const type: common.GenericTypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
-		first: {
+		isEmpty: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		contains: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					name: null,
+					type: { type: "Generic", name: "ItemType" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		doesNotContain: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					name: null,
+					type: { type: "Generic", name: "ItemType" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		firstItem: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -38,7 +138,7 @@ const type: common.GenericTypeType = {
 				],
 			},
 		},
-		last: {
+		lastItem: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -57,7 +157,169 @@ const type: common.GenericTypeType = {
 				],
 			},
 		},
-		unique: {
+		removeFirst: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: null,
+							type: {
+								type: "Primitive",
+								primitive: "Integer",
+							},
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+		},
+		removeAt: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: { type: "Generic", name: "ItemType" },
+			},
+		},
+		removeEvery: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: null,
+							type: { type: "Generic", name: "ItemType" },
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: "where",
+							type: {
+								type: "Function",
+								parameterTypes: [
+									{
+										name: null,
+										type: {
+											type: "Generic",
+											name: "ItemType",
+										},
+									},
+								],
+								returnType: {
+									type: "Primitive",
+									primitive: "Boolean",
+								},
+							},
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+		},
+		removeLast: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: null,
+							type: {
+								type: "Primitive",
+								primitive: "Integer",
+							},
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+			],
+		},
+		removeDuplicates: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -73,37 +335,51 @@ const type: common.GenericTypeType = {
 				itemType: { type: "Generic", name: "ItemType" },
 			},
 		},
-		dropFirst: {
-			type: "SimpleMethod",
-			parameterTypes: [
+		prepend: {
+			type: "OverloadedMethod",
+			overloads: [
 				{
-					name: null,
-					type: {
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: null,
+							type: { type: "Generic", name: "ItemType" },
+						},
+					],
+					returnType: {
+						type: "List",
+						itemType: { type: "Generic", name: "ItemType" },
+					},
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+						{
+							name: "contentsOf",
+							type: {
+								type: "List",
+								itemType: { type: "Generic", name: "ItemType" },
+							},
+						},
+					],
+					returnType: {
 						type: "List",
 						itemType: { type: "Generic", name: "ItemType" },
 					},
 				},
 			],
-			returnType: {
-				type: "List",
-				itemType: { type: "Generic", name: "ItemType" },
-			},
-		},
-		dropLast: {
-			type: "SimpleMethod",
-			parameterTypes: [
-				{
-					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
-				},
-			],
-			returnType: {
-				type: "List",
-				itemType: { type: "Generic", name: "ItemType" },
-			},
 		},
 		append: {
 			type: "OverloadedMethod",

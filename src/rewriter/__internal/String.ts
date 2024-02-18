@@ -1,8 +1,8 @@
 import type { BooleanType } from "./Boolean"
 import type { ListType } from "./List"
 
-import * as $Boolean from "./Boolean"
-import * as $List from "./List"
+import { createBoolean } from "./Boolean"
+import { createList } from "./List"
 import { typeKeySymbol } from "./type"
 
 export type StringType = { [typeKeySymbol]: "String"; value: string }
@@ -12,25 +12,25 @@ export function createString(value: string): StringType {
 }
 
 export function isEmpty(originalString: StringType): BooleanType {
-	return $Boolean.createBoolean(originalString.value.length === 0)
+	return createBoolean(originalString.value.length === 0)
 }
 
-export function hasContent(originalString: StringType): BooleanType {
-	return $Boolean.createBoolean(originalString.value.length !== 0)
+export function hasAnyContent(originalString: StringType): BooleanType {
+	return createBoolean(originalString.value.length !== 0)
 }
 
 export function is(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
-	return $Boolean.createBoolean(originalString.value === otherString.value)
+	return createBoolean(originalString.value === otherString.value)
 }
 
-export function isnt(
+export function isNot(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
-	return $Boolean.createBoolean(originalString.value !== otherString.value)
+	return createBoolean(originalString.value !== otherString.value)
 }
 
 export function prepend(
@@ -47,11 +47,11 @@ export function append(
 	return createString(originalString.value + otherString.value)
 }
 
-export function split(
+export function splitOn(
 	originalString: StringType,
 	splitterString: StringType,
 ): ListType<StringType> {
-	return $List.createList(
+	return createList(
 		originalString.value
 			.split(splitterString.value)
 			.map((chunk) => createString(chunk)),
@@ -62,7 +62,12 @@ export function contains(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
-	return $Boolean.createBoolean(
-		originalString.value.includes(otherString.value),
-	)
+	return createBoolean(originalString.value.includes(otherString.value))
+}
+
+export function doesNotContain(
+	originalString: StringType,
+	otherString: StringType,
+): BooleanType {
+	return createBoolean(!originalString.value.includes(otherString.value))
 }

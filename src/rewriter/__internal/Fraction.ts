@@ -1,8 +1,10 @@
 import { Fraction } from "bigint-fraction"
 
+import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { StringType } from "./String"
 
+import { createBoolean, negate } from "./Boolean"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
@@ -21,6 +23,33 @@ export function createFraction(
 		[typeKeySymbol]: "Fraction",
 		fraction: new Fraction(numerator, denominator),
 	}
+}
+
+export function of(numerator: IntegerType, denominator: IntegerType) {
+	return createFraction(numerator.value, denominator.value)
+}
+
+export function is(
+	originalFraction: FractionType,
+	otherFraction: FractionType,
+): BooleanType {
+	let originalFractionClone = originalFraction.fraction.clone()
+	let otherFractionClone = otherFraction.fraction.clone()
+
+	originalFractionClone.reduce()
+	otherFractionClone.reduce()
+
+	return createBoolean(
+		originalFractionClone.denominator === otherFractionClone.denominator &&
+			originalFractionClone.numerator === otherFractionClone.numerator,
+	)
+}
+
+export function isNot(
+	originalFraction: FractionType,
+	otherFraction: FractionType,
+): BooleanType {
+	return negate(is(originalFraction, otherFraction))
 }
 
 // #region Add
@@ -85,7 +114,7 @@ export function subtract__overload$2(
 
 // #region Divide
 
-export function divide__overload$1(
+export function divideBy__overload$1(
 	firstFraction: FractionType,
 	secondFraction: FractionType,
 ): FractionType {
@@ -97,7 +126,7 @@ export function divide__overload$1(
 	return createFraction(numerator1 * denominator2, denominator1 * numerator2)
 }
 
-export function divide__overload$2(
+export function divideBy__overload$2(
 	fraction: FractionType,
 	integer: IntegerType,
 ): FractionType {
@@ -112,7 +141,7 @@ export function divide__overload$2(
 
 // #region Multiply
 
-export function multiply__overload$1(
+export function multiplyWith__overload$1(
 	firstFraction: FractionType,
 	secondFraction: FractionType,
 ): FractionType {
@@ -124,7 +153,7 @@ export function multiply__overload$1(
 	return createFraction(numerator1 * numerator2, denominator1 * denominator2)
 }
 
-export function multiply__overload$2(
+export function multiplyWith__overload$2(
 	fraction: FractionType,
 	integer: IntegerType,
 ): FractionType {
@@ -133,6 +162,142 @@ export function multiply__overload$2(
 	clonedFraction.multiply(integer.value)
 
 	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
+}
+
+// #endregion
+
+// #region isLessThan
+
+export function isLessThan__overload$1(
+	firstFraction: FractionType,
+	secondFraction: FractionType,
+): BooleanType {
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 < fraction2)
+}
+
+export function isLessThan__overload$2(
+	fraction: FractionType,
+	integer: IntegerType,
+): BooleanType {
+	const numerator1 = fraction.fraction.numerator
+	const denominator1 = fraction.fraction.denominator
+	const numerator2 = integer.value
+	const denominator2 = 1n
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 < fraction2)
+}
+
+// #endregion
+
+// #region isLessThanOrEqualTo
+
+export function isLessThanOrEqualTo__overload$1(
+	firstFraction: FractionType,
+	secondFraction: FractionType,
+): BooleanType {
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 <= fraction2)
+}
+
+export function isLessThanOrEqualTo__overload$2(
+	fraction: FractionType,
+	integer: IntegerType,
+): BooleanType {
+	const numerator1 = fraction.fraction.numerator
+	const denominator1 = fraction.fraction.denominator
+	const numerator2 = integer.value
+	const denominator2 = 1n
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 <= fraction2)
+}
+
+// #endregion
+
+// #region isGreaterThan
+
+export function isGreaterThan__overload$1(
+	firstFraction: FractionType,
+	secondFraction: FractionType,
+): BooleanType {
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 > fraction2)
+}
+
+export function isGreaterThan__overload$2(
+	fraction: FractionType,
+	integer: IntegerType,
+): BooleanType {
+	const numerator1 = fraction.fraction.numerator
+	const denominator1 = fraction.fraction.denominator
+	const numerator2 = integer.value
+	const denominator2 = 1n
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 > fraction2)
+}
+
+// #endregion
+
+// #region isGreaterThanOrEqualTo
+
+export function isGreaterThanOrEqualTo__overload$1(
+	firstFraction: FractionType,
+	secondFraction: FractionType,
+): BooleanType {
+	const numerator1 = firstFraction.fraction.numerator
+	const denominator1 = firstFraction.fraction.denominator
+	const numerator2 = secondFraction.fraction.numerator
+	const denominator2 = secondFraction.fraction.denominator
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 >= fraction2)
+}
+
+export function isGreaterThanOrEqualTo__overload$2(
+	fraction: FractionType,
+	integer: IntegerType,
+): BooleanType {
+	const numerator1 = fraction.fraction.numerator
+	const denominator1 = fraction.fraction.denominator
+	const numerator2 = integer.value
+	const denominator2 = 1n
+
+	const fraction1 = numerator1 * denominator2
+	const fraction2 = numerator2 * denominator1
+
+	return createBoolean(fraction1 >= fraction2)
 }
 
 // #endregion

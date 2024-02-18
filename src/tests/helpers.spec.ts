@@ -186,6 +186,10 @@ describe("Helpers", () => {
 			type: "Primitive",
 			primitive: "String",
 		}
+		const recordPrimitive: PrimitiveType = {
+			type: "Primitive",
+			primitive: "Record",
+		}
 
 		const builtInType: Type = {
 			type: "Type",
@@ -600,6 +604,7 @@ describe("Helpers", () => {
 			expect(matchesType(unknown, integerPrimitive)).toBe(true)
 			expect(matchesType(unknown, fractionPrimitive)).toBe(true)
 			expect(matchesType(unknown, stringPrimitive)).toBe(true)
+			expect(matchesType(unknown, recordPrimitive)).toBe(true)
 
 			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true)
 
@@ -622,6 +627,8 @@ describe("Helpers", () => {
 			expect(matchesType(integerPrimitive, integerPrimitive)).toBe(true)
 			expect(matchesType(fractionPrimitive, fractionPrimitive)).toBe(true)
 			expect(matchesType(stringPrimitive, stringPrimitive)).toBe(true)
+			expect(matchesType(recordPrimitive, recordPrimitive)).toBe(true)
+			expect(matchesType(recordPrimitive, recordType)).toBe(true)
 		})
 
 		it("should match TypeTypes that match PrimitiveTypes", () => {
@@ -637,18 +644,27 @@ describe("Helpers", () => {
 			expect(matchesType(booleanPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(booleanPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(booleanPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(booleanPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(stringPrimitive, booleanPrimitive)).toBe(false)
 			expect(matchesType(stringPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(stringPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(stringPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(integerPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(integerPrimitive, booleanPrimitive)).toBe(false)
 			expect(matchesType(integerPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(integerPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(fractionPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, booleanPrimitive)).toBe(false)
+			expect(matchesType(fractionPrimitive, recordPrimitive)).toBe(false)
+
+			expect(matchesType(recordPrimitive, booleanPrimitive)).toBe(false)
+			expect(matchesType(recordPrimitive, stringPrimitive)).toBe(false)
+			expect(matchesType(recordPrimitive, integerPrimitive)).toBe(false)
+			expect(matchesType(recordPrimitive, fractionPrimitive)).toBe(false)
 		})
 
 		it("should match UnionTypes", () => {
