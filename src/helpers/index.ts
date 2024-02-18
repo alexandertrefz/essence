@@ -60,6 +60,14 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return lhs.primitive === rhs.primitive
 	}
 
+	if (
+		lhs.type === "Primitive" &&
+		lhs.primitive === "Record" &&
+		rhs.type === "Record"
+	) {
+		return true
+	}
+
 	if (lhs.type === "UnionType") {
 		if (rhs.type === "UnionType") {
 			for (let lhsType of lhs.types) {

@@ -5,6 +5,53 @@ const type: common.TypeType = {
 	name: "Fraction",
 	definition: { type: "Primitive", primitive: "Fraction" },
 	methods: {
+		of: {
+			type: "StaticMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					name: "over",
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Fraction" },
+		},
+
+		is: {
+			type: "SimpleMethod",
+
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Fraction" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Fraction" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+
+		isNot: {
+			type: "SimpleMethod",
+
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Fraction" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Fraction" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+
 		add: {
 			type: "OverloadedMethod",
 			overloads: [
@@ -69,7 +116,7 @@ const type: common.TypeType = {
 			],
 		},
 
-		divide: {
+		divideBy: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
@@ -101,7 +148,7 @@ const type: common.TypeType = {
 			],
 		},
 
-		multiply: {
+		multiplyWith: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
@@ -129,6 +176,134 @@ const type: common.TypeType = {
 						},
 					],
 					returnType: { type: "Primitive", primitive: "Fraction" },
+				},
+			],
+		},
+
+		isLessThan: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isLessThanOrEqualTo: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isGreaterThan: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isGreaterThanOrEqualTo: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
 				},
 			],
 		},

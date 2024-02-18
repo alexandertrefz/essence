@@ -5,6 +5,38 @@ const type: common.TypeType = {
 	name: "Integer",
 	definition: { type: "Primitive", primitive: "Integer" },
 	methods: {
+		is: {
+			type: "SimpleMethod",
+
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+
+		isNot: {
+			type: "SimpleMethod",
+
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Integer" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+
 		add: {
 			type: "OverloadedMethod",
 			overloads: [
@@ -36,6 +68,7 @@ const type: common.TypeType = {
 				},
 			],
 		},
+
 		subtract: {
 			type: "OverloadedMethod",
 			overloads: [
@@ -67,7 +100,8 @@ const type: common.TypeType = {
 				},
 			],
 		},
-		divide: {
+
+		divideBy: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
@@ -98,7 +132,8 @@ const type: common.TypeType = {
 				},
 			],
 		},
-		multiply: {
+
+		multiplyWith: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
@@ -129,6 +164,135 @@ const type: common.TypeType = {
 				},
 			],
 		},
+
+		isLessThan: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isLessThanOrEqualTo: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isGreaterThan: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
+		isGreaterThanOrEqualTo: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Primitive", primitive: "Fraction" },
+						},
+					],
+					returnType: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+		},
+
 		toString: {
 			type: "SimpleMethod",
 			parameterTypes: [

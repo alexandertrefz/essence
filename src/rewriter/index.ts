@@ -56,7 +56,7 @@ export async function rewrite(
 		minify: false,
 		treeShaking: true,
 		bundle: true,
-		format: "iife",
+		format: "esm",
 		outfile: flags.outputFileName,
 	})
 }
@@ -115,21 +115,185 @@ function rewriteTypeDefinitionStatement(
 		superClass: null,
 		body: {
 			type: "ClassBody",
-			body: Object.entries(node.methods).map<estree.MethodDefinition>(
-				([name, method]) => {
-					return {
-						type: "MethodDefinition",
-						key: {
-							type: "Identifier",
-							name,
+			body: [
+				...Object.entries(node.methods).map<estree.MethodDefinition>(
+					([name, method]) => {
+						return {
+							type: "MethodDefinition",
+							key: {
+								type: "Identifier",
+								name,
+							},
+							value: rewriteFunctionExpression(
+								method.method.value,
+							),
+							kind: "method",
+							computed: false,
+							static: true,
+						}
+					},
+				),
+				{
+					type: "MethodDefinition",
+					key: { type: "Identifier", name: "is" },
+					value: {
+						type: "FunctionExpression",
+						id: null,
+						params: [
+							{
+								type: "Identifier",
+								name: "firstRecordInstance",
+							},
+							{
+								type: "Identifier",
+								name: "secondRecordInstance",
+							},
+						],
+						body: {
+							type: "BlockStatement",
+							body: [
+								{
+									type: "ReturnStatement",
+									argument: {
+										type: "CallExpression",
+										optional: false,
+										callee: {
+											type: "MemberExpression",
+											optional: false,
+											object: {
+												type: "Identifier",
+												name: "Record",
+											},
+											property: {
+												type: "Identifier",
+												name: "is",
+											},
+											computed: false,
+										},
+										arguments: [
+											{
+												type: "Identifier",
+												name: "firstRecordInstance",
+											},
+											{
+												type: "Identifier",
+												name: "secondRecordInstance",
+											},
+										],
+									},
+								},
+							],
 						},
-						value: rewriteFunctionExpression(method.method.value),
-						kind: "method",
-						computed: false,
-						static: true,
-					}
+					},
+					kind: "method",
+					computed: false,
+					static: true,
 				},
-			),
+				{
+					type: "MethodDefinition",
+					key: { type: "Identifier", name: "isNot" },
+					value: {
+						type: "FunctionExpression",
+						id: null,
+						params: [
+							{
+								type: "Identifier",
+								name: "firstRecordInstance",
+							},
+							{
+								type: "Identifier",
+								name: "secondRecordInstance",
+							},
+						],
+						body: {
+							type: "BlockStatement",
+							body: [
+								{
+									type: "ReturnStatement",
+									argument: {
+										type: "CallExpression",
+										optional: false,
+										callee: {
+											type: "MemberExpression",
+											optional: false,
+											object: {
+												type: "Identifier",
+												name: "Record",
+											},
+											property: {
+												type: "Identifier",
+												name: "isNot",
+											},
+											computed: false,
+										},
+										arguments: [
+											{
+												type: "Identifier",
+												name: "firstRecordInstance",
+											},
+											{
+												type: "Identifier",
+												name: "secondRecordInstance",
+											},
+										],
+									},
+								},
+							],
+						},
+					},
+					kind: "method",
+					computed: false,
+					static: true,
+				},
+				{
+					type: "MethodDefinition",
+					key: { type: "Identifier", name: "toString" },
+					value: {
+						type: "FunctionExpression",
+						id: null,
+						params: [
+							{
+								type: "Identifier",
+								name: "recordInstance",
+							},
+						],
+						body: {
+							type: "BlockStatement",
+							body: [
+								{
+									type: "ReturnStatement",
+									argument: {
+										type: "CallExpression",
+										optional: false,
+										callee: {
+											type: "MemberExpression",
+											optional: false,
+											object: {
+												type: "Identifier",
+												name: "Record",
+											},
+											property: {
+												type: "Identifier",
+												name: "toString",
+											},
+											computed: false,
+										},
+										arguments: [
+											{
+												type: "Identifier",
+												name: "recordInstance",
+											},
+										],
+									},
+								},
+							],
+						},
+					},
+					kind: "method",
+					computed: false,
+					static: true,
+				},
+			],
 		},
 	}
 }
@@ -191,15 +355,17 @@ function rewriteNamespaceDefinitionStatement(
 function rewriteChoiceStatement(
 	node: common.typedSimple.ChoiceStatementNode,
 ): estree.IfStatement {
-	let alternate: estree.Statement
+	let alternate: estree.Statement | null = null
 
-	if (
-		node.falseBody.length === 1 &&
-		node.falseBody[0].nodeType === "ChoiceStatement"
-	) {
-		alternate = rewriteStatement(node.falseBody[0])
-	} else {
-		alternate = rewriteBlockStatement(node.falseBody)
+	if (node.falseBody.length > 0) {
+		if (
+			node.falseBody.length === 1 &&
+			node.falseBody[0].nodeType === "ChoiceStatement"
+		) {
+			alternate = rewriteStatement(node.falseBody[0])
+		} else {
+			alternate = rewriteBlockStatement(node.falseBody)
+		}
 	}
 
 	return {

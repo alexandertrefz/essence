@@ -8,6 +8,7 @@ import fractionType from "./types/Fraction"
 import integerType from "./types/Integer"
 import listType from "./types/List"
 import nothingType from "./types/Nothing"
+import recordType from "./types/Record"
 import stringType from "./types/String"
 
 export function resolveType(
@@ -632,15 +633,24 @@ export function resolveMethodLookupType(
 	scope: enricher.Scope,
 ): common.MethodType {
 	let baseType = resolveMethodLookupBaseType(node.base, scope)
-	let result = baseType.methods[node.member.content]
 
-	if (result == null) {
-		throw new Error(
-			`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.start.line}:${node.base.position.start.column}.`,
-		)
+	// Check wether the called Method exists on the Record Base Type
+	if (
+		baseType.definition.type === "Record" &&
+		recordType.methods[node.member.content]
+	) {
+		return recordType.methods[node.member.content]
+	} else {
+		let result = baseType.methods[node.member.content]
+
+		if (result == null) {
+			throw new Error(
+				`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.start.line}:${node.base.position.start.column}.`,
+			)
+		}
+
+		return result
 	}
-
-	return result
 }
 
 export function resolveGenericFunctionDefinitionType(
@@ -893,6 +903,8 @@ export function resolveMethodLookupBaseType(
 					`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.\nLeft hand side is Nothing.`,
 				)
 			}
+		case "Record":
+			return recordType
 		default:
 			throw new Error(
 				`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.`,
@@ -1062,6 +1074,8 @@ export function resolvePrimitiveTypeType(
 			return booleanType
 		case "String":
 			return stringType
+		case "Record":
+			return recordType
 	}
 }
 

@@ -15,7 +15,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
-		hasContent: {
+		hasAnyContent: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -39,7 +39,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
-		isnt: {
+		isNot: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -81,7 +81,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		},
-		split: {
+		splitOn: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -89,7 +89,7 @@ const type: common.TypeType = {
 					type: { type: "Primitive", primitive: "String" },
 				},
 				{
-					name: "on",
+					name: null,
 					type: { type: "Primitive", primitive: "String" },
 				},
 			],
@@ -99,6 +99,20 @@ const type: common.TypeType = {
 			},
 		},
 		contains: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "String" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		doesNotContain: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{

@@ -5,6 +5,16 @@ const type: common.TypeType = {
 	name: "Boolean",
 	definition: { type: "Primitive", primitive: "Boolean" },
 	methods: {
+		negate: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
@@ -19,7 +29,7 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
-		isnt: {
+		isNot: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -33,9 +43,27 @@ const type: common.TypeType = {
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
 		},
-		negate: {
+		and: {
 			type: "SimpleMethod",
 			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
+			],
+			returnType: { type: "Primitive", primitive: "Boolean" },
+		},
+		or: {
+			type: "SimpleMethod",
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Primitive", primitive: "Boolean" },
+				},
 				{
 					name: null,
 					type: { type: "Primitive", primitive: "Boolean" },
