@@ -558,7 +558,7 @@ export function resolveLookupType(
 		baseType.type !== "GenericType"
 	) {
 		throw new Error(
-			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Type, or GenericType.`,
+			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Namespace, Type, or GenericType.`,
 		)
 	} else {
 		if (
