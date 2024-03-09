@@ -1,4 +1,4 @@
-import * as path from "path"
+import * as path from "node:path"
 
 import { generate } from "escodegen"
 import * as estree from "estree"
