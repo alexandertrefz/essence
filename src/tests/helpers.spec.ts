@@ -129,32 +129,8 @@ describe("Helpers", () => {
 		})
 	})
 
-	describe("stripPositionFromArray", () => {
-		it("should strip position from all values", () => {
-			let input: Array<Token> = [
-				{
-					value: "",
-					type: TokenType.LiteralString,
-					position: {
-						start: { line: 0, column: 0 },
-						end: { line: 0, column: 0 },
-					},
-				},
-			]
-
-			let output: Array<SimpleToken> = [
-				{
-					value: "",
-					type: TokenType.LiteralString,
-				},
-			]
-
-			expect(stripPositionFromArray(input)).toEqual(output)
-		})
-	})
-
-	describe("stripPositionFromArray", () => {
-		it("should strip position from all values", () => {
+	describe("resolveOverloadedMethodName", () => {
+		it("should resolve the overloaded method name", () => {
 			const name = "Test"
 			const index = 1
 
