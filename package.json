@@ -1,45 +1,42 @@
 {
-  "name": "essence-compiler",
-  "version": "0.0.1",
-  "description": "A new simple but powerful language.",
-  "main": "index.js",
-  "scripts": {
-    "pre-commit": "bun compile-grammar && bun format && bun test",
-    "compile-grammar": "nearleyc src/parser/grammar.ne -o src/parser/grammar.ts",
-    "format": "biome format . --write",
-    "check": "biome check . --apply"
-  },
-  "keywords": [
-    "language",
-    "essence"
-  ],
-  "author": "Alexander Trefz",
-  "license": "MIT",
-  "engines": {
-    "bun": ">=1.0.x"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "1.6.0",
-    "@types/bun": "1.0.8",
-    "@types/deep-equal": "1.0.4",
-    "@types/escodegen": "0.0.10",
-    "@types/estree": "1.0.5",
-    "@types/nearley": "2.11.5",
-    "@types/yargs": "17.0.32",
-    "husky": "9.0.11"
-  },
-  "dependencies": {
-    "bigint-fraction": "1.0.6",
-    "chalk": "5.3.0",
-    "deep-equal": "2.2.3",
-    "esbuild": "0.20.1",
-    "escodegen": "2.1.0",
-    "nearley": "2.20.1",
-    "typescript": "5.4.2",
-    "yargs": "17.7.2"
-  },
-  "repository": {
-    "url": "https://atrefz@github.com/atrefz/essence.git",
-    "type": "git"
-  }
+	"name": "essence-compiler",
+	"version": "0.0.1",
+	"description": "A new simple but powerful language.",
+	"main": "index.js",
+	"scripts": {
+		"pre-commit": "bun compile-grammar && bun format && bun test",
+		"compile-grammar": "nearleyc src/parser/grammar.ne -o src/parser/grammar.ts",
+		"format": "biome format . --write",
+		"check": "biome check . --apply"
+	},
+	"keywords": ["language", "essence"],
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"engines": {
+		"bun": ">=1.0.x"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "1.6.0",
+		"@types/bun": "1.0.8",
+		"@types/deep-equal": "1.0.4",
+		"@types/escodegen": "0.0.10",
+		"@types/estree": "1.0.5",
+		"@types/nearley": "2.11.5",
+		"@types/yargs": "17.0.32",
+		"husky": "9.0.11"
+	},
+	"dependencies": {
+		"bigint-fraction": "1.0.6",
+		"chalk": "5.3.0",
+		"deep-equal": "2.2.3",
+		"esbuild": "0.20.1",
+		"escodegen": "2.1.0",
+		"nearley": "2.20.1",
+		"typescript": "5.4.2",
+		"yargs": "17.7.2"
+	},
+	"repository": {
+		"url": "https://atrefz@github.com/atrefz/essence.git",
+		"type": "git"
+	}
 }
