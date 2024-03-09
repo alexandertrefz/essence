@@ -8,7 +8,7 @@ import type { StringType } from "./String"
 import { toString as boolToString } from "./Boolean"
 import { toString__overload$1 as fractionToString } from "./Fraction"
 import { toString as integerToString } from "./Integer"
-import { AnyType, typeKeySymbol } from "./type"
+import { type AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
 

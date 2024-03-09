@@ -6,7 +6,7 @@ import { createBoolean, negate } from "./Boolean"
 import { createInteger } from "./Integer"
 import { createNothing } from "./Nothing"
 import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
-import { AnyType, typeKeySymbol } from "./type"
+import { type AnyType, typeKeySymbol } from "./type"
 
 export type ListType<ItemType extends AnyType> = {
 	[typeKeySymbol]: "List"

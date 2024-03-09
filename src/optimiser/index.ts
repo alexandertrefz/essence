@@ -1,4 +1,4 @@
-import { common } from "../interfaces"
+import type { common } from "../interfaces"
 
 // TODO: Implement Optimisation
 export const optimise = (

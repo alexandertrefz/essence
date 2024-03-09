@@ -1,5 +1,5 @@
 import { matchesType } from "../helpers"
-import { common } from "../interfaces"
+import type { common } from "../interfaces"
 
 type CurrentFunctionContext =
 	| common.typed.FunctionDefinitionNode

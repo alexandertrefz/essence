@@ -1,4 +1,4 @@
-import * as common from "./common"
+import type * as common from "./common"
 
 export type Scope = {
 	parent: Scope | null

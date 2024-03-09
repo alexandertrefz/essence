@@ -1,4 +1,4 @@
-import { common, enricher, parser } from "../interfaces"
+import type { common, enricher, parser } from "../interfaces"
 
 import {
 	resolveFunctionValueType,

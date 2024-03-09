@@ -1,4 +1,4 @@
-import { Position } from "./common"
+import type { Position } from "./common"
 
 export enum TokenType {
 	SymbolAt = "SymbolAt",

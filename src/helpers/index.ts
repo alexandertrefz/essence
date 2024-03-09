@@ -1,4 +1,4 @@
-import { common, lexer } from "../interfaces"
+import type { common, lexer } from "../interfaces"
 
 export function stripPositionFromArray(
 	tokens: Array<lexer.Token | undefined>,

@@ -1,11 +1,11 @@
 import * as path from "node:path"
 
 import { generate } from "escodegen"
-import * as estree from "estree"
+import type * as estree from "estree"
 
-import { BuildResult, build } from "esbuild"
+import { type BuildResult, build } from "esbuild"
 
-import { common } from "../interfaces"
+import type { common } from "../interfaces"
 
 export async function rewrite(
 	program: common.typedSimple.Program,

@@ -7,7 +7,7 @@ import nothingType from "./types/Nothing"
 import numberType from "./types/Number"
 import stringType from "./types/String"
 
-import { common, enricher, parser } from "../interfaces"
+import type { common, enricher, parser } from "../interfaces"
 
 import { enrichNode } from "./enrichers"
 

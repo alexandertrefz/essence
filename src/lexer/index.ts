@@ -1,5 +1,5 @@
-import { Token as NearleyToken } from "nearley"
-import { common, lexer } from "../interfaces"
+import type { Token as NearleyToken } from "nearley"
+import { type common, lexer } from "../interfaces"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
