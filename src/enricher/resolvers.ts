@@ -1,7 +1,7 @@
 import deepEqual from "deep-equal"
 
 import { matchesType } from "../helpers"
-import { common, enricher, parser } from "../interfaces"
+import type { common, enricher, parser } from "../interfaces"
 
 import booleanType from "./types/Boolean"
 import fractionType from "./types/Fraction"

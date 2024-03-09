@@ -1,4 +1,4 @@
-import { Fraction } from "bigint-fraction"
+import type { Fraction } from "bigint-fraction"
 
 import type { IntegerType } from "./Integer"
 import type { AnyType } from "./type"

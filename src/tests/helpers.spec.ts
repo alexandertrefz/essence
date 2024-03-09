@@ -14,7 +14,7 @@ import {
 
 import { lexer } from "../interfaces"
 
-import {
+import type {
 	FunctionType,
 	ListType,
 	OverloadedMethodType,
