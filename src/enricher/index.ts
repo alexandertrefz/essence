@@ -3,26 +3,32 @@ import fractionType from "./types/Fraction"
 import integerType from "./types/Integer"
 import listType from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
-import nothingType from "./types/Nothing"
-import numberType from "./types/Number"
+import numberNamespace from "./types/Number"
 import stringType from "./types/String"
 
 import type { common, enricher, parser } from "../interfaces"
 
-import { enrichNode } from "./enrichers"
+import { enrichNode, extractNamespaceFromType } from "./enrichers"
 
 export const enrich = (program: parser.Program): common.typed.Program => {
 	let topLevelScope: enricher.Scope = {
 		parent: null,
 		members: {
 			...nativeFunctions,
+			String: extractNamespaceFromType(stringType),
+			Boolean: extractNamespaceFromType(booleanType),
+			Integer: extractNamespaceFromType(integerType),
+			Fraction: extractNamespaceFromType(fractionType),
+			Number: numberNamespace,
+		},
+		types: {
 			List: listType,
-			String: stringType,
-			Boolean: booleanType,
-			Nothing: nothingType,
-			Integer: integerType,
-			Fraction: fractionType,
-			Number: numberType,
+			Nothing: { type: "Primitive", primitive: "Nothing" },
+			Boolean: { type: "Primitive", primitive: "Boolean" },
+			String: { type: "Primitive", primitive: "String" },
+			Integer: { type: "Primitive", primitive: "Integer" },
+			Fraction: { type: "Primitive", primitive: "Fraction" },
+			Record: { type: "Primitive", primitive: "Record" },
 		},
 	}
 

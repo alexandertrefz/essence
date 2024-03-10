@@ -156,7 +156,11 @@ export function enrichMethodFunctionDefinition(
 	scope: enricher.Scope,
 	selfType: common.Type,
 ): common.typed.FunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
 
 	if (!isStatic) {
 		declareVariableInScope("@", selfType, newScope)
@@ -176,7 +180,11 @@ export function enrichGenericFunctionDefinition(
 	node: parser.GenericFunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.GenericFunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
 
 	return {
 		nodeType: "GenericFunctionDefinition",
@@ -209,7 +217,11 @@ export function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
-	let newScope = { parent: scope, members: {} }
+	let newScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -445,7 +457,11 @@ export function enrichMatch(
 		nodeType: "Match",
 		value: enrichExpression(node.value, scope),
 		handlers: node.handlers.map((handler) => {
-			let bodyScope = { parent: scope, members: {} }
+			let bodyScope = {
+				parent: scope,
+				members: {},
+				types: {},
+			} satisfies enricher.Scope
 			let matcher = resolveType(handler.matcher, scope)
 
 			declareVariableInScope("@", matcher, bodyScope)
@@ -570,7 +586,8 @@ export function enrichTypeDefinitionStatement(
 
 	let type = resolveTypeDefinitionStatementType(node, scope)
 
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, extractNamespaceFromType(type), scope)
+	declareTypeInScope(node.name, type, scope)
 
 	return {
 		nodeType: "TypeDefinitionStatement",
@@ -578,8 +595,41 @@ export function enrichTypeDefinitionStatement(
 		properties: enrichProperties(node.properties, scope),
 		methods: enrichMethods(node.methods, scope, type),
 		position: node.position,
-		type,
+		type: type,
 	}
+}
+
+export function extractNamespaceFromType(
+	type: common.TypeType,
+): common.NamespaceType {
+	return {
+		type: "Namespace",
+		name: type.name,
+		definition: { type: "Record", members: {} },
+		methods: Object.fromEntries(
+			Object.entries(type.methods).map(([name, method]) => {
+				if (method.type === "SimpleMethod") {
+					return [
+						name,
+						{
+							...method,
+							type: "StaticMethod",
+						},
+					]
+				} else if (method.type === "OverloadedMethod") {
+					return [
+						name,
+						{
+							...method,
+							type: "OverloadedStaticMethod",
+						},
+					]
+				} else {
+					return [name, method]
+				}
+			}),
+		),
+	} satisfies common.NamespaceType
 }
 
 export function enrichNamespaceDefinitionStatement(
@@ -641,8 +691,16 @@ export function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
-	let trueScope = { parent: scope, members: {} }
-	let falseScope = { parent: scope, members: {} }
+	let trueScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
+	let falseScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
 
 	return {
 		nodeType: "IfElseStatement",
@@ -657,7 +715,11 @@ export function enrichIfStatement(
 	node: parser.IfStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfStatementNode {
-	let bodyScope = { parent: scope, members: {} }
+	let bodyScope = {
+		parent: scope,
+		members: {},
+		types: {},
+	} satisfies enricher.Scope
 
 	return {
 		nodeType: "IfStatement",
@@ -711,6 +773,23 @@ function declareVariableInScope(
 	}
 
 	scope.members[variableName] = type
+
+	return scope
+}
+
+function declareTypeInScope(
+	identifier: parser.IdentifierNode | string,
+	type: common.Type,
+	scope: enricher.Scope,
+): enricher.Scope {
+	const variableName =
+		typeof identifier === "string" ? identifier : identifier.content
+
+	if (scope.types[variableName] != null) {
+		throw new Error(`Type ${variableName} is already declared.`)
+	}
+
+	scope.types[variableName] = type
 
 	return scope
 }

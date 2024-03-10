@@ -7,7 +7,6 @@ import booleanType from "./types/Boolean"
 import fractionType from "./types/Fraction"
 import integerType from "./types/Integer"
 import listType from "./types/List"
-import nothingType from "./types/Nothing"
 import recordType from "./types/Record"
 import stringType from "./types/String"
 
@@ -403,13 +402,6 @@ export function resolveCombinationType(
 		}
 
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
-			if (
-				rhsType.type === "Primitive" &&
-				rhsType.primitive !== "Nothing"
-			) {
-				rhsType = resolvePrimitiveTypeType(rhsType, scope)
-			}
-
 			if (!deepEqual(lhs.members[rhsName], rhsType)) {
 				return false
 			}
@@ -730,7 +722,11 @@ export function resolveTypeDefinitionStatementType(
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
 		methods[methodName] = resolveMethodType(
 			methodValue,
-			{ parent: scope, members: { [node.name.content]: resultType } },
+			{
+				parent: scope,
+				members: { [node.name.content]: resultType },
+				types: { [node.name.content]: resultType },
+			},
 			resultType,
 		)
 	}
@@ -767,6 +763,7 @@ export function resolveNamespaceDefinitionStatementType(
 		methods[methodName] = resolveNamespaceMethodType(methodValue, {
 			parent: scope,
 			members: { [node.name.content]: resultType },
+			types: {},
 		})
 	}
 
@@ -783,11 +780,11 @@ export function resolveIdentifierTypeDeclarationType(
 	scope: enricher.Scope,
 ): common.Type {
 	let name = node.type.content
-	let result = findVariableInScope(name, scope)
+	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
 		throw new Error(
-			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
+			`Type '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
 		)
 	} else {
 		return result
@@ -878,6 +875,25 @@ export function findVariableInScope(
 
 		if (searchScope.members[name] != null) {
 			return searchScope.members[name]
+		} else {
+			searchScope = searchScope.parent
+		}
+	}
+}
+
+export function findTypeInScope(
+	name: string,
+	scope: enricher.Scope,
+): common.Type | null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (true) {
+		if (searchScope === null) {
+			return null
+		}
+
+		if (searchScope.types[name] != null) {
+			return searchScope.types[name]
 		} else {
 			searchScope = searchScope.parent
 		}
