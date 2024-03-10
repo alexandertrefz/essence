@@ -300,55 +300,47 @@ function rewriteTypeDefinitionStatement(
 
 function rewriteNamespaceDefinitionStatement(
 	node: common.typedSimple.NamespaceDefinitionStatementNode,
-): estree.VariableDeclaration {
+): estree.ClassDeclaration {
 	return {
-		type: "VariableDeclaration",
-		kind: "const",
-		declarations: [
-			{
-				type: "VariableDeclarator",
-				id: rewriteIdentifier(node.name),
-				init: {
-					type: "ObjectExpression",
-					properties: [
-						...Object.entries(node.properties).map<estree.Property>(
-							([name, value]) => {
-								return {
-									type: "Property",
-									key: {
-										type: "Identifier",
-										name,
-									},
-									value: rewriteExpression(value),
-									kind: "init",
-									method: false,
-									shorthand: false,
-									computed: false,
-								}
+		type: "ClassDeclaration",
+		id: rewriteIdentifier(node.name),
+		superClass: null,
+		body: {
+			type: "ClassBody",
+			body: [
+				...Object.entries(
+					node.properties,
+				).map<estree.PropertyDefinition>(([name, value]) => {
+					return {
+						type: "PropertyDefinition",
+						key: {
+							type: "Identifier",
+							name,
+						},
+						value: rewriteExpression(value),
+						computed: false,
+						static: true,
+					}
+				}),
+				...Object.entries(node.methods).map<estree.MethodDefinition>(
+					([name, method]) => {
+						return {
+							type: "MethodDefinition",
+							key: {
+								type: "Identifier",
+								name,
 							},
-						),
-						...Object.entries(node.methods).map<estree.Property>(
-							([name, method]) => {
-								return {
-									type: "Property",
-									key: {
-										type: "Identifier",
-										name,
-									},
-									value: rewriteFunctionExpression(
-										method.method.value,
-									),
-									kind: "init",
-									method: true,
-									computed: false,
-									shorthand: false,
-								}
-							},
-						),
-					],
-				},
-			},
-		],
+							value: rewriteFunctionExpression(
+								method.method.value,
+							),
+							kind: "method",
+							computed: false,
+							static: true,
+						}
+					},
+				),
+			],
+		},
 	}
 }
 
