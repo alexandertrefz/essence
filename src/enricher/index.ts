@@ -29,6 +29,13 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			Integer: { type: "Primitive", primitive: "Integer" },
 			Fraction: { type: "Primitive", primitive: "Fraction" },
 			Record: { type: "Primitive", primitive: "Record" },
+			Number: {
+				type: "UnionType",
+				types: [
+					{ type: "Primitive", primitive: "Integer" },
+					{ type: "Primitive", primitive: "Fraction" },
+				],
+			},
 		},
 	}
 
