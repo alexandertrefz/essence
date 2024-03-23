@@ -129,9 +129,13 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
 			if (
 				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+				// TODO: Check wether this is safe
+				// I have changed the order around, in order to enable a parameter of
+				// type (_ a: A | B) -> X receiving an argument of type (_ a: A) -> X since this is safe.
+				// Need to confirm this doesn't have strange side effects.
 				!matchesType(
-					lhs.parameterTypes[i].type,
 					rhs.parameterTypes[i].type,
+					lhs.parameterTypes[i].type,
 				)
 			) {
 				return false
