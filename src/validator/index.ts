@@ -595,7 +595,7 @@ function validateSimpleFunctionInvocation(
 		| common.FunctionType
 		| common.StaticMethodType
 		| common.GenericFunctionType,
-	argumentNodes: common.typed.ArgumentNode[],
+	argumentNodes: Array<common.typed.ArgumentNode>,
 ) {
 	for (let argumentNode of argumentNodes) {
 		validateExpression(argumentNode.value)
@@ -629,7 +629,7 @@ function validateSimpleFunctionInvocation(
 // TODO: The enricher should probably replace GenericFunctionInvocations with the Resolved Variants so we dont have to duplicate this function
 function inferFunctionType(
 	genericFunctionType: common.GenericFunctionType,
-	argumentTypes: common.typed.ArgumentNode[],
+	argumentTypes: Array<common.typed.ArgumentNode>,
 ): common.FunctionType {
 	let inferredGenerics: Record<string, common.Type> = {}
 

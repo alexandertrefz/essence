@@ -405,7 +405,7 @@ export function ifElseStatementNode(
 
 export function ifStatement(
 	condition: parser.ExpressionNode,
-	body: parser.ImplementationNode[],
+	body: Array<parser.ImplementationNode>,
 	position: common.Position,
 ): parser.IfStatementNode {
 	return { nodeType: "IfStatement", condition, body, position }
@@ -524,6 +524,7 @@ type KeyValuePair = {
 	value: parser.ExpressionNode
 	position: common.Position
 }
+
 type KeyValuePairObject = {
 	data: Record<string, parser.ExpressionNode>
 	position: common.Position
@@ -538,7 +539,7 @@ export function keyValuePair(
 }
 
 export function buildKeyValuePairList(
-	kvpList: KeyValuePair[],
+	kvpList: Array<KeyValuePair>,
 	kvp: KeyValuePair,
 ): KeyValuePairObject {
 	const keyValuePairList = [...kvpList, kvp]
