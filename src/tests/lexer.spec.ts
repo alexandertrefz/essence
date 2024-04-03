@@ -5,7 +5,6 @@ import { lexer } from "../interfaces"
 import { Lexer } from "../lexer"
 
 const TokenType = lexer.TokenType
-type Token = lexer.Token
 type SimpleToken = lexer.SimpleToken
 
 describe("Lexer", () => {
@@ -19,7 +18,7 @@ describe("Lexer", () => {
 
 		lexer.reset(input)
 
-		expect(lexer.next()).toEqual(output)
+		expect<ReturnType<typeof lexer.next>>(lexer.next()).toEqual(output)
 	})
 
 	describe("Linebreaks", () => {
