@@ -6,7 +6,6 @@
 	"scripts": {
 		"pre-commit": "bun compile-grammar && bun format && bun test",
 		"compile-grammar": "nearleyc src/parser/grammar.ne -o src/parser/grammar.ts",
-		"format": "biome format . --write",
 		"check": "biome check . --apply"
 	},
 	"keywords": ["language", "essence"],
