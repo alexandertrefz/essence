@@ -7142,6 +7142,426 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 }
 `;
 
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with empty Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 46,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {},
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 41,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {},
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 46,
+              "line": 1,
+            },
+            "start": {
+              "column": 44,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 48,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 48,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with simple Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 69,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 52,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 46,
+                  "line": 1,
+                },
+              },
+              "type": {
+                "content": "String",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 52,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 46,
+                    "line": 1,
+                  },
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 54,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {
+            "key": {
+              "nodeType": "StringValue",
+              "position": {
+                "end": {
+                  "column": 67,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 65,
+                  "line": 1,
+                },
+              },
+              "value": "",
+            },
+          },
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 69,
+              "line": 1,
+            },
+            "start": {
+              "column": 57,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 71,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 71,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with complex Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 99,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "members": {
+                "key": {
+                  "nodeType": "UnionTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 71,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 53,
+                      "line": 1,
+                    },
+                  },
+                  "types": [
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 60,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 53,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Integer",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 60,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 53,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 71,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 63,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Fraction",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 71,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 63,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+              "nodeType": "RecordTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 73,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 46,
+                  "line": 1,
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 75,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {
+            "key": {
+              "members": {
+                "key": {
+                  "nodeType": "IntegerValue",
+                  "position": {
+                    "end": {
+                      "column": 95,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 94,
+                      "line": 1,
+                    },
+                  },
+                  "value": "1",
+                },
+              },
+              "nodeType": "RecordValue",
+              "position": {
+                "end": {
+                  "column": 97,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 86,
+                  "line": 1,
+                },
+              },
+              "type": null,
+            },
+          },
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 99,
+              "line": 1,
+            },
+            "start": {
+              "column": 78,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 101,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 101,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement without Type 1`] = `
 {
   "implementation": {
@@ -7304,6 +7724,426 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
   "position": {
     "end": {
       "column": 52,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with empty Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 46,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {},
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 41,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {},
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 46,
+              "line": 1,
+            },
+            "start": {
+              "column": 44,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 48,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 48,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with simple Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 69,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 52,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 46,
+                  "line": 1,
+                },
+              },
+              "type": {
+                "content": "String",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 52,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 46,
+                    "line": 1,
+                  },
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 54,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {
+            "key": {
+              "nodeType": "StringValue",
+              "position": {
+                "end": {
+                  "column": 67,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 65,
+                  "line": 1,
+                },
+              },
+              "value": "",
+            },
+          },
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 69,
+              "line": 1,
+            },
+            "start": {
+              "column": 57,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 71,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 71,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with complex Record Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "identifier",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "VariableDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 99,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "members": {
+                "key": {
+                  "nodeType": "UnionTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 71,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 53,
+                      "line": 1,
+                    },
+                  },
+                  "types": [
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 60,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 53,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Integer",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 60,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 53,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 71,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 63,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Fraction",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 71,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 63,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+              "nodeType": "RecordTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 73,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 46,
+                  "line": 1,
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 75,
+              "line": 1,
+            },
+            "start": {
+              "column": 39,
+              "line": 1,
+            },
+          },
+        },
+        "value": {
+          "members": {
+            "key": {
+              "members": {
+                "key": {
+                  "nodeType": "IntegerValue",
+                  "position": {
+                    "end": {
+                      "column": 95,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 94,
+                      "line": 1,
+                    },
+                  },
+                  "value": "1",
+                },
+              },
+              "nodeType": "RecordValue",
+              "position": {
+                "end": {
+                  "column": 97,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 86,
+                  "line": 1,
+                },
+              },
+              "type": null,
+            },
+          },
+          "nodeType": "RecordValue",
+          "position": {
+            "end": {
+              "column": 99,
+              "line": 1,
+            },
+            "start": {
+              "column": 78,
+              "line": 1,
+            },
+          },
+          "type": null,
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 101,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 101,
       "line": 1,
     },
     "start": {
@@ -13541,6 +14381,420 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "end": {
       "column": 8,
       "line": 13,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with SimpleTypes 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "Type",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 27,
+              "line": 1,
+            },
+            "start": {
+              "column": 23,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "TypeAliasStatement",
+        "position": {
+          "end": {
+            "column": 35,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 35,
+              "line": 1,
+            },
+            "start": {
+              "column": 30,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Type2",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 35,
+                "line": 1,
+              },
+              "start": {
+                "column": 30,
+                "line": 1,
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 37,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 37,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with empty Record Types 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "Type",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 27,
+              "line": 1,
+            },
+            "start": {
+              "column": 23,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "TypeAliasStatement",
+        "position": {
+          "end": {
+            "column": 32,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {},
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 32,
+              "line": 1,
+            },
+            "start": {
+              "column": 30,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 34,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 34,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with simple Record Types 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "Type",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 27,
+              "line": 1,
+            },
+            "start": {
+              "column": 23,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "TypeAliasStatement",
+        "position": {
+          "end": {
+            "column": 44,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 42,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 37,
+                  "line": 1,
+                },
+              },
+              "type": {
+                "content": "Type2",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 42,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 37,
+                    "line": 1,
+                  },
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 1,
+            },
+            "start": {
+              "column": 30,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 46,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 46,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with complex Record Types 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "Type",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 27,
+              "line": 1,
+            },
+            "start": {
+              "column": 23,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "TypeAliasStatement",
+        "position": {
+          "end": {
+            "column": 66,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": {
+          "members": {
+            "key": {
+              "members": {
+                "key": {
+                  "nodeType": "UnionTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 62,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 44,
+                      "line": 1,
+                    },
+                  },
+                  "types": [
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 51,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 44,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Integer",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 51,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 44,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                    {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 62,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 54,
+                          "line": 1,
+                        },
+                      },
+                      "type": {
+                        "content": "Fraction",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 62,
+                            "line": 1,
+                          },
+                          "start": {
+                            "column": 54,
+                            "line": 1,
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+              "nodeType": "RecordTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 64,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 37,
+                  "line": 1,
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 66,
+              "line": 1,
+            },
+            "start": {
+              "column": 30,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 68,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 68,
+      "line": 1,
     },
     "start": {
       "column": 1,

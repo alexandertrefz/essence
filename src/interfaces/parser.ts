@@ -265,6 +265,7 @@ export interface FunctionStatementNode {
 
 export type TypeDeclarationNode =
 	| IdentifierTypeDeclarationNode
+	| RecordTypeDeclarationNode
 	| UnionTypeDeclarationNode
 
 export interface GenericDeclarationNode {
@@ -277,6 +278,12 @@ export interface GenericDeclarationNode {
 export interface IdentifierTypeDeclarationNode {
 	nodeType: "IdentifierTypeDeclaration"
 	type: IdentifierNode
+	position: Position
+}
+
+export interface RecordTypeDeclarationNode {
+	nodeType: "RecordTypeDeclaration"
+	members: Record<string, TypeDeclarationNode>
 	position: Position
 }
 
