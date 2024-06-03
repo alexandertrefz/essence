@@ -22,7 +22,6 @@ import type {
 	PrimitiveType,
 	RecordType,
 	StaticMethodType,
-	Type,
 	UnionType,
 	UnknownType,
 } from "../interfaces/common"
@@ -177,6 +176,29 @@ describe("Helpers", () => {
 		// 	type: "List",
 		// 	itemType: { type: "Primitive", primitive: "Integer" },
 		// }
+
+		const smallStringRecordType: RecordType = {
+			type: "Record",
+			members: {
+				key: stringPrimitive,
+			},
+		}
+
+		const smallIntegerRecordType: RecordType = {
+			type: "Record",
+			members: {
+				key: integerPrimitive,
+			},
+		}
+
+		const bigRecordType: RecordType = {
+			type: "Record",
+			members: {
+				key: stringPrimitive,
+				key2: stringPrimitive,
+				key3: integerPrimitive,
+			},
+		}
 
 		// #region Unions
 
@@ -562,6 +584,26 @@ describe("Helpers", () => {
 			expect(matchesType(fractionPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, booleanPrimitive)).toBe(false)
+		})
+
+		it("should match matching record types", () => {
+			expect(
+				matchesType(smallStringRecordType, smallStringRecordType),
+			).toBe(true)
+			expect(matchesType(bigRecordType, bigRecordType)).toBe(true)
+			expect(matchesType(smallStringRecordType, bigRecordType)).toBe(true)
+		})
+
+		it("should not match mismatched record types", () => {
+			expect(
+				matchesType(smallIntegerRecordType, smallStringRecordType),
+			).toBe(false)
+			expect(
+				matchesType(smallStringRecordType, smallIntegerRecordType),
+			).toBe(false)
+			expect(matchesType(bigRecordType, smallStringRecordType)).toBe(
+				false,
+			)
 		})
 
 		it("should match UnionTypes", () => {
