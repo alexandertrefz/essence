@@ -1,9 +1,12 @@
 import type { common } from "../../interfaces"
 
-const type: common.TypeType = {
-	type: "Type",
+export const type: common.Type = { type: "Primitive", primitive: "String" }
+
+export const namespace: common.NamespaceType = {
+	type: "Namespace",
 	name: "String",
-	definition: { type: "Primitive", primitive: "String" },
+	targetType: type,
+	definition: { type: "Record", members: {} },
 	methods: {
 		isEmpty: {
 			type: "SimpleMethod",
@@ -128,5 +131,3 @@ const type: common.TypeType = {
 		},
 	},
 }
-
-export default type

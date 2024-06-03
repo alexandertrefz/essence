@@ -1,8 +1,17 @@
 import type { common } from "../../interfaces"
 
-const type: common.NamespaceType = {
+export const type: common.Type = {
+	type: "UnionType",
+	types: [
+		{ type: "Primitive", primitive: "Integer" },
+		{ type: "Primitive", primitive: "Fraction" },
+	],
+}
+
+export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Number",
+	targetType: type,
 	definition: {
 		type: "Record",
 		members: {
@@ -271,5 +280,3 @@ const type: common.NamespaceType = {
 		},
 	},
 }
-
-export default type

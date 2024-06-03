@@ -10,7 +10,6 @@ import type {
 	Position,
 	StringPrimitiveType,
 	Type,
-	TypeType,
 } from "./index"
 
 // #region Program & Sections
@@ -37,7 +36,6 @@ export type ExpressionNode =
 	| NativeFunctionInvocationNode
 	| MethodInvocationNode
 	| FunctionInvocationNode
-	| MethodLookupNode
 	| ValueNode
 	| LookupNode
 	| IdentifierNode
@@ -55,9 +53,17 @@ export interface NativeFunctionInvocationNode {
 
 export interface MethodInvocationNode {
 	nodeType: "MethodInvocation"
-	name: MethodLookupNode
+	base: ExpressionNode
+	member: {
+		name: string
+		position: Position
+	}
 	arguments: Array<ArgumentNode>
 	position: Position
+	namespace: {
+		name: string
+		type: NamespaceType
+	}
 	type: Type
 	overloadedMethodIndex: number | null
 }
@@ -69,15 +75,6 @@ export interface FunctionInvocationNode {
 	position: Position
 	type: Type
 	overloadedMethodIndex: number | null
-}
-
-export interface MethodLookupNode {
-	nodeType: "MethodLookup"
-	base: ExpressionNode
-	member: IdentifierNode
-	position: Position
-	baseType: TypeType
-	type: Type
 }
 
 export type ValueNode =
@@ -196,7 +193,6 @@ export type StatementNode =
 	| ConstantDeclarationStatementNode
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
-	| TypeDefinitionStatementNode
 	| NamespaceDefinitionStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
@@ -248,32 +244,17 @@ export interface OverloadedStaticMethod {
 	methods: Array<FunctionValueNode>
 }
 
-export type Method =
-	| SimpleMethod
-	| StaticMethod
-	| OverloadedMethod
-	| OverloadedStaticMethod
-
-export type Methods = Record<string, Method>
-
-export interface TypeDefinitionStatementNode {
-	nodeType: "TypeDefinitionStatement"
-	name: IdentifierNode
-	properties: Record<string, Type>
-	methods: Methods
-	position: Position
-	type: TypeType
-}
-
-export type NamespaceMethod = StaticMethod | OverloadedStaticMethod
-
-export type NamespaceMethods = Record<string, NamespaceMethod>
+export type Methods = Record<
+	string,
+	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
+>
 
 export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
+	targetType: Type | null
 	properties: Record<string, { type: Type; value: ExpressionNode }>
-	methods: NamespaceMethods
+	methods: Methods
 	position: Position
 	type: NamespaceType
 }

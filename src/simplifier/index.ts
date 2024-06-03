@@ -40,13 +40,11 @@ function simplifyImplementationNode(
 		case "Lookup":
 		case "Identifier":
 		case "Self":
-		case "MethodLookup":
 		case "Match":
 			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
-		case "TypeDefinitionStatement":
 		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -92,8 +90,6 @@ function simplifyExpression(
 			return simplifyIdentifier(node)
 		case "Self":
 			return simplifySelf(node)
-		case "MethodLookup":
-			return simplifyMethodLookup(node)
 		case "Match":
 			return simplifyMatch(node)
 	}
@@ -112,22 +108,27 @@ function simplifyNativeFunctionInvocation(
 
 function simplifyMethodInvocation(
 	node: common.typed.MethodInvocationNode,
-): common.typedSimple.FunctionInvocationNode {
+): common.typedSimple.MethodInvocationNode {
 	if (node.overloadedMethodIndex !== null) {
-		node.name.member.content = resolveOverloadedMethodName(
-			node.name.member.content,
+		node.member.name = resolveOverloadedMethodName(
+			node.member.name,
 			node.overloadedMethodIndex,
 		)
 	}
 
 	return {
-		nodeType: "FunctionInvocation",
-		name: simplifyExpression(node.name),
+		nodeType: "MethodInvocation",
+		base: {
+			nodeType: "Identifier",
+			name: node.namespace.name,
+			type: node.namespace.type,
+		},
+		member: { name: node.member.name },
 		arguments: [
 			{
 				nodeType: "Argument",
 				name: "@",
-				value: simplifyExpression(node.name.base),
+				value: simplifyExpression(node.base),
 			},
 			...node.arguments.map((arg) => simplifyArgument(arg)),
 		],
@@ -288,21 +289,6 @@ function simplifySelf(
 	}
 }
 
-function simplifyMethodLookup(
-	node: common.typed.MethodLookupNode,
-): common.typedSimple.LookupNode {
-	return {
-		nodeType: "Lookup",
-		base: {
-			nodeType: "Identifier",
-			name: node.baseType.name,
-			type: node.baseType,
-		},
-		member: simplifyIdentifier(node.member),
-		type: node.type,
-	}
-}
-
 function simplifyMatch(
 	node: common.typed.MatchNode,
 ): common.typedSimple.MatchNode {
@@ -334,8 +320,6 @@ function simplifyStatement(
 			return simplifyVariableDeclarationStatement(node)
 		case "VariableAssignmentStatement":
 			return simplifyVariableAssignmentStatement(node)
-		case "TypeDefinitionStatement":
-			return simplifyTypeDefinitionStatement(node)
 		case "NamespaceDefinitionStatement":
 			return simplifyNamespaceDefinitionStatement(node)
 		case "IfElseStatement":
@@ -380,18 +364,6 @@ function simplifyVariableAssignmentStatement(
 		nodeType: "VariableAssignmentStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyExpression(node.value),
-	}
-}
-
-function simplifyTypeDefinitionStatement(
-	node: common.typed.TypeDefinitionStatementNode,
-): common.typedSimple.TypeDefinitionStatementNode {
-	return {
-		nodeType: "TypeDefinitionStatement",
-		name: simplifyIdentifier(node.name),
-		properties: node.properties,
-		methods: simplifyMethods(node.methods, node.type),
-		type: node.type,
 	}
 }
 

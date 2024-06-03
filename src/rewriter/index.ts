@@ -75,8 +75,6 @@ function rewriteStatement(
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
 			return rewriteVariableDeclarationStatement(node)
-		case "TypeDefinitionStatement":
-			return rewriteTypeDefinitionStatement(node)
 		case "NamespaceDefinitionStatement":
 			return rewriteNamespaceDefinitionStatement(node)
 		case "ChoiceStatement":
@@ -103,198 +101,6 @@ function rewriteVariableDeclarationStatement(
 			},
 		],
 		kind: node.isConstant ? "const" : "let",
-	}
-}
-
-function rewriteTypeDefinitionStatement(
-	node: common.typedSimple.TypeDefinitionStatementNode,
-): estree.ClassDeclaration {
-	return {
-		type: "ClassDeclaration",
-		id: rewriteIdentifier(node.name),
-		superClass: null,
-		body: {
-			type: "ClassBody",
-			body: [
-				...Object.entries(node.methods).map<estree.MethodDefinition>(
-					([name, method]) => {
-						return {
-							type: "MethodDefinition",
-							key: {
-								type: "Identifier",
-								name,
-							},
-							value: rewriteFunctionExpression(
-								method.method.value,
-							),
-							kind: "method",
-							computed: false,
-							static: true,
-						}
-					},
-				),
-				{
-					type: "MethodDefinition",
-					key: { type: "Identifier", name: "is" },
-					value: {
-						type: "FunctionExpression",
-						id: null,
-						params: [
-							{
-								type: "Identifier",
-								name: "firstRecordInstance",
-							},
-							{
-								type: "Identifier",
-								name: "secondRecordInstance",
-							},
-						],
-						body: {
-							type: "BlockStatement",
-							body: [
-								{
-									type: "ReturnStatement",
-									argument: {
-										type: "CallExpression",
-										optional: false,
-										callee: {
-											type: "MemberExpression",
-											optional: false,
-											object: {
-												type: "Identifier",
-												name: "Record",
-											},
-											property: {
-												type: "Identifier",
-												name: "is",
-											},
-											computed: false,
-										},
-										arguments: [
-											{
-												type: "Identifier",
-												name: "firstRecordInstance",
-											},
-											{
-												type: "Identifier",
-												name: "secondRecordInstance",
-											},
-										],
-									},
-								},
-							],
-						},
-					},
-					kind: "method",
-					computed: false,
-					static: true,
-				},
-				{
-					type: "MethodDefinition",
-					key: { type: "Identifier", name: "isNot" },
-					value: {
-						type: "FunctionExpression",
-						id: null,
-						params: [
-							{
-								type: "Identifier",
-								name: "firstRecordInstance",
-							},
-							{
-								type: "Identifier",
-								name: "secondRecordInstance",
-							},
-						],
-						body: {
-							type: "BlockStatement",
-							body: [
-								{
-									type: "ReturnStatement",
-									argument: {
-										type: "CallExpression",
-										optional: false,
-										callee: {
-											type: "MemberExpression",
-											optional: false,
-											object: {
-												type: "Identifier",
-												name: "Record",
-											},
-											property: {
-												type: "Identifier",
-												name: "isNot",
-											},
-											computed: false,
-										},
-										arguments: [
-											{
-												type: "Identifier",
-												name: "firstRecordInstance",
-											},
-											{
-												type: "Identifier",
-												name: "secondRecordInstance",
-											},
-										],
-									},
-								},
-							],
-						},
-					},
-					kind: "method",
-					computed: false,
-					static: true,
-				},
-				{
-					type: "MethodDefinition",
-					key: { type: "Identifier", name: "toString" },
-					value: {
-						type: "FunctionExpression",
-						id: null,
-						params: [
-							{
-								type: "Identifier",
-								name: "recordInstance",
-							},
-						],
-						body: {
-							type: "BlockStatement",
-							body: [
-								{
-									type: "ReturnStatement",
-									argument: {
-										type: "CallExpression",
-										optional: false,
-										callee: {
-											type: "MemberExpression",
-											optional: false,
-											object: {
-												type: "Identifier",
-												name: "Record",
-											},
-											property: {
-												type: "Identifier",
-												name: "toString",
-											},
-											computed: false,
-										},
-										arguments: [
-											{
-												type: "Identifier",
-												name: "recordInstance",
-											},
-										],
-									},
-								},
-							],
-						},
-					},
-					kind: "method",
-					computed: false,
-					static: true,
-				},
-			],
-		},
 	}
 }
 
@@ -424,6 +230,8 @@ function rewriteExpression(
 			return rewriteNativeFunctionInvocation(node)
 		case "FunctionInvocation":
 			return rewriteFunctionInvocation(node)
+		case "MethodInvocation":
+			return rewriteMethodInvocation(node)
 		case "Combination":
 			return rewriteCombination(node)
 		case "RecordValue":
@@ -502,6 +310,26 @@ function rewriteFunctionInvocation(
 		type: "CallExpression",
 		optional: false,
 		callee: rewriteExpression(node.name),
+		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
+	}
+}
+
+function rewriteMethodInvocation(
+	node: common.typedSimple.MethodInvocationNode,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: rewriteExpression(node.base),
+			property: {
+				type: "Identifier",
+				name: node.member.name,
+			},
+			computed: false,
+		},
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
@@ -786,13 +614,7 @@ function rewriteMatch(
 		let matcherArgument: estree.ObjectExpression
 
 		// TODO: Handle Record Types
-		if (matcher.type === "Type") {
-			matcherArgument = convertObjectToObjectExpression(
-				matcher.definition,
-			)
-		} else {
-			matcherArgument = convertObjectToObjectExpression(matcher)
-		}
+		matcherArgument = convertObjectToObjectExpression(matcher)
 
 		return {
 			type: "CallExpression",

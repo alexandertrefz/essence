@@ -1,20 +1,23 @@
 import type { common } from "../../interfaces"
 
-const type: common.TypeType = {
-	type: "Type",
+export const type: common.Type = { type: "Record", members: {} }
+
+export const namespace: common.NamespaceType = {
+	type: "Namespace",
 	name: "Record",
-	definition: { type: "Primitive", primitive: "Record" },
+	targetType: type,
+	definition: { type: "Record", members: {} },
 	methods: {
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Record" },
+					type: type,
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Record" },
+					type: type,
 				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
@@ -24,11 +27,11 @@ const type: common.TypeType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Record" },
+					type: type,
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Record" },
+					type: type,
 				},
 			],
 			returnType: { type: "Primitive", primitive: "Boolean" },
@@ -38,12 +41,10 @@ const type: common.TypeType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Record" },
+					type: type,
 				},
 			],
 			returnType: { type: "Primitive", primitive: "String" },
 		} as common.MethodType,
 	},
 }
-
-export default type

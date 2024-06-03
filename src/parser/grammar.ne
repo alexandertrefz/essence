@@ -37,7 +37,6 @@ Statement ->
 	  ConstantDeclarationStatement {% id %}
 	| VariableDeclarationStatement {% id %}
 	| VariableAssignmentStatement  {% id %}
-	| TypeDefinitionStatement      {% id %}
 	| NamespaceDefinitionStatement {% id %}
 	| IfElseStatement              {% id %}
 	| IfStatement                  {% id %}
@@ -57,11 +56,10 @@ VariableDeclarationStatement ->
 VariableAssignmentStatement ->
 	Identifier EqualSign Expression {% ([name, _, value]) => generators.variableAssignmentStatement(name, value, { start: name.position.start, end: value.position.end }) %}
 
-TypeDefinitionStatement ->
-	TypeKeyword Identifier TypeDefinitionBody {% ([keyword, name, body]) => generators.typeDefinitionStatement(name, body.body, { start: keyword.position.start, end: body.position.end }) %}
 
 NamespaceDefinitionStatement ->
-	NamespaceKeyword Identifier NamespaceDefinitionBody {% ([keyword, name, body]) => generators.namespaceDefinitionStatement(name, body.body, { start: keyword.position.start, end: body.position.end }) %}
+	  NamespaceKeyword Identifier NamespaceBody                 {% ([keyword, name, body]) =>          generators.namespaceDefinitionStatement(name, null, body.body, { start: keyword.position.start, end: body.position.end }) %}
+	| NamespaceKeyword Identifier ForKeyword Type NamespaceBody {% ([keyword, name, _, type, body]) => generators.namespaceDefinitionStatement(name, type, body.body, { start: keyword.position.start, end: body.position.end }) %}
 
 IfElseStatement ->
 	  IfStatement ElseKeyword Block           {% ([ifStatement, _, block]) => generators.ifElseStatementNode(ifStatement, block.body, { start: ifStatement.position.start, end: block.position.end }) %}
@@ -82,10 +80,6 @@ FunctionStatement ->
 # ---------- #
 
 Expression ->
-	  ExpressionWithoutMethodLookup {% id %}
-	| MethodLookup                  {% id %}
-
-ExpressionWithoutMethodLookup ->
 	  NativeFunctionInvocation {% id %}
 	| MethodInvocation         {% id %}
 	| FunctionInvocation       {% id %}
@@ -101,11 +95,25 @@ NativeFunctionInvocation ->
 		([symbol, name, args]) => generators.nativeFunctionInvocation(name, args.args, { start: symbol.position.start, end: args.position.end })
 	%}
 
+
+NamespaceSpecifier ->
+	LeftAngle Identifier RightAngle {% second %}
+
 MethodInvocation ->
-	MethodLookup ArgumentList {% ([lookup, args]) => generators.methodInvocation(lookup, args.args, { start: lookup.position.start, end: args.position.end }) %}
+	Expression MethodLookupSymbol NamespaceSpecifier:? Identifier ArgumentList {%
+		([base, _, namespaceSpecifier, name, args]) => {
+			return generators.methodInvocation(
+				base,
+				name,
+				namespaceSpecifier,
+				args.args,
+				{ start: base.position.start, end: args.position.end }
+			)
+		}
+	%}
 
 FunctionInvocation ->
-	ExpressionWithoutMethodLookup ArgumentList {% ([expression, args]) => generators.functionInvocation(expression, args.args, { start: expression.position.start, end: args.position.end }) %}
+	Expression ArgumentList {% ([expression, args]) => generators.functionInvocation(expression, args.args, { start: expression.position.start, end: args.position.end }) %}
 
 Combination ->
 	  LeftBrace Expression WithKeyword KeyValuePairList RightBrace {% ([lbrace, lhs, withKeyword, rhs, rbrace]) => generators.combination(lhs, generators.recordValueNode(null, rhs.data, rhs.position), { start: lhs.position.start, end: rhs.position.end }) %}
@@ -135,9 +143,6 @@ Identifier ->
 Self ->
 	AtSign {% ([symbol]) => generators.self(symbol.position) %}
 
-MethodLookup ->
-	ExpressionWithoutMethodLookup MethodLookupSymbol Identifier {% ([base, , member]) => generators.methodLookup(base, member, { start: base.position.start, end: member.position.end }) %}
-
 Match ->
 	MatchKeyword Expression LeftBrace (MatchHandler):* RightBrace {%
 		([keyword, expression, lbrace, handlers, rbrace]) => generators.match(expression, flatten(handlers), { start: keyword.position.start, end: rbrace.position.end })
@@ -157,26 +162,16 @@ Block ->
 MatchHandler ->
 	CaseKeyword Type ReturnType Block {% ([_, matcher, returnType, block]) => ({ matcher, returnType, body: block.body }) %}
 
-TypeDefinitionBody ->
-	LeftBrace (TypeProperty | TypeMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
-
-TypeProperty ->
-	Identifier Colon Type {% ([name, _, type]) => ({ nodeType: "PropertyNode", name, type }) %}
-
-TypeMethod ->
-	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "SimpleMethodNode",           name, method }) %}
-	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
-	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
-	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
-
-NamespaceDefinitionBody ->
+NamespaceBody ->
 	LeftBrace (NamespaceProperty | NamespaceMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
 
 NamespaceProperty ->
-	StaticKeyword Identifier DeclarationType:? EqualSign Expression {% ([, name, type, , value]) => ({ nodeType: "NamespacePropertyNode", name, type, value }) %}
+	StaticKeyword Identifier DeclarationType:? EqualSign Expression {% ([keyword, name, type, , value]) => ({ nodeType: "NamespacePropertyNode", name, type, value }) %}
 
 NamespaceMethod ->
-	  StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
+	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "SimpleMethodNode",           name, method }) %}
+	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
+	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
 	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
 
 ReturnSymbol ->
@@ -264,9 +259,9 @@ ListLiteral ->
 ExpressionList ->
 	(Expression Comma):* Expression Comma:? {% ([list, expression]) => ([...list.map(first), expression]) %}
 
-#           #
+# --------- #
 # Functions #
-#           #
+# --------- #
 
 Parameter ->
 	  Identifier Colon Type            {% ([name, _, type]) =>                       generators.parameter(name,         name,         type, { start: name.position.start, end: type.position.end }) %}
@@ -313,8 +308,10 @@ Type ->
 	| UnionType  {% id %}
 
 SimpleType ->
+	IdentifierType {% id %}
+
+IdentifierType ->
 	  Identifier {% ([identifier]) => generators.identifierTypeDeclaration(identifier, identifier.position) %}
-	| LeftBracket Type RightBracket {% ([lbracket, type, rbracket]) => generators.listTypeDeclaration(type, { start: lbracket.position.start, end: rbracket.position.end }) %}
 
 UnionType ->
 	SimpleType (Pipe SimpleType):+ {% ([leftType, otherTypes]) => generators.unionTypeDeclaration([leftType, ...otherTypes.map(second)], { start: leftType.position.start, end: otherTypes[otherTypes.length - 1][1].position.end }) %}
@@ -342,6 +339,7 @@ MatchKeyword          -> %KeywordMatch          {% id %}
 CaseKeyword           -> %KeywordCase           {% id %}
 WithKeyword           -> %KeywordWith           {% id %}
 NamespaceKeyword      -> %KeywordNamespace      {% id %}
+ForKeyword            -> %KeywordFor            {% id %}
 
 # ---------------- #
 # Compound Symbols #

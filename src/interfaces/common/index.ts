@@ -72,16 +72,9 @@ export type MethodType =
 	| OverloadedStaticMethodType
 	| OverloadedMethodType
 
-export type NamespaceMethodType = StaticMethodType | OverloadedStaticMethodType
-
 export type ListType = {
 	type: "List"
 	itemType: Type
-}
-
-export type RecordPrimitiveType = {
-	type: "Primitive"
-	primitive: "Record"
 }
 
 export type StringPrimitiveType = {
@@ -110,7 +103,6 @@ export type NothingPrimitiveType = {
 }
 
 export type PrimitiveType =
-	| RecordPrimitiveType
 	| StringPrimitiveType
 	| IntegerPrimitiveType
 	| FractionPrimitiveType
@@ -127,23 +119,9 @@ export type BuiltInType = {
 
 export type NamespaceType = {
 	type: "Namespace"
+	targetType: Type | null
 	name: string
 	definition: RecordType
-	methods: Record<string, NamespaceMethodType>
-}
-
-export type TypeType = {
-	type: "Type"
-	name: string
-	definition: RecordType | BuiltInType | PrimitiveType
-	methods: Record<string, MethodType>
-}
-
-export type GenericTypeType = {
-	type: "GenericType"
-	name: string
-	definition: RecordType | BuiltInType | PrimitiveType
-	generics: Array<GenericDeclaration>
 	methods: Record<string, MethodType>
 }
 
@@ -158,8 +136,6 @@ export type Type =
 	| GenericFunctionType
 	| MethodType
 	| PrimitiveType
-	| TypeType
-	| GenericTypeType
 	| NamespaceType
 	| ListType
 	| UnknownType
