@@ -4,10 +4,9 @@ import {
 	resolveFunctionValueType,
 	resolveListValueType,
 	resolveMatchType,
-	resolveMethodLookupBaseType,
+	resolveMethodInvocation,
 	resolveNamespaceDefinitionStatementType,
 	resolveType,
-	resolveTypeDefinitionStatementType,
 } from "./resolvers"
 
 export function enrichNode(
@@ -30,13 +29,11 @@ export function enrichNode(
 		case "Lookup":
 		case "Identifier":
 		case "Self":
-		case "MethodLookup":
 		case "Match":
 			return enrichExpression(node, scope)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
-		case "TypeDefinitionStatement":
 		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -83,8 +80,6 @@ export function enrichExpression(
 			return enrichIdentifier(node, scope)
 		case "Self":
 			return enrichSelf(node, scope)
-		case "MethodLookup":
-			return enrichMethodLookup(node, scope)
 		case "Match":
 			return enrichMatch(node, scope)
 	}
@@ -109,15 +104,25 @@ export function enrichMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.MethodInvocationNode {
+	let { namespace, type, overloadedMethodIndex } = resolveMethodInvocation(
+		node,
+		scope,
+	)
+
 	return {
 		nodeType: "MethodInvocation",
-		name: enrichMethodLookup(node.name, scope),
+		base: enrichExpression(node.base, scope),
+		member: {
+			name: node.member.content,
+			position: node.member.position,
+		},
 		arguments: node.arguments.map((argument) =>
 			enrichArgument(argument, scope),
 		),
 		position: node.position,
-		type: resolveType(node, scope),
-		overloadedMethodIndex: null,
+		namespace,
+		type,
+		overloadedMethodIndex,
 	}
 }
 
@@ -152,9 +157,8 @@ export function enrichCombination(
 
 export function enrichMethodFunctionDefinition(
 	method: parser.FunctionValueNode,
-	isStatic: boolean,
 	scope: enricher.Scope,
-	selfType: common.Type,
+	selfType: common.Type | null,
 ): common.typed.FunctionDefinitionNode {
 	let newScope = {
 		parent: scope,
@@ -162,7 +166,7 @@ export function enrichMethodFunctionDefinition(
 		types: {},
 	} satisfies enricher.Scope
 
-	if (!isStatic) {
+	if (selfType !== null) {
 		declareVariableInScope("@", selfType, newScope)
 	}
 
@@ -236,24 +240,11 @@ export function enrichFunctionDefinition(
 export function enrichMethodFunctionValue(
 	node: parser.SimpleMethod | parser.StaticMethod,
 	scope: enricher.Scope,
-	selfType: common.Type,
+	selfType: common.Type | null,
 ): common.typed.FunctionValueNode {
-	let isStatic: boolean
-
-	if (node.nodeType === "SimpleMethod") {
-		isStatic = false
-	} else {
-		isStatic = true
-	}
-
 	return {
 		nodeType: "FunctionValue",
-		value: enrichMethodFunctionDefinition(
-			node.method,
-			isStatic,
-			scope,
-			selfType,
-		),
+		value: enrichMethodFunctionDefinition(node.method, scope, selfType),
 		position: node.method.position,
 		type: resolveFunctionValueType(node.method, scope),
 	}
@@ -262,26 +253,14 @@ export function enrichMethodFunctionValue(
 export function enrichMethodsFunctionValue(
 	node: parser.OverloadedMethod | parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
-	selfType: common.Type,
+	selfType: common.Type | null,
 ): Array<common.typed.FunctionValueNode> {
 	let results: Array<common.typed.FunctionValueNode> = []
-	let isStatic: boolean
 
-	if (node.nodeType === "OverloadedMethod") {
-		isStatic = false
-	} else {
-		isStatic = true
-	}
-
-	for (let [, method] of Object.entries(node.methods)) {
+	for (let method of Object.values(node.methods)) {
 		results.push({
 			nodeType: "FunctionValue",
-			value: enrichMethodFunctionDefinition(
-				method,
-				isStatic,
-				scope,
-				selfType,
-			),
+			value: enrichMethodFunctionDefinition(method, scope, selfType),
 			position: method.position,
 			type: resolveFunctionValueType(method, scope),
 		})
@@ -428,24 +407,17 @@ export function enrichSelf(
 	scope: enricher.Scope,
 	type: common.Type = resolveType(node, scope),
 ): common.typed.SelfNode {
+	// TODO: Can a namespace ever be a valid Type for Self?
+	if (type.type === "Namespace") {
+		if (type.targetType) {
+			type = type.targetType
+		}
+	}
+
 	return {
 		nodeType: "Self",
 		position: node.position,
 		type,
-	}
-}
-
-export function enrichMethodLookup(
-	node: parser.MethodLookupNode,
-	scope: enricher.Scope,
-): common.typed.MethodLookupNode {
-	return {
-		nodeType: "MethodLookup",
-		base: enrichExpression(node.base, scope),
-		baseType: resolveMethodLookupBaseType(node.base, scope),
-		member: methodMember(node, scope),
-		position: node.position,
-		type: resolveType(node, scope),
 	}
 }
 
@@ -492,8 +464,6 @@ export function enrichStatement(
 			return enrichVariableDeclarationStatement(node, scope)
 		case "VariableAssignmentStatement":
 			return enrichVariableAssignmentStatement(node, scope)
-		case "TypeDefinitionStatement":
-			return enrichTypeDefinitionStatement(node, scope)
 		case "NamespaceDefinitionStatement":
 			return enrichNamespaceDefinitionStatement(node, scope)
 		case "IfElseStatement":
@@ -567,71 +537,6 @@ export function enrichVariableAssignmentStatement(
 	}
 }
 
-export function enrichTypeDefinitionStatement(
-	node: parser.TypeDefinitionStatementNode,
-	scope: enricher.Scope,
-): common.typed.TypeDefinitionStatementNode {
-	function enrichProperties(
-		properties: Record<string, parser.TypeDeclarationNode>,
-		scope: enricher.Scope,
-	): Record<string, common.Type> {
-		let result: Record<string, common.Type> = {}
-
-		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
-			result[propertyKey] = resolveType(propertyValue, scope)
-		}
-
-		return result
-	}
-
-	let type = resolveTypeDefinitionStatementType(node, scope)
-
-	declareVariableInScope(node.name, extractNamespaceFromType(type), scope)
-	declareTypeInScope(node.name, type, scope)
-
-	return {
-		nodeType: "TypeDefinitionStatement",
-		name: enrichIdentifier(node.name, scope),
-		properties: enrichProperties(node.properties, scope),
-		methods: enrichMethods(node.methods, scope, type),
-		position: node.position,
-		type: type,
-	}
-}
-
-export function extractNamespaceFromType(
-	type: common.TypeType,
-): common.NamespaceType {
-	return {
-		type: "Namespace",
-		name: type.name,
-		definition: { type: "Record", members: {} },
-		methods: Object.fromEntries(
-			Object.entries(type.methods).map(([name, method]) => {
-				if (method.type === "SimpleMethod") {
-					return [
-						name,
-						{
-							...method,
-							type: "StaticMethod",
-						},
-					]
-				} else if (method.type === "OverloadedMethod") {
-					return [
-						name,
-						{
-							...method,
-							type: "OverloadedStaticMethod",
-						},
-					]
-				} else {
-					return [name, method]
-				}
-			}),
-		),
-	} satisfies common.NamespaceType
-}
-
 export function enrichNamespaceDefinitionStatement(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
@@ -679,9 +584,10 @@ export function enrichNamespaceDefinitionStatement(
 
 	return {
 		nodeType: "NamespaceDefinitionStatement",
+		targetType: type.targetType,
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
-		methods: enrichNamespaceMethods(node.methods, scope, type),
+		methods: enrichMethods(node.methods, scope, type.targetType),
 		position: node.position,
 		type,
 	}
@@ -806,18 +712,6 @@ function enrichArgument(
 	}
 }
 
-function methodMember(
-	node: parser.MethodLookupNode,
-	scope: enricher.Scope,
-): common.typed.IdentifierNode {
-	return {
-		nodeType: "Identifier",
-		content: node.member.content,
-		position: node.member.position,
-		type: resolveType(node, scope),
-	}
-}
-
 function enrichMembers(
 	members: Record<string, parser.ExpressionNode>,
 	scope: enricher.Scope,
@@ -832,9 +726,9 @@ function enrichMembers(
 }
 
 function enrichMethods(
-	members: parser.Methods,
+	members: parser.NamespaceMethods,
 	scope: enricher.Scope,
-	selfType: common.Type,
+	selfType: common.Type | null,
 ): common.typed.Methods {
 	let result: common.typed.Methods = {}
 
@@ -857,34 +751,6 @@ function enrichMethods(
 					scope,
 					selfType,
 				),
-			}
-		} else {
-			result[memberKey] = {
-				nodeType: "OverloadedStaticMethod",
-				methods: enrichMethodsFunctionValue(
-					memberValue,
-					scope,
-					selfType,
-				),
-			}
-		}
-	}
-
-	return result
-}
-
-function enrichNamespaceMethods(
-	members: parser.NamespaceMethods,
-	scope: enricher.Scope,
-	selfType: common.Type,
-): common.typed.NamespaceMethods {
-	let result: common.typed.NamespaceMethods = {}
-
-	for (let [memberKey, memberValue] of Object.entries(members)) {
-		if (memberValue.nodeType === "StaticMethod") {
-			result[memberKey] = {
-				nodeType: "StaticMethod",
-				method: enrichMethodFunctionValue(memberValue, scope, selfType),
 			}
 		} else {
 			result[memberKey] = {

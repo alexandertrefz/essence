@@ -9,7 +9,6 @@ import type {
 	NothingPrimitiveType,
 	StringPrimitiveType,
 	Type,
-	TypeType,
 } from "./index"
 
 // #region Program & Sections
@@ -33,6 +32,7 @@ export type ImplementationNode = ExpressionNode | StatementNode
 export type ExpressionNode =
 	| NativeFunctionInvocationNode
 	| FunctionInvocationNode
+	| MethodInvocationNode
 	| ValueNode
 	| LookupNode
 	| IdentifierNode
@@ -49,6 +49,16 @@ export interface NativeFunctionInvocationNode {
 export interface FunctionInvocationNode {
 	nodeType: "FunctionInvocation"
 	name: ExpressionNode
+	arguments: Array<ArgumentNode>
+	type: Type
+}
+
+export interface MethodInvocationNode {
+	nodeType: "MethodInvocation"
+	base: IdentifierNode
+	member: {
+		name: string
+	}
 	arguments: Array<ArgumentNode>
 	type: Type
 }
@@ -149,7 +159,6 @@ export interface MatchNode {
 export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
-	| TypeDefinitionStatementNode
 	| NamespaceDefinitionStatementNode
 	| ChoiceStatementNode
 	| ReturnStatementNode
@@ -175,14 +184,6 @@ export interface Method {
 }
 
 export type Methods = Record<string, Method>
-
-export interface TypeDefinitionStatementNode {
-	nodeType: "TypeDefinitionStatement"
-	name: IdentifierNode
-	properties: Record<string, Type>
-	methods: Methods
-	type: TypeType
-}
 
 export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"

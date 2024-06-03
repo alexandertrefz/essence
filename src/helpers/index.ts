@@ -60,14 +60,6 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return lhs.primitive === rhs.primitive
 	}
 
-	if (
-		lhs.type === "Primitive" &&
-		lhs.primitive === "Record" &&
-		rhs.type === "Record"
-	) {
-		return true
-	}
-
 	if (lhs.type === "UnionType") {
 		if (rhs.type === "UnionType") {
 			for (let lhsType of lhs.types) {
@@ -97,44 +89,6 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return false
 	}
 
-	if (lhs.type === "Type" && rhs.type === "Type") {
-		if (
-			lhs.definition.type === "BuiltIn" &&
-			rhs.definition.type === "BuiltIn"
-		) {
-			return true
-		} else if (
-			lhs.definition.type !== "BuiltIn" &&
-			rhs.definition.type !== "BuiltIn"
-		) {
-			return matchesType(lhs.definition, rhs.definition)
-		} else {
-			return false
-		}
-	}
-
-	if (
-		lhs.type === "Type" &&
-		(rhs.type === "Primitive" || rhs.type === "Record")
-	) {
-		if (lhs.definition.type !== "BuiltIn") {
-			return matchesType(lhs.definition, rhs)
-		} else {
-			return false
-		}
-	}
-
-	if (
-		(lhs.type === "Primitive" || rhs.type === "Record") &&
-		rhs.type === "Type"
-	) {
-		if (rhs.definition.type !== "BuiltIn") {
-			return matchesType(lhs, rhs.definition)
-		} else {
-			return false
-		}
-	}
-
 	if (lhs.type === "Record" && rhs.type === "Record") {
 		for (let memberName in lhs.members) {
 			if (rhs.members[memberName] === undefined) {
@@ -149,14 +103,6 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		}
 
 		return true
-	}
-
-	if (lhs.type === "List" && rhs.type === "List") {
-		if (rhs.itemType.type === "Unknown") {
-			return true
-		} else {
-			return matchesType(lhs.itemType, rhs.itemType)
-		}
 	}
 
 	if (lhs.type === "Function" && rhs.type === "Function") {

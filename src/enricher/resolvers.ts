@@ -3,18 +3,10 @@ import deepEqual from "deep-equal"
 import { matchesType } from "../helpers"
 import type { common, enricher, parser } from "../interfaces"
 
-import booleanType from "./types/Boolean"
-import fractionType from "./types/Fraction"
-import integerType from "./types/Integer"
-import listType from "./types/List"
-import recordType from "./types/Record"
-import stringType from "./types/String"
-
 export function resolveType(
 	node:
 		| parser.ExpressionNode
 		| parser.FunctionDefinitionNode
-		| parser.TypeDefinitionStatementNode
 		| parser.TypeDeclarationNode
 		| parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
@@ -50,18 +42,12 @@ export function resolveType(
 			return resolveIdentifierType(node, scope)
 		case "Self":
 			return resolveSelfType(node, scope)
-		case "MethodLookup":
-			return resolveMethodLookupType(node, scope)
 		case "FunctionDefinition":
 			return resolveFunctionDefinitionType(node, scope)
-		case "TypeDefinitionStatement":
-			return resolveTypeDefinitionStatementType(node, scope)
 		case "NamespaceDefinitionStatement":
 			return resolveNamespaceDefinitionStatementType(node, scope)
 		case "IdentifierTypeDeclaration":
 			return resolveIdentifierTypeDeclarationType(node, scope)
-		case "ListTypeDeclaration":
-			return resolveListTypeDeclarationType(node, scope)
 		case "UnionTypeDeclaration":
 			return resolveUnionTypeDeclarationType(node, scope)
 		case "Match":
@@ -206,36 +192,94 @@ function inferGenericFunctionInvocation(
 	return inferredFunctionType
 }
 
-export function resolveMethodInvocationType(
+export function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
+	resolvedNamespace: common.NamespaceType,
 	scope: enricher.Scope,
-): common.Type {
-	let type = resolveMethodLookupType(node.name, scope)
+):
+	| { returnType: common.Type; overloadedMethodIndex: number | null }
+	| undefined {
+	let methodType = resolvedNamespace.methods[node.member.content]
 
-	if (type.type === "SimpleMethod" || type.type === "StaticMethod") {
-		return type.returnType
-	} else if (
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
+	let methodArguments: Array<parser.ArgumentNode> = [...node.arguments]
+
+	if (
+		methodType.type === "SimpleMethod" ||
+		methodType.type === "OverloadedMethod"
 	) {
-		const methodArguments = [
-			{ name: null, value: node.name.base },
+		methodArguments = [
+			{ nodeType: "Argument", name: null, value: node.base },
 			...node.arguments,
 		]
+	}
 
-		overloadLoop: for (let overload of type.overloads) {
+	if (
+		methodType.type === "SimpleMethod" ||
+		methodType.type === "StaticMethod"
+	) {
+		if (methodType.parameterTypes.length !== methodArguments.length) {
+			return
+		}
+
+		for (
+			let parameterIndex = 0;
+			parameterIndex < methodType.parameterTypes.length;
+			parameterIndex++
+		) {
+			const parameter = methodType.parameterTypes[parameterIndex]
+			const argument = methodArguments[parameterIndex]
+
+			const parameterNameIsMatched =
+				(parameter.name === null && argument.name === null) ||
+				(parameter.name && argument.name?.content)
+
+			if (
+				!(
+					parameterNameIsMatched &&
+					matchesType(
+						parameter.type,
+						resolveType(argument.value, scope),
+					)
+				)
+			) {
+				return
+			}
+		}
+
+		return {
+			returnType: methodType.returnType,
+			overloadedMethodIndex: null,
+		}
+	} else if (
+		methodType.type === "OverloadedMethod" ||
+		methodType.type === "OverloadedStaticMethod"
+	) {
+		overloadLoop: for (
+			let overloadIndex = 0;
+			overloadIndex < methodType.overloads.length;
+			overloadIndex++
+		) {
+			let overload = methodType.overloads[overloadIndex]
+
 			if (overload.parameterTypes.length !== methodArguments.length) {
 				continue
 			}
 
-			for (let i = 1; i < overload.parameterTypes.length; i++) {
-				const parameter = overload.parameterTypes[i]
-				const argument = methodArguments[i]
+			for (
+				let parameterIndex = 0;
+				parameterIndex < overload.parameterTypes.length;
+				parameterIndex++
+			) {
+				const parameter = overload.parameterTypes[parameterIndex]
+				const argument = methodArguments[parameterIndex]
+
+				const parameterNameIsMatched =
+					(parameter.name === null && argument.name === null) ||
+					(parameter.name && argument.name?.content)
 
 				if (
 					!(
-						((parameter.name === null && argument.name === null) ||
-							(parameter.name && argument.name?.content)) &&
+						parameterNameIsMatched &&
 						matchesType(
 							parameter.type,
 							resolveType(argument.value, scope),
@@ -246,26 +290,117 @@ export function resolveMethodInvocationType(
 				}
 			}
 
-			return overload.returnType
+			return {
+				overloadedMethodIndex: overloadIndex,
+				returnType: overload.returnType,
+			}
+		}
+	} else {
+		return undefined
+	}
+}
+
+export function resolveMethodInvocation(
+	node: parser.MethodInvocationNode,
+	scope: enricher.Scope,
+): {
+	namespace: { name: string; type: common.NamespaceType }
+	type: common.Type
+	overloadedMethodIndex: number | null
+} {
+	let namespaces = resolveMethodLookupBaseNamespaces(node, scope)
+	let resolvedNamespace: { name: string; type: common.NamespaceType }
+
+	if (namespaces.size === 0) {
+		// NOTE: This should be impossible. Every Primitive has at least 1 Namespace.
+		throw "Could not find a Namespace for this value."
+	} else {
+		let matchingNamespaces = new Map<string, common.NamespaceType>()
+		for (let [name, namespace] of namespaces) {
+			if (Object.hasOwn(namespace.methods, node.member.content)) {
+				matchingNamespaces.set(name, namespace)
+			}
 		}
 
-		console.log("Arguments")
-		console.log("=========")
-		console.log(Bun.inspect(methodArguments))
-		console.log()
+		if (matchingNamespaces.size === 0) {
+			throw `Could not find a method with name ${node.member.content} in the namespaces matching the type of the left hand side expression.`
+		} else {
+			if (matchingNamespaces.size === 1) {
+				resolvedNamespace = {
+					name: Array.from(matchingNamespaces.entries())[0][0],
+					type: Array.from(matchingNamespaces.entries())[0][1],
+				}
 
-		console.log("Overloads")
-		console.log("=========")
-		console.log(Bun.inspect(type.overloads))
+				let resolvedMethod = resolveInvokedMethodInNamespace(
+					node,
+					resolvedNamespace.type,
+					scope,
+				)
 
-		throw new Error(
-			"MethodInvocation: Passed arguments do not match any overload",
-		)
-	} else {
-		throw new Error(
-			`${node.name.member.content} is not a function on Type at ${node.name.base.position.start.line}:${node.name.base.position.start.column}.`,
-		)
+				if (resolvedMethod) {
+					return {
+						namespace: resolvedNamespace,
+						overloadedMethodIndex:
+							resolvedMethod.overloadedMethodIndex,
+						type: resolvedMethod.returnType,
+					}
+				} else {
+					throw new Error(
+						"MethodInvocation: Passed arguments do not match any overload",
+					)
+				}
+			} else {
+				let resolvedMethods = []
+
+				for (let [namespaceName, namespaceType] of matchingNamespaces) {
+					let resolvedMethod = resolveInvokedMethodInNamespace(
+						node,
+						namespaceType,
+						scope,
+					)
+
+					if (resolvedMethod) {
+						resolvedMethods.push({
+							namespace: {
+								name: namespaceName,
+								type: namespaceType,
+							},
+							overloadedMethodIndex:
+								resolvedMethod.overloadedMethodIndex,
+							type: resolvedMethod.returnType,
+						})
+					}
+				}
+
+				if (resolvedMethods.length === 0) {
+					throw new Error(
+						"MethodInvocation: Passed arguments do not match any overload",
+					)
+				} else if (resolvedMethods.length === 1) {
+					return resolvedMethods[0]
+				} else {
+					throw new Error(
+						`MethodInvocation: Passed arguments matched more than 1 namespace, please disambiguate.
+
+The Matching namespaces are:
+${resolvedMethods
+	.map((method) => {
+		return `    - ${method.namespace.name}`
+	})
+	.join("\n")}
+`,
+					)
+				}
+			}
+		}
 	}
+}
+
+export function resolveMethodInvocationType(
+	node: parser.MethodInvocationNode,
+	scope: enricher.Scope,
+): common.Type {
+	return resolveMethodInvocation(node, scope).type
 }
 
 export function resolveFunctionInvocationType(
@@ -344,63 +479,9 @@ export function resolveCombinationType(
 	scope: enricher.Scope,
 ): common.Type {
 	function isSubType(
-		lhs: common.RecordType | common.TypeType | common.GenericTypeType,
-		rhs: common.RecordType | common.TypeType | common.GenericTypeType,
+		lhs: common.RecordType,
+		rhs: common.RecordType,
 	): boolean {
-		if (lhs.type === "Type") {
-			if (
-				lhs.definition.type === "Primitive" ||
-				lhs.definition.type === "BuiltIn"
-			) {
-				throw new Error(
-					`You can not combine ${lhs.name} with other Types.`,
-				)
-			} else {
-				lhs = lhs.definition
-			}
-		}
-
-		if (rhs.type === "Type") {
-			if (
-				rhs.definition.type === "Primitive" ||
-				rhs.definition.type === "BuiltIn"
-			) {
-				throw new Error(
-					`You can not combine ${rhs.name} with other Types.`,
-				)
-			} else {
-				rhs = rhs.definition
-			}
-		}
-
-		// TODO: Check if this is enough checking - shouldnt we compare the generics as well, at least in Number?
-
-		if (lhs.type === "GenericType") {
-			if (
-				lhs.definition.type === "Primitive" ||
-				lhs.definition.type === "BuiltIn"
-			) {
-				throw new Error(
-					`You can not combine ${lhs.name} with other Types.`,
-				)
-			} else {
-				lhs = lhs.definition
-			}
-		}
-
-		if (rhs.type === "GenericType") {
-			if (
-				rhs.definition.type === "Primitive" ||
-				rhs.definition.type === "BuiltIn"
-			) {
-				throw new Error(
-					`You can not combine ${rhs.name} with other Types.`,
-				)
-			} else {
-				rhs = rhs.definition
-			}
-		}
-
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
 			if (!deepEqual(lhs.members[rhsName], rhsType)) {
 				return false
@@ -543,25 +624,23 @@ export function resolveLookupType(
 ): common.Type {
 	let baseType = resolveType(node.base, scope)
 
-	if (
-		baseType.type !== "Record" &&
-		baseType.type !== "Namespace" &&
-		baseType.type !== "Type" &&
-		baseType.type !== "GenericType"
-	) {
+	if (baseType.type !== "Record" && baseType.type !== "Namespace") {
 		throw new Error(
 			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Namespace, Type, or GenericType.`,
 		)
 	} else {
-		if (
-			baseType.type === "Type" ||
-			baseType.type === "GenericType" ||
-			baseType.type === "Namespace"
-		) {
+		if (baseType.type === "Namespace") {
 			if (baseType.definition.type === "Record") {
-				if (baseType.definition.members[node.member.content] != null) {
+				if (
+					Object.hasOwn(
+						baseType.definition.members,
+						node.member.content,
+					)
+				) {
 					return baseType.definition.members[node.member.content]
-				} else if (baseType.methods[node.member.content] != null) {
+				} else if (
+					Object.hasOwn(baseType.methods, node.member.content)
+				) {
 					return baseType.methods[node.member.content]
 				} else {
 					throw new Error(
@@ -569,7 +648,7 @@ export function resolveLookupType(
 					)
 				}
 			} else {
-				if (baseType.methods[node.member.content] != null) {
+				if (Object.hasOwn(baseType.methods, node.member.content)) {
 					return baseType.methods[node.member.content]
 				} else {
 					throw new Error(
@@ -578,7 +657,7 @@ export function resolveLookupType(
 				}
 			}
 		} else {
-			if (baseType.members[node.member.content] !== null) {
+			if (Object.hasOwn(baseType.members, node.member.content)) {
 				return baseType.members[node.member.content]
 			} else {
 				throw new Error(
@@ -616,31 +695,6 @@ export function resolveSelfType(
 			"@-Expressions can not be used outside of methods and match expressions.",
 		)
 	} else {
-		return result
-	}
-}
-
-export function resolveMethodLookupType(
-	node: parser.MethodLookupNode,
-	scope: enricher.Scope,
-): common.MethodType {
-	let baseType = resolveMethodLookupBaseType(node.base, scope)
-
-	// Check wether the called Method exists on the Record Base Type
-	if (
-		baseType.definition.type === "Record" &&
-		recordType.methods[node.member.content]
-	) {
-		return recordType.methods[node.member.content]
-	} else {
-		let result = baseType.methods[node.member.content]
-
-		if (result == null) {
-			throw new Error(
-				`Could not resolve Method ${node.member.content} on Type of Expression at ${node.base.position.start.line}:${node.base.position.start.column}.`,
-			)
-		}
-
 		return result
 	}
 }
@@ -701,12 +755,16 @@ export function resolveFunctionDefinitionType(
 	}
 }
 
-export function resolveTypeDefinitionStatementType(
-	node: parser.TypeDefinitionStatementNode,
+export function resolveNamespaceDefinitionStatementType(
+	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
-): common.TypeType {
-	let resultType: common.TypeType = {
-		type: "Type",
+): common.NamespaceType {
+	let resultType: common.NamespaceType = {
+		type: "Namespace",
+		targetType:
+			node.targetType === null
+				? null
+				: resolveType(node.targetType, scope),
 		name: node.name.content,
 		definition: { type: "Record", members: {} },
 		methods: {},
@@ -716,7 +774,7 @@ export function resolveTypeDefinitionStatementType(
 	let methods: Record<string, common.MethodType> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		definitionMembers[memberKey] = resolveType(memberValue, scope)
+		definitionMembers[memberKey] = resolveType(memberValue.value, scope)
 	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
@@ -727,7 +785,7 @@ export function resolveTypeDefinitionStatementType(
 				members: { [node.name.content]: resultType },
 				types: { [node.name.content]: resultType },
 			},
-			resultType,
+			resultType.targetType,
 		)
 	}
 
@@ -737,40 +795,6 @@ export function resolveTypeDefinitionStatementType(
 	}
 
 	resultType.methods = methods
-
-	return resultType
-}
-
-export function resolveNamespaceDefinitionStatementType(
-	node: parser.NamespaceDefinitionStatementNode,
-	scope: enricher.Scope,
-): common.NamespaceType {
-	let resultType: common.NamespaceType = {
-		type: "Namespace",
-		name: node.name.content,
-		definition: { type: "Record", members: {} },
-		methods: {},
-	}
-
-	let definitionMembers: Record<string, common.Type> = {}
-	let methods: Record<string, common.NamespaceMethodType> = {}
-
-	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		definitionMembers[memberKey] = resolveType(memberValue.value, scope)
-	}
-
-	for (let [methodName, methodValue] of Object.entries(node.methods)) {
-		methods[methodName] = resolveNamespaceMethodType(methodValue, {
-			parent: scope,
-			members: { [node.name.content]: resultType },
-			types: {},
-		})
-	}
-
-	resultType.definition = {
-		type: "Record",
-		members: definitionMembers,
-	}
 
 	return resultType
 }
@@ -789,24 +813,6 @@ export function resolveIdentifierTypeDeclarationType(
 	} else {
 		return result
 	}
-}
-
-export function resolveListTypeDeclarationType(
-	node: parser.ListTypeDeclarationNode,
-	scope: enricher.Scope,
-): common.ListType {
-	const itemType = resolveType(node.type, scope)
-
-	if (
-		itemType.type === "SimpleMethod" ||
-		itemType.type === "StaticMethod" ||
-		itemType.type === "OverloadedMethod" ||
-		itemType.type === "OverloadedStaticMethod"
-	) {
-		throw new Error("Methods can not be List Item Types.")
-	}
-
-	return { type: "List", itemType }
 }
 
 export function resolveUnionTypeDeclarationType(
@@ -892,7 +898,7 @@ export function findTypeInScope(
 			return null
 		}
 
-		if (searchScope.types[name] != null) {
+		if (Object.hasOwn(searchScope.types, name)) {
 			return searchScope.types[name]
 		} else {
 			searchScope = searchScope.parent
@@ -900,32 +906,67 @@ export function findTypeInScope(
 	}
 }
 
-export function resolveMethodLookupBaseType(
-	node: parser.ExpressionNode,
+export function getAllNamespacesInScope(
 	scope: enricher.Scope,
-): common.TypeType {
-	let baseType = resolveType(node, scope)
+	identifier: parser.IdentifierNode | null,
+): Map<string, common.NamespaceType> {
+	let searchScope: enricher.Scope | null = scope
+	let variableNames: Array<string> = []
+	let namespaces: Map<string, common.NamespaceType> = new Map()
 
-	switch (baseType.type) {
-		case "List":
-			return resolveGenericType(listType, { ItemType: baseType.itemType })
-		case "Type":
-			return baseType
-		case "Primitive":
-			if (baseType.primitive !== "Nothing") {
-				return resolvePrimitiveTypeType(baseType, scope)
+	scopeLoop: while (true) {
+		if (searchScope === null) {
+			break
+		}
+
+		for (let [key, value] of Object.entries(searchScope.members)) {
+			if (identifier) {
+				if (value.type === "Namespace" && identifier.content === key) {
+					namespaces.set(key, value)
+					break scopeLoop
+				}
 			} else {
-				throw new Error(
-					`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.\nLeft hand side is Nothing.`,
-				)
+				// NOTE: Since we are resolving bottom up, we need to exclude any shadowed variables
+				if (!variableNames.includes(key)) {
+					variableNames.push(key)
+
+					if (value.type === "Namespace") {
+						namespaces.set(key, value)
+					}
+				}
 			}
-		case "Record":
-			return recordType
-		default:
-			throw new Error(
-				`Could not resolve Member on a Type at ${node.position.start.line}:${node.position.start.column}.`,
-			)
+		}
+
+		searchScope = searchScope.parent
 	}
+
+	return namespaces
+}
+
+export function resolveMethodLookupBaseNamespaces(
+	node: parser.MethodInvocationNode,
+	scope: enricher.Scope,
+): Map<string, common.NamespaceType> {
+	let baseType = resolveType(node.base, scope)
+	let namespaces = getAllNamespacesInScope(scope, node.namespaceSpecifier)
+	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
+
+	for (let [name, namespace] of namespaces) {
+		if (namespace.targetType) {
+			if (namespace.targetType.type === "UnionType") {
+				for (let type of namespace.targetType.types) {
+					if (matchesType(type, baseType)) {
+						matchingNamespaces.set(name, namespace)
+						break
+					}
+				}
+			} else if (matchesType(namespace.targetType, baseType)) {
+				matchingNamespaces.set(name, namespace)
+			}
+		}
+	}
+
+	return matchingNamespaces
 }
 
 export function resolveMethodType(
@@ -935,9 +976,15 @@ export function resolveMethodType(
 		| parser.OverloadedMethod
 		| parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
-	selfType: common.TypeType,
+	selfType: common.Type | null,
 ): common.MethodType {
 	if (node.nodeType === "SimpleMethod") {
+		if (selfType === null) {
+			throw new Error(
+				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+			)
+		}
+
 		return {
 			type: "SimpleMethod",
 			parameterTypes: [
@@ -975,6 +1022,12 @@ export function resolveMethodType(
 			returnType: resolveType(node.method.value.returnType, scope),
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
+		if (selfType === null) {
+			throw new Error(
+				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+			)
+		}
+
 		return {
 			type: "OverloadedMethod",
 			overloads: node.methods.map((method) => {
@@ -1026,237 +1079,4 @@ export function resolveMethodType(
 			}),
 		}
 	}
-}
-
-export function resolveNamespaceMethodType(
-	node: parser.StaticMethod | parser.OverloadedStaticMethod,
-	scope: enricher.Scope,
-): common.NamespaceMethodType {
-	if (node.nodeType === "StaticMethod") {
-		return {
-			type: "StaticMethod",
-			parameterTypes: node.method.value.parameters.map((param) => {
-				let name = null
-
-				if (param.externalName !== null) {
-					name = param.externalName.content
-				}
-
-				return {
-					name,
-					type: resolveType(param.type, scope),
-				}
-			}),
-			returnType: resolveType(node.method.value.returnType, scope),
-		}
-	} else {
-		return {
-			type: "OverloadedStaticMethod",
-			overloads: node.methods.map((method) => {
-				return {
-					parameterTypes: [
-						...method.value.parameters.map((parameter) => {
-							let name: string | null
-
-							if (parameter.externalName !== null) {
-								name = parameter.externalName.content
-							} else {
-								name = null
-							}
-
-							return {
-								name,
-								type: resolveType(parameter.type, scope),
-							}
-						}),
-					],
-					returnType: resolveType(method.value.returnType, scope),
-				}
-			}),
-		}
-	}
-}
-
-export function resolvePrimitiveTypeType(
-	type: Exclude<common.PrimitiveType, common.NothingPrimitiveType>,
-	_scope: enricher.Scope,
-): common.TypeType {
-	switch (type.primitive) {
-		case "Integer":
-			return integerType
-		case "Fraction":
-			return fractionType
-		case "Boolean":
-			return booleanType
-		case "String":
-			return stringType
-		case "Record":
-			return recordType
-	}
-}
-
-export function resolveGenericType(
-	type: common.GenericTypeType,
-	types: Record<string, common.Type>,
-): common.TypeType {
-	let resolvedType: common.TypeType = {
-		type: "Type",
-		name: type.name,
-		definition: structuredClone(type.definition),
-		methods: structuredClone(type.methods),
-	}
-	const passedTypes = Object.entries(types)
-
-	if (type.generics.length !== passedTypes.length) {
-		// TODO: Throw error, declaring which generics are missing
-	}
-
-	if (resolvedType.definition.type === "Record") {
-		for (let [propertyKey, propertyValue] of Object.entries(
-			resolvedType.definition.members,
-		)) {
-			if (propertyValue.type === "Generic") {
-				if (propertyValue.name in types) {
-					resolvedType.definition.members[propertyKey] =
-						types[propertyValue.name]
-				}
-			} else if (propertyValue.type === "UnionType") {
-				resolvedType.definition.members[propertyKey] =
-					deeplyResolveGenericsForUnion(propertyValue, types)
-			}
-		}
-	}
-
-	// TODO: Figure out if we can generalise the case for ListType
-	for (let [methodName, methodValue] of Object.entries(
-		resolvedType.methods,
-	)) {
-		if (
-			methodValue.type === "SimpleMethod" ||
-			methodValue.type === "StaticMethod"
-		) {
-			for (let parameter of methodValue.parameterTypes) {
-				if (parameter.type.type === "Function") {
-					parameter.type = deeplyInferGenericsForFunction(
-						parameter.type,
-						types,
-					)
-				}
-
-				if (parameter.type.type === "Generic") {
-					if (parameter.type.name in types) {
-						parameter.type = types[parameter.type.name]
-					}
-				}
-
-				if (parameter.type.type === "UnionType") {
-					parameter.type = deeplyResolveGenericsForUnion(
-						parameter.type,
-						types,
-					)
-				}
-
-				if (
-					parameter.type.type === "List" &&
-					parameter.type.itemType.type === "Generic"
-				) {
-					if (parameter.type.itemType.name in types) {
-						parameter.type.itemType =
-							types[parameter.type.itemType.name]
-					}
-				}
-			}
-
-			if (methodValue.returnType.type === "Generic") {
-				if (methodValue.returnType.name in types) {
-					methodValue.returnType = types[methodValue.returnType.name]
-				}
-			}
-
-			if (methodValue.returnType.type === "UnionType") {
-				methodValue.returnType = deeplyResolveGenericsForUnion(
-					methodValue.returnType,
-					types,
-				)
-			}
-
-			if (
-				methodValue.returnType.type === "List" &&
-				methodValue.returnType.itemType.type === "Generic"
-			) {
-				if (methodValue.returnType.itemType.name in types) {
-					methodValue.returnType.itemType =
-						types[methodValue.returnType.itemType.name]
-				}
-			}
-		}
-
-		if (
-			methodValue.type === "OverloadedMethod" ||
-			methodValue.type === "OverloadedStaticMethod"
-		) {
-			for (let overload of methodValue.overloads) {
-				for (let parameter of overload.parameterTypes) {
-					// TODO: Infer genericFunction as well
-
-					if (parameter.type.type === "Function") {
-						parameter.type = deeplyInferGenericsForFunction(
-							parameter.type,
-							types,
-						)
-					}
-
-					if (parameter.type.type === "Generic") {
-						if (parameter.type.name in types) {
-							parameter.type = types[parameter.type.name]
-						}
-					}
-
-					if (parameter.type.type === "UnionType") {
-						parameter.type = deeplyResolveGenericsForUnion(
-							parameter.type,
-							types,
-						)
-					}
-
-					if (
-						parameter.type.type === "List" &&
-						parameter.type.itemType.type === "Generic"
-					) {
-						if (parameter.type.itemType.name in types) {
-							parameter.type.itemType =
-								types[parameter.type.itemType.name]
-						}
-					}
-				}
-
-				if (overload.returnType.type === "Generic") {
-					if (overload.returnType.name in types) {
-						overload.returnType = types[overload.returnType.name]
-					}
-				}
-
-				if (overload.returnType.type === "UnionType") {
-					overload.returnType = deeplyResolveGenericsForUnion(
-						overload.returnType,
-						types,
-					)
-				}
-
-				if (
-					overload.returnType.type === "List" &&
-					overload.returnType.itemType.type === "Generic"
-				) {
-					if (overload.returnType.itemType.name in types) {
-						overload.returnType.itemType =
-							types[overload.returnType.itemType.name]
-					}
-				}
-			}
-		}
-
-		resolvedType.methods[methodName] = methodValue
-	}
-
-	return resolvedType
 }

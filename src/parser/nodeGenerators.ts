@@ -52,11 +52,20 @@ export function nativeFunctionInvocation(
 }
 
 export function methodInvocation(
-	name: parser.MethodLookupNode,
+	base: parser.ExpressionNode,
+	member: parser.IdentifierNode,
+	namespaceSpecifier: parser.IdentifierNode | null,
 	args: Array<parser.ArgumentNode>,
 	position: common.Position,
 ): parser.MethodInvocationNode {
-	return { nodeType: "MethodInvocation", name, arguments: args, position }
+	return {
+		nodeType: "MethodInvocation",
+		base,
+		member,
+		namespaceSpecifier,
+		arguments: args,
+		position,
+	}
 }
 
 export function functionInvocation(
@@ -65,14 +74,6 @@ export function functionInvocation(
 	position: common.Position,
 ): parser.FunctionInvocationNode {
 	return { nodeType: "FunctionInvocation", name, arguments: args, position }
-}
-
-export function methodLookup(
-	base: parser.ExpressionNode,
-	member: parser.IdentifierNode,
-	position: common.Position,
-): parser.MethodLookupNode {
-	return { nodeType: "MethodLookup", base, member, position }
 }
 
 export function recordValueNode(
@@ -263,21 +264,22 @@ export function variableAssignmentStatement(
 	return { nodeType: "VariableAssignmentStatement", name, value, position }
 }
 
-export function typeDefinitionStatement(
+export function namespaceDefinitionStatement(
 	name: parser.IdentifierNode,
-	body: Array<TypeProperty | TypeMethod>,
+	targetType: parser.TypeDeclarationNode | null,
+	body: Array<NamespaceProperty | NamespaceMethod>,
 	position: common.Position,
-): parser.TypeDefinitionStatementNode {
-	const properties = body.reduce<TypeProperties>((prev, curr) => {
-		if (curr.nodeType === "PropertyNode") {
-			prev[curr.name.content] = curr.type
+): parser.NamespaceDefinitionStatementNode {
+	const properties = body.reduce<NamespaceProperties>((prev, curr) => {
+		if (curr.nodeType === "NamespacePropertyNode") {
+			prev[curr.name.content] = { type: curr.type, value: curr.value }
 		}
 
 		return prev
 	}, {})
 
-	const methods = body.reduce<parser.Methods>((prev, curr) => {
-		if (curr.nodeType !== "PropertyNode") {
+	const methods = body.reduce<parser.NamespaceMethods>((prev, curr) => {
+		if (curr.nodeType !== "NamespacePropertyNode") {
 			const overloadedMethod = prev[curr.name.content]
 
 			if (overloadedMethod) {
@@ -323,58 +325,8 @@ export function typeDefinitionStatement(
 	}, {})
 
 	return {
-		nodeType: "TypeDefinitionStatement",
-		name,
-		position,
-		properties,
-		methods,
-	}
-}
-
-export function namespaceDefinitionStatement(
-	name: parser.IdentifierNode,
-	body: Array<NamespaceProperty | NamespaceMethod>,
-	position: common.Position,
-): parser.NamespaceDefinitionStatementNode {
-	const properties = body.reduce<NamespaceProperties>((prev, curr) => {
-		if (curr.nodeType === "NamespacePropertyNode") {
-			prev[curr.name.content] = { type: curr.type, value: curr.value }
-		}
-
-		return prev
-	}, {})
-
-	const methods = body.reduce<parser.NamespaceMethods>((prev, curr) => {
-		if (curr.nodeType !== "NamespacePropertyNode") {
-			const overloadedMethod = prev[curr.name.content]
-
-			if (overloadedMethod) {
-				if (overloadedMethod.nodeType === "OverloadedStaticMethod") {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedStaticMethod",
-						methods: [...overloadedMethod.methods, curr.method],
-					}
-				}
-			} else {
-				if (curr.nodeType === "StaticMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "StaticMethod",
-						method: curr.method,
-					}
-				} else if (curr.nodeType === "OverloadedStaticMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedStaticMethod",
-						methods: [curr.method],
-					}
-				}
-			}
-		}
-
-		return prev
-	}, {})
-
-	return {
 		nodeType: "NamespaceDefinitionStatement",
+		targetType,
 		name,
 		position,
 		properties,
@@ -436,17 +388,6 @@ export function identifierTypeDeclaration(
 ): parser.IdentifierTypeDeclarationNode {
 	return {
 		nodeType: "IdentifierTypeDeclaration",
-		type,
-		position,
-	}
-}
-
-export function listTypeDeclaration(
-	type: parser.TypeDeclarationNode,
-	position: common.Position,
-): parser.ListTypeDeclarationNode {
-	return {
-		nodeType: "ListTypeDeclaration",
 		type,
 		position,
 	}
@@ -594,20 +535,6 @@ type OverloadedStaticMethodNode = {
 	method: parser.FunctionValueNode
 }
 
-type TypeProperty = {
-	nodeType: "PropertyNode"
-	name: parser.IdentifierNode
-	type: parser.TypeDeclarationNode
-}
-
-type TypeProperties = Record<string, parser.TypeDeclarationNode>
-
-type TypeMethod =
-	| SimpleMethodNode
-	| StaticMethodNode
-	| OverloadedMethodNode
-	| OverloadedStaticMethodNode
-
 type NamespaceProperty = {
 	nodeType: "NamespacePropertyNode"
 	name: parser.IdentifierNode
@@ -615,11 +542,15 @@ type NamespaceProperty = {
 	value: parser.ExpressionNode
 }
 
-type NamespaceMethod = StaticMethodNode | OverloadedStaticMethodNode
-
 type NamespaceProperties = Record<
 	string,
 	{ type: parser.TypeDeclarationNode | null; value: parser.ExpressionNode }
 >
+
+type NamespaceMethod =
+	| SimpleMethodNode
+	| StaticMethodNode
+	| OverloadedMethodNode
+	| OverloadedStaticMethodNode
 
 // #endregion

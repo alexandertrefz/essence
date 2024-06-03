@@ -36,13 +36,11 @@ function validateImplementationNode(
 		case "Lookup":
 		case "Identifier":
 		case "Self":
-		case "MethodLookup":
 		case "Match":
 			return validateExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
-		case "TypeDefinitionStatement":
 		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -64,8 +62,6 @@ function validateExpression(
 			return validateMethodInvocation(node)
 		case "FunctionInvocation":
 			return validateFunctionInvocation(node)
-		case "MethodLookup":
-			return validateMethodLookup(node)
 		case "Lookup":
 			return validateLookup(node)
 		case "Match":
@@ -107,91 +103,11 @@ function validateNativeFunctionInvocation(
 function validateMethodInvocation(
 	node: common.typed.MethodInvocationNode,
 ): common.typed.MethodInvocationNode {
-	const methodType = node.name.type
-	const methodArguments = [
-		{ name: null, type: node.name.base.type },
-		...node.arguments,
-	]
-
-	if (
-		methodType.type !== "SimpleMethod" &&
-		methodType.type !== "OverloadedMethod"
-	) {
-		throw new Error("MethodInvocation: Identifier isn't a function")
-	}
-
 	for (let argumentNode of node.arguments) {
 		validateExpression(argumentNode.value)
 	}
 
-	validateMethodLookup(node.name)
-
-	if (methodType.type === "OverloadedMethod") {
-		let lastIterationHadError = false
-		let index = 0
-
-		for (let overload of methodType.overloads) {
-			lastIterationHadError = false
-
-			if (overload.parameterTypes.length !== methodArguments.length) {
-				lastIterationHadError = true
-				index++
-				continue
-			}
-
-			for (let i = 0; i < overload.parameterTypes.length; i++) {
-				if (
-					overload.parameterTypes[i].name !==
-						methodArguments[i].name ||
-					!matchesType(
-						overload.parameterTypes[i].type,
-						methodArguments[i].type,
-					)
-				) {
-					lastIterationHadError = true
-					break
-				}
-			}
-
-			if (lastIterationHadError === false) {
-				break
-			}
-
-			index++
-		}
-
-		if (lastIterationHadError) {
-			throw new Error(
-				"MethodInvocation: Passed arguments do not match any overload",
-			)
-		} else {
-			node.overloadedMethodIndex = index
-		}
-	} else {
-		if (methodType.parameterTypes.length !== methodArguments.length) {
-			throw new Error(
-				"MethodInvocation: Amount of arguments doesn't match",
-			)
-		}
-
-		for (let i = 0; i < methodType.parameterTypes.length; i++) {
-			if (
-				methodType.parameterTypes[i].name !== methodArguments[i].name ||
-				!matchesType(
-					methodType.parameterTypes[i].type,
-					methodArguments[i].type,
-				)
-			) {
-				if (i === 0) {
-					throw new Error("MethodInvocation: BaseType mismatch")
-				} else {
-					throw new Error(
-						`MethodInvocation: ArgumentType mismatch at argument ${i}`,
-					)
-				}
-			}
-		}
-	}
+	validateExpression(node.base)
 
 	return node
 }
@@ -322,14 +238,6 @@ function validateLookup(
 	return node
 }
 
-function validateMethodLookup(
-	node: common.typed.MethodLookupNode,
-): common.typed.MethodLookupNode {
-	validateExpression(node.base)
-
-	return node
-}
-
 function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
@@ -378,8 +286,6 @@ function validateStatement(
 			return validateVariableDeclarationStatement(node)
 		case "VariableAssignmentStatement":
 			return validateVariableAssignmentStatement(node)
-		case "TypeDefinitionStatement":
-			return validateTypeDefinitionStatement(node)
 		case "NamespaceDefinitionStatement":
 			return validateNamespaceDefinitionStatement(node)
 		case "IfElseStatement":
@@ -457,9 +363,9 @@ ${Bun.inspect(node.value.type)}
 	return node
 }
 
-function validateTypeDefinitionStatement(
-	node: common.typed.TypeDefinitionStatementNode,
-): common.typed.TypeDefinitionStatementNode {
+function validateNamespaceDefinitionStatement(
+	node: common.typed.NamespaceDefinitionStatementNode,
+): common.typed.NamespaceDefinitionStatementNode {
 	for (let methodName in node.methods) {
 		let method = node.methods[methodName]
 
@@ -467,32 +373,6 @@ function validateTypeDefinitionStatement(
 			method.nodeType === "SimpleMethod" ||
 			method.nodeType === "StaticMethod"
 		) {
-			if (method.method.value.nodeType === "FunctionDefinition") {
-				validateFunctionDefinition(method.method.value)
-			} else {
-				validateGenericFunctionDefinition(method.method.value)
-			}
-		} else {
-			method.methods.map((overloadedMethod) => {
-				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
-					validateFunctionDefinition(overloadedMethod.value)
-				} else {
-					validateGenericFunctionDefinition(overloadedMethod.value)
-				}
-			})
-		}
-	}
-
-	return node
-}
-
-function validateNamespaceDefinitionStatement(
-	node: common.typed.NamespaceDefinitionStatementNode,
-): common.typed.NamespaceDefinitionStatementNode {
-	for (let methodName in node.methods) {
-		let method = node.methods[methodName]
-
-		if (method.nodeType === "StaticMethod") {
 			if (method.method.value.nodeType === "FunctionDefinition") {
 				validateFunctionDefinition(method.method.value)
 			} else {

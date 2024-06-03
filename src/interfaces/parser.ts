@@ -24,7 +24,6 @@ export type ExpressionNode =
 	| NativeFunctionInvocationNode
 	| MethodInvocationNode
 	| FunctionInvocationNode
-	| MethodLookupNode
 	| ValueNode
 	| LookupNode
 	| SelfNode
@@ -41,7 +40,9 @@ export interface NativeFunctionInvocationNode {
 
 export interface MethodInvocationNode {
 	nodeType: "MethodInvocation"
-	name: MethodLookupNode
+	base: ExpressionNode
+	member: IdentifierNode
+	namespaceSpecifier: IdentifierNode | null
 	arguments: Array<ArgumentNode>
 	position: Position
 }
@@ -50,13 +51,6 @@ export interface FunctionInvocationNode {
 	nodeType: "FunctionInvocation"
 	name: ExpressionNode
 	arguments: Array<ArgumentNode>
-	position: Position
-}
-
-export interface MethodLookupNode {
-	nodeType: "MethodLookup"
-	base: ExpressionNode
-	member: IdentifierNode
 	position: Position
 }
 
@@ -163,7 +157,6 @@ export type StatementNode =
 	| ConstantDeclarationStatementNode
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
-	| TypeDefinitionStatementNode
 	| NamespaceDefinitionStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
@@ -213,27 +206,15 @@ export interface OverloadedStaticMethod {
 	methods: Array<FunctionValueNode>
 }
 
-export type Methods = Record<
+export type NamespaceMethods = Record<
 	string,
 	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
 >
 
-export type NamespaceMethods = Record<
-	string,
-	StaticMethod | OverloadedStaticMethod
->
-
-export interface TypeDefinitionStatementNode {
-	nodeType: "TypeDefinitionStatement"
-	name: IdentifierNode
-	properties: Record<string, TypeDeclarationNode>
-	methods: Methods
-	position: Position
-}
-
 export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
+	targetType: TypeDeclarationNode | null
 	properties: Record<
 		string,
 		{ type: TypeDeclarationNode | null; value: ExpressionNode }
@@ -276,7 +257,6 @@ export interface FunctionStatementNode {
 
 export type TypeDeclarationNode =
 	| IdentifierTypeDeclarationNode
-	| ListTypeDeclarationNode
 	| UnionTypeDeclarationNode
 
 export interface GenericDeclarationNode {

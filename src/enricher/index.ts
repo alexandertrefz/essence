@@ -1,41 +1,53 @@
-import booleanType from "./types/Boolean"
-import fractionType from "./types/Fraction"
-import integerType from "./types/Integer"
-import listType from "./types/List"
+import {
+	namespace as booleanNamespace,
+	type as booleanType,
+} from "./types/Boolean"
+import {
+	namespace as fractionNamespace,
+	type as fractionType,
+} from "./types/Fraction"
+import {
+	namespace as integerNamespace,
+	type as integerType,
+} from "./types/Integer"
 import nativeFunctions from "./types/NativeFunctions"
-import numberNamespace from "./types/Number"
-import stringType from "./types/String"
+import {
+	namespace as numberNamespace,
+	type as numberType,
+} from "./types/Number"
+import {
+	namespace as recordNamespace,
+	type as recordType,
+} from "./types/Record"
+import {
+	namespace as stringNamespace,
+	type as stringType,
+} from "./types/String"
 
 import type { common, enricher, parser } from "../interfaces"
 
-import { enrichNode, extractNamespaceFromType } from "./enrichers"
+import { enrichNode } from "./enrichers"
 
 export const enrich = (program: parser.Program): common.typed.Program => {
 	let topLevelScope: enricher.Scope = {
 		parent: null,
 		members: {
 			...nativeFunctions,
-			String: extractNamespaceFromType(stringType),
-			Boolean: extractNamespaceFromType(booleanType),
-			Integer: extractNamespaceFromType(integerType),
-			Fraction: extractNamespaceFromType(fractionType),
+			String: stringNamespace,
+			Boolean: booleanNamespace,
+			Integer: integerNamespace,
+			Fraction: fractionNamespace,
 			Number: numberNamespace,
+			Record: recordNamespace,
 		},
 		types: {
-			List: listType,
 			Nothing: { type: "Primitive", primitive: "Nothing" },
-			Boolean: { type: "Primitive", primitive: "Boolean" },
-			String: { type: "Primitive", primitive: "String" },
-			Integer: { type: "Primitive", primitive: "Integer" },
-			Fraction: { type: "Primitive", primitive: "Fraction" },
-			Record: { type: "Primitive", primitive: "Record" },
-			Number: {
-				type: "UnionType",
-				types: [
-					{ type: "Primitive", primitive: "Integer" },
-					{ type: "Primitive", primitive: "Fraction" },
-				],
-			},
+			Boolean: booleanType,
+			String: stringType,
+			Integer: integerType,
+			Fraction: fractionType,
+			Record: recordType,
+			Number: numberType,
 		},
 	}
 

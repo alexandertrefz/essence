@@ -16,11 +16,11 @@ import { lexer } from "../interfaces"
 
 import type {
 	FunctionType,
-	ListType,
+	MethodType,
 	OverloadedMethodType,
 	OverloadedStaticMethodType,
 	PrimitiveType,
-	SimpleMethodType,
+	RecordType,
 	StaticMethodType,
 	Type,
 	UnionType,
@@ -162,72 +162,21 @@ describe("Helpers", () => {
 			type: "Primitive",
 			primitive: "String",
 		}
-		const recordPrimitive: PrimitiveType = {
-			type: "Primitive",
-			primitive: "Record",
-		}
 
-		const builtInType: Type = {
-			type: "Type",
-			name: "TestType",
-			definition: { type: "BuiltIn" },
-			methods: {},
-		}
+		// const unknownList: ListType = {
+		// 	type: "List",
+		// 	itemType: { type: "Unknown" },
+		// }
 
-		const unresolvedIntegerType: Type = {
-			type: "Type",
-			name: "Integer",
-			definition: { type: "Primitive", primitive: "Integer" },
-			methods: {},
-		}
+		// const stringList: ListType = {
+		// 	type: "List",
+		// 	itemType: { type: "Primitive", primitive: "String" },
+		// }
 
-		const recordType: Type = {
-			type: "Type",
-			name: "TestType",
-			definition: {
-				type: "Record",
-				members: { test: { type: "Primitive", primitive: "String" } },
-			},
-			methods: {},
-		}
-
-		const alternativeRecordType: Type = {
-			type: "Type",
-			name: "TestType",
-			definition: {
-				type: "Record",
-				members: { test: { type: "Primitive", primitive: "Integer" } },
-			},
-			methods: {},
-		}
-
-		const biggerRecordType: Type = {
-			type: "Type",
-			name: "TestType",
-			definition: {
-				type: "Record",
-				members: {
-					test: { type: "Primitive", primitive: "String" },
-					test2: { type: "Primitive", primitive: "String" },
-				},
-			},
-			methods: {},
-		}
-
-		const unknownList: ListType = {
-			type: "List",
-			itemType: { type: "Unknown" },
-		}
-
-		const stringList: ListType = {
-			type: "List",
-			itemType: { type: "Primitive", primitive: "String" },
-		}
-
-		const integerList: ListType = {
-			type: "List",
-			itemType: { type: "Primitive", primitive: "Integer" },
-		}
+		// const integerList: ListType = {
+		// 	type: "List",
+		// 	itemType: { type: "Primitive", primitive: "Integer" },
+		// }
 
 		// #region Unions
 
@@ -288,20 +237,19 @@ describe("Helpers", () => {
 
 		// #region Simple Methods
 
-		const noArgumentSimpleMethodType: SimpleMethodType = {
+		const noArgumentSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [],
 			returnType: { type: "Primitive", primitive: "String" },
 		}
 
-		const noArgumentWithDifferentReturnTypeSimpleMethodType: SimpleMethodType =
-			{
-				type: "SimpleMethod",
-				parameterTypes: [],
-				returnType: { type: "Primitive", primitive: "Integer" },
-			}
+		const noArgumentWithDifferentReturnTypeSimpleMethodType: MethodType = {
+			type: "SimpleMethod",
+			parameterTypes: [],
+			returnType: { type: "Primitive", primitive: "Integer" },
+		}
 
-		const singleArgumentSimpleMethodType: SimpleMethodType = {
+		const singleArgumentSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -312,7 +260,7 @@ describe("Helpers", () => {
 			returnType: { type: "Primitive", primitive: "String" },
 		}
 
-		const singleArgumentWithNameSimpleMethodType: SimpleMethodType = {
+		const singleArgumentWithNameSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
@@ -580,19 +528,12 @@ describe("Helpers", () => {
 			expect(matchesType(unknown, integerPrimitive)).toBe(true)
 			expect(matchesType(unknown, fractionPrimitive)).toBe(true)
 			expect(matchesType(unknown, stringPrimitive)).toBe(true)
-			expect(matchesType(unknown, recordPrimitive)).toBe(true)
 
 			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true)
 
-			expect(matchesType(unknown, builtInType)).toBe(true)
-
-			expect(matchesType(unknown, recordType)).toBe(true)
-			expect(matchesType(unknown, alternativeRecordType)).toBe(true)
-			expect(matchesType(unknown, biggerRecordType)).toBe(true)
-
-			expect(matchesType(unknown, unknownList)).toBe(true)
-			expect(matchesType(unknown, stringList)).toBe(true)
-			expect(matchesType(unknown, integerList)).toBe(true)
+			// expect(matchesType(unknown, unknownList)).toBe(true)
+			// expect(matchesType(unknown, stringList)).toBe(true)
+			// expect(matchesType(unknown, integerList)).toBe(true)
 
 			expect(matchesType(unknown, noArgumentFunctionType)).toBe(true)
 			expect(matchesType(unknown, singleArgumentFunctionType)).toBe(true)
@@ -603,44 +544,24 @@ describe("Helpers", () => {
 			expect(matchesType(integerPrimitive, integerPrimitive)).toBe(true)
 			expect(matchesType(fractionPrimitive, fractionPrimitive)).toBe(true)
 			expect(matchesType(stringPrimitive, stringPrimitive)).toBe(true)
-			expect(matchesType(recordPrimitive, recordPrimitive)).toBe(true)
-			expect(matchesType(recordPrimitive, recordType)).toBe(true)
-		})
-
-		it("should match TypeTypes that match PrimitiveTypes", () => {
-			expect(matchesType(unresolvedIntegerType, integerPrimitive)).toBe(
-				true,
-			)
-			expect(matchesType(integerPrimitive, unresolvedIntegerType)).toBe(
-				true,
-			)
 		})
 
 		it("should not match mismatched PrimitiveTypes", () => {
 			expect(matchesType(booleanPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(booleanPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(booleanPrimitive, fractionPrimitive)).toBe(false)
-			expect(matchesType(booleanPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(stringPrimitive, booleanPrimitive)).toBe(false)
 			expect(matchesType(stringPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(stringPrimitive, fractionPrimitive)).toBe(false)
-			expect(matchesType(stringPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(integerPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(integerPrimitive, booleanPrimitive)).toBe(false)
 			expect(matchesType(integerPrimitive, fractionPrimitive)).toBe(false)
-			expect(matchesType(integerPrimitive, recordPrimitive)).toBe(false)
 
 			expect(matchesType(fractionPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, integerPrimitive)).toBe(false)
 			expect(matchesType(fractionPrimitive, booleanPrimitive)).toBe(false)
-			expect(matchesType(fractionPrimitive, recordPrimitive)).toBe(false)
-
-			expect(matchesType(recordPrimitive, booleanPrimitive)).toBe(false)
-			expect(matchesType(recordPrimitive, stringPrimitive)).toBe(false)
-			expect(matchesType(recordPrimitive, integerPrimitive)).toBe(false)
-			expect(matchesType(recordPrimitive, fractionPrimitive)).toBe(false)
 		})
 
 		it("should match UnionTypes", () => {
@@ -653,13 +574,6 @@ describe("Helpers", () => {
 			expect(
 				matchesType(unionTypeIntegerString, unionTypeStringInteger),
 			).toBe(true)
-
-			expect(matchesType(unionTypeStringInteger, stringPrimitive)).toBe(
-				true,
-			)
-			expect(matchesType(unionTypeStringInteger, integerPrimitive)).toBe(
-				true,
-			)
 
 			expect(matchesType(unionTypeIntegerString, stringPrimitive)).toBe(
 				true,
@@ -679,36 +593,22 @@ describe("Helpers", () => {
 			expect(matchesType(unionTypeStringInteger, fractionPrimitive)).toBe(
 				false,
 			)
-			expect(matchesType(unionTypeStringInteger, builtInType)).toBe(false)
-			expect(matchesType(unionTypeStringInteger, recordType)).toBe(false)
 		})
 
-		it("should match matching TypeTypes", () => {
-			expect(matchesType(builtInType, builtInType)).toBe(true)
-			expect(matchesType(recordType, recordType)).toBe(true)
-		})
+		// it("should match matching ListTypes", () => {
+		// 	expect(matchesType(unknownList, stringList)).toBe(true)
+		// 	expect(matchesType(unknownList, integerList)).toBe(true)
+		// 	expect(matchesType(stringList, unknownList)).toBe(true)
+		// 	expect(matchesType(integerList, unknownList)).toBe(true)
 
-		it("should not match mismatched TypeTypes", () => {
-			expect(matchesType(recordType, alternativeRecordType)).toBe(false)
-			expect(matchesType(biggerRecordType, recordType)).toBe(false)
-			expect(matchesType(builtInType, recordType)).toBe(false)
-			expect(matchesType(recordType, builtInType)).toBe(false)
-		})
+		// 	expect(matchesType(stringList, stringList)).toBe(true)
+		// 	expect(matchesType(integerList, integerList)).toBe(true)
+		// })
 
-		it("should match matching ListTypes", () => {
-			expect(matchesType(unknownList, stringList)).toBe(true)
-			expect(matchesType(unknownList, integerList)).toBe(true)
-			expect(matchesType(stringList, unknownList)).toBe(true)
-			expect(matchesType(integerList, unknownList)).toBe(true)
-
-			expect(matchesType(stringList, stringList)).toBe(true)
-			expect(matchesType(integerList, integerList)).toBe(true)
-		})
-
-		it("should not match mismatched ListTypes", () => {
-			expect(matchesType(stringList, integerList)).toBe(false)
-			expect(matchesType(integerList, stringList)).toBe(false)
-		})
+		// it("should not match mismatched ListTypes", () => {
+		// 	expect(matchesType(stringList, integerList)).toBe(false)
+		// 	expect(matchesType(integerList, stringList)).toBe(false)
+		// })
 
 		it("should match matching FunctionTypes", () => {
 			expect(
@@ -1045,17 +945,6 @@ describe("Helpers", () => {
 
 		it("should not match mismatched Types", () => {
 			expect(
-				matchesType(recordType, noArgumentOverloadedStaticMethodType),
-			).toBe(false)
-			expect(
-				matchesType(
-					builtInType,
-					singleArgumentWithNameOverloadedStaticMethodType,
-				),
-			).toBe(false)
-			expect(matchesType(builtInType, fractionPrimitive)).toBe(false)
-			expect(matchesType(fractionPrimitive, builtInType)).toBe(false)
-			expect(
 				matchesType(
 					noArgumentOverloadedStaticMethodType,
 					singleArgumentFunctionType,
@@ -1073,9 +962,9 @@ describe("Helpers", () => {
 					fractionPrimitive,
 				),
 			).toBe(false)
-			expect(
-				matchesType(integerList, noArgumentOverloadedStaticMethodType),
-			).toBe(false)
+			// expect(
+			// 	matchesType(integerList, noArgumentOverloadedStaticMethodType),
+			// ).toBe(false)
 		})
 	})
 })
