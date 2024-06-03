@@ -308,10 +308,21 @@ Type ->
 	| UnionType  {% id %}
 
 SimpleType ->
-	IdentifierType {% id %}
+	  IdentifierType {% id %}
+	| RecordType     {% id %}
 
 IdentifierType ->
-	  Identifier {% ([identifier]) => generators.identifierTypeDeclaration(identifier, identifier.position) %}
+	Identifier {% ([identifier]) => generators.identifierTypeDeclaration(identifier, identifier.position) %}
+
+RecordType ->
+	  LeftBrace RightBrace                 {% ([leftBrace,          rightBrace]) => generators.recordTypeDeclaration({},           { start: leftBrace.position.start, end: rightBrace.position.end }) %}
+	| LeftBrace KeyTypePairList RightBrace {% ([leftBrace, kvtList, rightBrace]) => generators.recordTypeDeclaration(kvtList.data, { start: leftBrace.position.start, end: rightBrace.position.end }) %}
+
+KeyTypePairList ->
+	(KeyTypePair Comma):* KeyTypePair Comma:? {% ([kvtCommaList, kvt]) => generators.buildKeyTypePairList(kvtCommaList.map(first), kvt) %}
+
+KeyTypePair ->
+	Identifier Colon Type {% ([identifier, _, value]) => generators.keyTypePair(identifier.content, value, { start: identifier.position.start, end: value.position.end }) %}
 
 UnionType ->
 	SimpleType (Pipe SimpleType):+ {% ([leftType, otherTypes]) => generators.unionTypeDeclaration([leftType, ...otherTypes.map(second)], { start: leftType.position.start, end: otherTypes[otherTypes.length - 1][1].position.end }) %}

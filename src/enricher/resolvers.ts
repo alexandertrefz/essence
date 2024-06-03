@@ -50,6 +50,8 @@ export function resolveType(
 			return resolveIdentifierTypeDeclarationType(node, scope)
 		case "UnionTypeDeclaration":
 			return resolveUnionTypeDeclarationType(node, scope)
+		case "RecordTypeDeclaration":
+			return resolveRecordTypeDeclarationType(node, scope)
 		case "Match":
 			return resolveMatchType(node, scope)
 	}
@@ -826,6 +828,20 @@ export function resolveUnionTypeDeclarationType(
 	}
 
 	return { type: "UnionType", types: resolvedTypes }
+}
+
+export function resolveRecordTypeDeclarationType(
+	node: parser.RecordTypeDeclarationNode,
+	scope: enricher.Scope,
+): common.RecordType {
+	return {
+		type: "Record",
+		members: Object.fromEntries(
+			Object.entries(node.members).map(([key, value]) => {
+				return [key, resolveType(value, scope)]
+			}),
+		),
+	}
 }
 
 export function resolveMatchType(

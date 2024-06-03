@@ -726,6 +726,30 @@ describe("Parser", () => {
 
 				expect(input).toMatchSnapshot()
 			})
+
+			it("should parse ConstantDeclarationStatement with empty Record Type", () => {
+				let input: parser.Program = parse(
+					"implementation { constant identifier: {} = {} }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse ConstantDeclarationStatement with simple Record Type", () => {
+				let input: parser.Program = parse(
+					`implementation { constant identifier: { key: String } = { key = "" } }`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse ConstantDeclarationStatement with complex Record Type", () => {
+				let input: parser.Program = parse(
+					"implementation { constant identifier: { key: { key: Integer | Fraction } } = { key = { key = 1 } } }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
 		})
 
 		describe("VariableDeclarationStatements", () => {
@@ -740,6 +764,30 @@ describe("Parser", () => {
 			it("should parse VariableDeclarationStatement with Type", () => {
 				let input: parser.Program = parse(
 					`implementation { variable identifier: String = "" }`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with empty Record Type", () => {
+				let input: parser.Program = parse(
+					"implementation { variable identifier: {} = {} }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with simple Record Type", () => {
+				let input: parser.Program = parse(
+					`implementation { variable identifier: { key: String } = { key = "" } }`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse VariableDeclarationStatement with complex Record Type", () => {
+				let input: parser.Program = parse(
+					"implementation { variable identifier: { key: { key: Integer | Fraction } } = { key = { key = 1 } } }",
 				)
 
 				expect(input).toMatchSnapshot()
@@ -1137,9 +1185,33 @@ describe("Parser", () => {
 		})
 
 		describe("TypeAliasStatements", () => {
-			it("should parse TypeAlias Statements", () => {
+			it("should parse TypeAlias Statements with SimpleTypes", () => {
 				let input: parser.Program = parse(
 					"implementation { type Type = Type2 }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse TypeAlias Statements with empty Record Types", () => {
+				let input: parser.Program = parse(
+					"implementation { type Type = {} }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse TypeAlias Statements with simple Record Types", () => {
+				let input: parser.Program = parse(
+					"implementation { type Type = { key: Type2 } }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse TypeAlias Statements with complex Record Types", () => {
+				let input: parser.Program = parse(
+					"implementation { type Type = { key: { key: Integer | Fraction } } }",
 				)
 
 				expect(input).toMatchSnapshot()

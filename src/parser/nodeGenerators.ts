@@ -401,6 +401,57 @@ export function identifierTypeDeclaration(
 	}
 }
 
+type KeyTypePair = {
+	key: string
+	type: parser.TypeDeclarationNode
+	position: common.Position
+}
+
+type KeyTypePairObject = {
+	data: Record<string, parser.TypeDeclarationNode>
+	position: common.Position
+}
+
+export function keyTypePair(
+	key: string,
+	type: parser.TypeDeclarationNode,
+	position: common.Position,
+): KeyTypePair {
+	return { key, type, position }
+}
+
+export function buildKeyTypePairList(
+	ktpList: Array<KeyTypePair>,
+	ktp: KeyTypePair,
+): KeyTypePairObject {
+	const keyTypePairList = [...ktpList, ktp]
+
+	return {
+		data: keyTypePairList.reduce<KeyTypePairObject["data"]>(
+			(prev, curr) => {
+				prev[curr.key] = curr.type
+				return prev
+			},
+			{},
+		),
+		position: {
+			start: keyTypePairList[0].position.start,
+			end: keyTypePairList[keyTypePairList.length - 1].position.end,
+		},
+	}
+}
+
+export function recordTypeDeclaration(
+	members: Record<string, parser.TypeDeclarationNode>,
+	position: common.Position,
+): parser.RecordTypeDeclarationNode {
+	return {
+		nodeType: "RecordTypeDeclaration",
+		members,
+		position,
+	}
+}
+
 export function unionTypeDeclaration(
 	types: Array<parser.TypeDeclarationNode>,
 	position: common.Position,
