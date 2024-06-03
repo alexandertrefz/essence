@@ -378,6 +378,14 @@ export function functionStatement(
 	return { nodeType: "FunctionStatement", name, value, position }
 }
 
+export function typeAliasStatement(
+	name: parser.IdentifierNode,
+	type: parser.TypeDeclarationNode,
+	position: common.Position,
+): parser.TypeAliasStatementNode {
+	return { nodeType: "TypeAliasStatement", name, type, position }
+}
+
 // #endregion
 
 // #region Helpers

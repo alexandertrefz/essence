@@ -77,6 +77,8 @@ function rewriteStatement(
 			return rewriteVariableDeclarationStatement(node)
 		case "NamespaceDefinitionStatement":
 			return rewriteNamespaceDefinitionStatement(node)
+		case "TypeAliasStatement":
+			return rewriteTypeAliasStatement(node)
 		case "ChoiceStatement":
 			return rewriteChoiceStatement(node)
 		case "ReturnStatement":
@@ -148,6 +150,12 @@ function rewriteNamespaceDefinitionStatement(
 			],
 		},
 	}
+}
+
+function rewriteTypeAliasStatement(
+	_node: common.typedSimple.TypeAliasStatementNode,
+): estree.EmptyStatement {
+	return { type: "EmptyStatement" }
 }
 
 function rewriteChoiceStatement(

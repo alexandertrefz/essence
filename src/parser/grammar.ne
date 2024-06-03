@@ -37,6 +37,7 @@ Statement ->
 	  ConstantDeclarationStatement {% id %}
 	| VariableDeclarationStatement {% id %}
 	| VariableAssignmentStatement  {% id %}
+	| TypeAliasStatement           {% id %}
 	| NamespaceDefinitionStatement {% id %}
 	| IfElseStatement              {% id %}
 	| IfStatement                  {% id %}
@@ -56,6 +57,8 @@ VariableDeclarationStatement ->
 VariableAssignmentStatement ->
 	Identifier EqualSign Expression {% ([name, _, value]) => generators.variableAssignmentStatement(name, value, { start: name.position.start, end: value.position.end }) %}
 
+TypeAliasStatement ->
+	TypeKeyword Identifier EqualSign Type {% ([keyword, name, _, type]) => generators.typeAliasStatement(name, type, { start: keyword.position.start, end: type.position.end }) %}
 
 NamespaceDefinitionStatement ->
 	  NamespaceKeyword Identifier NamespaceBody                 {% ([keyword, name, body]) =>          generators.namespaceDefinitionStatement(name, null, body.body, { start: keyword.position.start, end: body.position.end }) %}
@@ -221,7 +224,7 @@ Integer ->
 			}
 
 			return {
-				value: value, 
+				value: value,
 				position: { start: start, end: end }
 			}
 		}
@@ -272,7 +275,7 @@ ParameterList ->
 	  LeftParen RightParen {% ([leftParen, rightParen]) => ({ parameters: [], position: { start: leftParen.position.start, end: rightParen.position.end } }) %}
 	| LeftParen (Parameter Comma):* Parameter Comma:? RightParen {%
 		([leftParen, paramCommaList, param, _, rightParen]) => ({
-			parameters: [...paramCommaList.map(first), param], 
+			parameters: [...paramCommaList.map(first), param],
 			position: { start: leftParen.position.start, end: rightParen.position.end }
 		})
 	%}
