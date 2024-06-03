@@ -177,9 +177,6 @@ NamespaceMethod ->
 	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
 	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
 
-ReturnSymbol ->
-	LeftAngle Dash {% symbol %}
-
 DeclarationType ->
 	Colon Type {% second %}
 
@@ -323,7 +320,7 @@ TypeHeader ->
 	Type Tilde RightAngle {% first %}
 
 ReturnType ->
-	ReturnSymbol Type {% second %}
+	Dash RightAngle Type {% third %}
 
 # -------- #
 # Keywords #
@@ -354,11 +351,11 @@ NativeLookupSymbol ->
 MethodLookupSymbol ->
 	Colon Colon {% symbol %}
 
-ReturnSymbol ->
-	Dash RightAngle {% symbol %}
-
 CombinationSymbol ->
 	LeftAngle Pipe {% symbol %}
+
+ReturnSymbol ->
+	LeftAngle Dash {% symbol %}
 
 # ------- #
 # Symbols #
