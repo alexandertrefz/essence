@@ -194,6 +194,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| TypeAliasStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -257,6 +258,13 @@ export interface NamespaceDefinitionStatementNode {
 	methods: Methods
 	position: Position
 	type: NamespaceType
+}
+
+export interface TypeAliasStatementNode {
+	nodeType: "TypeAliasStatement"
+	name: IdentifierNode
+	type: Type
+	position: Position
 }
 
 export interface IfElseStatementNode {

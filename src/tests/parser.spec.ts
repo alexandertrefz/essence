@@ -1136,6 +1136,16 @@ describe("Parser", () => {
 			})
 		})
 
+		describe("TypeAliasStatements", () => {
+			it("should parse TypeAlias Statements", () => {
+				let input: parser.Program = parse(
+					"implementation { type Type = Type2 }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+		})
+
 		describe("FunctionStatements", () => {
 			it("should parse FunctionStatements with no parameters", () => {
 				let input: parser.Program = parse(

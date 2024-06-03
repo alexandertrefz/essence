@@ -46,6 +46,7 @@ function simplifyImplementationNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
+		case "TypeAliasStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -322,6 +323,8 @@ function simplifyStatement(
 			return simplifyVariableAssignmentStatement(node)
 		case "NamespaceDefinitionStatement":
 			return simplifyNamespaceDefinitionStatement(node)
+		case "TypeAliasStatement":
+			return simplifyTypeAliasStatement(node)
 		case "IfElseStatement":
 			return simplifyChoice(node)
 		case "IfStatement":
@@ -379,6 +382,16 @@ function simplifyNamespaceDefinitionStatement(
 			}),
 		),
 		methods: simplifyMethods(node.methods, node.type),
+		type: node.type,
+	}
+}
+
+function simplifyTypeAliasStatement(
+	node: common.typed.TypeAliasStatementNode,
+): common.typedSimple.TypeAliasStatementNode {
+	return {
+		nodeType: "TypeAliasStatement",
+		name: simplifyIdentifier(node.name),
 		type: node.type,
 	}
 }

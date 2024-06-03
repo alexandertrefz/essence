@@ -160,6 +160,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| TypeAliasStatementNode
 	| ChoiceStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
@@ -191,6 +192,12 @@ export interface NamespaceDefinitionStatementNode {
 	properties: Record<string, ExpressionNode>
 	methods: Methods
 	type: NamespaceType
+}
+
+export interface TypeAliasStatementNode {
+	nodeType: "TypeAliasStatement"
+	name: IdentifierNode
+	type: Type
 }
 
 export interface ChoiceStatementNode {

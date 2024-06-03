@@ -35,6 +35,7 @@ export function enrichNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
+		case "TypeAliasStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -466,6 +467,8 @@ export function enrichStatement(
 			return enrichVariableAssignmentStatement(node, scope)
 		case "NamespaceDefinitionStatement":
 			return enrichNamespaceDefinitionStatement(node, scope)
+		case "TypeAliasStatement":
+			return enrichTypeAliasStatement(node, scope)
 		case "IfElseStatement":
 			return enrichIfElseStatementNode(node, scope)
 		case "IfStatement":
@@ -590,6 +593,22 @@ export function enrichNamespaceDefinitionStatement(
 		methods: enrichMethods(node.methods, scope, type.targetType),
 		position: node.position,
 		type,
+	}
+}
+
+export function enrichTypeAliasStatement(
+	node: parser.TypeAliasStatementNode,
+	scope: enricher.Scope,
+): common.typed.TypeAliasStatementNode {
+	const type = resolveType(node.type, scope)
+
+	declareTypeInScope(node.name.content, type, scope)
+
+	return {
+		nodeType: "TypeAliasStatement",
+		name: enrichIdentifier(node.name, scope, type),
+		type,
+		position: node.position,
 	}
 }
 

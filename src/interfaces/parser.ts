@@ -1,4 +1,4 @@
-import type { Position } from "./common"
+import type { Position, Type } from "./common"
 
 export type Program = {
 	nodeType: "Program"
@@ -158,6 +158,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| TypeAliasStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -220,6 +221,13 @@ export interface NamespaceDefinitionStatementNode {
 		{ type: TypeDeclarationNode | null; value: ExpressionNode }
 	>
 	methods: NamespaceMethods
+	position: Position
+}
+
+export interface TypeAliasStatementNode {
+	nodeType: "TypeAliasStatement"
+	name: IdentifierNode
+	type: TypeDeclarationNode
 	position: Position
 }
 
