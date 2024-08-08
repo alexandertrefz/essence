@@ -178,7 +178,6 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
-		returnType: Type
 		body: Array<ImplementationNode>
 	}>
 	position: Position

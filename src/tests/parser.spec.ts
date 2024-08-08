@@ -640,12 +640,12 @@ describe("Parser", () => {
 			it("should parse match expression with function invocation", () => {
 				let input: parser.Program = parse(
 					`implementation {
-						match expression() {
-							case Integer -> Integer {
+						match expression() -> Integer {
+							case Integer {
 								<- 1
 							}
 
-							case Fraction -> Integer {
+							case Fraction {
 								<- 2
 							}
 						}
