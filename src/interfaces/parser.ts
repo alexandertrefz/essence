@@ -140,10 +140,10 @@ export interface CombinationNode {
 
 export interface MatchNode {
 	nodeType: "Match"
+	returnType: TypeDeclarationNode
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: TypeDeclarationNode
-		returnType: TypeDeclarationNode
 		body: Array<ImplementationNode>
 	}>
 	position: Position

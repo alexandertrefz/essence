@@ -207,9 +207,9 @@ export function combination(
 
 export function match(
 	value: parser.ExpressionNode,
+	returnType: parser.TypeDeclarationNode,
 	handlers: Array<{
 		matcher: parser.TypeDeclarationNode
-		returnType: parser.TypeDeclarationNode
 		body: Array<parser.ImplementationNode>
 	}>,
 	position: common.Position,
@@ -217,6 +217,7 @@ export function match(
 	return {
 		nodeType: "Match",
 		value,
+		returnType,
 		handlers,
 		position,
 	}

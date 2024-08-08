@@ -252,7 +252,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				nodeType: "FunctionDefinition",
 				parameters: [],
 				body: handler.body,
-				returnType: handler.returnType,
+				returnType: node.type,
 			})
 		}
 	}

@@ -147,8 +147,8 @@ Self ->
 	AtSign {% ([symbol]) => generators.self(symbol.position) %}
 
 Match ->
-	MatchKeyword Expression LeftBrace (MatchHandler):* RightBrace {%
-		([keyword, expression, lbrace, handlers, rbrace]) => generators.match(expression, flatten(handlers), { start: keyword.position.start, end: rbrace.position.end })
+	MatchKeyword Expression ReturnType LeftBrace (MatchHandler):* RightBrace {%
+		([keyword, expression, returnType, lbrace, handlers, rbrace]) => generators.match(expression, returnType, flatten(handlers), { start: keyword.position.start, end: rbrace.position.end })
 	%}
 
 ###########
@@ -163,7 +163,7 @@ Block ->
 	LeftBrace (Statement | Expression):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}
 
 MatchHandler ->
-	CaseKeyword Type ReturnType Block {% ([_, matcher, returnType, block]) => ({ matcher, returnType, body: block.body }) %}
+	CaseKeyword Type Block {% ([_, matcher, block]) => ({ matcher, body: block.body }) %}
 
 NamespaceBody ->
 	LeftBrace (NamespaceProperty | NamespaceMethod):* RightBrace {% ([lbrace, body, rbrace]) => ({ body: flatten(body), position: { start: lbrace.position.start, end: rbrace.position.end } }) %}

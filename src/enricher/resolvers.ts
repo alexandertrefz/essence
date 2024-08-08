@@ -848,36 +848,7 @@ export function resolveMatchType(
 	node: parser.MatchNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let returnTypes = []
-
-	for (let handler of node.handlers) {
-		const resolvedReturnType = resolveType(handler.returnType, scope)
-
-		if (returnTypes.length === 0) {
-			returnTypes.push(resolvedReturnType)
-		} else {
-			let typeAlreadyNoted = false
-
-			for (let returnType of returnTypes) {
-				if (matchesType(returnType, resolvedReturnType)) {
-					typeAlreadyNoted = true
-					break
-				}
-			}
-
-			if (!typeAlreadyNoted) {
-				returnTypes.push(resolvedReturnType)
-			}
-		}
-	}
-
-	if (returnTypes.length === 0) {
-		return { type: "Unknown" }
-	} else if (returnTypes.length === 1) {
-		return returnTypes[0]
-	} else {
-		return { type: "UnionType", types: returnTypes }
-	}
+	return resolveType(node.returnType, scope)
 }
 
 /***********/

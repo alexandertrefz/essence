@@ -442,11 +442,10 @@ export function enrichMatch(
 			return {
 				body: handler.body.map((node) => enrichNode(node, bodyScope)),
 				matcher,
-				returnType: resolveType(handler.returnType, scope),
 			}
 		}),
 		position: node.position,
-		type: resolveMatchType(node, scope),
+		type: resolveType(node.returnType, scope),
 	}
 }
 
