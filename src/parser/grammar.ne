@@ -172,10 +172,10 @@ NamespaceProperty ->
 	StaticKeyword Identifier DeclarationType:? EqualSign Expression {% ([keyword, name, type, , value]) => ({ nodeType: "NamespacePropertyNode", name, type, value }) %}
 
 NamespaceMethod ->
-	  Identifier FunctionLiteral                               {% ([   name, method]) => ({ nodeType: "SimpleMethodNode",           name, method }) %}
-	| StaticKeyword Identifier FunctionLiteral                 {% ([,  name, method]) => ({ nodeType: "StaticMethodNode",           name, method }) %}
-	| OverloadKeyword Identifier FunctionLiteral               {% ([,  name, method]) => ({ nodeType: "OverloadedMethodNode",       name, method }) %}
-	| OverloadKeyword StaticKeyword Identifier FunctionLiteral {% ([,, name, method]) => ({ nodeType: "OverloadedStaticMethodNode", name, method }) %}
+	  Identifier FunctionLiteral                               						  {% ([   name, method]) =>    ({ nodeType: "SimpleMethodNode",           name, method }) %}
+	| StaticKeyword Identifier FunctionLiteral                 						  {% ([,  name, method]) =>    ({ nodeType: "StaticMethodNode",           name, method }) %}
+	| OverloadKeyword Identifier LeftBrace FunctionLiteral:* RightBrace 			  {% ([,  name, , methods]) => ({ nodeType: "OverloadedMethodNode",       name, methods }) %}
+	| OverloadKeyword StaticKeyword Identifier LeftBrace FunctionLiteral:* RightBrace {% ([,, name, , methods]) => ({ nodeType: "OverloadedStaticMethodNode", name, methods }) %}
 
 DeclarationType ->
 	Colon Type {% second %}

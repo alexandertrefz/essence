@@ -899,12 +899,14 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace {
-								overload static method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload static method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(name parameter: Type) -> Type {
-									<- parameter
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,
@@ -917,16 +919,18 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace {
-								overload static method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload static method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(name parameter: Type) -> Type {
-									<- parameter
-								}
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(item parameter: Type) -> Type {
-									<- parameter
+									(item parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,
@@ -1022,12 +1026,14 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace for Type {
-								overload static method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload static method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(name parameter: Type) -> Type {
-									<- parameter
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,
@@ -1040,16 +1046,18 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace for Type {
-								overload static method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload static method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(name parameter: Type) -> Type {
-									<- parameter
-								}
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload static method(item parameter: Type) -> Type {
-									<- parameter
+									(item parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,
@@ -1110,12 +1118,14 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace for Type {
-								overload method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload method(name parameter: Type) -> Type {
-									<- parameter
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,
@@ -1128,16 +1138,18 @@ describe("Parser", () => {
 					let input: parser.Program = parse(
 						`implementation {
 							namespace Namespace for Type {
-								overload method(parameter: Type) -> Type {
-									<- parameter
-								}
+								overload method {
+									(parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload method(name parameter: Type) -> Type {
-									<- parameter
-								}
+									(name parameter: Type) -> Type {
+										<- parameter
+									}
 
-								overload method(item parameter: Type) -> Type {
-									<- parameter
+									(item parameter: Type) -> Type {
+										<- parameter
+									}
 								}
 							}
 						}`,

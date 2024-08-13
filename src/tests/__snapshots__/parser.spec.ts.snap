@@ -9226,12 +9226,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -9242,24 +9242,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -9272,12 +9272,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -9286,36 +9286,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 47,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 47,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 43,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -9323,12 +9323,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 47,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 43,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -9339,12 +9339,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 56,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 52,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -9352,12 +9352,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 56,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 52,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -9368,12 +9368,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -9384,24 +9384,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -9414,12 +9414,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -9428,36 +9428,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -9465,12 +9465,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -9481,12 +9481,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -9494,12 +9494,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -9528,7 +9528,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
         "position": {
           "end": {
             "column": 9,
-            "line": 10,
+            "line": 12,
           },
           "start": {
             "column": 8,
@@ -9542,7 +9542,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "position": {
       "end": {
         "column": 8,
-        "line": 11,
+        "line": 13,
       },
       "start": {
         "column": 1,
@@ -9554,7 +9554,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
   "position": {
     "end": {
       "column": 8,
-      "line": 11,
+      "line": 13,
     },
     "start": {
       "column": 1,
@@ -9577,12 +9577,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -9593,24 +9593,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -9623,12 +9623,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -9637,36 +9637,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 47,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 47,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 43,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -9674,12 +9674,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 47,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 43,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -9690,12 +9690,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 56,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 52,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -9703,12 +9703,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 56,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 52,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -9719,12 +9719,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -9735,24 +9735,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -9765,12 +9765,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -9779,36 +9779,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -9816,12 +9816,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -9832,12 +9832,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -9845,12 +9845,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -9861,12 +9861,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 13,
+                    "column": 11,
+                    "line": 14,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 11,
+                    "column": 10,
+                    "line": 12,
                   },
                 },
                 "value": {
@@ -9877,24 +9877,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 12,
+                            "column": 23,
+                            "line": 13,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 12,
+                            "column": 14,
+                            "line": 13,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 12,
+                          "column": 23,
+                          "line": 13,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 12,
+                          "column": 11,
+                          "line": 13,
                         },
                       },
                     },
@@ -9907,12 +9907,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 11,
+                            "column": 15,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 11,
+                            "column": 11,
+                            "line": 12,
                           },
                         },
                       },
@@ -9921,36 +9921,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 11,
+                            "column": 25,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 11,
+                            "column": 16,
+                            "line": 12,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 11,
+                          "column": 31,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 11,
+                          "column": 11,
+                          "line": 12,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 11,
+                            "column": 31,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 11,
+                            "column": 27,
+                            "line": 12,
                           },
                         },
                         "type": {
@@ -9958,12 +9958,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 11,
+                              "column": 31,
+                              "line": 12,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 11,
+                              "column": 27,
+                              "line": 12,
                             },
                           },
                         },
@@ -9974,12 +9974,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 11,
+                        "column": 40,
+                        "line": 12,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 11,
+                        "column": 36,
+                        "line": 12,
                       },
                     },
                     "type": {
@@ -9987,12 +9987,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 11,
+                          "column": 40,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 11,
+                          "column": 36,
+                          "line": 12,
                         },
                       },
                     },
@@ -10021,7 +10021,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
         "position": {
           "end": {
             "column": 9,
-            "line": 14,
+            "line": 16,
           },
           "start": {
             "column": 8,
@@ -10035,7 +10035,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "position": {
       "end": {
         "column": 8,
-        "line": 15,
+        "line": 17,
       },
       "start": {
         "column": 1,
@@ -10047,7 +10047,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
   "position": {
     "end": {
       "column": 8,
-      "line": 15,
+      "line": 17,
     },
     "start": {
       "column": 1,
@@ -11220,12 +11220,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -11236,24 +11236,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -11266,12 +11266,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -11280,36 +11280,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 47,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 47,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 43,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -11317,12 +11317,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 47,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 43,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -11333,12 +11333,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 56,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 52,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -11346,12 +11346,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 56,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 52,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -11362,12 +11362,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -11378,24 +11378,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -11408,12 +11408,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -11422,36 +11422,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -11459,12 +11459,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -11475,12 +11475,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -11488,12 +11488,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -11522,7 +11522,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         "position": {
           "end": {
             "column": 9,
-            "line": 10,
+            "line": 12,
           },
           "start": {
             "column": 8,
@@ -11562,7 +11562,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "position": {
       "end": {
         "column": 8,
-        "line": 11,
+        "line": 13,
       },
       "start": {
         "column": 1,
@@ -11574,7 +11574,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
   "position": {
     "end": {
       "column": 8,
-      "line": 11,
+      "line": 13,
     },
     "start": {
       "column": 1,
@@ -11597,12 +11597,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -11613,24 +11613,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -11643,12 +11643,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -11657,36 +11657,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 41,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 47,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 47,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 43,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -11694,12 +11694,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 47,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 43,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -11710,12 +11710,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 56,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 52,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -11723,12 +11723,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 56,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 52,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -11739,12 +11739,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -11755,24 +11755,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -11785,12 +11785,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -11799,36 +11799,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -11836,12 +11836,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -11852,12 +11852,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -11865,12 +11865,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -11881,12 +11881,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 13,
+                    "column": 11,
+                    "line": 14,
                   },
                   "start": {
-                    "column": 31,
-                    "line": 11,
+                    "column": 10,
+                    "line": 12,
                   },
                 },
                 "value": {
@@ -11897,24 +11897,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 12,
+                            "column": 23,
+                            "line": 13,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 12,
+                            "column": 14,
+                            "line": 13,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 12,
+                          "column": 23,
+                          "line": 13,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 12,
+                          "column": 11,
+                          "line": 13,
                         },
                       },
                     },
@@ -11927,12 +11927,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 36,
-                            "line": 11,
+                            "column": 15,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 32,
-                            "line": 11,
+                            "column": 11,
+                            "line": 12,
                           },
                         },
                       },
@@ -11941,36 +11941,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 46,
-                            "line": 11,
+                            "column": 25,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 37,
-                            "line": 11,
+                            "column": 16,
+                            "line": 12,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 52,
-                          "line": 11,
+                          "column": 31,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 32,
-                          "line": 11,
+                          "column": 11,
+                          "line": 12,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 52,
-                            "line": 11,
+                            "column": 31,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 48,
-                            "line": 11,
+                            "column": 27,
+                            "line": 12,
                           },
                         },
                         "type": {
@@ -11978,12 +11978,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 52,
-                              "line": 11,
+                              "column": 31,
+                              "line": 12,
                             },
                             "start": {
-                              "column": 48,
-                              "line": 11,
+                              "column": 27,
+                              "line": 12,
                             },
                           },
                         },
@@ -11994,12 +11994,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 61,
-                        "line": 11,
+                        "column": 40,
+                        "line": 12,
                       },
                       "start": {
-                        "column": 57,
-                        "line": 11,
+                        "column": 36,
+                        "line": 12,
                       },
                     },
                     "type": {
@@ -12007,12 +12007,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 61,
-                          "line": 11,
+                          "column": 40,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 57,
-                          "line": 11,
+                          "column": 36,
+                          "line": 12,
                         },
                       },
                     },
@@ -12041,7 +12041,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         "position": {
           "end": {
             "column": 9,
-            "line": 14,
+            "line": 16,
           },
           "start": {
             "column": 8,
@@ -12081,7 +12081,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "position": {
       "end": {
         "column": 8,
-        "line": 15,
+        "line": 17,
       },
       "start": {
         "column": 1,
@@ -12093,7 +12093,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
   "position": {
     "end": {
       "column": 8,
-      "line": 15,
+      "line": 17,
     },
     "start": {
       "column": 1,
@@ -12978,12 +12978,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 24,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -12994,24 +12994,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -13024,12 +13024,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 34,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -13038,36 +13038,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 34,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 40,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 40,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 36,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -13075,12 +13075,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 40,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 36,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -13091,12 +13091,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 49,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 45,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -13104,12 +13104,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 49,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 45,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -13120,12 +13120,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 24,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -13136,24 +13136,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -13166,12 +13166,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 29,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -13180,36 +13180,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 39,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 30,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 45,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 45,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 41,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -13217,12 +13217,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 45,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 41,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -13233,12 +13233,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 54,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 50,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -13246,12 +13246,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 54,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 50,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -13280,7 +13280,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         "position": {
           "end": {
             "column": 9,
-            "line": 10,
+            "line": 12,
           },
           "start": {
             "column": 8,
@@ -13320,7 +13320,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "position": {
       "end": {
         "column": 8,
-        "line": 11,
+        "line": 13,
       },
       "start": {
         "column": 1,
@@ -13332,7 +13332,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
   "position": {
     "end": {
       "column": 8,
-      "line": 11,
+      "line": 13,
     },
     "start": {
       "column": 1,
@@ -13355,12 +13355,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 5,
+                    "column": 11,
+                    "line": 6,
                   },
                   "start": {
-                    "column": 24,
-                    "line": 3,
+                    "column": 10,
+                    "line": 4,
                   },
                 },
                 "value": {
@@ -13371,24 +13371,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 4,
+                            "column": 23,
+                            "line": 5,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 4,
+                            "column": 14,
+                            "line": 5,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 4,
+                          "column": 23,
+                          "line": 5,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 4,
+                          "column": 11,
+                          "line": 5,
                         },
                       },
                     },
@@ -13401,12 +13401,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 34,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
@@ -13415,36 +13415,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 34,
-                            "line": 3,
+                            "column": 20,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 3,
+                            "column": 11,
+                            "line": 4,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 40,
-                          "line": 3,
+                          "column": 26,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 3,
+                          "column": 11,
+                          "line": 4,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 40,
-                            "line": 3,
+                            "column": 26,
+                            "line": 4,
                           },
                           "start": {
-                            "column": 36,
-                            "line": 3,
+                            "column": 22,
+                            "line": 4,
                           },
                         },
                         "type": {
@@ -13452,12 +13452,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 40,
-                              "line": 3,
+                              "column": 26,
+                              "line": 4,
                             },
                             "start": {
-                              "column": 36,
-                              "line": 3,
+                              "column": 22,
+                              "line": 4,
                             },
                           },
                         },
@@ -13468,12 +13468,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 49,
-                        "line": 3,
+                        "column": 35,
+                        "line": 4,
                       },
                       "start": {
-                        "column": 45,
-                        "line": 3,
+                        "column": 31,
+                        "line": 4,
                       },
                     },
                     "type": {
@@ -13481,12 +13481,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 49,
-                          "line": 3,
+                          "column": 35,
+                          "line": 4,
                         },
                         "start": {
-                          "column": 45,
-                          "line": 3,
+                          "column": 31,
+                          "line": 4,
                         },
                       },
                     },
@@ -13497,12 +13497,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 9,
+                    "column": 11,
+                    "line": 10,
                   },
                   "start": {
-                    "column": 24,
-                    "line": 7,
+                    "column": 10,
+                    "line": 8,
                   },
                 },
                 "value": {
@@ -13513,24 +13513,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 8,
+                            "column": 23,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 8,
+                            "column": 14,
+                            "line": 9,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 8,
+                          "column": 23,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 8,
+                          "column": 11,
+                          "line": 9,
                         },
                       },
                     },
@@ -13543,12 +13543,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 29,
-                            "line": 7,
+                            "column": 15,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 7,
+                            "column": 11,
+                            "line": 8,
                           },
                         },
                       },
@@ -13557,36 +13557,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 39,
-                            "line": 7,
+                            "column": 25,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 30,
-                            "line": 7,
+                            "column": 16,
+                            "line": 8,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 45,
-                          "line": 7,
+                          "column": 31,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 7,
+                          "column": 11,
+                          "line": 8,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 45,
-                            "line": 7,
+                            "column": 31,
+                            "line": 8,
                           },
                           "start": {
-                            "column": 41,
-                            "line": 7,
+                            "column": 27,
+                            "line": 8,
                           },
                         },
                         "type": {
@@ -13594,12 +13594,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 45,
-                              "line": 7,
+                              "column": 31,
+                              "line": 8,
                             },
                             "start": {
-                              "column": 41,
-                              "line": 7,
+                              "column": 27,
+                              "line": 8,
                             },
                           },
                         },
@@ -13610,12 +13610,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 54,
-                        "line": 7,
+                        "column": 40,
+                        "line": 8,
                       },
                       "start": {
-                        "column": 50,
-                        "line": 7,
+                        "column": 36,
+                        "line": 8,
                       },
                     },
                     "type": {
@@ -13623,12 +13623,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 54,
-                          "line": 7,
+                          "column": 40,
+                          "line": 8,
                         },
                         "start": {
-                          "column": 50,
-                          "line": 7,
+                          "column": 36,
+                          "line": 8,
                         },
                       },
                     },
@@ -13639,12 +13639,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "nodeType": "FunctionValue",
                 "position": {
                   "end": {
-                    "column": 10,
-                    "line": 13,
+                    "column": 11,
+                    "line": 14,
                   },
                   "start": {
-                    "column": 24,
-                    "line": 11,
+                    "column": 10,
+                    "line": 12,
                   },
                 },
                 "value": {
@@ -13655,24 +13655,24 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 22,
-                            "line": 12,
+                            "column": 23,
+                            "line": 13,
                           },
                           "start": {
-                            "column": 13,
-                            "line": 12,
+                            "column": 14,
+                            "line": 13,
                           },
                         },
                       },
                       "nodeType": "ReturnStatement",
                       "position": {
                         "end": {
-                          "column": 22,
-                          "line": 12,
+                          "column": 23,
+                          "line": 13,
                         },
                         "start": {
-                          "column": 10,
-                          "line": 12,
+                          "column": 11,
+                          "line": 13,
                         },
                       },
                     },
@@ -13685,12 +13685,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 29,
-                            "line": 11,
+                            "column": 15,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 11,
+                            "column": 11,
+                            "line": 12,
                           },
                         },
                       },
@@ -13699,36 +13699,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 39,
-                            "line": 11,
+                            "column": 25,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 30,
-                            "line": 11,
+                            "column": 16,
+                            "line": 12,
                           },
                         },
                       },
                       "nodeType": "Parameter",
                       "position": {
                         "end": {
-                          "column": 45,
-                          "line": 11,
+                          "column": 31,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 11,
+                          "column": 11,
+                          "line": 12,
                         },
                       },
                       "type": {
                         "nodeType": "IdentifierTypeDeclaration",
                         "position": {
                           "end": {
-                            "column": 45,
-                            "line": 11,
+                            "column": 31,
+                            "line": 12,
                           },
                           "start": {
-                            "column": 41,
-                            "line": 11,
+                            "column": 27,
+                            "line": 12,
                           },
                         },
                         "type": {
@@ -13736,12 +13736,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                           "nodeType": "Identifier",
                           "position": {
                             "end": {
-                              "column": 45,
-                              "line": 11,
+                              "column": 31,
+                              "line": 12,
                             },
                             "start": {
-                              "column": 41,
-                              "line": 11,
+                              "column": 27,
+                              "line": 12,
                             },
                           },
                         },
@@ -13752,12 +13752,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "IdentifierTypeDeclaration",
                     "position": {
                       "end": {
-                        "column": 54,
-                        "line": 11,
+                        "column": 40,
+                        "line": 12,
                       },
                       "start": {
-                        "column": 50,
-                        "line": 11,
+                        "column": 36,
+                        "line": 12,
                       },
                     },
                     "type": {
@@ -13765,12 +13765,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 54,
-                          "line": 11,
+                          "column": 40,
+                          "line": 12,
                         },
                         "start": {
-                          "column": 50,
-                          "line": 11,
+                          "column": 36,
+                          "line": 12,
                         },
                       },
                     },
@@ -13799,7 +13799,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         "position": {
           "end": {
             "column": 9,
-            "line": 14,
+            "line": 16,
           },
           "start": {
             "column": 8,
@@ -13839,7 +13839,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "position": {
       "end": {
         "column": 8,
-        "line": 15,
+        "line": 17,
       },
       "start": {
         "column": 1,
@@ -13851,7 +13851,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
   "position": {
     "end": {
       "column": 8,
-      "line": 15,
+      "line": 17,
     },
     "start": {
       "column": 1,
@@ -14125,11 +14125,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
               "position": {
                 "end": {
                   "column": 10,
-                  "line": 7,
+                  "line": 11,
                 },
                 "start": {
-                  "column": 22,
-                  "line": 5,
+                  "column": 15,
+                  "line": 9,
                 },
               },
               "value": {
@@ -14141,11 +14141,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "position": {
                         "end": {
                           "column": 22,
-                          "line": 6,
+                          "line": 10,
                         },
                         "start": {
                           "column": 13,
-                          "line": 6,
+                          "line": 10,
                         },
                       },
                     },
@@ -14153,11 +14153,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "position": {
                       "end": {
                         "column": 22,
-                        "line": 6,
+                        "line": 10,
                       },
                       "start": {
                         "column": 10,
-                        "line": 6,
+                        "line": 10,
                       },
                     },
                   },
@@ -14170,12 +14170,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 32,
-                          "line": 5,
+                          "column": 25,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 23,
-                          "line": 5,
+                          "column": 16,
+                          "line": 9,
                         },
                       },
                     },
@@ -14184,36 +14184,36 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 32,
-                          "line": 5,
+                          "column": 25,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 23,
-                          "line": 5,
+                          "column": 16,
+                          "line": 9,
                         },
                       },
                     },
                     "nodeType": "Parameter",
                     "position": {
                       "end": {
-                        "column": 38,
-                        "line": 5,
+                        "column": 31,
+                        "line": 9,
                       },
                       "start": {
-                        "column": 23,
-                        "line": 5,
+                        "column": 16,
+                        "line": 9,
                       },
                     },
                     "type": {
                       "nodeType": "IdentifierTypeDeclaration",
                       "position": {
                         "end": {
-                          "column": 38,
-                          "line": 5,
+                          "column": 31,
+                          "line": 9,
                         },
                         "start": {
-                          "column": 34,
-                          "line": 5,
+                          "column": 27,
+                          "line": 9,
                         },
                       },
                       "type": {
@@ -14221,12 +14221,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 38,
-                            "line": 5,
+                            "column": 31,
+                            "line": 9,
                           },
                           "start": {
-                            "column": 34,
-                            "line": 5,
+                            "column": 27,
+                            "line": 9,
                           },
                         },
                       },
@@ -14237,12 +14237,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "nodeType": "IdentifierTypeDeclaration",
                   "position": {
                     "end": {
-                      "column": 47,
-                      "line": 5,
+                      "column": 40,
+                      "line": 9,
                     },
                     "start": {
-                      "column": 43,
-                      "line": 5,
+                      "column": 36,
+                      "line": 9,
                     },
                   },
                   "type": {
@@ -14250,19 +14250,19 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     "nodeType": "Identifier",
                     "position": {
                       "end": {
-                        "column": 47,
-                        "line": 5,
+                        "column": 40,
+                        "line": 9,
                       },
                       "start": {
-                        "column": 43,
-                        "line": 5,
+                        "column": 36,
+                        "line": 9,
                       },
                     },
                   },
                 },
               },
             },
-            "nodeType": "StaticMethod",
+            "nodeType": "SimpleMethod",
           },
         },
         "name": {
