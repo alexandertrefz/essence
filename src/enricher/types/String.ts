@@ -1,104 +1,104 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Primitive", primitive: "String" }
+export const type: common.Type = { type: "String" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "String",
 	targetType: type,
-	definition: { type: "Record", members: {} },
+	properties: {},
 	methods: {
 		isEmpty: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		hasAnyContent: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		isNot: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		prepend: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		},
 		append: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		},
 		splitOn: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
 			returnType: {
 				type: "List",
-				itemType: { type: "Primitive", primitive: "String" },
+				itemType: { type: "String" },
 			},
 		},
 		contains: {
@@ -106,28 +106,28 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 	},
 }

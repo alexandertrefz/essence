@@ -146,20 +146,16 @@ describe("Helpers", () => {
 		const unknown: UnknownType = { type: "Unknown" }
 
 		const booleanPrimitive: PrimitiveType = {
-			type: "Primitive",
-			primitive: "Boolean",
+			type: "Boolean",
 		}
 		const integerPrimitive: PrimitiveType = {
-			type: "Primitive",
-			primitive: "Integer",
+			type: "Integer",
 		}
 		const fractionPrimitive: PrimitiveType = {
-			type: "Primitive",
-			primitive: "Fraction",
+			type: "Fraction",
 		}
 		const stringPrimitive: PrimitiveType = {
-			type: "Primitive",
-			primitive: "String",
+			type: "String",
 		}
 
 		// const unknownList: ListType = {
@@ -169,12 +165,12 @@ describe("Helpers", () => {
 
 		// const stringList: ListType = {
 		// 	type: "List",
-		// 	itemType: { type: "Primitive", primitive: "String" },
+		// 	itemType: { type: "String" },
 		// }
 
 		// const integerList: ListType = {
 		// 	type: "List",
-		// 	itemType: { type: "Primitive", primitive: "Integer" },
+		// 	itemType: { type: "Integer" },
 		// }
 
 		const smallStringRecordType: RecordType = {
@@ -224,13 +220,13 @@ describe("Helpers", () => {
 		const noArgumentFunctionType: FunctionType = {
 			type: "Function",
 			parameterTypes: [],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const noArgumentWithDifferentReturnTypeFunctionType: FunctionType = {
 			type: "Function",
 			parameterTypes: [],
-			returnType: { type: "Primitive", primitive: "Integer" },
+			returnType: { type: "Integer" },
 		}
 
 		const singleArgumentFunctionType: FunctionType = {
@@ -238,10 +234,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const singleArgumentWithNameFunctionType: FunctionType = {
@@ -249,10 +245,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: "test",
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		// #endregion
@@ -262,13 +258,13 @@ describe("Helpers", () => {
 		const noArgumentSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const noArgumentWithDifferentReturnTypeSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
 			parameterTypes: [],
-			returnType: { type: "Primitive", primitive: "Integer" },
+			returnType: { type: "Integer" },
 		}
 
 		const singleArgumentSimpleMethodType: MethodType = {
@@ -276,10 +272,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const singleArgumentWithNameSimpleMethodType: MethodType = {
@@ -287,10 +283,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: "test",
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		// #endregion
@@ -300,14 +296,14 @@ describe("Helpers", () => {
 		const noArgumentStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
 			parameterTypes: [],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const noArgumentWithDifferentReturnTypeStaticMethodType: StaticMethodType =
 			{
 				type: "StaticMethod",
 				parameterTypes: [],
-				returnType: { type: "Primitive", primitive: "Integer" },
+				returnType: { type: "Integer" },
 			}
 
 		const singleArgumentStaticMethodType: StaticMethodType = {
@@ -315,10 +311,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		const singleArgumentWithNameStaticMethodType: StaticMethodType = {
@@ -326,10 +322,10 @@ describe("Helpers", () => {
 			parameterTypes: [
 				{
 					name: "test",
-					type: { type: "Primitive", primitive: "String" },
+					type: { type: "String" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		}
 
 		// #endregion
@@ -341,7 +337,7 @@ describe("Helpers", () => {
 			overloads: [
 				{
 					parameterTypes: [],
-					returnType: { type: "Primitive", primitive: "String" },
+					returnType: { type: "String" },
 				},
 			],
 		}
@@ -352,7 +348,7 @@ describe("Helpers", () => {
 				overloads: [
 					{
 						parameterTypes: [],
-						returnType: { type: "Primitive", primitive: "Integer" },
+						returnType: { type: "Integer" },
 					},
 				],
 			}
@@ -364,10 +360,10 @@ describe("Helpers", () => {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "String" },
+							type: { type: "String" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "String" },
+					returnType: { type: "String" },
 				},
 			],
 		}
@@ -381,24 +377,22 @@ describe("Helpers", () => {
 							{
 								name: "test",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 					{
 						parameterTypes: [
 							{
 								name: "test2",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}
@@ -412,24 +406,22 @@ describe("Helpers", () => {
 							{
 								name: "test2",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 					{
 						parameterTypes: [
 							{
 								name: "test3",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}
@@ -444,7 +436,7 @@ describe("Helpers", () => {
 				overloads: [
 					{
 						parameterTypes: [],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}
@@ -455,7 +447,7 @@ describe("Helpers", () => {
 				overloads: [
 					{
 						parameterTypes: [],
-						returnType: { type: "Primitive", primitive: "Integer" },
+						returnType: { type: "Integer" },
 					},
 				],
 			}
@@ -469,12 +461,11 @@ describe("Helpers", () => {
 							{
 								name: null,
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}
@@ -488,24 +479,22 @@ describe("Helpers", () => {
 							{
 								name: "test",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 					{
 						parameterTypes: [
 							{
 								name: "test2",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}
@@ -519,24 +508,22 @@ describe("Helpers", () => {
 							{
 								name: "test2",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 					{
 						parameterTypes: [
 							{
 								name: "test3",
 								type: {
-									type: "Primitive",
-									primitive: "String",
+									type: "String",
 								},
 							},
 						],
-						returnType: { type: "Primitive", primitive: "String" },
+						returnType: { type: "String" },
 					},
 				],
 			}

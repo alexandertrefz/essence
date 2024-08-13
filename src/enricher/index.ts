@@ -41,7 +41,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			Record: recordNamespace,
 		},
 		types: {
-			Nothing: { type: "Primitive", primitive: "Nothing" },
+			Nothing: { type: "Nothing" },
 			Boolean: booleanType,
 			String: stringType,
 			Integer: integerType,

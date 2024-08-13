@@ -1,12 +1,12 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Primitive", primitive: "Integer" }
+export const type: common.Type = { type: "Integer" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Integer",
 	targetType: type,
-	definition: { type: "Record", members: {} },
+	properties: {},
 	methods: {
 		is: {
 			type: "SimpleMethod",
@@ -14,14 +14,14 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 
 		isNot: {
@@ -30,14 +30,14 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 
 		add: {
@@ -47,27 +47,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 			],
 		},
@@ -79,27 +79,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 			],
 		},
@@ -111,27 +111,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 			],
 		},
@@ -143,27 +143,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 			],
 		},
@@ -175,27 +175,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 			],
 		},
@@ -207,27 +207,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 			],
 		},
@@ -239,27 +239,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 			],
 		},
@@ -271,27 +271,27 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Boolean" },
+					returnType: { type: "Boolean" },
 				},
 			],
 		},
@@ -301,10 +301,10 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		} as common.MethodType,
 	},
 }
