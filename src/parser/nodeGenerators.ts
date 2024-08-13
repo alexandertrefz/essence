@@ -281,43 +281,25 @@ export function namespaceDefinitionStatement(
 
 	const methods = body.reduce<parser.NamespaceMethods>((prev, curr) => {
 		if (curr.nodeType !== "NamespacePropertyNode") {
-			const overloadedMethod = prev[curr.name.content]
-
-			if (overloadedMethod) {
-				if (overloadedMethod.nodeType === "OverloadedMethod") {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedMethod",
-						methods: [...overloadedMethod.methods, curr.method],
-					}
-				} else if (
-					overloadedMethod.nodeType === "OverloadedStaticMethod"
-				) {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedStaticMethod",
-						methods: [...overloadedMethod.methods, curr.method],
-					}
+			if (curr.nodeType === "SimpleMethodNode") {
+				prev[curr.name.content] = {
+					nodeType: "SimpleMethod",
+					method: curr.method,
 				}
-			} else {
-				if (curr.nodeType === "SimpleMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "SimpleMethod",
-						method: curr.method,
-					}
-				} else if (curr.nodeType === "StaticMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "StaticMethod",
-						method: curr.method,
-					}
-				} else if (curr.nodeType === "OverloadedMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedMethod",
-						methods: [curr.method],
-					}
-				} else if (curr.nodeType === "OverloadedStaticMethodNode") {
-					prev[curr.name.content] = {
-						nodeType: "OverloadedStaticMethod",
-						methods: [curr.method],
-					}
+			} else if (curr.nodeType === "StaticMethodNode") {
+				prev[curr.name.content] = {
+					nodeType: "StaticMethod",
+					method: curr.method,
+				}
+			} else if (curr.nodeType === "OverloadedMethodNode") {
+				prev[curr.name.content] = {
+					nodeType: "OverloadedMethod",
+					methods: curr.methods,
+				}
+			} else if (curr.nodeType === "OverloadedStaticMethodNode") {
+				prev[curr.name.content] = {
+					nodeType: "OverloadedStaticMethod",
+					methods: curr.methods,
 				}
 			}
 		}
@@ -586,13 +568,13 @@ type StaticMethodNode = {
 type OverloadedMethodNode = {
 	nodeType: "OverloadedMethodNode"
 	name: parser.IdentifierNode
-	method: parser.FunctionValueNode
+	methods: Array<parser.FunctionValueNode>
 }
 
 type OverloadedStaticMethodNode = {
 	nodeType: "OverloadedStaticMethodNode"
 	name: parser.IdentifierNode
-	method: parser.FunctionValueNode
+	methods: Array<parser.FunctionValueNode>
 }
 
 type NamespaceProperty = {
