@@ -1,13 +1,13 @@
 import type {
-	BooleanPrimitiveType,
-	FractionPrimitiveType,
+	BooleanType,
+	FractionType,
 	FunctionType,
 	GenericFunctionType,
-	IntegerPrimitiveType,
+	IntegerType,
 	ListType,
 	NamespaceType,
-	NothingPrimitiveType,
-	StringPrimitiveType,
+	NothingType,
+	StringType,
 	Type,
 } from "./index"
 
@@ -82,31 +82,31 @@ export type RecordValueNode = {
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
-	type: StringPrimitiveType
+	type: StringType
 }
 
 export type IntegerValueNode = {
 	nodeType: "IntegerValue"
 	value: string
-	type: IntegerPrimitiveType
+	type: IntegerType
 }
 
 export type FractionValueNode = {
 	nodeType: "FractionValue"
 	numerator: string
 	denominator: string
-	type: FractionPrimitiveType
+	type: FractionType
 }
 
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
-	type: BooleanPrimitiveType
+	type: BooleanType
 }
 
 export type NothingValueNode = {
 	nodeType: "NothingValue"
-	type: NothingPrimitiveType
+	type: NothingType
 }
 
 export type FunctionValueNode = {

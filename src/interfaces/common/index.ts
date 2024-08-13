@@ -72,42 +72,25 @@ export type MethodType =
 	| OverloadedStaticMethodType
 	| OverloadedMethodType
 
-export type ListType = {
-	type: "List"
-	itemType: Type
+export type StringType = {
+	type: "String"
 }
 
-export type StringPrimitiveType = {
-	type: "Primitive"
-	primitive: "String"
+export type IntegerType = {
+	type: "Integer"
 }
 
-export type IntegerPrimitiveType = {
-	type: "Primitive"
-	primitive: "Integer"
+export type FractionType = {
+	type: "Fraction"
 }
 
-export type FractionPrimitiveType = {
-	type: "Primitive"
-	primitive: "Fraction"
+export type BooleanType = {
+	type: "Boolean"
 }
 
-export type BooleanPrimitiveType = {
-	type: "Primitive"
-	primitive: "Boolean"
+export type NothingType = {
+	type: "Nothing"
 }
-
-export type NothingPrimitiveType = {
-	type: "Primitive"
-	primitive: "Nothing"
-}
-
-export type PrimitiveType =
-	| StringPrimitiveType
-	| IntegerPrimitiveType
-	| FractionPrimitiveType
-	| BooleanPrimitiveType
-	| NothingPrimitiveType
 
 export type UnknownType = {
 	type: "Unknown"
@@ -121,7 +104,7 @@ export type NamespaceType = {
 	type: "Namespace"
 	targetType: Type | null
 	name: string
-	definition: RecordType
+	properties: Record<string, Type>
 	methods: Record<string, MethodType>
 }
 
@@ -130,16 +113,16 @@ export type UnionType = {
 	types: Array<Type>
 }
 
-export type Type =
+export type PrimitiveType =
+	| NothingType
+	| StringType
+	| IntegerType
+	| FractionType
+	| BooleanType
 	| RecordType
 	| FunctionType
-	| GenericFunctionType
-	| MethodType
-	| PrimitiveType
 	| NamespaceType
-	| ListType
-	| UnknownType
-	| GenericType
-	| UnionType
+
+export type Type = UnknownType | PrimitiveType | UnionType | MethodType
 
 export { typed, typedSimple }

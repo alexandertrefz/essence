@@ -291,7 +291,7 @@ export function enrichStringValue(
 		nodeType: "StringValue",
 		value: node.value,
 		position: node.position,
-		type: { type: "Primitive", primitive: "String" },
+		type: { type: "String" },
 	}
 }
 
@@ -303,7 +303,7 @@ export function enrichIntegerValue(
 		nodeType: "IntegerValue",
 		value: node.value,
 		position: node.position,
-		type: { type: "Primitive", primitive: "Integer" },
+		type: { type: "Integer" },
 	}
 }
 
@@ -316,7 +316,7 @@ export function enrichFractionValue(
 		numerator: node.numerator,
 		denominator: node.denominator,
 		position: node.position,
-		type: { type: "Primitive", primitive: "Fraction" },
+		type: { type: "Fraction" },
 	}
 }
 
@@ -328,7 +328,7 @@ export function enrichBooleanValue(
 		nodeType: "BooleanValue",
 		value: node.value,
 		position: node.position,
-		type: { type: "Primitive", primitive: "Boolean" },
+		type: { type: "Boolean" },
 	}
 }
 
@@ -339,7 +339,7 @@ export function enrichNothingValue(
 	return {
 		nodeType: "NothingValue",
 		position: node.position,
-		type: { type: "Primitive", primitive: "Nothing" },
+		type: { type: "Nothing" },
 	}
 }
 

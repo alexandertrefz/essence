@@ -6,7 +6,7 @@ export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Record",
 	targetType: type,
-	definition: { type: "Record", members: {} },
+	properties: {},
 	methods: {
 		is: {
 			type: "SimpleMethod",
@@ -20,7 +20,7 @@ export const namespace: common.NamespaceType = {
 					type: type,
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		isNot: {
 			type: "SimpleMethod",
@@ -34,7 +34,7 @@ export const namespace: common.NamespaceType = {
 					type: type,
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		toString: {
 			type: "SimpleMethod",
@@ -44,7 +44,7 @@ export const namespace: common.NamespaceType = {
 					type: type,
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		} as common.MethodType,
 	},
 }

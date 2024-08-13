@@ -23,19 +23,15 @@ export function resolveType(
 		case "RecordValue":
 			return resolveRecordValueType(node, scope)
 		case "StringValue":
-			return { type: "Primitive", primitive: "String" }
+			return { type: "String" }
 		case "IntegerValue":
-			return { type: "Primitive", primitive: "Integer" }
+			return { type: "Integer" }
 		case "FractionValue":
-			return { type: "Primitive", primitive: "Fraction" }
+			return { type: "Fraction" }
 		case "BooleanValue":
-			return { type: "Primitive", primitive: "Boolean" }
+			return { type: "Boolean" }
 		case "NothingValue":
-			return { type: "Primitive", primitive: "Nothing" }
-		case "FunctionValue":
-			return resolveFunctionValueType(node, scope)
-		case "ListValue":
-			return resolveListValueType(node, scope)
+			return { type: "Nothing" }
 		case "Lookup":
 			return resolveLookupType(node, scope)
 		case "Identifier":
@@ -497,45 +493,45 @@ export function resolveCombinationType(
 	let rhsType = resolveType(node.rhs, scope)
 
 	switch (lhsType.type) {
-		case "SimpleMethod":
-		case "StaticMethod":
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
 		case "Function":
-		case "GenericFunction":
-			throw new Error("You can not combine Functions.")
 		case "Namespace":
 			throw new Error("You can not combine Namespaces.")
-		case "List":
-			throw new Error("You can not combine Lists.")
-		case "Primitive":
-			throw new Error("You can not combine Primitives.")
+		// case "List":
+		// 	throw new Error("You can not combine Lists.")
+		case "Boolean":
+			throw new Error("You can not combine Booleans.")
+		case "Integer":
+			throw new Error("You can not combine Integers.")
+		case "Fraction":
+			throw new Error("You can not combine Fractions.")
+		case "Nothing":
+			throw new Error("You can not combine Nothings.")
+		case "String":
+			throw new Error("You can not combine Strings.")
 		case "Unknown":
 			throw new Error("You can not combine Unknowns.")
-		case "Generic":
-			throw new Error("You can not combine Generics.")
 		case "UnionType":
 			throw new Error("You can not combine Unions.")
 	}
 
 	switch (rhsType.type) {
-		case "SimpleMethod":
-		case "StaticMethod":
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
 		case "Function":
-		case "GenericFunction":
-			throw new Error("You can not combine Functions.")
 		case "Namespace":
 			throw new Error("You can not combine Namespaces.")
-		case "List":
-			throw new Error("You can not combine Lists.")
-		case "Primitive":
-			throw new Error("You can not combine Primitives.")
+		// case "List":
+		// 	throw new Error("You can not combine Lists.")
+		case "Boolean":
+			throw new Error("You can not combine Booleans.")
+		case "Integer":
+			throw new Error("You can not combine Integers.")
+		case "Fraction":
+			throw new Error("You can not combine Fractions.")
+		case "Nothing":
+			throw new Error("You can not combine Nothings.")
+		case "String":
+			throw new Error("You can not combine Strings.")
 		case "Unknown":
 			throw new Error("You can not combine Unknowns.")
-		case "Generic":
-			throw new Error("You can not combine Generics.")
 		case "UnionType":
 			throw new Error("You can not combine Unions.")
 	}
@@ -632,31 +628,14 @@ export function resolveLookupType(
 		)
 	} else {
 		if (baseType.type === "Namespace") {
-			if (baseType.definition.type === "Record") {
-				if (
-					Object.hasOwn(
-						baseType.definition.members,
-						node.member.content,
-					)
-				) {
-					return baseType.definition.members[node.member.content]
-				} else if (
-					Object.hasOwn(baseType.methods, node.member.content)
-				) {
-					return baseType.methods[node.member.content]
-				} else {
-					throw new Error(
-						`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
-					)
-				}
+			if (Object.hasOwn(baseType.properties, node.member.content)) {
+				return baseType.properties[node.member.content]
+			} else if (Object.hasOwn(baseType.methods, node.member.content)) {
+				return baseType.methods[node.member.content]
 			} else {
-				if (Object.hasOwn(baseType.methods, node.member.content)) {
-					return baseType.methods[node.member.content]
-				} else {
-					throw new Error(
-						"Access to properties of Primitive Types is not allowed.",
-					)
-				}
+				throw new Error(
+					`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
+				)
 			}
 		} else {
 			if (Object.hasOwn(baseType.members, node.member.content)) {
@@ -768,15 +747,15 @@ export function resolveNamespaceDefinitionStatementType(
 				? null
 				: resolveType(node.targetType, scope),
 		name: node.name.content,
-		definition: { type: "Record", members: {} },
+		properties: {},
 		methods: {},
 	}
 
-	let definitionMembers: Record<string, common.Type> = {}
+	let properties: Record<string, common.Type> = {}
 	let methods: Record<string, common.MethodType> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		definitionMembers[memberKey] = resolveType(memberValue.value, scope)
+		properties[memberKey] = resolveType(memberValue.value, scope)
 	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
@@ -791,11 +770,7 @@ export function resolveNamespaceDefinitionStatementType(
 		)
 	}
 
-	resultType.definition = {
-		type: "Record",
-		members: definitionMembers,
-	}
-
+	resultType.properties = properties
 	resultType.methods = methods
 
 	return resultType

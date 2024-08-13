@@ -24,7 +24,7 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		isNot: {
 			type: "SimpleMethod",
@@ -44,7 +44,7 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		length: {
 			type: "SimpleMethod",
@@ -57,7 +57,7 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Integer" },
+			returnType: { type: "Integer" },
 		},
 		hasItems: {
 			type: "SimpleMethod",
@@ -70,7 +70,7 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		isEmpty: {
 			type: "SimpleMethod",
@@ -83,7 +83,7 @@ const type: common.GenericTypeType = {
 					},
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		contains: {
 			type: "SimpleMethod",
@@ -100,7 +100,7 @@ const type: common.GenericTypeType = {
 					type: { type: "Generic", name: "ItemType" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
@@ -117,7 +117,7 @@ const type: common.GenericTypeType = {
 					type: { type: "Generic", name: "ItemType" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		firstItem: {
 			type: "SimpleMethod",
@@ -134,7 +134,7 @@ const type: common.GenericTypeType = {
 				type: "UnionType",
 				types: [
 					{ type: "Generic", name: "ItemType" },
-					{ type: "Primitive", primitive: "Nothing" },
+					{ type: "Nothing" },
 				],
 			},
 		},
@@ -153,7 +153,7 @@ const type: common.GenericTypeType = {
 				type: "UnionType",
 				types: [
 					{ type: "Generic", name: "ItemType" },
-					{ type: "Primitive", primitive: "Nothing" },
+					{ type: "Nothing" },
 				],
 			},
 		},
@@ -187,8 +187,7 @@ const type: common.GenericTypeType = {
 						{
 							name: null,
 							type: {
-								type: "Primitive",
-								primitive: "Integer",
+								type: "Integer",
 							},
 						},
 					],
@@ -211,7 +210,7 @@ const type: common.GenericTypeType = {
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Integer" },
+					type: { type: "Integer" },
 				},
 			],
 			returnType: {
@@ -264,8 +263,7 @@ const type: common.GenericTypeType = {
 									},
 								],
 								returnType: {
-									type: "Primitive",
-									primitive: "Boolean",
+									type: "Boolean",
 								},
 							},
 						},
@@ -307,8 +305,7 @@ const type: common.GenericTypeType = {
 						{
 							name: null,
 							type: {
-								type: "Primitive",
-								primitive: "Integer",
+								type: "Integer",
 							},
 						},
 					],

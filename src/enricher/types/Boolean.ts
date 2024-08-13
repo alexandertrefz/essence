@@ -1,88 +1,88 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Primitive", primitive: "Boolean" }
+export const type: common.Type = { type: "Boolean" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Boolean",
 	targetType: type,
-	definition: { type: "Record", members: {} },
+	properties: {},
 	methods: {
 		negate: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		is: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		isNot: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		and: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		or: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "Boolean" },
+			returnType: { type: "Boolean" },
 		},
 		toString: {
 			type: "SimpleMethod",
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Primitive", primitive: "Boolean" },
+					type: { type: "Boolean" },
 				},
 			],
-			returnType: { type: "Primitive", primitive: "String" },
+			returnType: { type: "String" },
 		} as common.MethodType,
 	},
 }

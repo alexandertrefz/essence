@@ -2,22 +2,16 @@ import type { common } from "../../interfaces"
 
 export const type: common.Type = {
 	type: "UnionType",
-	types: [
-		{ type: "Primitive", primitive: "Integer" },
-		{ type: "Primitive", primitive: "Fraction" },
-	],
+	types: [{ type: "Integer" }, { type: "Fraction" }],
 }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Number",
 	targetType: type,
-	definition: {
-		type: "Record",
-		members: {
-			PI: { type: "Primitive", primitive: "Fraction" },
-			TAO: { type: "Primitive", primitive: "Fraction" },
-		},
+	properties: {
+		PI: { type: "Fraction" },
+		TAO: { type: "Fraction" },
 	},
 	methods: {
 		lowestNumber: {
@@ -27,64 +21,58 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 				{
@@ -94,13 +82,12 @@ export const namespace: common.NamespaceType = {
 							type: {
 								type: "List",
 								itemType: {
-									type: "Primitive",
-									primitive: "Integer",
+									type: "Integer",
 								},
 							},
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
@@ -109,13 +96,12 @@ export const namespace: common.NamespaceType = {
 							type: {
 								type: "List",
 								itemType: {
-									type: "Primitive",
-									primitive: "Fraction",
+									type: "Fraction",
 								},
 							},
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 				{
 					parameterTypes: [
@@ -127,12 +113,10 @@ export const namespace: common.NamespaceType = {
 									type: "UnionType",
 									types: [
 										{
-											type: "Primitive",
-											primitive: "Integer",
+											type: "Integer",
 										},
 										{
-											type: "Primitive",
-											primitive: "Fraction",
+											type: "Fraction",
 										},
 									],
 								},
@@ -141,10 +125,7 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 			],
@@ -156,64 +137,58 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 				{
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Fraction" },
+							type: { type: "Fraction" },
 						},
 						{
 							name: null,
-							type: { type: "Primitive", primitive: "Integer" },
+							type: { type: "Integer" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 				{
@@ -223,13 +198,12 @@ export const namespace: common.NamespaceType = {
 							type: {
 								type: "List",
 								itemType: {
-									type: "Primitive",
-									primitive: "Integer",
+									type: "Integer",
 								},
 							},
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Integer" },
+					returnType: { type: "Integer" },
 				},
 				{
 					parameterTypes: [
@@ -238,13 +212,12 @@ export const namespace: common.NamespaceType = {
 							type: {
 								type: "List",
 								itemType: {
-									type: "Primitive",
-									primitive: "Fraction",
+									type: "Fraction",
 								},
 							},
 						},
 					],
-					returnType: { type: "Primitive", primitive: "Fraction" },
+					returnType: { type: "Fraction" },
 				},
 				{
 					parameterTypes: [
@@ -256,12 +229,10 @@ export const namespace: common.NamespaceType = {
 									type: "UnionType",
 									types: [
 										{
-											type: "Primitive",
-											primitive: "Integer",
+											type: "Integer",
 										},
 										{
-											type: "Primitive",
-											primitive: "Fraction",
+											type: "Fraction",
 										},
 									],
 								},
@@ -270,10 +241,7 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [
-							{ type: "Primitive", primitive: "Integer" },
-							{ type: "Primitive", primitive: "Fraction" },
-						],
+						types: [{ type: "Integer" }, { type: "Fraction" }],
 					},
 				},
 			],

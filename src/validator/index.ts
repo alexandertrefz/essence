@@ -399,12 +399,7 @@ function validateIfElseStatementNode(
 	node: common.typed.IfElseStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfElseStatementNode {
-	if (
-		!(
-			node.condition.type.type === "Primitive" &&
-			node.condition.type.primitive === "Boolean"
-		)
-	) {
+	if (!(node.condition.type.type === "Boolean")) {
 		throw new Error("If Condition has to be a Boolean")
 	}
 
@@ -424,12 +419,7 @@ function validateIfStatement(
 	node: common.typed.IfStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfStatementNode {
-	if (
-		!(
-			node.condition.type.type === "Primitive" &&
-			node.condition.type.primitive === "Boolean"
-		)
-	) {
+	if (!(node.condition.type.type === "Boolean")) {
 		throw new Error("If Condition has to be a Boolean")
 	}
 

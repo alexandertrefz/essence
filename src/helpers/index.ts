@@ -56,8 +56,24 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return true
 	}
 
-	if (lhs.type === "Primitive" && rhs.type === "Primitive") {
-		return lhs.primitive === rhs.primitive
+	if (lhs.type === "Nothing" && rhs.type === "Nothing") {
+		return true
+	}
+
+	if (lhs.type === "String" && rhs.type === "String") {
+		return true
+	}
+
+	if (lhs.type === "Boolean" && rhs.type === "Boolean") {
+		return true
+	}
+
+	if (lhs.type === "Integer" && rhs.type === "Integer") {
+		return true
+	}
+
+	if (lhs.type === "Fraction" && rhs.type === "Fraction") {
+		return true
 	}
 
 	if (lhs.type === "UnionType") {

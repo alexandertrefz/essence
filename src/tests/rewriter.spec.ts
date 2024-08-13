@@ -282,43 +282,37 @@ describe("Rewriter", () => {
 				it("returns true when the type is the same", () => {
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "Nothing",
+							type: "Nothing",
 						}),
 					).toBeTrue()
 
 					expect(
 						isValueOfType(booleanTrue(), {
-							type: "Primitive",
-							primitive: "Boolean",
+							type: "Boolean",
 						}),
 					).toBeTrue()
 
 					expect(
 						isValueOfType(booleanFalse(), {
-							type: "Primitive",
-							primitive: "Boolean",
+							type: "Boolean",
 						}),
 					).toBeTrue()
 
 					expect(
 						isValueOfType(stringEmpty(), {
-							type: "Primitive",
-							primitive: "String",
+							type: "String",
 						}),
 					).toBeTrue()
 
 					expect(
 						isValueOfType(integerOne(), {
-							type: "Primitive",
-							primitive: "Integer",
+							type: "Integer",
 						}),
 					).toBeTrue()
 
 					expect(
 						isValueOfType(fractionOne(), {
-							type: "Primitive",
-							primitive: "Fraction",
+							type: "Fraction",
 						}),
 					).toBeTrue()
 				})
@@ -326,43 +320,37 @@ describe("Rewriter", () => {
 				it("returns false when the type is different", () => {
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "String",
+							type: "String",
 						}),
 					).toBeFalse()
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "Boolean",
+							type: "Boolean",
 						}),
 					).toBeFalse()
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "Boolean",
+							type: "Boolean",
 						}),
 					).toBeFalse()
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "String",
+							type: "String",
 						}),
 					).toBeFalse()
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "Integer",
+							type: "Integer",
 						}),
 					).toBeFalse()
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Primitive",
-							primitive: "Fraction",
+							type: "Fraction",
 						}),
 					).toBeFalse()
 				})
@@ -372,8 +360,7 @@ describe("Rewriter", () => {
 						isValueOfType(listEmpty(), {
 							type: "List",
 							itemType: {
-								type: "Primitive",
-								primitive: "Nothing",
+								type: "Nothing",
 							},
 						}),
 					).toBeFalse()
