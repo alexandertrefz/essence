@@ -28,7 +28,7 @@
 		"bigint-fraction": "1.0.6",
 		"chalk": "5.3.0",
 		"deep-equal": "2.2.3",
-		"esbuild": "0.23.0",
+		"esbuild": "0.25.0",
 		"escodegen": "alexandertrefz/escodegen",
 		"nearley": "2.20.1",
 		"typescript": "5.5.4",
