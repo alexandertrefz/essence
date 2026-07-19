@@ -145,7 +145,7 @@ export function nothingValueNode(
 }
 
 export function functionValueNode(
-	value: parser.FunctionDefinitionNode | parser.GenericFunctionDefinitionNode,
+	value: parser.FunctionDefinitionNode,
 	position: common.Position,
 ): parser.FunctionValueNode {
 	return {
@@ -446,6 +446,19 @@ export function unionTypeDeclaration(
 	}
 }
 
+export function genericTypeDeclaration(
+	baseType: parser.UngenericTypeDeclarationNode,
+	generics: Array<parser.TypeDeclarationNode>,
+	position: common.Position,
+): parser.GenericTypeDeclarationNode {
+	return {
+		nodeType: "GenericTypeDeclaration",
+		baseType,
+		generics,
+		position,
+	}
+}
+
 export function genericDeclarationNode(
 	name: parser.IdentifierNode,
 	defaultType: parser.TypeDeclarationNode | null,
@@ -464,9 +477,9 @@ export function genericFunctionDefinition(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
 	body: Array<parser.ImplementationNode>,
-): parser.GenericFunctionDefinitionNode {
+): parser.FunctionDefinitionNode {
 	return {
-		nodeType: "GenericFunctionDefinition",
+		nodeType: "FunctionDefinition",
 		generics,
 		parameters,
 		returnType,
@@ -481,6 +494,7 @@ export function functionDefinition(
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
+		generics: [],
 		parameters,
 		returnType,
 		body,
