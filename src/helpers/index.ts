@@ -103,6 +103,14 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	lhs = normalizeType(lhs)
 	rhs = normalizeType(rhs)
 
+	// NOTE: Error Types are poison values — they only occur after a
+	// Diagnostic has already been reported, and match anything in both
+	// directions so that a single mistake does not cascade into
+	// follow-up Diagnostics.
+	if (lhs.type === "Error" || rhs.type === "Error") {
+		return true
+	}
+
 	// NOTE: Stabilisation semantics — unresolved Generics match anything, in
 	// both directions. Generic Inference will replace this with proper
 	// binding & substitution.

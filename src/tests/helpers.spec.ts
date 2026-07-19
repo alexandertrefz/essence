@@ -15,6 +15,7 @@ import {
 import { lexer } from "../interfaces"
 
 import type {
+	ErrorType,
 	FunctionType,
 	MethodType,
 	OverloadedMethodType,
@@ -572,6 +573,22 @@ describe("Helpers", () => {
 
 			expect(matchesType(unknown, noArgumentFunctionType)).toBe(true)
 			expect(matchesType(unknown, singleArgumentFunctionType)).toBe(true)
+		})
+
+		it("should match anything to ErrorType, in both directions", () => {
+			const errorType: ErrorType = { type: "Error" }
+
+			expect(matchesType(errorType, booleanPrimitive)).toBe(true)
+			expect(matchesType(errorType, stringPrimitive)).toBe(true)
+			expect(matchesType(errorType, unionTypeStringInteger)).toBe(true)
+			expect(matchesType(errorType, noArgumentFunctionType)).toBe(true)
+
+			expect(matchesType(booleanPrimitive, errorType)).toBe(true)
+			expect(matchesType(stringPrimitive, errorType)).toBe(true)
+			expect(matchesType(unionTypeStringInteger, errorType)).toBe(true)
+			expect(matchesType(noArgumentFunctionType, errorType)).toBe(true)
+
+			expect(matchesType(errorType, errorType)).toBe(true)
 		})
 
 		it("should match matching PrimitiveTypes", () => {
