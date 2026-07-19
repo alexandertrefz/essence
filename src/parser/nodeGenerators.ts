@@ -267,6 +267,7 @@ export function variableAssignmentStatement(
 
 export function namespaceDefinitionStatement(
 	name: parser.IdentifierNode,
+	generics: Array<parser.GenericDeclarationNode>,
 	targetType: parser.TypeDeclarationNode | null,
 	body: Array<NamespaceProperty | NamespaceMethod>,
 	position: common.Position,
@@ -311,6 +312,7 @@ export function namespaceDefinitionStatement(
 		nodeType: "NamespaceDefinitionStatement",
 		targetType,
 		name,
+		generics,
 		position,
 		properties,
 		methods,
@@ -363,10 +365,11 @@ export function functionStatement(
 
 export function typeAliasStatement(
 	name: parser.IdentifierNode,
+	generics: Array<parser.GenericDeclarationNode>,
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
 ): parser.TypeAliasStatementNode {
-	return { nodeType: "TypeAliasStatement", name, type, position }
+	return { nodeType: "TypeAliasStatement", name, generics, type, position }
 }
 
 // #endregion
@@ -462,12 +465,14 @@ export function genericTypeDeclaration(
 export function genericDeclarationNode(
 	name: parser.IdentifierNode,
 	defaultType: parser.TypeDeclarationNode | null,
+	inferred: boolean,
 	position: common.Position,
 ): parser.GenericDeclarationNode {
 	return {
 		nodeType: "GenericDeclarationNode",
 		name,
 		defaultType,
+		inferred,
 		position,
 	}
 }

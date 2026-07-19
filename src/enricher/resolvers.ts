@@ -582,7 +582,7 @@ export function resolveGenericDeclarations(
 
 		return {
 			name: generic.name.content,
-			infer: false,
+			infer: generic.inferred,
 			defaultType,
 		}
 	})
@@ -636,14 +636,18 @@ export function resolveNamespaceDefinitionStatementType(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
 ): common.NamespaceType {
+	// NOTE: Namespace Generics are visible in the target Type and in every
+	// Method signature — `namespace Boxes<infer Item> for List<Item>`.
+	let genericScope = scopeWithGenerics(node.generics, scope)
+
 	let resultType: common.NamespaceType = {
 		type: "Namespace",
 		targetType:
 			node.targetType === null
 				? null
-				: resolveType(node.targetType, scope),
+				: resolveType(node.targetType, genericScope),
 		name: node.name.content,
-		generics: [],
+		generics: resolveGenericDeclarations(node.generics, scope),
 		properties: {},
 		methods: {},
 	}
@@ -662,7 +666,7 @@ export function resolveNamespaceDefinitionStatementType(
 		methods[methodName] = resolveMethodType(
 			methodValue,
 			{
-				parent: scope,
+				parent: genericScope,
 				members: { [node.name.content]: resultType },
 				constants: new Set([node.name.content]),
 				types: {},
@@ -675,6 +679,21 @@ export function resolveNamespaceDefinitionStatementType(
 	resultType.methods = methods
 
 	return resultType
+}
+
+export function resolveTypeAliasStatementType(
+	node: parser.TypeAliasStatementNode,
+	scope: enricher.Scope,
+): common.Type {
+	if (node.generics.length === 0) {
+		return resolveType(node.type, scope)
+	}
+
+	// NOTE: Generic Type Aliases keep their body unapplied — the Generics stay
+	// GenericUses until a use site applies Type Arguments.
+	let genericScope = scopeWithGenerics(node.generics, scope)
+
+	return resolveType(node.type, genericScope)
 }
 
 export function resolveIdentifierTypeDeclarationType(
@@ -896,6 +915,8 @@ export function resolveMethodType(
 			selfType = { type: "Error" }
 		}
 
+		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
+
 		return {
 			type: "SimpleMethod",
 			generics: resolveGenericDeclarations(
@@ -913,13 +934,15 @@ export function resolveMethodType(
 
 					return {
 						name,
-						type: resolveType(param.type, scope),
+						type: resolveType(param.type, methodScope),
 					}
 				}),
 			],
-			returnType: resolveType(node.method.value.returnType, scope),
+			returnType: resolveType(node.method.value.returnType, methodScope),
 		}
 	} else if (node.nodeType === "StaticMethod") {
+		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
+
 		return {
 			type: "StaticMethod",
 			generics: resolveGenericDeclarations(
@@ -935,10 +958,10 @@ export function resolveMethodType(
 
 				return {
 					name,
-					type: resolveType(param.type, scope),
+					type: resolveType(param.type, methodScope),
 				}
 			}),
-			returnType: resolveType(node.method.value.returnType, scope),
+			returnType: resolveType(node.method.value.returnType, methodScope),
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
 		if (selfType === null) {
@@ -955,6 +978,11 @@ export function resolveMethodType(
 		return {
 			type: "OverloadedMethod",
 			overloads: node.methods.map((method) => {
+				let methodScope = scopeWithGenerics(
+					method.value.generics,
+					scope,
+				)
+
 				return {
 					generics: resolveGenericDeclarations(
 						method.value.generics,
@@ -973,11 +1001,14 @@ export function resolveMethodType(
 
 							return {
 								name,
-								type: resolveType(parameter.type, scope),
+								type: resolveType(parameter.type, methodScope),
 							}
 						}),
 					],
-					returnType: resolveType(method.value.returnType, scope),
+					returnType: resolveType(
+						method.value.returnType,
+						methodScope,
+					),
 				}
 			}),
 		}
@@ -985,6 +1016,11 @@ export function resolveMethodType(
 		return {
 			type: "OverloadedStaticMethod",
 			overloads: node.methods.map((method) => {
+				let methodScope = scopeWithGenerics(
+					method.value.generics,
+					scope,
+				)
+
 				return {
 					generics: resolveGenericDeclarations(
 						method.value.generics,
@@ -1002,11 +1038,14 @@ export function resolveMethodType(
 
 							return {
 								name,
-								type: resolveType(parameter.type, scope),
+								type: resolveType(parameter.type, methodScope),
 							}
 						}),
 					],
-					returnType: resolveType(method.value.returnType, scope),
+					returnType: resolveType(
+						method.value.returnType,
+						methodScope,
+					),
 				}
 			}),
 		}
