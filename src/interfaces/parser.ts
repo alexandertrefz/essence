@@ -1,4 +1,4 @@
-import type { Position, Type } from "./common"
+import type { Position } from "./common"
 
 export type Program = {
 	nodeType: "Program"
@@ -103,7 +103,7 @@ export type NothingValueNode = {
 
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
-	value: FunctionDefinitionNode | GenericFunctionDefinitionNode
+	value: FunctionDefinitionNode
 	position: Position
 }
 
@@ -264,6 +264,10 @@ export interface FunctionStatementNode {
 // #region Helpers
 
 export type TypeDeclarationNode =
+	| UngenericTypeDeclarationNode
+	| GenericTypeDeclarationNode
+
+export type UngenericTypeDeclarationNode =
 	| IdentifierTypeDeclarationNode
 	| RecordTypeDeclarationNode
 	| UnionTypeDeclarationNode
@@ -299,15 +303,15 @@ export interface UnionTypeDeclarationNode {
 	position: Position
 }
 
-export interface FunctionDefinitionNode {
-	nodeType: "FunctionDefinition"
-	parameters: Array<ParameterNode>
-	returnType: TypeDeclarationNode
-	body: Array<ImplementationNode>
+export interface GenericTypeDeclarationNode {
+	nodeType: "GenericTypeDeclaration"
+	baseType: UngenericTypeDeclarationNode
+	generics: Array<TypeDeclarationNode>
+	position: Position
 }
 
-export interface GenericFunctionDefinitionNode {
-	nodeType: "GenericFunctionDefinition"
+export interface FunctionDefinitionNode {
+	nodeType: "FunctionDefinition"
 	parameters: Array<ParameterNode>
 	generics: Array<GenericDeclarationNode>
 	returnType: TypeDeclarationNode
