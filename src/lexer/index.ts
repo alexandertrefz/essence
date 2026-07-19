@@ -433,7 +433,7 @@ const lexToken = (
 	cursor: Cursor,
 	ignoreList: Array<string>,
 ): LexingResult => {
-	let token: Token | undefined = undefined
+	let token: Token | undefined
 
 	if (input.length === 0) {
 		return {

@@ -1,13 +1,12 @@
 import type { BooleanType } from "./Boolean"
+import { toString as boolToString } from "./Boolean"
 import type { FractionType } from "./Fraction"
+import { toString__overload$1 as fractionToString } from "./Fraction"
 import type { IntegerType } from "./Integer"
+import { toString as integerToString } from "./Integer"
 import type { ListType } from "./List"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
-
-import { toString as boolToString } from "./Boolean"
-import { toString__overload$1 as fractionToString } from "./Fraction"
-import { toString as integerToString } from "./Integer"
 import { type AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60

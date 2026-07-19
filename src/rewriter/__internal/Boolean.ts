@@ -41,7 +41,7 @@ export function or(
 	return createBoolean(originalBoolean.value || other.value)
 }
 
-// biome-ignore lint/suspicious/noShadowRestrictedNames:
+// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(boolean: BooleanType): StringType {
 	return createString(boolean.value.toString())
 }

@@ -1,9 +1,7 @@
 import * as path from "node:path"
-
+import { type BuildResult, build } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"
-
-import { type BuildResult, build } from "esbuild"
 
 import type { common } from "../interfaces"
 
@@ -644,7 +642,7 @@ function rewriteMatch(
 		name: "_self",
 	}
 
-	let previousIfStatement: estree.IfStatement | undefined = undefined
+	let previousIfStatement: estree.IfStatement | undefined
 	let finalIfStatement: estree.IfStatement
 
 	for (let i = node.handlers.length - 1; i >= 0; i--) {
@@ -738,6 +736,7 @@ function internalImport(
 	return {
 		type: "ImportDeclaration",
 		specifiers,
+		attributes: [],
 		source: {
 			type: "Literal",
 			value: `${path.resolve(__dirname, "./__internal", fileName)}.ts`,

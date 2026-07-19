@@ -5,15 +5,15 @@ import path from "node:path"
 
 import chalk from "chalk"
 
-import yargs from "yargs/yargs"
 import { hideBin } from "yargs/helpers"
+import yargs from "yargs/yargs"
 
-import { parse } from "../src/parser"
 import { enrich } from "../src/enricher"
-import { validate } from "../src/validator"
-import { simplify } from "../src/simplifier"
 import { optimise } from "../src/optimiser"
+import { parse } from "../src/parser"
 import { rewrite } from "../src/rewriter"
+import { simplify } from "../src/simplifier"
+import { validate } from "../src/validator"
 
 let argv = await yargs(hideBin(process.argv))
 	.usage("Usage: $0 <fileName>")

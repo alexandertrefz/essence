@@ -5,16 +5,16 @@ import { Fraction } from "bigint-fraction"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as fraction from "../rewriter/__internal/Fraction"
 import * as integer from "../rewriter/__internal/Integer"
-import * as list from "../rewriter/__internal/List"
-import { createNothing } from "../rewriter/__internal/Nothing"
-import * as number from "../rewriter/__internal/Number"
-import * as record from "../rewriter/__internal/Record"
-import * as string from "../rewriter/__internal/String"
 import {
 	anyIs,
 	anyIsNot,
 	isFirstFractionBigger,
 } from "../rewriter/__internal/internalHelpers"
+import * as list from "../rewriter/__internal/List"
+import { createNothing } from "../rewriter/__internal/Nothing"
+import * as number from "../rewriter/__internal/Number"
+import * as record from "../rewriter/__internal/Record"
+import * as string from "../rewriter/__internal/String"
 import { isValueOfType } from "../rewriter/__internal/type"
 
 const booleanTrue = () => boolean.createBoolean(true)
