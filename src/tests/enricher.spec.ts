@@ -224,6 +224,70 @@ describe("Enricher", () => {
 		})
 	})
 
+	describe("Constant Reassignment", () => {
+		it("should allow reassigning Variables", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					variable a = "first"
+					a = "second"
+				}`),
+			).toEqual([])
+		})
+
+		it("should report reassigned Constants", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = "first"
+				a = "second"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Constant 'a' can not be reassigned.",
+			)
+			expect(diagnostics[0].position?.start.line).toBe(3)
+		})
+
+		it("should report reassigned Functions", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function getName () -> String {
+					<- "essence"
+				}
+
+				getName = "value"
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.message),
+			).toContain("Constant 'getName' can not be reassigned.")
+		})
+
+		it("should report reassigned Parameters", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function greet (_ name: String) -> String {
+					name = "other"
+					<- name
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Constant 'name' can not be reassigned.",
+			)
+		})
+
+		it("should allow reassigning outer Variables from inner scopes", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					variable a = "first"
+
+					if true {
+						a = "second"
+					}
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Declaration Hoisting", () => {
 		it("should allow using Functions before their declaration", () => {
 			expect(

@@ -168,11 +168,12 @@ export function enrichMethodFunctionDefinition(
 	let newScope = {
 		parent: scope,
 		members: {},
+		constants: new Set(),
 		types: {},
 	} satisfies enricher.Scope
 
 	if (selfType !== null) {
-		declareVariableInScope("@", selfType, newScope)
+		declareVariableInScope("@", selfType, newScope, true)
 	}
 
 	return {
@@ -218,6 +219,7 @@ export function enrichFunctionDefinition(
 	let newScope = {
 		parent: scope,
 		members: {},
+		constants: new Set<string>(),
 		types,
 	} satisfies enricher.Scope
 
@@ -433,11 +435,12 @@ export function enrichMatch(
 			let bodyScope = {
 				parent: scope,
 				members: {},
+				constants: new Set(),
 				types: {},
 			} satisfies enricher.Scope
 			let matcher = resolveType(handler.matcher, scope)
 
-			declareVariableInScope("@", matcher, bodyScope)
+			declareVariableInScope("@", matcher, bodyScope, true)
 
 			return {
 				body: handler.body.map((node) => enrichNode(node, bodyScope)),
@@ -494,7 +497,7 @@ export function enrichConstantDeclarationStatement(
 		type = resolveType(node.type, scope)
 	}
 
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, type, scope, true)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -538,6 +541,15 @@ export function enrichVariableAssignmentStatement(
 	node: parser.VariableAssignmentStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableAssignmentStatementNode {
+	let declaringScope = findDeclaringScope(node.name.content, scope)
+
+	if (declaringScope?.constants.has(node.name.content)) {
+		reportError(
+			`Constant '${node.name.content}' can not be reassigned.`,
+			node.name.position,
+		)
+	}
+
 	return {
 		nodeType: "VariableAssignmentStatement",
 		name: enrichIdentifier(node.name, scope),
@@ -591,7 +603,7 @@ export function enrichNamespaceDefinitionStatement(
 	let type = resolveNamespaceDefinitionStatementType(node, scope)
 
 	if (!isHoisted) {
-		declareVariableInScope(node.name, type, scope)
+		declareVariableInScope(node.name, type, scope, true)
 	}
 
 	return {
@@ -631,11 +643,13 @@ export function enrichIfElseStatementNode(
 	let trueScope = {
 		parent: scope,
 		members: {},
+		constants: new Set(),
 		types: {},
 	} satisfies enricher.Scope
 	let falseScope = {
 		parent: scope,
 		members: {},
+		constants: new Set(),
 		types: {},
 	} satisfies enricher.Scope
 
@@ -655,6 +669,7 @@ export function enrichIfStatement(
 	let bodyScope = {
 		parent: scope,
 		members: {},
+		constants: new Set(),
 		types: {},
 	} satisfies enricher.Scope
 
@@ -685,7 +700,7 @@ export function enrichFunctionStatement(
 	let type = resolveType(node.value, scope)
 
 	if (!isHoisted) {
-		declareVariableInScope(node.name, type, scope)
+		declareVariableInScope(node.name, type, scope, true)
 	}
 
 	return {
@@ -705,6 +720,7 @@ function declareVariableInScope(
 	identifier: parser.IdentifierNode | string,
 	type: common.Type,
 	scope: enricher.Scope,
+	isConstant = false,
 ): enricher.Scope {
 	const variableName =
 		typeof identifier === "string" ? identifier : identifier.content
@@ -718,7 +734,30 @@ function declareVariableInScope(
 
 	scope.members[variableName] = type
 
+	if (isConstant) {
+		scope.constants.add(variableName)
+	} else {
+		scope.constants.delete(variableName)
+	}
+
 	return scope
+}
+
+function findDeclaringScope(
+	name: string,
+	scope: enricher.Scope,
+): enricher.Scope | null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		if (searchScope.members[name] != null) {
+			return searchScope
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return null
 }
 
 function declareTypeInScope(
@@ -814,7 +853,7 @@ function enrichParameter(
 ): common.typed.ParameterNode {
 	let type = resolveType(node.type, scope)
 
-	declareVariableInScope(node.internalName, type, scope)
+	declareVariableInScope(node.internalName, type, scope, true)
 
 	return {
 		nodeType: "Parameter",
