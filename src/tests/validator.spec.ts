@@ -218,6 +218,65 @@ describe("Validator", () => {
 			)
 		})
 
+		it("should accept Functions that return on all code paths", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function classify (_ value: Boolean) -> String {
+						if value {
+							<- "true"
+						} else {
+							<- "false"
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept Functions returning Nothing without a return", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function log (_ value: String) -> Nothing {
+						__print(value)
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report Functions that do not return on all code paths", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function classify (_ value: Boolean) -> String {
+					if value {
+						<- "true"
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Not all code paths return a value.",
+			)
+		})
+
+		it("should report Match cases that do not return on all code paths", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant value: Number = 5
+				constant a = match value -> Number {
+					case Integer {
+						<- @
+					}
+
+					case Fraction {
+						__print(@)
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Not all code paths return a value.",
+			)
+		})
+
 		it("should report all independent errors of a Program", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a: String = true
