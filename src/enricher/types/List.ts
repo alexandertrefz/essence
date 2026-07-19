@@ -1,158 +1,153 @@
 import type { common } from "../../interfaces"
+import type { AppliedType, GenericListType } from "../../interfaces/common"
 
-const type: common.GenericTypeType = {
-	type: "GenericType",
-	name: "List",
-	definition: { type: "BuiltIn" },
+export const type: GenericListType = {
+	type: "GenericList",
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
+}
+
+const typeResolvedWithGenericUse: AppliedType = {
+	type: "AppliedType",
+	baseType: type,
+	appliedGenerics: [
+		{ name: null, type: { type: "GenericUse", name: "ItemType" } },
+	],
+}
+
+// TODO: Add a slice method
+// TODO: Add get methods for the generic case and filtered case
+// TODO: Add a map method
+// TODO: Add a reduce method
+export const namespace: common.NamespaceType = {
+	type: "Namespace",
+	name: "List",
+	generics: [{ name: "ItemType", defaultType: null, infer: true }],
+	targetType: typeResolvedWithGenericUse,
+	properties: {},
 	methods: {
 		is: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		isNot: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		length: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: { type: "Integer" },
 		},
 		hasItems: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		isEmpty: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		contains: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 				{
 					name: null,
-					type: { type: "Generic", name: "ItemType" },
+					type: { type: "GenericUse", name: "ItemType" },
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 				{
 					name: null,
-					type: { type: "Generic", name: "ItemType" },
+					type: { type: "GenericUse", name: "ItemType" },
 				},
 			],
 			returnType: { type: "Boolean" },
 		},
 		firstItem: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: {
 				type: "UnionType",
 				types: [
-					{ type: "Generic", name: "ItemType" },
+					{ type: "GenericUse", name: "ItemType" },
 					{ type: "Nothing" },
 				],
 			},
 		},
 		lastItem: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
 			returnType: {
 				type: "UnionType",
 				types: [
-					{ type: "Generic", name: "ItemType" },
+					{ type: "GenericUse", name: "ItemType" },
 					{ type: "Nothing" },
 				],
 			},
@@ -161,28 +156,21 @@ const type: common.GenericTypeType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: null,
@@ -191,73 +179,59 @@ const type: common.GenericTypeType = {
 							},
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 			],
 		},
 		removeAt: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 				{
 					name: null,
 					type: { type: "Integer" },
 				},
 			],
-			returnType: {
-				type: "List",
-				itemType: { type: "Generic", name: "ItemType" },
-			},
+			returnType: typeResolvedWithGenericUse,
 		},
 		removeEvery: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: null,
-							type: { type: "Generic", name: "ItemType" },
+							type: { type: "GenericUse", name: "ItemType" },
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: "where",
 							type: {
 								type: "Function",
+								generics: [],
 								parameterTypes: [
 									{
 										name: null,
 										type: {
-											type: "Generic",
+											type: "GenericUse",
 											name: "ItemType",
 										},
 									},
@@ -268,10 +242,7 @@ const type: common.GenericTypeType = {
 							},
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 			],
 		},
@@ -279,28 +250,21 @@ const type: common.GenericTypeType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: null,
@@ -309,72 +273,51 @@ const type: common.GenericTypeType = {
 							},
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 			],
 		},
 		removeDuplicates: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					type: typeResolvedWithGenericUse,
 				},
 			],
-			returnType: {
-				type: "List",
-				itemType: { type: "Generic", name: "ItemType" },
-			},
+			returnType: typeResolvedWithGenericUse,
 		},
 		prepend: {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: null,
-							type: { type: "Generic", name: "ItemType" },
+							type: { type: "GenericUse", name: "ItemType" },
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: "contentsOf",
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 			],
 		},
@@ -382,49 +325,34 @@ const type: common.GenericTypeType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: null,
-							type: { type: "Generic", name: "ItemType" },
+							type: { type: "GenericUse", name: "ItemType" },
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 						{
 							name: "contentsOf",
-							type: {
-								type: "List",
-								itemType: { type: "Generic", name: "ItemType" },
-							},
+							type: typeResolvedWithGenericUse,
 						},
 					],
-					returnType: {
-						type: "List",
-						itemType: { type: "Generic", name: "ItemType" },
-					},
+					returnType: typeResolvedWithGenericUse,
 				},
 			],
 		},
 	},
 }
-
-export default type

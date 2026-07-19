@@ -1,15 +1,17 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "String" }
+export const type: common.StringType = { type: "String" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "String",
 	targetType: type,
+	generics: [],
 	properties: {},
 	methods: {
 		isEmpty: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -20,6 +22,7 @@ export const namespace: common.NamespaceType = {
 		},
 		hasAnyContent: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -30,6 +33,7 @@ export const namespace: common.NamespaceType = {
 		},
 		is: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -44,6 +48,7 @@ export const namespace: common.NamespaceType = {
 		},
 		isNot: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -58,6 +63,7 @@ export const namespace: common.NamespaceType = {
 		},
 		prepend: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -72,6 +78,7 @@ export const namespace: common.NamespaceType = {
 		},
 		append: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -86,6 +93,7 @@ export const namespace: common.NamespaceType = {
 		},
 		splitOn: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -103,6 +111,7 @@ export const namespace: common.NamespaceType = {
 		},
 		contains: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -117,6 +126,7 @@ export const namespace: common.NamespaceType = {
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,

@@ -1,6 +1,6 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = {
+export const type: common.UnionType = {
 	type: "UnionType",
 	types: [{ type: "Integer" }, { type: "Fraction" }],
 }
@@ -9,6 +9,7 @@ export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Number",
 	targetType: type,
+	generics: [],
 	properties: {
 		PI: { type: "Fraction" },
 		TAO: { type: "Fraction" },
@@ -18,6 +19,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedStaticMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -31,6 +33,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Integer" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -44,6 +47,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -60,6 +64,7 @@ export const namespace: common.NamespaceType = {
 					},
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -76,6 +81,7 @@ export const namespace: common.NamespaceType = {
 					},
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -90,6 +96,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Integer" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -104,6 +111,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -134,6 +142,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedStaticMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -147,6 +156,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Integer" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -160,6 +170,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -176,6 +187,7 @@ export const namespace: common.NamespaceType = {
 					},
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -192,6 +204,7 @@ export const namespace: common.NamespaceType = {
 					},
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -206,6 +219,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Integer" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -220,6 +234,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
