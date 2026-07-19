@@ -1,11 +1,14 @@
 {
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"files": {
-		"ignore": [
-			"./lib/*",
-			"./testFiles/*.js",
-			"./src/coverage/*",
-			"./src/parser/grammar.ts"
+		"includes": [
+			"**",
+			"!lib/**/*",
+			"!!testFiles/**/*.js",
+			"!src/coverage/**/*",
+			"!src/parser/grammar.ts",
+			"!!docs/_layouts",
+			"!!**/__snapshots__"
 		]
 	},
 	"formatter": {
@@ -22,16 +25,17 @@
 		"rules": {
 			"style": {
 				"useConst": "off",
-				"useShorthandArrayType": "off",
 				"noParameterAssign": "off",
-				"noUselessElse": "off"
+				"noUselessElse": "off",
+				"useConsistentArrayType": {
+					"level": "on",
+					"options": { "syntax": "generic" }
+				}
 			},
 			"suspicious": {
 				"noExplicitAny": "off"
 			}
 		}
 	},
-	"organizeImports": {
-		"enabled": true
-	}
+	"assist": { "actions": { "source": { "organizeImports": "on" } } }
 }
