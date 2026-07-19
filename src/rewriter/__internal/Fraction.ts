@@ -1,10 +1,9 @@
 import { Fraction } from "bigint-fraction"
 
 import type { BooleanType } from "./Boolean"
+import { createBoolean, negate } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { StringType } from "./String"
-
-import { createBoolean, negate } from "./Boolean"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 

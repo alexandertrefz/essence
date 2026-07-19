@@ -1,11 +1,10 @@
 import { Fraction } from "bigint-fraction"
 
 import type { BooleanType } from "./Boolean"
-import type { FractionType } from "./Fraction"
-import type { StringType } from "./String"
-
 import { createBoolean } from "./Boolean"
+import type { FractionType } from "./Fraction"
 import { createFraction } from "./Fraction"
+import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
@@ -219,7 +218,7 @@ export function isGreaterThanOrEqualTo__overload$2(
 
 // #endregion
 
-// biome-ignore lint/suspicious/noShadowRestrictedNames:
+// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }

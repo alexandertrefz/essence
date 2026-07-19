@@ -1,12 +1,11 @@
 import { Fraction } from "bigint-fraction"
 
 import type { FractionType } from "./Fraction"
-import type { IntegerType } from "./Integer"
-import type { ListType } from "./List"
-
 import { createFraction } from "./Fraction"
+import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import { isFirstFractionBigger } from "./internalHelpers"
+import type { ListType } from "./List"
 import { typeKeySymbol } from "./type"
 
 // #region Constants
