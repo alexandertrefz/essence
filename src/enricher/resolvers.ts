@@ -1,7 +1,14 @@
 import deepEqual from "deep-equal"
 
 import { reportError } from "../diagnostics"
-import { type MatchableArgument, matchArguments, matchesType } from "../helpers"
+import {
+	applyGenericBindings,
+	createInferenceContext,
+	type GenericBindings,
+	type MatchableArgument,
+	matchArguments,
+	matchesTypeWithBindings,
+} from "../helpers"
 import type { common, enricher, parser } from "../interfaces"
 
 export function resolveType(
@@ -77,6 +84,83 @@ export function resolveFunctionTypeDeclarationType(
 	}
 }
 
+// NOTE: The result of inferring one invocation against one signature —
+// `unboundGenerics` lists Type Parameters that neither a default, the
+// receiver nor any Argument could bind. They are substituted as Error Types
+// in `returnType`; the caller reports them once the candidate is selected.
+type InferredInvocation = {
+	returnType: common.Type
+	unboundGenerics: Array<string>
+}
+
+// NOTE: Matches an invocation's Arguments left to right against a signature,
+// binding `infer` Generics on their first occurrence (for Methods the
+// receiver is the first Argument), and seeding plain Generics with their
+// definition-time defaults. Returns undefined when the Arguments do not
+// match; a fresh context per call keeps bindings from leaking between
+// overload candidates.
+function inferInvocation(
+	signature: common.BaseFunction,
+	matchableArguments: Array<MatchableArgument>,
+): InferredInvocation | undefined {
+	if (signature.generics.length === 0) {
+		if (
+			matchArguments(signature.parameterTypes, matchableArguments)
+				.type !== "Match"
+		) {
+			return undefined
+		}
+
+		return { returnType: signature.returnType, unboundGenerics: [] }
+	}
+
+	let context = createInferenceContext(signature.generics)
+
+	if (
+		matchArguments(signature.parameterTypes, matchableArguments, {
+			inference: context,
+		}).type !== "Match"
+	) {
+		return undefined
+	}
+
+	return substituteInferredReturnType(signature, context.bindings)
+}
+
+// NOTE: Substitutes the collected bindings into the return Type — Generics
+// that stayed unbound are substituted as Error Types, so that a single
+// "Could not infer" Diagnostic does not cascade.
+function substituteInferredReturnType(
+	signature: common.BaseFunction,
+	bindings: GenericBindings,
+): InferredInvocation {
+	let unboundGenerics = signature.generics
+		.filter((generic) => !bindings.has(generic.name))
+		.map((generic) => generic.name)
+
+	if (unboundGenerics.length > 0) {
+		bindings = new Map(bindings)
+
+		for (let name of unboundGenerics) {
+			bindings.set(name, { type: "Error" })
+		}
+	}
+
+	return {
+		returnType: applyGenericBindings(signature.returnType, bindings),
+		unboundGenerics,
+	}
+}
+
+function reportUnboundGenerics(
+	unboundGenerics: Array<string>,
+	position: common.Position,
+): void {
+	for (let name of unboundGenerics) {
+		reportError(`Could not infer Type Parameter '${name}'.`, position)
+	}
+}
+
 export function resolveNativeFunctionInvocationType(
 	node: parser.NativeFunctionInvocationNode,
 	scope: enricher.Scope,
@@ -84,7 +168,12 @@ export function resolveNativeFunctionInvocationType(
 	let type = resolveType(node.name, scope)
 
 	if (type.type === "Function") {
-		return type.returnType
+		return resolveInferredReturnType(
+			type,
+			node.arguments,
+			node.position,
+			scope,
+		)
 	}
 
 	if (type.type !== "Error") {
@@ -97,12 +186,53 @@ export function resolveNativeFunctionInvocationType(
 	return { type: "Error" }
 }
 
+// NOTE: Infers a Generic signature's return Type at an invocation whose
+// Argument mismatches are reported by the Validator — a failed match still
+// substitutes whatever could be bound, and "Could not infer" is only
+// reported when the Arguments actually matched.
+function resolveInferredReturnType(
+	signature: common.BaseFunction,
+	invocationArguments: Array<parser.ArgumentNode>,
+	position: common.Position,
+	scope: enricher.Scope,
+): common.Type {
+	if (signature.generics.length === 0) {
+		return signature.returnType
+	}
+
+	let matchableArguments: Array<MatchableArgument> = invocationArguments.map(
+		(argument) => ({
+			name: argument.name?.content ?? null,
+			getType: () => resolveType(argument.value, scope),
+		}),
+	)
+
+	let context = createInferenceContext(signature.generics)
+	let matchResult = matchArguments(
+		signature.parameterTypes,
+		matchableArguments,
+		{ inference: context },
+	)
+
+	let inferred = substituteInferredReturnType(signature, context.bindings)
+
+	if (matchResult.type === "Match") {
+		reportUnboundGenerics(inferred.unboundGenerics, position)
+	}
+
+	return inferred.returnType
+}
+
 export function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
 	resolvedNamespace: common.NamespaceType,
 	scope: enricher.Scope,
 ):
-	| { returnType: common.Type; overloadedMethodIndex: number | null }
+	| {
+			returnType: common.Type
+			overloadedMethodIndex: number | null
+			unboundGenerics: Array<string>
+	  }
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
 
@@ -129,16 +259,16 @@ export function resolveInvokedMethodInNamespace(
 		methodType.type === "SimpleMethod" ||
 		methodType.type === "StaticMethod"
 	) {
-		if (
-			matchArguments(methodType.parameterTypes, matchableArguments)
-				.type !== "Match"
-		) {
+		let inferred = inferInvocation(methodType, matchableArguments)
+
+		if (inferred === undefined) {
 			return
 		}
 
 		return {
-			returnType: methodType.returnType,
+			returnType: inferred.returnType,
 			overloadedMethodIndex: null,
+			unboundGenerics: inferred.unboundGenerics,
 		}
 	} else if (
 		methodType.type === "OverloadedMethod" ||
@@ -150,14 +280,13 @@ export function resolveInvokedMethodInNamespace(
 			overloadIndex++
 		) {
 			let overload = methodType.overloads[overloadIndex]
+			let inferred = inferInvocation(overload, matchableArguments)
 
-			if (
-				matchArguments(overload.parameterTypes, matchableArguments)
-					.type === "Match"
-			) {
+			if (inferred !== undefined) {
 				return {
 					overloadedMethodIndex: overloadIndex,
-					returnType: overload.returnType,
+					returnType: inferred.returnType,
+					unboundGenerics: inferred.unboundGenerics,
 				}
 			}
 		}
@@ -247,6 +376,7 @@ export function resolveMethodInvocation(
 				},
 				overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 				type: resolvedMethod.returnType,
+				unboundGenerics: resolvedMethod.unboundGenerics,
 			})
 		}
 	}
@@ -259,7 +389,18 @@ export function resolveMethodInvocation(
 
 		return resolveFailedMethodInvocation()
 	} else if (resolvedMethods.length === 1) {
-		return resolvedMethods[0]
+		let resolvedMethod = resolvedMethods[0]
+
+		// NOTE: Unbound Type Parameters are only reported for the selected
+		// candidate — losing overloads and Namespaces must not leak
+		// Diagnostics.
+		reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
+
+		return {
+			namespace: resolvedMethod.namespace,
+			type: resolvedMethod.type,
+			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
+		}
 	} else {
 		reportError(
 			`Passed arguments matched more than 1 Namespace, please disambiguate.
@@ -296,7 +437,12 @@ export function resolveFunctionInvocationType(
 		type.type === "SimpleMethod" ||
 		type.type === "StaticMethod"
 	) {
-		return type.returnType
+		return resolveInferredReturnType(
+			type,
+			node.arguments,
+			node.position,
+			scope,
+		)
 	} else if (
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
@@ -309,11 +455,12 @@ export function resolveFunctionInvocationType(
 		)
 
 		for (let overload of type.overloads) {
-			if (
-				matchArguments(overload.parameterTypes, matchableArguments)
-					.type === "Match"
-			) {
-				return overload.returnType
+			let inferred = inferInvocation(overload, matchableArguments)
+
+			if (inferred !== undefined) {
+				reportUnboundGenerics(inferred.unboundGenerics, node.position)
+
+				return inferred.returnType
 			}
 		}
 
@@ -340,7 +487,7 @@ function describeTypesForCombination(type: common.Type): string {
 		case "Error":
 			return "Error Types"
 		case "GenericList":
-		case "AppliedType":
+		case "GenericAlias":
 		case "GenericUse":
 			return "Generic Types"
 		case "Function":
@@ -689,6 +836,7 @@ export function resolveNamespaceDefinitionStatementType(
 				types: {},
 			},
 			resultType.targetType,
+			resultType.generics,
 		)
 	}
 
@@ -706,11 +854,55 @@ export function resolveTypeAliasStatementType(
 		return resolveType(node.type, scope)
 	}
 
-	// NOTE: Generic Type Aliases keep their body unapplied — the Generics stay
-	// GenericUses until a use site applies Type Arguments.
+	// NOTE: Generic Type Aliases keep their body unapplied — the Generics
+	// stay GenericUses until a use site applies Type Arguments, which
+	// substitutes them into the body.
 	let genericScope = scopeWithGenerics(node.generics, scope)
 
-	return resolveType(node.type, genericScope)
+	return {
+		type: "GenericAlias",
+		name: node.name.content,
+		generics: resolveGenericDeclarations(node.generics, scope),
+		aliasedType: resolveType(node.type, genericScope),
+	}
+}
+
+// NOTE: Applies Type Arguments to a Generic Type Alias by substituting them
+// into the alias body — missing Arguments fall back to the Generic's default
+// Type, and to an Error Type (after a Diagnostic) without one.
+function applyGenericAlias(
+	aliasType: common.GenericAliasType,
+	typeArguments: Array<common.Type>,
+	position: common.Position,
+): common.Type {
+	let generics = aliasType.generics
+	let requiredCount = generics.filter(
+		(generic) => generic.defaultType === null,
+	).length
+
+	if (
+		typeArguments.length > generics.length ||
+		typeArguments.length < requiredCount
+	) {
+		reportError(
+			`Wrong number of Type Arguments for Type '${aliasType.name}'.`,
+			position,
+		)
+	}
+
+	let bindings: GenericBindings = new Map()
+
+	for (let i = 0; i < generics.length; i++) {
+		let generic = generics[i]
+		let argument =
+			i < typeArguments.length
+				? typeArguments[i]
+				: (generic.defaultType ?? { type: "Error" as const })
+
+		bindings.set(generic.name, argument)
+	}
+
+	return applyGenericBindings(aliasType.aliasedType, bindings)
 }
 
 export function resolveIdentifierTypeDeclarationType(
@@ -724,9 +916,15 @@ export function resolveIdentifierTypeDeclarationType(
 		reportError(`Type '${name}' is not declared.`, node.position)
 
 		return { type: "Error" }
-	} else {
-		return result
 	}
+
+	// NOTE: A bare use of a Generic Type Alias applies the defaults — without
+	// a full set of defaults it is missing Type Arguments.
+	if (result.type === "GenericAlias") {
+		return applyGenericAlias(result, [], node.position)
+	}
+
+	return result
 }
 
 export function resolveUnionTypeDeclarationType(
@@ -760,15 +958,35 @@ export function resolveGenericTypeDeclarationType(
 	node: parser.GenericTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let baseType = resolveType(node.baseType, scope)
+	let baseType: common.Type
+
+	// NOTE: The base Type is looked up raw — `resolveIdentifierTypeDeclarationType`
+	// would already apply a Generic Alias' defaults before the Type Arguments
+	// get a chance to.
+	if (node.baseType.nodeType === "IdentifierTypeDeclaration") {
+		let name = node.baseType.type.content
+		let result = findTypeInScope(name, scope)
+
+		if (result === null) {
+			reportError(
+				`Type '${name}' is not declared.`,
+				node.baseType.position,
+			)
+
+			return { type: "Error" }
+		}
+
+		baseType = result
+	} else {
+		baseType = resolveType(node.baseType, scope)
+	}
 
 	if (baseType.type === "Error") {
 		return baseType
 	}
 
-	// NOTE: List is the only Generic Type so far. Applied Lists are
-	// normalized into plain List Types right away, so that inferred and
-	// declared List Types share a single representation.
+	// NOTE: Applied Lists are normalized into plain List Types right away, so
+	// that inferred and declared List Types share a single representation.
 	if (baseType.type === "GenericList") {
 		if (node.generics.length !== 1) {
 			reportError("List requires exactly 1 Type Argument.", node.position)
@@ -786,6 +1004,14 @@ export function resolveGenericTypeDeclarationType(
 			type: "List",
 			itemType: resolveType(node.generics[0], scope),
 		}
+	}
+
+	if (baseType.type === "GenericAlias") {
+		return applyGenericAlias(
+			baseType,
+			node.generics.map((generic) => resolveType(generic, scope)),
+			node.position,
+		)
 	}
 
 	reportError("This Type is not generic.", node.position)
@@ -895,16 +1121,32 @@ export function resolveMethodLookupBaseNamespaces(
 
 	let namespaces = getAllNamespacesInScope(scope, node.namespaceSpecifier)
 
+	// NOTE: Generic Namespaces match their target Type by binding the
+	// Namespace's Generics against the receiver — the bindings are only used
+	// for the selection here, Method resolution re-binds them from the
+	// receiver Argument.
 	for (let [name, namespace] of namespaces) {
 		if (namespace.targetType) {
 			if (namespace.targetType.type === "UnionType") {
 				for (let type of namespace.targetType.types) {
-					if (matchesType(type, baseType)) {
+					if (
+						matchesTypeWithBindings(
+							type,
+							baseType,
+							createInferenceContext(namespace.generics),
+						)
+					) {
 						matchingNamespaces.set(name, namespace)
 						break
 					}
 				}
-			} else if (matchesType(namespace.targetType, baseType)) {
+			} else if (
+				matchesTypeWithBindings(
+					namespace.targetType,
+					baseType,
+					createInferenceContext(namespace.generics),
+				)
+			) {
 				matchingNamespaces.set(name, namespace)
 			}
 		}
@@ -913,6 +1155,9 @@ export function resolveMethodLookupBaseNamespaces(
 	return matchingNamespaces
 }
 
+// NOTE: The enclosing Namespace's Generics are merged into every Method
+// signature, so that each signature is self-contained for inference — the
+// receiver Argument re-binds them on every invocation.
 export function resolveMethodType(
 	node:
 		| parser.SimpleMethod
@@ -921,6 +1166,7 @@ export function resolveMethodType(
 		| parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
+	namespaceGenerics: Array<common.GenericDeclaration> = [],
 ): common.MethodType {
 	if (node.nodeType === "SimpleMethod") {
 		if (selfType === null) {
@@ -936,10 +1182,13 @@ export function resolveMethodType(
 
 		return {
 			type: "SimpleMethod",
-			generics: resolveGenericDeclarations(
-				node.method.value.generics,
-				scope,
-			),
+			generics: [
+				...namespaceGenerics,
+				...resolveGenericDeclarations(
+					node.method.value.generics,
+					scope,
+				),
+			],
 			parameterTypes: [
 				{ name: null, type: selfType },
 				...node.method.value.parameters.map((param) => {
@@ -962,10 +1211,13 @@ export function resolveMethodType(
 
 		return {
 			type: "StaticMethod",
-			generics: resolveGenericDeclarations(
-				node.method.value.generics,
-				scope,
-			),
+			generics: [
+				...namespaceGenerics,
+				...resolveGenericDeclarations(
+					node.method.value.generics,
+					scope,
+				),
+			],
 			parameterTypes: node.method.value.parameters.map((param) => {
 				let name = null
 
@@ -1001,10 +1253,13 @@ export function resolveMethodType(
 				)
 
 				return {
-					generics: resolveGenericDeclarations(
-						method.value.generics,
-						scope,
-					),
+					generics: [
+						...namespaceGenerics,
+						...resolveGenericDeclarations(
+							method.value.generics,
+							scope,
+						),
+					],
 					parameterTypes: [
 						{ name: null, type: methodSelfType },
 						...method.value.parameters.map((parameter) => {
@@ -1039,10 +1294,13 @@ export function resolveMethodType(
 				)
 
 				return {
-					generics: resolveGenericDeclarations(
-						method.value.generics,
-						scope,
-					),
+					generics: [
+						...namespaceGenerics,
+						...resolveGenericDeclarations(
+							method.value.generics,
+							scope,
+						),
+					],
 					parameterTypes: [
 						...method.value.parameters.map((parameter) => {
 							let name: string | null

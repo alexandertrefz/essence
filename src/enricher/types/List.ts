@@ -1,24 +1,21 @@
 import type { common } from "../../interfaces"
-import type { AppliedType, GenericListType } from "../../interfaces/common"
+import type { GenericListType, ListType } from "../../interfaces/common"
 
 export const type: GenericListType = {
 	type: "GenericList",
 	generics: [{ name: "ItemType", defaultType: { type: "Unknown" } }],
 }
 
-const typeResolvedWithGenericUse: AppliedType = {
-	type: "AppliedType",
-	baseType: type,
-	appliedGenerics: [
-		{ name: null, type: { type: "GenericUse", name: "ItemType" } },
-	],
+const typeResolvedWithGenericUse: ListType = {
+	type: "List",
+	itemType: { type: "GenericUse", name: "ItemType" },
 }
 
 // TODO: Add a slice method
 // TODO: Add get methods for the generic case and filtered case
 // TODO: Add a map method
 // TODO: Add a reduce method
-export const namespace: common.NamespaceType = {
+const namespaceDefinition: common.NamespaceType = {
 	type: "Namespace",
 	name: "List",
 	generics: [{ name: "ItemType", defaultType: null, infer: true }],
@@ -356,3 +353,22 @@ export const namespace: common.NamespaceType = {
 		},
 	},
 }
+
+// NOTE: The Namespace-level `ItemType` Generic is merged into every Method
+// signature, so that each signature is self-contained for inference — a
+// Method looked up as a value re-infers `ItemType` from its receiver
+// argument.
+for (let method of Object.values(namespaceDefinition.methods)) {
+	if (method.type === "SimpleMethod" || method.type === "StaticMethod") {
+		method.generics = [...namespaceDefinition.generics, ...method.generics]
+	} else {
+		for (let overload of method.overloads) {
+			overload.generics = [
+				...namespaceDefinition.generics,
+				...overload.generics,
+			]
+		}
+	}
+}
+
+export const namespace = namespaceDefinition

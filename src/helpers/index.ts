@@ -186,10 +186,10 @@ function matchGenericUse(
 		return true
 	}
 
-	// NOTE: Without an inference context unresolved Generics still match
-	// anything, in both directions — the callers that check Generic
-	// signatures always supply a context.
-	return context === null
+	// NOTE: A Generic that is not bindable here is an opaque symbol of an
+	// enclosing definition — it only matches itself, which the caller has
+	// already checked.
+	return false
 }
 
 // NOTE: Members that would bind a still-unbound Generic are tried last, so
@@ -259,19 +259,6 @@ function signatureMatches(
 	return matchTypes(expected.returnType, actual.returnType, context)
 }
 
-// NOTE: `AppliedType`s over List are normalized into plain List Types here,
-// so that the rest of `matchesType` only has to deal with one representation.
-function normalizeType(type: common.Type): common.Type {
-	if (type.type === "AppliedType" && type.baseType.type === "GenericList") {
-		return {
-			type: "List",
-			itemType: type.appliedGenerics[0]?.type ?? { type: "Unknown" },
-		}
-	}
-
-	return type
-}
-
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }
@@ -293,9 +280,6 @@ function matchTypes(
 	rhs: common.Type,
 	context: GenericInferenceContext | null,
 ): boolean {
-	lhs = normalizeType(lhs)
-	rhs = normalizeType(rhs)
-
 	// NOTE: Error Types are poison values — they only occur after a
 	// Diagnostic has already been reported, and match anything in both
 	// directions so that a single mistake does not cascade into
