@@ -667,6 +667,46 @@ describe("Helpers", () => {
 			)
 		})
 
+		it("should match UnionTypes that are a subset of the expected UnionType", () => {
+			const unionTypeStringIntegerFraction: UnionType = {
+				type: "UnionType",
+				types: [stringPrimitive, integerPrimitive, fractionPrimitive],
+			}
+
+			expect(
+				matchesType(
+					unionTypeStringIntegerFraction,
+					unionTypeStringInteger,
+				),
+			).toBe(true)
+			expect(
+				matchesType(
+					unionTypeStringIntegerFraction,
+					unionTypeIntegerFraction,
+				),
+			).toBe(true)
+		})
+
+		it("should not match UnionTypes that are a superset of the expected UnionType", () => {
+			const unionTypeStringIntegerFraction: UnionType = {
+				type: "UnionType",
+				types: [stringPrimitive, integerPrimitive, fractionPrimitive],
+			}
+
+			expect(
+				matchesType(
+					unionTypeStringInteger,
+					unionTypeStringIntegerFraction,
+				),
+			).toBe(false)
+			expect(
+				matchesType(
+					unionTypeIntegerFraction,
+					unionTypeStringIntegerFraction,
+				),
+			).toBe(false)
+		})
+
 		// it("should match matching ListTypes", () => {
 		// 	expect(matchesType(unknownList, stringList)).toBe(true)
 		// 	expect(matchesType(unknownList, integerList)).toBe(true)
