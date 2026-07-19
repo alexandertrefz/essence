@@ -2,19 +2,19 @@ import type { common } from "../../interfaces"
 
 const functions: Record<string, common.Type> = {
 	__print: {
-		type: "GenericFunction",
-		generics: [{ name: "Item", defaultType: null }],
+		type: "Function",
+		generics: [{ name: "Item", defaultType: null, infer: true }],
 		parameterTypes: [
 			{
 				name: null,
 				type: {
-					type: "Generic",
+					type: "GenericUse",
 					name: "Item",
 				},
 			},
 		],
 		returnType: {
-			type: "Generic",
+			type: "GenericUse",
 			name: "Item",
 		},
 	},

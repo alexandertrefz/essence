@@ -1,15 +1,17 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Record", members: {} }
+export const type: common.RecordType = { type: "Record", members: {} }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Record",
+	generics: [],
 	targetType: type,
 	properties: {},
 	methods: {
 		is: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -24,6 +26,7 @@ export const namespace: common.NamespaceType = {
 		},
 		isNot: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -38,6 +41,7 @@ export const namespace: common.NamespaceType = {
 		},
 		toString: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,

@@ -1,3 +1,5 @@
+import type { common, enricher, parser } from "../interfaces"
+import { enrichNode } from "./enrichers"
 import {
 	namespace as booleanNamespace,
 	type as booleanType,
@@ -10,6 +12,7 @@ import {
 	namespace as integerNamespace,
 	type as integerType,
 } from "./types/Integer"
+import { namespace as listNamespace, type as listType } from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
 import {
 	namespace as numberNamespace,
@@ -24,10 +27,6 @@ import {
 	type as stringType,
 } from "./types/String"
 
-import type { common, enricher, parser } from "../interfaces"
-
-import { enrichNode } from "./enrichers"
-
 export const enrich = (program: parser.Program): common.typed.Program => {
 	let topLevelScope: enricher.Scope = {
 		parent: null,
@@ -39,6 +38,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			Fraction: fractionNamespace,
 			Number: numberNamespace,
 			Record: recordNamespace,
+			List: listNamespace,
 		},
 		types: {
 			Nothing: { type: "Nothing" },
@@ -48,6 +48,7 @@ export const enrich = (program: parser.Program): common.typed.Program => {
 			Fraction: fractionType,
 			Record: recordType,
 			Number: numberType,
+			List: listType,
 		},
 	}
 
