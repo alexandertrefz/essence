@@ -14,6 +14,8 @@ export function stripPosition(
 		;(tokenCopy as any).position = undefined
 		return tokenCopy
 	}
+
+	return undefined
 }
 
 export function symbol(array: Array<{ position: common.Position }>) {
@@ -51,9 +53,53 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}__overload$${index + 1}`
 }
 
+// NOTE: `AppliedType`s over List are normalized into plain List Types here,
+// so that the rest of `matchesType` only has to deal with one representation.
+function normalizeType(type: common.Type): common.Type {
+	if (type.type === "AppliedType" && type.baseType.type === "GenericList") {
+		return {
+			type: "List",
+			itemType: type.appliedGenerics[0]?.type ?? { type: "Unknown" },
+		}
+	}
+
+	return type
+}
+
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
-	if (lhs.type === "Unknown") {
+	lhs = normalizeType(lhs)
+	rhs = normalizeType(rhs)
+
+	// NOTE: Stabilisation semantics — unresolved Generics match anything, in
+	// both directions. Generic Inference will replace this with proper
+	// binding & substitution.
+	if (lhs.type === "Unknown" || lhs.type === "GenericUse") {
 		return true
+	}
+
+	if (rhs.type === "GenericUse") {
+		return true
+	}
+
+	if (
+		(lhs.type === "GenericList" || lhs.type === "List") &&
+		rhs.type === "GenericList"
+	) {
+		return true
+	}
+
+	if (lhs.type === "GenericList" && rhs.type === "List") {
+		return true
+	}
+
+	if (lhs.type === "List" && rhs.type === "List") {
+		// NOTE: Empty List Literals have an Unknown itemType and
+		// are assignable to any List.
+		if (rhs.itemType.type === "Unknown") {
+			return true
+		}
+
+		return matchesType(lhs.itemType, rhs.itemType)
 	}
 
 	if (lhs.type === "Nothing" && rhs.type === "Nothing") {
@@ -129,9 +175,13 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		for (let i = 0; i < lhs.parameterTypes.length; i++) {
 			if (
 				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
+				// TODO: Check wether this is safe
+				// I have changed the order around, in order to enable a parameter of
+				// type (_ a: A | B) -> X receiving an argument of type (_ a: A) -> X since this is safe.
+				// Need to confirm this doesn't have strange side effects.
 				!matchesType(
-					lhs.parameterTypes[i].type,
 					rhs.parameterTypes[i].type,
+					lhs.parameterTypes[i].type,
 				)
 			) {
 				return false

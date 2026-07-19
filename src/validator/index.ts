@@ -1,10 +1,7 @@
 import { matchesType } from "../helpers"
 import type { common } from "../interfaces"
 
-type CurrentFunctionContext =
-	| common.typed.FunctionDefinitionNode
-	| common.typed.GenericFunctionDefinitionNode
-	| null
+type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
 export const validate = (
 	program: common.typed.Program,
@@ -89,10 +86,7 @@ function validateNativeFunctionInvocation(
 ): common.typed.NativeFunctionInvocationNode {
 	const functionType = node.name.type
 
-	if (
-		functionType.type === "Function" ||
-		functionType.type === "GenericFunction"
-	) {
+	if (functionType.type === "Function") {
 		validateSimpleFunctionInvocation(functionType, node.arguments)
 	} else {
 		throw new Error("NativeFunctionInvocation: Identifier isn't a function")
@@ -215,14 +209,6 @@ function validateFunctionInvocation(
 	return node
 }
 
-function validateGenericFunctionDefinition(
-	node: common.typed.GenericFunctionDefinitionNode,
-): common.typed.GenericFunctionDefinitionNode {
-	node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
-
-	return node
-}
-
 function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 ): common.typed.FunctionDefinitionNode {
@@ -250,6 +236,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		for (let bodyNode of handler.body) {
 			validateImplementationNode(bodyNode, {
 				nodeType: "FunctionDefinition",
+				generics: [],
 				parameters: [],
 				body: handler.body,
 				returnType: node.type,
@@ -263,11 +250,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 function validateFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typed.FunctionValueNode {
-	if (node.value.nodeType === "FunctionDefinition") {
-		validateFunctionDefinition(node.value)
-	} else {
-		validateGenericFunctionDefinition(node.value)
-	}
+	validateFunctionDefinition(node.value)
 
 	return node
 }
@@ -376,18 +359,10 @@ function validateNamespaceDefinitionStatement(
 			method.nodeType === "SimpleMethod" ||
 			method.nodeType === "StaticMethod"
 		) {
-			if (method.method.value.nodeType === "FunctionDefinition") {
-				validateFunctionDefinition(method.method.value)
-			} else {
-				validateGenericFunctionDefinition(method.method.value)
-			}
+			validateFunctionDefinition(method.method.value)
 		} else {
 			for (let overloadedMethod of method.methods) {
-				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
-					validateFunctionDefinition(overloadedMethod.value)
-				} else {
-					validateGenericFunctionDefinition(overloadedMethod.value)
-				}
+				validateFunctionDefinition(overloadedMethod.value)
 			}
 		}
 	}
@@ -464,18 +439,11 @@ function validateFunctionStatement(
 // #region Helpers
 
 function validateSimpleFunctionInvocation(
-	functionType:
-		| common.FunctionType
-		| common.StaticMethodType
-		| common.GenericFunctionType,
+	functionType: common.FunctionType | common.StaticMethodType,
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ) {
 	for (let argumentNode of argumentNodes) {
 		validateExpression(argumentNode.value)
-	}
-
-	if (functionType.type === "GenericFunction") {
-		functionType = inferFunctionType(functionType, argumentNodes)
 	}
 
 	if (functionType.parameterTypes.length !== argumentNodes.length) {
@@ -499,48 +467,4 @@ function validateSimpleFunctionInvocation(
 	}
 }
 
-// TODO: The enricher should probably replace GenericFunctionInvocations with the Resolved Variants so we dont have to duplicate this function
-function inferFunctionType(
-	genericFunctionType: common.GenericFunctionType,
-	argumentTypes: Array<common.typed.ArgumentNode>,
-): common.FunctionType {
-	let inferredGenerics: Record<string, common.Type> = {}
-
-	let inferredFunctionType: common.FunctionType = {
-		type: "Function",
-		parameterTypes: structuredClone(genericFunctionType.parameterTypes),
-		returnType: structuredClone(genericFunctionType.returnType),
-	}
-
-	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
-		let parameter = genericFunctionType.parameterTypes[i]
-		if (parameter.type.type === "Generic") {
-			if (!(parameter.type.name in inferredGenerics)) {
-				inferredGenerics[parameter.type.name] = argumentTypes[i].type
-			}
-		}
-	}
-
-	if (
-		Object.entries(inferredGenerics).length !==
-		genericFunctionType.generics.length
-	) {
-		throw new Error("Mismatch in amount of defined and declared Generics.")
-	}
-
-	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
-		let parameter = inferredFunctionType.parameterTypes[i]
-
-		if (parameter.type.type === "Generic") {
-			parameter.type = inferredGenerics[parameter.type.name]
-		}
-	}
-
-	if (inferredFunctionType.returnType.type === "Generic") {
-		inferredFunctionType.returnType =
-			inferredGenerics[inferredFunctionType.returnType.name]
-	}
-
-	return inferredFunctionType
-}
 // #endregion

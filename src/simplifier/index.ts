@@ -232,19 +232,9 @@ function simplifyNothingValue(
 function simplifyFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typedSimple.FunctionValueNode {
-	let value:
-		| common.typedSimple.FunctionDefinitionNode
-		| common.typedSimple.GenericFunctionDefinitionNode
-
-	if (node.value.nodeType === "FunctionDefinition") {
-		value = simplifyFunctionDefinition(node.value)
-	} else {
-		value = simplifyGenericFunctionDefinition(node.value)
-	}
-
 	return {
 		nodeType: "FunctionValue",
-		value,
+		value: simplifyFunctionDefinition(node.value),
 		type: node.type,
 	}
 }
@@ -299,7 +289,6 @@ function simplifyMatch(
 		handlers: node.handlers.map((handler) => {
 			return {
 				matcher: handler.matcher,
-				returnType: handler.returnType,
 				body: handler.body.map(simplifyImplementationNode),
 			}
 		}),
@@ -524,30 +513,6 @@ function simplifyParameter(
 			? simplifyIdentifier(node.externalName)
 			: null,
 		internalName: simplifyIdentifier(node.internalName),
-	}
-}
-
-function simplifyGenericDeclaration(
-	node: common.typed.GenericDeclarationNode,
-): common.typedSimple.GenericDeclarationNode {
-	return {
-		nodeType: "GenericDeclaration",
-		name: node.name,
-		defaultType: node.defaultType,
-	}
-}
-
-function simplifyGenericFunctionDefinition(
-	node: common.typed.GenericFunctionDefinitionNode,
-): common.typedSimple.GenericFunctionDefinitionNode {
-	return {
-		nodeType: "GenericFunctionDefinition",
-		generics: node.generics.map((param) =>
-			simplifyGenericDeclaration(param),
-		),
-		parameters: node.parameters.map((param) => simplifyParameter(param)),
-		body: node.body.map((node) => simplifyImplementationNode(node)),
-		returnType: node.returnType,
 	}
 }
 
