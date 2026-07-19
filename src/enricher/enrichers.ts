@@ -10,6 +10,7 @@ import {
 	resolveNamespaceDefinitionStatementType,
 	resolveRecordValueType,
 	resolveType,
+	resolveTypeAliasStatementType,
 } from "./resolvers"
 
 export function enrichNode(
@@ -165,11 +166,21 @@ export function enrichMethodFunctionDefinition(
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 ): common.typed.FunctionDefinitionNode {
+	// NOTE: The Method's own Generics are registered as GenericUses so that
+	// Parameter and Return Types as well as the body can reference them.
+	let types: Record<string, common.Type> = {}
+	for (let generic of method.value.generics) {
+		types[generic.name.content] = {
+			type: "GenericUse",
+			name: generic.name.content,
+		}
+	}
+
 	let newScope = {
 		parent: scope,
 		members: {},
 		constants: new Set(),
-		types: {},
+		types,
 	} satisfies enricher.Scope
 
 	if (selfType !== null) {
@@ -178,12 +189,14 @@ export function enrichMethodFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
-		generics: [],
+		generics: method.value.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		parameters: method.value.parameters.map((parameter) =>
 			enrichParameter(parameter, newScope),
 		),
 		body: method.value.body.map((node) => enrichNode(node, newScope)),
-		returnType: resolveType(method.value.returnType, scope),
+		returnType: resolveType(method.value.returnType, newScope),
 	}
 }
 
@@ -197,6 +210,7 @@ export function enrichGenericDeclarationNode(
 			? resolveType(node.defaultType, scope)
 			: null,
 		name: node.name.content,
+		inferred: node.inferred,
 		position: node.position,
 	}
 }
@@ -606,12 +620,29 @@ export function enrichNamespaceDefinitionStatement(
 		declareVariableInScope(node.name, type, scope, true)
 	}
 
+	// NOTE: Namespace Generics are visible in every Method — bodies reference
+	// them as opaque GenericUses.
+	let genericTypes: Record<string, common.Type> = {}
+	for (let generic of node.generics) {
+		genericTypes[generic.name.content] = {
+			type: "GenericUse",
+			name: generic.name.content,
+		}
+	}
+
+	let methodScope = {
+		parent: scope,
+		members: {},
+		constants: new Set(),
+		types: genericTypes,
+	} satisfies enricher.Scope
+
 	return {
 		nodeType: "NamespaceDefinitionStatement",
 		targetType: type.targetType,
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
-		methods: enrichMethods(node.methods, scope, type.targetType),
+		methods: enrichMethods(node.methods, methodScope, type.targetType),
 		position: node.position,
 		type,
 	}
@@ -622,7 +653,7 @@ export function enrichTypeAliasStatement(
 	scope: enricher.Scope,
 	isHoisted = false,
 ): common.typed.TypeAliasStatementNode {
-	const type = resolveType(node.type, scope)
+	const type = resolveTypeAliasStatementType(node, scope)
 
 	if (!isHoisted) {
 		declareTypeInScope(node.name, type, scope)

@@ -3457,6 +3457,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "generics": [
             {
               "defaultType": null,
+              "inferred": false,
               "name": {
                 "content": "Generic",
                 "nodeType": "Identifier",
@@ -3591,6 +3592,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "generics": [
             {
               "defaultType": null,
+              "inferred": false,
               "name": {
                 "content": "Generic",
                 "nodeType": "Identifier",
@@ -3794,6 +3796,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "generics": [
             {
               "defaultType": null,
+              "inferred": false,
               "name": {
                 "content": "Generic",
                 "nodeType": "Identifier",
@@ -3997,6 +4000,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "generics": [
             {
               "defaultType": null,
+              "inferred": false,
               "name": {
                 "content": "Generic",
                 "nodeType": "Identifier",
@@ -4187,6 +4191,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
           "generics": [
             {
               "defaultType": null,
+              "inferred": false,
               "name": {
                 "content": "Generic",
                 "nodeType": "Identifier",
@@ -8429,6 +8434,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -8490,6 +8496,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -8569,6 +8576,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -8665,6 +8673,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -8873,6 +8882,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -9227,6 +9237,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -9580,6 +9591,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -10076,6 +10088,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -10302,6 +10315,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -10389,6 +10403,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -10494,6 +10509,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {},
         "name": {
           "content": "Namespace",
@@ -10616,6 +10632,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -10850,6 +10867,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -11230,6 +11248,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -11609,6 +11628,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -12131,6 +12151,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -12383,6 +12404,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -12617,6 +12639,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -12997,6 +13020,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -13376,6 +13400,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "methods": [
@@ -13898,6 +13923,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -14150,6 +14176,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "methods": {
           "method": {
             "method": {
@@ -14402,6 +14429,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "name": {
           "content": "Type",
           "nodeType": "Identifier",
@@ -14487,6 +14515,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "name": {
           "content": "Type",
           "nodeType": "Identifier",
@@ -14559,6 +14588,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "name": {
           "content": "Type",
           "nodeType": "Identifier",
@@ -14659,6 +14689,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "generics": [],
         "name": {
           "content": "Type",
           "nodeType": "Identifier",

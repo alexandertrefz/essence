@@ -4,6 +4,7 @@ import { enrichNode } from "./enrichers"
 import {
 	resolveNamespaceDefinitionStatementType,
 	resolveType,
+	resolveTypeAliasStatementType,
 } from "./resolvers"
 import {
 	namespace as booleanNamespace,
@@ -125,7 +126,7 @@ function hoistDeclarations(
 			try {
 				speculation = collectDiagnostics((): common.Type => {
 					if (node.nodeType === "TypeAliasStatement") {
-						return resolveType(node.type, scope)
+						return resolveTypeAliasStatementType(node, scope)
 					} else if (node.nodeType === "FunctionStatement") {
 						return resolveType(node.value, scope)
 					} else {

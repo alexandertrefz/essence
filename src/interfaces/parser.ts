@@ -215,6 +215,7 @@ export type NamespaceMethods = Record<
 export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
+	generics: Array<GenericDeclarationNode>
 	targetType: TypeDeclarationNode | null
 	properties: Record<
 		string,
@@ -227,6 +228,7 @@ export interface NamespaceDefinitionStatementNode {
 export interface TypeAliasStatementNode {
 	nodeType: "TypeAliasStatement"
 	name: IdentifierNode
+	generics: Array<GenericDeclarationNode>
 	type: TypeDeclarationNode
 	position: Position
 }
@@ -276,6 +278,7 @@ export interface GenericDeclarationNode {
 	nodeType: "GenericDeclarationNode"
 	name: IdentifierNode
 	defaultType: TypeDeclarationNode | null
+	inferred: boolean
 	position: Position
 }
 

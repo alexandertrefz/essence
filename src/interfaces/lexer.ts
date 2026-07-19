@@ -40,6 +40,7 @@ export enum TokenType {
 	KeywordWith = "KeywordWith",
 	KeywordNamespace = "KeywordNamespace",
 	KeywordFor = "KeywordFor",
+	KeywordInfer = "KeywordInfer",
 	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",
