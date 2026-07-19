@@ -1,15 +1,17 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Fraction" }
+export const type: common.FractionType = { type: "Fraction" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Fraction",
+	generics: [],
 	targetType: type,
 	properties: {},
 	methods: {
 		of: {
 			type: "StaticMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -25,6 +27,7 @@ export const namespace: common.NamespaceType = {
 
 		is: {
 			type: "SimpleMethod",
+			generics: [],
 
 			parameterTypes: [
 				{
@@ -41,6 +44,7 @@ export const namespace: common.NamespaceType = {
 
 		isNot: {
 			type: "SimpleMethod",
+			generics: [],
 
 			parameterTypes: [
 				{
@@ -59,6 +63,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -72,6 +77,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -91,6 +97,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -104,6 +111,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -123,6 +131,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -136,6 +145,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -155,6 +165,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -168,6 +179,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Fraction" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -187,6 +199,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -200,6 +213,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Boolean" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -219,6 +233,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -232,6 +247,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Boolean" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -251,6 +267,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -264,6 +281,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Boolean" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -283,6 +301,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -296,6 +315,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Boolean" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -315,6 +335,7 @@ export const namespace: common.NamespaceType = {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -324,6 +345,7 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "String" },
 				},
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,

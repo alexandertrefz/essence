@@ -1,15 +1,17 @@
 import type { common } from "../../interfaces"
 
-export const type: common.Type = { type: "Boolean" }
+export const type: common.BooleanType = { type: "Boolean" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Boolean",
+	generics: [],
 	targetType: type,
 	properties: {},
 	methods: {
 		negate: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -20,6 +22,7 @@ export const namespace: common.NamespaceType = {
 		},
 		is: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -34,6 +37,7 @@ export const namespace: common.NamespaceType = {
 		},
 		isNot: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -48,6 +52,7 @@ export const namespace: common.NamespaceType = {
 		},
 		and: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -62,6 +67,7 @@ export const namespace: common.NamespaceType = {
 		},
 		or: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -76,6 +82,7 @@ export const namespace: common.NamespaceType = {
 		},
 		toString: {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
