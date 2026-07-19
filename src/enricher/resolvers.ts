@@ -659,12 +659,15 @@ export function resolveNamespaceDefinitionStatementType(
 	}
 
 	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		// NOTE: The Namespace is only injected as a member for
+		// self-reference — injecting it as a type would shadow a
+		// same-named Type Alias (`namespace Event for Event`).
 		methods[methodName] = resolveMethodType(
 			methodValue,
 			{
 				parent: scope,
 				members: { [node.name.content]: resultType },
-				types: { [node.name.content]: resultType },
+				types: {},
 			},
 			resultType.targetType,
 		)
