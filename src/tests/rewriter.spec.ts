@@ -5325,6 +5325,36 @@ describe("Rewriter", () => {
 					).toEqual(booleanTrue())
 				})
 
+				it("returns true regardless of key order", () => {
+					expect(
+						record.is(
+							record.createRecord({
+								a: integerOne(),
+								b: stringEmpty(),
+							}),
+							record.createRecord({
+								b: stringEmpty(),
+								a: integerOne(),
+							}),
+						),
+					).toEqual(booleanTrue())
+				})
+
+				it("returns false if the records share keys but differ in values", () => {
+					expect(
+						record.is(
+							record.createRecord({
+								a: integerOne(),
+								b: stringEmpty(),
+							}),
+							record.createRecord({
+								a: integerTwo(),
+								b: stringEmpty(),
+							}),
+						),
+					).toEqual(booleanFalse())
+				})
+
 				it("returns false if the records are different", () => {
 					expect(
 						record.is(

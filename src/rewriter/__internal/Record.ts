@@ -1,7 +1,8 @@
 import type { BooleanType } from "./Boolean"
-import { and, negate } from "./Boolean"
+import { createBoolean, negate } from "./Boolean"
+import { anyIs } from "./internalHelpers"
 import type { ListType } from "./List"
-import { createList, is as listIs } from "./List"
+import { createList } from "./List"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import type { AnyType } from "./type"
@@ -40,21 +41,30 @@ export function values(recordInstance: RecordType): ListType<AnyType> {
 	)
 }
 
+// NOTE: Records are structurally equal when they hold the same keys with
+// equal values — the order in which the keys were defined does not matter.
 export function is(
 	firstRecordInstance: RecordType,
 	secondRecordInstance: RecordType,
 ): BooleanType {
-	let keysAreEqual = listIs(
-		keys(firstRecordInstance),
-		keys(secondRecordInstance),
-	)
+	let firstKeys = Object.keys(firstRecordInstance)
+	let secondKeys = Object.keys(secondRecordInstance)
 
-	let valuesAreEqual = listIs(
-		values(firstRecordInstance),
-		values(secondRecordInstance),
-	)
+	if (firstKeys.length !== secondKeys.length) {
+		return createBoolean(false)
+	}
 
-	return and(keysAreEqual, valuesAreEqual)
+	for (let key of firstKeys) {
+		if (!Object.hasOwn(secondRecordInstance, key)) {
+			return createBoolean(false)
+		}
+
+		if (!anyIs(firstRecordInstance[key], secondRecordInstance[key])) {
+			return createBoolean(false)
+		}
+	}
+
+	return createBoolean(true)
 }
 
 export function isNot(
