@@ -4,8 +4,7 @@
 	"description": "A new simple but powerful language.",
 	"main": "index.js",
 	"scripts": {
-		"pre-commit": "bun compile-grammar && bun format && bun test",
-		"compile-grammar": "nearleyc src/parser/grammar.ne -o src/parser/grammar.ts",
+		"pre-commit": "bun format && bun test",
 		"check": "biome check --write"
 	},
 	"keywords": [
@@ -23,7 +22,6 @@
 		"@types/deep-equal": "1.0.4",
 		"@types/escodegen": "0.0.10",
 		"@types/estree": "1.0.8",
-		"@types/nearley": "2.11.5",
 		"@types/yargs": "17.0.34",
 		"husky": "9.1.7"
 	},
@@ -33,7 +31,6 @@
 		"deep-equal": "2.2.3",
 		"esbuild": "0.25.12",
 		"escodegen": "alexandertrefz/escodegen",
-		"nearley": "2.20.1",
 		"typescript": "5.9.3",
 		"yargs": "18.0.0"
 	},

@@ -78,7 +78,7 @@ export function functionInvocation(
 
 export function recordValueNode(
 	type: parser.TypeDeclarationNode | null,
-	members: Record<string, parser.ValueNode>,
+	members: Record<string, parser.ExpressionNode>,
 	position: common.Position,
 ): parser.RecordValueNode {
 	return {

@@ -1,4 +1,3 @@
-import type { Token as NearleyToken } from "nearley"
 import { type common, lexer } from "../interfaces"
 
 const TokenType = lexer.TokenType
@@ -522,30 +521,6 @@ export class Lexer {
 
 	save() {
 		return this.state
-	}
-
-	// TODO: Implement formatError
-	formatError(_token: NearleyToken) {
-		return ""
-		// nb. this gets called after consuming the offending token,
-		// so the culprit is index-1
-		// var buffer = this.buffer;
-		// if (typeof buffer === 'string') {
-		// 	var nextLineBreak = buffer.indexOf('\n', this.index);
-		// 	if (nextLineBreak === -1) nextLineBreak = buffer.length;
-		// 	var line = buffer.substring(this.lastLineBreak, nextLineBreak)
-		// 	var col = this.index - this.lastLineBreak;
-		// 	message += " at line " + this.line + " col " + col + ":\n\n";
-		// 	message += "  " + line + "\n"
-		// 	message += "  " + Array(col).join(" ") + "^"
-		// 	return message;
-		// } else {
-		// 	return message + " at index " + (this.index - 1);
-		// }
-	}
-
-	has(name: string) {
-		return name in TokenType
 	}
 
 	ignore(name: lexer.TokenType) {
