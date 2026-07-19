@@ -898,8 +898,16 @@ export function resolveMethodLookupBaseNamespaces(
 	scope: enricher.Scope,
 ): Map<string, common.NamespaceType> {
 	let baseType = resolveType(node.base, scope)
-	let namespaces = getAllNamespacesInScope(scope, node.namespaceSpecifier)
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
+
+	// NOTE: Error Types match any targetType — instead of every Namespace,
+	// they match none, so that a broken base expression does not produce
+	// follow-up Diagnostics.
+	if (baseType.type === "Error") {
+		return matchingNamespaces
+	}
+
+	let namespaces = getAllNamespacesInScope(scope, node.namespaceSpecifier)
 
 	for (let [name, namespace] of namespaces) {
 		if (namespace.targetType) {
