@@ -85,9 +85,18 @@ async function compile(flags) {
 			process.exit(1)
 		}
 
-		const validatedProgram = validate(enrichedProgram)
+		const validatorDiagnostics = validate(enrichedProgram)
 
-		const simplifiedProgram = simplify(validatedProgram)
+		printDiagnostics(validatorDiagnostics, flags.inputFileName)
+
+		if (containsErrors(validatorDiagnostics)) {
+			console.error(
+				chalk.red(`Compilation of ${flags.inputFileName} failed.`),
+			)
+			process.exit(1)
+		}
+
+		const simplifiedProgram = simplify(enrichedProgram)
 
 		const optimisedProgram = optimise(simplifiedProgram)
 

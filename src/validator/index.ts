@@ -1,3 +1,4 @@
+import { collectDiagnostics, reportError } from "../diagnostics"
 import { matchesType } from "../helpers"
 import type { common } from "../interfaces"
 
@@ -5,12 +6,28 @@ type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
 export const validate = (
 	program: common.typed.Program,
-): common.typed.Program => {
-	program.implementation.nodes.map((node) =>
-		validateImplementationNode(node, null),
-	)
+): Array<common.Diagnostic> => {
+	let { diagnostics } = collectDiagnostics(() => {
+		for (let node of program.implementation.nodes) {
+			// NOTE: Expected errors are reported as Diagnostics and recovered
+			// from in place — anything thrown past this point is a Compiler
+			// bug. It is reported as a Diagnostic as well, so that a single
+			// broken statement can not take down the validation of the
+			// remaining Program.
+			try {
+				validateImplementationNode(node, null)
+			} catch (error) {
+				reportError(
+					`Internal Compiler Error: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+					node.position,
+				)
+			}
+		}
+	})
 
-	return program
+	return diagnostics
 }
 
 function validateImplementationNode(
@@ -87,9 +104,16 @@ function validateNativeFunctionInvocation(
 	const functionType = node.name.type
 
 	if (functionType.type === "Function") {
-		validateSimpleFunctionInvocation(functionType, node.arguments)
-	} else {
-		throw new Error("NativeFunctionInvocation: Identifier isn't a function")
+		validateSimpleFunctionInvocation(
+			functionType,
+			node.arguments,
+			node.position,
+		)
+	} else if (functionType.type !== "Error") {
+		reportError(
+			`'${node.name.content}' is not a native function.`,
+			node.name.position,
+		)
 	}
 
 	return node
@@ -123,16 +147,22 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedMethod" &&
 		functionType.type !== "OverloadedStaticMethod"
 	) {
-		throw new Error(
-			"FunctionInvocation: Identifier isn't a Function or Method",
-		)
+		if (functionType.type !== "Error") {
+			reportError("This expression is not a Function.", node.position)
+		}
+
+		return node
 	}
 
 	if (
 		functionType.type === "Function" ||
 		functionType.type === "StaticMethod"
 	) {
-		validateSimpleFunctionInvocation(functionType, node.arguments)
+		validateSimpleFunctionInvocation(
+			functionType,
+			node.arguments,
+			node.position,
+		)
 	} else {
 		// Dynamic methods, being called in a manually via `.` are being validated here,
 		// as opposed to methods that are being called with `::` which get validated by `validateMethodInvocation`
@@ -174,17 +204,21 @@ function validateFunctionInvocation(
 			}
 
 			if (lastIterationHadError) {
-				throw new Error(
-					"MethodInvocation: Passed arguments do not match any overload",
+				reportError(
+					"Passed arguments do not match any overload.",
+					node.position,
 				)
 			} else {
 				node.overloadedMethodIndex = index
 			}
 		} else {
 			if (functionType.parameterTypes.length !== node.arguments.length) {
-				throw new Error(
-					"FunctionInvocation: Amount of arguments doesn't match",
+				reportError(
+					"Amount of passed arguments doesn't match the signature.",
+					node.position,
 				)
+
+				return node
 			}
 
 			for (let i = 0; i < functionType.parameterTypes.length; i++) {
@@ -196,10 +230,9 @@ function validateFunctionInvocation(
 						node.arguments[i].type,
 					)
 				) {
-					throw new Error(
-						`FunctionInvocation: ArgumentType mismatch at argument ${
-							i + 1
-						}`,
+					reportError(
+						`Argument ${i + 1} doesn't match its declared parameter.`,
+						node.arguments[i].value.position,
 					)
 				}
 			}
@@ -228,8 +261,14 @@ function validateLookup(
 function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
-	if (node.value.type.type !== "UnionType") {
-		throw new Error("You can only use Match-Expressions on Union Types.")
+	if (
+		node.value.type.type !== "UnionType" &&
+		node.value.type.type !== "Error"
+	) {
+		reportError(
+			"You can only use Match-Expressions on Union Types.",
+			node.value.position,
+		)
 	}
 
 	for (let handler of node.handlers) {
@@ -290,8 +329,9 @@ function validateConstantDeclarationStatement(
 ): common.typed.ConstantDeclarationStatementNode {
 	if (node.declaredType !== null) {
 		if (!matchesType(node.declaredType, node.value.type)) {
-			throw new Error(
-				`Wrong Assignment Value Type for Constant ${node.name.content}`,
+			reportError(
+				`Wrong Assignment Value Type for Constant '${node.name.content}'.`,
+				node.value.position,
 			)
 		}
 	}
@@ -306,17 +346,9 @@ function validateVariableDeclarationStatement(
 ): common.typed.VariableDeclarationStatementNode {
 	if (node.declaredType !== null) {
 		if (!matchesType(node.declaredType, node.value.type)) {
-			throw new Error(
-				`Wrong Assignment Value Type for Variable ${node.name.content}
-Expected
-
-${Bun.inspect(node.declaredType)}
-
-but received
-
-${Bun.inspect(node.value.type)}
-
-`,
+			reportError(
+				`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
+				node.value.position,
 			)
 		}
 	}
@@ -330,17 +362,9 @@ function validateVariableAssignmentStatement(
 	node: common.typed.VariableAssignmentStatementNode,
 ): common.typed.VariableAssignmentStatementNode {
 	if (!matchesType(node.name.type, node.value.type)) {
-		throw new Error(
-			`Wrong Assignment Value Type for Variable ${node.name.content}
-Expected
-
-${Bun.inspect(node.name.type)}
-
-but received
-
-${Bun.inspect(node.value.type)}
-
-`,
+		reportError(
+			`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
+			node.value.position,
 		)
 	}
 
@@ -374,8 +398,14 @@ function validateIfElseStatementNode(
 	node: common.typed.IfElseStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfElseStatementNode {
-	if (!(node.condition.type.type === "Boolean")) {
-		throw new Error("If Condition has to be a Boolean")
+	if (
+		node.condition.type.type !== "Boolean" &&
+		node.condition.type.type !== "Error"
+	) {
+		reportError(
+			"If Conditions have to be Booleans.",
+			node.condition.position,
+		)
 	}
 
 	validateExpression(node.condition)
@@ -394,8 +424,14 @@ function validateIfStatement(
 	node: common.typed.IfStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfStatementNode {
-	if (!(node.condition.type.type === "Boolean")) {
-		throw new Error("If Condition has to be a Boolean")
+	if (
+		node.condition.type.type !== "Boolean" &&
+		node.condition.type.type !== "Error"
+	) {
+		reportError(
+			"If Conditions have to be Booleans.",
+			node.condition.position,
+		)
 	}
 
 	validateExpression(node.condition)
@@ -412,12 +448,13 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		throw new Error("Top level returns are not permitted.")
-	}
-
-	if (!matchesType(currentFunctionContext.returnType, node.expression.type)) {
-		throw new Error(
+		reportError("Top level returns are not permitted.", node.position)
+	} else if (
+		!matchesType(currentFunctionContext.returnType, node.expression.type)
+	) {
+		reportError(
 			"Type of returned expression doesn't match the declared return type.",
+			node.expression.position,
 		)
 	}
 
@@ -441,13 +478,19 @@ function validateFunctionStatement(
 function validateSimpleFunctionInvocation(
 	functionType: common.FunctionType | common.StaticMethodType,
 	argumentNodes: Array<common.typed.ArgumentNode>,
+	position: common.Position,
 ) {
 	for (let argumentNode of argumentNodes) {
 		validateExpression(argumentNode.value)
 	}
 
 	if (functionType.parameterTypes.length !== argumentNodes.length) {
-		throw new Error("FunctionInvocation: Amount of arguments doesn't match")
+		reportError(
+			"Amount of passed arguments doesn't match the signature.",
+			position,
+		)
+
+		return
 	}
 
 	for (let i = 0; i < functionType.parameterTypes.length; i++) {
@@ -458,10 +501,9 @@ function validateSimpleFunctionInvocation(
 				argumentNodes[i].type,
 			)
 		) {
-			throw new Error(
-				`FunctionInvocation: ArgumentType mismatch at argument ${
-					i + 1
-				}`,
+			reportError(
+				`Argument ${i + 1} doesn't match its declared parameter.`,
+				argumentNodes[i].value.position,
 			)
 		}
 	}
