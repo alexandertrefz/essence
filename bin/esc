@@ -11,7 +11,7 @@ import yargs from "yargs/yargs"
 import { containsErrors } from "../src/diagnostics"
 import { enrich } from "../src/enricher"
 import { optimise } from "../src/optimiser"
-import { parse } from "../src/parser"
+import { parseWithDiagnostics } from "../src/parser"
 import { rewrite } from "../src/rewriter"
 import { simplify } from "../src/simplifier"
 import { validate } from "../src/validator"
@@ -71,7 +71,17 @@ async function compile(flags) {
 	try {
 		const data = await readFile(flags.inputFileName, "utf8")
 
-		const initialProgram = parse(data)
+		const { program: initialProgram, diagnostics: parserDiagnostics } =
+			parseWithDiagnostics(data)
+
+		printDiagnostics(parserDiagnostics, flags.inputFileName)
+
+		if (containsErrors(parserDiagnostics)) {
+			console.error(
+				chalk.red(`Compilation of ${flags.inputFileName} failed.`),
+			)
+			process.exit(1)
+		}
 
 		const { program: enrichedProgram, diagnostics } =
 			enrich(initialProgram)

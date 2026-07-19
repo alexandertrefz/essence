@@ -1,17 +1,26 @@
 import { describe, expect, it } from "bun:test"
 
+import { containsErrors } from "../diagnostics"
 import type { parser } from "../interfaces"
-import { parse } from "../parser"
+import { parse, parseWithDiagnostics } from "../parser"
 
 describe("Parser", () => {
 	describe("Expressions", () => {
 		describe("NativeInvocations", () => {
 			it("should not parse NativePrefix without Identifier", () => {
-				expect(() => parse("implementation { __ }")).toThrow()
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { __ }",
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
 			it("should not parse NativeLookups without second Identifier", () => {
-				expect(() => parse("implementation { __lookup. }")).toThrow()
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { __lookup. }",
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
 			it("should parse NativeFunctionInvocation with one argument", () => {
