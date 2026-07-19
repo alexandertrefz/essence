@@ -1296,5 +1296,173 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 		})
+
+		describe("Generics", () => {
+			function firstNode(source: string): parser.ImplementationNode {
+				return parse(source).implementation.nodes[0]
+			}
+
+			it("should parse infer Generics on FunctionStatements", () => {
+				let node = firstNode(
+					`implementation {
+						function identity <infer T>(_ value: T) -> T {
+							<- value
+						}
+					}`,
+				)
+
+				expect(node.nodeType).toBe("FunctionStatement")
+
+				if (node.nodeType === "FunctionStatement") {
+					expect(node.value.generics).toHaveLength(1)
+					expect(node.value.generics[0].name.content).toBe("T")
+					expect(node.value.generics[0].inferred).toBe(true)
+					expect(node.value.generics[0].defaultType).toBeNull()
+				}
+			})
+
+			it("should parse Generic defaults on FunctionStatements", () => {
+				let node = firstNode(
+					`implementation {
+						function fallback <T = String>() -> T {
+							<- "value"
+						}
+					}`,
+				)
+
+				expect(node.nodeType).toBe("FunctionStatement")
+
+				if (node.nodeType === "FunctionStatement") {
+					expect(node.value.generics[0].name.content).toBe("T")
+					expect(node.value.generics[0].inferred).toBe(false)
+					expect(node.value.generics[0].defaultType).not.toBeNull()
+				}
+			})
+
+			it("should parse Generic NamespaceDefinitionStatements", () => {
+				let node = firstNode(
+					`implementation {
+						namespace Wrapper<infer Item> for List<Item> {
+							first() -> Item | Nothing {
+								<- @::firstItem()
+							}
+						}
+					}`,
+				)
+
+				expect(node.nodeType).toBe("NamespaceDefinitionStatement")
+
+				if (node.nodeType === "NamespaceDefinitionStatement") {
+					expect(node.generics).toHaveLength(1)
+					expect(node.generics[0].name.content).toBe("Item")
+					expect(node.generics[0].inferred).toBe(true)
+					expect(node.targetType).not.toBeNull()
+				}
+			})
+
+			it("should parse infer Generics on Methods", () => {
+				let node = firstNode(
+					`implementation {
+						namespace Wrapper<infer Item> for List<Item> {
+							map<infer Target>(_ transform: (_ item: Item) -> Target) -> List<Target> {
+								<- [transform(@::firstItem())]
+							}
+						}
+					}`,
+				)
+
+				expect(node.nodeType).toBe("NamespaceDefinitionStatement")
+
+				if (node.nodeType === "NamespaceDefinitionStatement") {
+					let method = node.methods.map
+
+					expect(method.nodeType).toBe("SimpleMethod")
+
+					if (method.nodeType === "SimpleMethod") {
+						expect(method.method.value.generics).toHaveLength(1)
+						expect(
+							method.method.value.generics[0].name.content,
+						).toBe("Target")
+						expect(method.method.value.generics[0].inferred).toBe(
+							true,
+						)
+					}
+				}
+			})
+
+			it("should parse Generic TypeAliasStatements", () => {
+				let node = firstNode(
+					`implementation {
+						type Maybe<Value> = Value | Nothing
+					}`,
+				)
+
+				expect(node.nodeType).toBe("TypeAliasStatement")
+
+				if (node.nodeType === "TypeAliasStatement") {
+					expect(node.generics).toHaveLength(1)
+					expect(node.generics[0].name.content).toBe("Value")
+					expect(node.generics[0].inferred).toBe(false)
+				}
+			})
+
+			it("should parse FunctionTypeDeclarations", () => {
+				let node = firstNode(
+					`implementation {
+						type Predicate = (_ value: String, count: Integer) -> Boolean
+					}`,
+				)
+
+				expect(node.nodeType).toBe("TypeAliasStatement")
+
+				if (node.nodeType === "TypeAliasStatement") {
+					expect(node.type.nodeType).toBe("FunctionTypeDeclaration")
+
+					if (node.type.nodeType === "FunctionTypeDeclaration") {
+						expect(node.type.parameterTypes).toHaveLength(2)
+						expect(
+							node.type.parameterTypes[0].externalName,
+						).toBeNull()
+						expect(
+							node.type.parameterTypes[1].externalName?.content,
+						).toBe("count")
+						expect(node.type.returnType.nodeType).toBe(
+							"IdentifierTypeDeclaration",
+						)
+					}
+				}
+			})
+
+			it("should keep infer usable as an Identifier", () => {
+				let node = firstNode(
+					`implementation {
+						constant infer = 5
+					}`,
+				)
+
+				expect(node.nodeType).toBe("ConstantDeclarationStatement")
+
+				if (node.nodeType === "ConstantDeclarationStatement") {
+					expect(node.name.content).toBe("infer")
+				}
+			})
+
+			it("should parse a Generic named infer", () => {
+				let node = firstNode(
+					`implementation {
+						function weird <infer>(_ value: infer) -> infer {
+							<- value
+						}
+					}`,
+				)
+
+				expect(node.nodeType).toBe("FunctionStatement")
+
+				if (node.nodeType === "FunctionStatement") {
+					expect(node.value.generics[0].name.content).toBe("infer")
+					expect(node.value.generics[0].inferred).toBe(false)
+				}
+			})
+		})
 	})
 })

@@ -187,4 +187,29 @@ describe("Parser Recovery", () => {
 			}
 		}
 	})
+
+	it("should recover from a broken Generic list", () => {
+		let { program, diagnostics } = parseWithDiagnostics(
+			`implementation {
+				namespace Broken<infer for List<Item> {
+					first() -> Item | Nothing {
+						<- @::firstItem()
+					}
+				}
+				constant y = 3
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+
+		let nodes = program.implementation.nodes
+
+		expect(nodes).toHaveLength(1)
+		expect(nodes[0].nodeType).toBe("ConstantDeclarationStatement")
+
+		if (nodes[0].nodeType === "ConstantDeclarationStatement") {
+			expect(nodes[0].name.content).toBe("y")
+		}
+	})
 })
