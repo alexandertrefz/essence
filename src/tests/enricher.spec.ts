@@ -392,4 +392,228 @@ describe("Enricher", () => {
 			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
 	})
+
+	describe("Generic Inference", () => {
+		function typeOfFirstConstant(source: string): common.Type {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			for (let node of program.implementation.nodes) {
+				if (node.nodeType === "ConstantDeclarationStatement") {
+					return node.type
+				}
+			}
+
+			throw new Error("No ConstantDeclarationStatement found.")
+		}
+
+		it("should infer List item Types through Method Invocations", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant first = [1, 2]::firstItem()
+				}`),
+			).toEqual({
+				type: "UnionType",
+				types: [{ type: "Integer" }, { type: "Nothing" }],
+			})
+		})
+
+		it("should substitute the receiver's item Type into List returns", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant shorter = ["a", "b"]::removeFirst()
+				}`),
+			).toEqual({ type: "List", itemType: { type: "String" } })
+		})
+
+		it("should infer Namespace Generics from the receiver", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					namespace Wrapper<infer Item> for List<Item> {
+						firstAgain() -> Item | Nothing {
+							<- @::firstItem()
+						}
+					}
+
+					constant first = ["x"]::firstAgain()
+				}`),
+			).toEqual({
+				type: "UnionType",
+				types: [{ type: "String" }, { type: "Nothing" }],
+			})
+		})
+
+		it("should bind Method Generics from Function Argument return Types", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					namespace Mapper<infer Item> for List<Item> {
+						transformFirst<infer Target>(
+							_ transform: (_ item: Item) -> Target,
+							fallback fallbackValue: Target,
+						) -> Target {
+							<- match @::firstItem() -> Target {
+								case Nothing { <- fallbackValue }
+								case Item { <- transform(@) }
+							}
+						}
+					}
+
+					constant first = [1]::transformFirst(
+						(_ item: Integer) -> String { <- item::toString() },
+						fallback "none",
+					)
+				}`),
+			).toEqual({ type: "String" })
+		})
+
+		it("should check Function Argument parameters against bound Generics", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Mapper<infer Item> for List<Item> {
+					transformFirst<infer Target>(
+						_ transform: (_ item: Item) -> Target,
+						fallback fallbackValue: Target,
+					) -> Target {
+						<- fallbackValue
+					}
+				}
+
+				constant first = [1]::transformFirst(
+					(_ item: String) -> String { <- item },
+					fallback "none",
+				)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Passed arguments do not match any overload.",
+			)
+		})
+
+		it("should infer Generic Functions from their Arguments", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					function identity <infer T>(_ value: T) -> T {
+						<- value
+					}
+
+					constant a = identity(5)
+				}`),
+			).toEqual({ type: "Integer" })
+		})
+
+		it("should report conflicting later occurrences as mismatches", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = [1, 2]::append("x")
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Passed arguments do not match any overload.",
+			)
+		})
+
+		it("should report Type Parameters that can not be inferred", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function broken <infer T>() -> T {
+					<- "value"
+				}
+
+				constant a = broken()
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => diagnostic.message),
+			).toContain("Could not infer Type Parameter 'T'.")
+		})
+
+		it("should apply defaults for unbound plain Generics", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					function fallback <T = String>() -> T {
+						<- "value"
+					}
+
+					constant a = fallback()
+				}`),
+			).toEqual({ type: "String" })
+		})
+
+		it("should expand applied Generic Type Aliases", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type Maybe<Value> = Value | Nothing
+
+				constant a: Maybe<Fraction> = 1/2
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let constant = program.implementation.nodes[1]
+
+			expect(constant.nodeType).toBe("ConstantDeclarationStatement")
+
+			if (constant.nodeType === "ConstantDeclarationStatement") {
+				expect(constant.declaredType).toEqual({
+					type: "UnionType",
+					types: [{ type: "Fraction" }, { type: "Nothing" }],
+				})
+			}
+		})
+
+		it("should apply Generic Type Alias defaults", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Fallback<Value = String> = Value | Nothing
+
+					constant a: Fallback = "value"
+				}`),
+			).toEqual([])
+		})
+
+		it("should report Generic Type Aliases applied with too many Type Arguments", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Maybe<Value> = Value | Nothing
+
+				constant a: Maybe<Fraction, Integer> = 1/2
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Wrong number of Type Arguments for Type 'Maybe'.",
+			)
+			expect(diagnostics[0].position?.start.line).toBe(4)
+		})
+
+		it("should report Generic Type Aliases used without Type Arguments", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Maybe<Value> = Value | Nothing
+
+				constant a: Maybe = 1/2
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Wrong number of Type Arguments for Type 'Maybe'.",
+			)
+		})
+
+		it("should match Generic Namespaces through applied Alias targets", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					type Maybe<Value> = Value | Nothing
+
+					namespace Maybe<infer Value> for Maybe<Value> {
+						withDefault(_ fallbackValue: Value) -> Value {
+							<- match @ -> Value {
+								case Nothing { <- fallbackValue }
+								case Value { <- @ }
+							}
+						}
+					}
+
+					constant first = [1, 2]::firstItem()::withDefault(0)
+				}`),
+			).toEqual({ type: "Integer" })
+		})
+	})
 })

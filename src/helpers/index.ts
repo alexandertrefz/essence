@@ -300,16 +300,24 @@ function matchTypes(
 	// NOTE: Generics can occur on either side — an expected Generic binds the
 	// actual Type, while an actual-side Generic occurs when signatures are
 	// compared (contravariant parameter positions flip the sides).
-	if (lhs.type === "GenericUse") {
+	if (lhs.type === "GenericUse" && context?.bindableNames.has(lhs.name)) {
 		return matchGenericUse(lhs, rhs, context, (binding) =>
 			matchTypes(binding, rhs, context),
 		)
 	}
 
-	if (rhs.type === "GenericUse") {
+	if (rhs.type === "GenericUse" && context?.bindableNames.has(rhs.name)) {
 		return matchGenericUse(rhs, lhs, context, (binding) =>
 			matchTypes(lhs, binding, context),
 		)
+	}
+
+	// NOTE: An opaque Generic is a symbol of an enclosing definition — as the
+	// expected Type it only accepts itself, which the same-name check above
+	// already covered. As the actual Type it falls through, so that an
+	// expected Union can still accept its own Generic member.
+	if (lhs.type === "GenericUse") {
+		return false
 	}
 
 	if (lhs.type === "Unknown") {

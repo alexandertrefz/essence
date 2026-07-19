@@ -1,9 +1,13 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+	applyGenericBindings,
+	createInferenceContext,
 	first,
 	flatten,
+	matchArguments,
 	matchesType,
+	matchesTypeWithBindings,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
@@ -17,12 +21,15 @@ import { lexer } from "../interfaces"
 import type {
 	ErrorType,
 	FunctionType,
+	GenericUse,
+	ListType,
 	MethodType,
 	OverloadedMethodType,
 	OverloadedStaticMethodType,
 	PrimitiveType,
 	RecordType,
 	StaticMethodType,
+	Type,
 	UnionType,
 	UnknownType,
 } from "../interfaces/common"
@@ -1289,6 +1296,370 @@ describe("Helpers", () => {
 			// expect(
 			// 	matchesType(integerList, noArgumentOverloadedStaticMethodType),
 			// ).toBe(false)
+		})
+
+		describe("Opaque Generics", () => {
+			const genericT: GenericUse = { type: "GenericUse", name: "T" }
+			const genericU: GenericUse = { type: "GenericUse", name: "U" }
+
+			it("should match a Generic to itself", () => {
+				expect(matchesType(genericT, genericT)).toBe(true)
+			})
+
+			it("should not match different Generics", () => {
+				expect(matchesType(genericT, genericU)).toBe(false)
+			})
+
+			it("should not match a Generic against a concrete Type", () => {
+				expect(matchesType(genericT, integerPrimitive)).toBe(false)
+				expect(matchesType(integerPrimitive, genericT)).toBe(false)
+			})
+
+			it("should accept a Generic member of an expected Union", () => {
+				const maybeT: UnionType = {
+					type: "UnionType",
+					types: [genericT, { type: "Nothing" }],
+				}
+
+				expect(matchesType(maybeT, genericT)).toBe(true)
+				expect(matchesType(maybeT, { type: "Nothing" })).toBe(true)
+				expect(matchesType(maybeT, genericU)).toBe(false)
+			})
+		})
+	})
+
+	describe("Generic Inference", () => {
+		const genericT: GenericUse = { type: "GenericUse", name: "T" }
+		const integer: Type = { type: "Integer" }
+		const fraction: Type = { type: "Fraction" }
+		const string: Type = { type: "String" }
+		const nothing: Type = { type: "Nothing" }
+
+		function inferContextFor(names: Array<string>) {
+			return createInferenceContext(
+				names.map((name) => ({ name, infer: true, defaultType: null })),
+			)
+		}
+
+		describe("createInferenceContext", () => {
+			it("should leave infer Generics unbound", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+
+				expect(context.bindableNames.has("T")).toBe(true)
+				expect(context.bindings.has("T")).toBe(false)
+			})
+
+			it("should seed plain Generics with their default Type", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: false, defaultType: string },
+				])
+
+				expect(context.bindableNames.has("T")).toBe(true)
+				expect(context.bindings.get("T")).toEqual(string)
+			})
+
+			it("should keep plain Generics without a default opaque", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: false, defaultType: null },
+				])
+
+				expect(context.bindableNames.has("T")).toBe(false)
+			})
+		})
+
+		describe("matchesTypeWithBindings", () => {
+			it("should bind a Generic on its first occurrence", () => {
+				let context = inferContextFor(["T"])
+
+				expect(
+					matchesTypeWithBindings(genericT, integer, context),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(integer)
+			})
+
+			it("should check later occurrences against the binding", () => {
+				let context = inferContextFor(["T"])
+				let integerOrFraction: UnionType = {
+					type: "UnionType",
+					types: [integer, fraction],
+				}
+
+				expect(
+					matchesTypeWithBindings(
+						genericT,
+						integerOrFraction,
+						context,
+					),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(genericT, fraction, context),
+				).toBe(true)
+				expect(matchesTypeWithBindings(genericT, string, context)).toBe(
+					false,
+				)
+			})
+
+			it("should reject conflicting later occurrences", () => {
+				let context = inferContextFor(["T"])
+
+				expect(
+					matchesTypeWithBindings(genericT, integer, context),
+				).toBe(true)
+				expect(matchesTypeWithBindings(genericT, string, context)).toBe(
+					false,
+				)
+			})
+
+			it("should bind Generics nested in Lists", () => {
+				let context = inferContextFor(["T"])
+				let listOfT: ListType = { type: "List", itemType: genericT }
+				let listOfString: ListType = { type: "List", itemType: string }
+
+				expect(
+					matchesTypeWithBindings(listOfT, listOfString, context),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(string)
+			})
+
+			it("should not bind from empty List Literals", () => {
+				let context = inferContextFor(["T"])
+				let listOfT: ListType = { type: "List", itemType: genericT }
+				let listOfUnknown: ListType = {
+					type: "List",
+					itemType: { type: "Unknown" },
+				}
+
+				expect(
+					matchesTypeWithBindings(listOfT, listOfUnknown, context),
+				).toBe(true)
+				expect(context.bindings.has("T")).toBe(false)
+			})
+
+			it("should bind Generics nested in Records", () => {
+				let context = inferContextFor(["T"])
+				let recordOfT: RecordType = {
+					type: "Record",
+					members: { key: genericT },
+				}
+				let recordOfInteger: RecordType = {
+					type: "Record",
+					members: { key: integer },
+				}
+
+				expect(
+					matchesTypeWithBindings(
+						recordOfT,
+						recordOfInteger,
+						context,
+					),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(integer)
+			})
+
+			it("should bind a Generic from a Function's return Type", () => {
+				let context = inferContextFor(["Target"])
+				let expected: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: integer }],
+					returnType: { type: "GenericUse", name: "Target" },
+				}
+				let actual: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: integer }],
+					returnType: string,
+				}
+
+				expect(matchesTypeWithBindings(expected, actual, context)).toBe(
+					true,
+				)
+				expect(context.bindings.get("Target")).toEqual(string)
+			})
+
+			it("should check a Function's parameters against bound Generics", () => {
+				let context = inferContextFor(["Item"])
+				let genericItem: GenericUse = {
+					type: "GenericUse",
+					name: "Item",
+				}
+
+				expect(
+					matchesTypeWithBindings(genericItem, integer, context),
+				).toBe(true)
+
+				let expected: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: genericItem }],
+					returnType: string,
+				}
+				let matching: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: integer }],
+					returnType: string,
+				}
+				let mismatching: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: string }],
+					returnType: string,
+				}
+
+				expect(
+					matchesTypeWithBindings(expected, matching, context),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(expected, mismatching, context),
+				).toBe(false)
+			})
+
+			it("should prefer concrete Union members over binding a Generic", () => {
+				let context = inferContextFor(["Value"])
+				let genericValue: GenericUse = {
+					type: "GenericUse",
+					name: "Value",
+				}
+				let maybeValue: UnionType = {
+					type: "UnionType",
+					types: [genericValue, nothing],
+				}
+
+				expect(
+					matchesTypeWithBindings(maybeValue, nothing, context),
+				).toBe(true)
+				expect(context.bindings.has("Value")).toBe(false)
+
+				expect(
+					matchesTypeWithBindings(maybeValue, integer, context),
+				).toBe(true)
+				expect(context.bindings.get("Value")).toEqual(integer)
+			})
+
+			it("should bind a Generic from a Union receiver", () => {
+				let context = inferContextFor(["Value"])
+				let genericValue: GenericUse = {
+					type: "GenericUse",
+					name: "Value",
+				}
+				let maybeValue: UnionType = {
+					type: "UnionType",
+					types: [genericValue, nothing],
+				}
+				let integerOrNothing: UnionType = {
+					type: "UnionType",
+					types: [integer, nothing],
+				}
+
+				expect(
+					matchesTypeWithBindings(
+						maybeValue,
+						integerOrNothing,
+						context,
+					),
+				).toBe(true)
+				expect(context.bindings.get("Value")).toEqual(integer)
+			})
+		})
+
+		describe("applyGenericBindings", () => {
+			it("should substitute bindings into nested Types", () => {
+				let bindings = new Map<string, Type>([["T", string]])
+				let listOfT: Type = { type: "List", itemType: genericT }
+				let functionOfT: Type = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: genericT }],
+					returnType: { type: "List", itemType: genericT },
+				}
+
+				expect(applyGenericBindings(listOfT, bindings)).toEqual({
+					type: "List",
+					itemType: string,
+				})
+				expect(applyGenericBindings(functionOfT, bindings)).toEqual({
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: string }],
+					returnType: { type: "List", itemType: string },
+				})
+			})
+
+			it("should leave unbound Generics untouched", () => {
+				let bindings = new Map<string, Type>()
+
+				expect(applyGenericBindings(genericT, bindings)).toEqual(
+					genericT,
+				)
+			})
+		})
+
+		describe("matchArguments with inference", () => {
+			const parameters = [
+				{ name: null, type: genericT },
+				{ name: null, type: genericT },
+			]
+
+			it("should infer Arguments left to right", () => {
+				let context = inferContextFor(["T"])
+
+				expect(
+					matchArguments(
+						parameters,
+						[
+							{ name: null, getType: () => integer },
+							{ name: null, getType: () => integer },
+						],
+						{ inference: context },
+					),
+				).toEqual({ type: "Match" })
+				expect(context.bindings.get("T")).toEqual(integer)
+			})
+
+			it("should reject Arguments conflicting with a binding", () => {
+				expect(
+					matchArguments(
+						parameters,
+						[
+							{ name: null, getType: () => integer },
+							{ name: null, getType: () => string },
+						],
+						{ inference: inferContextFor(["T"]) },
+					),
+				).toEqual({
+					type: "ArgumentMismatch",
+					mismatchedArgumentIndices: [1],
+				})
+			})
+
+			it("should not leak bindings between candidates", () => {
+				expect(
+					matchArguments(
+						parameters,
+						[
+							{ name: null, getType: () => string },
+							{ name: null, getType: () => integer },
+						],
+						{ inference: inferContextFor(["T"]) },
+					).type,
+				).toBe("ArgumentMismatch")
+
+				// NOTE: A fresh context is a fresh candidate — the previous
+				// String binding must not survive.
+				expect(
+					matchArguments(
+						parameters,
+						[
+							{ name: null, getType: () => integer },
+							{ name: null, getType: () => integer },
+						],
+						{ inference: inferContextFor(["T"]) },
+					),
+				).toEqual({ type: "Match" })
+			})
 		})
 	})
 })

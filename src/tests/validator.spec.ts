@@ -296,4 +296,65 @@ describe("Validator", () => {
 			)
 		})
 	})
+
+	describe("Generic Inference", () => {
+		it("should check declared Types against inferred return Types", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a: Integer = ["x"]::firstItem()
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Wrong Assignment Value Type for Constant 'a'.",
+			)
+		})
+
+		it("should accept declared Types matching inferred return Types", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant a: String | Nothing = ["x"]::firstItem()
+				}`),
+			).toEqual([])
+		})
+
+		it("should treat Generics as opaque inside Generic Functions", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function broken <infer T>(_ value: T) -> T {
+					<- "constant"
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Type of returned expression doesn't match the declared return type.",
+			)
+		})
+
+		it("should accept returning a Generic value as its own Generic Type", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function identity <infer T>(_ value: T) -> T {
+						<- value
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should validate Match Expressions over Generic Unions", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Wrapper<infer Item> for List<Item> {
+						firstOr(fallback fallbackValue: Item) -> Item {
+							<- match @::firstItem() -> Item {
+								case Nothing { <- fallbackValue }
+								case Item { <- @ }
+							}
+						}
+					}
+
+					__print([1]::firstOr(fallback 0))
+				}`),
+			).toEqual([])
+		})
+	})
 })
