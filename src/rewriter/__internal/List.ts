@@ -1,11 +1,10 @@
 import type { BooleanType } from "./Boolean"
-import type { IntegerType } from "./Integer"
-import type { NothingType } from "./Nothing"
-
 import { createBoolean, negate } from "./Boolean"
+import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
-import { createNothing } from "./Nothing"
 import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
+import type { NothingType } from "./Nothing"
+import { createNothing } from "./Nothing"
 import { type AnyType, typeKeySymbol } from "./type"
 
 export type ListType<ItemType extends AnyType> = {

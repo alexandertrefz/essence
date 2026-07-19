@@ -1,7 +1,6 @@
 import type { BooleanType } from "./Boolean"
-import type { ListType } from "./List"
-
 import { createBoolean } from "./Boolean"
+import type { ListType } from "./List"
 import { createList } from "./List"
 import { typeKeySymbol } from "./type"
 

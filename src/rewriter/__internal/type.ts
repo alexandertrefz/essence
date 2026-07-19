@@ -1,3 +1,4 @@
+import type { common } from "../../interfaces"
 import type { BooleanType } from "./Boolean"
 import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
@@ -5,8 +6,6 @@ import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
-
-import type { common } from "../../interfaces"
 
 export const typeKeySymbol = Symbol("$type")
 

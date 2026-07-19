@@ -382,13 +382,13 @@ function validateNamespaceDefinitionStatement(
 				validateGenericFunctionDefinition(method.method.value)
 			}
 		} else {
-			method.methods.map((overloadedMethod) => {
+			for (let overloadedMethod of method.methods) {
 				if (overloadedMethod.value.nodeType === "FunctionDefinition") {
 					validateFunctionDefinition(overloadedMethod.value)
 				} else {
 					validateGenericFunctionDefinition(overloadedMethod.value)
 				}
-			})
+			}
 		}
 	}
 

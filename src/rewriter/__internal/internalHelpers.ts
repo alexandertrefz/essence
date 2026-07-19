@@ -1,16 +1,13 @@
 import type { Fraction } from "bigint-fraction"
-
-import type { IntegerType } from "./Integer"
-import type { AnyType } from "./type"
-
-import { typeKeySymbol } from "./type"
-
 import { is as boolIs } from "./Boolean"
 import { is as fractionIs } from "./Fraction"
+import type { IntegerType } from "./Integer"
 import { is as integerIs } from "./Integer"
 import { is as listIs } from "./List"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
+import type { AnyType } from "./type"
+import { typeKeySymbol } from "./type"
 
 export function getInt32(number: IntegerType): number {
 	return Number(BigInt.asIntN(32, number.value))

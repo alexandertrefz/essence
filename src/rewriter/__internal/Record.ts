@@ -1,11 +1,10 @@
 import type { BooleanType } from "./Boolean"
-import type { ListType } from "./List"
-import type { StringType } from "./String"
-import type { AnyType } from "./type"
-
 import { and, negate } from "./Boolean"
+import type { ListType } from "./List"
 import { createList, is as listIs } from "./List"
+import type { StringType } from "./String"
 import { createString } from "./String"
+import type { AnyType } from "./type"
 import { typeKeySymbol } from "./type"
 
 export type RecordType = {
@@ -65,8 +64,9 @@ export function isNot(
 	return negate(is(firstRecordInstance, secondRecordInstance))
 }
 
-// biome-ignore lint/suspicious/noShadowRestrictedNames:
+// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(recordInstance: RecordType) {
 	// TODO
+	console.log("toString", recordInstance)
 	return createString("Record")
 }
