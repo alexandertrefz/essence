@@ -4,21 +4,23 @@
 - should structural typing accept `{ x: Number, y: Number }` to match `{ x: Number }` or should this require an opt-in like `Type extends { x: Number }`
 	- this would also allow for the correct return type to be declared
 ```
-function filterSpecific(_ list: List<{ num: Number }>, _ callback: (_ item: { num: Number }) -> Boolean) -> List<{ num: Number }>
-function filterGeneric<Item extends { num: Number }>(_ list: List<Item>, _ callback: (_ item: Item) -> Boolean) -> List<Item>
+type NumObject = { num: Number }
+
+function filterSpecific(_ list: List<NumObject>, _ callback: (_ item: NumObject) -> Boolean) -> List<NumObject>
+function filterGeneric<Item extends NumObject>(_ list: List<Item>, _ callback: (_ item: Item) -> Boolean) -> List<Item>
 
 constant list = [ { num = 1, str = "" }, { num = 3, str = "" } ]
-function filterCallback(item: { num: Number }) -> Boolean { <- item.num::isLessThan(2) }
+function filterCallback(item: NumObject) -> Boolean { <- item.num::isLessThan(2) }
 
 § Should the user be forced to map to the limited type, first?
 
 § returns [{ num = 1 }]
-filterSpecific(list::map((item) -> { num: Number } { <- { num: item.num } }), filterCallback)
+filterSpecific(list::map((item) -> NumObject { <- { num: item.num } }), filterCallback)
 
 § returns [{ num = 1 }] per the types, but in reality [{ num = 1, str = "" }]
 filterSpecific(list, filterCallback)
 
-§ returns [{ num = 1, str = "" }]
+§ returns [{ num = 1, str = "" }] per the types and also in reality
 filterGeneric(list, filterCallback)
 ```
 
