@@ -134,11 +134,14 @@ export interface IdentifierNode {
 	type: Type
 }
 
+// NOTE: `type` is only a Record Type for valid Programs — invalid
+// Combinations recover with an Error Type. The Simplifier only runs on
+// Programs without Error Diagnostics.
 export interface CombinationNode {
 	nodeType: "Combination"
 	lhs: ExpressionNode
 	rhs: ExpressionNode
-	type: RecordType
+	type: Type
 }
 
 export interface MatchNode {
