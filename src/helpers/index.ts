@@ -240,3 +240,64 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 
 	return false
 }
+
+// NOTE: The Argument Type is provided lazily — resolving an Argument's Type
+// in the Enricher can report Diagnostics, so `getType` is only invoked for
+// Arguments whose label already matched, exactly like the previous inline
+// checks did.
+export type MatchableArgument = {
+	name: string | null
+	getType: () => common.Type
+}
+
+export type ArgumentMatchResult =
+	| { type: "Match" }
+	| { type: "ArityMismatch" }
+	| { type: "ArgumentMismatch"; mismatchedArgumentIndices: Array<number> }
+
+// NOTE: Checks whether passed Arguments match a parameter list — arity,
+// labels (matched by name equality; a labelless Argument only matches a
+// labelless parameter), and per-Argument `matchesType`.
+// By default the check stops at the first mismatching Argument, which callers
+// that only need a boolean "does this overload match" rely on to avoid
+// resolving further Argument Types. With `collectAllMismatches` every
+// mismatching Argument index is collected, which the Validator uses to report
+// one Diagnostic per mismatching Argument.
+export function matchArguments(
+	parameters: common.BaseFunction["parameterTypes"],
+	matchableArguments: Array<MatchableArgument>,
+	options: { collectAllMismatches: boolean } = {
+		collectAllMismatches: false,
+	},
+): ArgumentMatchResult {
+	if (parameters.length !== matchableArguments.length) {
+		return { type: "ArityMismatch" }
+	}
+
+	let mismatchedArgumentIndices: Array<number> = []
+
+	for (let i = 0; i < parameters.length; i++) {
+		let parameter = parameters[i]
+		let argument = matchableArguments[i]
+
+		if (
+			parameter.name !== argument.name ||
+			!matchesType(parameter.type, argument.getType())
+		) {
+			if (!options.collectAllMismatches) {
+				return {
+					type: "ArgumentMismatch",
+					mismatchedArgumentIndices: [i],
+				}
+			}
+
+			mismatchedArgumentIndices.push(i)
+		}
+	}
+
+	if (mismatchedArgumentIndices.length > 0) {
+		return { type: "ArgumentMismatch", mismatchedArgumentIndices }
+	}
+
+	return { type: "Match" }
+}

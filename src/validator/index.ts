@@ -1,5 +1,5 @@
 import { collectDiagnostics, reportError, reportWarning } from "../diagnostics"
-import { matchesType } from "../helpers"
+import { type MatchableArgument, matchArguments, matchesType } from "../helpers"
 import type { common } from "../interfaces"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -170,40 +170,26 @@ function validateFunctionInvocation(
 			functionType.type === "OverloadedMethod" ||
 			functionType.type === "OverloadedStaticMethod"
 		) {
-			let lastIterationHadError = false
+			let matchableArguments = matchableArgumentsFromTypedNodes(
+				node.arguments,
+			)
+
+			let overloadMatched = true
 			let index = 0
 
 			for (let overload of functionType.overloads) {
-				lastIterationHadError = false
+				overloadMatched =
+					matchArguments(overload.parameterTypes, matchableArguments)
+						.type === "Match"
 
-				if (overload.parameterTypes.length !== node.arguments.length) {
-					lastIterationHadError = true
-					index++
-					continue
-				}
-
-				for (let i = 0; i < overload.parameterTypes.length; i++) {
-					if (
-						overload.parameterTypes[i].name !==
-							node.arguments[i].name ||
-						!matchesType(
-							overload.parameterTypes[i].type,
-							node.arguments[i].type,
-						)
-					) {
-						lastIterationHadError = true
-						break
-					}
-				}
-
-				if (lastIterationHadError === false) {
+				if (overloadMatched) {
 					break
 				}
 
 				index++
 			}
 
-			if (lastIterationHadError) {
+			if (!overloadMatched) {
 				reportError(
 					"Passed arguments do not match any overload.",
 					node.position,
@@ -212,7 +198,13 @@ function validateFunctionInvocation(
 				node.overloadedMethodIndex = index
 			}
 		} else {
-			if (functionType.parameterTypes.length !== node.arguments.length) {
+			let matchResult = matchArguments(
+				functionType.parameterTypes,
+				matchableArgumentsFromTypedNodes(node.arguments),
+				{ collectAllMismatches: true },
+			)
+
+			if (matchResult.type === "ArityMismatch") {
 				reportError(
 					"Amount of passed arguments doesn't match the signature.",
 					node.position,
@@ -221,15 +213,8 @@ function validateFunctionInvocation(
 				return node
 			}
 
-			for (let i = 0; i < functionType.parameterTypes.length; i++) {
-				if (
-					functionType.parameterTypes[i].name !==
-						node.arguments[i].name ||
-					!matchesType(
-						functionType.parameterTypes[i].type,
-						node.arguments[i].type,
-					)
-				) {
+			if (matchResult.type === "ArgumentMismatch") {
+				for (let i of matchResult.mismatchedArgumentIndices) {
 					reportError(
 						`Argument ${i + 1} doesn't match its declared parameter.`,
 						node.arguments[i].value.position,
@@ -588,6 +573,15 @@ function describeType(type: common.Type): string {
 	}
 }
 
+function matchableArgumentsFromTypedNodes(
+	argumentNodes: Array<common.typed.ArgumentNode>,
+): Array<MatchableArgument> {
+	return argumentNodes.map((argumentNode) => ({
+		name: argumentNode.name,
+		getType: () => argumentNode.type,
+	}))
+}
+
 function validateSimpleFunctionInvocation(
 	functionType: common.FunctionType | common.StaticMethodType,
 	argumentNodes: Array<common.typed.ArgumentNode>,
@@ -597,7 +591,13 @@ function validateSimpleFunctionInvocation(
 		validateExpression(argumentNode.value)
 	}
 
-	if (functionType.parameterTypes.length !== argumentNodes.length) {
+	let matchResult = matchArguments(
+		functionType.parameterTypes,
+		matchableArgumentsFromTypedNodes(argumentNodes),
+		{ collectAllMismatches: true },
+	)
+
+	if (matchResult.type === "ArityMismatch") {
 		reportError(
 			"Amount of passed arguments doesn't match the signature.",
 			position,
@@ -606,14 +606,8 @@ function validateSimpleFunctionInvocation(
 		return
 	}
 
-	for (let i = 0; i < functionType.parameterTypes.length; i++) {
-		if (
-			functionType.parameterTypes[i].name !== argumentNodes[i].name ||
-			!matchesType(
-				functionType.parameterTypes[i].type,
-				argumentNodes[i].type,
-			)
-		) {
+	if (matchResult.type === "ArgumentMismatch") {
+		for (let i of matchResult.mismatchedArgumentIndices) {
 			reportError(
 				`Argument ${i + 1} doesn't match its declared parameter.`,
 				argumentNodes[i].value.position,
