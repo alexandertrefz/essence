@@ -97,6 +97,25 @@ describe("Enricher", () => {
 			)
 		})
 
+		it("should accept Method Invocations with matching argument labels", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant a = [1]::append(contentsOf [2])
+				}`),
+			).toEqual([])
+		})
+
+		it("should report Method Invocations with wrong argument labels", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = [1]::append(wrongLabel [2])
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Passed arguments do not match any overload.",
+			)
+		})
+
 		it("should report Combinations of non-Record Types", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = { "value" with name = "x" }
