@@ -449,6 +449,32 @@ export function unionTypeDeclaration(
 	}
 }
 
+export function functionTypeParameter(
+	externalName: parser.IdentifierNode | null,
+	type: parser.TypeDeclarationNode,
+	position: common.Position,
+): parser.FunctionTypeParameterNode {
+	return {
+		nodeType: "FunctionTypeParameter",
+		externalName,
+		type,
+		position,
+	}
+}
+
+export function functionTypeDeclaration(
+	parameterTypes: Array<parser.FunctionTypeParameterNode>,
+	returnType: parser.TypeDeclarationNode,
+	position: common.Position,
+): parser.FunctionTypeDeclarationNode {
+	return {
+		nodeType: "FunctionTypeDeclaration",
+		parameterTypes,
+		returnType,
+		position,
+	}
+}
+
 export function genericTypeDeclaration(
 	baseType: parser.UngenericTypeDeclarationNode,
 	generics: Array<parser.TypeDeclarationNode>,
