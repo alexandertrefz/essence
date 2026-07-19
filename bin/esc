@@ -9,6 +9,7 @@ import { hideBin } from "yargs/helpers"
 import yargs from "yargs/yargs"
 
 import { containsErrors } from "../src/diagnostics"
+import { renderDiagnostics } from "../src/diagnostics/render"
 import { enrich } from "../src/enricher"
 import { optimise } from "../src/optimiser"
 import { parseWithDiagnostics } from "../src/parser"
@@ -37,21 +38,16 @@ let argv = await yargs(hideBin(process.argv))
 	})
 	.parse()
 
-function printDiagnostics(diagnostics, inputFileName) {
-	for (let diagnostic of diagnostics) {
-		let location = chalk.cyan(inputFileName)
-
-		if (diagnostic.position) {
-			location += `:${diagnostic.position.start.line}:${diagnostic.position.start.column}`
-		}
-
-		let severity =
-			diagnostic.severity === "error"
-				? chalk.red("error")
-				: chalk.yellow("warning")
-
-		console.error(`${location} ${severity}: ${diagnostic.message}`)
+function printDiagnostics(diagnostics, sourceText, inputFileName) {
+	if (diagnostics.length === 0) {
+		return
 	}
+
+	let rendered = renderDiagnostics(diagnostics, sourceText, inputFileName, {
+		color: chalk.level > 0,
+	})
+
+	console.error(rendered.replace(/\n$/, ""))
 }
 
 function generateOutputFilePath(inputFileName, outputFileName) {
@@ -74,7 +70,7 @@ async function compile(flags) {
 		const { program: initialProgram, diagnostics: parserDiagnostics } =
 			parseWithDiagnostics(data)
 
-		printDiagnostics(parserDiagnostics, flags.inputFileName)
+		printDiagnostics(parserDiagnostics, data, flags.inputFileName)
 
 		if (containsErrors(parserDiagnostics)) {
 			console.error(
@@ -86,7 +82,7 @@ async function compile(flags) {
 		const { program: enrichedProgram, diagnostics } =
 			enrich(initialProgram)
 
-		printDiagnostics(diagnostics, flags.inputFileName)
+		printDiagnostics(diagnostics, data, flags.inputFileName)
 
 		if (containsErrors(diagnostics)) {
 			console.error(
@@ -97,7 +93,7 @@ async function compile(flags) {
 
 		const validatorDiagnostics = validate(enrichedProgram)
 
-		printDiagnostics(validatorDiagnostics, flags.inputFileName)
+		printDiagnostics(validatorDiagnostics, data, flags.inputFileName)
 
 		if (containsErrors(validatorDiagnostics)) {
 			console.error(
