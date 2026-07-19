@@ -273,6 +273,7 @@ export type UngenericTypeDeclarationNode =
 	| IdentifierTypeDeclarationNode
 	| RecordTypeDeclarationNode
 	| UnionTypeDeclarationNode
+	| FunctionTypeDeclarationNode
 
 export interface GenericDeclarationNode {
 	nodeType: "GenericDeclarationNode"
@@ -303,6 +304,20 @@ export interface ListTypeDeclarationNode {
 export interface UnionTypeDeclarationNode {
 	nodeType: "UnionTypeDeclaration"
 	types: Array<TypeDeclarationNode>
+	position: Position
+}
+
+export interface FunctionTypeParameterNode {
+	nodeType: "FunctionTypeParameter"
+	externalName: IdentifierNode | null
+	type: TypeDeclarationNode
+	position: Position
+}
+
+export interface FunctionTypeDeclarationNode {
+	nodeType: "FunctionTypeDeclaration"
+	parameterTypes: Array<FunctionTypeParameterNode>
+	returnType: TypeDeclarationNode
 	position: Position
 }
 

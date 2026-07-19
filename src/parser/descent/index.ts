@@ -1218,7 +1218,8 @@ class DescentParser {
 
 	protected parseSimpleType():
 		| parser.IdentifierTypeDeclarationNode
-		| parser.RecordTypeDeclarationNode {
+		| parser.RecordTypeDeclarationNode
+		| parser.FunctionTypeDeclarationNode {
 		let token = this.peekOrFail("a Type")
 
 		if (isIdentifierToken(token)) {
@@ -1231,10 +1232,80 @@ class DescentParser {
 			return this.parseRecordType()
 		}
 
+		if (token.type === TokenType.SymbolLeftParen) {
+			return this.parseFunctionType()
+		}
+
 		fail(
 			`Expected a Type but found ${describeToken(token)}.`,
 			token.position,
 		)
+	}
+
+	protected parseFunctionType(): parser.FunctionTypeDeclarationNode {
+		let leftParen = this.tokens.expect(TokenType.SymbolLeftParen)
+
+		let parameterTypes: Array<parser.FunctionTypeParameterNode> = []
+
+		if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
+			parameterTypes.push(this.parseFunctionTypeParameter())
+
+			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+				this.tokens.next()
+
+				if (this.tokens.peek()?.type === TokenType.SymbolRightParen) {
+					break
+				}
+
+				parameterTypes.push(this.parseFunctionTypeParameter())
+			}
+		}
+
+		this.tokens.expect(TokenType.SymbolRightParen)
+
+		let returnType = this.parseReturnType()
+
+		return generators.functionTypeDeclaration(parameterTypes, returnType, {
+			start: leftParen.position.start,
+			end: returnType.position.end,
+		})
+	}
+
+	// NOTE: Function Type parameters mirror the parameter grammar — the
+	// internal name only documents the parameter and may be omitted entirely
+	// (`_: String`), while the external name is part of the call syntax.
+	protected parseFunctionTypeParameter(): parser.FunctionTypeParameterNode {
+		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
+			let underscore = this.tokens.next()
+
+			if (isIdentifierToken(this.tokens.peek())) {
+				this.parseIdentifier()
+			}
+
+			this.tokens.expect(TokenType.SymbolColon)
+
+			let type = this.parseType()
+
+			return generators.functionTypeParameter(null, type, {
+				start: underscore.position.start,
+				end: type.position.end,
+			})
+		}
+
+		let name = this.parseIdentifier()
+
+		if (isIdentifierToken(this.tokens.peek())) {
+			this.parseIdentifier()
+		}
+
+		this.tokens.expect(TokenType.SymbolColon)
+
+		let type = this.parseType()
+
+		return generators.functionTypeParameter(name, type, {
+			start: name.position.start,
+			end: type.position.end,
+		})
 	}
 
 	protected parseRecordType(): parser.RecordTypeDeclarationNode {

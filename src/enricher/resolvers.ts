@@ -55,8 +55,25 @@ export function resolveType(
 			return resolveRecordTypeDeclarationType(node, scope)
 		case "GenericTypeDeclaration":
 			return resolveGenericTypeDeclarationType(node, scope)
+		case "FunctionTypeDeclaration":
+			return resolveFunctionTypeDeclarationType(node, scope)
 		case "Match":
 			return resolveMatchType(node, scope)
+	}
+}
+
+export function resolveFunctionTypeDeclarationType(
+	node: parser.FunctionTypeDeclarationNode,
+	scope: enricher.Scope,
+): common.FunctionType {
+	return {
+		type: "Function",
+		generics: [],
+		parameterTypes: node.parameterTypes.map((parameter) => ({
+			name: parameter.externalName?.content ?? null,
+			type: resolveType(parameter.type, scope),
+		})),
+		returnType: resolveType(node.returnType, scope),
 	}
 }
 
