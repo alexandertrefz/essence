@@ -204,4 +204,109 @@ describe("Enricher", () => {
 			expect(program.implementation.nodes).toHaveLength(2)
 		})
 	})
+
+	describe("Declaration Hoisting", () => {
+		it("should allow using Functions before their declaration", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant greeting = getGreeting()
+
+					function getGreeting () -> String {
+						<- "hello"
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should allow mutually recursive Functions", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function isEven (_ value: Integer) -> Boolean {
+						if value::is(0) {
+							<- true
+						}
+
+						<- isOdd(value::subtract(1))
+					}
+
+					function isOdd (_ value: Integer) -> Boolean {
+						if value::is(0) {
+							<- false
+						}
+
+						<- isEven(value::subtract(1))
+					}
+
+					__print(isEven(4))
+				}`),
+			).toEqual([])
+		})
+
+		it("should allow using Type Aliases before their declaration", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Names = List<Name>
+					type Name = String
+
+					constant names: Names = ["essence"]
+				}`),
+			).toEqual([])
+		})
+
+		it("should allow Namespaces before their target Type Alias", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Person for Person {
+						createWith (_ name: String) -> Person {
+							<- { name = name }
+						}
+					}
+
+					type Person = { name: String }
+
+					constant person = Person.createWith("essence")
+				}`),
+			).toEqual([])
+		})
+
+		it("should not hoist Constants", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = b
+				constant b = "value"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe("Variable 'b' is not declared.")
+		})
+
+		it("should leave Namespaces referencing later Variables to in-order enrichment", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Config {
+					static defaultName () -> String {
+						<- fallbackName
+					}
+				}
+
+				constant fallbackName = "essence"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Variable 'fallbackName' is not declared.",
+			)
+		})
+
+		it("should still report duplicate hoisted declarations", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Name = String
+				type Name = Boolean
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Type 'Name' is already declared.",
+			)
+			expect(diagnostics[0].position?.start.line).toBe(3)
+		})
+	})
 })
