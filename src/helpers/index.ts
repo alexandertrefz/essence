@@ -53,6 +53,177 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}__overload$${index + 1}`
 }
 
+// #region Generic Inference
+
+export type GenericBindings = Map<common.GenericName, common.Type>
+
+// NOTE: The mutable state of one inference — `bindableNames` holds the Type
+// Parameters the current invocation may bind, `bindings` the Types they have
+// been bound to so far. Generics outside of `bindableNames` stay opaque
+// symbols that only match themselves.
+export type GenericInferenceContext = {
+	bindableNames: Set<common.GenericName>
+	bindings: GenericBindings
+}
+
+// NOTE: `infer` Generics start unbound and re-bind on every invocation.
+// Plain Generics bind at definition time — their default Type is seeded as
+// an immutable binding; without a default they stay opaque and can never be
+// bound, which the caller reports at the invocation.
+export function createInferenceContext(
+	generics: Array<common.GenericDeclaration>,
+	seededBindings: GenericBindings | null = null,
+): GenericInferenceContext {
+	let bindableNames = new Set<common.GenericName>()
+	let bindings: GenericBindings = new Map()
+
+	for (let generic of generics) {
+		if (generic.infer) {
+			bindableNames.add(generic.name)
+		} else if (generic.defaultType !== null) {
+			bindableNames.add(generic.name)
+			bindings.set(generic.name, generic.defaultType)
+		}
+	}
+
+	if (seededBindings !== null) {
+		for (let [name, type] of seededBindings) {
+			if (bindableNames.has(name)) {
+				bindings.set(name, type)
+			}
+		}
+	}
+
+	return { bindableNames, bindings }
+}
+
+// NOTE: Substitutes bound Generics in `type` — unbound bindable Generics are
+// left untouched, opaque Generics always are.
+export function applyGenericBindings(
+	type: common.Type,
+	bindings: GenericBindings,
+): common.Type {
+	switch (type.type) {
+		case "GenericUse":
+			return bindings.get(type.name) ?? type
+		case "List":
+			return {
+				type: "List",
+				itemType: applyGenericBindings(type.itemType, bindings),
+			}
+		case "UnionType":
+			return {
+				type: "UnionType",
+				types: type.types.map((memberType) =>
+					applyGenericBindings(memberType, bindings),
+				),
+			}
+		case "Record":
+			return {
+				type: "Record",
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, memberType]) => [
+						name,
+						applyGenericBindings(memberType, bindings),
+					]),
+				),
+			}
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+			return {
+				...type,
+				parameterTypes: type.parameterTypes.map((parameter) => ({
+					name: parameter.name,
+					type: applyGenericBindings(parameter.type, bindings),
+				})),
+				returnType: applyGenericBindings(type.returnType, bindings),
+			}
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return {
+				...type,
+				overloads: type.overloads.map((overload) => ({
+					...overload,
+					parameterTypes: overload.parameterTypes.map(
+						(parameter) => ({
+							name: parameter.name,
+							type: applyGenericBindings(
+								parameter.type,
+								bindings,
+							),
+						}),
+					),
+					returnType: applyGenericBindings(
+						overload.returnType,
+						bindings,
+					),
+				})),
+			}
+		default:
+			return type
+	}
+}
+
+// NOTE: Handles an expected or actual GenericUse — the first occurrence of a
+// bindable Generic binds the Type on the other side, every later occurrence
+// substitutes the binding and re-checks with the normal assignability rules.
+function matchGenericUse(
+	generic: common.GenericUse,
+	otherType: common.Type,
+	context: GenericInferenceContext | null,
+	checkAgainstBinding: (binding: common.Type) => boolean,
+): boolean {
+	if (context?.bindableNames.has(generic.name)) {
+		let binding = context.bindings.get(generic.name)
+
+		if (binding !== undefined) {
+			return checkAgainstBinding(binding)
+		}
+
+		context.bindings.set(generic.name, otherType)
+
+		return true
+	}
+
+	// NOTE: Without an inference context unresolved Generics still match
+	// anything, in both directions — the callers that check Generic
+	// signatures always supply a context.
+	return context === null
+}
+
+// NOTE: Members that would bind a still-unbound Generic are tried last, so
+// that a Union member with a concrete counterpart does not get eaten by a
+// greedy first-occurrence binding (`Nothing` must match the `Nothing` member
+// of `Value | Nothing`, not bind `Value`).
+function orderUnionMembersForMatching(
+	types: Array<common.Type>,
+	context: GenericInferenceContext | null,
+): Array<common.Type> {
+	if (context === null) {
+		return types
+	}
+
+	let bindingMembers: Array<common.Type> = []
+	let concreteMembers: Array<common.Type> = []
+
+	for (let type of types) {
+		if (
+			type.type === "GenericUse" &&
+			context.bindableNames.has(type.name) &&
+			!context.bindings.has(type.name)
+		) {
+			bindingMembers.push(type)
+		} else {
+			concreteMembers.push(type)
+		}
+	}
+
+	return [...concreteMembers, ...bindingMembers]
+}
+
+// #endregion
+
 // NOTE: A signature is substitutable when the actual signature accepts at
 // least what the expected signature promises to feed it (contravariant
 // parameter types) and returns no more than the expected signature promises
@@ -63,6 +234,7 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 function signatureMatches(
 	expected: common.BaseFunction,
 	actual: common.BaseFunction,
+	context: GenericInferenceContext | null,
 ): boolean {
 	if (expected.parameterTypes.length !== actual.parameterTypes.length) {
 		return false
@@ -74,16 +246,17 @@ function signatureMatches(
 		}
 
 		if (
-			!matchesType(
+			!matchTypes(
 				actual.parameterTypes[i].type,
 				expected.parameterTypes[i].type,
+				context,
 			)
 		) {
 			return false
 		}
 	}
 
-	return matchesType(expected.returnType, actual.returnType)
+	return matchTypes(expected.returnType, actual.returnType, context)
 }
 
 // NOTE: `AppliedType`s over List are normalized into plain List Types here,
@@ -100,6 +273,26 @@ function normalizeType(type: common.Type): common.Type {
 }
 
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
+	return matchTypes(lhs, rhs, null)
+}
+
+// NOTE: The inference-aware form of `matchesType` — the first occurrence of
+// a bindable Generic (in `context.bindableNames`) binds the Type on the
+// other side, every later occurrence checks with the normal assignability
+// rules. Bindings accumulate in `context.bindings`.
+export function matchesTypeWithBindings(
+	lhs: common.Type,
+	rhs: common.Type,
+	context: GenericInferenceContext,
+): boolean {
+	return matchTypes(lhs, rhs, context)
+}
+
+function matchTypes(
+	lhs: common.Type,
+	rhs: common.Type,
+	context: GenericInferenceContext | null,
+): boolean {
 	lhs = normalizeType(lhs)
 	rhs = normalizeType(rhs)
 
@@ -111,14 +304,31 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return true
 	}
 
-	// NOTE: Stabilisation semantics — unresolved Generics match anything, in
-	// both directions. Generic Inference will replace this with proper
-	// binding & substitution.
-	if (lhs.type === "Unknown" || lhs.type === "GenericUse") {
+	// NOTE: A Generic always matches itself, bindable or not.
+	if (
+		lhs.type === "GenericUse" &&
+		rhs.type === "GenericUse" &&
+		lhs.name === rhs.name
+	) {
 		return true
 	}
 
+	// NOTE: Generics can occur on either side — an expected Generic binds the
+	// actual Type, while an actual-side Generic occurs when signatures are
+	// compared (contravariant parameter positions flip the sides).
+	if (lhs.type === "GenericUse") {
+		return matchGenericUse(lhs, rhs, context, (binding) =>
+			matchTypes(binding, rhs, context),
+		)
+	}
+
 	if (rhs.type === "GenericUse") {
+		return matchGenericUse(rhs, lhs, context, (binding) =>
+			matchTypes(lhs, binding, context),
+		)
+	}
+
+	if (lhs.type === "Unknown") {
 		return true
 	}
 
@@ -140,7 +350,7 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			return true
 		}
 
-		return matchesType(lhs.itemType, rhs.itemType)
+		return matchTypes(lhs.itemType, rhs.itemType, context)
 	}
 
 	if (lhs.type === "Nothing" && rhs.type === "Nothing") {
@@ -164,6 +374,8 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	}
 
 	if (lhs.type === "UnionType") {
+		let lhsMembers = orderUnionMembersForMatching(lhs.types, context)
+
 		if (rhs.type === "UnionType") {
 			// NOTE: An actual Union is assignable when every one of its
 			// members is accepted by some member of the expected Union — the
@@ -172,8 +384,8 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
 
-				for (let lhsType of lhs.types) {
-					if (matchesType(lhsType, rhsType)) {
+				for (let lhsType of lhsMembers) {
+					if (matchTypes(lhsType, rhsType, context)) {
 						foundMatch = true
 						break
 					}
@@ -186,8 +398,8 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 
 			return true
 		} else {
-			for (let type of lhs.types) {
-				if (matchesType(type, rhs)) {
+			for (let type of lhsMembers) {
+				if (matchTypes(type, rhs, context)) {
 					return true
 				}
 			}
@@ -203,7 +415,11 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 			}
 
 			if (
-				!matchesType(lhs.members[memberName], rhs.members[memberName])
+				!matchTypes(
+					lhs.members[memberName],
+					rhs.members[memberName],
+					context,
+				)
 			) {
 				return false
 			}
@@ -217,7 +433,7 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		(lhs.type === "SimpleMethod" && rhs.type === "SimpleMethod") ||
 		(lhs.type === "StaticMethod" && rhs.type === "StaticMethod")
 	) {
-		return signatureMatches(lhs, rhs)
+		return signatureMatches(lhs, rhs, context)
 	}
 
 	if (
@@ -230,7 +446,9 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		}
 
 		for (let i = 0; i < lhs.overloads.length; i++) {
-			if (!signatureMatches(lhs.overloads[i], rhs.overloads[i])) {
+			if (
+				!signatureMatches(lhs.overloads[i], rhs.overloads[i], context)
+			) {
 				return false
 			}
 		}
@@ -263,17 +481,24 @@ export type ArgumentMatchResult =
 // resolving further Argument Types. With `collectAllMismatches` every
 // mismatching Argument index is collected, which the Validator uses to report
 // one Diagnostic per mismatching Argument.
+// With `inference` the Arguments are matched left to right against a Generic
+// signature — the first occurrence of a bindable Generic binds the Argument's
+// Type, later occurrences check against the binding. Callers pass a fresh
+// context per overload candidate, so bindings can not leak between
+// candidates.
 export function matchArguments(
 	parameters: common.BaseFunction["parameterTypes"],
 	matchableArguments: Array<MatchableArgument>,
-	options: { collectAllMismatches: boolean } = {
-		collectAllMismatches: false,
-	},
+	options: {
+		collectAllMismatches?: boolean
+		inference?: GenericInferenceContext
+	} = {},
 ): ArgumentMatchResult {
 	if (parameters.length !== matchableArguments.length) {
 		return { type: "ArityMismatch" }
 	}
 
+	let inferenceContext = options.inference ?? null
 	let mismatchedArgumentIndices: Array<number> = []
 
 	for (let i = 0; i < parameters.length; i++) {
@@ -282,7 +507,7 @@ export function matchArguments(
 
 		if (
 			parameter.name !== argument.name ||
-			!matchesType(parameter.type, argument.getType())
+			!matchTypes(parameter.type, argument.getType(), inferenceContext)
 		) {
 			if (!options.collectAllMismatches) {
 				return {
