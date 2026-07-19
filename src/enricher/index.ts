@@ -2,6 +2,10 @@ import { collectDiagnostics, reportError } from "../diagnostics"
 import type { common, enricher, parser } from "../interfaces"
 import { enrichNode } from "./enrichers"
 import {
+	resolveNamespaceDefinitionStatementType,
+	resolveType,
+} from "./resolvers"
+import {
 	namespace as booleanNamespace,
 	type as booleanType,
 } from "./types/Boolean"
@@ -74,10 +78,97 @@ export const enrich = (
 	return { program: result, diagnostics }
 }
 
+type HoistableStatementNode =
+	| parser.TypeAliasStatementNode
+	| parser.FunctionStatementNode
+	| parser.NamespaceDefinitionStatementNode
+
+function isHoistable(
+	node: parser.ImplementationNode,
+): node is HoistableStatementNode {
+	return (
+		node.nodeType === "TypeAliasStatement" ||
+		node.nodeType === "FunctionStatement" ||
+		node.nodeType === "NamespaceDefinitionStatement"
+	)
+}
+
+// NOTE: Type Aliases, Functions & Namespaces are order-independent — their
+// Types are hoisted into scope before the statement-by-statement enrichment,
+// so that top level declarations can reference each other regardless of
+// their order, including mutually recursive Functions.
+//
+// Hoisting is speculative: declarations are resolved in rounds until no
+// further declaration resolves cleanly. Whatever can not be hoisted (because
+// it is broken, a duplicate, or references Variables — which are deliberately
+// not hoisted) is left to the in-order enrichment, which reports its
+// Diagnostics.
+function hoistDeclarations(
+	nodes: Array<parser.ImplementationNode>,
+	scope: enricher.Scope,
+): Set<parser.ImplementationNode> {
+	let hoistedNodes = new Set<parser.ImplementationNode>()
+	let pendingNodes = nodes.filter(isHoistable)
+
+	while (pendingNodes.length > 0) {
+		let remainingNodes: Array<HoistableStatementNode> = []
+
+		for (let node of pendingNodes) {
+			let speculation: {
+				result: common.Type
+				diagnostics: Array<common.Diagnostic>
+			}
+
+			try {
+				speculation = collectDiagnostics((): common.Type => {
+					if (node.nodeType === "TypeAliasStatement") {
+						return resolveType(node.type, scope)
+					} else if (node.nodeType === "FunctionStatement") {
+						return resolveType(node.value, scope)
+					} else {
+						return resolveNamespaceDefinitionStatementType(
+							node,
+							scope,
+						)
+					}
+				})
+			} catch {
+				remainingNodes.push(node)
+				continue
+			}
+
+			let targetMap =
+				node.nodeType === "TypeAliasStatement"
+					? scope.types
+					: scope.members
+
+			if (
+				speculation.diagnostics.length === 0 &&
+				targetMap[node.name.content] == null
+			) {
+				targetMap[node.name.content] = speculation.result
+				hoistedNodes.add(node)
+			} else {
+				remainingNodes.push(node)
+			}
+		}
+
+		if (remainingNodes.length === pendingNodes.length) {
+			break
+		}
+
+		pendingNodes = remainingNodes
+	}
+
+	return hoistedNodes
+}
+
 const enrichImplementation = (
 	implementation: parser.ImplementationSectionNode,
 	scope: enricher.Scope,
 ): common.typed.ImplementationSectionNode => {
+	let hoistedNodes = hoistDeclarations(implementation.nodes, scope)
+
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) => {
@@ -87,7 +178,7 @@ const enrichImplementation = (
 			// broken statement can not take down the enrichment of the
 			// remaining Program.
 			try {
-				return [enrichNode(node, scope)]
+				return [enrichNode(node, scope, hoistedNodes)]
 			} catch (error) {
 				reportError(
 					`Internal Compiler Error: ${

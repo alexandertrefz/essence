@@ -15,6 +15,7 @@ import {
 export function enrichNode(
 	node: parser.ImplementationNode,
 	scope: enricher.Scope,
+	hoistedNodes?: Set<parser.ImplementationNode>,
 ): common.typed.ImplementationNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
@@ -43,7 +44,7 @@ export function enrichNode(
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
-			return enrichStatement(node, scope)
+			return enrichStatement(node, scope, hoistedNodes)
 	}
 }
 
@@ -455,7 +456,10 @@ export function enrichMatch(
 export function enrichStatement(
 	node: parser.StatementNode,
 	scope: enricher.Scope,
+	hoistedNodes?: Set<parser.ImplementationNode>,
 ): common.typed.StatementNode {
+	let isHoisted = hoistedNodes?.has(node) === true
+
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 			return enrichConstantDeclarationStatement(node, scope)
@@ -464,9 +468,9 @@ export function enrichStatement(
 		case "VariableAssignmentStatement":
 			return enrichVariableAssignmentStatement(node, scope)
 		case "NamespaceDefinitionStatement":
-			return enrichNamespaceDefinitionStatement(node, scope)
+			return enrichNamespaceDefinitionStatement(node, scope, isHoisted)
 		case "TypeAliasStatement":
-			return enrichTypeAliasStatement(node, scope)
+			return enrichTypeAliasStatement(node, scope, isHoisted)
 		case "IfElseStatement":
 			return enrichIfElseStatementNode(node, scope)
 		case "IfStatement":
@@ -474,7 +478,7 @@ export function enrichStatement(
 		case "ReturnStatement":
 			return enrichReturnStatement(node, scope)
 		case "FunctionStatement":
-			return enrichFunctionStatement(node, scope)
+			return enrichFunctionStatement(node, scope, isHoisted)
 	}
 }
 
@@ -545,6 +549,7 @@ export function enrichVariableAssignmentStatement(
 export function enrichNamespaceDefinitionStatement(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
+	isHoisted = false,
 ): common.typed.NamespaceDefinitionStatementNode {
 	function enrichProperties(
 		properties: Record<
@@ -585,7 +590,9 @@ export function enrichNamespaceDefinitionStatement(
 
 	let type = resolveNamespaceDefinitionStatementType(node, scope)
 
-	declareVariableInScope(node.name, type, scope)
+	if (!isHoisted) {
+		declareVariableInScope(node.name, type, scope)
+	}
 
 	return {
 		nodeType: "NamespaceDefinitionStatement",
@@ -601,10 +608,13 @@ export function enrichNamespaceDefinitionStatement(
 export function enrichTypeAliasStatement(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
+	isHoisted = false,
 ): common.typed.TypeAliasStatementNode {
 	const type = resolveType(node.type, scope)
 
-	declareTypeInScope(node.name.content, type, scope)
+	if (!isHoisted) {
+		declareTypeInScope(node.name, type, scope)
+	}
 
 	return {
 		nodeType: "TypeAliasStatement",
@@ -670,9 +680,13 @@ export function enrichReturnStatement(
 export function enrichFunctionStatement(
 	node: parser.FunctionStatementNode,
 	scope: enricher.Scope,
+	isHoisted = false,
 ): common.typed.FunctionStatementNode {
 	let type = resolveType(node.value, scope)
-	declareVariableInScope(node.name, type, scope)
+
+	if (!isHoisted) {
+		declareVariableInScope(node.name, type, scope)
+	}
 
 	return {
 		nodeType: "FunctionStatement",
