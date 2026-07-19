@@ -30,6 +30,11 @@ export function isValueOfType(value: AnyType, type: common.Type) {
 		return value[typeKeySymbol] === "Integer"
 	} else if (type.type === "Fraction") {
 		return value[typeKeySymbol] === "Fraction"
+	} else if (type.type === "GenericUse") {
+		// NOTE: Types erase at runtime — a Generic matcher stands for any
+		// value. Handlers are tested in order, so concrete matchers narrow
+		// the value before a Generic matcher catches the rest.
+		return true
 	} else {
 		console.log("Complex type checking has yet to be implemented!")
 		return false
