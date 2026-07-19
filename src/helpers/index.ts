@@ -53,6 +53,39 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}__overload$${index + 1}`
 }
 
+// NOTE: A signature is substitutable when the actual signature accepts at
+// least what the expected signature promises to feed it (contravariant
+// parameter types) and returns no more than the expected signature promises
+// to yield (covariant return type).
+// This accepts an actual `(_ a: A | B) -> X` where `(_ a: A) -> X` is
+// expected, and rejects the unsafe reverse direction.
+// External parameter names are part of the call syntax and must match exactly.
+function signatureMatches(
+	expected: common.BaseFunction,
+	actual: common.BaseFunction,
+): boolean {
+	if (expected.parameterTypes.length !== actual.parameterTypes.length) {
+		return false
+	}
+
+	for (let i = 0; i < expected.parameterTypes.length; i++) {
+		if (expected.parameterTypes[i].name !== actual.parameterTypes[i].name) {
+			return false
+		}
+
+		if (
+			!matchesType(
+				actual.parameterTypes[i].type,
+				expected.parameterTypes[i].type,
+			)
+		) {
+			return false
+		}
+	}
+
+	return matchesType(expected.returnType, actual.returnType)
+}
+
 // NOTE: `AppliedType`s over List are normalized into plain List Types here,
 // so that the rest of `matchesType` only has to deal with one representation.
 function normalizeType(type: common.Type): common.Type {
@@ -167,152 +200,25 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 		return true
 	}
 
-	if (lhs.type === "Function" && rhs.type === "Function") {
-		if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (
-				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				// TODO: Check wether this is safe
-				// I have changed the order around, in order to enable a parameter of
-				// type (_ a: A | B) -> X receiving an argument of type (_ a: A) -> X since this is safe.
-				// Need to confirm this doesn't have strange side effects.
-				!matchesType(
-					rhs.parameterTypes[i].type,
-					lhs.parameterTypes[i].type,
-				)
-			) {
-				return false
-			}
-		}
-
-		if (!matchesType(lhs.returnType, rhs.returnType)) {
-			return false
-		}
-
-		return true
-	}
-
-	if (lhs.type === "SimpleMethod" && rhs.type === "SimpleMethod") {
-		if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-			return false
-		}
-
-		if (!matchesType(lhs.returnType, rhs.returnType)) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (
-				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(
-					lhs.parameterTypes[i].type,
-					rhs.parameterTypes[i].type,
-				)
-			) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	if (lhs.type === "StaticMethod" && rhs.type === "StaticMethod") {
-		if (lhs.parameterTypes.length !== rhs.parameterTypes.length) {
-			return false
-		}
-
-		if (!matchesType(lhs.returnType, rhs.returnType)) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.parameterTypes.length; i++) {
-			if (
-				lhs.parameterTypes[i].name !== rhs.parameterTypes[i].name ||
-				!matchesType(
-					lhs.parameterTypes[i].type,
-					rhs.parameterTypes[i].type,
-				)
-			) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	if (lhs.type === "OverloadedMethod" && rhs.type === "OverloadedMethod") {
-		if (lhs.overloads.length !== rhs.overloads.length) {
-			return false
-		}
-
-		for (let i = 0; i < lhs.overloads.length; i++) {
-			let lhsOverload = lhs.overloads[i]
-			let rhsOverload = rhs.overloads[i]
-
-			if (
-				lhsOverload.parameterTypes.length !==
-				rhsOverload.parameterTypes.length
-			) {
-				return false
-			}
-
-			for (let j = 0; j < lhsOverload.parameterTypes.length; j++) {
-				if (
-					lhsOverload.parameterTypes[j].name !==
-						rhsOverload.parameterTypes[j].name ||
-					!matchesType(
-						lhsOverload.parameterTypes[j].type,
-						rhsOverload.parameterTypes[j].type,
-					)
-				) {
-					return false
-				}
-			}
-
-			if (!matchesType(lhsOverload.returnType, rhsOverload.returnType)) {
-				return false
-			}
-		}
-
-		return true
+	if (
+		(lhs.type === "Function" && rhs.type === "Function") ||
+		(lhs.type === "SimpleMethod" && rhs.type === "SimpleMethod") ||
+		(lhs.type === "StaticMethod" && rhs.type === "StaticMethod")
+	) {
+		return signatureMatches(lhs, rhs)
 	}
 
 	if (
-		lhs.type === "OverloadedStaticMethod" &&
-		rhs.type === "OverloadedStaticMethod"
+		(lhs.type === "OverloadedMethod" && rhs.type === "OverloadedMethod") ||
+		(lhs.type === "OverloadedStaticMethod" &&
+			rhs.type === "OverloadedStaticMethod")
 	) {
 		if (lhs.overloads.length !== rhs.overloads.length) {
 			return false
 		}
 
 		for (let i = 0; i < lhs.overloads.length; i++) {
-			let lhsOverload = lhs.overloads[i]
-			let rhsOverload = rhs.overloads[i]
-
-			if (
-				lhsOverload.parameterTypes.length !==
-				rhsOverload.parameterTypes.length
-			) {
-				return false
-			}
-
-			for (let j = 0; j < lhsOverload.parameterTypes.length; j++) {
-				if (
-					lhsOverload.parameterTypes[j].name !==
-						rhsOverload.parameterTypes[j].name ||
-					!matchesType(
-						lhsOverload.parameterTypes[j].type,
-						rhsOverload.parameterTypes[j].type,
-					)
-				) {
-					return false
-				}
-			}
-
-			if (!matchesType(lhsOverload.returnType, rhsOverload.returnType)) {
+			if (!signatureMatches(lhs.overloads[i], rhs.overloads[i])) {
 				return false
 			}
 		}
