@@ -55,6 +55,7 @@ const keywords = [
 	"with",
 	"namespace",
 	"for",
+	"infer",
 ]
 const symbols = [
 	"(",
@@ -130,6 +131,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordNamespace
 	} else if (value === "for") {
 		return TokenType.KeywordFor
+	} else if (value === "infer") {
+		return TokenType.KeywordInfer
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

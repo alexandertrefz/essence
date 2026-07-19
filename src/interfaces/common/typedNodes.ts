@@ -312,6 +312,7 @@ export interface GenericDeclarationNode {
 	nodeType: "GenericDeclaration"
 	name: string
 	defaultType: Type | null
+	inferred: boolean
 	position: Position
 }
 

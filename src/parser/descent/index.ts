@@ -22,15 +22,16 @@ type BlockResult = {
 
 type NamespaceBodyNode = Parameters<
 	typeof generators.namespaceDefinitionStatement
->[2][number]
+>[3][number]
 
 // NOTE: These token types form the Identifier rule of the grammar — the
-// keywords `with`, `static` and `case` are valid Identifiers.
+// keywords `with`, `static`, `case` and `infer` are valid Identifiers.
 const identifierTokenTypes = [
 	TokenType.Identifier,
 	TokenType.KeywordWith,
 	TokenType.KeywordStatic,
 	TokenType.KeywordCase,
+	TokenType.KeywordInfer,
 ]
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -328,12 +329,13 @@ class DescentParser {
 	protected parseTypeAliasStatement(): parser.TypeAliasStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordType)
 		let name = this.parseIdentifier()
+		let generics = this.parseOptionalGenericList()
 
 		this.tokens.expect(TokenType.SymbolEqual)
 
 		let type = this.parseType()
 
-		return generators.typeAliasStatement(name, type, {
+		return generators.typeAliasStatement(name, generics, type, {
 			start: keyword.position.start,
 			end: type.position.end,
 		})
@@ -342,7 +344,7 @@ class DescentParser {
 	protected parseFunctionStatement(): parser.FunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordFunction)
 		let name = this.parseIdentifier()
-		let value = this.parseFunctionLiteral()
+		let value = this.parseOptionallyGenericFunctionLiteral()
 
 		return generators.functionStatement(name, value.value, {
 			start: keyword.position.start,
@@ -388,6 +390,7 @@ class DescentParser {
 	protected parseNamespaceDefinitionStatement(): parser.NamespaceDefinitionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordNamespace)
 		let name = this.parseIdentifier()
+		let generics = this.parseOptionalGenericList()
 
 		let targetType: parser.TypeDeclarationNode | null = null
 		if (this.tokens.peek()?.type === TokenType.KeywordFor) {
@@ -400,10 +403,16 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
 		let closingPosition = this.parseClosingBrace()
 
-		return generators.namespaceDefinitionStatement(name, targetType, body, {
-			start: keyword.position.start,
-			end: closingPosition.end,
-		})
+		return generators.namespaceDefinitionStatement(
+			name,
+			generics,
+			targetType,
+			body,
+			{
+				start: keyword.position.start,
+				end: closingPosition.end,
+			},
+		)
 	}
 
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {
@@ -426,7 +435,7 @@ class DescentParser {
 			this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			let methods = this.parseStatementList(() =>
-				this.parseFunctionLiteral(),
+				this.parseOptionallyGenericFunctionLiteral(),
 			)
 
 			this.parseClosingBrace()
@@ -450,11 +459,14 @@ class DescentParser {
 
 			let name = this.parseIdentifier()
 
-			if (this.tokens.peek()?.type === TokenType.SymbolLeftParen) {
+			if (
+				this.tokens.peek()?.type === TokenType.SymbolLeftParen ||
+				this.tokens.peek()?.type === TokenType.SymbolLeftAngle
+			) {
 				return {
 					nodeType: "StaticMethodNode",
 					name,
-					method: this.parseFunctionLiteral(),
+					method: this.parseOptionallyGenericFunctionLiteral(),
 				}
 			}
 
@@ -472,7 +484,7 @@ class DescentParser {
 		return {
 			nodeType: "SimpleMethodNode",
 			name,
-			method: this.parseFunctionLiteral(),
+			method: this.parseOptionallyGenericFunctionLiteral(),
 		}
 	}
 
@@ -924,9 +936,29 @@ class DescentParser {
 		)
 	}
 
+	// NOTE: Named Functions and Methods take an optional Generic list before
+	// their parameter list — anonymous Function literals in expression
+	// position are dispatched by their first Token instead (see
+	// `parsePrimaryExpression`).
+	protected parseOptionallyGenericFunctionLiteral(): parser.FunctionValueNode {
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
+			return this.parseGenericFunctionLiteral()
+		}
+
+		return this.parseFunctionLiteral()
+	}
+
 	// #endregion
 
 	// #region Functions
+
+	protected parseOptionalGenericList(): Array<parser.GenericDeclarationNode> {
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
+			return this.parseGenericList().generics
+		}
+
+		return []
+	}
 
 	protected parseGenericList(): {
 		generics: Array<parser.GenericDeclarationNode>
@@ -958,20 +990,38 @@ class DescentParser {
 	}
 
 	protected parseGenericDeclaration(): parser.GenericDeclarationNode {
+		// NOTE: `infer` is a valid Identifier, so it only acts as the modifier
+		// when it is followed by the actual Generic name — `<infer>` declares
+		// a Generic named `infer`.
+		let inferred = false
+		let inferKeyword: Token | null = null
+
+		if (
+			this.tokens.peek()?.type === TokenType.KeywordInfer &&
+			isIdentifierToken(this.tokens.peek(1))
+		) {
+			inferKeyword = this.tokens.next()
+			inferred = true
+		}
+
 		let name = this.parseIdentifier()
+		let start = inferKeyword?.position.start ?? name.position.start
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			this.tokens.next()
 
 			let type = this.parseType()
 
-			return generators.genericDeclarationNode(name, type, {
-				start: name.position.start,
+			return generators.genericDeclarationNode(name, type, inferred, {
+				start,
 				end: type.position.end,
 			})
 		}
 
-		return generators.genericDeclarationNode(name, null, name.position)
+		return generators.genericDeclarationNode(name, null, inferred, {
+			start,
+			end: name.position.end,
+		})
 	}
 
 	protected parseParameterList(): {
