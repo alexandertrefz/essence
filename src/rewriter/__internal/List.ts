@@ -159,12 +159,12 @@ export function removeEvery__overload$1<ItemType extends AnyType>(
 
 export function removeEvery__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
-	positiveFilterFunction: (item: ItemType) => BooleanType,
+	shouldRemoveFunction: (item: ItemType) => BooleanType,
 ): ListType<ItemType> {
 	let filteredList: Array<ItemType> = []
 
 	for (let item of originalList.value) {
-		if (positiveFilterFunction(item).value) {
+		if (!shouldRemoveFunction(item).value) {
 			filteredList.push(item)
 		}
 	}

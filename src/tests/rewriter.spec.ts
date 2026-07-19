@@ -4853,9 +4853,9 @@ describe("Rewriter", () => {
 							integerList,
 							(item: integer.IntegerType) => {
 								if (item.value === integerZero().value) {
-									return booleanFalse()
-								} else {
 									return booleanTrue()
+								} else {
+									return booleanFalse()
 								}
 							},
 						),
@@ -4872,9 +4872,9 @@ describe("Rewriter", () => {
 							integerList,
 							(item: integer.IntegerType) => {
 								if (item.value === integerOne().value) {
-									return booleanFalse()
-								} else {
 									return booleanTrue()
+								} else {
+									return booleanFalse()
 								}
 							},
 						),
@@ -4885,9 +4885,9 @@ describe("Rewriter", () => {
 							integerList,
 							(item: integer.IntegerType) => {
 								if (item.value === integerTwo().value) {
-									return booleanFalse()
-								} else {
 									return booleanTrue()
+								} else {
+									return booleanFalse()
 								}
 							},
 						),
@@ -4904,9 +4904,9 @@ describe("Rewriter", () => {
 							list.createList([booleanTrue(), booleanFalse()]),
 							(item: boolean.BooleanType) => {
 								if (item.value === booleanTrue().value) {
-									return booleanFalse()
-								} else {
 									return booleanTrue()
+								} else {
+									return booleanFalse()
 								}
 							},
 						),
@@ -4917,9 +4917,9 @@ describe("Rewriter", () => {
 							list.createList([booleanTrue(), booleanFalse()]),
 							(item: boolean.BooleanType) => {
 								if (item.value === booleanFalse().value) {
-									return booleanFalse()
-								} else {
 									return booleanTrue()
+								} else {
+									return booleanFalse()
 								}
 							},
 						),
