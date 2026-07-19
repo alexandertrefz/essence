@@ -11,8 +11,20 @@ export type Position = {
 	end: Cursor
 }
 
+export type DiagnosticSeverity = "error" | "warning"
+
+export type Diagnostic = {
+	severity: DiagnosticSeverity
+	message: string
+	position: Position | null
+}
+
 export type UnknownType = {
 	type: "Unknown"
+}
+
+export type ErrorType = {
+	type: "Error"
 }
 
 export type NothingType = {
@@ -144,6 +156,7 @@ export type AppliedType = {
 
 export type Type =
 	| UnknownType
+	| ErrorType
 	| PrimitiveType
 	| UnionType
 	| MethodType

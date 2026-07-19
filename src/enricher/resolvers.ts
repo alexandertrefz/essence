@@ -361,6 +361,8 @@ export function resolveCombinationType(
 	let rhsType = resolveType(node.rhs, scope)
 
 	switch (lhsType.type) {
+		case "Error":
+			throw new Error("You can not combine Error Types.")
 		case "GenericList":
 		case "AppliedType":
 		case "GenericUse":
@@ -392,6 +394,8 @@ export function resolveCombinationType(
 	}
 
 	switch (rhsType.type) {
+		case "Error":
+			throw new Error("You can not combine Error Types.")
 		case "GenericList":
 		case "AppliedType":
 		case "GenericUse":
