@@ -1,4 +1,4 @@
-import { collectDiagnostics, reportError } from "../diagnostics"
+import { collectDiagnostics, reportError, reportWarning } from "../diagnostics"
 import { matchesType } from "../helpers"
 import type { common } from "../interfaces"
 
@@ -261,10 +261,39 @@ function validateLookup(
 function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
-	if (
-		node.value.type.type !== "UnionType" &&
-		node.value.type.type !== "Error"
-	) {
+	if (node.value.type.type === "UnionType") {
+		let unionType = node.value.type
+
+		for (let memberType of unionType.types) {
+			let isHandled = node.handlers.some((handler) =>
+				matchesType(handler.matcher, memberType),
+			)
+
+			if (!isHandled) {
+				reportError(
+					`Match Expression does not handle Type '${describeType(
+						memberType,
+					)}'.`,
+					node.position,
+				)
+			}
+		}
+
+		for (let handler of node.handlers) {
+			let isReachable = unionType.types.some((memberType) =>
+				matchesType(handler.matcher, memberType),
+			)
+
+			if (!isReachable) {
+				reportWarning(
+					`Type '${describeType(
+						handler.matcher,
+					)}' is not a member of the matched Union — this case can never match.`,
+					node.position,
+				)
+			}
+		}
+	} else if (node.value.type.type !== "Error") {
 		reportError(
 			"You can only use Match-Expressions on Union Types.",
 			node.value.position,
@@ -474,6 +503,37 @@ function validateFunctionStatement(
 // #endregion
 
 // #region Helpers
+
+function describeType(type: common.Type): string {
+	switch (type.type) {
+		case "UnionType":
+			return type.types.map(describeType).join(" | ")
+		case "List":
+			return `List<${describeType(type.itemType)}>`
+		case "GenericList":
+			return "List"
+		case "Record":
+			return `{ ${Object.entries(type.members)
+				.map(
+					([memberName, memberType]) =>
+						`${memberName}: ${describeType(memberType)}`,
+				)
+				.join(", ")} }`
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return "Function"
+		case "Namespace":
+		case "GenericUse":
+			return type.name
+		case "AppliedType":
+			return describeType(type.baseType)
+		default:
+			return type.type
+	}
+}
 
 function validateSimpleFunctionInvocation(
 	functionType: common.FunctionType | common.StaticMethodType,
