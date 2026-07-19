@@ -8,6 +8,7 @@ import chalk from "chalk"
 import { hideBin } from "yargs/helpers"
 import yargs from "yargs/yargs"
 
+import { containsErrors } from "../src/diagnostics"
 import { enrich } from "../src/enricher"
 import { optimise } from "../src/optimiser"
 import { parse } from "../src/parser"
@@ -36,6 +37,23 @@ let argv = await yargs(hideBin(process.argv))
 	})
 	.parse()
 
+function printDiagnostics(diagnostics, inputFileName) {
+	for (let diagnostic of diagnostics) {
+		let location = chalk.cyan(inputFileName)
+
+		if (diagnostic.position) {
+			location += `:${diagnostic.position.start.line}:${diagnostic.position.start.column}`
+		}
+
+		let severity =
+			diagnostic.severity === "error"
+				? chalk.red("error")
+				: chalk.yellow("warning")
+
+		console.error(`${location} ${severity}: ${diagnostic.message}`)
+	}
+}
+
 function generateOutputFilePath(inputFileName, outputFileName) {
 	if (outputFileName === undefined) {
 		outputFileName = `${path.basename(
@@ -55,7 +73,17 @@ async function compile(flags) {
 
 		const initialProgram = parse(data)
 
-		const enrichedProgram = enrich(initialProgram)
+		const { program: enrichedProgram, diagnostics } =
+			enrich(initialProgram)
+
+		printDiagnostics(diagnostics, flags.inputFileName)
+
+		if (containsErrors(diagnostics)) {
+			console.error(
+				chalk.red(`Compilation of ${flags.inputFileName} failed.`),
+			)
+			process.exit(1)
+		}
 
 		const validatedProgram = validate(enrichedProgram)
 

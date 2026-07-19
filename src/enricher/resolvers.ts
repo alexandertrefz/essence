@@ -1,5 +1,6 @@
 import deepEqual from "deep-equal"
 
+import { reportError } from "../diagnostics"
 import { matchesType } from "../helpers"
 import type { common, enricher, parser } from "../interfaces"
 
@@ -67,9 +68,16 @@ export function resolveNativeFunctionInvocationType(
 
 	if (type.type === "Function") {
 		return type.returnType
-	} else {
-		throw new Error(`${node.name.content} is not a native function.`)
 	}
+
+	if (type.type !== "Error") {
+		reportError(
+			`'${node.name.content}' is not a native function.`,
+			node.name.position,
+		)
+	}
+
+	return { type: "Error" }
 }
 
 export function resolveInvokedMethodInNamespace(
@@ -182,6 +190,31 @@ export function resolveInvokedMethodInNamespace(
 	}
 }
 
+// NOTE: Failed Method Invocations resolve to a placeholder Namespace and an
+// Error Type — the Diagnostic has already been reported, and later stages
+// only run when there are no Error Diagnostics.
+function resolveFailedMethodInvocation(): {
+	namespace: { name: string; type: common.NamespaceType }
+	type: common.Type
+	overloadedMethodIndex: number | null
+} {
+	return {
+		namespace: {
+			name: "",
+			type: {
+				type: "Namespace",
+				targetType: null,
+				name: "",
+				generics: [],
+				properties: {},
+				methods: {},
+			},
+		},
+		type: { type: "Error" },
+		overloadedMethodIndex: null,
+	}
+}
+
 export function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
@@ -191,91 +224,79 @@ export function resolveMethodInvocation(
 	overloadedMethodIndex: number | null
 } {
 	let namespaces = resolveMethodLookupBaseNamespaces(node, scope)
-	let resolvedNamespace: { name: string; type: common.NamespaceType }
 
 	if (namespaces.size === 0) {
-		throw new Error(
-			`Could not find a Namespace for the value at ${node.base.position.start.line}:${node.base.position.start.column} (method '${node.member.content}').`,
-		)
-	} else {
-		let matchingNamespaces = new Map<string, common.NamespaceType>()
-		for (let [name, namespace] of namespaces) {
-			if (Object.hasOwn(namespace.methods, node.member.content)) {
-				matchingNamespaces.set(name, namespace)
-			}
+		if (resolveType(node.base, scope).type !== "Error") {
+			reportError(
+				`Could not find a Namespace for this value (method '${node.member.content}').`,
+				node.base.position,
+			)
 		}
 
-		if (matchingNamespaces.size === 0) {
-			throw `Could not find a method with name ${node.member.content} in the namespaces matching the type of the left hand side expression.`
-		} else {
-			if (matchingNamespaces.size === 1) {
-				resolvedNamespace = {
-					name: Array.from(matchingNamespaces.entries())[0][0],
-					type: Array.from(matchingNamespaces.entries())[0][1],
-				}
+		return resolveFailedMethodInvocation()
+	}
 
-				let resolvedMethod = resolveInvokedMethodInNamespace(
-					node,
-					resolvedNamespace.type,
-					scope,
-				)
+	let matchingNamespaces = new Map<string, common.NamespaceType>()
+	for (let [name, namespace] of namespaces) {
+		if (Object.hasOwn(namespace.methods, node.member.content)) {
+			matchingNamespaces.set(name, namespace)
+		}
+	}
 
-				if (resolvedMethod) {
-					return {
-						namespace: resolvedNamespace,
-						overloadedMethodIndex:
-							resolvedMethod.overloadedMethodIndex,
-						type: resolvedMethod.returnType,
-					}
-				} else {
-					throw new Error(
-						"MethodInvocation: Passed arguments do not match any overload",
-					)
-				}
-			} else {
-				let resolvedMethods = []
+	if (matchingNamespaces.size === 0) {
+		reportError(
+			`Could not find a method named '${node.member.content}' in the Namespaces matching this value.`,
+			node.member.position,
+		)
 
-				for (let [namespaceName, namespaceType] of matchingNamespaces) {
-					let resolvedMethod = resolveInvokedMethodInNamespace(
-						node,
-						namespaceType,
-						scope,
-					)
+		return resolveFailedMethodInvocation()
+	}
 
-					if (resolvedMethod) {
-						resolvedMethods.push({
-							namespace: {
-								name: namespaceName,
-								type: namespaceType,
-							},
-							overloadedMethodIndex:
-								resolvedMethod.overloadedMethodIndex,
-							type: resolvedMethod.returnType,
-						})
-					}
-				}
+	let resolvedMethods = []
 
-				if (resolvedMethods.length === 0) {
-					throw new Error(
-						"MethodInvocation: Passed arguments do not match any overload",
-					)
-				} else if (resolvedMethods.length === 1) {
-					return resolvedMethods[0]
-				} else {
-					throw new Error(
-						`MethodInvocation: Passed arguments matched more than 1 namespace, please disambiguate.
+	for (let [namespaceName, namespaceType] of matchingNamespaces) {
+		let resolvedMethod = resolveInvokedMethodInNamespace(
+			node,
+			namespaceType,
+			scope,
+		)
 
-The Matching namespaces are:
+		if (resolvedMethod) {
+			resolvedMethods.push({
+				namespace: {
+					name: namespaceName,
+					type: namespaceType,
+				},
+				overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
+				type: resolvedMethod.returnType,
+			})
+		}
+	}
+
+	if (resolvedMethods.length === 0) {
+		reportError(
+			"Passed arguments do not match any overload.",
+			node.position,
+		)
+
+		return resolveFailedMethodInvocation()
+	} else if (resolvedMethods.length === 1) {
+		return resolvedMethods[0]
+	} else {
+		reportError(
+			`Passed arguments matched more than 1 Namespace, please disambiguate.
+
+The matching Namespaces are:
 ${resolvedMethods
 	.map((method) => {
 		return `    - ${method.namespace.name}`
 	})
 	.join("\n")}
 `,
-					)
-				}
-			}
-		}
+			node.position,
+		)
+
+		return resolveFailedMethodInvocation()
 	}
 }
 
@@ -330,20 +351,65 @@ export function resolveFunctionInvocationType(
 			return overload.returnType
 		}
 
-		throw new Error(
-			"MethodInvocation: Passed arguments do not match any overload",
+		reportError(
+			"Passed arguments do not match any overload.",
+			node.position,
 		)
+
+		return { type: "Error" }
 	} else {
-		throw new Error(
-			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
-		)
+		if (type.type !== "Error") {
+			reportError(
+				"This expression is not a Function.",
+				node.name.position,
+			)
+		}
+
+		return { type: "Error" }
+	}
+}
+
+function describeTypesForCombination(type: common.Type): string {
+	switch (type.type) {
+		case "Error":
+			return "Error Types"
+		case "GenericList":
+		case "AppliedType":
+		case "GenericUse":
+			return "Generic Types"
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return "Functions"
+		case "Namespace":
+			return "Namespaces"
+		case "List":
+			return "Lists"
+		case "Boolean":
+			return "Booleans"
+		case "Integer":
+			return "Integers"
+		case "Fraction":
+			return "Fractions"
+		case "Nothing":
+			return "Nothings"
+		case "String":
+			return "Strings"
+		case "Unknown":
+			return "Unknowns"
+		case "UnionType":
+			return "Unions"
+		case "Record":
+			return "Records"
 	}
 }
 
 export function resolveCombinationType(
 	node: parser.CombinationNode,
 	scope: enricher.Scope,
-): common.RecordType {
+): common.Type {
 	function isSubType(
 		lhs: common.RecordType,
 		rhs: common.RecordType,
@@ -360,70 +426,26 @@ export function resolveCombinationType(
 	let lhsType = resolveType(node.lhs, scope)
 	let rhsType = resolveType(node.rhs, scope)
 
-	switch (lhsType.type) {
-		case "Error":
-			throw new Error("You can not combine Error Types.")
-		case "GenericList":
-		case "AppliedType":
-		case "GenericUse":
-			throw new Error("You can not combine Generic Types.")
-		case "Function":
-		case "SimpleMethod":
-		case "StaticMethod":
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
-			throw new Error("You can not combine Functions.")
-		case "Namespace":
-			throw new Error("You can not combine Namespaces.")
-		case "List":
-			throw new Error("You can not combine Lists.")
-		case "Boolean":
-			throw new Error("You can not combine Booleans.")
-		case "Integer":
-			throw new Error("You can not combine Integers.")
-		case "Fraction":
-			throw new Error("You can not combine Fractions.")
-		case "Nothing":
-			throw new Error("You can not combine Nothings.")
-		case "String":
-			throw new Error("You can not combine Strings.")
-		case "Unknown":
-			throw new Error("You can not combine Unknowns.")
-		case "UnionType":
-			throw new Error("You can not combine Unions.")
+	if (lhsType.type === "Error" || rhsType.type === "Error") {
+		return { type: "Error" }
 	}
 
-	switch (rhsType.type) {
-		case "Error":
-			throw new Error("You can not combine Error Types.")
-		case "GenericList":
-		case "AppliedType":
-		case "GenericUse":
-			throw new Error("You can not combine Generic Types.")
-		case "Function":
-		case "SimpleMethod":
-		case "StaticMethod":
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
-			throw new Error("You can not combine Functions.")
-		case "Namespace":
-			throw new Error("You can not combine Namespaces.")
-		case "List":
-			throw new Error("You can not combine Lists.")
-		case "Boolean":
-			throw new Error("You can not combine Booleans.")
-		case "Integer":
-			throw new Error("You can not combine Integers.")
-		case "Fraction":
-			throw new Error("You can not combine Fractions.")
-		case "Nothing":
-			throw new Error("You can not combine Nothings.")
-		case "String":
-			throw new Error("You can not combine Strings.")
-		case "Unknown":
-			throw new Error("You can not combine Unknowns.")
-		case "UnionType":
-			throw new Error("You can not combine Unions.")
+	if (lhsType.type !== "Record") {
+		reportError(
+			`You can not combine ${describeTypesForCombination(lhsType)}.`,
+			node.lhs.position,
+		)
+
+		return { type: "Error" }
+	}
+
+	if (rhsType.type !== "Record") {
+		reportError(
+			`You can not combine ${describeTypesForCombination(rhsType)}.`,
+			node.rhs.position,
+		)
+
+		return { type: "Error" }
 	}
 
 	// TODO: Resolve Applied Types and check wether they are Records
@@ -434,9 +456,12 @@ export function resolveCombinationType(
 		if (isSubType(lhsType, rhsType)) {
 			return lhsType
 		} else {
-			throw new Error(
+			reportError(
 				"The right hand side Type must be a Partial of the left hand side Type.",
+				node.rhs.position,
 			)
+
+			return lhsType
 		}
 	}
 }
@@ -450,22 +475,27 @@ export function resolveRecordValueType(
 
 		if (resolvedType.type === "Record") {
 			return resolvedType
-		} else {
-			throw new Error(
-				"Record Type Annotations have to be of a Record Type!",
+		}
+
+		if (resolvedType.type !== "Error") {
+			reportError(
+				"Type Annotations for Records must be Record Types.",
+				node.type.position,
 			)
 		}
-	} else {
-		let members: Record<string, common.Type> = {}
+	}
 
-		for (let [memberKey, memberValue] of Object.entries(node.members)) {
-			members[memberKey] = resolveType(memberValue, scope)
-		}
+	// NOTE: Missing or invalid Type Annotations fall back to the
+	// structural Type of the Record Literal itself.
+	let members: Record<string, common.Type> = {}
 
-		return {
-			type: "Record",
-			members,
-		}
+	for (let [memberKey, memberValue] of Object.entries(node.members)) {
+		members[memberKey] = resolveType(memberValue, scope)
+	}
+
+	return {
+		type: "Record",
+		members,
 	}
 }
 
@@ -518,30 +548,41 @@ export function resolveLookupType(
 ): common.Type {
 	let baseType = resolveType(node.base, scope)
 
-	if (baseType.type !== "Record" && baseType.type !== "Namespace") {
-		throw new Error(
-			`Node starting at ${node.base.position.start.line}:${node.base.position.start.column} is neither a Record, Namespace, Type, or GenericType.`,
-		)
-	} else {
-		if (baseType.type === "Namespace") {
-			if (Object.hasOwn(baseType.properties, node.member.content)) {
-				return baseType.properties[node.member.content]
-			} else if (Object.hasOwn(baseType.methods, node.member.content)) {
-				return baseType.methods[node.member.content]
-			} else {
-				throw new Error(
-					`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
-				)
-			}
+	if (baseType.type === "Error") {
+		return baseType
+	}
+
+	if (baseType.type === "Namespace") {
+		if (Object.hasOwn(baseType.properties, node.member.content)) {
+			return baseType.properties[node.member.content]
+		} else if (Object.hasOwn(baseType.methods, node.member.content)) {
+			return baseType.methods[node.member.content]
 		} else {
-			if (Object.hasOwn(baseType.members, node.member.content)) {
-				return baseType.members[node.member.content]
-			} else {
-				throw new Error(
-					`Object starting at ${node.base.position.start.line}:${node.base.position.start.column} has no member '${node.member.content}'.`,
-				)
-			}
+			reportError(
+				`Namespace '${baseType.name}' has no member '${node.member.content}'.`,
+				node.member.position,
+			)
+
+			return { type: "Error" }
 		}
+	} else if (baseType.type === "Record") {
+		if (Object.hasOwn(baseType.members, node.member.content)) {
+			return baseType.members[node.member.content]
+		} else {
+			reportError(
+				`This Record has no member '${node.member.content}'.`,
+				node.member.position,
+			)
+
+			return { type: "Error" }
+		}
+	} else {
+		reportError(
+			"Only Records and Namespaces have members.",
+			node.base.position,
+		)
+
+		return { type: "Error" }
 	}
 }
 
@@ -553,24 +594,27 @@ export function resolveIdentifierType(
 	let result = findVariableInScope(name, scope)
 
 	if (result === null) {
-		throw new Error(
-			`Variable '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
-		)
+		reportError(`Variable '${name}' is not declared.`, node.position)
+
+		return { type: "Error" }
 	} else {
 		return result
 	}
 }
 
 export function resolveSelfType(
-	_node: parser.SelfNode,
+	node: parser.SelfNode,
 	scope: enricher.Scope,
 ): common.Type {
 	let result = findVariableInScope("@", scope)
 
 	if (result === null) {
-		throw new Error(
-			"@-Expressions can not be used outside of methods and match expressions.",
+		reportError(
+			"@-Expressions can not be used outside of Methods and Match Expressions.",
+			node.position,
 		)
+
+		return { type: "Error" }
 	} else {
 		return result
 	}
@@ -691,9 +735,9 @@ export function resolveIdentifierTypeDeclarationType(
 	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
-		throw new Error(
-			`Type '${name}' at ${node.position.start.line}:${node.position.start.column} is not declared.`,
-		)
+		reportError(`Type '${name}' is not declared.`, node.position)
+
+		return { type: "Error" }
 	} else {
 		return result
 	}
@@ -732,14 +776,24 @@ export function resolveGenericTypeDeclarationType(
 ): common.Type {
 	let baseType = resolveType(node.baseType, scope)
 
+	if (baseType.type === "Error") {
+		return baseType
+	}
+
 	// NOTE: List is the only Generic Type so far. Applied Lists are
 	// normalized into plain List Types right away, so that inferred and
 	// declared List Types share a single representation.
 	if (baseType.type === "GenericList") {
 		if (node.generics.length !== 1) {
-			throw new Error(
-				`List requires exactly 1 Type Argument at ${node.position.start.line}:${node.position.start.column}.`,
-			)
+			reportError("List requires exactly 1 Type Argument.", node.position)
+
+			return {
+				type: "List",
+				itemType:
+					node.generics.length > 0
+						? resolveType(node.generics[0], scope)
+						: { type: "Error" },
+			}
 		}
 
 		return {
@@ -748,9 +802,9 @@ export function resolveGenericTypeDeclarationType(
 		}
 	}
 
-	throw new Error(
-		`Type at ${node.position.start.line}:${node.position.start.column} is not generic.`,
-	)
+	reportError("This Type is not generic.", node.position)
+
+	return { type: "Error" }
 }
 
 export function resolveMatchType(
@@ -876,9 +930,12 @@ export function resolveMethodType(
 ): common.MethodType {
 	if (node.nodeType === "SimpleMethod") {
 		if (selfType === null) {
-			throw new Error(
+			reportError(
 				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+				node.method.position,
 			)
+
+			selfType = { type: "Error" }
 		}
 
 		return {
@@ -927,10 +984,15 @@ export function resolveMethodType(
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
 		if (selfType === null) {
-			throw new Error(
+			reportError(
 				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+				node.methods[0]?.position ?? null,
 			)
+
+			selfType = { type: "Error" }
 		}
+
+		const methodSelfType = selfType
 
 		return {
 			type: "OverloadedMethod",
@@ -941,7 +1003,7 @@ export function resolveMethodType(
 						scope,
 					),
 					parameterTypes: [
-						{ name: null, type: selfType },
+						{ name: null, type: methodSelfType },
 						...method.value.parameters.map((parameter) => {
 							let name: string | null
 
