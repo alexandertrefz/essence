@@ -1,7 +1,7 @@
 import deepEqual from "deep-equal"
 
 import { reportError } from "../diagnostics"
-import { matchesType } from "../helpers"
+import { type MatchableArgument, matchArguments, matchesType } from "../helpers"
 import type { common, enricher, parser } from "../interfaces"
 
 export function resolveType(
@@ -101,37 +101,22 @@ export function resolveInvokedMethodInNamespace(
 		]
 	}
 
+	let matchableArguments: Array<MatchableArgument> = methodArguments.map(
+		(argument) => ({
+			name: argument.name?.content ?? null,
+			getType: () => resolveType(argument.value, scope),
+		}),
+	)
+
 	if (
 		methodType.type === "SimpleMethod" ||
 		methodType.type === "StaticMethod"
 	) {
-		if (methodType.parameterTypes.length !== methodArguments.length) {
-			return
-		}
-
-		for (
-			let parameterIndex = 0;
-			parameterIndex < methodType.parameterTypes.length;
-			parameterIndex++
+		if (
+			matchArguments(methodType.parameterTypes, matchableArguments)
+				.type !== "Match"
 		) {
-			const parameter = methodType.parameterTypes[parameterIndex]
-			const argument = methodArguments[parameterIndex]
-
-			const parameterNameIsMatched =
-				(parameter.name === null && argument.name === null) ||
-				parameter.name === argument.name?.content
-
-			if (
-				!(
-					parameterNameIsMatched &&
-					matchesType(
-						parameter.type,
-						resolveType(argument.value, scope),
-					)
-				)
-			) {
-				return
-			}
+			return
 		}
 
 		return {
@@ -142,45 +127,21 @@ export function resolveInvokedMethodInNamespace(
 		methodType.type === "OverloadedMethod" ||
 		methodType.type === "OverloadedStaticMethod"
 	) {
-		overloadLoop: for (
+		for (
 			let overloadIndex = 0;
 			overloadIndex < methodType.overloads.length;
 			overloadIndex++
 		) {
 			let overload = methodType.overloads[overloadIndex]
 
-			if (overload.parameterTypes.length !== methodArguments.length) {
-				continue
-			}
-
-			for (
-				let parameterIndex = 0;
-				parameterIndex < overload.parameterTypes.length;
-				parameterIndex++
+			if (
+				matchArguments(overload.parameterTypes, matchableArguments)
+					.type === "Match"
 			) {
-				const parameter = overload.parameterTypes[parameterIndex]
-				const argument = methodArguments[parameterIndex]
-
-				const parameterNameIsMatched =
-					(parameter.name === null && argument.name === null) ||
-					parameter.name === argument.name?.content
-
-				if (
-					!(
-						parameterNameIsMatched &&
-						matchesType(
-							parameter.type,
-							resolveType(argument.value, scope),
-						)
-					)
-				) {
-					continue overloadLoop
+				return {
+					overloadedMethodIndex: overloadIndex,
+					returnType: overload.returnType,
 				}
-			}
-
-			return {
-				overloadedMethodIndex: overloadIndex,
-				returnType: overload.returnType,
 			}
 		}
 
@@ -323,32 +284,20 @@ export function resolveFunctionInvocationType(
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
 	) {
-		const methodArguments = node.arguments
+		const matchableArguments: Array<MatchableArgument> = node.arguments.map(
+			(argument) => ({
+				name: argument.name?.content ?? null,
+				getType: () => resolveType(argument.value, scope),
+			}),
+		)
 
-		overloadLoop: for (let overload of type.overloads) {
-			if (overload.parameterTypes.length !== methodArguments.length) {
-				continue
+		for (let overload of type.overloads) {
+			if (
+				matchArguments(overload.parameterTypes, matchableArguments)
+					.type === "Match"
+			) {
+				return overload.returnType
 			}
-
-			for (let i = 0; i < overload.parameterTypes.length; i++) {
-				const parameter = overload.parameterTypes[i]
-				const argument = methodArguments[i]
-
-				if (
-					!(
-						((parameter.name === null && argument.name === null) ||
-							parameter.name === argument.name?.content) &&
-						matchesType(
-							parameter.type,
-							resolveType(argument.value, scope),
-						)
-					)
-				) {
-					continue overloadLoop
-				}
-			}
-
-			return overload.returnType
 		}
 
 		reportError(
