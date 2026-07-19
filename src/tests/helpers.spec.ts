@@ -998,6 +998,218 @@ describe("Helpers", () => {
 			).toBe(false)
 		})
 
+		describe("Signature Variance", () => {
+			const takesIntegerFunctionType: FunctionType = {
+				type: "Function",
+				generics: [],
+				parameterTypes: [{ name: null, type: { type: "Integer" } }],
+				returnType: { type: "String" },
+			}
+
+			const takesIntegerOrFractionFunctionType: FunctionType = {
+				type: "Function",
+				generics: [],
+				parameterTypes: [
+					{ name: null, type: unionTypeIntegerFraction },
+				],
+				returnType: { type: "String" },
+			}
+
+			const returnsIntegerFunctionType: FunctionType = {
+				type: "Function",
+				generics: [],
+				parameterTypes: [],
+				returnType: { type: "Integer" },
+			}
+
+			const returnsIntegerOrFractionFunctionType: FunctionType = {
+				type: "Function",
+				generics: [],
+				parameterTypes: [],
+				returnType: unionTypeIntegerFraction,
+			}
+
+			const takesIntegerSimpleMethodType: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [{ name: null, type: { type: "Integer" } }],
+				returnType: { type: "String" },
+			}
+
+			const takesIntegerOrFractionSimpleMethodType: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [
+					{ name: null, type: unionTypeIntegerFraction },
+				],
+				returnType: { type: "String" },
+			}
+
+			const returnsIntegerSimpleMethodType: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [],
+				returnType: { type: "Integer" },
+			}
+
+			const returnsIntegerOrFractionSimpleMethodType: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [],
+				returnType: unionTypeIntegerFraction,
+			}
+
+			const takesIntegerStaticMethodType: MethodType = {
+				type: "StaticMethod",
+				generics: [],
+				parameterTypes: [{ name: null, type: { type: "Integer" } }],
+				returnType: { type: "String" },
+			}
+
+			const takesIntegerOrFractionStaticMethodType: MethodType = {
+				type: "StaticMethod",
+				generics: [],
+				parameterTypes: [
+					{ name: null, type: unionTypeIntegerFraction },
+				],
+				returnType: { type: "String" },
+			}
+
+			const takesIntegerOverloadedMethodType: MethodType = {
+				type: "OverloadedMethod",
+				overloads: [
+					{
+						generics: [],
+						parameterTypes: [
+							{ name: null, type: { type: "Integer" } },
+						],
+						returnType: { type: "String" },
+					},
+				],
+			}
+
+			const takesIntegerOrFractionOverloadedMethodType: MethodType = {
+				type: "OverloadedMethod",
+				overloads: [
+					{
+						generics: [],
+						parameterTypes: [
+							{ name: null, type: unionTypeIntegerFraction },
+						],
+						returnType: { type: "String" },
+					},
+				],
+			}
+
+			it("should accept Functions with wider parameter types (contravariance)", () => {
+				expect(
+					matchesType(
+						takesIntegerFunctionType,
+						takesIntegerOrFractionFunctionType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject Functions with narrower parameter types", () => {
+				expect(
+					matchesType(
+						takesIntegerOrFractionFunctionType,
+						takesIntegerFunctionType,
+					),
+				).toBe(false)
+			})
+
+			it("should accept Functions with narrower return types (covariance)", () => {
+				expect(
+					matchesType(
+						returnsIntegerOrFractionFunctionType,
+						returnsIntegerFunctionType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject Functions with wider return types", () => {
+				expect(
+					matchesType(
+						returnsIntegerFunctionType,
+						returnsIntegerOrFractionFunctionType,
+					),
+				).toBe(false)
+			})
+
+			it("should accept SimpleMethods with wider parameter types (contravariance)", () => {
+				expect(
+					matchesType(
+						takesIntegerSimpleMethodType,
+						takesIntegerOrFractionSimpleMethodType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject SimpleMethods with narrower parameter types", () => {
+				expect(
+					matchesType(
+						takesIntegerOrFractionSimpleMethodType,
+						takesIntegerSimpleMethodType,
+					),
+				).toBe(false)
+			})
+
+			it("should accept SimpleMethods with narrower return types (covariance)", () => {
+				expect(
+					matchesType(
+						returnsIntegerOrFractionSimpleMethodType,
+						returnsIntegerSimpleMethodType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject SimpleMethods with wider return types", () => {
+				expect(
+					matchesType(
+						returnsIntegerSimpleMethodType,
+						returnsIntegerOrFractionSimpleMethodType,
+					),
+				).toBe(false)
+			})
+
+			it("should accept StaticMethods with wider parameter types (contravariance)", () => {
+				expect(
+					matchesType(
+						takesIntegerStaticMethodType,
+						takesIntegerOrFractionStaticMethodType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject StaticMethods with narrower parameter types", () => {
+				expect(
+					matchesType(
+						takesIntegerOrFractionStaticMethodType,
+						takesIntegerStaticMethodType,
+					),
+				).toBe(false)
+			})
+
+			it("should accept OverloadedMethods with wider parameter types (contravariance)", () => {
+				expect(
+					matchesType(
+						takesIntegerOverloadedMethodType,
+						takesIntegerOrFractionOverloadedMethodType,
+					),
+				).toBe(true)
+			})
+
+			it("should reject OverloadedMethods with narrower parameter types", () => {
+				expect(
+					matchesType(
+						takesIntegerOrFractionOverloadedMethodType,
+						takesIntegerOverloadedMethodType,
+					),
+				).toBe(false)
+			})
+		})
+
 		it("should not match mismatched Types", () => {
 			expect(
 				matchesType(
