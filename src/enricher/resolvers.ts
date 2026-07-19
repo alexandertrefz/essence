@@ -655,7 +655,7 @@ export function scopeWithGenerics(
 		}
 	}
 
-	return { parent: scope, members: {}, types }
+	return { parent: scope, members: {}, constants: new Set(), types }
 }
 
 export function resolveFunctionDefinitionType(
@@ -715,6 +715,7 @@ export function resolveNamespaceDefinitionStatementType(
 			{
 				parent: scope,
 				members: { [node.name.content]: resultType },
+				constants: new Set([node.name.content]),
 				types: {},
 			},
 			resultType.targetType,

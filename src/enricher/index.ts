@@ -40,18 +40,21 @@ export const enrich = (
 } => {
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
+			let members: Record<string, common.Type> = {
+				...nativeFunctions,
+				String: stringNamespace,
+				Boolean: booleanNamespace,
+				Integer: integerNamespace,
+				Fraction: fractionNamespace,
+				Number: numberNamespace,
+				Record: recordNamespace,
+				List: listNamespace,
+			}
+
 			let topLevelScope: enricher.Scope = {
 				parent: null,
-				members: {
-					...nativeFunctions,
-					String: stringNamespace,
-					Boolean: booleanNamespace,
-					Integer: integerNamespace,
-					Fraction: fractionNamespace,
-					Number: numberNamespace,
-					Record: recordNamespace,
-					List: listNamespace,
-				},
+				members,
+				constants: new Set(Object.keys(members)),
 				types: {
 					Nothing: { type: "Nothing" },
 					Boolean: booleanType,
@@ -147,6 +150,11 @@ function hoistDeclarations(
 				targetMap[node.name.content] == null
 			) {
 				targetMap[node.name.content] = speculation.result
+
+				if (node.nodeType !== "TypeAliasStatement") {
+					scope.constants.add(node.name.content)
+				}
+
 				hoistedNodes.add(node)
 			} else {
 				remainingNodes.push(node)
