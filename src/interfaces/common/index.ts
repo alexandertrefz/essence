@@ -11,66 +11,17 @@ export type Position = {
 	end: Cursor
 }
 
-export type GenericType = {
-	type: "Generic"
-	name: string
+export type UnknownType = {
+	type: "Unknown"
 }
 
-export type RecordType = {
-	type: "Record"
-	members: Record<string, Type>
+export type NothingType = {
+	type: "Nothing"
 }
 
-type Parameter = {
-	type: Type
-	name: string | null
+export type BooleanType = {
+	type: "Boolean"
 }
-
-type GenericDeclaration = {
-	name: string
-	defaultType: Type | null
-}
-
-export type FunctionType = {
-	type: "Function"
-	parameterTypes: Array<Parameter>
-	returnType: Type
-}
-
-export type GenericFunctionType = {
-	type: "GenericFunction"
-	generics: Array<GenericDeclaration>
-	parameterTypes: Array<Parameter>
-	returnType: Type
-}
-
-export type SimpleMethodType = {
-	type: "SimpleMethod"
-	parameterTypes: Array<Parameter>
-	returnType: Type
-}
-
-export type StaticMethodType = {
-	type: "StaticMethod"
-	parameterTypes: Array<Parameter>
-	returnType: Type
-}
-
-export type OverloadedStaticMethodType = {
-	type: "OverloadedStaticMethod"
-	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
-}
-
-export type OverloadedMethodType = {
-	type: "OverloadedMethod"
-	overloads: Array<{ parameterTypes: Array<Parameter>; returnType: Type }>
-}
-
-export type MethodType =
-	| SimpleMethodType
-	| StaticMethodType
-	| OverloadedStaticMethodType
-	| OverloadedMethodType
 
 export type StringType = {
 	type: "String"
@@ -84,45 +35,120 @@ export type FractionType = {
 	type: "Fraction"
 }
 
-export type BooleanType = {
-	type: "Boolean"
+export type RecordType = {
+	type: "Record"
+	members: Record<string, Type>
 }
 
-export type NothingType = {
-	type: "Nothing"
+export type GenericListType = {
+	type: "GenericList"
+	generics: [{ name: "ItemType"; defaultType: { type: "Unknown" } }]
 }
 
-export type UnknownType = {
-	type: "Unknown"
+export type ListType = {
+	type: "List"
+	itemType: Type
 }
 
-export type BuiltInType = {
-	type: "BuiltIn"
+type Parameter = {
+	type: Type | GenericUse
+	name: string | null
 }
+
+export type BaseFunction = {
+	parameterTypes: Array<
+		| Parameter
+		| {
+				type: GenericUse
+				name: string | null
+		  }
+	>
+	generics: Array<GenericDeclaration>
+	returnType: Type | GenericUse
+}
+
+export type FunctionType = BaseFunction & {
+	type: "Function"
+}
+
+export type SimpleMethodType = BaseFunction & {
+	type: "SimpleMethod"
+}
+
+export type StaticMethodType = BaseFunction & {
+	type: "StaticMethod"
+}
+
+export type OverloadedStaticMethodType = {
+	type: "OverloadedStaticMethod"
+	overloads: Array<BaseFunction>
+}
+
+export type OverloadedMethodType = {
+	type: "OverloadedMethod"
+	overloads: Array<BaseFunction>
+}
+
+export type MethodType =
+	| SimpleMethodType
+	| StaticMethodType
+	| OverloadedStaticMethodType
+	| OverloadedMethodType
+
+export type PrimitiveType =
+	| NothingType
+	| BooleanType
+	| StringType
+	| IntegerType
+	| FractionType
+	| RecordType
+	| ListType
+	| FunctionType
+	| NamespaceType
 
 export type NamespaceType = {
 	type: "Namespace"
 	targetType: Type | null
 	name: string
-	properties: Record<string, Type>
+	generics: Array<GenericDeclaration>
+	properties: Record<string, Type | GenericUse>
 	methods: Record<string, MethodType>
 }
 
 export type UnionType = {
 	type: "UnionType"
-	types: Array<Type>
+	types: Array<Type | GenericUse>
 }
 
-export type PrimitiveType =
-	| NothingType
-	| StringType
-	| IntegerType
-	| FractionType
-	| BooleanType
-	| RecordType
-	| FunctionType
-	| NamespaceType
+export type GenericName = string
 
-export type Type = UnknownType | PrimitiveType | UnionType | MethodType
+export type GenericDeclaration = {
+	name: GenericName
+	infer: boolean
+	defaultType: Type | null
+}
+
+export type GenericUse = {
+	type: "GenericUse"
+	name: GenericName
+}
+
+export type AppliedType = {
+	type: "AppliedType"
+	baseType: Exclude<Type, AppliedType>
+	appliedGenerics: Array<{
+		name: string | null
+		type: Type | GenericUse
+	}>
+}
+
+export type Type =
+	| UnknownType
+	| PrimitiveType
+	| UnionType
+	| MethodType
+	| GenericListType
+	| AppliedType
+	| GenericUse
 
 export { typed, typedSimple }
