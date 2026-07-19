@@ -1,3 +1,4 @@
+import { reportError } from "../diagnostics"
 import type { common, enricher, parser } from "../interfaces"
 
 import {
@@ -270,11 +271,14 @@ export function enrichRecordValue(
 ): common.typed.RecordValueNode {
 	let declaredType: common.Type | null = null
 	if (node.type !== null) {
-		declaredType = resolveType(node.type, scope)
+		let resolvedType = resolveType(node.type, scope)
 
-		if (declaredType.type !== "Record") {
-			throw new Error(
-				"Type Annotations for Records need to be of Record Types!",
+		if (resolvedType.type === "Record") {
+			declaredType = resolvedType
+		} else if (resolvedType.type !== "Error") {
+			reportError(
+				"Type Annotations for Records must be Record Types.",
+				node.type.position,
 			)
 		}
 	}
@@ -692,7 +696,10 @@ function declareVariableInScope(
 		typeof identifier === "string" ? identifier : identifier.content
 
 	if (scope.members[variableName] != null) {
-		throw new Error(`Variable ${variableName} is already declared.`)
+		reportError(
+			`Variable '${variableName}' is already declared.`,
+			typeof identifier === "string" ? null : identifier.position,
+		)
 	}
 
 	scope.members[variableName] = type
@@ -709,7 +716,10 @@ function declareTypeInScope(
 		typeof identifier === "string" ? identifier : identifier.content
 
 	if (scope.types[variableName] != null) {
-		throw new Error(`Type ${variableName} is already declared.`)
+		reportError(
+			`Type '${variableName}' is already declared.`,
+			typeof identifier === "string" ? null : identifier.position,
+		)
 	}
 
 	scope.types[variableName] = type

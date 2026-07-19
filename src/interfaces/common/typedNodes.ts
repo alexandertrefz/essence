@@ -165,12 +165,14 @@ export interface SelfNode {
 	type: Type
 }
 
+// NOTE: `type` is only a Record Type for valid Programs — invalid
+// Combinations recover with an Error Type.
 export interface CombinationNode {
 	nodeType: "Combination"
 	lhs: ExpressionNode
 	rhs: ExpressionNode
 	position: Position
-	type: RecordType
+	type: Type
 }
 
 export interface MatchNode {
