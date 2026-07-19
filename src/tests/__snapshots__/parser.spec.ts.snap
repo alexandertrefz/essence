@@ -1,4 +1,4 @@
-// Bun Snapshot v1, https://goo.gl/fbAQLP
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocation with one argument 1`] = `
 {
@@ -2626,6 +2626,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
         },
         "value": {
           "body": [],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [],
           "returnType": {
@@ -2730,6 +2731,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -2903,6 +2905,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -3076,6 +3079,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -3236,6 +3240,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -3479,7 +3484,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
-          "nodeType": "GenericFunctionDefinition",
+          "nodeType": "FunctionDefinition",
           "parameters": [],
           "returnType": {
             "nodeType": "IdentifierTypeDeclaration",
@@ -3613,7 +3618,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
-          "nodeType": "GenericFunctionDefinition",
+          "nodeType": "FunctionDefinition",
           "parameters": [
             {
               "externalName": {
@@ -3816,7 +3821,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
-          "nodeType": "GenericFunctionDefinition",
+          "nodeType": "FunctionDefinition",
           "parameters": [
             {
               "externalName": {
@@ -4019,7 +4024,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
-          "nodeType": "GenericFunctionDefinition",
+          "nodeType": "FunctionDefinition",
           "parameters": [
             {
               "externalName": null,
@@ -4209,7 +4214,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
               },
             },
           ],
-          "nodeType": "GenericFunctionDefinition",
+          "nodeType": "FunctionDefinition",
           "parameters": [
             {
               "externalName": {
@@ -8704,6 +8709,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -8911,6 +8917,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -9056,6 +9063,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -9264,6 +9272,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -9406,6 +9415,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -9615,6 +9625,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -9757,6 +9768,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -9899,6 +9911,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -10107,6 +10120,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -10646,6 +10660,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -10879,6 +10894,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -11024,6 +11040,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -11258,6 +11275,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -11400,6 +11418,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -11635,6 +11654,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -11777,6 +11797,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -11919,6 +11940,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -12153,6 +12175,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -12404,6 +12427,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -12637,6 +12661,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -12782,6 +12807,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -13016,6 +13042,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -13158,6 +13185,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -13393,6 +13421,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -13535,6 +13564,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -13677,6 +13707,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
@@ -13911,6 +13942,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -14162,6 +14194,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
@@ -14810,6 +14843,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
         },
         "value": {
           "body": [],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [],
           "returnType": {
@@ -14928,6 +14962,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -15115,6 +15150,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -15302,6 +15338,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
@@ -15476,6 +15513,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {

@@ -304,8 +304,12 @@ ArgumentList ->
 # ----- #
 
 Type ->
-	  SimpleType {% id %}
-	| UnionType  {% id %}
+	  NonGenericType {% id %}
+	| GenericType    {% id %}
+
+NonGenericType ->
+	  SimpleType  {% id %}
+	| UnionType   {% id %}
 
 SimpleType ->
 	  IdentifierType {% id %}
@@ -315,11 +319,16 @@ IdentifierType ->
 	Identifier {% ([identifier]) => generators.identifierTypeDeclaration(identifier, identifier.position) %}
 
 RecordType ->
-	  LeftBrace RightBrace                 {% ([leftBrace,          rightBrace]) => generators.recordTypeDeclaration({},           { start: leftBrace.position.start, end: rightBrace.position.end }) %}
-	| LeftBrace KeyTypePairList RightBrace {% ([leftBrace, kvtList, rightBrace]) => generators.recordTypeDeclaration(kvtList.data, { start: leftBrace.position.start, end: rightBrace.position.end }) %}
+	  LeftBrace RightBrace                 {% ([leftBrace,                  rightBrace]) => generators.recordTypeDeclaration({},                   { start: leftBrace.position.start, end: rightBrace.position.end }) %}
+	| LeftBrace KeyTypePairList RightBrace {% ([leftBrace, keyTypePairList, rightBrace]) => generators.recordTypeDeclaration(keyTypePairList.data, { start: leftBrace.position.start, end: rightBrace.position.end }) %}
+
+GenericType ->
+	NonGenericType LeftAngle (Type Comma):* Type Comma:? RightAngle {%
+		([baseType, leftAngle, typeCommaList, finalType, _, rightAngle]) => generators.genericTypeDeclaration(baseType, [...typeCommaList.map(first), finalType], { start: leftAngle.position.start, end: rightAngle.position.end })
+	%}
 
 KeyTypePairList ->
-	(KeyTypePair Comma):* KeyTypePair Comma:? {% ([kvtCommaList, kvt]) => generators.buildKeyTypePairList(kvtCommaList.map(first), kvt) %}
+	(KeyTypePair Comma):* KeyTypePair Comma:? {% ([keyTypePairCommaList, finalKeyTypePair]) => generators.buildKeyTypePairList(keyTypePairCommaList.map(first), finalKeyTypePair) %}
 
 KeyTypePair ->
 	Identifier Colon Type {% ([identifier, _, value]) => generators.keyTypePair(identifier.content, value, { start: identifier.position.start, end: value.position.end }) %}
