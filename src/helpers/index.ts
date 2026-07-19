@@ -165,10 +165,14 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 
 	if (lhs.type === "UnionType") {
 		if (rhs.type === "UnionType") {
-			for (let lhsType of lhs.types) {
+			// NOTE: An actual Union is assignable when every one of its
+			// members is accepted by some member of the expected Union — the
+			// actual Type must not be able to hold any value the expected
+			// Type can not hold.
+			for (let rhsType of rhs.types) {
 				let foundMatch = false
 
-				for (let rhsType of rhs.types) {
+				for (let lhsType of lhs.types) {
 					if (matchesType(lhsType, rhsType)) {
 						foundMatch = true
 						break
