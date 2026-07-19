@@ -2,11 +2,11 @@ import type {
 	BooleanType,
 	FractionType,
 	FunctionType,
-	GenericFunctionType,
 	IntegerType,
 	ListType,
 	NamespaceType,
 	NothingType,
+	RecordType,
 	StringType,
 	Type,
 } from "./index"
@@ -75,7 +75,7 @@ export type ValueNode =
 
 export type RecordValueNode = {
 	nodeType: "RecordValue"
-	type: Type
+	type: RecordType
 	members: Record<string, ExpressionNode>
 }
 
@@ -111,8 +111,8 @@ export type NothingValueNode = {
 
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
-	value: FunctionDefinitionNode | GenericFunctionDefinitionNode
-	type: FunctionType | GenericFunctionType
+	value: FunctionDefinitionNode
+	type: FunctionType
 }
 
 export type ListValueNode = {
@@ -138,7 +138,7 @@ export interface CombinationNode {
 	nodeType: "Combination"
 	lhs: ExpressionNode
 	rhs: ExpressionNode
-	type: Type
+	type: RecordType
 }
 
 export interface MatchNode {
@@ -146,7 +146,6 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
-		returnType: Type
 		body: Array<ImplementationNode>
 	}>
 	type: Type
@@ -229,24 +228,10 @@ export interface FunctionDefinitionNode {
 	returnType: Type
 }
 
-export interface GenericFunctionDefinitionNode {
-	nodeType: "GenericFunctionDefinition"
-	generics: Array<GenericDeclarationNode>
-	parameters: Array<ParameterNode>
-	body: Array<ImplementationNode>
-	returnType: Type
-}
-
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode
-}
-
-export interface GenericDeclarationNode {
-	nodeType: "GenericDeclaration"
-	name: string
-	defaultType: Type | null
 }
 
 export interface ArgumentNode {

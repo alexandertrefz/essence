@@ -219,18 +219,21 @@ describe("Helpers", () => {
 
 		const noArgumentFunctionType: FunctionType = {
 			type: "Function",
+			generics: [],
 			parameterTypes: [],
 			returnType: { type: "String" },
 		}
 
 		const noArgumentWithDifferentReturnTypeFunctionType: FunctionType = {
 			type: "Function",
+			generics: [],
 			parameterTypes: [],
 			returnType: { type: "Integer" },
 		}
 
 		const singleArgumentFunctionType: FunctionType = {
 			type: "Function",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -242,6 +245,7 @@ describe("Helpers", () => {
 
 		const singleArgumentWithNameFunctionType: FunctionType = {
 			type: "Function",
+			generics: [],
 			parameterTypes: [
 				{
 					name: "test",
@@ -257,18 +261,21 @@ describe("Helpers", () => {
 
 		const noArgumentSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [],
 			returnType: { type: "String" },
 		}
 
 		const noArgumentWithDifferentReturnTypeSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [],
 			returnType: { type: "Integer" },
 		}
 
 		const singleArgumentSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -280,6 +287,7 @@ describe("Helpers", () => {
 
 		const singleArgumentWithNameSimpleMethodType: MethodType = {
 			type: "SimpleMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: "test",
@@ -295,6 +303,7 @@ describe("Helpers", () => {
 
 		const noArgumentStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
+			generics: [],
 			parameterTypes: [],
 			returnType: { type: "String" },
 		}
@@ -302,12 +311,14 @@ describe("Helpers", () => {
 		const noArgumentWithDifferentReturnTypeStaticMethodType: StaticMethodType =
 			{
 				type: "StaticMethod",
+				generics: [],
 				parameterTypes: [],
 				returnType: { type: "Integer" },
 			}
 
 		const singleArgumentStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: null,
@@ -319,6 +330,7 @@ describe("Helpers", () => {
 
 		const singleArgumentWithNameStaticMethodType: StaticMethodType = {
 			type: "StaticMethod",
+			generics: [],
 			parameterTypes: [
 				{
 					name: "test",
@@ -336,6 +348,7 @@ describe("Helpers", () => {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [],
 					returnType: { type: "String" },
 				},
@@ -347,6 +360,7 @@ describe("Helpers", () => {
 				type: "OverloadedMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [],
 						returnType: { type: "Integer" },
 					},
@@ -357,6 +371,7 @@ describe("Helpers", () => {
 			type: "OverloadedMethod",
 			overloads: [
 				{
+					generics: [],
 					parameterTypes: [
 						{
 							name: null,
@@ -373,6 +388,7 @@ describe("Helpers", () => {
 				type: "OverloadedMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test",
@@ -384,6 +400,7 @@ describe("Helpers", () => {
 						returnType: { type: "String" },
 					},
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test2",
@@ -402,6 +419,7 @@ describe("Helpers", () => {
 				type: "OverloadedMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test2",
@@ -413,6 +431,7 @@ describe("Helpers", () => {
 						returnType: { type: "String" },
 					},
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test3",
@@ -435,6 +454,7 @@ describe("Helpers", () => {
 				type: "OverloadedStaticMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [],
 						returnType: { type: "String" },
 					},
@@ -446,6 +466,7 @@ describe("Helpers", () => {
 				type: "OverloadedStaticMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [],
 						returnType: { type: "Integer" },
 					},
@@ -457,6 +478,7 @@ describe("Helpers", () => {
 				type: "OverloadedStaticMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: null,
@@ -475,6 +497,7 @@ describe("Helpers", () => {
 				type: "OverloadedStaticMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test",
@@ -486,6 +509,7 @@ describe("Helpers", () => {
 						returnType: { type: "String" },
 					},
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test2",
@@ -504,6 +528,7 @@ describe("Helpers", () => {
 				type: "OverloadedStaticMethod",
 				overloads: [
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test2",
@@ -515,6 +540,7 @@ describe("Helpers", () => {
 						returnType: { type: "String" },
 					},
 					{
+						generics: [],
 						parameterTypes: [
 							{
 								name: "test3",
