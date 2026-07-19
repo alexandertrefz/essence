@@ -119,7 +119,7 @@ export function resolveInvokedMethodInNamespace(
 
 			const parameterNameIsMatched =
 				(parameter.name === null && argument.name === null) ||
-				(parameter.name && argument.name?.content)
+				parameter.name === argument.name?.content
 
 			if (
 				!(
@@ -163,7 +163,7 @@ export function resolveInvokedMethodInNamespace(
 
 				const parameterNameIsMatched =
 					(parameter.name === null && argument.name === null) ||
-					(parameter.name && argument.name?.content)
+					parameter.name === argument.name?.content
 
 				if (
 					!(
@@ -337,7 +337,7 @@ export function resolveFunctionInvocationType(
 				if (
 					!(
 						((parameter.name === null && argument.name === null) ||
-							(parameter.name && argument.name?.content)) &&
+							parameter.name === argument.name?.content) &&
 						matchesType(
 							parameter.type,
 							resolveType(argument.value, scope),
