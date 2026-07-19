@@ -244,8 +244,11 @@ function validateFunctionInvocation(
 
 function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
+	position: common.Position,
 ): common.typed.FunctionDefinitionNode {
 	node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
+
+	validateDefiniteReturn(node, position)
 
 	return node
 }
@@ -301,15 +304,19 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	}
 
 	for (let handler of node.handlers) {
-		for (let bodyNode of handler.body) {
-			validateImplementationNode(bodyNode, {
-				nodeType: "FunctionDefinition",
-				generics: [],
-				parameters: [],
-				body: handler.body,
-				returnType: node.type,
-			})
+		let handlerContext: common.typed.FunctionDefinitionNode = {
+			nodeType: "FunctionDefinition",
+			generics: [],
+			parameters: [],
+			body: handler.body,
+			returnType: node.type,
 		}
+
+		for (let bodyNode of handler.body) {
+			validateImplementationNode(bodyNode, handlerContext)
+		}
+
+		validateDefiniteReturn(handlerContext, node.position)
 	}
 
 	return node
@@ -318,7 +325,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 function validateFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typed.FunctionValueNode {
-	validateFunctionDefinition(node.value)
+	validateFunctionDefinition(node.value, node.position)
 
 	return node
 }
@@ -412,10 +419,16 @@ function validateNamespaceDefinitionStatement(
 			method.nodeType === "SimpleMethod" ||
 			method.nodeType === "StaticMethod"
 		) {
-			validateFunctionDefinition(method.method.value)
+			validateFunctionDefinition(
+				method.method.value,
+				method.method.position,
+			)
 		} else {
 			for (let overloadedMethod of method.methods) {
-				validateFunctionDefinition(overloadedMethod.value)
+				validateFunctionDefinition(
+					overloadedMethod.value,
+					overloadedMethod.position,
+				)
 			}
 		}
 	}
@@ -495,7 +508,7 @@ function validateReturnStatement(
 function validateFunctionStatement(
 	node: common.typed.FunctionStatementNode,
 ): common.typed.FunctionStatementNode {
-	validateFunctionDefinition(node.value)
+	validateFunctionDefinition(node.value, node.position)
 
 	return node
 }
@@ -503,6 +516,46 @@ function validateFunctionStatement(
 // #endregion
 
 // #region Helpers
+
+function bodyDefinitelyReturns(
+	body: Array<common.typed.ImplementationNode>,
+): boolean {
+	return body.some(nodeDefinitelyReturns)
+}
+
+function nodeDefinitelyReturns(node: common.typed.ImplementationNode): boolean {
+	if (node.nodeType === "ReturnStatement") {
+		return true
+	}
+
+	if (node.nodeType === "IfElseStatement") {
+		return (
+			bodyDefinitelyReturns(node.trueBody) &&
+			bodyDefinitelyReturns(node.falseBody)
+		)
+	}
+
+	return false
+}
+
+function validateDefiniteReturn(
+	definition: common.typed.FunctionDefinitionNode,
+	position: common.Position,
+): void {
+	let returnType = definition.returnType
+
+	if (
+		returnType.type === "Nothing" ||
+		returnType.type === "Unknown" ||
+		returnType.type === "Error"
+	) {
+		return
+	}
+
+	if (!bodyDefinitelyReturns(definition.body)) {
+		reportError("Not all code paths return a value.", position)
+	}
+}
 
 function describeType(type: common.Type): string {
 	switch (type.type) {
