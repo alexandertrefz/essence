@@ -127,6 +127,67 @@ describe("Validator", () => {
 			)
 		})
 
+		it("should accept exhaustive Match Expressions", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant value: Number = 5
+					constant a = match value -> Number {
+						case Integer {
+							<- @
+						}
+
+						case Fraction {
+							<- @
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report non-exhaustive Match Expressions", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant value: Number = 5
+				constant a = match value -> Number {
+					case Integer {
+						<- @
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].message).toBe(
+				"Match Expression does not handle Type 'Fraction'.",
+			)
+		})
+
+		it("should warn about unreachable Match cases", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Value = Integer | Fraction
+
+				constant value: Value = 5
+				constant a = match value -> Value {
+					case Integer {
+						<- @
+					}
+
+					case Fraction {
+						<- @
+					}
+
+					case String {
+						<- 5
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].message).toBe(
+				"Type 'String' is not a member of the matched Union — this case can never match.",
+			)
+		})
+
 		it("should report Function Invocations with mismatched arity", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				function greet (_ name: String) -> String {
