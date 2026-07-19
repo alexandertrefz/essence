@@ -17,7 +17,7 @@ implementation {
 	§ We could leave the Union Name (`CalculatorOperation`) off whenever there is no ambiguity,
 	§ and call for disambiguation when needed, just like for namespace resolution in method calls:
 	§ constant operation = #Add({ left: 1, right: 1 })
-	constant operation = CalculatorOperation#Add({ left: 1, right: 1 })
+	constant operation: CalculatorOperation = CalculatorOperation#Add({ left: 1, right: 1 })
 
 	constant result = match operation -> Number | Nothing {
 		case #Add {
