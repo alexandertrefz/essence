@@ -705,9 +705,7 @@ function rewriteParameter(
 }
 
 function rewriteFunctionExpression(
-	node:
-		| common.typedSimple.FunctionDefinitionNode
-		| common.typedSimple.GenericFunctionDefinitionNode,
+	node: common.typedSimple.FunctionDefinitionNode,
 ): estree.FunctionExpression {
 	return {
 		type: "FunctionExpression",

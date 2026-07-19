@@ -22,6 +22,8 @@ export function resolveType(
 			return resolveCombinationType(node, scope)
 		case "RecordValue":
 			return resolveRecordValueType(node, scope)
+		case "ListValue":
+			return resolveListValueType(node, scope)
 		case "StringValue":
 			return { type: "String" }
 		case "IntegerValue":
@@ -32,6 +34,8 @@ export function resolveType(
 			return { type: "Boolean" }
 		case "NothingValue":
 			return { type: "Nothing" }
+		case "FunctionValue":
+			return resolveFunctionValueType(node, scope)
 		case "Lookup":
 			return resolveLookupType(node, scope)
 		case "Identifier":
@@ -48,6 +52,8 @@ export function resolveType(
 			return resolveUnionTypeDeclarationType(node, scope)
 		case "RecordTypeDeclaration":
 			return resolveRecordTypeDeclarationType(node, scope)
+		case "GenericTypeDeclaration":
+			return resolveGenericTypeDeclarationType(node, scope)
 		case "Match":
 			return resolveMatchType(node, scope)
 	}
@@ -61,133 +67,9 @@ export function resolveNativeFunctionInvocationType(
 
 	if (type.type === "Function") {
 		return type.returnType
-	} else if (type.type === "GenericFunction") {
-		let inferredType = inferGenericFunctionInvocation(
-			type,
-			node.arguments,
-			scope,
-		)
-
-		return inferredType.returnType
 	} else {
 		throw new Error(`${node.name.content} is not a native function.`)
 	}
-}
-
-function deeplyResolveGenerics(
-	type: common.Type,
-	inferredGenerics: Record<string, common.Type>,
-): common.Type {
-	if (type.type === "Generic") {
-		return inferredGenerics[type.name]
-	} else if (type.type === "UnionType") {
-		return deeplyResolveGenericsForUnion(type, inferredGenerics)
-	} else if (type.type === "Record") {
-		return deeplyResolveGenericsForRecord(type, inferredGenerics)
-	} else if (type.type === "List") {
-		return {
-			type: "List",
-			itemType: deeplyResolveGenerics(type.itemType, inferredGenerics),
-		}
-	} else {
-		return type
-	}
-}
-
-function deeplyResolveGenericsForUnion(
-	union: common.UnionType,
-	inferredGenerics: Record<string, common.Type>,
-): common.UnionType {
-	union = structuredClone(union)
-
-	for (let i = 0; i < union.types.length; i++) {
-		union.types[i] = deeplyResolveGenerics(union.types[i], inferredGenerics)
-	}
-
-	return union
-}
-
-function deeplyResolveGenericsForRecord(
-	record: common.RecordType,
-	inferredGenerics: Record<string, common.Type>,
-): common.RecordType {
-	record = structuredClone(record)
-
-	let entries = Object.entries(record.members)
-
-	for (let i = 0; i < entries.length; i++) {
-		entries[i][1] = deeplyResolveGenerics(entries[i][1], inferredGenerics)
-	}
-
-	record.members = Object.fromEntries(entries)
-
-	return record
-}
-
-function deeplyInferGenericsForFunction(
-	functionType: common.FunctionType,
-	inferredGenerics: Record<string, common.Type>,
-): common.FunctionType {
-	for (let i = 0; i < functionType.parameterTypes.length; i++) {
-		functionType.parameterTypes[i].type = deeplyResolveGenerics(
-			functionType.parameterTypes[i].type,
-			inferredGenerics,
-		)
-	}
-
-	functionType.returnType = deeplyResolveGenerics(
-		functionType.returnType,
-		inferredGenerics,
-	)
-
-	return functionType
-}
-
-function inferGenericFunctionInvocation(
-	genericFunctionType: common.GenericFunctionType,
-	argumentTypes: parser.ArgumentNode[],
-	scope: enricher.Scope,
-): common.FunctionType {
-	let inferredGenerics: Record<string, common.Type> = {}
-
-	let inferredFunctionType: common.FunctionType = {
-		type: "Function",
-		parameterTypes: structuredClone(genericFunctionType.parameterTypes),
-		returnType: structuredClone(genericFunctionType.returnType),
-	}
-
-	for (let i = 0; i < genericFunctionType.parameterTypes.length; i++) {
-		let parameter = genericFunctionType.parameterTypes[i]
-		if (parameter.type.type === "Generic") {
-			if (!(parameter.type.name in inferredGenerics)) {
-				inferredGenerics[parameter.type.name] = resolveType(
-					argumentTypes[i].value,
-					scope,
-				)
-			}
-		}
-	}
-
-	if (
-		Object.entries(inferredGenerics).length !==
-		genericFunctionType.generics.length
-	) {
-		throw new Error("Mismatch in amount of defined and declared Generics.")
-	}
-
-	for (let i = 0; i < inferredFunctionType.parameterTypes.length; i++) {
-		inferredFunctionType.parameterTypes[i].type = deeplyResolveGenerics(
-			inferredFunctionType.parameterTypes[i].type,
-			inferredGenerics,
-		)
-	}
-
-	inferredFunctionType.returnType = deeplyResolveGenerics(
-		inferredFunctionType.returnType,
-		inferredGenerics,
-	)
-
-	return inferredFunctionType
 }
 
 export function resolveInvokedMethodInNamespace(
@@ -293,6 +175,8 @@ export function resolveInvokedMethodInNamespace(
 				returnType: overload.returnType,
 			}
 		}
+
+		return undefined
 	} else {
 		return undefined
 	}
@@ -310,8 +194,9 @@ export function resolveMethodInvocation(
 	let resolvedNamespace: { name: string; type: common.NamespaceType }
 
 	if (namespaces.size === 0) {
-		// NOTE: This should be impossible. Every Primitive has at least 1 Namespace.
-		throw "Could not find a Namespace for this value."
+		throw new Error(
+			`Could not find a Namespace for the value at ${node.base.position.start.line}:${node.base.position.start.column} (method '${node.member.content}').`,
+		)
 	} else {
 		let matchingNamespaces = new Map<string, common.NamespaceType>()
 		for (let [name, namespace] of namespaces) {
@@ -445,26 +330,9 @@ export function resolveFunctionInvocationType(
 			return overload.returnType
 		}
 
-		console.log("Arguments")
-		console.log("=========")
-		console.log(Bun.inspect(methodArguments))
-		console.log()
-
-		console.log("Overloads")
-		console.log("=========")
-		console.log(Bun.inspect(type.overloads))
-
 		throw new Error(
 			"MethodInvocation: Passed arguments do not match any overload",
 		)
-	} else if (type.type === "GenericFunction") {
-		let inferredType = inferGenericFunctionInvocation(
-			type,
-			node.arguments,
-			scope,
-		)
-
-		return inferredType.returnType
 	} else {
 		throw new Error(
 			`Expression at ${node.name.position.start.line}:${node.name.position.start.column} is not a function.`,
@@ -475,7 +343,7 @@ export function resolveFunctionInvocationType(
 export function resolveCombinationType(
 	node: parser.CombinationNode,
 	scope: enricher.Scope,
-): common.Type {
+): common.RecordType {
 	function isSubType(
 		lhs: common.RecordType,
 		rhs: common.RecordType,
@@ -493,11 +361,20 @@ export function resolveCombinationType(
 	let rhsType = resolveType(node.rhs, scope)
 
 	switch (lhsType.type) {
+		case "GenericList":
+		case "AppliedType":
+		case "GenericUse":
+			throw new Error("You can not combine Generic Types.")
 		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			throw new Error("You can not combine Functions.")
 		case "Namespace":
 			throw new Error("You can not combine Namespaces.")
-		// case "List":
-		// 	throw new Error("You can not combine Lists.")
+		case "List":
+			throw new Error("You can not combine Lists.")
 		case "Boolean":
 			throw new Error("You can not combine Booleans.")
 		case "Integer":
@@ -515,11 +392,20 @@ export function resolveCombinationType(
 	}
 
 	switch (rhsType.type) {
+		case "GenericList":
+		case "AppliedType":
+		case "GenericUse":
+			throw new Error("You can not combine Generic Types.")
 		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			throw new Error("You can not combine Functions.")
 		case "Namespace":
 			throw new Error("You can not combine Namespaces.")
-		// case "List":
-		// 	throw new Error("You can not combine Lists.")
+		case "List":
+			throw new Error("You can not combine Lists.")
 		case "Boolean":
 			throw new Error("You can not combine Booleans.")
 		case "Integer":
@@ -535,6 +421,8 @@ export function resolveCombinationType(
 		case "UnionType":
 			throw new Error("You can not combine Unions.")
 	}
+
+	// TODO: Resolve Applied Types and check wether they are Records
 
 	if (deepEqual(lhsType, rhsType)) {
 		return lhsType
@@ -552,9 +440,17 @@ export function resolveCombinationType(
 export function resolveRecordValueType(
 	node: parser.RecordValueNode,
 	scope: enricher.Scope,
-): common.Type {
+): common.RecordType {
 	if (node.type !== null) {
-		return resolveType(node.type, scope)
+		const resolvedType = resolveType(node.type, scope)
+
+		if (resolvedType.type === "Record") {
+			return resolvedType
+		} else {
+			throw new Error(
+				"Record Type Annotations have to be of a Record Type!",
+			)
+		}
 	} else {
 		let members: Record<string, common.Type> = {}
 
@@ -572,12 +468,8 @@ export function resolveRecordValueType(
 export function resolveFunctionValueType(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
-): common.FunctionType | common.GenericFunctionType {
-	if (node.value.nodeType === "FunctionDefinition") {
-		return resolveFunctionDefinitionType(node.value, scope)
-	} else {
-		return resolveGenericFunctionDefinitionType(node.value, scope)
-	}
+): common.FunctionType {
+	return resolveFunctionDefinitionType(node.value, scope)
 }
 
 export function resolveListValueType(
@@ -680,46 +572,53 @@ export function resolveSelfType(
 	}
 }
 
-export function resolveGenericFunctionDefinitionType(
-	node: parser.GenericFunctionDefinitionNode,
+export function resolveGenericDeclarations(
+	generics: Array<parser.GenericDeclarationNode>,
 	scope: enricher.Scope,
-): common.GenericFunctionType {
-	return {
-		type: "GenericFunction",
-		generics: node.generics.map((generic) => {
-			let defaultType = null
+): Array<common.GenericDeclaration> {
+	return generics.map((generic) => {
+		let defaultType = null
 
-			if (generic.defaultType) {
-				defaultType = resolveType(generic.defaultType, scope)
-			}
+		if (generic.defaultType) {
+			defaultType = resolveType(generic.defaultType, scope)
+		}
 
-			return {
-				name: generic.name.content,
-				defaultType,
-			}
-		}),
-		parameterTypes: node.parameters.map((parameter) => {
-			let name = null
+		return {
+			name: generic.name.content,
+			infer: false,
+			defaultType,
+		}
+	})
+}
 
-			if (parameter.externalName !== null) {
-				name = parameter.externalName.content
-			}
+// NOTE: Declared Generics are registered as GenericUses so that Parameter
+// and Return Types can reference them. Binding them to concrete Types
+// happens once Generic Inference is implemented.
+export function scopeWithGenerics(
+	generics: Array<parser.GenericDeclarationNode>,
+	scope: enricher.Scope,
+): enricher.Scope {
+	let types: Record<string, common.Type> = {}
 
-			return {
-				name,
-				type: resolveType(parameter.type, scope),
-			}
-		}),
-		returnType: resolveType(node.returnType, scope),
+	for (let generic of generics) {
+		types[generic.name.content] = {
+			type: "GenericUse",
+			name: generic.name.content,
+		}
 	}
+
+	return { parent: scope, members: {}, types }
 }
 
 export function resolveFunctionDefinitionType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.FunctionType {
+	let functionScope = scopeWithGenerics(node.generics, scope)
+
 	return {
 		type: "Function",
+		generics: resolveGenericDeclarations(node.generics, scope),
 		parameterTypes: node.parameters.map((parameter) => {
 			let name = null
 
@@ -729,10 +628,10 @@ export function resolveFunctionDefinitionType(
 
 			return {
 				name,
-				type: resolveType(parameter.type, scope),
+				type: resolveType(parameter.type, functionScope),
 			}
 		}),
-		returnType: resolveType(node.returnType, scope),
+		returnType: resolveType(node.returnType, functionScope),
 	}
 }
 
@@ -747,6 +646,7 @@ export function resolveNamespaceDefinitionStatementType(
 				? null
 				: resolveType(node.targetType, scope),
 		name: node.name.content,
+		generics: [],
 		properties: {},
 		methods: {},
 	}
@@ -817,6 +717,33 @@ export function resolveRecordTypeDeclarationType(
 			}),
 		),
 	}
+}
+
+export function resolveGenericTypeDeclarationType(
+	node: parser.GenericTypeDeclarationNode,
+	scope: enricher.Scope,
+): common.Type {
+	let baseType = resolveType(node.baseType, scope)
+
+	// NOTE: List is the only Generic Type so far. Applied Lists are
+	// normalized into plain List Types right away, so that inferred and
+	// declared List Types share a single representation.
+	if (baseType.type === "GenericList") {
+		if (node.generics.length !== 1) {
+			throw new Error(
+				`List requires exactly 1 Type Argument at ${node.position.start.line}:${node.position.start.column}.`,
+			)
+		}
+
+		return {
+			type: "List",
+			itemType: resolveType(node.generics[0], scope),
+		}
+	}
+
+	throw new Error(
+		`Type at ${node.position.start.line}:${node.position.start.column} is not generic.`,
+	)
 }
 
 export function resolveMatchType(
@@ -949,6 +876,10 @@ export function resolveMethodType(
 
 		return {
 			type: "SimpleMethod",
+			generics: resolveGenericDeclarations(
+				node.method.value.generics,
+				scope,
+			),
 			parameterTypes: [
 				{ name: null, type: selfType },
 				...node.method.value.parameters.map((param) => {
@@ -969,6 +900,10 @@ export function resolveMethodType(
 	} else if (node.nodeType === "StaticMethod") {
 		return {
 			type: "StaticMethod",
+			generics: resolveGenericDeclarations(
+				node.method.value.generics,
+				scope,
+			),
 			parameterTypes: node.method.value.parameters.map((param) => {
 				let name = null
 
@@ -994,6 +929,10 @@ export function resolveMethodType(
 			type: "OverloadedMethod",
 			overloads: node.methods.map((method) => {
 				return {
+					generics: resolveGenericDeclarations(
+						method.value.generics,
+						scope,
+					),
 					parameterTypes: [
 						{ name: null, type: selfType },
 						...method.value.parameters.map((parameter) => {
@@ -1020,6 +959,10 @@ export function resolveMethodType(
 			type: "OverloadedStaticMethod",
 			overloads: node.methods.map((method) => {
 				return {
+					generics: resolveGenericDeclarations(
+						method.value.generics,
+						scope,
+					),
 					parameterTypes: [
 						...method.value.parameters.map((parameter) => {
 							let name: string | null

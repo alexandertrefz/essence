@@ -1,11 +1,13 @@
 import type { common, enricher, parser } from "../interfaces"
 
 import {
+	resolveCombinationType,
 	resolveFunctionValueType,
 	resolveListValueType,
 	resolveMatchType,
 	resolveMethodInvocation,
 	resolveNamespaceDefinitionStatementType,
+	resolveRecordValueType,
 	resolveType,
 } from "./resolvers"
 
@@ -152,7 +154,7 @@ export function enrichCombination(
 		lhs: enrichExpression(node.lhs, scope),
 		rhs: enrichExpression(node.rhs, scope),
 		position: node.position,
-		type: resolveType(node, scope),
+		type: resolveCombinationType(node, scope),
 	}
 }
 
@@ -173,34 +175,12 @@ export function enrichMethodFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
+		generics: [],
 		parameters: method.value.parameters.map((parameter) =>
 			enrichParameter(parameter, newScope),
 		),
 		body: method.value.body.map((node) => enrichNode(node, newScope)),
 		returnType: resolveType(method.value.returnType, scope),
-	}
-}
-
-export function enrichGenericFunctionDefinition(
-	node: parser.GenericFunctionDefinitionNode,
-	scope: enricher.Scope,
-): common.typed.GenericFunctionDefinitionNode {
-	let newScope = {
-		parent: scope,
-		members: {},
-		types: {},
-	} satisfies enricher.Scope
-
-	return {
-		nodeType: "GenericFunctionDefinition",
-		parameters: node.parameters.map((parameter) =>
-			enrichParameter(parameter, newScope),
-		),
-		generics: node.generics.map((generic) =>
-			enrichGenericDeclarationNode(generic, scope),
-		),
-		body: node.body.map((node) => enrichNode(node, newScope)),
-		returnType: resolveType(node.returnType, scope),
 	}
 }
 
@@ -222,10 +202,21 @@ export function enrichFunctionDefinition(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
+	// NOTE: Declared Generics are registered as GenericUses so that
+	// Parameter and Return Types can reference them. Binding them to
+	// concrete Types happens once Generic Inference is implemented.
+	let types: Record<string, common.Type> = {}
+	for (let generic of node.generics) {
+		types[generic.name.content] = {
+			type: "GenericUse",
+			name: generic.name.content,
+		}
+	}
+
 	let newScope = {
 		parent: scope,
 		members: {},
-		types: {},
+		types,
 	} satisfies enricher.Scope
 
 	return {
@@ -233,8 +224,11 @@ export function enrichFunctionDefinition(
 		parameters: node.parameters.map((parameter) =>
 			enrichParameter(parameter, newScope),
 		),
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
-		returnType: resolveType(node.returnType, scope),
+		returnType: resolveType(node.returnType, newScope),
 	}
 }
 
@@ -274,12 +268,23 @@ export function enrichRecordValue(
 	node: parser.RecordValueNode,
 	scope: enricher.Scope,
 ): common.typed.RecordValueNode {
+	let declaredType: common.Type | null = null
+	if (node.type !== null) {
+		declaredType = resolveType(node.type, scope)
+
+		if (declaredType.type !== "Record") {
+			throw new Error(
+				"Type Annotations for Records need to be of Record Types!",
+			)
+		}
+	}
+
 	return {
 		nodeType: "RecordValue",
 		members: enrichMembers(node.members, scope),
 		position: node.position,
-		type: resolveType(node, scope),
-		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
+		type: resolveRecordValueType(node, scope),
+		declaredType: declaredType,
 	}
 }
 
@@ -347,19 +352,9 @@ export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
-	let value:
-		| common.typed.FunctionDefinitionNode
-		| common.typed.GenericFunctionDefinitionNode
-
-	if (node.value.nodeType === "FunctionDefinition") {
-		value = enrichFunctionDefinition(node.value, scope)
-	} else {
-		value = enrichGenericFunctionDefinition(node.value, scope)
-	}
-
 	return {
 		nodeType: "FunctionValue",
-		value,
+		value: enrichFunctionDefinition(node.value, scope),
 		position: node.position,
 		type: resolveFunctionValueType(node, scope),
 	}
@@ -519,7 +514,11 @@ export function enrichVariableDeclarationStatement(
 
 	return {
 		nodeType: "VariableDeclarationStatement",
-		name: enrichIdentifier(node.name, scope),
+		name: enrichIdentifier(
+			node.name,
+			scope,
+			resolveType(node.value, scope),
+		),
 		value: enrichExpression(node.value, scope),
 		position: node.position,
 		type: resolveType(node.value, scope),
