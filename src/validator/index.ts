@@ -1,5 +1,10 @@
 import { collectDiagnostics, reportError, reportWarning } from "../diagnostics"
-import { type MatchableArgument, matchArguments, matchesType } from "../helpers"
+import {
+	createInferenceContext,
+	type MatchableArgument,
+	matchArguments,
+	matchesType,
+} from "../helpers"
 import type { common } from "../interfaces"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -179,8 +184,15 @@ function validateFunctionInvocation(
 
 			for (let overload of functionType.overloads) {
 				overloadMatched =
-					matchArguments(overload.parameterTypes, matchableArguments)
-						.type === "Match"
+					matchArguments(
+						overload.parameterTypes,
+						matchableArguments,
+						{
+							inference: createInferenceContext(
+								overload.generics,
+							),
+						},
+					).type === "Match"
 
 				if (overloadMatched) {
 					break
@@ -201,7 +213,10 @@ function validateFunctionInvocation(
 			let matchResult = matchArguments(
 				functionType.parameterTypes,
 				matchableArgumentsFromTypedNodes(node.arguments),
-				{ collectAllMismatches: true },
+				{
+					collectAllMismatches: true,
+					inference: createInferenceContext(functionType.generics),
+				},
 			)
 
 			if (matchResult.type === "ArityMismatch") {
@@ -565,9 +580,8 @@ function describeType(type: common.Type): string {
 			return "Function"
 		case "Namespace":
 		case "GenericUse":
+		case "GenericAlias":
 			return type.name
-		case "AppliedType":
-			return describeType(type.baseType)
 		default:
 			return type.type
 	}
@@ -594,7 +608,10 @@ function validateSimpleFunctionInvocation(
 	let matchResult = matchArguments(
 		functionType.parameterTypes,
 		matchableArgumentsFromTypedNodes(argumentNodes),
-		{ collectAllMismatches: true },
+		{
+			collectAllMismatches: true,
+			inference: createInferenceContext(functionType.generics),
+		},
 	)
 
 	if (matchResult.type === "ArityMismatch") {

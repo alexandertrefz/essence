@@ -145,13 +145,13 @@ export type GenericUse = {
 	name: GenericName
 }
 
-export type AppliedType = {
-	type: "AppliedType"
-	baseType: Exclude<Type, AppliedType>
-	appliedGenerics: Array<{
-		name: string | null
-		type: Type | GenericUse
-	}>
+// NOTE: The unapplied form of a generic Type Alias — use sites apply Type
+// Arguments (`Maybe<Fraction>`), which substitutes them into `aliasedType`.
+export type GenericAliasType = {
+	type: "GenericAlias"
+	name: string
+	generics: Array<GenericDeclaration>
+	aliasedType: Type
 }
 
 export type Type =
@@ -161,7 +161,7 @@ export type Type =
 	| UnionType
 	| MethodType
 	| GenericListType
-	| AppliedType
+	| GenericAliasType
 	| GenericUse
 
 export { typed, typedSimple }
