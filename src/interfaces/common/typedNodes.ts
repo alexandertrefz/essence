@@ -175,11 +175,18 @@ export interface CombinationNode {
 	type: Type
 }
 
+// NOTE: `matcher` is the Type a Handler binds `@` to. `literal` and `guard`
+// are what make a Handler *conditional*: it can decline a value whose Type the
+// Matcher accepted, so it covers only part of `matcher` and can never make a
+// Union exhaustive on its own.
 export interface MatchNode {
 	nodeType: "Match"
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
+		literal: ExpressionNode | null
+		memberLiterals: Record<string, ExpressionNode> | null
+		guard: ExpressionNode | null
 		body: Array<ImplementationNode>
 	}>
 	position: Position
