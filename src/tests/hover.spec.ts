@@ -33,8 +33,10 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
+		// NOTE: Callables read back as their declaration rather than as a
+		// name bound to a Function Type.
 		expect(hover(source, { line: 2, column: 11 })).toBe(
-			"greet: (subject: String) -> String",
+			"function greet(subject: String) -> String",
 		)
 	})
 
@@ -80,7 +82,74 @@ describe("Hover", () => {
 		// NOTE: Self is stripped from the signature — `append` takes two
 		// Strings internally, but a call site only passes one.
 		expect(hover(source, { line: 2, column: 20 })).toBe(
-			"append: (_ String) -> String",
+			"append(_ String) -> String",
+		)
+	})
+
+	it("should describe a Static Method with its keyword", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"\t\tstatic show(value: Integer) -> String {",
+			'\t\t\t<- "42"',
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 14 })).toBe(
+			"static show(value: Integer) -> String",
+		)
+	})
+
+	it("should describe a Static Method invocation", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"\t\tstatic show(value: Integer) -> String {",
+			'\t\t\t<- "42"',
+			"\t\t}",
+			"\t}",
+			"\tThing.show(1)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 7, column: 9 })).toBe(
+			"show(value: Integer) -> String",
+		)
+	})
+
+	it("should narrow an Overloaded Method to the invoked signature", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing for Integer {",
+			"\t\toverload combine {",
+			"\t\t\t(_ other: Integer) -> Integer {",
+			"\t\t\t\t<- 42",
+			"\t\t\t}",
+			"\t\t\t(_ other: Integer, _ third: Integer) -> Integer {",
+			"\t\t\t\t<- 42",
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
+			"\t__print(1::combine(2))",
+			"}",
+		].join("\n")
+
+		// NOTE: The Arguments pick the first Overload, so only that one is
+		// shown — the others are noise once the call resolved.
+		expect(hover(source, { line: 12, column: 14 })).toBe(
+			"combine(_ Integer) -> Integer",
+		)
+	})
+
+	it("should pick the Overload the Arguments selected, not the first one", () => {
+		let source = ["implementation {", "\t__print(1::add(2/1))", "}"].join(
+			"\n",
+		)
+
+		expect(hover(source, { line: 2, column: 13 })).toBe(
+			"add(_ Fraction) -> Fraction",
 		)
 	})
 
