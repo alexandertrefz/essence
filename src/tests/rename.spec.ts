@@ -3,7 +3,9 @@ import { describe, expect, it } from "bun:test"
 import { enrich } from "../enricher"
 import type { common } from "../interfaces"
 import {
+	findOccurrence as findAnyOccurrence,
 	findDefinition,
+	findOccurrences,
 	findRenameableOccurrence,
 	isValidIdentifierName,
 } from "../lsp/rename"
@@ -643,5 +645,125 @@ describe("isValidIdentifierName", () => {
 		expect(isValidIdentifierName("match")).toBe(false)
 		expect(isValidIdentifierName("nothing")).toBe(false)
 		expect(isValidIdentifierName("true")).toBe(false)
+	})
+})
+
+describe("findOccurrence (References)", () => {
+	function occurrencesOf(source: string, cursor: common.Cursor) {
+		let { program } = parseWithDiagnostics(source)
+		let { program: enrichedProgram } = enrich(program)
+
+		return findAnyOccurrence(program, cursor, enrichedProgram)
+	}
+
+	it("should report every occurrence of a Constant", () => {
+		let source = [
+			"implementation {",
+			"\tconstant value = 1",
+			"\tconstant other = value",
+			"\t__print(value)",
+			"}",
+		].join("\n")
+
+		let occurrence = occurrencesOf(source, { line: 3, column: 19 })
+
+		expect(occurrence).not.toBeNull()
+		expect(occurrence?.declaration.occurrences).toHaveLength(3)
+		expect(occurrence?.declaration.definition).toEqual({
+			start: { line: 2, column: 11 },
+			end: { line: 2, column: 16 },
+		})
+	})
+
+	it("should report occurrences of builtins, unlike renaming", () => {
+		let source = [
+			"implementation {",
+			'\t__print("one")',
+			'\t__print("two")',
+			"}",
+		].join("\n")
+
+		let occurrence = occurrencesOf(source, { line: 2, column: 3 })
+
+		expect(occurrence?.declaration.builtin).toBe(true)
+		expect(occurrence?.declaration.definition).toBeNull()
+		expect(occurrence?.declaration.occurrences).toHaveLength(2)
+
+		expect(findOccurrence(source, { line: 2, column: 3 })).toBeNull()
+	})
+
+	it("should report Method occurrences across declaration and invocations", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Stringify for Integer {",
+			"\t\tstring() -> String {",
+			'\t\t\t<- "one"',
+			"\t\t}",
+			"\t}",
+			"\t__print(1::string())",
+			"\t__print(2::<Stringify>string())",
+			"}",
+		].join("\n")
+
+		let occurrence = occurrencesOf(source, { line: 7, column: 14 })
+
+		expect(occurrence?.declaration.occurrences).toHaveLength(3)
+	})
+})
+
+describe("findOccurrences (Document Highlight)", () => {
+	function occurrencesOf(source: string, cursor: common.Cursor) {
+		let { program } = parseWithDiagnostics(source)
+		let { program: enrichedProgram } = enrich(program)
+
+		return findOccurrences(program, cursor, enrichedProgram)
+	}
+
+	it("should mark the declaration and assignments as writes, uses as reads", () => {
+		let source = [
+			"implementation {",
+			"\tvariable count = 1",
+			"\tcount = 2",
+			"\t__print(count)",
+			"}",
+		].join("\n")
+
+		let occurrences = occurrencesOf(source, { line: 2, column: 11 })
+
+		expect(
+			occurrences.map((occurrence) => [
+				occurrence.position.start.line,
+				occurrence.access,
+			]),
+		).toEqual([
+			[2, "write"],
+			[3, "write"],
+			[4, "read"],
+		])
+	})
+
+	it("should mark a Parameter's declaration as a write and its uses as reads", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet (subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let occurrences = occurrencesOf(source, { line: 3, column: 6 })
+
+		expect(occurrences.map((occurrence) => occurrence.access)).toEqual([
+			"write",
+			"read",
+		])
+	})
+
+	it("should return nothing when there is no Identifier at the cursor", () => {
+		let source = ["implementation {", "\tconstant value = 1", "}"].join(
+			"\n",
+		)
+
+		expect(occurrencesOf(source, { line: 2, column: 2 })).toEqual([])
 	})
 })
