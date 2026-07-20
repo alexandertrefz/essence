@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
 import { analyse } from "../lsp/analyse"

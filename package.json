@@ -5,7 +5,7 @@
 	"main": "index.js",
 	"type": "module",
 	"scripts": {
-		"check": "biome check --write"
+		"check": "oxlint --fix && oxfmt"
 	},
 	"keywords": [
 		"language",
@@ -17,12 +17,13 @@
 		"bun": ">=1.0.x"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.5.4",
 		"@types/bun": "1.3.14",
 		"@types/deep-equal": "1.0.4",
 		"@types/escodegen": "0.0.10",
 		"@types/estree": "1.0.9",
-		"@types/yargs": "17.0.35"
+		"@types/yargs": "17.0.35",
+		"oxfmt": "^0.59.0",
+		"oxlint": "^1.74.0"
 	},
 	"dependencies": {
 		"bigint-fraction": "1.0.6",
@@ -40,7 +41,6 @@
 		"type": "git"
 	},
 	"trustedDependencies": [
-		"@biomejs/biome",
 		"esbuild"
 	]
 }

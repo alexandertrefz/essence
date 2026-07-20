@@ -1,4 +1,5 @@
 import * as path from "node:path"
+
 import type { BuildResult } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"
@@ -741,32 +742,6 @@ function internalImport(
 			type: "Literal",
 			value: `${path.resolve(__dirname, "./__internal", fileName)}.ts`,
 			raw: `"${path.resolve(__dirname, "./__internal", fileName)}.ts"`,
-		},
-	}
-}
-
-function importSpecifier(variableName: string): estree.ImportSpecifier {
-	return {
-		type: "ImportSpecifier",
-		local: {
-			type: "Identifier",
-			name: variableName,
-		},
-		imported: {
-			type: "Identifier",
-			name: variableName,
-		},
-	}
-}
-
-function importDefaultSpecifier(
-	variableName: string,
-): estree.ImportDefaultSpecifier {
-	return {
-		type: "ImportDefaultSpecifier",
-		local: {
-			type: "Identifier",
-			name: variableName,
 		},
 	}
 }
