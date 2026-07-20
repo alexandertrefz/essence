@@ -1,4 +1,5 @@
 import * as path from "node:path"
+
 import type { BuildResult } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"

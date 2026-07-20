@@ -1,3 +1,4 @@
+import { TextDocument } from "vscode-languageserver-textdocument"
 import {
 	type CompletionItem,
 	CompletionItemKind,
@@ -15,7 +16,6 @@ import {
 	TextDocumentSyncKind,
 	TextDocuments,
 } from "vscode-languageserver/node"
-import { TextDocument } from "vscode-languageserver-textdocument"
 
 import { enrich } from "../enricher/index"
 import type { common } from "../interfaces/index"

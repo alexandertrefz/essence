@@ -1,4 +1,5 @@
 import type { Fraction } from "bigint-fraction"
+
 import { is as boolIs } from "./Boolean"
 import { is as fractionIs } from "./Fraction"
 import type { IntegerType } from "./Integer"

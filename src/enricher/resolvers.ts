@@ -1301,22 +1301,20 @@ export function resolveMethodType(
 							scope,
 						),
 					],
-					parameterTypes: [
-						...method.value.parameters.map((parameter) => {
-							let name: string | null
+					parameterTypes: method.value.parameters.map((parameter) => {
+						let name: string | null
 
-							if (parameter.externalName !== null) {
-								name = parameter.externalName.content
-							} else {
-								name = null
-							}
+						if (parameter.externalName !== null) {
+							name = parameter.externalName.content
+						} else {
+							name = null
+						}
 
-							return {
-								name,
-								type: resolveType(parameter.type, methodScope),
-							}
-						}),
-					],
+						return {
+							name,
+							type: resolveType(parameter.type, methodScope),
+						}
+					}),
 					returnType: resolveType(
 						method.value.returnType,
 						methodScope,
