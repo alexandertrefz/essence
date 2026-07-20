@@ -196,6 +196,24 @@ export function findOccurrence(
 	return occurrenceAt(buildRenameIndex(program, enrichedProgram), cursor)
 }
 
+// NOTE: Every index entry resolving to the same Declaration as the one under
+// the cursor. Document Highlight needs the entries rather than the
+// Declaration's flat Position list, because only they carry the access.
+export function findOccurrences(
+	program: parser.Program,
+	cursor: common.Cursor,
+	enrichedProgram: common.typed.Program | null = null,
+): Array<Occurrence> {
+	let index = buildRenameIndex(program, enrichedProgram)
+	let occurrence = occurrenceAt(index, cursor)
+
+	if (occurrence === null) {
+		return []
+	}
+
+	return index.filter((entry) => entry.declaration === occurrence.declaration)
+}
+
 export function findDefinition(
 	program: parser.Program,
 	cursor: common.Cursor,

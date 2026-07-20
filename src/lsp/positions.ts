@@ -1,7 +1,27 @@
 import type { common } from "../interfaces"
 
 // NOTE: Shared Position geometry for the features that search a typed AST
-// for "the smallest node containing the cursor".
+// for "the smallest node containing the cursor" — Hovers, Completion's
+// Scope lookup and Signature Help's enclosing invocation all need it.
+
+// NOTE: Cursor ordering — true when `a` is at or before `b`.
+export function isAtOrBefore(a: common.Cursor, b: common.Cursor): boolean {
+	return a.line < b.line || (a.line === b.line && a.column <= b.column)
+}
+
+// NOTE: Compared by value — a Declaration's `definition` currently aliases
+// one of its occurrence objects, but nothing enforces that.
+export function isSamePosition(
+	a: common.Position,
+	b: common.Position,
+): boolean {
+	return (
+		a.start.line === b.start.line &&
+		a.start.column === b.start.column &&
+		a.end.line === b.end.line &&
+		a.end.column === b.end.column
+	)
+}
 
 export function contains(
 	range: common.Position,
