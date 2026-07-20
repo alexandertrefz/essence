@@ -278,6 +278,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						memberType,
 					)}'.`,
 					node.position,
+					{ code: "missing-case" },
 				)
 			}
 		}
@@ -288,11 +289,14 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			)
 
 			if (!isReachable) {
+				// NOTE: Tagged `unnecessary` so that clients grey the case out
+				// instead of underlining it — it is dead, not wrong.
 				reportWarning(
 					`Type '${describeType(
 						handler.matcher,
 					)}' is not a member of the matched Union — this case can never match.`,
 					node.position,
+					{ code: "unreachable-case", tags: ["unnecessary"] },
 				)
 			}
 		}
@@ -553,7 +557,9 @@ function validateDefiniteReturn(
 	}
 
 	if (!bodyDefinitelyReturns(definition.body)) {
-		reportError("Not all code paths return a value.", position)
+		reportError("Not all code paths return a value.", position, {
+			code: "missing-return",
+		})
 	}
 }
 
