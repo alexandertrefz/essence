@@ -1,4 +1,4 @@
-import deepEqual from "deep-equal"
+import { isDeepStrictEqual } from "node:util"
 
 import { reportError } from "../diagnostics/index"
 import {
@@ -528,7 +528,7 @@ export function resolveCombinationType(
 		rhs: common.RecordType,
 	): boolean {
 		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
-			if (!deepEqual(lhs.members[rhsName], rhsType)) {
+			if (!isDeepStrictEqual(lhs.members[rhsName], rhsType)) {
 				return false
 			}
 		}
@@ -563,7 +563,7 @@ export function resolveCombinationType(
 
 	// TODO: Resolve Applied Types and check wether they are Records
 
-	if (deepEqual(lhsType, rhsType)) {
+	if (isDeepStrictEqual(lhsType, rhsType)) {
 		return lhsType
 	} else {
 		if (isSubType(lhsType, rhsType)) {
@@ -634,7 +634,7 @@ export function resolveListValueType(
 
 		for (let expression of node.values) {
 			let expressionType = resolveType(expression, scope)
-			if (!deepEqual(itemType, expressionType)) {
+			if (!isDeepStrictEqual(itemType, expressionType)) {
 				if (!isUnion) {
 					isUnion = true
 
