@@ -78,7 +78,7 @@ export function functionInvocation(
 
 export function recordValueNode(
 	type: parser.TypeDeclarationNode | null,
-	members: Record<string, parser.ExpressionNode>,
+	members: Record<string, parser.RecordValueMemberNode>,
 	position: common.Position,
 ): parser.RecordValueNode {
 	return {
@@ -274,7 +274,11 @@ export function namespaceDefinitionStatement(
 ): parser.NamespaceDefinitionStatementNode {
 	const properties = body.reduce<NamespaceProperties>((prev, curr) => {
 		if (curr.nodeType === "NamespacePropertyNode") {
-			prev[curr.name.content] = { type: curr.type, value: curr.value }
+			prev[curr.name.content] = {
+				name: curr.name,
+				type: curr.type,
+				value: curr.value,
+			}
 		}
 
 		return prev
@@ -285,21 +289,25 @@ export function namespaceDefinitionStatement(
 			if (curr.nodeType === "SimpleMethodNode") {
 				prev[curr.name.content] = {
 					nodeType: "SimpleMethod",
+					name: curr.name,
 					method: curr.method,
 				}
 			} else if (curr.nodeType === "StaticMethodNode") {
 				prev[curr.name.content] = {
 					nodeType: "StaticMethod",
+					name: curr.name,
 					method: curr.method,
 				}
 			} else if (curr.nodeType === "OverloadedMethodNode") {
 				prev[curr.name.content] = {
 					nodeType: "OverloadedMethod",
+					name: curr.name,
 					methods: curr.methods,
 				}
 			} else if (curr.nodeType === "OverloadedStaticMethodNode") {
 				prev[curr.name.content] = {
 					nodeType: "OverloadedStaticMethod",
+					name: curr.name,
 					methods: curr.methods,
 				}
 			}
@@ -388,22 +396,22 @@ export function identifierTypeDeclaration(
 }
 
 type KeyTypePair = {
-	key: string
+	name: parser.IdentifierNode
 	type: parser.TypeDeclarationNode
 	position: common.Position
 }
 
 type KeyTypePairObject = {
-	data: Record<string, parser.TypeDeclarationNode>
+	data: Record<string, parser.RecordTypeMemberNode>
 	position: common.Position
 }
 
 export function keyTypePair(
-	key: string,
+	name: parser.IdentifierNode,
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
 ): KeyTypePair {
-	return { key, type, position }
+	return { name, type, position }
 }
 
 export function buildKeyTypePairList(
@@ -415,7 +423,7 @@ export function buildKeyTypePairList(
 	return {
 		data: keyTypePairList.reduce<KeyTypePairObject["data"]>(
 			(prev, curr) => {
-				prev[curr.key] = curr.type
+				prev[curr.name.content] = { name: curr.name, type: curr.type }
 				return prev
 			},
 			{},
@@ -428,7 +436,7 @@ export function buildKeyTypePairList(
 }
 
 export function recordTypeDeclaration(
-	members: Record<string, parser.TypeDeclarationNode>,
+	members: Record<string, parser.RecordTypeMemberNode>,
 	position: common.Position,
 ): parser.RecordTypeDeclarationNode {
 	return {
@@ -548,22 +556,22 @@ export function parameter(
 }
 
 type KeyValuePair = {
-	key: string
+	name: parser.IdentifierNode
 	value: parser.ExpressionNode
 	position: common.Position
 }
 
 type KeyValuePairObject = {
-	data: Record<string, parser.ExpressionNode>
+	data: Record<string, parser.RecordValueMemberNode>
 	position: common.Position
 }
 
 export function keyValuePair(
-	key: string,
+	name: parser.IdentifierNode,
 	value: parser.ExpressionNode,
 	position: common.Position,
 ): KeyValuePair {
-	return { key, value, position }
+	return { name, value, position }
 }
 
 export function buildKeyValuePairList(
@@ -575,7 +583,7 @@ export function buildKeyValuePairList(
 	return {
 		data: keyValuePairList.reduce<KeyValuePairObject["data"]>(
 			(prev, curr) => {
-				prev[curr.key] = curr.value
+				prev[curr.name.content] = { name: curr.name, value: curr.value }
 				return prev
 			},
 			{},
@@ -629,10 +637,7 @@ type NamespaceProperty = {
 	value: parser.ExpressionNode
 }
 
-type NamespaceProperties = Record<
-	string,
-	{ type: parser.TypeDeclarationNode | null; value: parser.ExpressionNode }
->
+type NamespaceProperties = Record<string, parser.NamespacePropertyNode>
 
 type NamespaceMethod =
 	| SimpleMethodNode

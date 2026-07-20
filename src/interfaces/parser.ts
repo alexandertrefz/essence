@@ -64,10 +64,17 @@ export type ValueNode =
 	| FunctionValueNode
 	| ListValueNode
 
+// NOTE: Record members keep their name as a full IdentifierNode — the
+// Language Server needs the name's Position for renaming.
+export interface RecordValueMemberNode {
+	name: IdentifierNode
+	value: ExpressionNode
+}
+
 export type RecordValueNode = {
 	nodeType: "RecordValue"
 	type: TypeDeclarationNode | null
-	members: Record<string, ExpressionNode>
+	members: Record<string, RecordValueMemberNode>
 	position: Position
 }
 
@@ -189,21 +196,25 @@ export interface VariableAssignmentStatementNode {
 
 export interface SimpleMethod {
 	nodeType: "SimpleMethod"
+	name: IdentifierNode
 	method: FunctionValueNode
 }
 
 export interface StaticMethod {
 	nodeType: "StaticMethod"
+	name: IdentifierNode
 	method: FunctionValueNode
 }
 
 export interface OverloadedMethod {
 	nodeType: "OverloadedMethod"
+	name: IdentifierNode
 	methods: Array<FunctionValueNode>
 }
 
 export interface OverloadedStaticMethod {
 	nodeType: "OverloadedStaticMethod"
+	name: IdentifierNode
 	methods: Array<FunctionValueNode>
 }
 
@@ -212,15 +223,18 @@ export type NamespaceMethods = Record<
 	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
 >
 
+export interface NamespacePropertyNode {
+	name: IdentifierNode
+	type: TypeDeclarationNode | null
+	value: ExpressionNode
+}
+
 export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	targetType: TypeDeclarationNode | null
-	properties: Record<
-		string,
-		{ type: TypeDeclarationNode | null; value: ExpressionNode }
-	>
+	properties: Record<string, NamespacePropertyNode>
 	methods: NamespaceMethods
 	position: Position
 }
@@ -289,9 +303,16 @@ export interface IdentifierTypeDeclarationNode {
 	position: Position
 }
 
+// NOTE: Record Type members keep their name as a full IdentifierNode — the
+// Language Server needs the name's Position for renaming.
+export interface RecordTypeMemberNode {
+	name: IdentifierNode
+	type: TypeDeclarationNode
+}
+
 export interface RecordTypeDeclarationNode {
 	nodeType: "RecordTypeDeclaration"
-	members: Record<string, TypeDeclarationNode>
+	members: Record<string, RecordTypeMemberNode>
 	position: Position
 }
 

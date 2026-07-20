@@ -603,7 +603,7 @@ export function resolveRecordValueType(
 	let members: Record<string, common.Type> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.members)) {
-		members[memberKey] = resolveType(memberValue, scope)
+		members[memberKey] = resolveType(memberValue.value, scope)
 	}
 
 	return {
@@ -948,7 +948,7 @@ export function resolveRecordTypeDeclarationType(
 		type: "Record",
 		members: Object.fromEntries(
 			Object.entries(node.members).map(([key, value]) => {
-				return [key, resolveType(value, scope)]
+				return [key, resolveType(value.type, scope)]
 			}),
 		),
 	}
