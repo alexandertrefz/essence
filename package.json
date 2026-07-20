@@ -4,7 +4,6 @@
 	"description": "A new simple but powerful language.",
 	"main": "index.js",
 	"scripts": {
-		"pre-commit": "bun format && bun test",
 		"check": "biome check --write"
 	},
 	"keywords": [
@@ -22,8 +21,7 @@
 		"@types/deep-equal": "1.0.4",
 		"@types/escodegen": "0.0.10",
 		"@types/estree": "1.0.9",
-		"@types/yargs": "17.0.35",
-		"husky": "9.1.7"
+		"@types/yargs": "17.0.35"
 	},
 	"dependencies": {
 		"bigint-fraction": "1.0.6",
