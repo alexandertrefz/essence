@@ -17,7 +17,9 @@ describe("Signature Help", () => {
 
 		expect(help).not.toBeNull()
 		expect(help?.signatures).toHaveLength(1)
-		expect(help?.signatures[0].label).toBe("(subject: String) -> String")
+		expect(help?.signatures[0].label).toBe(
+			"greet(subject: String) -> String",
+		)
 		expect(help?.activeParameter).toBe(0)
 	})
 
@@ -85,7 +87,7 @@ describe("Signature Help", () => {
 		let help = findSignatureHelp(source, { line: 8, column: 20 })
 
 		expect(help?.signatures[0].label).toBe(
-			"(value: Integer, extra: Integer) -> Integer",
+			"identity(value: Integer, extra: Integer) -> Integer",
 		)
 		expect(help?.activeParameter).toBe(1)
 	})
@@ -111,8 +113,86 @@ describe("Signature Help", () => {
 
 		expect(help?.signatures).toHaveLength(2)
 		expect(help?.signatures[1].label).toBe(
-			"(_ Integer, _ Integer) -> Integer",
+			"combine(_ Integer, _ Integer) -> Integer",
 		)
+
+		// NOTE: The Enricher resolves the half written call to the one
+		// Parameter Overload — the second Argument has already ruled it out,
+		// so the Overload that can still take it is the active one.
+		expect(help?.activeSignature).toBe(1)
+	})
+
+	it("should highlight repeated Parameters by range, not by their text", () => {
+		let source = [
+			"implementation {",
+			"\tfunction pair (first: Integer, second: Integer) -> Integer {",
+			"\t\t<- first",
+			"\t}",
+			"\tpair(",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 5, column: 7 })
+
+		let signature = help?.signatures[0]
+
+		expect(signature?.parameters).toEqual([
+			[5, 19],
+			[21, 36],
+		])
+
+		// NOTE: The ranges must index into the label the Editor is shown.
+		expect(
+			signature?.parameters.map(([start, end]) =>
+				signature.label.slice(start, end),
+			),
+		).toEqual(["first: Integer", "second: Integer"])
+	})
+
+	it("should show a Static Method invoked through its Namespace", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"\t\tstatic show(value: Integer) -> String {",
+			'\t\t\t<- "42"',
+			"\t\t}",
+			"\t}",
+			"\tThing.show(",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 7, column: 13 })
+
+		expect(help?.signatures[0].label).toBe(
+			"Thing.show(value: Integer) -> String",
+		)
+	})
+
+	it("should qualify the Namespace when more than one provides the Method", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace First for Integer {",
+			"\t\ttag(_ label: String) -> String {",
+			"\t\t\t<- label",
+			"\t\t}",
+			"\t}",
+			"\tnamespace Second for Integer {",
+			"\t\ttag(_ level: Integer) -> String {",
+			'\t\t\t<- "x"',
+			"\t\t}",
+			"\t}",
+			"\t1::tag(",
+			"}",
+		].join("\n")
+
+		let help = findSignatureHelp(source, { line: 12, column: 9 })
+
+		// NOTE: `1::<First>tag(…)` is how a call site picks one, so the label
+		// is qualified the same way.
+		expect(help?.signatures.map((signature) => signature.label)).toEqual([
+			"<First>tag(_ String) -> String",
+			"<Second>tag(_ Integer) -> String",
+		])
 	})
 
 	it("should strip Self from a Simple Method's signature", () => {
@@ -120,7 +200,7 @@ describe("Signature Help", () => {
 
 		let help = findSignatureHelp(source, { line: 2, column: 18 })
 
-		expect(help?.signatures[0].label).toBe("(_ String) -> String")
+		expect(help?.signatures[0].label).toBe("append(_ String) -> String")
 	})
 
 	it("should return null outside of any invocation", () => {
