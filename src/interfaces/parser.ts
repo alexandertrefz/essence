@@ -275,6 +275,7 @@ export type NamespaceMethods = Record<
 
 export interface NamespacePropertyNode {
 	name: IdentifierNode
+	documentation: Documentation | null
 	type: TypeDeclarationNode | null
 	value: ExpressionNode
 }

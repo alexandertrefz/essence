@@ -313,6 +313,7 @@ export function namespaceDefinitionStatement(
 		if (curr.nodeType === "NamespacePropertyNode") {
 			prev[curr.name.content] = {
 				name: curr.name,
+				documentation: curr.documentation,
 				type: curr.type,
 				value: curr.value,
 			}
@@ -689,6 +690,7 @@ type OverloadedStaticMethodNode = {
 type NamespaceProperty = {
 	nodeType: "NamespacePropertyNode"
 	name: parser.IdentifierNode
+	documentation: common.Documentation | null
 	type: parser.TypeDeclarationNode | null
 	value: parser.ExpressionNode
 }

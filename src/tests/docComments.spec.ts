@@ -187,6 +187,38 @@ describe("Documentation Comments", () => {
 		)
 	})
 
+	it("should document a Namespace's static Property", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"\t\t§§ The greeting used when nothing else fits.",
+			'\t\tstatic fallback = "Hello, stranger!"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 11 })?.documentation).toBe(
+			"The greeting used when nothing else fits.",
+		)
+	})
+
+	it("should document a Method where its name is declared", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Stringify for Integer {",
+			"\t\t§§ Spells this Integer out as text.",
+			"\t\ttext() -> String {",
+			"\t\t\t<- @::toString()",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 4 })?.documentation).toBe(
+			"Spells this Integer out as text.",
+		)
+	})
+
 	it("should carry Documentation on the builtin Namespaces", () => {
 		let source = [
 			"implementation {",

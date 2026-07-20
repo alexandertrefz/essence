@@ -176,6 +176,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitIdentifier(node.name, state, undefined, node.documentation)
 
 			for (let property of Object.values(node.properties)) {
+				visitIdentifier(
+					property.name,
+					state,
+					`static ${property.name.content}`,
+					property.documentation,
+				)
 				visitNode(property.value, state)
 			}
 
@@ -191,6 +197,11 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					member.nodeType === "OverloadedStaticMethod"
 
 				let label = isStatic ? `static ${name}` : name
+
+				// NOTE: The name is typed as the Method itself, so hovering it
+				// describes the whole Method — every Overload at once, since
+				// the name is what they share.
+				visitIdentifier(member.name, state, label)
 
 				for (let method of methods) {
 					consider(state, method.position, method.type, label)
