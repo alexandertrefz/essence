@@ -5,9 +5,11 @@ import {
 	DocumentHighlightKind,
 	type DocumentSymbol,
 	ErrorCodes,
+	InlayHintKind,
 	type Position,
 	ProposedFeatures,
 	ResponseError,
+	type SelectionRange,
 	SymbolKind,
 	TextDocumentSyncKind,
 	TextDocuments,
@@ -24,7 +26,9 @@ import {
 	type DocumentSymbolEntry,
 	findDocumentSymbols,
 } from "./documentSymbols"
+import { findFoldingRanges } from "./foldingRanges"
 import { findHover } from "./hover"
+import { findInlayHints } from "./inlayHints"
 import { isSamePosition } from "./positions"
 import {
 	type DeclarationKind,
@@ -34,6 +38,7 @@ import {
 	findRenameableOccurrence,
 	isValidIdentifierName,
 } from "./rename"
+import { findSelectionRanges } from "./selectionRanges"
 import {
 	encodeSemanticTokens,
 	findSemanticTokens,
@@ -74,6 +79,9 @@ export function startServer() {
 					},
 					full: true,
 				},
+				foldingRangeProvider: true,
+				selectionRangeProvider: true,
+				inlayHintProvider: true,
 			},
 		}
 	})
@@ -299,6 +307,64 @@ export function startServer() {
 		let { program } = parseWithDiagnostics(document.getText())
 
 		return findDocumentSymbols(program).map(toLspDocumentSymbol)
+	})
+
+	connection.onFoldingRanges((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		let { program } = parseWithDiagnostics(document.getText())
+
+		return findFoldingRanges(program).map((range) => ({
+			startLine: range.startLine - 1,
+			endLine: range.endLine - 1,
+		}))
+	})
+
+	connection.onSelectionRanges((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		let { program } = parseWithDiagnostics(document.getText())
+
+		return params.positions.map((position) => {
+			let chain = findSelectionRanges(program, toCursor(position))
+
+			// NOTE: The protocol nests the chain outwards through `parent`.
+			let range: SelectionRange | undefined
+
+			for (let selection of chain) {
+				range = { range: toLspRange(selection), parent: range }
+			}
+
+			return range ?? { range: { start: position, end: position } }
+		})
+	})
+
+	connection.languages.inlayHint.on((params) => {
+		let parsed = parseAndEnrich(params.textDocument.uri)
+
+		if (parsed?.enrichedProgram == null) {
+			return null
+		}
+
+		return findInlayHints(parsed.enrichedProgram, {
+			start: toCursor(params.range.start),
+			end: toCursor(params.range.end),
+		}).map((hint) => ({
+			position: {
+				line: hint.position.line - 1,
+				character: hint.position.column - 1,
+			},
+			label: hint.label,
+			kind: InlayHintKind.Type,
+		}))
 	})
 
 	connection.onCompletion((params) => {
