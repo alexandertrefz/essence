@@ -423,10 +423,16 @@ export function startServer() {
 			return null
 		}
 
+		// NOTE: Parameters are handed over as offset ranges into the label
+		// rather than as text — the protocol resolves a text label by
+		// searching the signature for it, which always finds the first of two
+		// identically printed Parameters.
 		return {
 			signatures: help.signatures.map((signature) => ({
 				label: signature.label,
-				parameters: signature.parameters.map((label) => ({ label })),
+				parameters: signature.parameters.map((range) => ({
+					label: range,
+				})),
 			})),
 			activeSignature: help.activeSignature,
 			activeParameter: help.activeParameter,

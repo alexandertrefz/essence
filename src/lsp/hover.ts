@@ -1,11 +1,16 @@
 import type { common } from "../interfaces/index"
 import { contains, isSmaller } from "./positions"
-import { printType, withoutSelf } from "./printType"
+import { printSignature, printType, signaturesOf } from "./printType"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
 // its inferred Type there. The smallest typed node containing the cursor
 // wins, so hovering an Identifier inside a larger Expression describes the
 // Identifier, not the Expression around it.
+//
+// Anything callable is rendered the way it is declared — `greet(subject:
+// String) -> String` rather than `greet: (subject: String) -> String` — and an
+// Overload set that has not been narrowed to one candidate spells out every
+// Overload on its own line instead of combining them into a single Type.
 
 export type HoverInfo = {
 	position: common.Position
@@ -34,21 +39,54 @@ function consider(
 	type: common.Type,
 	label: string | null,
 ) {
-	if (!contains(position, state.cursor)) {
+	if (!wins(state, position)) {
 		return
 	}
 
-	// NOTE: Ties go to the newer candidate — children are visited after
-	// their parents, so the deeper node wins.
-	if (state.best !== null && isSmaller(state.best.position, position)) {
-		return
-	}
+	let signatures = signaturesOf(type)
 
 	state.best = {
 		position,
 		content:
-			label === null ? printType(type) : `${label}: ${printType(type)}`,
+			signatures !== null
+				? describeSignatures(signatures, label ?? "")
+				: label === null
+					? printType(type)
+					: `${label}: ${printType(type)}`,
 	}
+}
+
+function considerSignatures(
+	state: State,
+	position: common.Position,
+	signatures: Array<common.BaseFunction>,
+	label: string,
+) {
+	if (!wins(state, position)) {
+		return
+	}
+
+	state.best = { position, content: describeSignatures(signatures, label) }
+}
+
+// NOTE: Ties go to the newer candidate — children are visited after their
+// parents, so the deeper node wins. Every node in the Program is offered, so
+// the Type is only printed once a candidate has actually won.
+function wins(state: State, position: common.Position): boolean {
+	if (!contains(position, state.cursor)) {
+		return false
+	}
+
+	return state.best === null || !isSmaller(state.best.position, position)
+}
+
+function describeSignatures(
+	signatures: Array<common.BaseFunction>,
+	label: string,
+): string {
+	return signatures
+		.map((signature) => printSignature(signature, label))
+		.join("\n")
 }
 
 /***********/
@@ -76,9 +114,16 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitIdentifier(node.name, state)
 			visitNode(node.value, state)
 			return
+		// NOTE: Declarations that carry a keyword in the source repeat it, so
+		// the Hover reads back as the declaration itself.
 		case "FunctionStatement":
-			consider(state, node.position, node.type, node.name.content)
-			visitIdentifier(node.name, state)
+			consider(
+				state,
+				node.position,
+				node.type,
+				`function ${node.name.content}`,
+			)
+			visitIdentifier(node.name, state, `function ${node.name.content}`)
 			visitFunctionDefinition(node.value, state)
 			return
 		case "NamespaceDefinitionStatement":
@@ -89,15 +134,21 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				visitNode(property.value, state)
 			}
 
-			for (let member of Object.values(node.methods)) {
+			for (let [name, member] of Object.entries(node.methods)) {
 				let methods =
 					member.nodeType === "OverloadedMethod" ||
 					member.nodeType === "OverloadedStaticMethod"
 						? member.methods
 						: [member.method]
 
+				let isStatic =
+					member.nodeType === "StaticMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+
+				let label = isStatic ? `static ${name}` : name
+
 				for (let method of methods) {
-					consider(state, method.position, method.type, null)
+					consider(state, method.position, method.type, label)
 					visitFunctionDefinition(method.value, state)
 				}
 			}
@@ -133,13 +184,13 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			// NOTE: The Method name resolves through the Namespace — with an
 			// overload the invoked signature is picked out for the Hover.
-			let memberType = methodType(node)
+			let signatures = invokedSignatures(node)
 
-			if (memberType !== null) {
-				consider(
+			if (signatures !== null) {
+				considerSignatures(
 					state,
 					node.member.position,
-					memberType,
+					signatures,
 					node.member.name,
 				)
 			}
@@ -204,8 +255,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 	}
 }
 
-function visitIdentifier(node: common.typed.IdentifierNode, state: State) {
-	consider(state, node.position, node.type, node.content)
+function visitIdentifier(
+	node: common.typed.IdentifierNode,
+	state: State,
+	label: string = node.content,
+) {
+	consider(state, node.position, node.type, label)
 }
 
 function visitArguments(
@@ -237,38 +292,30 @@ function visitFunctionDefinition(
 	visitBody(definition.body, state)
 }
 
-function methodType(
+function invokedSignatures(
 	node: common.typed.MethodInvocationNode,
-): common.Type | null {
+): Array<common.BaseFunction> | null {
 	let memberType = node.namespace.type.methods[node.member.name]
 
 	if (memberType === undefined) {
 		return null
 	}
 
-	switch (memberType.type) {
-		case "SimpleMethod":
-			return { ...memberType, ...withoutSelf(memberType) }
-		case "StaticMethod":
-			return memberType
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod": {
-			let overloads =
-				memberType.type === "OverloadedMethod"
-					? memberType.overloads.map(withoutSelf)
-					: memberType.overloads
+	let signatures = signaturesOf(memberType)
 
-			// NOTE: With a resolved overload only the invoked signature is
-			// shown, packaged as a plain Function Type.
-			if (node.overloadedMethodIndex !== null) {
-				let overload = overloads[node.overloadedMethodIndex]
+	if (signatures === null) {
+		return null
+	}
 
-				if (overload !== undefined) {
-					return { type: "Function", ...overload }
-				}
-			}
+	// NOTE: With a resolved Overload only the invoked signature is shown —
+	// the others are noise once the Arguments have picked one.
+	if (node.overloadedMethodIndex !== null) {
+		let invoked = signatures[node.overloadedMethodIndex]
 
-			return { ...memberType, overloads }
+		if (invoked !== undefined) {
+			return [invoked]
 		}
 	}
+
+	return signatures
 }

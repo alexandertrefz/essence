@@ -4,7 +4,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
-import { printSignature, printType, withoutSelf } from "./printType"
+import { printSignatureSummary, printType, signaturesOf } from "./printType"
 import { buildProbeSource } from "./probe"
 import {
 	type Declaration,
@@ -442,19 +442,11 @@ function specifierCompletions(
 	return entries
 }
 
+// NOTE: A Completion's detail is a single line next to its label, so an
+// Overload set shows its first signature and counts the rest — Signature Help
+// and the Hover are where every Overload is spelled out.
 function printInvokedSignature(method: common.MethodType): string {
-	switch (method.type) {
-		case "SimpleMethod":
-			return printSignature(withoutSelf(method))
-		case "OverloadedMethod":
-			return method.overloads
-				.map((overload) => printSignature(withoutSelf(overload)))
-				.join(" & ")
-		case "StaticMethod":
-			return printSignature(method)
-		case "OverloadedStaticMethod":
-			return method.overloads.map(printSignature).join(" & ")
-	}
+	return printSignatureSummary(signaturesOf(method) ?? [])
 }
 
 /********************/

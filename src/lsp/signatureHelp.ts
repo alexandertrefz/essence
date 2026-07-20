@@ -3,7 +3,11 @@ import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isSmaller } from "./positions"
-import { printSignature, printType, withoutSelf } from "./printType"
+import {
+	describeSignature,
+	type ParameterRange,
+	signaturesOf,
+} from "./printType"
 import { buildProbeSource, stripNoise } from "./probe"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
@@ -23,6 +27,9 @@ import { buildProbeSource, stripNoise } from "./probe"
 // is being shown. When that resolution failed, every Namespace whose target
 // Type matches the receiver (independent of Arguments) is offered instead,
 // mirroring Completion's `::` listing.
+//
+// Labels carry the callee's name, so what is shown is the whole contract of
+// the call being written — `append(_ String) -> String`, not a bare signature.
 
 export type SignatureHelpInfo = {
 	signatures: Array<SignatureInfo>
@@ -32,7 +39,7 @@ export type SignatureHelpInfo = {
 
 export type SignatureInfo = {
 	label: string
-	parameters: Array<string>
+	parameters: Array<ParameterRange>
 }
 
 export function findSignatureHelp(
@@ -68,18 +75,21 @@ export function findSignatureHelp(
 
 	let activeParameter = countArguments(headText, invocation.arguments.length)
 
+	// NOTE: A Static Method is invoked through a Lookup (`Thing.show(…)`), so
+	// the callee is not always a plain Function Type.
 	if (invocation.nodeType === "FunctionInvocation") {
-		let calleeType = invocation.name.type
+		let signatures = signaturesOf(invocation.name.type)
 
-		if (calleeType.type !== "Function") {
+		if (signatures === null) {
 			return null
 		}
 
-		return {
-			signatures: [signatureOf(calleeType)],
-			activeSignature: 0,
+		return help(
+			signatures,
+			calleeName(invocation.name),
+			invocation.overloadedMethodIndex,
 			activeParameter,
-		}
+		)
 	}
 
 	// NOTE: `namespace.name` is empty exactly when resolution failed (see
@@ -90,11 +100,16 @@ export function findSignatureHelp(
 			invocation.namespace.type.methods[invocation.member.name]
 
 		if (methodType !== undefined) {
-			return signatureHelpForMethod(
-				methodType,
-				invocation.overloadedMethodIndex,
-				activeParameter,
-			)
+			let signatures = signaturesOf(methodType)
+
+			if (signatures !== null) {
+				return help(
+					signatures,
+					invocation.member.name,
+					invocation.overloadedMethodIndex,
+					activeParameter,
+				)
+			}
 		}
 	}
 
@@ -104,7 +119,10 @@ export function findSignatureHelp(
 		null,
 	)
 
-	let candidates: Array<common.BaseFunction> = []
+	let candidates: Array<{
+		namespaceName: string
+		signature: common.BaseFunction
+	}> = []
 
 	for (let namespace of namespaces) {
 		let methodType = namespace.methods[invocation.member.name]
@@ -113,19 +131,8 @@ export function findSignatureHelp(
 			continue
 		}
 
-		switch (methodType.type) {
-			case "SimpleMethod":
-				candidates.push(withoutSelf(methodType))
-				break
-			case "StaticMethod":
-				candidates.push(methodType)
-				break
-			case "OverloadedMethod":
-				candidates.push(...methodType.overloads.map(withoutSelf))
-				break
-			case "OverloadedStaticMethod":
-				candidates.push(...methodType.overloads)
-				break
+		for (let signature of signaturesOf(methodType) ?? []) {
+			candidates.push({ namespaceName: namespace.name, signature })
 		}
 	}
 
@@ -133,56 +140,85 @@ export function findSignatureHelp(
 		return null
 	}
 
+	// NOTE: Several Namespaces can offer the same Method for one receiver, and
+	// `1::<Thing>string(…)` is how a call site picks between them — so the
+	// label is qualified the same way, but only while the choice is open.
+	let isAmbiguous =
+		new Set(candidates.map((candidate) => candidate.namespaceName)).size > 1
+
+	let signatures = candidates.map((candidate) => candidate.signature)
+
 	return {
-		signatures: candidates.map(signatureOf),
-		activeSignature: 0,
+		signatures: candidates.map((candidate) =>
+			describeSignature(
+				candidate.signature,
+				isAmbiguous
+					? `<${candidate.namespaceName}>${invocation.member.name}`
+					: invocation.member.name,
+			),
+		),
+		activeSignature: activeSignatureOf(signatures, null, activeParameter),
 		activeParameter,
 	}
 }
 
-function signatureHelpForMethod(
-	methodType: common.MethodType,
+function help(
+	signatures: Array<common.BaseFunction>,
+	name: string,
 	overloadedMethodIndex: number | null,
 	activeParameter: number,
 ): SignatureHelpInfo {
-	if (methodType.type === "SimpleMethod") {
-		return {
-			signatures: [signatureOf(withoutSelf(methodType))],
-			activeSignature: 0,
-			activeParameter,
-		}
-	}
-
-	if (methodType.type === "StaticMethod") {
-		return {
-			signatures: [signatureOf(methodType)],
-			activeSignature: 0,
-			activeParameter,
-		}
-	}
-
-	// NOTE: With an Overload already resolved (arguments so far matched one
-	// candidate) it is shown alone — otherwise every Overload is offered.
-	let overloads =
-		methodType.type === "OverloadedMethod"
-			? methodType.overloads.map(withoutSelf)
-			: methodType.overloads
-
 	return {
-		signatures: overloads.map(signatureOf),
-		activeSignature: Math.max(overloadedMethodIndex ?? 0, 0),
+		signatures: signatures.map((signature) =>
+			describeSignature(signature, name),
+		),
+		activeSignature: activeSignatureOf(
+			signatures,
+			overloadedMethodIndex,
+			activeParameter,
+		),
 		activeParameter,
 	}
 }
 
-function signatureOf(fn: common.BaseFunction): SignatureInfo {
-	return {
-		label: printSignature(fn),
-		parameters: fn.parameterTypes.map((parameter) =>
-			parameter.name === null
-				? `_ ${printType(parameter.type)}`
-				: `${parameter.name}: ${printType(parameter.type)}`,
-		),
+// NOTE: An Overload the Arguments already resolved to stays active, but only
+// while it still has room for the Argument being typed — resolution runs on
+// the half written call, so `combine(2, ` resolves to the one Parameter
+// Overload that the second Argument has already ruled out. Otherwise the
+// first Overload that can still take the Argument wins.
+function activeSignatureOf(
+	signatures: Array<common.BaseFunction>,
+	overloadedMethodIndex: number | null,
+	activeParameter: number,
+): number {
+	if (overloadedMethodIndex !== null) {
+		let resolved = signatures[overloadedMethodIndex]
+
+		if (
+			resolved !== undefined &&
+			resolved.parameterTypes.length > activeParameter
+		) {
+			return overloadedMethodIndex
+		}
+	}
+
+	let match = signatures.findIndex(
+		(signature) => signature.parameterTypes.length > activeParameter,
+	)
+
+	return match === -1 ? 0 : match
+}
+
+// NOTE: Static Methods are called through a Lookup, so the callee's name is
+// the path written at the call site rather than a single Identifier.
+function calleeName(node: common.typed.ImplementationNode): string {
+	switch (node.nodeType) {
+		case "Identifier":
+			return node.content
+		case "Lookup":
+			return `${calleeName(node.base)}.${node.member.content}`
+		default:
+			return ""
 	}
 }
 
