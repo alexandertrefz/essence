@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
 import {
 	findOccurrence as findAnyOccurrence,
 	findDefinition,
@@ -10,7 +10,7 @@ import {
 	identifierPattern,
 	isValidIdentifierName,
 } from "../lsp/rename"
-import { parseWithDiagnostics } from "../parser"
+import { parseWithDiagnostics } from "../parser/index"
 
 function findOccurrence(source: string, cursor: common.Cursor) {
 	let { program } = parseWithDiagnostics(source)

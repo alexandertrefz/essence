@@ -1,4 +1,4 @@
-import { enrich } from "../enricher"
+import { enrich } from "../enricher/index"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as fractionNamespace } from "../enricher/types/Fraction"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
@@ -6,9 +6,12 @@ import { namespace as listNamespace } from "../enricher/types/List"
 import { namespace as numberNamespace } from "../enricher/types/Number"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
-import { createInferenceContext, matchesTypeWithBindings } from "../helpers"
-import type { common } from "../interfaces"
-import { parseWithDiagnostics } from "../parser"
+import {
+	createInferenceContext,
+	matchesTypeWithBindings,
+} from "../helpers/index"
+import type { common } from "../interfaces/index"
+import { parseWithDiagnostics } from "../parser/index"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type

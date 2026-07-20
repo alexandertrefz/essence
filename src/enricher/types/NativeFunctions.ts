@@ -1,4 +1,4 @@
-import type { common } from "../../interfaces"
+import type { common } from "../../interfaces/index"
 
 const functions: Record<string, common.Type> = {
 	__print: {

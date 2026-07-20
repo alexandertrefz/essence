@@ -1,4 +1,4 @@
-import type { common, parser } from "../interfaces"
+import type { common, parser } from "../interfaces/index"
 import { type DeclarationKind, indexProgram } from "./rename"
 
 // NOTE: Semantic Tokens classify Identifiers by what they actually resolve

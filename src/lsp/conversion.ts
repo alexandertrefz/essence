@@ -6,7 +6,7 @@ import {
 	type Range,
 } from "vscode-languageserver"
 
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 
 export function toCursor(position: Position): common.Cursor {
 	return { line: position.line + 1, column: position.character + 1 }

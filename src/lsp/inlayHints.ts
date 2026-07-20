@@ -1,4 +1,4 @@
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 import { printType } from "./printType"
 
 // NOTE: Inlay Hints annotate Constant and Variable declarations that carry no

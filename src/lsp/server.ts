@@ -17,9 +17,9 @@ import {
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
 
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
-import { parseWithDiagnostics } from "../parser"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
+import { parseWithDiagnostics } from "../parser/index"
 import { analyse } from "./analyse"
 import { type CompletionEntry, findCompletions } from "./completion"
 import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"

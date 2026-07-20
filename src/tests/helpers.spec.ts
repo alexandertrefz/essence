@@ -14,10 +14,7 @@ import {
 	stripPositionFromArray,
 	symbol,
 	third,
-} from "../helpers"
-
-import { lexer } from "../interfaces"
-
+} from "../helpers/index"
 import type {
 	ErrorType,
 	FunctionType,
@@ -32,7 +29,8 @@ import type {
 	Type,
 	UnionType,
 	UnknownType,
-} from "../interfaces/common"
+} from "../interfaces/common/index"
+import { lexer } from "../interfaces/index"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token

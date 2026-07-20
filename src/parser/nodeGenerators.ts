@@ -1,4 +1,4 @@
-import type { common, parser } from "../interfaces"
+import type { common, parser } from "../interfaces/index"
 
 // #region Program & Sections
 

@@ -1,11 +1,15 @@
-import { collectDiagnostics, reportError, reportWarning } from "../diagnostics"
+import {
+	collectDiagnostics,
+	reportError,
+	reportWarning,
+} from "../diagnostics/index"
 import {
 	createInferenceContext,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
-} from "../helpers"
-import type { common } from "../interfaces"
+} from "../helpers/index"
+import type { common } from "../interfaces/index"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 

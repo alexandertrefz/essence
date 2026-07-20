@@ -1,8 +1,8 @@
-import { containsErrors } from "../diagnostics"
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
-import { parseWithDiagnostics } from "../parser"
-import { validate } from "../validator"
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
+import { parseWithDiagnostics } from "../parser/index"
+import { validate } from "../validator/index"
 
 // NOTE: The pipeline stages are fault-tolerant, so parsing and enrichment
 // always run — broken statements are dropped from the AST, and the remaining
