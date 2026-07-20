@@ -6,6 +6,7 @@ import {
 	type DocumentSymbol,
 	ErrorCodes,
 	InlayHintKind,
+	InsertTextFormat,
 	type Position,
 	ProposedFeatures,
 	ResponseError,
@@ -36,6 +37,7 @@ import {
 	findOccurrence,
 	findOccurrences,
 	findRenameableOccurrence,
+	identifierPattern,
 	isValidIdentifierName,
 } from "./rename"
 import { findSelectionRanges } from "./selectionRanges"
@@ -82,6 +84,7 @@ export function startServer() {
 				foldingRangeProvider: true,
 				selectionRangeProvider: true,
 				inlayHintProvider: true,
+				linkedEditingRangeProvider: true,
 			},
 		}
 	})
@@ -297,6 +300,28 @@ export function startServer() {
 		}
 	})
 
+	connection.languages.onLinkedEditingRange((params) => {
+		// NOTE: Editing one occurrence updates the rest as they are typed, so
+		// this is deliberately restricted to what renaming would accept —
+		// Builtins are excluded, since typing over `__print` must not look
+		// like it is renaming it.
+		let occurrence = renameableOccurrenceAt(
+			params.textDocument.uri,
+			params.position,
+		)
+
+		if (occurrence === null) {
+			return null
+		}
+
+		return {
+			ranges: occurrence.declaration.occurrences.map(toLspRange),
+			// NOTE: Typing a character an Identifier cannot contain ends the
+			// linked edit instead of propagating something unparseable.
+			wordPattern: identifierPattern,
+		}
+	})
+
 	connection.onDocumentSymbol((params) => {
 		let document = documents.get(params.textDocument.uri)
 
@@ -499,10 +524,28 @@ const completionItemKinds: Record<DeclarationKind, CompletionItemKind> = {
 	label: CompletionItemKind.Text,
 }
 
+// NOTE: The kinds that are invoked rather than referred to — completing one
+// inserts its parentheses and leaves the cursor between them.
+const callableKinds = new Set<DeclarationKind>([
+	"function",
+	"method",
+	"staticMethod",
+])
+
 function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
+	if (!callableKinds.has(entry.kind)) {
+		return {
+			label: entry.label,
+			kind: completionItemKinds[entry.kind],
+			detail: entry.detail ?? undefined,
+		}
+	}
+
 	return {
 		label: entry.label,
 		kind: completionItemKinds[entry.kind],
 		detail: entry.detail ?? undefined,
+		insertText: `${entry.label}($0)`,
+		insertTextFormat: InsertTextFormat.Snippet,
 	}
 }

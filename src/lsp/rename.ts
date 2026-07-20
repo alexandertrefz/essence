@@ -163,6 +163,18 @@ const reservedWords = new Set([
 // rejected, as are reserved words.
 const forbiddenIdentifierCharacters = /[\s"§(){}[\]<>|/@,.:=\-~_]/
 
+// NOTE: The same character class in its positive form: one whole Identifier.
+// Linked editing hands it to the editor so that typing a character a name
+// cannot contain ends the linked edit rather than propagating something
+// unparseable. Kept as a string because the editor wants a pattern, not a
+// RegExp.
+//
+// Number literals are deliberately not covered: `_` separates digit groups
+// and a leading `-` belongs to the literal, so they need a second alternative
+// — the extension's language configuration spells that out for word
+// selection, but renaming only ever targets Identifiers.
+export const identifierPattern = '[^\\s"§(){}\\[\\]<>|/@,.:=~_-]+'
+
 export function isValidIdentifierName(name: string): boolean {
 	return (
 		name.length > 0 &&
