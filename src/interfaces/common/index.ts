@@ -13,11 +13,29 @@ export type Position = {
 
 export type DiagnosticSeverity = "error" | "warning"
 
+// NOTE: `unnecessary` renders the code greyed out rather than underlined —
+// for Diagnostics about code that has no effect instead of code that is
+// wrong.
+export type DiagnosticTag = "unnecessary" | "deprecated"
+
 export type Diagnostic = {
 	severity: DiagnosticSeverity
 	message: string
 	position: Position | null
+	// NOTE: A stable identifier for the kind of Diagnostic, independent of
+	// the message wording — what a Language Server client keys Quick Fixes
+	// off, and what lets a message be reworded without breaking them.
+	code?: DiagnosticCode
+	tags?: Array<DiagnosticTag>
 }
+
+export type DiagnosticCode =
+	| "missing-case"
+	| "unreachable-case"
+	| "missing-return"
+	| "constant-reassignment"
+	| "unknown-name"
+	| "internal-error"
 
 export type UnknownType = {
 	type: "Unknown"
