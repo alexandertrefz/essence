@@ -2,6 +2,7 @@ import { enrich } from "../enricher/index"
 import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
+import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { printSignatureSummary, printType, signaturesOf } from "./printType"
@@ -36,6 +37,10 @@ export type CompletionEntry = {
 	label: string
 	kind: DeclarationKind
 	detail: string | null
+	// NOTE: The description alone — a Completion list has no room for the
+	// tagged sections, and Signature Help shows them the moment the call is
+	// actually being written.
+	documentation?: string | null
 }
 
 // NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols, and
@@ -356,6 +361,7 @@ function memberCompletions(baseType: common.Type): Array<CompletionEntry> {
 				label: name,
 				kind: methodDeclarationKind(method),
 				detail: printType(method),
+				documentation: describe(documentationOf(method)) || null,
 			})
 		}
 
@@ -406,6 +412,7 @@ function methodCompletions(
 				label: name,
 				kind: "method",
 				detail: printInvokedSignature(method),
+				documentation: describe(documentationOf(method)) || null,
 			})
 		}
 	}

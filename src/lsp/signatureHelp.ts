@@ -1,6 +1,7 @@
 import { enrich } from "../enricher/index"
 import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
+import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isSmaller } from "./positions"
 import {
@@ -39,7 +40,13 @@ export type SignatureHelpInfo = {
 
 export type SignatureInfo = {
 	label: string
-	parameters: Array<ParameterRange>
+	documentation: string | null
+	parameters: Array<ParameterInfo>
+}
+
+export type ParameterInfo = {
+	range: ParameterRange
+	documentation: string | null
 }
 
 export function findSignatureHelp(
@@ -87,6 +94,7 @@ export function findSignatureHelp(
 		return help(
 			signatures,
 			calleeName(invocation.name),
+			documentationOf(invocation.name.type),
 			invocation.overloadedMethodIndex,
 			activeParameter,
 		)
@@ -106,6 +114,7 @@ export function findSignatureHelp(
 				return help(
 					signatures,
 					invocation.member.name,
+					documentationOf(methodType),
 					invocation.overloadedMethodIndex,
 					activeParameter,
 				)
@@ -122,6 +131,7 @@ export function findSignatureHelp(
 	let candidates: Array<{
 		namespaceName: string
 		signature: common.BaseFunction
+		fallback: common.Documentation | null
 	}> = []
 
 	for (let namespace of namespaces) {
@@ -132,7 +142,11 @@ export function findSignatureHelp(
 		}
 
 		for (let signature of signaturesOf(methodType) ?? []) {
-			candidates.push({ namespaceName: namespace.name, signature })
+			candidates.push({
+				namespaceName: namespace.name,
+				signature,
+				fallback: documentationOf(methodType),
+			})
 		}
 	}
 
@@ -150,11 +164,12 @@ export function findSignatureHelp(
 
 	return {
 		signatures: candidates.map((candidate) =>
-			describeSignature(
+			signatureInfo(
 				candidate.signature,
 				isAmbiguous
 					? `<${candidate.namespaceName}>${invocation.member.name}`
 					: invocation.member.name,
+				candidate.fallback,
 			),
 		),
 		activeSignature: activeSignatureOf(signatures, null, activeParameter),
@@ -165,12 +180,13 @@ export function findSignatureHelp(
 function help(
 	signatures: Array<common.BaseFunction>,
 	name: string,
+	fallback: common.Documentation | null,
 	overloadedMethodIndex: number | null,
 	activeParameter: number,
 ): SignatureHelpInfo {
 	return {
 		signatures: signatures.map((signature) =>
-			describeSignature(signature, name),
+			signatureInfo(signature, name, fallback),
 		),
 		activeSignature: activeSignatureOf(
 			signatures,
@@ -178,6 +194,29 @@ function help(
 			activeParameter,
 		),
 		activeParameter,
+	}
+}
+
+// NOTE: A Parameter's own text is shown next to that Parameter, so the
+// signature's own Documentation is reduced to its description — repeating the
+// `@param` sections underneath would say everything twice. An Overload
+// without text of its own falls back to whatever documents the set.
+function signatureInfo(
+	signature: common.BaseFunction,
+	name: string,
+	fallback: common.Documentation | null,
+): SignatureInfo {
+	let described = describeSignature(signature, name)
+	let documentation = signature.documentation ?? fallback
+
+	return {
+		label: described.label,
+		documentation: describe(documentation) || null,
+		parameters: described.parameters.map((range, index) => ({
+			range,
+			documentation:
+				signature.parameterTypes[index]?.documentation ?? null,
+		})),
 	}
 }
 

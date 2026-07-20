@@ -1,6 +1,7 @@
 import { reportError } from "../../diagnostics/index"
 import { type common, lexer } from "../../interfaces/index"
 import { Lexer } from "../../lexer/index"
+import { parseDocumentation } from "../documentation"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -102,6 +103,12 @@ export class TokenStream {
 	protected index: number
 	protected braceDepth: number
 	public hadLexerError: boolean
+	// NOTE: Documentation Comments are kept out of the Token array entirely
+	// and indexed by the line they sit on. The parser has many fixed offset
+	// lookaheads and backtracks by Token index, all of which would have to
+	// learn to step over them; keying by line costs none of that, and a
+	// Comment always ends at its line break, so one line holds at most one.
+	protected documentationLines: Map<number, Token>
 
 	constructor(source: string) {
 		let sourceLexer = new Lexer()
@@ -114,6 +121,7 @@ export class TokenStream {
 		this.index = 0
 		this.braceDepth = 0
 		this.hadLexerError = false
+		this.documentationLines = new Map()
 
 		// NOTE: The Lexer throws on unterminated String Literals — its only
 		// error case. That is reported as a positioned Diagnostic here and
@@ -123,7 +131,15 @@ export class TokenStream {
 		try {
 			let token = sourceLexer.next()
 			while (token !== undefined) {
-				this.tokens.push(token)
+				if (token.type === TokenType.DocComment) {
+					this.documentationLines.set(
+						token.position.start.line,
+						token,
+					)
+				} else {
+					this.tokens.push(token)
+				}
+
 				token = sourceLexer.next()
 			}
 		} catch {
@@ -140,6 +156,53 @@ export class TokenStream {
 
 	get depth(): number {
 		return this.braceDepth
+	}
+
+	// NOTE: Whether the next Token opens a line of its own. A Declaration may
+	// share its line with the signature it owns — `function greet (…)` is one
+	// line and one Declaration — but a Parameter sitting on that same line is
+	// a smaller thing than what the block above it documents, and must not
+	// claim it.
+	startsLine(): boolean {
+		let token = this.peek()
+
+		if (token === undefined) {
+			return false
+		}
+
+		let previous = this.tokens[this.index - 1]
+
+		return (
+			previous === undefined ||
+			previous.position.end.line < token.position.start.line
+		)
+	}
+
+	// NOTE: The run of `§§` Comments directly above `line`. Any gap ends the
+	// run — a blank line or an ordinary `§` Comment in between means the block
+	// was written about something else, so it documents nothing.
+	documentationAbove(line: number): common.Documentation | null {
+		let lines: Array<string> = []
+		let start: common.Cursor | null = null
+		let end: common.Cursor | null = null
+
+		for (
+			let current = line - 1;
+			this.documentationLines.has(current);
+			current--
+		) {
+			let token = this.documentationLines.get(current) as Token
+
+			lines.unshift(token.value)
+			start = token.position.start
+			end ??= token.position.end
+		}
+
+		if (start === null || end === null) {
+			return null
+		}
+
+		return parseDocumentation(lines, { start, end })
 	}
 
 	peek(offset = 0): Token | undefined {

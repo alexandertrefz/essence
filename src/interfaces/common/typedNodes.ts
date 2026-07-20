@@ -1,5 +1,6 @@
 import type {
 	BooleanType,
+	Documentation,
 	FractionType,
 	FunctionType,
 	IntegerType,
@@ -215,6 +216,7 @@ export interface ConstantDeclarationStatementNode {
 	position: Position
 	declaredType: Type | null
 	type: Type
+	documentation: Documentation | null
 }
 
 export interface VariableDeclarationStatementNode {
@@ -224,6 +226,7 @@ export interface VariableDeclarationStatementNode {
 	position: Position
 	declaredType: Type | null
 	type: Type
+	documentation: Documentation | null
 }
 
 export interface VariableAssignmentStatementNode {
@@ -266,6 +269,7 @@ export interface NamespaceDefinitionStatementNode {
 	methods: Methods
 	position: Position
 	type: NamespaceType
+	documentation: Documentation | null
 }
 
 export interface TypeAliasStatementNode {
@@ -273,6 +277,7 @@ export interface TypeAliasStatementNode {
 	name: IdentifierNode
 	type: Type
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface IfElseStatementNode {

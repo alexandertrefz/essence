@@ -45,6 +45,7 @@ export enum TokenType {
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",
 	Comment = "Comment",
+	DocComment = "DocComment",
 }
 
 export interface Token {

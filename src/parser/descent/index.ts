@@ -303,10 +303,13 @@ class DescentParser {
 
 		let value = this.parseExpression()
 
-		return generators.constantDeclarationStatement(name, type, value, {
-			start: keyword.position.start,
-			end: value.position.end,
-		})
+		return generators.constantDeclarationStatement(
+			name,
+			type,
+			value,
+			{ start: keyword.position.start, end: value.position.end },
+			this.tokens.documentationAbove(keyword.position.start.line),
+		)
 	}
 
 	protected parseVariableDeclarationStatement(): parser.VariableDeclarationStatementNode {
@@ -318,10 +321,13 @@ class DescentParser {
 
 		let value = this.parseExpression()
 
-		return generators.variableDeclarationStatement(name, type, value, {
-			start: keyword.position.start,
-			end: value.position.end,
-		})
+		return generators.variableDeclarationStatement(
+			name,
+			type,
+			value,
+			{ start: keyword.position.start, end: value.position.end },
+			this.tokens.documentationAbove(keyword.position.start.line),
+		)
 	}
 
 	protected parseVariableAssignmentStatement(): parser.VariableAssignmentStatementNode {
@@ -346,10 +352,13 @@ class DescentParser {
 
 		let type = this.parseType()
 
-		return generators.typeAliasStatement(name, generics, type, {
-			start: keyword.position.start,
-			end: type.position.end,
-		})
+		return generators.typeAliasStatement(
+			name,
+			generics,
+			type,
+			{ start: keyword.position.start, end: type.position.end },
+			this.tokens.documentationAbove(keyword.position.start.line),
+		)
 	}
 
 	protected parseFunctionStatement(): parser.FunctionStatementNode {
@@ -423,6 +432,7 @@ class DescentParser {
 				start: keyword.position.start,
 				end: closingPosition.end,
 			},
+			this.tokens.documentationAbove(keyword.position.start.line),
 		)
 	}
 
@@ -430,6 +440,12 @@ class DescentParser {
 		let token = this.peekOrFail()
 
 		if (token.type === TokenType.KeywordOverload) {
+			// NOTE: A block level `§§` documents the Overload set as a whole;
+			// each Overload inside it picks up its own from its first line.
+			let documentation = this.tokens.documentationAbove(
+				token.position.start.line,
+			)
+
 			this.tokens.next()
 
 			let isStatic = false
@@ -456,10 +472,16 @@ class DescentParser {
 					nodeType: "OverloadedStaticMethodNode",
 					name,
 					methods,
+					documentation,
 				}
 			}
 
-			return { nodeType: "OverloadedMethodNode", name, methods }
+			return {
+				nodeType: "OverloadedMethodNode",
+				name,
+				methods,
+				documentation,
+			}
 		}
 
 		if (
@@ -1041,6 +1063,7 @@ class DescentParser {
 	}
 
 	protected parseFunctionLiteral(): parser.FunctionValueNode {
+		let documentation = this.documentationHere()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
 		let block = this.parseBlock()
@@ -1050,6 +1073,7 @@ class DescentParser {
 				parameterList.parameters,
 				returnType,
 				block.body,
+				documentation,
 			),
 			{
 				start: parameterList.position.start,
@@ -1059,6 +1083,7 @@ class DescentParser {
 	}
 
 	protected parseGenericFunctionLiteral(): parser.FunctionValueNode {
+		let documentation = this.documentationHere()
 		let genericList = this.parseGenericList()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
@@ -1070,6 +1095,7 @@ class DescentParser {
 				parameterList.parameters,
 				returnType,
 				block.body,
+				documentation,
 			),
 			{
 				start: parameterList.position.start,
@@ -1199,7 +1225,27 @@ class DescentParser {
 		}
 	}
 
+	// NOTE: The `§§` block above whatever is about to be parsed. Every
+	// Declaration sits on the line of its own first Token, so no Declaration
+	// needs to hand its Documentation down to the signature it owns.
+	protected documentationHere(): common.Documentation | null {
+		let token = this.tokens.peek()
+
+		if (token === undefined) {
+			return null
+		}
+
+		return this.tokens.documentationAbove(token.position.start.line)
+	}
+
 	protected parseParameter(): parser.ParameterNode {
+		// NOTE: Only a Parameter written on a line of its own can carry a
+		// block — otherwise the first Parameter of `function greet (…)` would
+		// claim the Function's own Documentation.
+		let documentation = this.tokens.startsLine()
+			? this.documentationHere()
+			: null
+
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
 
@@ -1211,10 +1257,16 @@ class DescentParser {
 
 				let type = this.parseType()
 
-				return generators.parameter(null, null, type, {
-					start: underscore.position.start,
-					end: type.position.end,
-				})
+				return generators.parameter(
+					null,
+					null,
+					type,
+					{
+						start: underscore.position.start,
+						end: type.position.end,
+					},
+					documentation,
+				)
 			}
 
 			let internalName = this.parseIdentifier()
@@ -1223,10 +1275,13 @@ class DescentParser {
 
 			let type = this.parseType()
 
-			return generators.parameter(null, internalName, type, {
-				start: underscore.position.start,
-				end: type.position.end,
-			})
+			return generators.parameter(
+				null,
+				internalName,
+				type,
+				{ start: underscore.position.start, end: type.position.end },
+				documentation,
+			)
 		}
 
 		let name = this.parseIdentifier()
@@ -1238,20 +1293,26 @@ class DescentParser {
 
 			let type = this.parseType()
 
-			return generators.parameter(name, internalName, type, {
-				start: name.position.start,
-				end: type.position.end,
-			})
+			return generators.parameter(
+				name,
+				internalName,
+				type,
+				{ start: name.position.start, end: type.position.end },
+				documentation,
+			)
 		}
 
 		this.tokens.expect(TokenType.SymbolColon)
 
 		let type = this.parseType()
 
-		return generators.parameter(name, name, type, {
-			start: name.position.start,
-			end: type.position.end,
-		})
+		return generators.parameter(
+			name,
+			name,
+			type,
+			{ start: name.position.start, end: type.position.end },
+			documentation,
+		)
 	}
 
 	protected parseArgumentList(): {
