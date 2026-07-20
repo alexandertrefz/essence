@@ -1,0 +1,22 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"rules": {
+		"typescript/array-type": ["warn", { "default": "generic" }],
+		"no-unused-vars": "warn"
+	},
+	"overrides": [
+		{
+			"files": ["src/ariadne/**"],
+			"rules": {
+				"no-control-regex": "off"
+			}
+		}
+	],
+	"ignorePatterns": [
+		"lib/**",
+		"src/coverage/**",
+		"src/parser/grammar.ts",
+		"testFiles/**",
+		"docs/**"
+	]
+}

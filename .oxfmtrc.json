@@ -1,0 +1,26 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 4,
+	"printWidth": 80,
+	"singleQuote": false,
+	"jsxSingleQuote": false,
+	"quoteProps": "as-needed",
+	"trailingComma": "all",
+	"semi": false,
+	"arrowParens": "always",
+	"bracketSameLine": false,
+	"bracketSpacing": true,
+	"sortImports": true,
+	"sortPackageJson": false,
+	"ignorePatterns": [
+		"lib/**/*",
+		"src/coverage/**/*",
+		"src/parser/grammar.ts",
+		"docs/_layouts/**",
+		"testFiles/**",
+		"**/__snapshots__/**",
+		"**/*.md",
+		"**/*.yml"
+	]
+}
