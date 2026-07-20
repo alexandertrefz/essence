@@ -25,18 +25,25 @@ export function report(diagnostic: common.Diagnostic): void {
 	}
 }
 
+type DiagnosticDetails = {
+	code?: common.DiagnosticCode
+	tags?: Array<common.DiagnosticTag>
+}
+
 export function reportError(
 	message: string,
 	position: common.Position | null = null,
+	details: DiagnosticDetails = {},
 ): void {
-	report({ severity: "error", message, position })
+	report({ severity: "error", message, position, ...details })
 }
 
 export function reportWarning(
 	message: string,
 	position: common.Position | null = null,
+	details: DiagnosticDetails = {},
 ): void {
-	report({ severity: "warning", message, position })
+	report({ severity: "warning", message, position, ...details })
 }
 
 export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {

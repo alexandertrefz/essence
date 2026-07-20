@@ -1,6 +1,7 @@
 import {
 	type Diagnostic,
 	DiagnosticSeverity,
+	DiagnosticTag,
 	type Position,
 	type Range,
 } from "vscode-languageserver"
@@ -42,5 +43,11 @@ export function toLspDiagnostic(diagnostic: common.Diagnostic): Diagnostic {
 				: DiagnosticSeverity.Warning,
 		message: diagnostic.message,
 		source: "essence",
+		code: diagnostic.code,
+		tags: diagnostic.tags?.map((tag) =>
+			tag === "unnecessary"
+				? DiagnosticTag.Unnecessary
+				: DiagnosticTag.Deprecated,
+		),
 	}
 }
