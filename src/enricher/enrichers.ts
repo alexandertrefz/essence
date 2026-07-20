@@ -824,13 +824,13 @@ function enrichArgument(
 }
 
 function enrichMembers(
-	members: Record<string, parser.ExpressionNode>,
+	members: Record<string, parser.RecordValueMemberNode>,
 	scope: enricher.Scope,
 ): Record<string, common.typed.ExpressionNode> {
 	let result: Record<string, common.typed.ExpressionNode> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		result[memberKey] = enrichExpression(memberValue, scope)
+		result[memberKey] = enrichExpression(memberValue.value, scope)
 	}
 
 	return result
