@@ -34,6 +34,7 @@ import {
 	findRenameableOccurrence,
 	isValidIdentifierName,
 } from "./rename"
+import { findSignatureHelp } from "./signatureHelp"
 
 const analysisDebounceInMilliseconds = 200
 
@@ -56,6 +57,9 @@ export function startServer() {
 				documentSymbolProvider: true,
 				completionProvider: {
 					triggerCharacters: [".", ":", "<"],
+				},
+				signatureHelpProvider: {
+					triggerCharacters: ["(", ","],
 				},
 			},
 		}
@@ -283,6 +287,32 @@ export function startServer() {
 		)
 
 		return entries.map(toLspCompletionItem)
+	})
+
+	connection.onSignatureHelp((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		let help = findSignatureHelp(
+			document.getText(),
+			toCursor(params.position),
+		)
+
+		if (help === null) {
+			return null
+		}
+
+		return {
+			signatures: help.signatures.map((signature) => ({
+				label: signature.label,
+				parameters: signature.parameters.map((label) => ({ label })),
+			})),
+			activeSignature: help.activeSignature,
+			activeParameter: help.activeParameter,
+		}
 	})
 
 	function scheduleAnalysis(uri: string) {
