@@ -1,10 +1,15 @@
 import {
 	type Diagnostic,
 	DiagnosticSeverity,
+	type Position,
 	type Range,
 } from "vscode-languageserver"
 
 import type { common } from "../interfaces"
+
+export function toCursor(position: Position): common.Cursor {
+	return { line: position.line + 1, column: position.character + 1 }
+}
 
 // NOTE: Compiler Positions are 1-based, LSP Ranges are 0-based. Diagnostics
 // without a Position are mapped to the very start of the document.
