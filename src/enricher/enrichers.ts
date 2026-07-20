@@ -882,14 +882,21 @@ function enrichParameter(
 ): common.typed.ParameterNode {
 	let type = resolveType(node.type, scope)
 
-	declareVariableInScope(node.internalName, type, scope, true)
+	// NOTE: `_: Type` binds no name, so there is nothing to declare — leaving
+	// it out of Scope is what makes the Parameter unreferenceable rather than
+	// merely unused.
+	if (node.internalName !== null) {
+		declareVariableInScope(node.internalName, type, scope, true)
+	}
 
 	return {
 		nodeType: "Parameter",
 		externalName: node.externalName
 			? enrichIdentifier(node.externalName, scope, type)
 			: null,
-		internalName: enrichIdentifier(node.internalName, scope),
+		internalName: node.internalName
+			? enrichIdentifier(node.internalName, scope)
+			: null,
 		position: node.position,
 	}
 }

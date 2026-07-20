@@ -1060,6 +1060,21 @@ class DescentParser {
 	protected parseParameter(): parser.ParameterNode {
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
+
+			// NOTE: `_: Type` stops at the `_` — it drops the label *and* the
+			// name, leaving a Parameter the body has no way to refer to. `_
+			// name: Type` only drops the label.
+			if (this.tokens.peek()?.type === TokenType.SymbolColon) {
+				this.tokens.next()
+
+				let type = this.parseType()
+
+				return generators.parameter(null, null, type, {
+					start: underscore.position.start,
+					end: type.position.end,
+				})
+			}
+
 			let internalName = this.parseIdentifier()
 
 			this.tokens.expect(TokenType.SymbolColon)

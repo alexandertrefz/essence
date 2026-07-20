@@ -821,6 +821,12 @@ function walkFunctionDefinition(
 	for (let parameter of definition.parameters) {
 		walkTypeDeclaration(parameter.type, functionScope, context)
 
+		// NOTE: `_: Type` declares neither a Parameter name nor a call site
+		// label, so it holds no symbol a rename could reach.
+		if (parameter.internalName === null) {
+			continue
+		}
+
 		if (parameter.externalName === null) {
 			// NOTE: `_` — explicitly label-less.
 			declareInScope(
