@@ -1,6 +1,6 @@
-import { reportError } from "../../diagnostics"
-import { type common, lexer } from "../../interfaces"
-import { Lexer } from "../../lexer"
+import { reportError } from "../../diagnostics/index"
+import { type common, lexer } from "../../interfaces/index"
+import { Lexer } from "../../lexer/index"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token

@@ -1,4 +1,4 @@
-import type { Position } from "./common"
+import type { Position } from "./common/index"
 
 export type Program = {
 	nodeType: "Program"

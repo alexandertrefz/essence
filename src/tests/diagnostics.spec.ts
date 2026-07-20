@@ -6,8 +6,8 @@ import {
 	report,
 	reportError,
 	reportWarning,
-} from "../diagnostics"
-import type { common } from "../interfaces"
+} from "../diagnostics/index"
+import type { common } from "../interfaces/index"
 
 const position: common.Position = {
 	start: { line: 1, column: 1 },

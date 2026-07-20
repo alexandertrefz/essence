@@ -1,5 +1,5 @@
-import { type Cache, Config, Label, Report, Source } from "../ariadne"
-import type { common } from "../interfaces"
+import { type Cache, Config, Label, Report, Source } from "../ariadne/index"
+import type { common } from "../interfaces/index"
 
 export interface RenderOptions {
 	color?: boolean

@@ -1,5 +1,5 @@
-import { reportError } from "../diagnostics"
-import type { common, enricher, parser } from "../interfaces"
+import { reportError } from "../diagnostics/index"
+import type { common, enricher, parser } from "../interfaces/index"
 
 import {
 	resolveCombinationType,

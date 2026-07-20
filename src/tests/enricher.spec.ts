@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
-import { parse } from "../parser"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
+import { parse } from "../parser/index"
 
 function enrichSource(source: string): {
 	program: common.typed.Program

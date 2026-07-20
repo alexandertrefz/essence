@@ -1,4 +1,4 @@
-import type { common } from "../../interfaces"
+import type { common } from "../../interfaces/index"
 
 export const type: common.UnionType = {
 	type: "UnionType",

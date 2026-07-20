@@ -1,6 +1,6 @@
 import deepEqual from "deep-equal"
 
-import { reportError } from "../diagnostics"
+import { reportError } from "../diagnostics/index"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -8,8 +8,8 @@ import {
 	type MatchableArgument,
 	matchArguments,
 	matchesTypeWithBindings,
-} from "../helpers"
-import type { common, enricher, parser } from "../interfaces"
+} from "../helpers/index"
+import type { common, enricher, parser } from "../interfaces/index"
 
 export function resolveType(
 	node:

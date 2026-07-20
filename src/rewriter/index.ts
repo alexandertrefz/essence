@@ -3,7 +3,7 @@ import type { BuildResult } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 
 export async function rewrite(
 	program: common.typedSimple.Program,
@@ -40,7 +40,7 @@ export async function rewrite(
 		},
 	})
 
-	const __dirname = import.meta.dir
+	const __dirname = import.meta.dirname
 
 	const { build } = await import("esbuild")
 
@@ -731,7 +731,7 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	const __dirname = import.meta.dir
+	const __dirname = import.meta.dirname
 
 	return {
 		type: "ImportDeclaration",

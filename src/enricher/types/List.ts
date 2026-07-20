@@ -1,5 +1,5 @@
-import type { common } from "../../interfaces"
-import type { GenericListType, ListType } from "../../interfaces/common"
+import type { GenericListType, ListType } from "../../interfaces/common/index"
+import type { common } from "../../interfaces/index"
 
 export const type: GenericListType = {
 	type: "GenericList",

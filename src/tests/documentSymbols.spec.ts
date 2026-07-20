@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { findDocumentSymbols } from "../lsp/documentSymbols"
-import { parseWithDiagnostics } from "../parser"
+import { parseWithDiagnostics } from "../parser/index"
 
 function symbolsOf(source: string) {
 	let { program } = parseWithDiagnostics(source)

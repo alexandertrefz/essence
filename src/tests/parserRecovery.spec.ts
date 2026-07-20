@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseWithDiagnostics } from "../parser"
+import { parseWithDiagnostics } from "../parser/index"
 
 describe("Parser Recovery", () => {
 	it("should report zero diagnostics for a valid program", () => {

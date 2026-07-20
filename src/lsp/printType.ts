@@ -1,4 +1,4 @@
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { findFoldingRanges } from "../lsp/foldingRanges"
 import { findSelectionRanges } from "../lsp/selectionRanges"
-import { parseWithDiagnostics } from "../parser"
+import { parseWithDiagnostics } from "../parser/index"
 
 function foldingRangesOf(source: string) {
 	let { program } = parseWithDiagnostics(source)

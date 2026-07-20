@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { Source } from "../ariadne"
+import { Source } from "../ariadne/index"
 import { renderDiagnostic, renderDiagnostics } from "../diagnostics/render"
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 
 function removeTrailing(text: string): string {
 	let lines = text.split("\n")

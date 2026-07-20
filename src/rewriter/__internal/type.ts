@@ -1,4 +1,4 @@
-import type { common } from "../../interfaces"
+import type { common } from "../../interfaces/index"
 import type { BooleanType } from "./Boolean"
 import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
