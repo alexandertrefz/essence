@@ -1,4 +1,6 @@
 import {
+	type CompletionItem,
+	CompletionItemKind,
 	createConnection,
 	DocumentHighlightKind,
 	type DocumentSymbol,
@@ -16,6 +18,7 @@ import { enrich } from "../enricher"
 import type { common } from "../interfaces"
 import { parseWithDiagnostics } from "../parser"
 import { analyse } from "./analyse"
+import { type CompletionEntry, findCompletions } from "./completion"
 import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"
 import {
 	type DocumentSymbolEntry,
@@ -24,6 +27,7 @@ import {
 import { findHover } from "./hover"
 import { isSamePosition } from "./positions"
 import {
+	type DeclarationKind,
 	findDefinition,
 	findOccurrence,
 	findOccurrences,
@@ -50,6 +54,9 @@ export function startServer() {
 				referencesProvider: true,
 				documentHighlightProvider: true,
 				documentSymbolProvider: true,
+				completionProvider: {
+					triggerCharacters: [".", ":", "<"],
+				},
 			},
 		}
 	})
@@ -263,6 +270,21 @@ export function startServer() {
 		return findDocumentSymbols(program).map(toLspDocumentSymbol)
 	})
 
+	connection.onCompletion((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		let entries = findCompletions(
+			document.getText(),
+			toCursor(params.position),
+		)
+
+		return entries.map(toLspCompletionItem)
+	})
+
 	function scheduleAnalysis(uri: string) {
 		let pendingTimer = pendingAnalyses.get(uri)
 
@@ -336,5 +358,28 @@ function toLspDocumentSymbol(entry: DocumentSymbolEntry): DocumentSymbol {
 		range: toLspRange(entry.range),
 		selectionRange: toLspRange(entry.selectionRange),
 		children: entry.children.map(toLspDocumentSymbol),
+	}
+}
+
+const completionItemKinds: Record<DeclarationKind, CompletionItemKind> = {
+	constant: CompletionItemKind.Constant,
+	variable: CompletionItemKind.Variable,
+	function: CompletionItemKind.Function,
+	parameter: CompletionItemKind.Variable,
+	namespace: CompletionItemKind.Module,
+	type: CompletionItemKind.Interface,
+	generic: CompletionItemKind.TypeParameter,
+	method: CompletionItemKind.Method,
+	staticMethod: CompletionItemKind.Method,
+	property: CompletionItemKind.Property,
+	member: CompletionItemKind.Field,
+	label: CompletionItemKind.Text,
+}
+
+function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
+	return {
+		label: entry.label,
+		kind: completionItemKinds[entry.kind],
+		detail: entry.detail ?? undefined,
 	}
 }
