@@ -685,22 +685,10 @@ export function enrichNamespaceDefinitionStatement(
 	isHoisted = false,
 ): common.typed.NamespaceDefinitionStatementNode {
 	function enrichProperties(
-		properties: Record<
-			string,
-			{
-				type: parser.TypeDeclarationNode | null
-				value: parser.ExpressionNode
-			}
-		>,
+		properties: Record<string, parser.NamespacePropertyNode>,
 		scope: enricher.Scope,
-	): Record<
-		string,
-		{ type: common.Type; value: common.typed.ExpressionNode }
-	> {
-		let result: Record<
-			string,
-			{ type: common.Type; value: common.typed.ExpressionNode }
-		> = {}
+	): Record<string, common.typed.NamespaceProperty> {
+		let result: Record<string, common.typed.NamespaceProperty> = {}
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
 			let type: common.Type
@@ -715,7 +703,19 @@ export function enrichNamespaceDefinitionStatement(
 				type = resolveType(propertyValue.type, scope)
 			}
 
-			result[propertyKey] = { type, value }
+			result[propertyKey] = {
+				// NOTE: As with a Method, the name is a typed Identifier of
+				// its own so that the cursor can land on it.
+				name: {
+					nodeType: "Identifier",
+					content: propertyKey,
+					position: propertyValue.name.position,
+					type,
+				},
+				type,
+				value,
+				documentation: propertyValue.documentation,
+			}
 		}
 
 		return result
@@ -749,7 +749,12 @@ export function enrichNamespaceDefinitionStatement(
 		targetType: type.targetType,
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
-		methods: enrichMethods(node.methods, methodScope, type.targetType),
+		methods: enrichMethods(
+			node.methods,
+			methodScope,
+			type.targetType,
+			type.methods,
+		),
 		position: node.position,
 		type,
 		documentation: node.documentation,
@@ -949,23 +954,37 @@ function enrichMethods(
 	members: parser.NamespaceMethods,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
+	methodTypes: Record<string, common.MethodType>,
 ): common.typed.Methods {
 	let result: common.typed.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
+		// NOTE: The name is typed as the Method itself, so that whatever
+		// resolves a Type at the cursor describes the Method when the cursor
+		// is on its name.
+		let name: common.typed.IdentifierNode = {
+			nodeType: "Identifier",
+			content: memberKey,
+			position: memberValue.name.position,
+			type: methodTypes[memberKey] ?? { type: "Unknown" },
+		}
+
 		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {
 				nodeType: "SimpleMethod",
+				name,
 				method: enrichMethodFunctionValue(memberValue, scope, selfType),
 			}
 		} else if (memberValue.nodeType === "StaticMethod") {
 			result[memberKey] = {
 				nodeType: "StaticMethod",
+				name,
 				method: enrichMethodFunctionValue(memberValue, scope, selfType),
 			}
 		} else if (memberValue.nodeType === "OverloadedMethod") {
 			result[memberKey] = {
 				nodeType: "OverloadedMethod",
+				name,
 				methods: enrichMethodsFunctionValue(
 					memberValue,
 					scope,
@@ -975,6 +994,7 @@ function enrichMethods(
 		} else {
 			result[memberKey] = {
 				nodeType: "OverloadedStaticMethod",
+				name,
 				methods: enrichMethodsFunctionValue(
 					memberValue,
 					scope,

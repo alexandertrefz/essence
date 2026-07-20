@@ -102,6 +102,59 @@ describe("Hover", () => {
 		)
 	})
 
+	it("should describe a Method by its name in its declaration", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Stringify for Integer {",
+			"\t\tlabel(_ prefix: String) -> String {",
+			"\t\t\t<- prefix",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: The cursor is on `label` itself, which the Namespace also
+		// contains — the Method's name is the smaller node, so it wins.
+		expect(hover(source, { line: 3, column: 4 })).toBe(
+			"label(_ String) -> String",
+		)
+	})
+
+	it("should describe every Overload by the name they share", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing for Integer {",
+			"\t\toverload combine {",
+			"\t\t\t(_ other: Integer) -> Integer {",
+			"\t\t\t\t<- 42",
+			"\t\t\t}",
+			"\t\t\t(_ other: Integer, _ third: Integer) -> Integer {",
+			"\t\t\t\t<- 42",
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 13 })).toBe(
+			"combine(_ Integer) -> Integer\ncombine(_ Integer, _ Integer) -> Integer",
+		)
+	})
+
+	it("should describe a Namespace's static Property by its name", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			'\t\tstatic label = "hi"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 11 })).toBe(
+			"static label: String",
+		)
+	})
+
 	it("should describe a Static Method invocation", () => {
 		let source = [
 			"implementation {",

@@ -439,13 +439,14 @@ class DescentParser {
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {
 		let token = this.peekOrFail()
 
-		if (token.type === TokenType.KeywordOverload) {
-			// NOTE: A block level `§§` documents the Overload set as a whole;
-			// each Overload inside it picks up its own from its first line.
-			let documentation = this.tokens.documentationAbove(
-				token.position.start.line,
-			)
+		// NOTE: A Method takes its Documentation from its own signature line,
+		// which is the same line — but an `overload` block and a static
+		// Property own no signature, so theirs is read here.
+		let documentation = this.tokens.documentationAbove(
+			token.position.start.line,
+		)
 
+		if (token.type === TokenType.KeywordOverload) {
 			this.tokens.next()
 
 			let isStatic = false
@@ -509,7 +510,13 @@ class DescentParser {
 
 			let value = this.parseExpression()
 
-			return { nodeType: "NamespacePropertyNode", name, type, value }
+			return {
+				nodeType: "NamespacePropertyNode",
+				name,
+				documentation,
+				type,
+				value,
+			}
 		}
 
 		let name = this.parseIdentifier()

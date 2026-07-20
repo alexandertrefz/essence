@@ -236,23 +236,37 @@ export interface VariableAssignmentStatementNode {
 	position: Position
 }
 
+export interface NamespaceProperty {
+	name: IdentifierNode
+	type: Type
+	value: ExpressionNode
+	documentation: Documentation | null
+}
+
+// NOTE: The name is kept as an Identifier of its own rather than left to the
+// `Methods` record key — a key carries no Position, so without it nothing can
+// tell that the cursor is on the Method's name.
 export interface SimpleMethod {
 	nodeType: "SimpleMethod"
+	name: IdentifierNode
 	method: FunctionValueNode
 }
 
 export interface StaticMethod {
 	nodeType: "StaticMethod"
+	name: IdentifierNode
 	method: FunctionValueNode
 }
 
 export interface OverloadedMethod {
 	nodeType: "OverloadedMethod"
+	name: IdentifierNode
 	methods: Array<FunctionValueNode>
 }
 
 export interface OverloadedStaticMethod {
 	nodeType: "OverloadedStaticMethod"
+	name: IdentifierNode
 	methods: Array<FunctionValueNode>
 }
 
@@ -265,7 +279,7 @@ export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
 	targetType: Type | null
-	properties: Record<string, { type: Type; value: ExpressionNode }>
+	properties: Record<string, NamespaceProperty>
 	methods: Methods
 	position: Position
 	type: NamespaceType
