@@ -136,14 +136,16 @@ describe("Signature Help", () => {
 
 		let signature = help?.signatures[0]
 
-		expect(signature?.parameters).toEqual([
+		expect(
+			signature?.parameters.map((parameter) => parameter.range),
+		).toEqual([
 			[5, 19],
 			[21, 36],
 		])
 
 		// NOTE: The ranges must index into the label the Editor is shown.
 		expect(
-			signature?.parameters.map(([start, end]) =>
+			signature?.parameters.map(({ range: [start, end] }) =>
 				signature.label.slice(start, end),
 			),
 		).toEqual(["first: Integer", "second: Integer"])

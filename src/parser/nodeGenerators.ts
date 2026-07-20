@@ -264,6 +264,7 @@ export function constantDeclarationStatement(
 	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
+	documentation: common.Documentation | null = null,
 ): parser.ConstantDeclarationStatementNode {
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -271,6 +272,7 @@ export function constantDeclarationStatement(
 		name,
 		value,
 		position,
+		documentation,
 	}
 }
 
@@ -279,6 +281,7 @@ export function variableDeclarationStatement(
 	type: parser.TypeDeclarationNode | null,
 	value: parser.ExpressionNode,
 	position: common.Position,
+	documentation: common.Documentation | null = null,
 ): parser.VariableDeclarationStatementNode {
 	return {
 		nodeType: "VariableDeclarationStatement",
@@ -286,6 +289,7 @@ export function variableDeclarationStatement(
 		name,
 		value,
 		position,
+		documentation,
 	}
 }
 
@@ -303,6 +307,7 @@ export function namespaceDefinitionStatement(
 	targetType: parser.TypeDeclarationNode | null,
 	body: Array<NamespaceProperty | NamespaceMethod>,
 	position: common.Position,
+	documentation: common.Documentation | null = null,
 ): parser.NamespaceDefinitionStatementNode {
 	const properties = body.reduce<NamespaceProperties>((prev, curr) => {
 		if (curr.nodeType === "NamespacePropertyNode") {
@@ -335,12 +340,14 @@ export function namespaceDefinitionStatement(
 					nodeType: "OverloadedMethod",
 					name: curr.name,
 					methods: curr.methods,
+					documentation: curr.documentation,
 				}
 			} else if (curr.nodeType === "OverloadedStaticMethodNode") {
 				prev[curr.name.content] = {
 					nodeType: "OverloadedStaticMethod",
 					name: curr.name,
 					methods: curr.methods,
+					documentation: curr.documentation,
 				}
 			}
 		}
@@ -354,6 +361,7 @@ export function namespaceDefinitionStatement(
 		name,
 		generics,
 		position,
+		documentation,
 		properties,
 		methods,
 	}
@@ -408,8 +416,16 @@ export function typeAliasStatement(
 	generics: Array<parser.GenericDeclarationNode>,
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
+	documentation: common.Documentation | null = null,
 ): parser.TypeAliasStatementNode {
-	return { nodeType: "TypeAliasStatement", name, generics, type, position }
+	return {
+		nodeType: "TypeAliasStatement",
+		name,
+		generics,
+		type,
+		position,
+		documentation,
+	}
 }
 
 // #endregion
@@ -548,6 +564,7 @@ export function genericFunctionDefinition(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
 	body: Array<parser.ImplementationNode>,
+	documentation: common.Documentation | null = null,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
@@ -555,6 +572,7 @@ export function genericFunctionDefinition(
 		parameters,
 		returnType,
 		body,
+		documentation,
 	}
 }
 
@@ -562,6 +580,7 @@ export function functionDefinition(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
 	body: Array<parser.ImplementationNode>,
+	documentation: common.Documentation | null = null,
 ): parser.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
@@ -569,6 +588,7 @@ export function functionDefinition(
 		parameters,
 		returnType,
 		body,
+		documentation,
 	}
 }
 
@@ -577,6 +597,7 @@ export function parameter(
 	internalName: parser.IdentifierNode | null,
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
+	documentation: common.Documentation | null = null,
 ): parser.ParameterNode {
 	return {
 		nodeType: "Parameter",
@@ -584,6 +605,7 @@ export function parameter(
 		internalName,
 		type,
 		position,
+		documentation,
 	}
 }
 
@@ -654,12 +676,14 @@ type OverloadedMethodNode = {
 	nodeType: "OverloadedMethodNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode>
+	documentation: common.Documentation | null
 }
 
 type OverloadedStaticMethodNode = {
 	nodeType: "OverloadedStaticMethodNode"
 	name: parser.IdentifierNode
 	methods: Array<parser.FunctionValueNode>
+	documentation: common.Documentation | null
 }
 
 type NamespaceProperty = {

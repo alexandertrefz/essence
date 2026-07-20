@@ -56,9 +56,16 @@ export const namespace: common.NamespaceType = {
 						{
 							name: null,
 							type: { type: "Integer" },
+							documentation: "the Integer to add",
 						},
 					],
 					returnType: { type: "Integer" },
+					documentation: {
+						description: "Adds two Integers, giving an Integer.",
+						parameters: {},
+						returns: null,
+						position: null,
+					},
 				},
 				{
 					generics: [],
@@ -70,11 +77,25 @@ export const namespace: common.NamespaceType = {
 						{
 							name: null,
 							type: { type: "Fraction" },
+							documentation: "the Fraction to add",
 						},
 					],
 					returnType: { type: "Fraction" },
+					documentation: {
+						description:
+							"Adds a Fraction to an Integer. The result is a Fraction, since the sum need not be whole.",
+						parameters: {},
+						returns: null,
+						position: null,
+					},
 				},
 			],
+			documentation: {
+				description: "Adds a number to this Integer.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 		},
 
 		subtract: {

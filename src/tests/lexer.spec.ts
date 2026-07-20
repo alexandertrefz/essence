@@ -182,6 +182,28 @@ describe("Lexer", () => {
 				stripPositionFromArray([lexer.next(), lexer.next()]),
 			).toEqual(output)
 		})
+
+		it("should lex a doubled sigil as a Documentation Comment", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("§§ Documentation")
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "§§ Documentation",
+				type: TokenType.DocComment,
+			})
+		})
+
+		it("should still lex a spaced out sigil as an ordinary Comment", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("§ § not documentation")
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "§ § not documentation",
+				type: TokenType.Comment,
+			})
+		})
 	})
 
 	describe("Identifiers", () => {

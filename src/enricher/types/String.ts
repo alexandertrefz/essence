@@ -19,6 +19,12 @@ export const namespace: common.NamespaceType = {
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description: "Whether this String has no characters at all.",
+				parameters: {},
+				returns: "true for the empty String, false otherwise",
+				position: null,
+			},
 		},
 		hasAnyContent: {
 			type: "SimpleMethod",
@@ -87,9 +93,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to add to the end",
 				},
 			],
 			returnType: { type: "String" },
+			documentation: {
+				description:
+					"Joins another String onto the end of this one.\n\nNeither String is changed — the joined result is returned.",
+				parameters: {},
+				returns: "the two Strings joined together",
+				position: null,
+			},
 		},
 		splitOn: {
 			type: "SimpleMethod",

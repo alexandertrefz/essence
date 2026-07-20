@@ -11,6 +11,21 @@ export type Position = {
 	end: Cursor
 }
 
+// NOTE: What a `§§` block above a Declaration says about it. `description` is
+// Markdown, as the Language Server hands it to the Editor unchanged; the
+// tagged sections are lifted out of it so that each can be shown where it
+// belongs — a Parameter's text next to that Parameter rather than in one
+// undifferentiated blob.
+export type Documentation = {
+	description: string
+	parameters: Record<string, string>
+	returns: string | null
+	// NOTE: Null for the hand written builtin Namespaces — they document
+	// themselves in TypeScript rather than in a `§§` block, so there is no
+	// Essence source to point back at.
+	position: Position | null
+}
+
 export type DiagnosticSeverity = "error" | "warning"
 
 // NOTE: `unnecessary` renders the code greyed out rather than underlined —
@@ -80,21 +95,23 @@ export type ListType = {
 	itemType: Type
 }
 
-type Parameter = {
+export type Parameter = {
 	type: Type | GenericUse
 	name: string | null
+	// NOTE: What the Declaration's `§§` block says about this Parameter, so
+	// Signature Help can describe the Argument being typed rather than the
+	// call as a whole.
+	documentation?: string
 }
 
+// NOTE: `documentation` is optional throughout, so that the hand written
+// builtin Namespaces in `enricher/types` stay valid while they are documented
+// one Method at a time.
 export type BaseFunction = {
-	parameterTypes: Array<
-		| Parameter
-		| {
-				type: GenericUse
-				name: string | null
-		  }
-	>
+	parameterTypes: Array<Parameter>
 	generics: Array<GenericDeclaration>
 	returnType: Type | GenericUse
+	documentation?: Documentation
 }
 
 export type FunctionType = BaseFunction & {
@@ -109,14 +126,19 @@ export type StaticMethodType = BaseFunction & {
 	type: "StaticMethod"
 }
 
+// NOTE: The Overloaded kinds are not `BaseFunction`s, so a `§§` block above
+// the `overload` keyword documents the set as a whole — each Overload
+// separately documents itself, and falls back to the set's text.
 export type OverloadedStaticMethodType = {
 	type: "OverloadedStaticMethod"
 	overloads: Array<BaseFunction>
+	documentation?: Documentation
 }
 
 export type OverloadedMethodType = {
 	type: "OverloadedMethod"
 	overloads: Array<BaseFunction>
+	documentation?: Documentation
 }
 
 export type MethodType =
