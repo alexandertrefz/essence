@@ -4,7 +4,6 @@ import {
 	resolveCombinationType,
 	resolveFunctionValueType,
 	resolveListValueType,
-	resolveMatchType,
 	resolveMethodInvocation,
 	resolveNamespaceDefinitionStatementType,
 	resolveRecordValueType,

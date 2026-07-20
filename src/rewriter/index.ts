@@ -746,32 +746,6 @@ function internalImport(
 	}
 }
 
-function importSpecifier(variableName: string): estree.ImportSpecifier {
-	return {
-		type: "ImportSpecifier",
-		local: {
-			type: "Identifier",
-			name: variableName,
-		},
-		imported: {
-			type: "Identifier",
-			name: variableName,
-		},
-	}
-}
-
-function importDefaultSpecifier(
-	variableName: string,
-): estree.ImportDefaultSpecifier {
-	return {
-		type: "ImportDefaultSpecifier",
-		local: {
-			type: "Identifier",
-			name: variableName,
-		},
-	}
-}
-
 function importNamespaceSpecifier(
 	variableName: string,
 ): estree.ImportNamespaceSpecifier {
