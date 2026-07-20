@@ -7,6 +7,7 @@ import {
 	findDefinition,
 	findOccurrences,
 	findRenameableOccurrence,
+	identifierPattern,
 	isValidIdentifierName,
 } from "../lsp/rename"
 import { parseWithDiagnostics } from "../parser"
@@ -765,5 +766,34 @@ describe("findOccurrences (Document Highlight)", () => {
 		)
 
 		expect(occurrencesOf(source, { line: 2, column: 2 })).toEqual([])
+	})
+})
+
+describe("identifierPattern", () => {
+	// NOTE: Editors get this as a word pattern, so it has to agree with
+	// `isValidIdentifierName` on what one whole Identifier is.
+	function wholeMatch(text: string) {
+		return new RegExp(`^(?:${identifierPattern})$`).test(text)
+	}
+
+	it("should match a whole plain Identifier", () => {
+		expect(wholeMatch("value")).toBe(true)
+		expect(wholeMatch("Name2")).toBe(true)
+	})
+
+	it("should stop at the Symbols the Lexer treats as separators", () => {
+		expect(wholeMatch("with_underscore")).toBe(false)
+		expect(wholeMatch("with-dash")).toBe(false)
+		expect(wholeMatch("a.b")).toBe(false)
+		expect(wholeMatch("two words")).toBe(false)
+	})
+
+	it("should select only the Identifier out of surrounding syntax", () => {
+		expect(
+			"person.firstName".match(new RegExp(identifierPattern, "g")),
+		).toEqual(["person", "firstName"])
+		expect(
+			"42::string()".match(new RegExp(identifierPattern, "g")),
+		).toEqual(["42", "string"])
 	})
 })
