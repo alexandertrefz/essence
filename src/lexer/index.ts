@@ -38,6 +38,7 @@ const orHelper = (
 const linebreak = "\n"
 const stringLiteral = '"'
 const commentLiteral = "§"
+const documentationLiteral = "§§"
 const booleans = ["true", "false"]
 const nothing = "nothing"
 const keywords = [
@@ -341,6 +342,14 @@ const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 
 	input = input.slice(i + 1)
 	token.position.end = cursor
+
+	// NOTE: Doubling the sigil turns a private note into Documentation of
+	// whatever is declared below it. The distinction is made here rather than
+	// by a separate sub-lexer because the two are lexed identically — only the
+	// Token type differs, and only the Parser cares.
+	if (token.value.startsWith(documentationLiteral)) {
+		token.type = TokenType.DocComment
+	}
 
 	return {
 		input,

@@ -625,6 +625,7 @@ export function enrichConstantDeclarationStatement(
 		position: node.position,
 		type: resolveType(node.value, scope),
 		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
+		documentation: node.documentation,
 	}
 }
 
@@ -653,6 +654,7 @@ export function enrichVariableDeclarationStatement(
 		position: node.position,
 		type: resolveType(node.value, scope),
 		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
+		documentation: node.documentation,
 	}
 }
 
@@ -750,6 +752,7 @@ export function enrichNamespaceDefinitionStatement(
 		methods: enrichMethods(node.methods, methodScope, type.targetType),
 		position: node.position,
 		type,
+		documentation: node.documentation,
 	}
 }
 
@@ -769,6 +772,7 @@ export function enrichTypeAliasStatement(
 		name: enrichIdentifier(node.name, scope, type),
 		type,
 		position: node.position,
+		documentation: node.documentation,
 	}
 }
 

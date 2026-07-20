@@ -780,19 +780,9 @@ export function resolveFunctionDefinitionType(
 	return {
 		type: "Function",
 		generics: resolveGenericDeclarations(node.generics, scope),
-		parameterTypes: node.parameters.map((parameter) => {
-			let name = null
-
-			if (parameter.externalName !== null) {
-				name = parameter.externalName.content
-			}
-
-			return {
-				name,
-				type: resolveType(parameter.type, functionScope),
-			}
-		}),
+		parameterTypes: resolveParameterTypes(node, functionScope),
 		returnType: resolveType(node.returnType, functionScope),
+		documentation: node.documentation ?? undefined,
 	}
 }
 
@@ -1158,6 +1148,44 @@ export function resolveMethodLookupBaseNamespaces(
 // NOTE: The enclosing Namespace's Generics are merged into every Method
 // signature, so that each signature is self-contained for inference — the
 // receiver Argument re-binds them on every invocation.
+// NOTE: The Parameter Types of a signature, carrying whatever documents each
+// Parameter. A Parameter is described either by a `§§` block of its own or by
+// an `@param` in the Declaration's — the tag is looked up under both names,
+// since a call site writes the external one and the body reads the internal
+// one.
+function resolveParameterTypes(
+	definition: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+): Array<common.Parameter> {
+	return definition.parameters.map((parameter) => ({
+		name: parameter.externalName?.content ?? null,
+		type: resolveType(parameter.type, scope),
+		documentation: parameterDocumentation(
+			parameter,
+			definition.documentation,
+		),
+	}))
+}
+
+function parameterDocumentation(
+	parameter: parser.ParameterNode,
+	documentation: common.Documentation | null,
+): string | undefined {
+	if (parameter.documentation !== null) {
+		return parameter.documentation.description
+	}
+
+	for (let name of [parameter.externalName, parameter.internalName]) {
+		let tagged = documentation?.parameters[name?.content ?? ""]
+
+		if (tagged !== undefined) {
+			return tagged
+		}
+	}
+
+	return undefined
+}
+
 export function resolveMethodType(
 	node:
 		| parser.SimpleMethod
@@ -1191,20 +1219,10 @@ export function resolveMethodType(
 			],
 			parameterTypes: [
 				{ name: null, type: selfType },
-				...node.method.value.parameters.map((param) => {
-					let name = null
-
-					if (param.externalName !== null) {
-						name = param.externalName.content
-					}
-
-					return {
-						name,
-						type: resolveType(param.type, methodScope),
-					}
-				}),
+				...resolveParameterTypes(node.method.value, methodScope),
 			],
 			returnType: resolveType(node.method.value.returnType, methodScope),
+			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "StaticMethod") {
 		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
@@ -1218,19 +1236,12 @@ export function resolveMethodType(
 					scope,
 				),
 			],
-			parameterTypes: node.method.value.parameters.map((param) => {
-				let name = null
-
-				if (param.externalName !== null) {
-					name = param.externalName.content
-				}
-
-				return {
-					name,
-					type: resolveType(param.type, methodScope),
-				}
-			}),
+			parameterTypes: resolveParameterTypes(
+				node.method.value,
+				methodScope,
+			),
 			returnType: resolveType(node.method.value.returnType, methodScope),
+			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
 		if (selfType === null) {
@@ -1262,27 +1273,16 @@ export function resolveMethodType(
 					],
 					parameterTypes: [
 						{ name: null, type: methodSelfType },
-						...method.value.parameters.map((parameter) => {
-							let name: string | null
-
-							if (parameter.externalName !== null) {
-								name = parameter.externalName.content
-							} else {
-								name = null
-							}
-
-							return {
-								name,
-								type: resolveType(parameter.type, methodScope),
-							}
-						}),
+						...resolveParameterTypes(method.value, methodScope),
 					],
 					returnType: resolveType(
 						method.value.returnType,
 						methodScope,
 					),
+					documentation: method.value.documentation ?? undefined,
 				}
 			}),
+			documentation: node.documentation ?? undefined,
 		}
 	} else {
 		return {
@@ -1301,26 +1301,18 @@ export function resolveMethodType(
 							scope,
 						),
 					],
-					parameterTypes: method.value.parameters.map((parameter) => {
-						let name: string | null
-
-						if (parameter.externalName !== null) {
-							name = parameter.externalName.content
-						} else {
-							name = null
-						}
-
-						return {
-							name,
-							type: resolveType(parameter.type, methodScope),
-						}
-					}),
+					parameterTypes: resolveParameterTypes(
+						method.value,
+						methodScope,
+					),
 					returnType: resolveType(
 						method.value.returnType,
 						methodScope,
 					),
+					documentation: method.value.documentation ?? undefined,
 				}
 			}),
+			documentation: node.documentation ?? undefined,
 		}
 	}
 }

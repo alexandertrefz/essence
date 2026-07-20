@@ -133,8 +133,10 @@ export function applyGenericBindings(
 		case "StaticMethod":
 			return {
 				...type,
+				// NOTE: Spread rather than rebuilt — a Parameter carries what
+				// documents it, and binding a Generic must not lose that.
 				parameterTypes: type.parameterTypes.map((parameter) => ({
-					name: parameter.name,
+					...parameter,
 					type: applyGenericBindings(parameter.type, bindings),
 				})),
 				returnType: applyGenericBindings(type.returnType, bindings),
@@ -147,7 +149,7 @@ export function applyGenericBindings(
 					...overload,
 					parameterTypes: overload.parameterTypes.map(
 						(parameter) => ({
-							name: parameter.name,
+							...parameter,
 							type: applyGenericBindings(
 								parameter.type,
 								bindings,

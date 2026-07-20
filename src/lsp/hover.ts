@@ -1,4 +1,5 @@
 import type { common } from "../interfaces/index"
+import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
 import { printSignature, printType, signaturesOf } from "./printType"
 
@@ -15,6 +16,7 @@ import { printSignature, printType, signaturesOf } from "./printType"
 export type HoverInfo = {
 	position: common.Position
 	content: string
+	documentation: string | null
 }
 
 type State = {
@@ -38,6 +40,7 @@ function consider(
 	position: common.Position,
 	type: common.Type,
 	label: string | null,
+	declared: common.Documentation | null = null,
 ) {
 	if (!wins(state, position)) {
 		return
@@ -45,14 +48,23 @@ function consider(
 
 	let signatures = signaturesOf(type)
 
+	if (signatures !== null) {
+		state.best = {
+			position,
+			content: describeSignatures(signatures, label ?? ""),
+			documentation: renderDocumentation(
+				documentationFor(signatures, documentationOf(type) ?? declared),
+			),
+		}
+
+		return
+	}
+
 	state.best = {
 		position,
 		content:
-			signatures !== null
-				? describeSignatures(signatures, label ?? "")
-				: label === null
-					? printType(type)
-					: `${label}: ${printType(type)}`,
+			label === null ? printType(type) : `${label}: ${printType(type)}`,
+		documentation: renderDocumentation(declared),
 	}
 }
 
@@ -61,12 +73,33 @@ function considerSignatures(
 	position: common.Position,
 	signatures: Array<common.BaseFunction>,
 	label: string,
+	fallback: common.Documentation | null,
 ) {
 	if (!wins(state, position)) {
 		return
 	}
 
-	state.best = { position, content: describeSignatures(signatures, label) }
+	state.best = {
+		position,
+		content: describeSignatures(signatures, label),
+		documentation: renderDocumentation(
+			documentationFor(signatures, fallback),
+		),
+	}
+}
+
+// NOTE: Once the Arguments have narrowed an Overload set to one signature its
+// own text is what applies, falling back to whatever documents the set as a
+// whole. With the set still open only the shared text can be meant.
+function documentationFor(
+	signatures: Array<common.BaseFunction>,
+	fallback: common.Documentation | null,
+): common.Documentation | null {
+	if (signatures.length !== 1) {
+		return fallback
+	}
+
+	return signatures[0].documentation ?? fallback
 }
 
 // NOTE: Ties go to the newer candidate — children are visited after their
@@ -106,8 +139,14 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			consider(state, node.position, node.type, node.name.content)
-			visitIdentifier(node.name, state)
+			consider(
+				state,
+				node.position,
+				node.type,
+				node.name.content,
+				node.documentation,
+			)
+			visitIdentifier(node.name, state, undefined, node.documentation)
 			visitNode(node.value, state)
 			return
 		case "VariableAssignmentStatement":
@@ -127,8 +166,14 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitFunctionDefinition(node.value, state)
 			return
 		case "NamespaceDefinitionStatement":
-			consider(state, node.position, node.type, node.name.content)
-			visitIdentifier(node.name, state)
+			consider(
+				state,
+				node.position,
+				node.type,
+				node.name.content,
+				node.documentation,
+			)
+			visitIdentifier(node.name, state, undefined, node.documentation)
 
 			for (let property of Object.values(node.properties)) {
 				visitNode(property.value, state)
@@ -155,8 +200,14 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "TypeAliasStatement":
-			consider(state, node.position, node.type, node.name.content)
-			visitIdentifier(node.name, state)
+			consider(
+				state,
+				node.position,
+				node.type,
+				node.name.content,
+				node.documentation,
+			)
+			visitIdentifier(node.name, state, undefined, node.documentation)
 			return
 		case "IfStatement":
 			visitNode(node.condition, state)
@@ -192,6 +243,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					node.member.position,
 					signatures,
 					node.member.name,
+					documentationOf(
+						node.namespace.type.methods[node.member.name],
+					),
 				)
 			}
 
@@ -259,8 +313,9 @@ function visitIdentifier(
 	node: common.typed.IdentifierNode,
 	state: State,
 	label: string = node.content,
+	declared: common.Documentation | null = null,
 ) {
-	consider(state, node.position, node.type, label)
+	consider(state, node.position, node.type, label, declared)
 }
 
 function visitArguments(

@@ -2690,6 +2690,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
         },
         "value": {
           "body": [],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [],
@@ -2795,10 +2796,12 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -2969,10 +2972,12 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "internal",
                 "nodeType": "Identifier",
@@ -3143,10 +3148,12 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": null,
               "internalName": {
                 "content": "internal",
@@ -3304,10 +3311,12 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -3376,6 +3385,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
               },
             },
             {
+              "documentation": null,
               "externalName": {
                 "content": "external2",
                 "nodeType": "Identifier",
@@ -3518,6 +3528,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
         },
         "value": {
           "body": [],
+          "documentation": null,
           "generics": [
             {
               "defaultType": null,
@@ -3653,6 +3664,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
+          "documentation": null,
           "generics": [
             {
               "defaultType": null,
@@ -3687,6 +3699,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -3857,6 +3870,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
+          "documentation": null,
           "generics": [
             {
               "defaultType": null,
@@ -3891,6 +3905,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "internal",
                 "nodeType": "Identifier",
@@ -4061,6 +4076,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
               },
             },
           ],
+          "documentation": null,
           "generics": [
             {
               "defaultType": null,
@@ -4095,6 +4111,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": null,
               "internalName": {
                 "content": "internal",
@@ -4252,6 +4269,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
               },
             },
           ],
+          "documentation": null,
           "generics": [
             {
               "defaultType": null,
@@ -4286,6 +4304,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -4354,6 +4373,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
               },
             },
             {
+              "documentation": null,
               "externalName": {
                 "content": "external2",
                 "nodeType": "Identifier",
@@ -7313,6 +7333,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -7386,6 +7407,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -7485,6 +7507,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -7572,6 +7595,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -7734,6 +7758,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8001,6 +8026,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8074,6 +8100,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8173,6 +8200,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8260,6 +8288,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8422,6 +8451,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "identifier",
           "nodeType": "Identifier",
@@ -8689,6 +8719,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "with",
           "nodeType": "Identifier",
@@ -8762,6 +8793,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "case",
           "nodeType": "Identifier",
@@ -8835,6 +8867,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "name": {
           "content": "static",
           "nodeType": "Identifier",
@@ -8980,6 +9013,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -9042,6 +9076,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -9136,6 +9171,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -9261,6 +9297,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -9306,10 +9343,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -9484,6 +9523,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -9529,10 +9569,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -9689,10 +9731,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -9867,9 +9911,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -9913,10 +9959,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -10056,10 +10104,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -10235,9 +10285,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -10281,10 +10333,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -10424,10 +10478,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -10567,10 +10623,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "item",
                         "nodeType": "Identifier",
@@ -10746,6 +10804,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -10791,10 +10850,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -11001,6 +11062,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -11089,6 +11151,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -11209,6 +11272,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {},
         "name": {
@@ -11360,6 +11424,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -11405,10 +11470,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -11609,6 +11676,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -11654,10 +11722,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -11814,10 +11884,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -12018,9 +12090,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -12064,10 +12138,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -12207,10 +12283,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -12412,9 +12490,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -12458,10 +12538,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -12601,10 +12683,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -12744,10 +12828,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "item",
                         "nodeType": "Identifier",
@@ -12949,6 +13035,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -12994,10 +13081,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -13230,6 +13319,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -13275,10 +13365,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -13479,6 +13571,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -13524,10 +13617,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -13684,10 +13779,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -13888,9 +13985,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -13934,10 +14033,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -14077,10 +14178,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -14282,9 +14385,11 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
+            "documentation": null,
             "methods": [
               {
                 "nodeType": "FunctionValue",
@@ -14328,10 +14433,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "parameter",
                         "nodeType": "Identifier",
@@ -14471,10 +14578,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "name",
                         "nodeType": "Identifier",
@@ -14614,10 +14723,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   ],
+                  "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
                   "parameters": [
                     {
+                      "documentation": null,
                       "externalName": {
                         "content": "item",
                         "nodeType": "Identifier",
@@ -14819,6 +14930,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -14864,10 +14976,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -15100,6 +15214,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "methods": {
           "method": {
@@ -15145,10 +15260,12 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                     },
                   },
                 ],
+                "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
+                    "documentation": null,
                     "externalName": {
                       "content": "parameter",
                       "nodeType": "Identifier",
@@ -15381,6 +15498,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "name": {
           "content": "Type",
@@ -15467,6 +15585,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "name": {
           "content": "Type",
@@ -15540,6 +15659,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "name": {
           "content": "Type",
@@ -15657,6 +15777,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "documentation": null,
         "generics": [],
         "name": {
           "content": "Type",
@@ -15874,6 +15995,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
         },
         "value": {
           "body": [],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [],
@@ -15993,10 +16115,12 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -16181,10 +16305,12 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "internal",
                 "nodeType": "Identifier",
@@ -16369,10 +16495,12 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": null,
               "internalName": {
                 "content": "internal",
@@ -16544,10 +16672,12 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
           ],
+          "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
           "parameters": [
             {
+              "documentation": null,
               "externalName": {
                 "content": "external",
                 "nodeType": "Identifier",
@@ -16616,6 +16746,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
               },
             },
             {
+              "documentation": null,
               "externalName": {
                 "content": "external2",
                 "nodeType": "Identifier",

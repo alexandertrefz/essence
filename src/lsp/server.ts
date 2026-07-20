@@ -8,6 +8,7 @@ import {
 	ErrorCodes,
 	InlayHintKind,
 	InsertTextFormat,
+	type MarkupContent,
 	type Position,
 	ProposedFeatures,
 	ResponseError,
@@ -222,11 +223,18 @@ export function startServer() {
 			return null
 		}
 
+		// NOTE: The signature goes in a code fence so the Editor highlights
+		// it; the Documentation below the rule is Markdown as written.
+		let signature = `\`\`\`essence\n${hover.content}\n\`\`\``
+
 		return {
 			range: toLspRange(hover.position),
 			contents: {
 				kind: "markdown" as const,
-				value: `\`\`\`essence\n${hover.content}\n\`\`\``,
+				value:
+					hover.documentation === null
+						? signature
+						: `${signature}\n\n---\n\n${hover.documentation}`,
 			},
 		}
 	})
@@ -430,8 +438,10 @@ export function startServer() {
 		return {
 			signatures: help.signatures.map((signature) => ({
 				label: signature.label,
-				parameters: signature.parameters.map((range) => ({
-					label: range,
+				documentation: toMarkdown(signature.documentation),
+				parameters: signature.parameters.map((parameter) => ({
+					label: parameter.range,
+					documentation: toMarkdown(parameter.documentation),
 				})),
 			})),
 			activeSignature: help.activeSignature,
@@ -493,6 +503,14 @@ export function startServer() {
 	connection.listen()
 }
 
+function toMarkdown(documentation: string | null): MarkupContent | undefined {
+	if (documentation === null) {
+		return undefined
+	}
+
+	return { kind: "markdown", value: documentation }
+}
+
 const symbolKinds: Record<DocumentSymbolEntry["kind"], SymbolKind> = {
 	constant: SymbolKind.Constant,
 	variable: SymbolKind.Variable,
@@ -544,6 +562,7 @@ function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 			label: entry.label,
 			kind: completionItemKinds[entry.kind],
 			detail: entry.detail ?? undefined,
+			documentation: toMarkdown(entry.documentation ?? null),
 		}
 	}
 
@@ -551,6 +570,7 @@ function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 		label: entry.label,
 		kind: completionItemKinds[entry.kind],
 		detail: entry.detail ?? undefined,
+		documentation: toMarkdown(entry.documentation ?? null),
 		insertText: `${entry.label}($0)`,
 		insertTextFormat: InsertTextFormat.Snippet,
 	}

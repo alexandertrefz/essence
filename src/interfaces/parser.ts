@@ -1,4 +1,4 @@
-import type { Position } from "./common/index"
+import type { Documentation, Position } from "./common/index"
 
 export type Program = {
 	nodeType: "Program"
@@ -223,6 +223,7 @@ export interface ConstantDeclarationStatementNode {
 	type: TypeDeclarationNode | null
 	value: ExpressionNode
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface VariableDeclarationStatementNode {
@@ -231,6 +232,7 @@ export interface VariableDeclarationStatementNode {
 	type: TypeDeclarationNode | null
 	value: ExpressionNode
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface VariableAssignmentStatementNode {
@@ -256,12 +258,14 @@ export interface OverloadedMethod {
 	nodeType: "OverloadedMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	documentation: Documentation | null
 }
 
 export interface OverloadedStaticMethod {
 	nodeType: "OverloadedStaticMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	documentation: Documentation | null
 }
 
 export type NamespaceMethods = Record<
@@ -283,6 +287,7 @@ export interface NamespaceDefinitionStatementNode {
 	properties: Record<string, NamespacePropertyNode>
 	methods: NamespaceMethods
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface TypeAliasStatementNode {
@@ -291,6 +296,7 @@ export interface TypeAliasStatementNode {
 	generics: Array<GenericDeclarationNode>
 	type: TypeDeclarationNode
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface IfElseStatementNode {
@@ -401,6 +407,7 @@ export interface FunctionDefinitionNode {
 	generics: Array<GenericDeclarationNode>
 	returnType: TypeDeclarationNode
 	body: Array<ImplementationNode>
+	documentation: Documentation | null
 }
 
 // NOTE: `internalName` is null for `_: Type`, which binds no name at all —
@@ -413,6 +420,7 @@ export interface ParameterNode {
 	internalName: IdentifierNode | null
 	type: TypeDeclarationNode
 	position: Position
+	documentation: Documentation | null
 }
 
 export interface ArgumentNode {
