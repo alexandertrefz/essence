@@ -1,5 +1,5 @@
 import * as path from "node:path"
-import { type BuildResult, build } from "esbuild"
+import type { BuildResult } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
@@ -41,6 +41,8 @@ export async function rewrite(
 	})
 
 	const __dirname = import.meta.dir
+
+	const { build } = await import("esbuild")
 
 	return build({
 		stdin: {
