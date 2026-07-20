@@ -504,15 +504,27 @@ function simplifyMethods(
 	return result
 }
 
+// NOTE: A Parameter that binds no name still occupies a position in the
+// emitted Function, so it needs *some* name to be generated. Any unique one
+// will do, precisely because nothing can reference it — and `_0` can not
+// collide with a user Identifier, since `_` lexes as a Symbol and so can never
+// start one.
 function simplifyParameter(
 	node: common.typed.ParameterNode,
+	index: number,
 ): common.typedSimple.ParameterNode {
 	return {
 		nodeType: "Parameter",
 		externalName: node.externalName
 			? simplifyIdentifier(node.externalName)
 			: null,
-		internalName: simplifyIdentifier(node.internalName),
+		internalName: node.internalName
+			? simplifyIdentifier(node.internalName)
+			: {
+					nodeType: "Identifier",
+					name: `_${index}`,
+					type: { type: "Unknown" },
+				},
 	}
 }
 
@@ -521,7 +533,9 @@ function simplifyFunctionDefinition(
 ): common.typedSimple.FunctionDefinitionNode {
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((param) => simplifyParameter(param)),
+		parameters: node.parameters.map((param, index) =>
+			simplifyParameter(param, index),
+		),
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
 	}

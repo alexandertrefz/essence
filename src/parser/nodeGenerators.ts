@@ -542,7 +542,7 @@ export function functionDefinition(
 
 export function parameter(
 	externalName: parser.IdentifierNode | null,
-	internalName: parser.IdentifierNode,
+	internalName: parser.IdentifierNode | null,
 	type: parser.TypeDeclarationNode,
 	position: common.Position,
 ): parser.ParameterNode {

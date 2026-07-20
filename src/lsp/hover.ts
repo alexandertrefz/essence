@@ -229,7 +229,9 @@ function visitFunctionDefinition(
 			visitIdentifier(parameter.externalName, state)
 		}
 
-		visitIdentifier(parameter.internalName, state)
+		if (parameter.internalName !== null) {
+			visitIdentifier(parameter.internalName, state)
+		}
 	}
 
 	visitBody(definition.body, state)

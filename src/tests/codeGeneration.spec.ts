@@ -104,4 +104,42 @@ describe("Code Generation", () => {
 			expect(generated).toContain("nothing")
 		})
 	})
+
+	describe("Nameless Parameters", () => {
+		it("gives every nameless Parameter its own emitted name", () => {
+			let generated = generate(`
+				implementation {
+					function f(_: Integer, _: String, _: Boolean) -> Integer {
+						<- 1
+					}
+
+					__print(f(1, "a", true))
+				}
+			`)
+
+			// NOTE: Distinct placeholders — two Parameters sharing a name
+			// would be a redeclaration in the emitted Function.
+			expect(generated).toContain("_0")
+			expect(generated).toContain("_1")
+			expect(generated).toContain("_2")
+		})
+
+		// NOTE: The reason the form is worth having — in a Function Type there
+		// is no body, so a Parameter name could never be referred to anyway.
+		it("accepts a nameless Parameter in a Function Type", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						function apply(_ transform: (_: Integer) -> String) -> String {
+							<- transform(1)
+						}
+
+						__print(apply((_ value: Integer) -> String {
+							<- value::toString()
+						}))
+					}
+				`),
+			).not.toThrow()
+		})
+	})
 })
