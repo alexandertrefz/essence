@@ -2363,16 +2363,32 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
         "rhs": {
           "members": {
             "someKey": {
-              "content": "someValue",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 49,
-                  "line": 1,
+              "name": {
+                "content": "someKey",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 30,
+                    "line": 1,
+                  },
                 },
-                "start": {
-                  "column": 40,
-                  "line": 1,
+              },
+              "value": {
+                "content": "someValue",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 49,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 40,
+                    "line": 1,
+                  },
                 },
               },
             },
@@ -2451,16 +2467,32 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
         "rhs": {
           "members": {
             "someKey": {
-              "content": "someValue",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 49,
-                  "line": 1,
+              "name": {
+                "content": "someKey",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 30,
+                    "line": 1,
+                  },
                 },
-                "start": {
-                  "column": 40,
-                  "line": 1,
+              },
+              "value": {
+                "content": "someValue",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 49,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 40,
+                    "line": 1,
+                  },
                 },
               },
             },
@@ -2539,30 +2571,62 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
         "rhs": {
           "members": {
             "someKey": {
-              "content": "someValue",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 49,
-                  "line": 1,
+              "name": {
+                "content": "someKey",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 30,
+                    "line": 1,
+                  },
                 },
-                "start": {
-                  "column": 40,
-                  "line": 1,
+              },
+              "value": {
+                "content": "someValue",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 49,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 40,
+                    "line": 1,
+                  },
                 },
               },
             },
             "someOtherKey": {
-              "content": "someOtherValue",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 80,
-                  "line": 1,
+              "name": {
+                "content": "someOtherKey",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 63,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 51,
+                    "line": 1,
+                  },
                 },
-                "start": {
-                  "column": 66,
-                  "line": 1,
+              },
+              "value": {
+                "content": "someOtherValue",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 80,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 66,
+                    "line": 1,
+                  },
                 },
               },
             },
@@ -4421,16 +4485,32 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 31,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 20,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 26,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 26,
+                  "line": 1,
+                },
               },
             },
           },
@@ -4482,16 +4562,32 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 31,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 20,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 26,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 26,
+                  "line": 1,
+                },
               },
             },
           },
@@ -4543,30 +4639,62 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 31,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 20,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 26,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 26,
+                  "line": 1,
+                },
               },
             },
           },
           "key2": {
-            "content": "value2",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 46,
-                "line": 1,
+            "name": {
+              "content": "key2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 37,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 33,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 40,
-                "line": 1,
+            },
+            "value": {
+              "content": "value2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 46,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 40,
+                  "line": 1,
+                },
               },
             },
           },
@@ -4618,30 +4746,62 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 31,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 20,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 26,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 26,
+                  "line": 1,
+                },
               },
             },
           },
           "key2": {
-            "content": "value2",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 46,
-                "line": 1,
+            "name": {
+              "content": "key2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 37,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 33,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 40,
-                "line": 1,
+            },
+            "value": {
+              "content": "value2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 46,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 40,
+                  "line": 1,
+                },
               },
             },
           },
@@ -4693,34 +4853,66 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "members": {
-              "key": {
-                "content": "value",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 39,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 34,
-                    "line": 1,
-                  },
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 20,
+                  "line": 1,
                 },
               },
             },
-            "nodeType": "RecordValue",
-            "position": {
-              "end": {
-                "column": 41,
-                "line": 1,
+            "value": {
+              "members": {
+                "key": {
+                  "name": {
+                    "content": "key",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 31,
+                        "line": 1,
+                      },
+                      "start": {
+                        "column": 28,
+                        "line": 1,
+                      },
+                    },
+                  },
+                  "value": {
+                    "content": "value",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 39,
+                        "line": 1,
+                      },
+                      "start": {
+                        "column": 34,
+                        "line": 1,
+                      },
+                    },
+                  },
+                },
               },
-              "start": {
-                "column": 26,
-                "line": 1,
+              "nodeType": "RecordValue",
+              "position": {
+                "end": {
+                  "column": 41,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 26,
+                  "line": 1,
+                },
               },
+              "type": null,
             },
-            "type": null,
           },
         },
         "nodeType": "RecordValue",
@@ -4770,34 +4962,66 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       {
         "members": {
           "key": {
-            "members": {
-              "key": {
-                "content": "value",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 20,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 15,
-                    "line": 4,
-                  },
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 11,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
                 },
               },
             },
-            "nodeType": "RecordValue",
-            "position": {
-              "end": {
-                "column": 9,
-                "line": 5,
+            "value": {
+              "members": {
+                "key": {
+                  "name": {
+                    "content": "key",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 12,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 9,
+                        "line": 4,
+                      },
+                    },
+                  },
+                  "value": {
+                    "content": "value",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 20,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 15,
+                        "line": 4,
+                      },
+                    },
+                  },
+                },
               },
-              "start": {
-                "column": 14,
-                "line": 3,
+              "nodeType": "RecordValue",
+              "position": {
+                "end": {
+                  "column": 9,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 14,
+                  "line": 3,
+                },
               },
+              "type": null,
             },
-            "type": null,
           },
         },
         "nodeType": "RecordValue",
@@ -4847,16 +5071,32 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 39,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 28,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 34,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
               },
             },
           },
@@ -4934,16 +5174,32 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 39,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 28,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 34,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
               },
             },
           },
@@ -5021,30 +5277,62 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 39,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 28,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 34,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
               },
             },
           },
           "key2": {
-            "content": "value2",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 54,
-                "line": 1,
+            "name": {
+              "content": "key2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 45,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 41,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 48,
-                "line": 1,
+            },
+            "value": {
+              "content": "value2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 54,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 48,
+                  "line": 1,
+                },
               },
             },
           },
@@ -5122,30 +5410,62 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       {
         "members": {
           "key": {
-            "content": "value",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 39,
-                "line": 1,
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 28,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 34,
-                "line": 1,
+            },
+            "value": {
+              "content": "value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 34,
+                  "line": 1,
+                },
               },
             },
           },
           "key2": {
-            "content": "value2",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 54,
-                "line": 1,
+            "name": {
+              "content": "key2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 45,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 41,
+                  "line": 1,
+                },
               },
-              "start": {
-                "column": 48,
-                "line": 1,
+            },
+            "value": {
+              "content": "value2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 54,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 48,
+                  "line": 1,
+                },
               },
             },
           },
@@ -5223,39 +5543,58 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       {
         "members": {
           "key": {
-            "members": {
-              "key": {
-                "content": "value",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 20,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 15,
-                    "line": 4,
-                  },
+            "name": {
+              "content": "key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 11,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
                 },
               },
             },
-            "nodeType": "RecordValue",
-            "position": {
-              "end": {
-                "column": 9,
-                "line": 5,
+            "value": {
+              "members": {
+                "key": {
+                  "name": {
+                    "content": "key",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 12,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 9,
+                        "line": 4,
+                      },
+                    },
+                  },
+                  "value": {
+                    "content": "value",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 20,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 15,
+                        "line": 4,
+                      },
+                    },
+                  },
+                },
               },
-              "start": {
-                "column": 14,
-                "line": 3,
-              },
-            },
-            "type": {
-              "nodeType": "IdentifierTypeDeclaration",
+              "nodeType": "RecordValue",
               "position": {
                 "end": {
-                  "column": 18,
-                  "line": 3,
+                  "column": 9,
+                  "line": 5,
                 },
                 "start": {
                   "column": 14,
@@ -5263,8 +5602,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
                 },
               },
               "type": {
-                "content": "Type",
-                "nodeType": "Identifier",
+                "nodeType": "IdentifierTypeDeclaration",
                 "position": {
                   "end": {
                     "column": 18,
@@ -5273,6 +5611,20 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
                   "start": {
                     "column": 14,
                     "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "Type",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 18,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 14,
+                      "line": 3,
+                    },
                   },
                 },
               },
@@ -7246,20 +7598,22 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
         "type": {
           "members": {
             "key": {
-              "nodeType": "IdentifierTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 52,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 46,
-                  "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 44,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 1,
+                  },
                 },
               },
               "type": {
-                "content": "String",
-                "nodeType": "Identifier",
+                "nodeType": "IdentifierTypeDeclaration",
                 "position": {
                   "end": {
                     "column": 52,
@@ -7268,6 +7622,20 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
                   "start": {
                     "column": 46,
                     "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 52,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 46,
+                      "line": 1,
+                    },
                   },
                 },
               },
@@ -7288,18 +7656,34 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
         "value": {
           "members": {
             "key": {
-              "nodeType": "StringValue",
-              "position": {
-                "end": {
-                  "column": 67,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 65,
-                  "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 62,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 59,
+                    "line": 1,
+                  },
                 },
               },
-              "value": "",
+              "value": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 67,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 65,
+                    "line": 1,
+                  },
+                },
+                "value": "",
+              },
             },
           },
           "nodeType": "RecordValue",
@@ -7376,25 +7760,42 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
         "type": {
           "members": {
             "key": {
-              "members": {
-                "key": {
-                  "nodeType": "UnionTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 71,
-                      "line": 1,
-                    },
-                    "start": {
-                      "column": 53,
-                      "line": 1,
-                    },
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 44,
+                    "line": 1,
                   },
-                  "types": [
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
+                  "start": {
+                    "column": 41,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "members": {
+                  "key": {
+                    "name": {
+                      "content": "key",
+                      "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 60,
+                          "column": 51,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 1,
+                        },
+                      },
+                    },
+                    "type": {
+                      "nodeType": "UnionTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 71,
                           "line": 1,
                         },
                         "start": {
@@ -7402,60 +7803,75 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
                           "line": 1,
                         },
                       },
-                      "type": {
-                        "content": "Integer",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 60,
-                            "line": 1,
+                      "types": [
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 60,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 53,
+                              "line": 1,
+                            },
                           },
-                          "start": {
-                            "column": 53,
-                            "line": 1,
+                          "type": {
+                            "content": "Integer",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 60,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 53,
+                                "line": 1,
+                              },
+                            },
                           },
                         },
-                      },
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 71,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 63,
+                              "line": 1,
+                            },
+                          },
+                          "type": {
+                            "content": "Fraction",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 71,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 63,
+                                "line": 1,
+                              },
+                            },
+                          },
+                        },
+                      ],
                     },
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 71,
-                          "line": 1,
-                        },
-                        "start": {
-                          "column": 63,
-                          "line": 1,
-                        },
-                      },
-                      "type": {
-                        "content": "Fraction",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 71,
-                            "line": 1,
-                          },
-                          "start": {
-                            "column": 63,
-                            "line": 1,
-                          },
-                        },
-                      },
-                    },
-                  ],
+                  },
                 },
-              },
-              "nodeType": "RecordTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 73,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 46,
-                  "line": 1,
+                "nodeType": "RecordTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 73,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 46,
+                    "line": 1,
+                  },
                 },
               },
             },
@@ -7475,34 +7891,66 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
         "value": {
           "members": {
             "key": {
-              "members": {
-                "key": {
-                  "nodeType": "IntegerValue",
-                  "position": {
-                    "end": {
-                      "column": 95,
-                      "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 83,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 80,
+                    "line": 1,
+                  },
+                },
+              },
+              "value": {
+                "members": {
+                  "key": {
+                    "name": {
+                      "content": "key",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 91,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 88,
+                          "line": 1,
+                        },
+                      },
                     },
-                    "start": {
-                      "column": 94,
-                      "line": 1,
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 95,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 94,
+                          "line": 1,
+                        },
+                      },
+                      "value": "1",
                     },
                   },
-                  "value": "1",
                 },
+                "nodeType": "RecordValue",
+                "position": {
+                  "end": {
+                    "column": 97,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 86,
+                    "line": 1,
+                  },
+                },
+                "type": null,
               },
-              "nodeType": "RecordValue",
-              "position": {
-                "end": {
-                  "column": 97,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 86,
-                  "line": 1,
-                },
-              },
-              "type": null,
             },
           },
           "nodeType": "RecordValue",
@@ -7838,20 +8286,22 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
         "type": {
           "members": {
             "key": {
-              "nodeType": "IdentifierTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 52,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 46,
-                  "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 44,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 1,
+                  },
                 },
               },
               "type": {
-                "content": "String",
-                "nodeType": "Identifier",
+                "nodeType": "IdentifierTypeDeclaration",
                 "position": {
                   "end": {
                     "column": 52,
@@ -7860,6 +8310,20 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
                   "start": {
                     "column": 46,
                     "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 52,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 46,
+                      "line": 1,
+                    },
                   },
                 },
               },
@@ -7880,18 +8344,34 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
         "value": {
           "members": {
             "key": {
-              "nodeType": "StringValue",
-              "position": {
-                "end": {
-                  "column": 67,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 65,
-                  "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 62,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 59,
+                    "line": 1,
+                  },
                 },
               },
-              "value": "",
+              "value": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 67,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 65,
+                    "line": 1,
+                  },
+                },
+                "value": "",
+              },
             },
           },
           "nodeType": "RecordValue",
@@ -7968,25 +8448,42 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
         "type": {
           "members": {
             "key": {
-              "members": {
-                "key": {
-                  "nodeType": "UnionTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 71,
-                      "line": 1,
-                    },
-                    "start": {
-                      "column": 53,
-                      "line": 1,
-                    },
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 44,
+                    "line": 1,
                   },
-                  "types": [
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
+                  "start": {
+                    "column": 41,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "members": {
+                  "key": {
+                    "name": {
+                      "content": "key",
+                      "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 60,
+                          "column": 51,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 1,
+                        },
+                      },
+                    },
+                    "type": {
+                      "nodeType": "UnionTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 71,
                           "line": 1,
                         },
                         "start": {
@@ -7994,60 +8491,75 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
                           "line": 1,
                         },
                       },
-                      "type": {
-                        "content": "Integer",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 60,
-                            "line": 1,
+                      "types": [
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 60,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 53,
+                              "line": 1,
+                            },
                           },
-                          "start": {
-                            "column": 53,
-                            "line": 1,
+                          "type": {
+                            "content": "Integer",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 60,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 53,
+                                "line": 1,
+                              },
+                            },
                           },
                         },
-                      },
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 71,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 63,
+                              "line": 1,
+                            },
+                          },
+                          "type": {
+                            "content": "Fraction",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 71,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 63,
+                                "line": 1,
+                              },
+                            },
+                          },
+                        },
+                      ],
                     },
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 71,
-                          "line": 1,
-                        },
-                        "start": {
-                          "column": 63,
-                          "line": 1,
-                        },
-                      },
-                      "type": {
-                        "content": "Fraction",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 71,
-                            "line": 1,
-                          },
-                          "start": {
-                            "column": 63,
-                            "line": 1,
-                          },
-                        },
-                      },
-                    },
-                  ],
+                  },
                 },
-              },
-              "nodeType": "RecordTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 73,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 46,
-                  "line": 1,
+                "nodeType": "RecordTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 73,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 46,
+                    "line": 1,
+                  },
                 },
               },
             },
@@ -8067,34 +8579,66 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
         "value": {
           "members": {
             "key": {
-              "members": {
-                "key": {
-                  "nodeType": "IntegerValue",
-                  "position": {
-                    "end": {
-                      "column": 95,
-                      "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 83,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 80,
+                    "line": 1,
+                  },
+                },
+              },
+              "value": {
+                "members": {
+                  "key": {
+                    "name": {
+                      "content": "key",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 91,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 88,
+                          "line": 1,
+                        },
+                      },
                     },
-                    "start": {
-                      "column": 94,
-                      "line": 1,
+                    "value": {
+                      "nodeType": "IntegerValue",
+                      "position": {
+                        "end": {
+                          "column": 95,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 94,
+                          "line": 1,
+                        },
+                      },
+                      "value": "1",
                     },
                   },
-                  "value": "1",
                 },
+                "nodeType": "RecordValue",
+                "position": {
+                  "end": {
+                    "column": 97,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 86,
+                    "line": 1,
+                  },
+                },
+                "type": null,
               },
-              "nodeType": "RecordValue",
-              "position": {
-                "end": {
-                  "column": 97,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 86,
-                  "line": 1,
-                },
-              },
-              "type": null,
             },
           },
           "nodeType": "RecordValue",
@@ -8525,6 +9069,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value",
@@ -8605,6 +9163,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value",
@@ -8622,6 +9194,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
             },
           },
           "property2": {
+            "name": {
+              "content": "property2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 25,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 4,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value2",
@@ -8816,6 +9402,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
                 },
               },
             },
@@ -9028,6 +9628,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "StaticMethod",
           },
           "method2": {
@@ -9171,6 +9785,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 7,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 7,
                 },
               },
             },
@@ -9528,6 +10156,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 25,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedStaticMethod",
           },
         },
@@ -10025,6 +10667,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 25,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedStaticMethod",
           },
         },
@@ -10234,6 +10890,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 5,
+                },
+              },
+            },
             "nodeType": "StaticMethod",
           },
         },
@@ -10264,6 +10934,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "PropertyValue",
@@ -10432,6 +11116,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value",
@@ -10538,6 +11236,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value",
@@ -10555,6 +11267,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
             },
           },
           "property2": {
+            "name": {
+              "content": "property2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 25,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 4,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "Value2",
@@ -10775,6 +11501,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
                 },
               },
             },
@@ -11013,6 +11753,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "StaticMethod",
           },
           "method2": {
@@ -11156,6 +11910,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 23,
+                  "line": 7,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 7,
                 },
               },
             },
@@ -11539,6 +12307,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 25,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedStaticMethod",
           },
         },
@@ -12062,6 +12844,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 25,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedStaticMethod",
           },
         },
@@ -12297,6 +13093,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 22,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 5,
+                },
+              },
+            },
             "nodeType": "StaticMethod",
           },
         },
@@ -12327,6 +13137,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "PropertyValue",
@@ -12547,6 +13371,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 15,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
                 },
               },
             },
@@ -12785,6 +13623,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 15,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "SimpleMethod",
           },
           "method2": {
@@ -12928,6 +13780,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                       },
                     },
                   },
+                },
+              },
+            },
+            "name": {
+              "content": "method2",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 16,
+                  "line": 7,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 7,
                 },
               },
             },
@@ -13311,6 +14177,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 18,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedMethod",
           },
         },
@@ -13834,6 +14714,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             ],
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 18,
+                  "line": 3,
+                },
+              },
+            },
             "nodeType": "OverloadedMethod",
           },
         },
@@ -14069,6 +14963,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 15,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 5,
+                },
+              },
+            },
             "nodeType": "SimpleMethod",
           },
         },
@@ -14099,6 +15007,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "PropertyValue",
@@ -14322,6 +15244,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 },
               },
             },
+            "name": {
+              "content": "method",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 15,
+                  "line": 9,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 9,
+                },
+              },
+            },
             "nodeType": "SimpleMethod",
           },
         },
@@ -14352,6 +15288,20 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
         },
         "properties": {
           "property": {
+            "name": {
+              "content": "property",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+            },
             "type": null,
             "value": {
               "content": "PropertyValue",
@@ -14617,20 +15567,22 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
         "type": {
           "members": {
             "key": {
-              "nodeType": "IdentifierTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 42,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 37,
-                  "line": 1,
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 35,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 32,
+                    "line": 1,
+                  },
                 },
               },
               "type": {
-                "content": "Type2",
-                "nodeType": "Identifier",
+                "nodeType": "IdentifierTypeDeclaration",
                 "position": {
                   "end": {
                     "column": 42,
@@ -14639,6 +15591,20 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
                   "start": {
                     "column": 37,
                     "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "Type2",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 42,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 37,
+                      "line": 1,
+                    },
                   },
                 },
               },
@@ -14718,25 +15684,42 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
         "type": {
           "members": {
             "key": {
-              "members": {
-                "key": {
-                  "nodeType": "UnionTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 62,
-                      "line": 1,
-                    },
-                    "start": {
-                      "column": 44,
-                      "line": 1,
-                    },
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 35,
+                    "line": 1,
                   },
-                  "types": [
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
+                  "start": {
+                    "column": 32,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "members": {
+                  "key": {
+                    "name": {
+                      "content": "key",
+                      "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 51,
+                          "column": 42,
+                          "line": 1,
+                        },
+                        "start": {
+                          "column": 39,
+                          "line": 1,
+                        },
+                      },
+                    },
+                    "type": {
+                      "nodeType": "UnionTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 62,
                           "line": 1,
                         },
                         "start": {
@@ -14744,60 +15727,75 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
                           "line": 1,
                         },
                       },
-                      "type": {
-                        "content": "Integer",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 51,
-                            "line": 1,
+                      "types": [
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 51,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 44,
+                              "line": 1,
+                            },
                           },
-                          "start": {
-                            "column": 44,
-                            "line": 1,
+                          "type": {
+                            "content": "Integer",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 51,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 44,
+                                "line": 1,
+                              },
+                            },
                           },
                         },
-                      },
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 62,
+                              "line": 1,
+                            },
+                            "start": {
+                              "column": 54,
+                              "line": 1,
+                            },
+                          },
+                          "type": {
+                            "content": "Fraction",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 62,
+                                "line": 1,
+                              },
+                              "start": {
+                                "column": 54,
+                                "line": 1,
+                              },
+                            },
+                          },
+                        },
+                      ],
                     },
-                    {
-                      "nodeType": "IdentifierTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 62,
-                          "line": 1,
-                        },
-                        "start": {
-                          "column": 54,
-                          "line": 1,
-                        },
-                      },
-                      "type": {
-                        "content": "Fraction",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 62,
-                            "line": 1,
-                          },
-                          "start": {
-                            "column": 54,
-                            "line": 1,
-                          },
-                        },
-                      },
-                    },
-                  ],
+                  },
                 },
-              },
-              "nodeType": "RecordTypeDeclaration",
-              "position": {
-                "end": {
-                  "column": 64,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 37,
-                  "line": 1,
+                "nodeType": "RecordTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 64,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 37,
+                    "line": 1,
+                  },
                 },
               },
             },

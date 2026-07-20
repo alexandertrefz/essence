@@ -810,7 +810,7 @@ class DescentParser {
 
 		let value = this.parseExpression()
 
-		return generators.keyValuePair(name.content, value, {
+		return generators.keyValuePair(name, value, {
 			start: name.position.start,
 			end: value.position.end,
 		})
@@ -1356,7 +1356,7 @@ class DescentParser {
 
 		let type = this.parseType()
 
-		return generators.keyTypePair(name.content, type, {
+		return generators.keyTypePair(name, type, {
 			start: name.position.start,
 			end: type.position.end,
 		})
