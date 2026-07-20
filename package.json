@@ -26,13 +26,13 @@
 		"@types/bun": "1.3.14",
 		"@types/escodegen": "0.0.10",
 		"@types/estree": "1.0.9",
-		"oxfmt": "^0.59.0",
-		"oxlint": "^1.74.0"
+		"oxfmt": "0.59.0",
+		"oxlint": "1.74.0"
 	},
 	"dependencies": {
 		"bigint-fraction": "1.0.6",
 		"esbuild": "0.28.1",
-		"escodegen": "alexandertrefz/escodegen",
+		"escodegen": "alexandertrefz/escodegen#b4cb6d12aa3eb4082d001e0900ec30379ee79a63",
 		"typescript": "7.0.2",
 		"vscode-languageserver": "10.1.0",
 		"vscode-languageserver-textdocument": "1.0.12"
