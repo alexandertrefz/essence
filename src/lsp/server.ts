@@ -14,6 +14,7 @@ import type { common } from "../interfaces"
 import { parseWithDiagnostics } from "../parser"
 import { analyse } from "./analyse"
 import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"
+import { findHover } from "./hover"
 import {
 	findDefinition,
 	findRenameableOccurrence,
@@ -35,6 +36,7 @@ export function startServer() {
 					prepareProvider: true,
 				},
 				definitionProvider: true,
+				hoverProvider: true,
 			},
 		}
 	})
@@ -142,6 +144,28 @@ export function startServer() {
 		return {
 			uri: params.textDocument.uri,
 			range: toLspRange(definition),
+		}
+	})
+
+	connection.onHover((params) => {
+		let parsed = parseAndEnrich(params.textDocument.uri)
+
+		if (parsed?.enrichedProgram == null) {
+			return null
+		}
+
+		let hover = findHover(parsed.enrichedProgram, toCursor(params.position))
+
+		if (hover === null) {
+			return null
+		}
+
+		return {
+			range: toLspRange(hover.position),
+			contents: {
+				kind: "markdown" as const,
+				value: `\`\`\`essence\n${hover.content}\n\`\`\``,
+			},
 		}
 	})
 
