@@ -24,6 +24,10 @@ export function rewrite(program: common.typedSimple.Program): string {
 			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			internalImport([importNamespaceSpecifier("$type")], "type"),
+			internalImport(
+				[importNamespaceSpecifier("$helpers")],
+				"internalHelpers",
+			),
 			...rewriteImplementationSection(program.implementation),
 		],
 	}
@@ -619,6 +623,83 @@ function rewriteMatch(
 		}
 	}
 
+	function callAnyIs(
+		value: estree.Expression,
+		literal: estree.Expression,
+	): estree.CallExpression {
+		return {
+			type: "CallExpression",
+			optional: false,
+			callee: {
+				type: "MemberExpression",
+				object: { type: "Identifier", name: "$helpers" },
+				property: { type: "Identifier", name: "anyIs" },
+				optional: false,
+				computed: false,
+			},
+			arguments: [value, literal],
+		}
+	}
+
+	// NOTE: A literal Matcher needs no Type check in front of it — `anyIs`
+	// already answers false across differing Types. A Guard is ANDed on after
+	// whichever check the Matcher produced, so it only ever narrows.
+	function handlerTest(
+		handler: common.typedSimple.MatchNode["handlers"][number],
+		value: estree.Identifier,
+	): estree.Expression {
+		let and = (
+			left: estree.Expression,
+			right: estree.Expression,
+		): estree.Expression => ({
+			type: "LogicalExpression",
+			operator: "&&",
+			left,
+			right,
+		})
+
+		let test: estree.Expression =
+			handler.literal === null
+				? callIsValueOfType(value, handler.matcher)
+				: callAnyIs(value, rewriteExpression(handler.literal))
+
+		// NOTE: The member comparisons come after the Matcher's own check and
+		// rely on `&&` short-circuiting — that check is what guarantees the
+		// value is a Record carrying every member named here, so reading them
+		// is only safe once it has passed.
+		if (handler.memberLiterals !== null) {
+			for (let [name, literal] of Object.entries(
+				handler.memberLiterals,
+			)) {
+				test = and(
+					test,
+					callAnyIs(
+						{
+							type: "MemberExpression",
+							object: value,
+							property: { type: "Identifier", name },
+							optional: false,
+							computed: false,
+						},
+						rewriteExpression(literal),
+					),
+				)
+			}
+		}
+
+		if (handler.guard === null) {
+			return test
+		}
+
+		return and(test, {
+			type: "MemberExpression",
+			object: rewriteExpression(handler.guard),
+			property: { type: "Identifier", name: "value" },
+			optional: false,
+			computed: false,
+		})
+	}
+
 	const valueExpression = rewriteExpression(node.value)
 	const selfParameter: estree.Identifier = {
 		type: "Identifier",
@@ -635,7 +716,7 @@ function rewriteMatch(
 
 		let ifStatement: estree.IfStatement = {
 			type: "IfStatement",
-			test: callIsValueOfType(selfParameter, currentHandler.matcher),
+			test: handlerTest(currentHandler, selfParameter),
 			consequent: rewriteBlockStatement(currentHandler.body),
 		}
 

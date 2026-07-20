@@ -150,11 +150,57 @@ export interface MatchNode {
 	returnType: TypeDeclarationNode
 	value: ExpressionNode
 	handlers: Array<{
-		matcher: TypeDeclarationNode
+		matcher: MatcherNode
+		// NOTE: A `where` Guard makes the Handler conditional — it can decline
+		// a value its Matcher accepted, which is why a guarded Handler can
+		// never count towards exhaustiveness.
+		guard: ExpressionNode | null
 		body: Array<ImplementationNode>
 	}>
 	position: Position
 }
+
+export type MatcherNode =
+	| TypeDeclarationNode
+	| WildcardMatcherNode
+	| LiteralMatcherNode
+	| RecordMatcherNode
+
+// NOTE: A Record Matcher constrains members individually — `name: Type` by
+// Type, `name = value` by value. A Matcher that constrains any member by value
+// is conditional in the same way `case 0` is, since it can decline a Record
+// whose Types all matched.
+export interface RecordMatcherNode {
+	nodeType: "RecordMatcher"
+	members: Record<string, RecordMatcherMemberNode>
+	position: Position
+}
+
+export type RecordMatcherMemberNode =
+	| { kind: "Type"; name: IdentifierNode; type: TypeDeclarationNode }
+	| { kind: "Value"; name: IdentifierNode; value: LiteralMatcherValueNode }
+
+// NOTE: `case _` carries no Type of its own — the Enricher resolves it to
+// whatever the Handlers before it have not already caught.
+export interface WildcardMatcherNode {
+	nodeType: "WildcardMatcher"
+	position: Position
+}
+
+// NOTE: `case 0` matches one *value* rather than a Type, so — like a Guard —
+// it only ever covers part of its own Type.
+export interface LiteralMatcherNode {
+	nodeType: "LiteralMatcher"
+	value: LiteralMatcherValueNode
+	position: Position
+}
+
+export type LiteralMatcherValueNode =
+	| StringValueNode
+	| IntegerValueNode
+	| FractionValueNode
+	| BooleanValueNode
+	| NothingValueNode
 
 // #endregion
 

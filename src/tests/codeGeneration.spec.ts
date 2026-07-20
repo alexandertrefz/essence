@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -21,6 +22,31 @@ function generate(source: string): string {
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
 	return rewrite(optimise(simplify(enriched.program)))
+}
+
+// NOTE: The counterpart for cases that are supposed to be rejected — returns
+// whatever the first failing stage reported instead of asserting success.
+function diagnosticsOf(source: string): Array<common.Diagnostic> {
+	let parsed = parseWithDiagnostics(source)
+
+	if (containsErrors(parsed.diagnostics)) {
+		return parsed.diagnostics
+	}
+
+	let enriched = enrich(parsed.program)
+
+	if (containsErrors(enriched.diagnostics)) {
+		return enriched.diagnostics
+	}
+
+	return validate(enriched.program)
+}
+
+function hasCode(
+	diagnostics: Array<common.Diagnostic>,
+	code: common.DiagnosticCode,
+): boolean {
+	return diagnostics.some((diagnostic) => diagnostic.code === code)
 }
 
 describe("Code Generation", () => {
@@ -85,6 +111,162 @@ describe("Code Generation", () => {
 			expect(generated).not.toContain("types: {")
 		})
 
+		it("emits a wildcard Handler alongside the Handlers before it", () => {
+			let generated = generate(`
+				implementation {
+					variable value: Integer | Fraction | Nothing = nothing
+
+					__print(match value -> String {
+						case Nothing { <- "handled nothing" }
+						case _       { <- "handled the rest" }
+					})
+				}
+			`)
+
+			expect(generated).toContain("handled nothing")
+			expect(generated).toContain("handled the rest")
+		})
+	})
+
+	describe("Match Wildcards", () => {
+		// NOTE: The point of resolving a wildcard to the still-unhandled
+		// members rather than to Unknown — `@` has to keep a Type precise
+		// enough to call Methods on and to return where a member Type is
+		// expected.
+		it("narrows @ inside a wildcard to the unhandled members", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						variable value: Integer | Nothing = 5
+
+						__print(match value -> Integer {
+							case Nothing { <- 0 }
+							case _       { <- @::multiplyWith(2) }
+						})
+					}
+				`),
+			).not.toThrow()
+		})
+
+		it("accepts a wildcard as the only Handler", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						variable value: Integer | Nothing = 5
+
+						__print(match value -> String {
+							case _ { <- "anything" }
+						})
+					}
+				`),
+			).not.toThrow()
+		})
+	})
+
+	describe("Match Literals and Guards", () => {
+		it("compares by value for a literal Matcher", () => {
+			let generated = generate(`
+				implementation {
+					variable value: Integer | Nothing = 0
+
+					__print(match value -> String {
+						case 0       { <- "zero" }
+						case Integer { <- "other" }
+						case Nothing { <- "nothing" }
+					})
+				}
+			`)
+
+			// NOTE: A literal Matcher is a value comparison, not a Type check
+			// — `anyIs` is already false across differing Types, so it needs
+			// no `isValueOfType` in front of it.
+			expect(generated).toContain("anyIs")
+		})
+
+		it("ands a Guard onto the check its Matcher produced", () => {
+			let generated = generate(`
+				implementation {
+					variable value: Integer | Nothing = 1
+
+					__print(match value -> String {
+						case Integer where @::isGreaterThan(0) { <- "positive" }
+						case Integer                           { <- "other" }
+						case Nothing                           { <- "nothing" }
+					})
+				}
+			`)
+
+			expect(generated).toContain("&&")
+		})
+
+		// NOTE: The rule both features share — a Handler that can decline a
+		// value it Type-matched cannot make the Union exhaustive.
+		it("does not let a literal Matcher discharge its Type", () => {
+			let diagnostics = diagnosticsOf(`
+				implementation {
+					variable value: Integer | Nothing = 0
+
+					__print(match value -> String {
+						case 0       { <- "zero" }
+						case Nothing { <- "nothing" }
+					})
+				}
+			`)
+
+			expect(hasCode(diagnostics, "missing-case")).toBe(true)
+		})
+
+		it("does not let a Guard discharge its Type", () => {
+			let diagnostics = diagnosticsOf(`
+				implementation {
+					variable value: Integer | Nothing = 1
+
+					__print(match value -> String {
+						case Integer where @::isGreaterThan(0) { <- "positive" }
+						case Nothing                           { <- "nothing" }
+					})
+				}
+			`)
+
+			expect(hasCode(diagnostics, "missing-case")).toBe(true)
+		})
+
+		it("leaves a literal's Type in the residual of a later wildcard", () => {
+			// NOTE: `case 0` catches one Integer, so `@` inside the wildcard is
+			// still Integer|Nothing — calling an Integer Method on it has to
+			// stay an error.
+			let diagnostics = diagnosticsOf(`
+				implementation {
+					variable value: Integer | Nothing = 1
+
+					__print(match value -> Integer {
+						case 0 { <- 0 }
+						case _ { <- @::multiplyWith(2) }
+					})
+				}
+			`)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		it("narrows the wildcard once every other Type is unconditionally handled", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						variable value: Integer | Nothing = 1
+
+						__print(match value -> Integer {
+							case Nothing { <- 0 }
+							case 0       { <- 0 }
+							case _       { <- @::multiplyWith(2) }
+						})
+					}
+				`),
+			).not.toThrow()
+		})
+	})
+
+	describe("Record Matchers", () => {
 		// NOTE: Regression test — matching a Record used to fall through the
 		// runtime Type check entirely, so `case { a: Integer }` compiled
 		// cleanly and then never matched anything.
@@ -102,6 +284,68 @@ describe("Code Generation", () => {
 
 			expect(generated).toContain("record")
 			expect(generated).toContain("nothing")
+		})
+
+		it("compares a value-constrained member by value", () => {
+			let generated = generate(`
+				implementation {
+					variable value: { a: Integer, b: Integer } | Nothing = { a = 6, b = 2 }
+
+					__print(match value -> String {
+						case { a = 6, b: Integer } { <- "six" }
+						case { a: Integer }        { <- "record" }
+						case Nothing               { <- "nothing" }
+					})
+				}
+			`)
+
+			expect(generated).toContain("anyIs")
+		})
+
+		it("types @ as the Record so its members can be read", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						variable value: { a: Integer, b: Integer } | Nothing = { a = 6, b = 7 }
+
+						__print(match value -> Integer {
+							case { a = 6, b: Integer } { <- @.b }
+							case { a: Integer }        { <- @.a }
+							case Nothing               { <- 0 }
+						})
+					}
+				`),
+			).not.toThrow()
+		})
+
+		it("does not let a value-constrained Record discharge its Type", () => {
+			let diagnostics = diagnosticsOf(`
+				implementation {
+					variable value: { a: Integer } | Nothing = { a = 6 }
+
+					__print(match value -> String {
+						case { a = 6 }  { <- "six" }
+						case Nothing    { <- "nothing" }
+					})
+				}
+			`)
+
+			expect(hasCode(diagnostics, "missing-case")).toBe(true)
+		})
+
+		it("lets a purely Type-constrained Record discharge its Type", () => {
+			expect(() =>
+				generate(`
+					implementation {
+						variable value: { a: Integer } | Nothing = { a = 6 }
+
+						__print(match value -> String {
+							case { a: Integer } { <- "record" }
+							case Nothing        { <- "nothing" }
+						})
+					}
+				`),
+			).not.toThrow()
 		})
 	})
 

@@ -289,6 +289,25 @@ function simplifyMatch(
 		handlers: node.handlers.map((handler) => {
 			return {
 				matcher: handler.matcher,
+				literal:
+					handler.literal === null
+						? null
+						: simplifyExpression(handler.literal),
+				memberLiterals:
+					handler.memberLiterals === null
+						? null
+						: Object.fromEntries(
+								Object.entries(handler.memberLiterals).map(
+									([name, literal]) => [
+										name,
+										simplifyExpression(literal),
+									],
+								),
+							),
+				guard:
+					handler.guard === null
+						? null
+						: simplifyExpression(handler.guard),
 				body: handler.body.map(simplifyImplementationNode),
 			}
 		}),

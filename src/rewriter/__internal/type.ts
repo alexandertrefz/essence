@@ -48,6 +48,11 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// value. Handlers are tested in order, so concrete matchers narrow
 		// the value before a Generic matcher catches the rest.
 		return true
+	} else if (type.type === "Unknown") {
+		// NOTE: The Type a wildcard Handler (`case _`) resolves to once no
+		// Types are left to narrow — like a Generic matcher, it accepts
+		// whatever the Handlers before it did not catch.
+		return true
 	} else {
 		console.log("Complex type checking has yet to be implemented!")
 		return false

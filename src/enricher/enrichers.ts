@@ -1,4 +1,5 @@
 import { reportError } from "../diagnostics/index"
+import { matchesType } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import {
 	resolveCombinationType,
@@ -436,13 +437,51 @@ export function enrichSelf(
 	}
 }
 
+// NOTE: A wildcard Handler stands for whatever the Handlers before it have not
+// already caught, so it resolves to the Union of the still-unhandled members.
+// That is what lets `@` inside `case _` keep the matched Union's own member
+// Type instead of degrading to Unknown — `case Nothing` followed by `case _`
+// types `@` as the non-Nothing member. A wildcard with nothing left to catch
+// falls back to Unknown, which matches anything, so a redundant `case _` stays
+// harmless rather than becoming un-typeable.
+function resolveWildcardMatcherType(
+	valueType: common.Type,
+	handledMatchers: Array<common.Type>,
+): common.Type {
+	let isHandled = (memberType: common.Type) =>
+		handledMatchers.some((handledMatcher) =>
+			matchesType(handledMatcher, memberType),
+		)
+
+	if (valueType.type !== "UnionType") {
+		return isHandled(valueType) ? { type: "Unknown" } : valueType
+	}
+
+	let remainingTypes = valueType.types.filter(
+		(memberType) => !isHandled(memberType),
+	)
+
+	if (remainingTypes.length === 0) {
+		return { type: "Unknown" }
+	}
+
+	if (remainingTypes.length === 1) {
+		return remainingTypes[0]
+	}
+
+	return { type: "UnionType", types: remainingTypes }
+}
+
 export function enrichMatch(
 	node: parser.MatchNode,
 	scope: enricher.Scope,
 ): common.typed.MatchNode {
+	let value = enrichExpression(node.value, scope)
+	let handledMatchers: Array<common.Type> = []
+
 	return {
 		nodeType: "Match",
-		value: enrichExpression(node.value, scope),
+		value,
 		handlers: node.handlers.map((handler) => {
 			let bodyScope = {
 				parent: scope,
@@ -450,12 +489,80 @@ export function enrichMatch(
 				constants: new Set(),
 				types: {},
 			} satisfies enricher.Scope
-			let matcher = resolveType(handler.matcher, scope)
+
+			let literal: common.typed.ExpressionNode | null = null
+			let memberLiterals: Record<
+				string,
+				common.typed.ExpressionNode
+			> | null = null
+			let matcher: common.Type
+
+			if (handler.matcher.nodeType === "LiteralMatcher") {
+				// NOTE: A literal Matcher binds `@` to the literal's own Type —
+				// inside `case 0` the value is known to be an Integer.
+				literal = enrichExpression(handler.matcher.value, scope)
+				matcher = literal.type
+			} else if (handler.matcher.nodeType === "WildcardMatcher") {
+				matcher = resolveWildcardMatcherType(
+					value.type,
+					handledMatchers,
+				)
+			} else if (handler.matcher.nodeType === "RecordMatcher") {
+				// NOTE: Both kinds of member contribute a Type, so `@` is a
+				// Record either way and `@.name` works inside the Handler — a
+				// value-constrained member simply takes its literal's Type.
+				let members: Record<string, common.Type> = {}
+				let literals: Record<string, common.typed.ExpressionNode> = {}
+
+				for (let [name, member] of Object.entries(
+					handler.matcher.members,
+				)) {
+					if (member.kind === "Value") {
+						let enrichedValue = enrichExpression(
+							member.value,
+							scope,
+						)
+
+						literals[name] = enrichedValue
+						members[name] = enrichedValue.type
+					} else {
+						members[name] = resolveType(member.type, scope)
+					}
+				}
+
+				matcher = { type: "Record", members }
+				memberLiterals =
+					Object.keys(literals).length > 0 ? literals : null
+			} else {
+				matcher = resolveType(handler.matcher, scope)
+			}
+
+			// NOTE: Only an unconditional Handler retires a Type. A literal
+			// Matcher, a value-constrained Record member or a Guard can all
+			// decline a value whose Type they accepted, so a later wildcard
+			// still has to account for that Type.
+			if (
+				literal === null &&
+				memberLiterals === null &&
+				handler.guard === null
+			) {
+				handledMatchers.push(matcher)
+			}
 
 			declareVariableInScope("@", matcher, bodyScope, true)
 
+			// NOTE: The Guard is enriched in the body Scope so that it can use
+			// `@` — narrowing is what makes a Guard worth writing.
+			let guard =
+				handler.guard === null
+					? null
+					: enrichExpression(handler.guard, bodyScope)
+
 			return {
 				body: handler.body.map((node) => enrichNode(node, bodyScope)),
+				literal,
+				memberLiterals,
+				guard,
 				matcher,
 			}
 		}),
