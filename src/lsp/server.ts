@@ -34,6 +34,12 @@ import {
 	findRenameableOccurrence,
 	isValidIdentifierName,
 } from "./rename"
+import {
+	encodeSemanticTokens,
+	findSemanticTokens,
+	semanticTokenModifiers,
+	semanticTokenTypes,
+} from "./semanticTokens"
 import { findSignatureHelp } from "./signatureHelp"
 
 const analysisDebounceInMilliseconds = 200
@@ -60,6 +66,13 @@ export function startServer() {
 				},
 				signatureHelpProvider: {
 					triggerCharacters: ["(", ","],
+				},
+				semanticTokensProvider: {
+					legend: {
+						tokenTypes: semanticTokenTypes,
+						tokenModifiers: semanticTokenModifiers,
+					},
+					full: true,
 				},
 			},
 		}
@@ -260,6 +273,20 @@ export function startServer() {
 						: DocumentHighlightKind.Read,
 			}
 		})
+	})
+
+	connection.languages.semanticTokens.on((params) => {
+		let parsed = parseAndEnrich(params.textDocument.uri)
+
+		if (parsed === null) {
+			return { data: [] }
+		}
+
+		return {
+			data: encodeSemanticTokens(
+				findSemanticTokens(parsed.program, parsed.enrichedProgram),
+			),
+		}
 	})
 
 	connection.onDocumentSymbol((params) => {
