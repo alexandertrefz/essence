@@ -1167,8 +1167,33 @@ class DescentParser {
 
 	// #region Types
 
+	// NOTE: `|` binds loosest, so a Union is parsed on top of Generic
+	// application — `List<Item> | Nothing` is a Union of `List<Item>` and
+	// `Nothing`, not a Generic over a Union. A Union is still reachable as a
+	// Generic argument (`List<Item | Nothing>`), where the angle brackets
+	// delimit it.
 	protected parseType(): parser.TypeDeclarationNode {
-		let baseType = this.parseNonGenericType()
+		let firstType = this.parseGenericType()
+
+		if (this.tokens.peek()?.type === TokenType.SymbolPipe) {
+			let types = [firstType]
+
+			while (this.tokens.peek()?.type === TokenType.SymbolPipe) {
+				this.tokens.next()
+				types.push(this.parseGenericType())
+			}
+
+			return generators.unionTypeDeclaration(types, {
+				start: firstType.position.start,
+				end: types[types.length - 1].position.end,
+			})
+		}
+
+		return firstType
+	}
+
+	protected parseGenericType(): parser.TypeDeclarationNode {
+		let baseType = this.parseSimpleType()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
 			let leftAngle = this.tokens.next()
@@ -1194,26 +1219,6 @@ class DescentParser {
 		}
 
 		return baseType
-	}
-
-	protected parseNonGenericType(): parser.UngenericTypeDeclarationNode {
-		let firstType = this.parseSimpleType()
-
-		if (this.tokens.peek()?.type === TokenType.SymbolPipe) {
-			let types = [firstType]
-
-			while (this.tokens.peek()?.type === TokenType.SymbolPipe) {
-				this.tokens.next()
-				types.push(this.parseSimpleType())
-			}
-
-			return generators.unionTypeDeclaration(types, {
-				start: firstType.position.start,
-				end: types[types.length - 1].position.end,
-			})
-		}
-
-		return firstType
 	}
 
 	protected parseSimpleType():
