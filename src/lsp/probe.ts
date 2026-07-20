@@ -10,7 +10,7 @@
 // so offsets into the result still line up with the original text. Strings
 // may span lines (the Lexer runs to the next `"` regardless of newlines), so
 // this scans characters instead of working line by line.
-function stripNoise(text: string): string {
+export function stripNoise(text: string): string {
 	let stripped = ""
 	let inString = false
 	let inComment = false
