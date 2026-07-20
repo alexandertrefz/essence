@@ -38,6 +38,17 @@ function isIdentifierToken(token: Token | undefined): boolean {
 	return token !== undefined && identifierTokenTypes.includes(token.type)
 }
 
+// NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
+// `case "a"`. Everything else in Matcher position is read as a Type.
+const literalMatcherTokenTypes = [
+	TokenType.LiteralNumber,
+	TokenType.SymbolDash,
+	TokenType.LiteralString,
+	TokenType.LiteralTrue,
+	TokenType.LiteralFalse,
+	TokenType.LiteralNothing,
+]
+
 // NOTE: The Token types that can begin a Statement — these are the
 // resynchronisation points after a parse error.
 const statementStartTokenTypes = [
@@ -658,10 +669,11 @@ class DescentParser {
 		let handlers = this.parseStatementList(() => {
 			this.tokens.expect(TokenType.KeywordCase)
 
-			let matcher = this.parseType()
+			let matcher = this.parseMatcher()
+			let guard = this.parseOptionalGuard()
 			let block = this.parseBlock()
 
-			return { matcher, body: block.body }
+			return { matcher, guard, body: block.body }
 		})
 
 		let closingPosition = this.parseClosingBrace()
@@ -670,6 +682,136 @@ class DescentParser {
 			start: keyword.position.start,
 			end: closingPosition.end,
 		})
+	}
+
+	// NOTE: `_` is a wildcard only here — everywhere else it marks a labelless
+	// Parameter — so it is recognised in Matcher position rather than in
+	// `parseType`, where it would make `_` look like a Type name.
+	protected parseMatcher(): parser.MatcherNode {
+		let token = this.tokens.peek()
+
+		if (token?.type === TokenType.SymbolUnderscore) {
+			this.tokens.next()
+
+			return generators.wildcardMatcher(token.position)
+		}
+
+		if (
+			token !== undefined &&
+			literalMatcherTokenTypes.includes(token.type)
+		) {
+			let value = this.parseLiteralMatcherValue()
+
+			return generators.literalMatcher(value, value.position)
+		}
+
+		// NOTE: A Record in Matcher position is always a Record Matcher rather
+		// than a Record Type, because only the Matcher form admits
+		// `name = value` members alongside `name: Type` ones.
+		if (token?.type === TokenType.SymbolLeftBrace) {
+			return this.parseRecordMatcher()
+		}
+
+		return this.parseType()
+	}
+
+	protected parseRecordMatcher(): parser.RecordMatcherNode {
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
+			let rightBrace = this.tokens.next()
+
+			return generators.recordMatcher(
+				{},
+				{
+					start: leftBrace.position.start,
+					end: rightBrace.position.end,
+				},
+			)
+		}
+
+		let members = [this.parseRecordMatcherMember()]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			this.tokens.next()
+
+			if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
+				break
+			}
+
+			members.push(this.parseRecordMatcherMember())
+		}
+
+		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+
+		return generators.recordMatcher(Object.fromEntries(members), {
+			start: leftBrace.position.start,
+			end: rightBrace.position.end,
+		})
+	}
+
+	// NOTE: `name: Type` constrains a member by Type, `name = value` by value.
+	// The two mix freely inside one Matcher.
+	protected parseRecordMatcherMember(): [
+		string,
+		parser.RecordMatcherMemberNode,
+	] {
+		let name = this.parseIdentifier()
+
+		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
+			this.tokens.next()
+
+			return [
+				name.content,
+				{ kind: "Value", name, value: this.parseLiteralMatcherValue() },
+			]
+		}
+
+		this.tokens.expect(TokenType.SymbolColon)
+
+		return [name.content, { kind: "Type", name, type: this.parseType() }]
+	}
+
+	protected parseLiteralMatcherValue(): parser.LiteralMatcherValueNode {
+		let token = this.peekOrFail()
+
+		switch (token.type) {
+			case TokenType.SymbolDash:
+			case TokenType.LiteralNumber:
+				return this.parseNumberLiteral()
+			case TokenType.LiteralString:
+				this.tokens.next()
+				return generators.stringValueNode(token.value, token.position)
+			case TokenType.LiteralTrue:
+				this.tokens.next()
+				return generators.booleanValueNode(true, token.position)
+			case TokenType.LiteralFalse:
+				this.tokens.next()
+				return generators.booleanValueNode(false, token.position)
+			default:
+				this.tokens.next()
+				return generators.nothingValueNode(token.position)
+		}
+	}
+
+	// NOTE: `where` is not a Keyword — it is an ordinary Identifier used as an
+	// Argument label elsewhere (`removeEvery(where …)`), so it is recognised
+	// by content. That is unambiguous here because a Matcher is otherwise
+	// always followed by the Handler's opening brace.
+	protected parseOptionalGuard(): parser.ExpressionNode | null {
+		let token = this.tokens.peek()
+
+		if (
+			token !== undefined &&
+			token.type === TokenType.Identifier &&
+			token.value === "where"
+		) {
+			this.tokens.next()
+
+			return this.parseExpression()
+		}
+
+		return null
 	}
 
 	// #endregion

@@ -272,8 +272,17 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		let unionType = node.value.type
 
 		for (let memberType of unionType.types) {
-			let isHandled = node.handlers.some((handler) =>
-				matchesType(handler.matcher, memberType),
+			// NOTE: A Handler with a literal Matcher or a Guard covers only
+			// part of its Type — `case 0` leaves every other Integer, and a
+			// Guard can decline outright — so neither can discharge a member
+			// of the Union. Only an unconditional Handler makes a Match
+			// exhaustive.
+			let isHandled = node.handlers.some(
+				(handler) =>
+					handler.literal === null &&
+					handler.memberLiterals === null &&
+					handler.guard === null &&
+					matchesType(handler.matcher, memberType),
 			)
 
 			if (!isHandled) {

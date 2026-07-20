@@ -15,7 +15,7 @@ implementation {
 
 		reduce<infer TargetType>(
 			initialValue: TargetType,
-			_ reducingFunction (_ accumulator: TargetType, _ item: Item, _ index: number) -> TargetType
+			_ reducingFunction: (_ accumulator: TargetType, _ item: Item, _ index: Integer) -> TargetType
 		) -> TargetType {
 			variable reducedValue = initialValue
 
@@ -29,7 +29,7 @@ implementation {
 
 	constant list = [0, 1]
 
-	list::reduce(initialValue: "", (accumulator, item, index) {
+	list::reduce(initialValue "", (accumulator, item, index) {
 		<- accumulator::append(",")::append(item::toString())
 	}) § "0,1"
 	§ `accumulator` is String, due to `initialValue` being a String, which is the first occurence of `TargetType`.

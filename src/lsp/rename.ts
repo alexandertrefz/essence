@@ -701,7 +701,29 @@ function walkNode(
 			walkTypeDeclaration(node.returnType, scope, context)
 
 			for (let handler of node.handlers) {
-				walkTypeDeclaration(handler.matcher, scope, context)
+				// NOTE: Neither a wildcard nor a literal Matcher names a Type,
+				// so neither holds a reference that a rename could have to
+				// touch. A Record Matcher names one per Type-constrained
+				// member, so those are walked individually.
+				if (handler.matcher.nodeType === "RecordMatcher") {
+					for (let member of Object.values(handler.matcher.members)) {
+						if (member.kind === "Type") {
+							walkTypeDeclaration(member.type, scope, context)
+						}
+					}
+				} else if (
+					handler.matcher.nodeType !== "WildcardMatcher" &&
+					handler.matcher.nodeType !== "LiteralMatcher"
+				) {
+					walkTypeDeclaration(handler.matcher, scope, context)
+				}
+
+				// NOTE: Walked in the enclosing Scope rather than the
+				// Handler's — a Guard sits outside the body's range, and it
+				// declares nothing of its own.
+				if (handler.guard !== null) {
+					walkNode(handler.guard, scope, context)
+				}
 
 				let handlerScope = childScope(
 					scope,

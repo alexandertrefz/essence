@@ -6650,6 +6650,7 @@ exports[`Parser Expressions Match should parse match expression with function in
                 },
               },
             ],
+            "guard": null,
             "matcher": {
               "nodeType": "IdentifierTypeDeclaration",
               "position": {
@@ -6708,6 +6709,7 @@ exports[`Parser Expressions Match should parse match expression with function in
                 },
               },
             ],
+            "guard": null,
             "matcher": {
               "nodeType": "IdentifierTypeDeclaration",
               "position": {

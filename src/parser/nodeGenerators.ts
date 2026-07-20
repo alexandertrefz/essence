@@ -209,7 +209,8 @@ export function match(
 	value: parser.ExpressionNode,
 	returnType: parser.TypeDeclarationNode,
 	handlers: Array<{
-		matcher: parser.TypeDeclarationNode
+		matcher: parser.MatcherNode
+		guard: parser.ExpressionNode | null
 		body: Array<parser.ImplementationNode>
 	}>,
 	position: common.Position,
@@ -219,6 +220,37 @@ export function match(
 		value,
 		returnType,
 		handlers,
+		position,
+	}
+}
+
+export function wildcardMatcher(
+	position: common.Position,
+): parser.WildcardMatcherNode {
+	return {
+		nodeType: "WildcardMatcher",
+		position,
+	}
+}
+
+export function literalMatcher(
+	value: parser.LiteralMatcherValueNode,
+	position: common.Position,
+): parser.LiteralMatcherNode {
+	return {
+		nodeType: "LiteralMatcher",
+		value,
+		position,
+	}
+}
+
+export function recordMatcher(
+	members: Record<string, parser.RecordMatcherMemberNode>,
+	position: common.Position,
+): parser.RecordMatcherNode {
+	return {
+		nodeType: "RecordMatcher",
+		members,
 		position,
 	}
 }

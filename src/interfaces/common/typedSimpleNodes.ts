@@ -149,6 +149,9 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
+		literal: ExpressionNode | null
+		memberLiterals: Record<string, ExpressionNode> | null
+		guard: ExpressionNode | null
 		body: Array<ImplementationNode>
 	}>
 	type: Type
