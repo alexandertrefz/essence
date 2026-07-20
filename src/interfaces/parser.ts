@@ -357,10 +357,14 @@ export interface FunctionDefinitionNode {
 	body: Array<ImplementationNode>
 }
 
+// NOTE: `internalName` is null for `_: Type`, which binds no name at all —
+// the Parameter is positional and unreferenceable. That is what Function Types
+// (where a name could never be referred to) and deliberately ignored
+// Parameters need. `_ name: Type` still binds `name`, it only drops the label.
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
-	internalName: IdentifierNode
+	internalName: IdentifierNode | null
 	type: TypeDeclarationNode
 	position: Position
 }

@@ -301,10 +301,14 @@ export interface FunctionStatementNode {
 
 // #region Helpers
 
+// NOTE: A null `internalName` is the `_: Type` form — see the Parser's
+// ParameterNode. It survives into the typed tree so that nothing downstream
+// mistakes the Parameter for one the body could have referenced; the
+// Simplifier is where it finally gets a positional placeholder to emit.
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
-	internalName: IdentifierNode
+	internalName: IdentifierNode | null
 	position: Position
 }
 
