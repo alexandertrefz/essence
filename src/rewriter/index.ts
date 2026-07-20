@@ -1,15 +1,15 @@
 import * as path from "node:path"
 
-import type { BuildResult } from "esbuild"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
 import type { common } from "../interfaces/index"
 
-export async function rewrite(
-	program: common.typedSimple.Program,
-	flags: { inputFileName: string; outputFileName: string; debug: boolean },
-): Promise<BuildResult> {
+// NOTE: The Rewriter is pure: a typed simple Program in, JavaScript source
+// text out. Turning that text into a file — bundling the runtime into it,
+// minifying, writing it to disk — is the Bundler's job, which keeps this stage
+// synchronous and testable without touching a file system.
+export function rewrite(program: common.typedSimple.Program): string {
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
 		sourceType: "module",
@@ -28,7 +28,7 @@ export async function rewrite(
 		],
 	}
 
-	const programText = generate(rewrittenProgram, {
+	return generate(rewrittenProgram, {
 		format: {
 			indent: {
 				style: "\t",
@@ -39,26 +39,6 @@ export async function rewrite(
 			space: " ",
 			quotes: "double",
 		},
-	})
-
-	const __dirname = import.meta.dirname
-
-	const { build } = await import("esbuild")
-
-	return build({
-		stdin: {
-			contents: programText,
-			loader: "ts",
-			resolveDir: __dirname,
-			sourcefile: flags.inputFileName,
-		},
-
-		tsconfig: `${__dirname}/__internal/tsconfig.json`,
-		minify: false,
-		treeShaking: true,
-		bundle: true,
-		format: "esm",
-		outfile: flags.outputFileName,
 	})
 }
 

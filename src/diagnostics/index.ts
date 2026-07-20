@@ -1,4 +1,4 @@
-import deepEqual from "deep-equal"
+import { isDeepStrictEqual } from "node:util"
 
 import type { common } from "../interfaces/index"
 
@@ -15,7 +15,7 @@ function isDuplicate(diagnostic: common.Diagnostic): boolean {
 		(existingDiagnostic) =>
 			existingDiagnostic.severity === diagnostic.severity &&
 			existingDiagnostic.message === diagnostic.message &&
-			deepEqual(existingDiagnostic.position, diagnostic.position),
+			isDeepStrictEqual(existingDiagnostic.position, diagnostic.position),
 	)
 }
 
