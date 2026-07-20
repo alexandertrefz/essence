@@ -625,29 +625,25 @@ function rewriteMatch(
 		name: "_self",
 	}
 
-	let previousIfStatement: estree.IfStatement | undefined
-	let finalIfStatement: estree.IfStatement
+	// NOTE: The Handlers are folded back to front, so that each `if` becomes
+	// the `else` of the one before it — the first Handler ends up at the head
+	// of the chain and is therefore tested first.
+	let ifChain: estree.IfStatement | undefined
 
 	for (let i = node.handlers.length - 1; i >= 0; i--) {
 		const currentHandler = node.handlers[i]
 
-		if (i > 0) {
-			previousIfStatement = {
-				type: "IfStatement",
-				test: callIsValueOfType(selfParameter, currentHandler.matcher),
-				consequent: rewriteBlockStatement(currentHandler.body),
-			}
-		} else {
-			finalIfStatement = {
-				type: "IfStatement",
-				test: callIsValueOfType(selfParameter, currentHandler.matcher),
-				consequent: rewriteBlockStatement(currentHandler.body),
-			}
-
-			if (previousIfStatement) {
-				finalIfStatement.alternate = previousIfStatement
-			}
+		let ifStatement: estree.IfStatement = {
+			type: "IfStatement",
+			test: callIsValueOfType(selfParameter, currentHandler.matcher),
+			consequent: rewriteBlockStatement(currentHandler.body),
 		}
+
+		if (ifChain) {
+			ifStatement.alternate = ifChain
+		}
+
+		ifChain = ifStatement
 	}
 
 	return {
@@ -656,8 +652,7 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				// biome-ignore lint/style/noNonNullAssertion: We can guarantee that this will always be set
-				body: [finalIfStatement!],
+				body: ifChain ? [ifChain] : [],
 			},
 			params: [selfParameter],
 		},
@@ -738,6 +733,25 @@ function importNamespaceSpecifier(
 	}
 }
 
+// NOTE: Arrays have to be checked before the general object case — they are
+// `typeof "object"` too, and emitting one as an ObjectExpression would turn a
+// Union's member list into `{ 0: …, 1: … }`, which no longer has the Array
+// Methods the runtime Type check calls on it.
+function convertValueToExpression(value: unknown): estree.Expression {
+	if (Array.isArray(value)) {
+		return {
+			type: "ArrayExpression",
+			elements: value.map(convertValueToExpression),
+		}
+	}
+
+	if (value !== null && typeof value === "object") {
+		return convertObjectToObjectExpression(value)
+	}
+
+	return { type: "Literal", value } as estree.Literal
+}
+
 function convertObjectToObjectExpression(
 	object: object,
 ): estree.ObjectExpression {
@@ -745,19 +759,13 @@ function convertObjectToObjectExpression(
 		type: "ObjectExpression",
 		properties: Object.entries(object).map<estree.Property>(
 			([key, value]) => {
-				if (value !== null && typeof value === "object") {
-					value = convertObjectToObjectExpression(value)
-				} else {
-					value = { type: "Literal", value } as estree.Literal
-				}
-
 				return {
 					type: "Property",
 					key: {
 						type: "Identifier",
 						name: key,
 					},
-					value,
+					value: convertValueToExpression(value),
 					kind: "init",
 					computed: false,
 					method: false,

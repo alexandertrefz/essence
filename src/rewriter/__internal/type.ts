@@ -19,7 +19,7 @@ export type AnyType =
 	| NothingType
 
 // TODO: Handle Record Types
-export function isValueOfType(value: AnyType, type: common.Type) {
+export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	if (type.type === "Nothing") {
 		return value[typeKeySymbol] === "Nothing"
 	} else if (type.type === "Boolean") {
@@ -30,6 +30,19 @@ export function isValueOfType(value: AnyType, type: common.Type) {
 		return value[typeKeySymbol] === "Integer"
 	} else if (type.type === "Fraction") {
 		return value[typeKeySymbol] === "Fraction"
+	} else if (type.type === "Record") {
+		if (value[typeKeySymbol] !== "Record") {
+			return false
+		}
+
+		// NOTE: Structural and open — the value has to carry every member the
+		// Matcher names, matching in Type, but may carry more besides.
+		return Object.entries(type.members).every(
+			([name, memberType]) =>
+				name in value && isValueOfType(value[name], memberType),
+		)
+	} else if (type.type === "UnionType") {
+		return type.types.some((memberType) => isValueOfType(value, memberType))
 	} else if (type.type === "GenericUse") {
 		// NOTE: Types erase at runtime — a Generic matcher stands for any
 		// value. Handlers are tested in order, so concrete matchers narrow
