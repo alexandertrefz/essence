@@ -1,8 +1,8 @@
 // NOTE: Hand-written recursive descent parser — the default parser of the
 // compiler, re-exported through src/parser. It reuses the node generators,
 // keeping its ASTs identical to the ones the nearley parser produced.
-import { collectDiagnostics, reportError } from "../../diagnostics"
-import { type common, lexer, type parser } from "../../interfaces"
+import { collectDiagnostics, reportError } from "../../diagnostics/index"
+import { type common, lexer, type parser } from "../../interfaces/index"
 import * as generators from "../nodeGenerators"
 import {
 	describeToken,

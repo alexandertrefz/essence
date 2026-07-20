@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
-import { parse } from "../parser"
-import { validate } from "../validator"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
+import { parse } from "../parser/index"
+import { validate } from "../validator/index"
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics } = enrich(parse(source))

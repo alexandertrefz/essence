@@ -1,4 +1,4 @@
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 import { contains, isSmaller } from "./positions"
 import { printType, withoutSelf } from "./printType"
 

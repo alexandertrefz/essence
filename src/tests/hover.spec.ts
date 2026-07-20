@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher"
-import type { common } from "../interfaces"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
 import { findHover } from "../lsp/hover"
-import { parseWithDiagnostics } from "../parser"
+import { parseWithDiagnostics } from "../parser/index"
 
 function hover(source: string, cursor: common.Cursor): string | null {
 	let { program } = parseWithDiagnostics(source)

@@ -1,5 +1,5 @@
-import { resolveOverloadedMethodName } from "../helpers"
-import type { common } from "../interfaces"
+import { resolveOverloadedMethodName } from "../helpers/index"
+import type { common } from "../interfaces/index"
 
 export const simplify = (
 	program: common.typed.Program,

@@ -1,6 +1,6 @@
 import deepEqual from "deep-equal"
 
-import type { common } from "../interfaces"
+import type { common } from "../interfaces/index"
 
 // NOTE: The active Diagnostic list is module state so that the Enricher and
 // Validator do not have to thread a collector through every function. Both
