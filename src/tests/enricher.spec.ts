@@ -1518,5 +1518,103 @@ describe("Enricher", () => {
 				}`),
 			).toEqual([])
 		})
+
+		it("should prefer the more specific member Namespace inside a dispatch", () => {
+			let invocation = lastConstantValue(`implementation {
+				namespace IntegerTag for Integer {
+					tag() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace EitherTag for Integer | Boolean {
+					tag() -> String {
+						<- "either"
+					}
+				}
+
+				namespace StringTag for String {
+					tag() -> String {
+						<- "string"
+					}
+				}
+
+				constant value: Integer | String = 5
+				constant tagged = value::tag()
+			}`)
+
+			expect(
+				invocation.dispatch?.map(
+					(dispatchCase) => dispatchCase.namespaceName,
+				),
+			).toEqual(["IntegerTag", "StringTag"])
+		})
+	})
+
+	describe("Method Target Specificity", () => {
+		function lastConstantValue(
+			source: string,
+		): common.typed.MethodInvocationNode {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+			let value = constants[constants.length - 1].value
+
+			expect(value.nodeType).toBe("MethodInvocation")
+
+			if (value.nodeType !== "MethodInvocation") {
+				throw new Error("Last Constant is not a MethodInvocation.")
+			}
+
+			return value
+		}
+
+		it("should prefer the Namespace with the strictly more specific target Type", () => {
+			let invocation = lastConstantValue(`implementation {
+				namespace IntegerTag for Integer {
+					tag() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace EitherTag for Integer | Boolean {
+					tag() -> Integer {
+						<- 1
+					}
+				}
+
+				constant tagged = 5::tag()
+			}`)
+
+			expect(invocation.namespace.name).toBe("IntegerTag")
+			expect(invocation.type).toEqual({ type: "String" })
+		})
+
+		it("should resolve a Union receiver through the covering Namespace", () => {
+			let invocation = lastConstantValue(`implementation {
+				namespace IntegerTag for Integer {
+					tag() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace EitherTag for Integer | Boolean {
+					tag() -> Integer {
+						<- 1
+					}
+				}
+
+				constant value: Integer | Boolean = 5
+				constant tagged = value::tag()
+			}`)
+
+			expect(invocation.namespace.name).toBe("EitherTag")
+			expect(invocation.dispatch).toBeNull()
+			expect(invocation.type).toEqual({ type: "Integer" })
+		})
 	})
 })

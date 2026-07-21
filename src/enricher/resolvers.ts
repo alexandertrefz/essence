@@ -426,6 +426,13 @@ export function resolveMethodInvocation(
 		}
 	}
 
+	if (resolvedMethods.length > 1) {
+		resolvedMethods = filterMostSpecificByTarget(
+			resolvedMethods,
+			(candidate) => candidate.namespace.type.targetType,
+		)
+	}
+
 	if (resolvedMethods.length === 0) {
 		// NOTE: The covering Namespace has the Method but its overloads
 		// reject the Arguments — per-member dispatch may still accept them,
@@ -527,8 +534,19 @@ function resolveUnionMethodDispatch(
 			)
 
 			if (resolvedMethod) {
-				resolvedMethods.push({ namespaceName, ...resolvedMethod })
+				resolvedMethods.push({
+					namespaceName,
+					namespaceType,
+					...resolvedMethod,
+				})
 			}
+		}
+
+		if (resolvedMethods.length > 1) {
+			resolvedMethods = filterMostSpecificByTarget(
+				resolvedMethods,
+				(candidate) => candidate.namespaceType.targetType,
+			)
 		}
 
 		if (resolvedMethods.length === 0) {
@@ -655,6 +673,40 @@ ${resolvedMethods
 // coexist in one dispatched Union.
 function isRuntimeCatchAllType(type: common.Type): boolean {
 	return type.type === "GenericUse" || type.type === "Unknown"
+}
+
+// NOTE: The same specificity rule conformance resolution uses, applied to
+// Method resolution: when several Namespaces resolve a Method, one whose
+// target Type is strictly more specific by assignability wins (`Integer`
+// beats `Integer | Fraction` for an Integer receiver). This is what lets a
+// Namespace covering a Union carry the Union-level behaviour without making
+// every member-typed invocation ambiguous. Remaining ties stay a hard error.
+function filterMostSpecificByTarget<Candidate>(
+	candidates: Array<Candidate>,
+	targetOf: (candidate: Candidate) => common.Type | null,
+): Array<Candidate> {
+	function isStrictlyMoreSpecific(
+		target: common.Type | null,
+		other: common.Type | null,
+	): boolean {
+		if (target === null || other === null) {
+			return false
+		}
+
+		return matchesType(other, target) && !matchesType(target, other)
+	}
+
+	return candidates.filter(
+		(candidate) =>
+			!candidates.some(
+				(other) =>
+					other !== candidate &&
+					isStrictlyMoreSpecific(
+						targetOf(other),
+						targetOf(candidate),
+					),
+			),
+	)
 }
 
 export function resolveMethodInvocationType(
