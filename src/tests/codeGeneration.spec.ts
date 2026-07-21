@@ -479,14 +479,14 @@ describe("Code Generation", () => {
 	describe("Union Method Dispatch", () => {
 		it("should emit a runtime dispatch with one statically resolved target per member", () => {
 			const code = generate(`implementation {
-				constant number: Number = 5
+				constant value: Integer | Boolean = 5
 
-				__print(number::toString())
+				__print(value::toString())
 			}`)
 
 			expect(code).toContain("$type.dispatchMethod")
 			expect(code).toContain("Integer.toString")
-			expect(code).toContain("Fraction.toString")
+			expect(code).toContain("Boolean.toString")
 		})
 
 		it("should mangle overloaded Method names per dispatch case", () => {

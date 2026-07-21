@@ -5,6 +5,7 @@ import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as fractionNamespace } from "../enricher/types/Fraction"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
+import { namespace as numberNamespace } from "../enricher/types/Number"
 import { namespace as orderingNamespace } from "../enricher/types/Ordering"
 import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as recordNamespace } from "../enricher/types/Record"
@@ -1194,6 +1195,7 @@ describe("Enricher", () => {
 				booleanNamespace,
 				integerNamespace,
 				fractionNamespace,
+				numberNamespace,
 				recordNamespace,
 				nothingNamespace,
 				orderingNamespace,
@@ -1280,24 +1282,29 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		it("should not satisfy a bound with the Number Union", () => {
-			let diagnostics = diagnosticsFor(`implementation {
-				function describeValue <infer Value is Printable>(_ value: Value) -> String {
-					<- value::toString()
-				}
-
-				constant number: Number = 5
-
-				constant text = describeValue(number)
-			}`)
-
+		it("should satisfy bounds with the Number Union through its covering Namespace", () => {
 			expect(
-				diagnostics.some(
-					(diagnostic) =>
-						diagnostic.message ===
-						"Type 'Integer | Fraction' does not conform to Protocol 'Printable': no conforming Namespace is in scope.",
-				),
-			).toBe(true)
+				diagnosticsFor(`implementation {
+					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
+						<- match a::compareTo(b) -> Item {
+							case Less    { <- a }
+							case Equal   { <- a }
+							case Greater { <- b }
+						}
+					}
+
+					constant number: Number = 5
+					constant other: Number = 1/2
+
+					constant text = describeValue(number)
+					constant smallest: Number = smaller(number, other)
+					constant same: Boolean = number::is(other)
+				}`),
+			).toEqual([])
 		})
 
 		it("should let a concrete Record conformance beat the builtin Record Namespace", () => {
@@ -1386,8 +1393,8 @@ describe("Enricher", () => {
 
 		it("should collapse identical branch return Types", () => {
 			let invocation = lastConstantValue(`implementation {
-				constant number: Number = 5
-				constant text = number::toString()
+				constant value: Integer | Boolean = 5
+				constant text = value::toString()
 			}`)
 
 			expect(invocation.dispatch).not.toBeNull()
@@ -1461,15 +1468,27 @@ describe("Enricher", () => {
 
 		it("should reject the call when a member Type rejects the Arguments", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant number: Number = 5
-				constant bad = number::is(21)
+				namespace IntegerTag for Integer {
+					tag(_ flag: Integer) -> String {
+						<- "integer"
+					}
+				}
+
+				namespace BooleanTag for Boolean {
+					tag(_ flag: Boolean) -> String {
+						<- "boolean"
+					}
+				}
+
+				constant value: Integer | Boolean = 5
+				constant bad = value::tag(1)
 			}`)
 
 			expect(
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"Passed arguments do not match any overload for Type 'Fraction', a member of this value's Union Type.",
+						"Passed arguments do not match any overload for Type 'Boolean', a member of this value's Union Type.",
 				),
 			).toBe(true)
 		})
@@ -1615,6 +1634,35 @@ describe("Enricher", () => {
 			expect(invocation.namespace.name).toBe("EitherTag")
 			expect(invocation.dispatch).toBeNull()
 			expect(invocation.type).toEqual({ type: "Integer" })
+		})
+
+		it("should route single-member receivers past the Number Namespace", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant same = 5::is(3)
+			}`)
+
+			expect(invocation.namespace.name).toBe("Integer")
+		})
+
+		it("should resolve mixed-member comparisons through the Number Namespace", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant same = 1::is(1/1)
+			}`)
+
+			expect(invocation.namespace.name).toBe("Number")
+			expect(invocation.type).toEqual({ type: "Boolean" })
+		})
+
+		it("should order mixed members through the Number Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant ordered = match 5::compareTo(1/2) -> String {
+						case Less    { <- "smaller" }
+						case Equal   { <- "same" }
+						case Greater { <- "bigger" }
+					}
+				}`),
+			).toEqual([])
 		})
 	})
 })

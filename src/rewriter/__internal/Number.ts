@@ -1,11 +1,19 @@
 import { Fraction } from "bigint-fraction"
 
+import type { BooleanType } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import type { FractionType } from "./Fraction"
-import { createFraction } from "./Fraction"
+import {
+	createFraction,
+	toString__overload$1 as fractionToString,
+} from "./Fraction"
 import type { IntegerType } from "./Integer"
-import { createInteger } from "./Integer"
+import { createInteger, toString as integerToString } from "./Integer"
 import { isFirstFractionBigger } from "./internalHelpers"
 import type { ListType } from "./List"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
+import type { StringType } from "./String"
 import { typeKeySymbol } from "./type"
 
 // #region Constants
@@ -310,6 +318,66 @@ export function greatestNumber__overload$7(
 		)
 	} else {
 		return createInteger(greatestNumber.value)
+	}
+}
+
+// #endregion
+
+// #region Union-level Methods
+
+export type NumberType = IntegerType | FractionType
+
+// NOTE: The cross-member semantics of `Number`: two Numbers are compared by
+// numeric value, so the Integer `1` and the Fraction `1/1` are the same
+// Number even though the member Namespaces treat them as different values.
+// Cross-multiplication keeps everything in bigint arithmetic; equality is
+// sign-safe, and the ordering comparisons assume positive denominators like
+// the rest of the runtime does.
+function numeratorOf(number: NumberType): bigint {
+	if (number[typeKeySymbol] === "Integer") {
+		return number.value
+	} else {
+		return number.fraction.numerator
+	}
+}
+
+function denominatorOf(number: NumberType): bigint {
+	if (number[typeKeySymbol] === "Integer") {
+		return 1n
+	} else {
+		return number.fraction.denominator
+	}
+}
+
+export function is(number: NumberType, other: NumberType): BooleanType {
+	return createBoolean(
+		numeratorOf(number) * denominatorOf(other) ===
+			numeratorOf(other) * denominatorOf(number),
+	)
+}
+
+export function isNot(number: NumberType, other: NumberType): BooleanType {
+	return createBoolean(!is(number, other).value)
+}
+
+export function toString(number: NumberType): StringType {
+	if (number[typeKeySymbol] === "Integer") {
+		return integerToString(number)
+	} else {
+		return fractionToString(number)
+	}
+}
+
+export function compareTo(number: NumberType, other: NumberType): OrderingType {
+	let lhs = numeratorOf(number) * denominatorOf(other)
+	let rhs = numeratorOf(other) * denominatorOf(number)
+
+	if (lhs < rhs) {
+		return less
+	} else if (lhs === rhs) {
+		return equal
+	} else {
+		return greater
 	}
 }
 
