@@ -16,8 +16,19 @@ implementation {
 	__print(Integer.multiplyWith(100, 1000))
 	__print(100::multiplyWith(1000))
 
-	§ You can chain and nest these calls as well, of course.
-	100::add(11)::multiplyWith(5)::divideBy(1110::divideBy(2))::subtract(1)
+	§ You can chain and nest these calls as well, of course. Since dividing
+	§ might not produce a value, you match on its result before chaining onward.
+	constant half = match 1110::divideBy(2) -> Fraction {
+		case Fraction {
+			<- @
+		}
+
+		case Nothing {
+			<- 1/1
+		}
+	}
+
+	__print(100::add(11)::multiplyWith(5)::subtract(1)::divideBy(half))
 
 	§ And you can use numbers of any size, even exceeding the limits of IEEE 754.
 	__print(9_007_199_254_740_991::multiplyWith(500))

@@ -147,7 +147,10 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Fraction" }, { type: "Nothing" }],
+					},
 				},
 				{
 					generics: [],
@@ -161,7 +164,10 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Fraction" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Fraction" }, { type: "Nothing" }],
+					},
 				},
 			],
 		},
