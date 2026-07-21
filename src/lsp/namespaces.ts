@@ -1,16 +1,8 @@
+import {
+	builtinProtocols as builtinProtocolTable,
+	builtinNamespaces,
+} from "../enricher/builtins"
 import { enrich } from "../enricher/index"
-import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
-import { namespace as booleanNamespace } from "../enricher/types/Boolean"
-import { namespace as integerNamespace } from "../enricher/types/Integer"
-import { namespace as listNamespace } from "../enricher/types/List"
-import { namespace as nothingNamespace } from "../enricher/types/Nothing"
-import { namespace as numberNamespace } from "../enricher/types/Number"
-import { namespace as orderingNamespace } from "../enricher/types/Ordering"
-import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
-import { namespace as rationalNamespace } from "../enricher/types/Rational"
-import { namespace as recordNamespace } from "../enricher/types/Record"
-import { namespace as stringNamespace } from "../enricher/types/String"
-import { namespace as transcendentalNamespace } from "../enricher/types/Transcendental"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -27,25 +19,13 @@ import { parseWithDiagnostics } from "../parser/index"
 // Arguments happen to match an overload (Signature Help in particular is
 // used exactly while the Arguments are still incomplete).
 
-export const builtinNamespaces: Array<common.NamespaceType> = [
-	stringNamespace,
-	booleanNamespace,
-	integerNamespace,
-	rationalNamespace,
-	algebraicNamespace,
-	transcendentalNamespace,
-	numberNamespace,
-	nothingNamespace,
-	orderingNamespace,
-	recordNamespace,
-	listNamespace,
-]
+// NOTE: Derived from the Enricher's builtin tables — never listed by hand
+// here, so a new builtin can not reach resolution without also reaching the
+// Language Server.
+export { builtinNamespaces }
 
-export const builtinProtocols: Array<common.ProtocolType> = [
-	Equatable,
-	Printable,
-	Comparable,
-]
+export const builtinProtocols: Array<common.ProtocolType> =
+	Object.values(builtinProtocolTable)
 
 export function targetTypeMatches(
 	namespace: common.NamespaceType,

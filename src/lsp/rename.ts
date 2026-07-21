@@ -1,3 +1,8 @@
+import {
+	builtinMembers,
+	builtinProtocols as builtinProtocolTable,
+	builtinTypes as builtinTypeTable,
+} from "../enricher/builtins"
 import type { common, parser } from "../interfaces/index"
 
 // NOTE: Renaming is resolved on the Parser AST with a lexical Scope model
@@ -113,40 +118,14 @@ type WalkContext = {
 	scopes: Array<ScopeRange>
 }
 
-// NOTE: These mirror the top level Scope the Enricher starts from. Builtins
-// participate in resolution — so that shadowing works — but are rejected as
-// rename targets.
-const builtinValues = [
-	"__print",
-	"String",
-	"Boolean",
-	"Integer",
-	"Rational",
-	"Algebraic",
-	"Transcendental",
-	"Number",
-	"Nothing",
-	"Ordering",
-	"Record",
-	"List",
-]
+// NOTE: These ARE the top level Scope the Enricher starts from — derived
+// from its builtin tables, never listed by hand. Builtins participate in
+// resolution — so that shadowing works — but are rejected as rename targets.
+const builtinValues = Object.keys(builtinMembers)
 
-const builtinTypes = [
-	"Nothing",
-	"Boolean",
-	"String",
-	"Integer",
-	"Rational",
-	"Algebraic",
-	"Transcendental",
-	"Irrational",
-	"Record",
-	"Number",
-	"List",
-	"Ordering",
-]
+const builtinTypes = Object.keys(builtinTypeTable)
 
-const builtinProtocols = ["Equatable", "Printable", "Comparable"]
+const builtinProtocols = Object.keys(builtinProtocolTable)
 
 const reservedWords = new Set([
 	"if",
