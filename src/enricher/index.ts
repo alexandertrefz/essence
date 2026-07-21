@@ -1,5 +1,6 @@
 import { collectDiagnostics, reportError } from "../diagnostics/index"
 import type { common, enricher, parser } from "../interfaces/index"
+import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import { enrichNode } from "./enrichers"
 import {
 	resolveChoiceDeclarationStatementType,
@@ -8,59 +9,6 @@ import {
 	resolveType,
 	resolveTypeAliasStatementType,
 } from "./resolvers"
-import {
-	namespace as algebraicNamespace,
-	type as algebraicType,
-} from "./types/Algebraic"
-import {
-	namespace as booleanNamespace,
-	type as booleanType,
-} from "./types/Boolean"
-import {
-	namespace as integerNamespace,
-	type as integerType,
-} from "./types/Integer"
-import { namespace as listNamespace, type as listType } from "./types/List"
-import nativeFunctions from "./types/NativeFunctions"
-import {
-	namespace as nothingNamespace,
-	type as nothingType,
-} from "./types/Nothing"
-import {
-	namespace as numberNamespace,
-	type as numberType,
-} from "./types/Number"
-import {
-	namespace as orderingNamespace,
-	type as orderingType,
-} from "./types/Ordering"
-import { Comparable, Equatable, Printable } from "./types/Protocols"
-import {
-	namespace as rationalNamespace,
-	type as rationalType,
-} from "./types/Rational"
-import {
-	namespace as recordNamespace,
-	type as recordType,
-} from "./types/Record"
-import {
-	namespace as stringNamespace,
-	type as stringType,
-} from "./types/String"
-import {
-	namespace as transcendentalNamespace,
-	type as transcendentalType,
-} from "./types/Transcendental"
-
-// NOTE: `Irrational` is a transparent alias for `Algebraic | Transcendental`
-// — the pair are definitional complements (transcendental means "not
-// algebraic"), so the alias covers exactly the representable irrationals and
-// makes `π is Irrational` a true sentence.
-const irrationalType: common.UnionType = {
-	type: "UnionType",
-	name: "Irrational",
-	types: [algebraicType, transcendentalType],
-}
 
 export const enrich = (
 	program: parser.Program,
@@ -71,43 +19,15 @@ export const enrich = (
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
 			let members: Record<string, common.Type> = {
-				...nativeFunctions,
-				String: stringNamespace,
-				Boolean: booleanNamespace,
-				Integer: integerNamespace,
-				Rational: rationalNamespace,
-				Algebraic: algebraicNamespace,
-				Transcendental: transcendentalNamespace,
-				Number: numberNamespace,
-				Nothing: nothingNamespace,
-				Ordering: orderingNamespace,
-				Record: recordNamespace,
-				List: listNamespace,
+				...builtinMembers,
 			}
 
 			let topLevelScope: enricher.Scope = {
 				parent: null,
 				members,
 				constants: new Set(Object.keys(members)),
-				types: {
-					Nothing: nothingType,
-					Boolean: booleanType,
-					String: stringType,
-					Integer: integerType,
-					Rational: rationalType,
-					Algebraic: algebraicType,
-					Transcendental: transcendentalType,
-					Irrational: irrationalType,
-					Record: recordType,
-					Number: numberType,
-					List: listType,
-					Ordering: orderingType,
-				},
-				protocols: {
-					Equatable,
-					Printable,
-					Comparable,
-				},
+				types: { ...builtinTypes },
+				protocols: { ...builtinProtocols },
 			}
 
 			return {
