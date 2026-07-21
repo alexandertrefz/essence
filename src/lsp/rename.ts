@@ -138,9 +138,6 @@ const builtinTypes = [
 	"Record",
 	"Number",
 	"List",
-	"Less",
-	"Equal",
-	"Greater",
 	"Ordering",
 ]
 

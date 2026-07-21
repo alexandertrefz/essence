@@ -63,12 +63,6 @@ export type AnyType =
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	if (type.type === "Nothing") {
 		return value[typeKeySymbol] === "Nothing"
-	} else if (type.type === "Less") {
-		return value[typeKeySymbol] === "Less"
-	} else if (type.type === "Equal") {
-		return value[typeKeySymbol] === "Equal"
-	} else if (type.type === "Greater") {
-		return value[typeKeySymbol] === "Greater"
 	} else if (type.type === "Boolean") {
 		return value[typeKeySymbol] === "Boolean"
 	} else if (type.type === "String") {

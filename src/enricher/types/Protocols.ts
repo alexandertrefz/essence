@@ -103,7 +103,7 @@ export const Comparable: common.ProtocolType = {
 					"Orders the value against another one of the same Type.",
 				parameters: {},
 				returns:
-					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+					"`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
 				position: null,
 			},
 		},
