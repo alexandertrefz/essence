@@ -391,19 +391,19 @@ describe("Validator", () => {
 
 	describe("Protocol Bounds", () => {
 		const boundFunctionSetup = `
-			protocol Printable {
+			protocol Showable {
 				toString() -> String
 			}
 
 			type Vector = { x: Number, y: Number }
 
-			namespace VectorPrintable for Vector is Printable {
+			namespace VectorShowable for Vector is Showable {
 				toString() -> String {
 					<- "vector"
 				}
 			}
 
-			function describeValue <infer Value is Printable>(_ value: Value) -> String {
+			function describeValue <infer Value is Showable>(_ value: Value) -> String {
 				<- value::toString()
 			}
 		`

@@ -390,32 +390,32 @@ describe("Code Generation", () => {
 	describe("Protocols", () => {
 		it("should erase Protocol declarations from the emitted JavaScript", () => {
 			const code = generate(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
 				__print("done")
 			}`)
 
-			expect(code).not.toContain("Printable")
+			expect(code).not.toContain("Showable")
 			expect(code).not.toContain("toString")
 		})
 
 		it("should pass a conformance value at bounded invocations", () => {
 			const code = generate(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
 				type Vector = { x: Number, y: Number }
 
-				namespace VectorPrintable for Vector is Printable {
+				namespace VectorShowable for Vector is Showable {
 					toString() -> String {
 						<- "vector"
 					}
 				}
 
-				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+				function describeValue <infer Value is Showable>(_ value: Value) -> String {
 					<- value::toString()
 				}
 
@@ -426,29 +426,46 @@ describe("Code Generation", () => {
 			// body dispatches through it, and the call site packages the
 			// conforming Namespace's Methods into an object literal.
 			expect(code).toContain("Value__conformance")
-			expect(code).toContain("VectorPrintable.toString")
+			expect(code).toContain("VectorShowable.toString")
 			expect(code).toContain("Value__conformance.toString(")
+		})
+
+		it("should package builtin Namespace Methods into conformance values", () => {
+			const code = generate(`implementation {
+				function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
+					<- match a::compareTo(b) -> Item {
+						case Less    { <- a }
+						case Equal   { <- a }
+						case Greater { <- b }
+					}
+				}
+
+				__print(smaller(5, 3))
+			}`)
+
+			expect(code).toContain("compareTo: Integer.compareTo")
+			expect(code).toContain("Item__conformance.compareTo(")
 		})
 
 		it("should forward a conformance parameter between bounded Functions", () => {
 			const code = generate(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
 				type Vector = { x: Number, y: Number }
 
-				namespace VectorPrintable for Vector is Printable {
+				namespace VectorShowable for Vector is Showable {
 					toString() -> String {
 						<- "vector"
 					}
 				}
 
-				function inner <infer Value is Printable>(_ value: Value) -> String {
+				function inner <infer Value is Showable>(_ value: Value) -> String {
 					<- value::toString()
 				}
 
-				function outer <infer Item is Printable>(_ item: Item) -> String {
+				function outer <infer Item is Showable>(_ item: Item) -> String {
 					<- inner(item)
 				}
 

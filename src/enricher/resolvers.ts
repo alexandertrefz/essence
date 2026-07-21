@@ -583,6 +583,10 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Fractions"
 		case "Nothing":
 			return "Nothings"
+		case "Less":
+		case "Equal":
+		case "Greater":
+			return "Orderings"
 		case "String":
 			return "Strings"
 		case "Unknown":
@@ -1131,12 +1135,32 @@ export function resolveConformances(
 			}
 		}
 
-		let exactCandidates = candidates.filter((candidate) =>
-			isDeepStrictEqual(candidate.type.targetType, binding),
+		// NOTE: Specificity by assignability — a candidate whose target Type
+		// is assignable to another candidate's (but not the other way around)
+		// is the more specific one and wins. This is what lets a Namespace for
+		// a concrete Record shape beat the builtin Record Namespace's blanket
+		// conformance, and an exact target beat a covering Union.
+		let isStrictlyMoreSpecific = (
+			a: common.Type,
+			b: common.Type,
+		): boolean => matchesType(b, a) && !matchesType(a, b)
+
+		let mostSpecificCandidates = candidates.filter(
+			(candidate) =>
+				!candidates.some(
+					(other) =>
+						other !== candidate &&
+						other.type.targetType !== null &&
+						candidate.type.targetType !== null &&
+						isStrictlyMoreSpecific(
+							other.type.targetType,
+							candidate.type.targetType,
+						),
+				),
 		)
 
-		if (exactCandidates.length > 0) {
-			candidates = exactCandidates
+		if (mostSpecificCandidates.length > 0) {
+			candidates = mostSpecificCandidates
 		}
 
 		if (candidates.length === 0) {
@@ -1601,6 +1625,20 @@ export function resolveMethodLookupBaseNamespaces(
 	for (let [name, namespace] of namespaces) {
 		if (namespace.targetType) {
 			if (namespace.targetType.type === "UnionType") {
+				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
+				// the Union target as a whole — the per-member loop below only
+				// covers receivers of a single member Type.
+				if (
+					matchesTypeWithBindings(
+						namespace.targetType,
+						baseType,
+						createInferenceContext(namespace.generics),
+					)
+				) {
+					matchingNamespaces.set(name, namespace)
+					continue
+				}
+
 				for (let type of namespace.targetType.types) {
 					if (
 						matchesTypeWithBindings(

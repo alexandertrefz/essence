@@ -6,6 +6,8 @@ import type { FractionType } from "./Fraction"
 import { createFraction } from "./Fraction"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -231,4 +233,17 @@ export function isGreaterThanOrEqualTo__overload$2(
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
+}
+
+export function compareTo(
+	originalInteger: IntegerType,
+	otherInteger: IntegerType,
+): OrderingType {
+	if (originalInteger.value < otherInteger.value) {
+		return less
+	} else if (originalInteger.value > otherInteger.value) {
+		return greater
+	} else {
+		return equal
+	}
 }

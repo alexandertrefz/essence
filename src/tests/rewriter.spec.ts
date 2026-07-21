@@ -11,8 +11,10 @@ import {
 	isFirstFractionBigger,
 } from "../rewriter/__internal/internalHelpers"
 import * as list from "../rewriter/__internal/List"
+import * as nothingModule from "../rewriter/__internal/Nothing"
 import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
+import * as ordering from "../rewriter/__internal/Ordering"
 import * as record from "../rewriter/__internal/Record"
 import * as string from "../rewriter/__internal/String"
 import { isValueOfType } from "../rewriter/__internal/type"
@@ -5500,6 +5502,93 @@ describe("Rewriter", () => {
 						string.createString("Record"),
 					)
 				})
+			})
+		})
+
+		describe("Ordering", () => {
+			it("compares Ordering values with is and isNot", () => {
+				expect(ordering.is(ordering.less, ordering.less)).toEqual(
+					booleanTrue(),
+				)
+				expect(ordering.is(ordering.less, ordering.greater)).toEqual(
+					booleanFalse(),
+				)
+				expect(
+					ordering.isNot(ordering.equal, ordering.greater),
+				).toEqual(booleanTrue())
+			})
+
+			it("represents Ordering values as their variant name", () => {
+				expect(ordering.toString(ordering.less)).toEqual(
+					string.createString("Less"),
+				)
+				expect(ordering.toString(ordering.equal)).toEqual(
+					string.createString("Equal"),
+				)
+				expect(ordering.toString(ordering.greater)).toEqual(
+					string.createString("Greater"),
+				)
+			})
+
+			it("compares Ordering values with anyIs", () => {
+				expect(anyIs(ordering.less, ordering.less)).toBeTrue()
+				expect(anyIs(ordering.less, ordering.equal)).toBeFalse()
+				expect(anyIs(ordering.less, integerOne())).toBeFalse()
+			})
+
+			it("orders Integers with compareTo", () => {
+				expect(integer.compareTo(integerOne(), integerTwo())).toBe(
+					ordering.less,
+				)
+				expect(integer.compareTo(integerTwo(), integerTwo())).toBe(
+					ordering.equal,
+				)
+				expect(integer.compareTo(integerHundred(), integerTwo())).toBe(
+					ordering.greater,
+				)
+			})
+
+			it("orders Fractions with compareTo", () => {
+				expect(
+					fraction.compareTo(fractionOneHalf(), fractionOne()),
+				).toBe(ordering.less)
+				expect(fraction.compareTo(fractionOne(), fractionOne())).toBe(
+					ordering.equal,
+				)
+				expect(fraction.compareTo(fractionTwo(), fractionOne())).toBe(
+					ordering.greater,
+				)
+			})
+		})
+
+		describe("Protocol runtime gap fills", () => {
+			it("represents a String as itself", () => {
+				expect(string.toString(string.createString("text"))).toEqual(
+					string.createString("text"),
+				)
+			})
+
+			it("represents a List with its items", () => {
+				expect(
+					list.toString(
+						list.createList([integerOne(), integerTwo()]),
+					),
+				).toEqual(string.createString("[ 1, 2 ]"))
+			})
+
+			it("compares Nothing with is and isNot", () => {
+				expect(nothingModule.is(nothing(), nothing())).toEqual(
+					booleanTrue(),
+				)
+				expect(nothingModule.isNot(nothing(), nothing())).toEqual(
+					booleanFalse(),
+				)
+			})
+
+			it("represents Nothing as the String Nothing", () => {
+				expect(nothingModule.toString(nothing())).toEqual(
+					string.createString("Nothing"),
+				)
 			})
 		})
 	})

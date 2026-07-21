@@ -5,6 +5,7 @@ import { is as fractionIs } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import { is as integerIs } from "./Integer"
 import { is as listIs } from "./List"
+import { is as orderingIs } from "./Ordering"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
 import type { AnyType } from "./type"
@@ -64,6 +65,15 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		b[typeKeySymbol] === "List"
 	) {
 		return listIs(a, b).value
+	} else if (
+		(a[typeKeySymbol] === "Less" ||
+			a[typeKeySymbol] === "Equal" ||
+			a[typeKeySymbol] === "Greater") &&
+		(b[typeKeySymbol] === "Less" ||
+			b[typeKeySymbol] === "Equal" ||
+			b[typeKeySymbol] === "Greater")
+	) {
+		return orderingIs(a, b).value
 	} else {
 		return false
 	}
