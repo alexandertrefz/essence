@@ -194,11 +194,18 @@ export type GenericDeclaration = {
 	name: GenericName
 	infer: boolean
 	defaultType: Type | null
+	// NOTE: The Protocol bound of `<infer Item is Comparable>` — null when
+	// the Type Parameter is unbounded. Optional so the hand written builtin
+	// Namespaces stay valid.
+	constraint?: string | null
 }
 
 export type GenericUse = {
 	type: "GenericUse"
 	name: GenericName
+	// NOTE: Set on the GenericUse registered for a bounded Type Parameter —
+	// Method calls on values of this Type resolve through the Protocol.
+	constraint?: string
 }
 
 // NOTE: The unapplied form of a generic Type Alias — use sites apply Type
@@ -208,6 +215,20 @@ export type GenericAliasType = {
 	name: string
 	generics: Array<GenericDeclaration>
 	aliasedType: Type
+}
+
+// NOTE: How a bounded Type Parameter's Protocol requirement is fulfilled at
+// one invocation. A `namespace` source packages the conforming Namespace's
+// Methods into a conformance value at the call site; a `parameter` source
+// forwards the enclosing bounded Function's own conformance parameter.
+export type ConformanceSource =
+	| { kind: "namespace"; name: string; methodMap: Record<string, string> }
+	| { kind: "parameter"; name: string }
+
+export type Conformance = {
+	genericName: string
+	protocolName: string
+	source: ConformanceSource
 }
 
 export type Type =

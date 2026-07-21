@@ -587,6 +587,7 @@ export function genericDeclarationNode(
 	name: parser.IdentifierNode,
 	defaultType: parser.TypeDeclarationNode | null,
 	inferred: boolean,
+	constraint: parser.IdentifierNode | null,
 	position: common.Position,
 ): parser.GenericDeclarationNode {
 	return {
@@ -594,6 +595,7 @@ export function genericDeclarationNode(
 		name,
 		defaultType,
 		inferred,
+		constraint,
 		position,
 	}
 }

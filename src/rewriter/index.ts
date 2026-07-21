@@ -257,6 +257,41 @@ function rewriteExpression(
 			return rewriteIdentifier(node)
 		case "Match":
 			return rewriteMatch(node)
+		case "ConformanceValue":
+			return rewriteConformanceValue(node)
+	}
+}
+
+// NOTE: A conformance value is an object literal that maps each Protocol
+// Method's emitted name onto the conforming Namespace's fulfilling Method —
+// `{ compareTo: Integer.compareTo, … }`. This works uniformly for user
+// Namespaces (classes with static Methods) and builtin runtime modules, and
+// decouples the Protocol's method names from the Namespace's layout.
+function rewriteConformanceValue(
+	node: common.typedSimple.ConformanceValueNode,
+): estree.ObjectExpression {
+	return {
+		type: "ObjectExpression",
+		properties: Object.entries(node.methodMap).map(
+			([protocolMethodName, namespaceMethodName]): estree.Property => ({
+				type: "Property",
+				key: { type: "Identifier", name: protocolMethodName },
+				value: {
+					type: "MemberExpression",
+					object: { type: "Identifier", name: node.namespaceName },
+					property: {
+						type: "Identifier",
+						name: namespaceMethodName,
+					},
+					computed: false,
+					optional: false,
+				},
+				kind: "init",
+				method: false,
+				shorthand: false,
+				computed: false,
+			}),
+		),
 	}
 }
 

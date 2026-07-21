@@ -133,6 +133,7 @@ function simplifyMethodInvocation(
 				value: simplifyExpression(node.base),
 			},
 			...node.arguments.map((arg) => simplifyArgument(arg)),
+			...simplifyConformanceArguments(node.conformances),
 		],
 		type: node.type,
 	}
@@ -154,9 +155,38 @@ function simplifyFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name: simplifyExpression(node.name),
-		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
+		arguments: [
+			...node.arguments.map((arg) => simplifyArgument(arg)),
+			...simplifyConformanceArguments(node.conformances),
+		],
 		type: node.type,
 	}
+}
+
+// NOTE: The hidden trailing Arguments matching a bounded signature's hidden
+// trailing Parameters — a forwarded conformance parameter stays an
+// Identifier, a resolved Namespace becomes a ConformanceValue that the
+// Rewriter emits as a method-map object.
+function simplifyConformanceArguments(
+	conformances: Array<common.Conformance>,
+): Array<common.typedSimple.ArgumentNode> {
+	return conformances.map((conformance) => ({
+		nodeType: "Argument",
+		name: null,
+		value:
+			conformance.source.kind === "parameter"
+				? {
+						nodeType: "Identifier",
+						name: conformance.source.name,
+						type: { type: "Unknown" },
+					}
+				: {
+						nodeType: "ConformanceValue",
+						namespaceName: conformance.source.name,
+						methodMap: conformance.source.methodMap,
+						type: { type: "Unknown" },
+					},
+	}))
 }
 
 function simplifyCombination(
@@ -565,11 +595,30 @@ function simplifyParameter(
 function simplifyFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 ): common.typedSimple.FunctionDefinitionNode {
+	// NOTE: Every Protocol-bounded Type Parameter appends one hidden trailing
+	// Parameter (`Item__conformance`) — call sites append the matching
+	// conformance values in the same Generic declaration order.
+	let conformanceParameters: Array<common.typedSimple.ParameterNode> =
+		node.generics
+			.filter((generic) => generic.constraint !== null)
+			.map((generic) => ({
+				nodeType: "Parameter",
+				externalName: null,
+				internalName: {
+					nodeType: "Identifier",
+					name: `${generic.name}__conformance`,
+					type: { type: "Unknown" },
+				},
+			}))
+
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((param, index) =>
-			simplifyParameter(param, index),
-		),
+		parameters: [
+			...node.parameters.map((param, index) =>
+				simplifyParameter(param, index),
+			),
+			...conformanceParameters,
+		],
 		body: node.body.map((node) => simplifyImplementationNode(node)),
 		returnType: node.returnType,
 	}
