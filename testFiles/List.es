@@ -1,6 +1,6 @@
 implementation {
 
-	function greaterThanTwo(_ item: Number) -> Boolean {
+	function greaterThanTwo(_ item: Integer | Rational) -> Boolean {
 		<- match item -> Boolean {
 			case Rational { <- @::isGreaterThan(2) }
 			case Integer  { <- @::isGreaterThan(2) }
@@ -8,7 +8,7 @@ implementation {
 	}
 
 	variable list: List<Rational> = []
-	variable tau = list::append(Number.TAU)::firstItem()
+	variable approximateTau = list::append(710/113)::firstItem()
 
 	list = list::append(1/1)
 	list = list::append(contentsOf [2/1])

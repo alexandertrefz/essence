@@ -80,6 +80,21 @@ export type RationalType = {
 	type: "Rational"
 }
 
+// NOTE: A real algebraic irrational — the quadratic slice `a + b·√d` for now,
+// designed to grow to the full set (roots of integer polynomials) without a
+// semantic change. Exactly comparable; conforms to Comparable.
+export type AlgebraicType = {
+	type: "Algebraic"
+}
+
+// NOTE: A number that is provably NOT algebraic — rational combinations of π
+// for now. Equality is canonical-form equality; deliberately does NOT conform
+// to Comparable (deciding `Ordering#Equal` is undecidable in general), though
+// the `Number` Namespace hand-writes total cross-member comparisons.
+export type TranscendentalType = {
+	type: "Transcendental"
+}
+
 export type RecordType = {
 	type: "Record"
 	members: Record<string, Type>
@@ -164,6 +179,8 @@ export type PrimitiveType =
 	| StringType
 	| IntegerType
 	| RationalType
+	| AlgebraicType
+	| TranscendentalType
 	| RecordType
 	| CaseType
 	| ListType

@@ -95,6 +95,34 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: { type: "Rational" },
 				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Algebraic" },
+						},
+					],
+					returnType: { type: "Algebraic" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Transcendental" },
+						},
+					],
+					returnType: { type: "Transcendental" },
+				},
 			],
 		},
 
@@ -128,6 +156,34 @@ export const namespace: common.NamespaceType = {
 						},
 					],
 					returnType: { type: "Rational" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Algebraic" },
+						},
+					],
+					returnType: { type: "Algebraic" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Transcendental" },
+						},
+					],
+					returnType: { type: "Transcendental" },
 				},
 			],
 		},
@@ -169,6 +225,23 @@ export const namespace: common.NamespaceType = {
 						types: [{ type: "Rational" }, { type: "Nothing" }],
 					},
 				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Algebraic" },
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Algebraic" }, { type: "Rational" }],
+					},
+				},
 			],
 		},
 
@@ -202,6 +275,43 @@ export const namespace: common.NamespaceType = {
 						},
 					],
 					returnType: { type: "Rational" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Algebraic" },
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Algebraic" }, { type: "Rational" }],
+					},
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Rational" },
+						},
+						{
+							name: null,
+							type: { type: "Transcendental" },
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [
+							{ type: "Transcendental" },
+							{ type: "Rational" },
+						],
+					},
 				},
 			],
 		},
@@ -340,6 +450,32 @@ export const namespace: common.NamespaceType = {
 					returnType: { type: "Boolean" },
 				},
 			],
+		},
+
+		squareRoot: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Rational" },
+				},
+			],
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Rational" },
+					{ type: "Algebraic" },
+					{ type: "Nothing" },
+				],
+			},
+			documentation: {
+				description:
+					"The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 		},
 
 		toString: {

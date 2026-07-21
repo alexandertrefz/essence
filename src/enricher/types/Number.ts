@@ -3,7 +3,12 @@ import { type as orderingType } from "./Ordering"
 
 export const type: common.UnionType = {
 	type: "UnionType",
-	types: [{ type: "Integer" }, { type: "Rational" }],
+	types: [
+		{ type: "Integer" },
+		{ type: "Rational" },
+		{ type: "Algebraic" },
+		{ type: "Transcendental" },
+	],
 }
 
 // NOTE: The Union-level behaviour of `Number` — cross-member semantics only
@@ -11,6 +16,13 @@ export const type: common.UnionType = {
 // true), while the member Namespaces stay representational; Method target
 // specificity routes single-member receivers to those, so these Methods only
 // answer for Union-typed receivers and mixed-member Arguments.
+//
+// `compareTo` hand-writes all sixteen member cells and keeps the Comparable
+// conformance even though Transcendental alone does not conform: every
+// cross-kind cell is total because equality across kinds is impossible by
+// definition, and the only cell that could ever need a documented cutoff —
+// Transcendental against Transcendental — is exact within the current
+// linear-in-π grammar.
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Number",
@@ -18,8 +30,8 @@ export const namespace: common.NamespaceType = {
 	conformsTo: ["Equatable", "Printable", "Comparable"],
 	generics: [],
 	properties: {
-		PI: { type: "Rational" },
-		TAU: { type: "Rational" },
+		PI: { type: "Transcendental" },
+		TAU: { type: "Transcendental" },
 	},
 	methods: {
 		is: {

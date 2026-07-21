@@ -1,4 +1,5 @@
 import { enrich } from "../enricher/index"
+import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as listNamespace } from "../enricher/types/List"
@@ -9,6 +10,7 @@ import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
+import { namespace as transcendentalNamespace } from "../enricher/types/Transcendental"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -30,6 +32,8 @@ export const builtinNamespaces: Array<common.NamespaceType> = [
 	booleanNamespace,
 	integerNamespace,
 	rationalNamespace,
+	algebraicNamespace,
+	transcendentalNamespace,
 	numberNamespace,
 	nothingNamespace,
 	orderingNamespace,

@@ -18,6 +18,8 @@ implementation {
 				match @ -> String {
 					case Integer  { <- @::toString() }
 					case Rational { <- @::toString() }
+					case Algebraic { <- @::toString() }
+					case Transcendental { <- @::toString() }
 				}
 			)
 		}

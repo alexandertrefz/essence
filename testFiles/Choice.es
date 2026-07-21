@@ -33,6 +33,10 @@ implementation {
 			<- @.left::multiplyWith(@.right)
 		}
 
+		case #SquareRoot {
+			<- @.number::squareRoot()
+		}
+
 		case _ {
 			<- nothing
 		}
@@ -42,6 +46,8 @@ implementation {
 		case Nothing { <- "nothing" }
 		case Integer { <- @::toString() }
 		case Rational { <- @::toString() }
+		case Algebraic { <- @::toString() }
+		case Transcendental { <- @::toString() }
 	})
 
 	constant cleared: CalculatorOperation = #ClearAll
