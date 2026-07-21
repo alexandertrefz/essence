@@ -19,7 +19,7 @@ import { typeKeySymbol } from "./type"
 // #region Constants
 
 export const PI = createRational(355n, 113n)
-export const TAO = createRational(710n, 113n)
+export const TAU = createRational(710n, 113n)
 
 // #endregion
 

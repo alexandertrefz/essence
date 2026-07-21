@@ -19,7 +19,7 @@ export const namespace: common.NamespaceType = {
 	generics: [],
 	properties: {
 		PI: { type: "Rational" },
-		TAO: { type: "Rational" },
+		TAU: { type: "Rational" },
 	},
 	methods: {
 		is: {
