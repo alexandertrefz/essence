@@ -845,6 +845,10 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Integers"
 		case "Rational":
 			return "Rationals"
+		case "Algebraic":
+			return "Algebraics"
+		case "Transcendental":
+			return "Transcendentals"
 		case "Nothing":
 			return "Nothings"
 		case "String":

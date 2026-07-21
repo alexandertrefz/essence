@@ -1,3 +1,4 @@
+import { toString as algebraicToString } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { toString as boolToString } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -7,6 +8,7 @@ import type { RationalType } from "./Rational"
 import { toString__overload$1 as rationalToString } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
+import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
@@ -68,6 +70,10 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		}
 	} else if (obj[typeKeySymbol] === "Rational") {
 		return rationalToString(obj).value
+	} else if (obj[typeKeySymbol] === "Algebraic") {
+		return algebraicToString(obj).value
+	} else if (obj[typeKeySymbol] === "Transcendental") {
+		return transcendentalToString(obj).value
 	} else if (obj[typeKeySymbol] === "Integer") {
 		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {

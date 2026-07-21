@@ -1372,7 +1372,7 @@ describe("Enricher", () => {
 			return value
 		}
 
-		it("should dispatch a Number receiver to the Integer and Rational Namespaces", () => {
+		it("should dispatch a Number receiver to every member Namespace", () => {
 			let invocation = lastConstantValue(`implementation {
 				constant number: Number = 5
 				constant doubled = number::multiplyWith(2)
@@ -1384,10 +1384,15 @@ describe("Enricher", () => {
 				invocation.dispatch?.map(
 					(dispatchCase) => dispatchCase.namespaceName,
 				),
-			).toEqual(["Integer", "Rational"])
+			).toEqual(["Integer", "Rational", "Algebraic", "Transcendental"])
 			expect(invocation.type).toEqual({
 				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Rational" }],
+				types: [
+					{ type: "Integer" },
+					{ type: "Rational" },
+					{ type: "Algebraic" },
+					{ type: "Transcendental" },
+				],
 			})
 		})
 

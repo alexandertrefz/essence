@@ -9,6 +9,10 @@ import {
 	resolveTypeAliasStatementType,
 } from "./resolvers"
 import {
+	namespace as algebraicNamespace,
+	type as algebraicType,
+} from "./types/Algebraic"
+import {
 	namespace as booleanNamespace,
 	type as booleanType,
 } from "./types/Boolean"
@@ -43,6 +47,20 @@ import {
 	namespace as stringNamespace,
 	type as stringType,
 } from "./types/String"
+import {
+	namespace as transcendentalNamespace,
+	type as transcendentalType,
+} from "./types/Transcendental"
+
+// NOTE: `Irrational` is a transparent alias for `Algebraic | Transcendental`
+// — the pair are definitional complements (transcendental means "not
+// algebraic"), so the alias covers exactly the representable irrationals and
+// makes `π is Irrational` a true sentence.
+const irrationalType: common.UnionType = {
+	type: "UnionType",
+	name: "Irrational",
+	types: [algebraicType, transcendentalType],
+}
 
 export const enrich = (
 	program: parser.Program,
@@ -58,6 +76,8 @@ export const enrich = (
 				Boolean: booleanNamespace,
 				Integer: integerNamespace,
 				Rational: rationalNamespace,
+				Algebraic: algebraicNamespace,
+				Transcendental: transcendentalNamespace,
 				Number: numberNamespace,
 				Nothing: nothingNamespace,
 				Ordering: orderingNamespace,
@@ -75,6 +95,9 @@ export const enrich = (
 					String: stringType,
 					Integer: integerType,
 					Rational: rationalType,
+					Algebraic: algebraicType,
+					Transcendental: transcendentalType,
+					Irrational: irrationalType,
 					Record: recordType,
 					Number: numberType,
 					List: listType,

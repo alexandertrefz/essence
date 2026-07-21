@@ -130,8 +130,8 @@ describe("Validator", () => {
 		it("should accept exhaustive Match Expressions", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant value: Number = 5
-					constant a = match value -> Number {
+					constant value: Integer | Rational = 5
+					constant a = match value -> Integer | Rational {
 						case Integer {
 							<- @
 						}
@@ -146,8 +146,8 @@ describe("Validator", () => {
 
 		it("should report non-exhaustive Match Expressions", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant value: Number = 5
-				constant a = match value -> Number {
+				constant value: Integer | Rational = 5
+				constant a = match value -> Integer | Rational {
 					case Integer {
 						<- @
 					}
@@ -259,8 +259,8 @@ describe("Validator", () => {
 
 		it("should report Match cases that do not return on all code paths", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant value: Number = 5
-				constant a = match value -> Number {
+				constant value: Integer | Rational = 5
+				constant a = match value -> Integer | Rational {
 					case Integer {
 						<- @
 					}
