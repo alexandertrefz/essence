@@ -234,6 +234,8 @@ function rewriteExpression(
 			return rewriteFunctionInvocation(node)
 		case "MethodInvocation":
 			return rewriteMethodInvocation(node)
+		case "UnionMethodInvocation":
+			return rewriteUnionMethodInvocation(node)
 		case "Combination":
 			return rewriteCombination(node)
 		case "RecordValue":
@@ -368,6 +370,67 @@ function rewriteMethodInvocation(
 			computed: false,
 		},
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
+	}
+}
+
+// NOTE: A Method Invocation on a Union-typed receiver — emitted as
+// `$type.dispatchMethod(receiver, [args…], [[descriptor, Namespace.method,
+// [conformances…]], …])`. The helper evaluates receiver and Arguments once
+// and runs the first case whose member Type descriptor accepts the receiver;
+// the Enricher ordered the cases most specific first and guarantees one
+// matches.
+function rewriteUnionMethodInvocation(
+	node: common.typedSimple.UnionMethodInvocationNode,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "dispatchMethod" },
+			computed: false,
+		},
+		arguments: [
+			rewriteExpression(node.base),
+			{
+				type: "ArrayExpression",
+				elements: node.arguments.map((arg) => rewriteArgument(arg)),
+			},
+			{
+				type: "ArrayExpression",
+				elements: node.cases.map(
+					(dispatchCase): estree.ArrayExpression => ({
+						type: "ArrayExpression",
+						elements: [
+							convertObjectToObjectExpression(
+								dispatchCase.memberType,
+							),
+							{
+								type: "MemberExpression",
+								optional: false,
+								object: {
+									type: "Identifier",
+									name: dispatchCase.namespaceName,
+								},
+								property: {
+									type: "Identifier",
+									name: dispatchCase.methodName,
+								},
+								computed: false,
+							},
+							{
+								type: "ArrayExpression",
+								elements: dispatchCase.conformanceArguments.map(
+									(arg) => rewriteArgument(arg),
+								),
+							},
+						],
+					}),
+				),
+			},
+		],
 	}
 }
 

@@ -205,6 +205,35 @@ describe("Completion", () => {
 
 			expect(append?.detail).toBe("(_ String) -> String")
 		})
+
+		it("should offer only dispatchable Methods on a Union-typed receiver", () => {
+			let source = [
+				"implementation {",
+				"\tconstant value: Integer | Nothing = 5",
+				"\tvalue::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 9 })
+
+			expect(labels).toContain("toString")
+			expect(labels).toContain("is")
+			expect(labels).not.toContain("add")
+		})
+
+		it("should offer member Methods on a Number receiver", () => {
+			let source = [
+				"implementation {",
+				"\tconstant number: Number = 5",
+				"\tnumber::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 10 })
+
+			expect(labels).toContain("multiplyWith")
+			expect(labels).toContain("toString")
+		})
 	})
 
 	describe("Scope completion", () => {

@@ -5,6 +5,7 @@ import {
 	applyGenericBindings,
 	computeConformanceMethodMap,
 	createInferenceContext,
+	flattenUnionMembers,
 	type GenericBindings,
 	type MatchableArgument,
 	matchArguments,
@@ -238,6 +239,7 @@ export function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
 	resolvedNamespace: common.NamespaceType,
 	scope: enricher.Scope,
+	receiverType: common.Type | null = null,
 ):
 	| {
 			returnType: common.Type
@@ -249,24 +251,25 @@ export function resolveInvokedMethodInNamespace(
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
 
-	let methodArguments: Array<parser.ArgumentNode> = [...node.arguments]
-
-	if (
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "OverloadedMethod"
-	) {
-		methodArguments = [
-			{ nodeType: "Argument", name: null, value: node.base },
-			...node.arguments,
-		]
-	}
-
-	let matchableArguments: Array<MatchableArgument> = methodArguments.map(
+	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
 			getType: () => resolveType(argument.value, scope),
 		}),
 	)
+
+	if (
+		methodType.type === "SimpleMethod" ||
+		methodType.type === "OverloadedMethod"
+	) {
+		// NOTE: Union dispatch resolves the Method once per member Type — the
+		// override stands in for the receiver so each member is matched as if
+		// the receiver had that Type.
+		matchableArguments.unshift({
+			name: null,
+			getType: () => receiverType ?? resolveType(node.base, scope),
+		})
+	}
 
 	if (
 		methodType.type === "SimpleMethod" ||
@@ -316,44 +319,60 @@ export function resolveInvokedMethodInNamespace(
 
 // NOTE: Failed Method Invocations resolve to a placeholder Namespace and an
 // Error Type — the Diagnostic has already been reported, and later stages
-// only run when there are no Error Diagnostics.
-function resolveFailedMethodInvocation(): {
+// only run when there are no Error Diagnostics. Dispatched Invocations reuse
+// the placeholder Namespace: their targets live in `dispatch` instead.
+function placeholderNamespace(): { name: string; type: common.NamespaceType } {
+	return {
+		name: "",
+		type: {
+			type: "Namespace",
+			targetType: null,
+			name: "",
+			generics: [],
+			properties: {},
+			methods: {},
+		},
+	}
+}
+
+type ResolvedMethodInvocation = {
 	namespace: { name: string; type: common.NamespaceType }
 	type: common.Type
 	overloadedMethodIndex: number | null
 	conformances: Array<common.Conformance>
-} {
+	dispatch: Array<common.DispatchCase> | null
+}
+
+function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 	return {
-		namespace: {
-			name: "",
-			type: {
-				type: "Namespace",
-				targetType: null,
-				name: "",
-				generics: [],
-				properties: {},
-				methods: {},
-			},
-		},
+		namespace: placeholderNamespace(),
 		type: { type: "Error" },
 		overloadedMethodIndex: null,
 		conformances: [],
+		dispatch: null,
 	}
 }
 
 export function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
-): {
-	namespace: { name: string; type: common.NamespaceType }
-	type: common.Type
-	overloadedMethodIndex: number | null
-	conformances: Array<common.Conformance>
-} {
-	let namespaces = resolveMethodLookupBaseNamespaces(node, scope)
+): ResolvedMethodInvocation {
+	let baseType = resolveType(node.base, scope)
+	let namespaces = resolveMethodLookupNamespacesForReceiverType(
+		baseType,
+		node.namespaceSpecifier,
+		scope,
+	)
 
+	// NOTE: A Union-typed receiver falls back to per-member dispatch whenever
+	// no Namespace covering the whole Union can resolve the Method — a
+	// covering Namespace that can (`Ordering`) keeps taking precedence.
 	if (namespaces.size === 0) {
-		if (resolveType(node.base, scope).type !== "Error") {
+		if (baseType.type === "UnionType") {
+			return resolveUnionMethodDispatch(node, baseType, scope)
+		}
+
+		if (baseType.type !== "Error") {
 			reportError(
 				`Could not find a Namespace for this value (method '${node.member.content}').`,
 				node.base.position,
@@ -371,6 +390,10 @@ export function resolveMethodInvocation(
 	}
 
 	if (matchingNamespaces.size === 0) {
+		if (baseType.type === "UnionType") {
+			return resolveUnionMethodDispatch(node, baseType, scope)
+		}
+
 		reportError(
 			`Could not find a method named '${node.member.content}' in the Namespaces matching this value.`,
 			node.member.position,
@@ -404,6 +427,13 @@ export function resolveMethodInvocation(
 	}
 
 	if (resolvedMethods.length === 0) {
+		// NOTE: The covering Namespace has the Method but its overloads
+		// reject the Arguments — per-member dispatch may still accept them,
+		// since each member is matched with its own receiver Type.
+		if (baseType.type === "UnionType") {
+			return resolveUnionMethodDispatch(node, baseType, scope)
+		}
+
 		reportError(
 			"Passed arguments do not match any overload.",
 			node.position,
@@ -428,6 +458,7 @@ export function resolveMethodInvocation(
 				scope,
 				node.position,
 			),
+			dispatch: null,
 		}
 	} else {
 		reportError(
@@ -445,6 +476,185 @@ ${resolvedMethods
 
 		return resolveFailedMethodInvocation()
 	}
+}
+
+// NOTE: Per-member dispatch for a Union-typed receiver — the Method is
+// resolved statically for every member Type, and the Invocation is only
+// valid when every member resolves unambiguously. Its Type is the Union of
+// the branch return Types. The receiver's actual Type picks the branch at
+// runtime, so more specific member Types are ordered first — an open Record
+// member would otherwise swallow values of any member assignable to it.
+function resolveUnionMethodDispatch(
+	node: parser.MethodInvocationNode,
+	unionType: common.UnionType,
+	scope: enricher.Scope,
+): ResolvedMethodInvocation {
+	let members = flattenUnionMembers(unionType)
+	let dispatchCases: Array<common.DispatchCase> = []
+	let caseReturnTypes: Array<common.Type> = []
+
+	for (let [memberIndex, memberType] of members.entries()) {
+		let namespaces = resolveMethodLookupNamespacesForReceiverType(
+			memberType,
+			node.namespaceSpecifier,
+			scope,
+		)
+
+		let matchingNamespaces = new Map<string, common.NamespaceType>()
+		for (let [name, namespace] of namespaces) {
+			if (Object.hasOwn(namespace.methods, node.member.content)) {
+				matchingNamespaces.set(name, namespace)
+			}
+		}
+
+		if (matchingNamespaces.size === 0) {
+			reportError(
+				`Could not find a method named '${node.member.content}' for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type.`,
+				node.member.position,
+			)
+
+			return resolveFailedMethodInvocation()
+		}
+
+		let resolvedMethods = []
+
+		for (let [namespaceName, namespaceType] of matchingNamespaces) {
+			let resolvedMethod = resolveInvokedMethodInNamespace(
+				node,
+				namespaceType,
+				scope,
+				memberType,
+			)
+
+			if (resolvedMethod) {
+				resolvedMethods.push({ namespaceName, ...resolvedMethod })
+			}
+		}
+
+		if (resolvedMethods.length === 0) {
+			reportError(
+				`Passed arguments do not match any overload for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type.`,
+				node.position,
+			)
+
+			return resolveFailedMethodInvocation()
+		}
+
+		if (resolvedMethods.length > 1) {
+			reportError(
+				`Passed arguments matched more than 1 Namespace for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type, please disambiguate.
+
+The matching Namespaces are:
+${resolvedMethods
+	.map((method) => {
+		return `    - ${method.namespaceName}`
+	})
+	.join("\n")}
+`,
+				node.position,
+			)
+
+			return resolveFailedMethodInvocation()
+		}
+
+		let resolvedMethod = resolvedMethods[0]
+
+		// NOTE: Unbound Type Parameters depend on the Arguments, which every
+		// branch shares — reporting them for the first member only keeps the
+		// Diagnostic from repeating per member.
+		if (memberIndex === 0) {
+			reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
+		}
+
+		dispatchCases.push({
+			memberType,
+			namespaceName: resolvedMethod.namespaceName,
+			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
+			conformances: resolveConformances(
+				resolvedMethod.signatureGenerics,
+				resolvedMethod.bindings,
+				scope,
+				node.position,
+			),
+		})
+		caseReturnTypes.push(resolvedMethod.returnType)
+	}
+
+	let catchAllCases = dispatchCases.filter((dispatchCase) =>
+		isRuntimeCatchAllType(dispatchCase.memberType),
+	)
+
+	if (catchAllCases.length > 1) {
+		reportError(
+			`This method can not be dispatched — ${catchAllCases.length} member Types of this value's Union Type are indistinguishable at runtime.`,
+			node.position,
+		)
+
+		return resolveFailedMethodInvocation()
+	}
+
+	let sortedCases = [...dispatchCases].sort((a, b) => {
+		let aCatchAll = isRuntimeCatchAllType(a.memberType)
+		let bCatchAll = isRuntimeCatchAllType(b.memberType)
+
+		if (aCatchAll !== bCatchAll) {
+			return aCatchAll ? 1 : -1
+		}
+
+		let aIsMoreSpecific =
+			matchesType(b.memberType, a.memberType) &&
+			!matchesType(a.memberType, b.memberType)
+		let bIsMoreSpecific =
+			matchesType(a.memberType, b.memberType) &&
+			!matchesType(b.memberType, a.memberType)
+
+		if (aIsMoreSpecific) {
+			return -1
+		} else if (bIsMoreSpecific) {
+			return 1
+		} else {
+			return 0
+		}
+	})
+
+	let returnTypes: Array<common.Type> = []
+
+	for (let returnType of caseReturnTypes) {
+		let flattened =
+			returnType.type === "UnionType"
+				? flattenUnionMembers(returnType)
+				: [returnType]
+
+		for (let member of flattened) {
+			if (
+				!returnTypes.some(
+					(existing) =>
+						matchesType(existing, member) &&
+						matchesType(member, existing),
+				)
+			) {
+				returnTypes.push(member)
+			}
+		}
+	}
+
+	return {
+		namespace: placeholderNamespace(),
+		type:
+			returnTypes.length === 1
+				? returnTypes[0]
+				: { type: "UnionType", types: returnTypes },
+		overloadedMethodIndex: null,
+		conformances: [],
+		dispatch: sortedCases,
+	}
+}
+
+// NOTE: `isValueOfType` answers true for every value on these — such a
+// member can only ever be the last dispatch branch, and two of them can not
+// coexist in one dispatched Union.
+function isRuntimeCatchAllType(type: common.Type): boolean {
+	return type.type === "GenericUse" || type.type === "Unknown"
 }
 
 export function resolveMethodInvocationType(
@@ -1572,7 +1782,18 @@ export function resolveMethodLookupBaseNamespaces(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
 ): Map<string, common.NamespaceType> {
-	let baseType = resolveType(node.base, scope)
+	return resolveMethodLookupNamespacesForReceiverType(
+		resolveType(node.base, scope),
+		node.namespaceSpecifier,
+		scope,
+	)
+}
+
+export function resolveMethodLookupNamespacesForReceiverType(
+	baseType: common.Type,
+	namespaceSpecifier: parser.MethodInvocationNode["namespaceSpecifier"],
+	scope: enricher.Scope,
+): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
 	// NOTE: Error Types match any targetType — instead of every Namespace,
@@ -1616,7 +1837,7 @@ export function resolveMethodLookupBaseNamespaces(
 		return matchingNamespaces
 	}
 
-	let namespaces = getAllNamespacesInScope(scope, node.namespaceSpecifier)
+	let namespaces = getAllNamespacesInScope(scope, namespaceSpecifier)
 
 	// NOTE: Generic Namespaces match their target Type by binding the
 	// Namespace's Generics against the receiver — the bindings are only used

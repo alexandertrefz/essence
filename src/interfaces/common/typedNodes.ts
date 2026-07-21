@@ -1,6 +1,7 @@
 import type {
 	BooleanType,
 	Conformance,
+	DispatchCase,
 	Documentation,
 	FractionType,
 	FunctionType,
@@ -70,6 +71,10 @@ export interface MethodInvocationNode {
 	type: Type
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: Set for Union-typed receivers whose Method resolves per member
+	// Type — `namespace` and `overloadedMethodIndex` then hold placeholders,
+	// and each case carries its own statically resolved target.
+	dispatch: Array<DispatchCase> | null
 }
 
 export interface FunctionInvocationNode {

@@ -377,6 +377,22 @@ function findFulfillingMethodName(
 
 // #endregion
 
+export function flattenUnionMembers(
+	type: common.UnionType,
+): Array<common.Type> {
+	let members: Array<common.Type> = []
+
+	for (let member of type.types) {
+		if (member.type === "UnionType") {
+			members.push(...flattenUnionMembers(member))
+		} else {
+			members.push(member)
+		}
+	}
+
+	return members
+}
+
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }

@@ -475,4 +475,81 @@ describe("Code Generation", () => {
 			expect(code).toContain("inner(item, Item__conformance)")
 		})
 	})
+
+	describe("Union Method Dispatch", () => {
+		it("should emit a runtime dispatch with one statically resolved target per member", () => {
+			const code = generate(`implementation {
+				constant number: Number = 5
+
+				__print(number::toString())
+			}`)
+
+			expect(code).toContain("$type.dispatchMethod")
+			expect(code).toContain("Integer.toString")
+			expect(code).toContain("Fraction.toString")
+		})
+
+		it("should mangle overloaded Method names per dispatch case", () => {
+			const code = generate(`implementation {
+				constant number: Number = 5
+
+				__print(number::multiplyWith(2)::toString())
+			}`)
+
+			expect(code).toContain("Integer.multiplyWith__overload$")
+			expect(code).toContain("Fraction.multiplyWith__overload$")
+		})
+
+		it("should dispatch a bounded Type Parameter member through the conformance parameter", () => {
+			const code = generate(`implementation {
+				function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
+					<- items::firstItem()::toString()
+				}
+
+				__print(firstText([1, 2]))
+			}`)
+
+			expect(code).toContain("$type.dispatchMethod")
+			expect(code).toContain("Nothing.toString")
+			expect(code).toContain("Item__conformance.toString")
+		})
+
+		it("should order the catch-all Type Parameter case last", () => {
+			const code = generate(`implementation {
+				function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
+					<- items::firstItem()::toString()
+				}
+
+				__print(firstText([1, 2]))
+			}`)
+
+			expect(code.indexOf("Nothing.toString")).toBeGreaterThan(-1)
+			expect(code.indexOf("Nothing.toString")).toBeLessThan(
+				code.indexOf("Item__conformance.toString"),
+			)
+		})
+
+		it("should emit member Namespaces of a user Union as call targets", () => {
+			const code = generate(`implementation {
+				namespace IntegerTag for Integer {
+					tag() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace BooleanTag for Boolean {
+					tag() -> String {
+						<- "boolean"
+					}
+				}
+
+				constant value: Integer | Boolean = 5
+
+				__print(value::tag())
+			}`)
+
+			expect(code).toContain("IntegerTag.tag")
+			expect(code).toContain("BooleanTag.tag")
+		})
+	})
 })
