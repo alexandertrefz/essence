@@ -6,6 +6,8 @@ import type { IntegerType } from "./Integer"
 import { createInteger, toString as integerToString } from "./Integer"
 import { isFirstRationalBigger } from "./internalHelpers"
 import type { ListType } from "./List"
+import type { NothingType } from "./Nothing"
+import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
@@ -87,7 +89,11 @@ export function lowestNumber__overload$4(
 
 export function lowestNumber__overload$5(
 	integers: ListType<IntegerType>,
-): IntegerType {
+): IntegerType | NothingType {
+	if (integers.value.length === 0) {
+		return createNothing()
+	}
+
 	let lowestInteger = integers.value[0]
 
 	for (let integer of integers.value.slice(1)) {
@@ -101,7 +107,11 @@ export function lowestNumber__overload$5(
 
 export function lowestNumber__overload$6(
 	rationals: ListType<RationalType>,
-): RationalType {
+): RationalType | NothingType {
+	if (rationals.value.length === 0) {
+		return createNothing()
+	}
+
 	let lowestRational = rationals.value[0]
 
 	for (let rational of rationals.value.slice(1)) {
@@ -118,7 +128,11 @@ export function lowestNumber__overload$6(
 
 export function lowestNumber__overload$7(
 	numbers: ListType<IntegerType | RationalType>,
-): IntegerType | RationalType {
+): IntegerType | RationalType | NothingType {
+	if (numbers.value.length === 0) {
+		return createNothing()
+	}
+
 	let lowestNumber = numbers.value[0]
 
 	for (let number of numbers.value.slice(1)) {
@@ -236,7 +250,11 @@ export function greatestNumber__overload$4(
 
 export function greatestNumber__overload$5(
 	integers: ListType<IntegerType>,
-): IntegerType {
+): IntegerType | NothingType {
+	if (integers.value.length === 0) {
+		return createNothing()
+	}
+
 	let greatestInteger = integers.value[0]
 
 	for (let integer of integers.value.slice(1)) {
@@ -250,7 +268,11 @@ export function greatestNumber__overload$5(
 
 export function greatestNumber__overload$6(
 	rationals: ListType<RationalType>,
-): RationalType {
+): RationalType | NothingType {
+	if (rationals.value.length === 0) {
+		return createNothing()
+	}
+
 	let greatestRational = rationals.value[0]
 
 	for (let rational of rationals.value.slice(1)) {
@@ -269,7 +291,11 @@ export function greatestNumber__overload$6(
 
 export function greatestNumber__overload$7(
 	numbers: ListType<IntegerType | RationalType>,
-): IntegerType | RationalType {
+): IntegerType | RationalType | NothingType {
+	if (numbers.value.length === 0) {
+		return createNothing()
+	}
+
 	let greatestNumber = numbers.value[0]
 
 	for (let number of numbers.value.slice(1)) {
