@@ -3,6 +3,8 @@ import { Fraction } from "bigint-fraction"
 import type { BooleanType } from "./Boolean"
 import { createBoolean, negate } from "./Boolean"
 import type { IntegerType } from "./Integer"
+import type { NothingType } from "./Nothing"
+import { createNothing } from "./Nothing"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -24,7 +26,14 @@ export function createFraction(
 	}
 }
 
-export function of(numerator: IntegerType, denominator: IntegerType) {
+export function of(
+	numerator: IntegerType,
+	denominator: IntegerType,
+): FractionType | NothingType {
+	if (denominator.value === 0n) {
+		return createNothing()
+	}
+
 	return createFraction(numerator.value, denominator.value)
 }
 
@@ -116,11 +125,15 @@ export function subtract__overload$2(
 export function divideBy__overload$1(
 	firstFraction: FractionType,
 	secondFraction: FractionType,
-): FractionType {
+): FractionType | NothingType {
 	const numerator1 = firstFraction.fraction.numerator
 	const denominator1 = firstFraction.fraction.denominator
 	const numerator2 = secondFraction.fraction.numerator
 	const denominator2 = secondFraction.fraction.denominator
+
+	if (numerator2 === 0n) {
+		return createNothing()
+	}
 
 	return createFraction(numerator1 * denominator2, denominator1 * numerator2)
 }
@@ -128,7 +141,11 @@ export function divideBy__overload$1(
 export function divideBy__overload$2(
 	fraction: FractionType,
 	integer: IntegerType,
-): FractionType {
+): FractionType | NothingType {
+	if (integer.value === 0n) {
+		return createNothing()
+	}
+
 	let clonedFraction = fraction.fraction.clone()
 
 	clonedFraction.divide(integer.value)

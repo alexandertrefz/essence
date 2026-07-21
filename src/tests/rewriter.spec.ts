@@ -1194,6 +1194,22 @@ describe("Rewriter", () => {
 						),
 					).toEqual(fraction.createFraction(100n, 2n))
 				})
+
+				it("returns Nothing when dividing by zero", () => {
+					expect(
+						integer.divideBy__overload$1(
+							integerOne(),
+							integerZero(),
+						),
+					).toEqual(nothing())
+
+					expect(
+						integer.divideBy__overload$2(
+							integerOne(),
+							fraction.createFraction(0n, 1n),
+						),
+					).toEqual(nothing())
+				})
 			})
 
 			describe("isLessThan", () => {
@@ -2152,6 +2168,12 @@ describe("Rewriter", () => {
 						fractionOneHalf(),
 					)
 				})
+
+				it("returns Nothing for a zero denominator", () => {
+					expect(fraction.of(integerOne(), integerZero())).toEqual(
+						nothing(),
+					)
+				})
 			})
 
 			describe("is", () => {
@@ -2178,7 +2200,7 @@ describe("Rewriter", () => {
 							fraction.divideBy__overload$1(
 								fractionTwo(),
 								fractionTwo(),
-							),
+							) as fraction.FractionType,
 						),
 					).toEqual(booleanTrue())
 
@@ -2187,7 +2209,7 @@ describe("Rewriter", () => {
 							fraction.divideBy__overload$1(
 								fractionTwo(),
 								fractionTwo(),
-							),
+							) as fraction.FractionType,
 							fractionOne(),
 						),
 					).toEqual(booleanTrue())
@@ -2495,6 +2517,22 @@ describe("Rewriter", () => {
 							integerTwo(),
 						),
 					).toEqual(fraction.createFraction(100n, 2n))
+				})
+
+				it("returns Nothing when dividing by zero", () => {
+					expect(
+						fraction.divideBy__overload$1(
+							fractionOne(),
+							fraction.createFraction(0n, 1n),
+						),
+					).toEqual(nothing())
+
+					expect(
+						fraction.divideBy__overload$2(
+							fractionOne(),
+							integerZero(),
+						),
+					).toEqual(nothing())
 				})
 			})
 

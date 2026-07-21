@@ -4,6 +4,8 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { FractionType } from "./Fraction"
 import { createFraction } from "./Fraction"
+import type { NothingType } from "./Nothing"
+import { createNothing } from "./Nothing"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -75,18 +77,26 @@ export function subtract__overload$2(
 export function divideBy__overload$1(
 	numerator: IntegerType,
 	denominator: IntegerType,
-): FractionType {
+): FractionType | NothingType {
+	if (denominator.value === 0n) {
+		return createNothing()
+	}
+
 	return createFraction(numerator.value, denominator.value)
 }
 
 export function divideBy__overload$2(
 	numerator: IntegerType,
 	denominator: FractionType,
-): FractionType {
+): FractionType | NothingType {
 	let numerator1 = numerator.value
 	let denominator1 = 1n
 	let numerator2 = denominator.fraction.numerator
 	let denominator2 = denominator.fraction.denominator
+
+	if (numerator2 === 0n) {
+		return createNothing()
+	}
 
 	return createFraction(numerator1 * denominator2, denominator1 * numerator2)
 }
