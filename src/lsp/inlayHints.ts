@@ -140,7 +140,14 @@ function visitNode(
 		case "FunctionValue":
 			visitBody(node.value.body, hints)
 			return
+		case "CaseValue":
+			if (node.value !== null) {
+				visitNode(node.value, hints)
+			}
+
+			return
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

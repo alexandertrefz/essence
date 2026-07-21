@@ -1,8 +1,10 @@
 import type {
 	BooleanType,
+	CaseType,
 	Conformance,
 	DispatchCase,
 	Documentation,
+	ErrorType,
 	FractionType,
 	FunctionType,
 	IntegerType,
@@ -14,6 +16,7 @@ import type {
 	RecordType,
 	StringType,
 	Type,
+	UnionType,
 } from "./index"
 
 // #region Program & Sections
@@ -46,6 +49,20 @@ export type ExpressionNode =
 	| SelfNode
 	| CombinationNode
 	| MatchNode
+	| CaseValueNode
+
+// NOTE: `choice` carries the Choice's Union Type, `caseName` the CaseType —
+// so the cursor can land on either half of `ChoiceName#CaseName`. It is null
+// for the bare form (`#Add({ … })`). `type` is only ever a CaseType for
+// valid Programs; unknown Choices or Cases recover with an Error Type.
+export interface CaseValueNode {
+	nodeType: "CaseValue"
+	choice: IdentifierNode | null
+	caseName: IdentifierNode
+	value: ExpressionNode | null
+	position: Position
+	type: CaseType | ErrorType
+}
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation"
@@ -214,6 +231,7 @@ export type StatementNode =
 	| NamespaceDefinitionStatementNode
 	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
+	| ChoiceDeclarationStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -309,6 +327,18 @@ export interface TypeAliasStatementNode {
 	nodeType: "TypeAliasStatement"
 	name: IdentifierNode
 	type: Type
+	position: Position
+	documentation: Documentation | null
+}
+
+// NOTE: Each Case keeps its name as a typed Identifier of its own (typed as
+// its CaseType), so the cursor can land on it. `type` is the named Union of
+// all Cases — what the Choice's name resolves to in Type position.
+export interface ChoiceDeclarationStatementNode {
+	nodeType: "ChoiceDeclarationStatement"
+	name: IdentifierNode
+	cases: Array<{ name: IdentifierNode; type: CaseType }>
+	type: UnionType
 	position: Position
 	documentation: Documentation | null
 }

@@ -13,6 +13,8 @@ export type DocumentSymbolKind =
 	| "namespace"
 	| "protocol"
 	| "typeAlias"
+	| "choice"
+	| "case"
 	| "member"
 	| "method"
 	| "staticMethod"
@@ -79,6 +81,32 @@ function symbolForStatement(
 				range: node.position,
 				selectionRange: node.name.position,
 				children: recordTypeMembers(node.type),
+			}
+		case "ChoiceDeclarationStatement":
+			return {
+				name: node.name.content,
+				kind: "choice",
+				range: node.position,
+				selectionRange: node.name.position,
+				children: node.cases.map((choiceCase) => ({
+					name: `#${choiceCase.name.content}`,
+					kind: "case" as const,
+					range:
+						choiceCase.type === null
+							? choiceCase.name.position
+							: unionOfPositions(
+									choiceCase.name.position,
+									choiceCase.type.position,
+								),
+					selectionRange: choiceCase.name.position,
+					children: recordTypeMembers(
+						choiceCase.type ?? {
+							nodeType: "RecordTypeDeclaration",
+							members: {},
+							position: choiceCase.name.position,
+						},
+					),
+				})),
 			}
 		case "NamespaceDefinitionStatement":
 			return {

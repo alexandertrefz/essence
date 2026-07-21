@@ -100,6 +100,17 @@ export type RecordType = {
 	members: Record<string, Type>
 }
 
+// NOTE: One Case of a Choice — a *nominal* Record Type: its members are
+// accessed like any Record's, but assignability goes by (choice, name)
+// identity rather than by structure. A `choice` declaration manufactures one
+// CaseType per Case and names the Union of them.
+export type CaseType = {
+	type: "Case"
+	choice: string
+	name: string
+	members: Record<string, Type>
+}
+
 export type GenericListType = {
 	type: "GenericList"
 	generics: [{ name: "ItemType"; defaultType: { type: "Unknown" } }]
@@ -172,6 +183,7 @@ export type PrimitiveType =
 	| IntegerType
 	| FractionType
 	| RecordType
+	| CaseType
 	| ListType
 	| FunctionType
 	| NamespaceType
@@ -201,9 +213,13 @@ export type ProtocolType = {
 	documentation?: Documentation
 }
 
+// NOTE: `name` is set on the Union a `choice` declaration creates (and on the
+// builtin `Ordering`) — assignability ignores it entirely, it only gives
+// Diagnostics and Hovers a readable name for the Union of a Choice's Cases.
 export type UnionType = {
 	type: "UnionType"
 	types: Array<Type | GenericUse>
+	name?: string
 }
 
 export type GenericName = string

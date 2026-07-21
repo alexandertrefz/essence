@@ -76,6 +76,9 @@ function collectFromNode(
 		case "TypeAliasStatement":
 			addRange(ranges, node.position)
 			return
+		case "ChoiceDeclarationStatement":
+			addRange(ranges, node.position)
+			return
 		case "ProtocolDeclarationStatement":
 			addRange(ranges, node.position)
 			return

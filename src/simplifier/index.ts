@@ -41,6 +41,7 @@ function simplifyImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "CaseValue":
 			return simplifyExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -48,6 +49,7 @@ function simplifyImplementationNode(
 		case "NamespaceDefinitionStatement":
 		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -94,6 +96,26 @@ function simplifyExpression(
 			return simplifySelf(node)
 		case "Match":
 			return simplifyMatch(node)
+		case "CaseValue":
+			return simplifyCaseValue(node)
+	}
+}
+
+// NOTE: All the runtime needs is the tag the constructed value carries —
+// `"CalculatorOperation#Add"` — and the payload it is built from. An Error
+// Type never reaches this stage (Diagnostics gate codegen), so the empty tag
+// fallback is purely for the type checker.
+function simplifyCaseValue(
+	node: common.typed.CaseValueNode,
+): common.typedSimple.CaseValueNode {
+	return {
+		nodeType: "CaseValue",
+		tag:
+			node.type.type === "Case"
+				? `${node.type.choice}#${node.type.name}`
+				: "",
+		value: node.value === null ? null : simplifyExpression(node.value),
+		type: node.type,
 	}
 }
 
@@ -402,10 +424,12 @@ function simplifyStatement(
 			return simplifyProtocolDeclarationStatement(node)
 		case "TypeAliasStatement":
 			return simplifyTypeAliasStatement(node)
+		case "ChoiceDeclarationStatement":
+			return simplifyChoiceDeclarationStatement(node)
 		case "IfElseStatement":
-			return simplifyChoice(node)
+			return simplifyConditional(node)
 		case "IfStatement":
-			return simplifyChoice(node)
+			return simplifyConditional(node)
 		case "ReturnStatement":
 			return simplifyReturnStatement(node)
 		case "FunctionStatement":
@@ -485,9 +509,22 @@ function simplifyTypeAliasStatement(
 	}
 }
 
-function simplifyChoice(
+// NOTE: A Choice Declaration is purely a Type-level construct — like a Type
+// Alias it erases to nothing; only Case *constructions* have a runtime
+// footprint.
+function simplifyChoiceDeclarationStatement(
+	node: common.typed.ChoiceDeclarationStatementNode,
+): common.typedSimple.TypeAliasStatementNode {
+	return {
+		nodeType: "TypeAliasStatement",
+		name: simplifyIdentifier(node.name),
+		type: node.type,
+	}
+}
+
+function simplifyConditional(
 	node: common.typed.IfElseStatementNode | common.typed.IfStatementNode,
-): common.typedSimple.ChoiceStatementNode {
+): common.typedSimple.ConditionalStatementNode {
 	let convertedNode: common.typed.IfElseStatementNode
 	if (node.nodeType === "IfStatement") {
 		convertedNode = {
@@ -502,7 +539,7 @@ function simplifyChoice(
 	}
 
 	return {
-		nodeType: "ChoiceStatement",
+		nodeType: "ConditionalStatement",
 		condition: simplifyExpression(convertedNode.condition),
 		trueBody: convertedNode.trueBody.map((node) =>
 			simplifyImplementationNode(node),

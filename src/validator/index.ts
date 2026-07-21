@@ -5,6 +5,7 @@ import {
 } from "../diagnostics/index"
 import {
 	createInferenceContext,
+	flattenUnionMembers,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
@@ -60,11 +61,13 @@ function validateImplementationNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "CaseValue":
 			return validateExpression(node)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "ProtocolDeclarationStatement":
 		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
@@ -91,6 +94,8 @@ function validateExpression(
 			return validateLookup(node)
 		case "Match":
 			return validateMatch(node)
+		case "CaseValue":
+			return validateCaseValue(node)
 		case "FunctionValue":
 			return validateFunctionValue(node)
 		case "FractionValue":
@@ -322,9 +327,13 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
 	if (node.value.type.type === "UnionType") {
-		let unionType = node.value.type
+		// NOTE: Flattened, so that a Union member that is itself a Union — a
+		// Choice composed as `CalculatorOperation | Nothing`, or `Number |
+		// Nothing` — is discharged by Handlers for its *members* rather than
+		// demanding one Handler for the nested Union as a whole.
+		let memberTypes = flattenUnionMembers(node.value.type)
 
-		for (let memberType of unionType.types) {
+		for (let memberType of memberTypes) {
 			// NOTE: A Handler with a literal Matcher or a Guard covers only
 			// part of its Type — `case 0` leaves every other Integer, and a
 			// Guard can decline outright — so neither can discharge a member
@@ -350,7 +359,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		}
 
 		for (let handler of node.handlers) {
-			let isReachable = unionType.types.some((memberType) =>
+			let isReachable = memberTypes.some((memberType) =>
 				matchesType(handler.matcher, memberType),
 			)
 
@@ -387,6 +396,49 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		}
 
 		validateDefiniteReturn(handlerContext, node.position)
+	}
+
+	return node
+}
+
+// NOTE: Whether the payload is present and matches is checked here rather
+// than in the Enricher — the Case's Type resolves either way, so a wrong
+// payload stays a single Diagnostic instead of poisoning the whole
+// Expression.
+function validateCaseValue(
+	node: common.typed.CaseValueNode,
+): common.typed.CaseValueNode {
+	if (node.value !== null) {
+		validateExpression(node.value)
+		validateNoBoundFunctionValue(node.value)
+	}
+
+	if (node.type.type !== "Case") {
+		return node
+	}
+
+	let payloadType: common.RecordType = {
+		type: "Record",
+		members: node.type.members,
+	}
+
+	if (Object.keys(node.type.members).length === 0) {
+		if (node.value !== null) {
+			reportError(
+				`Case '#${node.type.name}' does not carry a payload.`,
+				node.value.position,
+			)
+		}
+	} else if (node.value === null) {
+		reportError(
+			`Case '#${node.type.name}' requires a payload of Type '${describeType(payloadType)}'.`,
+			node.position,
+		)
+	} else if (!matchesType(payloadType, node.value.type)) {
+		reportError(
+			`The payload does not match Case '#${node.type.name}' — expected '${describeType(payloadType)}'.`,
+			node.value.position,
+		)
 	}
 
 	return node
@@ -429,6 +481,7 @@ function validateStatement(
 		case "VariableAssignmentStatement":
 			return validateVariableAssignmentStatement(node)
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "ProtocolDeclarationStatement":
 			return node
 		case "NamespaceDefinitionStatement":
@@ -650,7 +703,13 @@ function validateDefiniteReturn(
 function describeType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
+			if (type.name !== undefined) {
+				return type.name
+			}
+
 			return type.types.map(describeType).join(" | ")
+		case "Case":
+			return `${type.choice}#${type.name}`
 		case "List":
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":

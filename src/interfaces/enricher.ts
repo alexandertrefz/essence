@@ -11,4 +11,8 @@ export type Scope = {
 	// not a Type, and keeping the maps apart is what lets Type positions
 	// reject Protocol names with a dedicated Diagnostic.
 	protocols: Record<string, common.ProtocolType>
+	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
+	// Function bodies and Match Handler bodies. Bare Case Expressions
+	// (`<- #Less`) consult it before falling back to the scope scan.
+	expectedReturnType?: common.Type
 }

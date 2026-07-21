@@ -163,6 +163,7 @@ const reservedWords = new Set([
 	"protocol",
 	"for",
 	"infer",
+	"choice",
 	"true",
 	"false",
 	"nothing",
@@ -171,7 +172,7 @@ const reservedWords = new Set([
 // NOTE: Anything the Lexer would not produce as a single Identifier Token —
 // whitespace, Symbols, String- and Comment-Literals, a leading digit — is
 // rejected, as are reserved words.
-const forbiddenIdentifierCharacters = /[\s"§(){}[\]<>|/@,.:=\-~_]/
+const forbiddenIdentifierCharacters = /[\s"§(){}[\]<>|/@,.:=\-~_#]/
 
 // NOTE: The same character class in its positive form: one whole Identifier.
 // Linked editing hands it to the editor so that typing a character a name
@@ -183,7 +184,7 @@ const forbiddenIdentifierCharacters = /[\s"§(){}[\]<>|/@,.:=\-~_]/
 // and a leading `-` belongs to the literal, so they need a second alternative
 // — the extension's language configuration spells that out for word
 // selection, but renaming only ever targets Identifiers.
-export const identifierPattern = '[^\\s"§(){}\\[\\]<>|/@,.:=~_-]+'
+export const identifierPattern = '[^\\s"§(){}\\[\\]<>|/@,.:=~_#-]+'
 
 export function isValidIdentifierName(name: string): boolean {
 	return (
@@ -494,7 +495,10 @@ function hoistDeclarations(
 	scope: Scope,
 ) {
 	for (let node of nodes) {
-		if (node.nodeType === "TypeAliasStatement") {
+		if (
+			node.nodeType === "TypeAliasStatement" ||
+			node.nodeType === "ChoiceDeclarationStatement"
+		) {
 			if (!scope.types.has(node.name.content)) {
 				scope.types.set(node.name.content, {
 					builtin: false,
@@ -645,6 +649,20 @@ function walkNode(
 		case "ProtocolDeclarationStatement":
 			walkProtocolDeclaration(node, scope, context)
 			return
+		case "ChoiceDeclarationStatement": {
+			declareInScope(scope, "types", node.name, "type", context)
+
+			// NOTE: Case names resolve through their Choice, never through a
+			// Scope — only the member Types inside the payload declarations
+			// hold renameable references.
+			for (let choiceCase of node.cases) {
+				if (choiceCase.type !== null) {
+					walkTypeDeclaration(choiceCase.type, scope, context)
+				}
+			}
+
+			return
+		}
 		case "TypeAliasStatement": {
 			declareInScope(scope, "types", node.name, "type", context)
 
@@ -728,6 +746,18 @@ function walkNode(
 			// NOTE: The member resolves through the base's Type — skipped.
 			walkNode(node.base, scope, context)
 			return
+		case "CaseValue":
+			// NOTE: The Case's name resolves through the Choice — only the
+			// (optional) Choice prefix is a Type reference of its own.
+			if (node.choice !== null) {
+				reference(scope, "types", node.choice, context)
+			}
+
+			if (node.value !== null) {
+				walkNode(node.value, scope, context)
+			}
+
+			return
 		case "Combination":
 			walkNode(node.lhs, scope, context)
 			walkNode(node.rhs, scope, context)
@@ -746,6 +776,18 @@ function walkNode(
 						if (member.kind === "Type") {
 							walkTypeDeclaration(member.type, scope, context)
 						}
+					}
+				} else if (handler.matcher.nodeType === "CaseMatcher") {
+					// NOTE: The Case's name resolves through the matched
+					// value's Type — only a prefixed Choice name is an
+					// ordinary Type reference.
+					if (handler.matcher.choice !== null) {
+						reference(
+							scope,
+							"types",
+							handler.matcher.choice,
+							context,
+						)
 					}
 				} else if (
 					handler.matcher.nodeType !== "WildcardMatcher" &&

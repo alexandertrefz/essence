@@ -47,6 +47,8 @@ export function resolveType(
 			return { type: "Nothing" }
 		case "FunctionValue":
 			return resolveFunctionValueType(node, scope)
+		case "CaseValue":
+			return resolveCaseValueType(node, scope)
 		case "Lookup":
 			return resolveLookupType(node, scope)
 		case "Identifier":
@@ -857,6 +859,8 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Unions"
 		case "Record":
 			return "Records"
+		case "Case":
+			return "Cases"
 	}
 }
 
@@ -918,6 +922,260 @@ export function resolveCombinationType(
 			return lhsType
 		}
 	}
+}
+
+// NOTE: Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name
+// resolves through the ordinary Type scope, so a Type Alias of a Choice works
+// too (`type Op = CalculatorOperation` admits `Op#Add`).
+export function resolveCaseReference(
+	choice: parser.IdentifierNode,
+	caseName: parser.IdentifierNode,
+	scope: enricher.Scope,
+): common.CaseType | common.ErrorType {
+	let choiceType = findTypeInScope(choice.content, scope)
+
+	if (choiceType === null) {
+		reportError(
+			`Type '${choice.content}' is not declared.`,
+			choice.position,
+		)
+
+		return { type: "Error" }
+	}
+
+	if (choiceType.type === "Error") {
+		return { type: "Error" }
+	}
+
+	let members =
+		choiceType.type === "UnionType"
+			? flattenUnionMembers(choiceType)
+			: [choiceType]
+
+	let caseType = members.find(
+		(member): member is common.CaseType =>
+			member.type === "Case" && member.name === caseName.content,
+	)
+
+	if (caseType === undefined) {
+		reportError(
+			`Type '${choice.content}' has no Case '#${caseName.content}'.`,
+			caseName.position,
+		)
+
+		return { type: "Error" }
+	}
+
+	return caseType
+}
+
+// NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup
+// resolves its Namespace — every Choice in Type scope is scanned for the
+// Case, and only actual ambiguity asks for the prefix. Shadowed Type names
+// are skipped, mirroring `getAllNamespacesInScope`.
+function findCaseTypesInScope(
+	name: string,
+	scope: enricher.Scope,
+): Array<common.CaseType> {
+	let seenTypeNames = new Set<string>()
+	let cases = new Map<string, common.CaseType>()
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		for (let [typeName, type] of Object.entries(searchScope.types)) {
+			if (seenTypeNames.has(typeName)) {
+				continue
+			}
+
+			seenTypeNames.add(typeName)
+
+			let members =
+				type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+
+			for (let member of members) {
+				if (member.type === "Case" && member.name === name) {
+					cases.set(`${member.choice}#${member.name}`, member)
+				}
+			}
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return [...cases.values()]
+}
+
+export function resolveBareCaseReference(
+	caseName: parser.IdentifierNode,
+	scope: enricher.Scope,
+): common.CaseType | common.ErrorType {
+	let candidates = findCaseTypesInScope(caseName.content, scope)
+
+	if (candidates.length === 1) {
+		return candidates[0]
+	}
+
+	if (candidates.length === 0) {
+		reportError(
+			`No Choice in scope declares a Case '#${caseName.content}'.`,
+			caseName.position,
+		)
+	} else {
+		reportError(
+			`Case '#${caseName.content}' is ambiguous — it is declared by the Choices ${candidates
+				.map((candidate) => `'${candidate.choice}'`)
+				.join(", ")}. Prefix it with its Choice's name.`,
+			caseName.position,
+		)
+	}
+
+	return { type: "Error" }
+}
+
+// NOTE: Contextual resolution for the bare form — the expected Type of the
+// position (a Declaration's annotation, an Assignment's target, the declared
+// return Type at a `<-`) is consulted before the scope scan, exactly like a
+// Matcher consults the scrutinee. `null` means the context does not pin the
+// Case down, and the scan decides.
+function resolveCaseInExpectedType(
+	caseName: parser.IdentifierNode,
+	expectedType: common.Type,
+): common.CaseType | common.ErrorType | null {
+	let members =
+		expectedType.type === "UnionType"
+			? flattenUnionMembers(expectedType)
+			: [expectedType]
+
+	let candidates = members.filter(
+		(member): member is common.CaseType =>
+			member.type === "Case" && member.name === caseName.content,
+	)
+
+	if (candidates.length === 0) {
+		return null
+	}
+
+	if (candidates.length > 1) {
+		reportError(
+			`Case '#${caseName.content}' is ambiguous — ${candidates.length} Choices in the expected Type declare it. Prefix it with its Choice's name.`,
+			caseName.position,
+		)
+
+		return { type: "Error" }
+	}
+
+	return candidates[0]
+}
+
+export function resolveCaseValueType(
+	node: parser.CaseValueNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
+): common.CaseType | common.ErrorType {
+	if (node.choice === null) {
+		if (expectedType !== null) {
+			let contextual = resolveCaseInExpectedType(
+				node.caseName,
+				expectedType,
+			)
+
+			if (contextual !== null) {
+				return contextual
+			}
+		}
+
+		return resolveBareCaseReference(node.caseName, scope)
+	}
+
+	return resolveCaseReference(node.choice, node.caseName, scope)
+}
+
+// NOTE: A bare Case Matcher (`case #Add`) resolves against the matched
+// value's own Union — the Case's name never has to be in scope by itself.
+// Ambiguity (two Choices in one Union sharing a Case name) asks for the
+// prefixed form instead of guessing.
+export function resolveCaseMatcherType(
+	node: parser.CaseMatcherNode,
+	valueType: common.Type,
+	scope: enricher.Scope,
+): common.Type {
+	if (node.choice !== null) {
+		return resolveCaseReference(node.choice, node.caseName, scope)
+	}
+
+	if (valueType.type === "Error") {
+		return { type: "Error" }
+	}
+
+	let members =
+		valueType.type === "UnionType"
+			? flattenUnionMembers(valueType)
+			: [valueType]
+
+	let candidates = members.filter(
+		(member): member is common.CaseType =>
+			member.type === "Case" && member.name === node.caseName.content,
+	)
+
+	if (candidates.length === 1) {
+		return candidates[0]
+	}
+
+	if (candidates.length === 0) {
+		reportError(
+			`The matched value's Type has no Case '#${node.caseName.content}'.`,
+			node.position,
+		)
+	} else {
+		reportError(
+			`Case '#${node.caseName.content}' is ambiguous — ${candidates.length} Choices in the matched Union declare it. Prefix it with its Choice's name.`,
+			node.position,
+		)
+	}
+
+	return { type: "Error" }
+}
+
+// NOTE: Each Case becomes a nominal Record Type, and the Choice's name is
+// declared as the *named* Union of them — every existing Union mechanism
+// (exhaustiveness, dispatch, `|` composition) applies to a Choice unchanged.
+export function resolveChoiceDeclarationStatementType(
+	node: parser.ChoiceDeclarationStatementNode,
+	scope: enricher.Scope,
+): common.UnionType {
+	if (node.cases.length === 0) {
+		reportError("A Choice must declare at least one Case.", node.position)
+	}
+
+	let caseTypes: Array<common.CaseType> = []
+
+	for (let choiceCase of node.cases) {
+		if (
+			caseTypes.some(
+				(existing) => existing.name === choiceCase.name.content,
+			)
+		) {
+			reportError(
+				`Case '#${choiceCase.name.content}' is declared more than once.`,
+				choiceCase.name.position,
+			)
+
+			continue
+		}
+
+		caseTypes.push({
+			type: "Case",
+			choice: node.name.content,
+			name: choiceCase.name.content,
+			members:
+				choiceCase.type === null
+					? {}
+					: resolveRecordTypeDeclarationType(choiceCase.type, scope)
+							.members,
+		})
+	}
+
+	return { type: "UnionType", name: node.name.content, types: caseTypes }
 }
 
 export function resolveRecordValueType(
@@ -1030,9 +1288,22 @@ export function resolveLookupType(
 
 			return { type: "Error" }
 		}
+	} else if (baseType.type === "Case") {
+		// NOTE: A Case *is* a Record with a nominal identity — its payload
+		// members are read exactly like a Record's.
+		if (Object.hasOwn(baseType.members, node.member.content)) {
+			return baseType.members[node.member.content]
+		} else {
+			reportError(
+				`Case '${baseType.choice}#${baseType.name}' has no member '${node.member.content}'.`,
+				node.member.position,
+			)
+
+			return { type: "Error" }
+		}
 	} else {
 		reportError(
-			"Only Records and Namespaces have members.",
+			"Only Records, Cases and Namespaces have members.",
 			node.base.position,
 		)
 
@@ -1305,9 +1576,15 @@ function resolveProtocolMethodType(
 function describeTypeForDiagnostic(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
+			if (type.name !== undefined) {
+				return type.name
+			}
+
 			return type.types
 				.map((memberType) => describeTypeForDiagnostic(memberType))
 				.join(" | ")
+		case "Case":
+			return `${type.choice}#${type.name}`
 		case "GenericUse":
 			return type.name
 		case "GenericAlias":
