@@ -1,6 +1,15 @@
 import { describe, expect, it } from "bun:test"
 
 import { enrich } from "../enricher/index"
+import { namespace as booleanNamespace } from "../enricher/types/Boolean"
+import { namespace as fractionNamespace } from "../enricher/types/Fraction"
+import { namespace as integerNamespace } from "../enricher/types/Integer"
+import { namespace as nothingNamespace } from "../enricher/types/Nothing"
+import { namespace as orderingNamespace } from "../enricher/types/Ordering"
+import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
+import { namespace as recordNamespace } from "../enricher/types/Record"
+import { namespace as stringNamespace } from "../enricher/types/String"
+import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import { parse } from "../parser/index"
 
@@ -621,7 +630,7 @@ describe("Enricher", () => {
 		it("should accept a well-formed Protocol declaration", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					protocol Equatable {
+					protocol Matchable {
 						is(_ other: Self) -> Boolean
 						isNot(_ other: Self) -> Boolean
 					}
@@ -646,11 +655,11 @@ describe("Enricher", () => {
 
 		it("should report duplicate Protocol declarations", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 			}`)
@@ -658,50 +667,50 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Printable' is already declared.",
+				"Protocol 'Showable' is already declared.",
 			)
 		})
 
 		it("should reject a Protocol used as a Type annotation", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				constant value: Printable = "text"
+				constant value: Showable = "text"
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+				"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
 			)
 		})
 
 		it("should reject a Protocol used as a Union member", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				constant value: Printable | Nothing = nothing
+				constant value: Showable | Nothing = nothing
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+				"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
 			)
 		})
 
 		it("should reject a Protocol used as a Match Case", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
 				variable value: Integer | Nothing = 1
 
 				constant result = match value -> Integer {
-					case Printable { <- 0 }
+					case Showable { <- 0 }
 					case Integer { <- @ }
 					case Nothing { <- 0 }
 				}
@@ -711,23 +720,23 @@ describe("Enricher", () => {
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+						"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
 				),
 			).toBe(true)
 		})
 
 		it("should reject a Protocol used as a value", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				constant value = Printable
+				constant value = Showable
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Printable' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+				"Protocol 'Showable' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
 			)
 		})
 
@@ -760,13 +769,13 @@ describe("Enricher", () => {
 		it("should accept a conforming Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					protocol Equatable {
+					protocol Matchable {
 						is(_ other: Self) -> Boolean
 					}
 
 					type Vector = { x: Number, y: Number }
 
-					namespace VectorEquatable for Vector is Equatable {
+					namespace VectorMatchable for Vector is Matchable {
 						is(_ other: Vector) -> Boolean {
 							<- true
 						}
@@ -780,13 +789,13 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					type Vector = { x: Number, y: Number }
 
-					namespace VectorEquatable for Vector is Equatable {
+					namespace VectorMatchable for Vector is Matchable {
 						is(_ other: Vector) -> Boolean {
 							<- true
 						}
 					}
 
-					protocol Equatable {
+					protocol Matchable {
 						is(_ other: Self) -> Boolean
 					}
 				}`),
@@ -796,13 +805,13 @@ describe("Enricher", () => {
 		it("should accept an overloaded Method fulfilling a simple requirement", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					protocol Printable {
+					protocol Showable {
 						toString() -> String
 					}
 
 					type Vector = { x: Number, y: Number }
 
-					namespace VectorPrintable for Vector is Printable {
+					namespace VectorShowable for Vector is Showable {
 						overload toString {
 							() -> String {
 								<- "vector"
@@ -819,30 +828,30 @@ describe("Enricher", () => {
 
 		it("should report a missing Method", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Equatable {
+				protocol Matchable {
 					is(_ other: Self) -> Boolean
 				}
 
 				type Vector = { x: Number, y: Number }
 
-				namespace VectorEquatable for Vector is Equatable {}
+				namespace VectorMatchable for Vector is Matchable {}
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace 'VectorEquatable' does not conform to Protocol 'Equatable': it is missing Method 'is'.",
+				"Namespace 'VectorMatchable' does not conform to Protocol 'Matchable': it is missing Method 'is'.",
 			)
 		})
 
 		it("should report a mismatched Method signature", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
 				type Vector = { x: Number, y: Number }
 
-				namespace VectorPrintable for Vector is Printable {
+				namespace VectorShowable for Vector is Showable {
 					toString() -> Boolean {
 						<- true
 					}
@@ -851,7 +860,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace 'VectorPrintable' does not conform to Protocol 'Printable': Method 'toString' does not match the Protocol's signature.",
+				"Namespace 'VectorShowable' does not conform to Protocol 'Showable': Method 'toString' does not match the Protocol's signature.",
 			)
 		})
 
@@ -859,7 +868,7 @@ describe("Enricher", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Vector = { x: Number, y: Number }
 
-				namespace VectorEquatable for Vector is Undeclared {}
+				namespace VectorMatchable for Vector is Undeclared {}
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -870,11 +879,11 @@ describe("Enricher", () => {
 
 		it("should reject a Conformance Clause on an untyped Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				namespace Helpers is Printable {}
+				namespace Helpers is Showable {}
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -885,11 +894,11 @@ describe("Enricher", () => {
 
 		it("should reject a Conformance Clause on a generic Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				namespace ListPrintable<infer Item> for List<Item> is Printable {
+				namespace ListShowable<infer Item> for List<Item> is Showable {
 					toString() -> String {
 						<- "list"
 					}
@@ -944,13 +953,13 @@ describe("Enricher", () => {
 
 	describe("Protocol Bounds", () => {
 		const printableSetup = `
-			protocol Printable {
+			protocol Showable {
 				toString() -> String
 			}
 
 			type Vector = { x: Number, y: Number }
 
-			namespace VectorPrintable for Vector is Printable {
+			namespace VectorShowable for Vector is Showable {
 				toString() -> String {
 					<- "vector"
 				}
@@ -962,7 +971,7 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					${printableSetup}
 
-					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					function describeValue <infer Value is Showable>(_ value: Value) -> String {
 						<- value::toString()
 					}
 
@@ -974,19 +983,19 @@ describe("Enricher", () => {
 		it("should resolve Self Parameters through a Protocol bound", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					protocol Equatable {
+					protocol Matchable {
 						is(_ other: Self) -> Boolean
 					}
 
 					type Vector = { x: Number, y: Number }
 
-					namespace VectorEquatable for Vector is Equatable {
+					namespace VectorMatchable for Vector is Matchable {
 						is(_ other: Vector) -> Boolean {
 							<- true
 						}
 					}
 
-					function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					function areEqual <infer Value is Matchable>(_ a: Value, _ b: Value) -> Boolean {
 						<- a::is(b)
 					}
 
@@ -997,11 +1006,11 @@ describe("Enricher", () => {
 
 		it("should reject a mismatched Argument for a Self Parameter", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Equatable {
+				protocol Matchable {
 					is(_ other: Self) -> Boolean
 				}
 
-				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+				function areEqual <infer Value is Matchable>(_ a: Value, _ b: Value) -> Boolean {
 					<- a::is(1)
 				}
 			}`)
@@ -1030,11 +1039,11 @@ describe("Enricher", () => {
 
 		it("should report a binding without a conforming Namespace", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+				function describeValue <infer Value is Showable>(_ value: Value) -> String {
 					<- value::toString()
 				}
 
@@ -1043,7 +1052,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Boolean' does not conform to Protocol 'Printable': no conforming Namespace is in scope.",
+				"Type 'Boolean' does not conform to Protocol 'Showable': no conforming Namespace is in scope.",
 			)
 		})
 
@@ -1052,11 +1061,11 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					${printableSetup}
 
-					function inner <infer Value is Printable>(_ value: Value) -> String {
+					function inner <infer Value is Showable>(_ value: Value) -> String {
 						<- value::toString()
 					}
 
-					function outer <infer Item is Printable>(_ item: Item) -> String {
+					function outer <infer Item is Showable>(_ item: Item) -> String {
 						<- inner(item)
 					}
 
@@ -1067,26 +1076,26 @@ describe("Enricher", () => {
 
 		it("should reject forwarding a Type Parameter without the required bound", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				protocol Equatable {
+				protocol Matchable {
 					is(_ other: Self) -> Boolean
 				}
 
-				function inner <infer Value is Printable>(_ value: Value) -> String {
+				function inner <infer Value is Showable>(_ value: Value) -> String {
 					<- value::toString()
 				}
 
-				function outer <infer Item is Equatable>(_ item: Item) -> String {
+				function outer <infer Item is Matchable>(_ item: Item) -> String {
 					<- inner(item)
 				}
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type Parameter 'Item' does not conform to Protocol 'Printable' — it carries no such bound.",
+				"Type Parameter 'Item' does not conform to Protocol 'Showable' — it carries no such bound.",
 			)
 		})
 
@@ -1094,13 +1103,13 @@ describe("Enricher", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				${printableSetup}
 
-				namespace VectorPrintableToo for Vector is Printable {
+				namespace VectorShowableToo for Vector is Showable {
 					toString() -> String {
 						<- "vector, too"
 					}
 				}
 
-				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+				function describeValue <infer Value is Showable>(_ value: Value) -> String {
 					<- value::toString()
 				}
 
@@ -1110,7 +1119,7 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(
 				diagnostics[0].message.startsWith(
-					"Multiple Namespaces conform to Protocol 'Printable' for Type 'Record', please disambiguate.",
+					"Multiple Namespaces conform to Protocol 'Showable' for Type 'Record', please disambiguate.",
 				),
 			).toBe(true)
 		})
@@ -1120,13 +1129,13 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					${printableSetup}
 
-					namespace MaybeVectorPrintable for Vector | Nothing is Printable {
+					namespace MaybeVectorShowable for Vector | Nothing is Showable {
 						toString() -> String {
 							<- "maybe a vector"
 						}
 					}
 
-					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					function describeValue <infer Value is Showable>(_ value: Value) -> String {
 						<- value::toString()
 					}
 
@@ -1151,11 +1160,11 @@ describe("Enricher", () => {
 
 		it("should reject bounds on Namespace Type Parameters", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				protocol Printable {
+				protocol Showable {
 					toString() -> String
 				}
 
-				namespace Wrapper<infer Item is Printable> for List<Item> {
+				namespace Wrapper<infer Item is Showable> for List<Item> {
 					firstText() -> String {
 						<- ""
 					}
@@ -1165,6 +1174,171 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
 				"Namespace Type Parameters can not have Protocol bounds (yet).",
+			)
+		})
+	})
+
+	describe("Builtin Protocols", () => {
+		// NOTE: The safety net for the hand written builtin signatures — every
+		// declared conformance must actually be fulfilled, via the same helper
+		// that drives conformance checking and conformance-value codegen.
+		describe("Conformance of builtin Namespaces", () => {
+			const protocols: Record<string, common.ProtocolType> = {
+				Equatable,
+				Printable,
+				Comparable,
+			}
+
+			const namespaces = [
+				stringNamespace,
+				booleanNamespace,
+				integerNamespace,
+				fractionNamespace,
+				recordNamespace,
+				nothingNamespace,
+				orderingNamespace,
+			]
+
+			for (const namespace of namespaces) {
+				it(`${namespace.name} fulfills its declared conformances`, () => {
+					expect(namespace.conformsTo).toBeDefined()
+					expect(namespace.conformsTo!.length).toBeGreaterThan(0)
+
+					for (const protocolName of namespace.conformsTo ?? []) {
+						const protocol = protocols[protocolName]
+
+						expect(protocol).toBeDefined()
+
+						const result = computeConformanceMethodMap(
+							protocol,
+							namespace,
+							namespace.targetType!,
+						)
+
+						expect(result.kind).toBe("conforms")
+					}
+				})
+			}
+		})
+
+		it("should order Integers with compareTo and match the Ordering exhaustively", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant ordering = 5::compareTo(7)
+
+					constant description = match ordering -> String {
+						case Less    { <- "smaller" }
+						case Equal   { <- "same" }
+						case Greater { <- "bigger" }
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should satisfy builtin Protocol bounds with builtin Types", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					__print(describeValue(5))
+					__print(describeValue(1/2))
+					__print(describeValue("text"))
+					__print(describeValue(true))
+					__print(describeValue(nothing))
+					__print(describeValue({ x = 1 }))
+					__print(describeValue(Ordering.less))
+				}`),
+			).toEqual([])
+		})
+
+		it("should order values through a Comparable bound", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
+						<- match a::compareTo(b) -> Item {
+							case Less    { <- a }
+							case Equal   { <- a }
+							case Greater { <- b }
+						}
+					}
+
+					constant smallerInteger: Integer = smaller(5, 3)
+					constant smallerFraction: Fraction = smaller(1/2, 1/3)
+				}`),
+			).toEqual([])
+		})
+
+		it("should compare Nothing and Orderings with Equatable methods", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant nothingSame: Boolean = nothing::is(nothing)
+					constant orderingSame: Boolean = Ordering.less::is(Ordering.less)
+					constant orderingText: String = Ordering.greater::toString()
+				}`),
+			).toEqual([])
+		})
+
+		it("should not satisfy a bound with the Number Union", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				constant number: Number = 5
+
+				constant text = describeValue(number)
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"Type 'Integer | Fraction' does not conform to Protocol 'Printable': no conforming Namespace is in scope.",
+				),
+			).toBe(true)
+		})
+
+		it("should let a concrete Record conformance beat the builtin Record Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorPrintable for Vector is Printable {
+						toString() -> String {
+							<- "a vector"
+						}
+					}
+
+					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					constant text: String = describeValue({ x = 1, y = 2 })
+				}`),
+			).toEqual([])
+		})
+
+		it("should resolve Methods on a Union-typed Ordering receiver", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant text: String = 5::compareTo(7)::toString()
+					constant same: Boolean = 5::compareTo(7)::is(Ordering.less)
+				}`),
+			).toEqual([])
+		})
+
+		it("should not allow redeclaring a builtin Protocol", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Printable' is already declared.",
 			)
 		})
 	})

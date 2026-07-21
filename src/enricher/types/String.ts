@@ -6,6 +6,7 @@ export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "String",
 	targetType: type,
+	conformsTo: ["Equatable", "Printable"],
 	generics: [],
 	properties: {},
 	methods: {
@@ -153,5 +154,23 @@ export const namespace: common.NamespaceType = {
 			],
 			returnType: { type: "Boolean" },
 		},
+		toString: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "String" },
+				},
+			],
+			returnType: { type: "String" },
+			documentation: {
+				description:
+					"Represents the String as itself — Strings are their own representation.",
+				parameters: {},
+				returns: "the String itself.",
+				position: null,
+			},
+		} as common.MethodType,
 	},
 }

@@ -7,6 +7,7 @@ export const namespace: common.NamespaceType = {
 	name: "Integer",
 	generics: [],
 	targetType: type,
+	conformsTo: ["Equatable", "Printable", "Comparable"],
 	properties: {},
 	methods: {
 		is: {
@@ -353,5 +354,35 @@ export const namespace: common.NamespaceType = {
 			],
 			returnType: { type: "String" },
 		} as common.MethodType,
+		compareTo: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Integer" },
+				},
+				{
+					name: null,
+					type: { type: "Integer" },
+					documentation: "the Integer to order against",
+				},
+			],
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Less" },
+					{ type: "Equal" },
+					{ type: "Greater" },
+				],
+			},
+			documentation: {
+				description: "Orders the Integer against another Integer.",
+				parameters: {},
+				returns:
+					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+				position: null,
+			},
+		},
 	},
 }

@@ -1,10 +1,13 @@
 import type { BooleanType } from "./Boolean"
 import { createBoolean, negate } from "./Boolean"
+import { getStringRepresentation } from "./functions"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { StringType } from "./String"
+import { createString } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
 
 export type ListType<ItemType extends AnyType> = {
@@ -229,4 +232,11 @@ export function append__overload$2<ItemType extends AnyType>(
 	contentsOf: ListType<ItemType>,
 ): ListType<ItemType> {
 	return createList([...originalList.value, ...contentsOf.value])
+}
+
+// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
+export function toString<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+): StringType {
+	return createString(getStringRepresentation(originalList))
 }

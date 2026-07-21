@@ -52,6 +52,26 @@ const namespaceDefinition: common.NamespaceType = {
 			],
 			returnType: { type: "Boolean" },
 		},
+		// NOTE: The List Namespace is generic, and generic Namespaces can not
+		// declare Protocol conformance (yet) — `toString` still exists for
+		// direct calls; List conformance ships with conditional conformance.
+		toString: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: typeResolvedWithGenericUse,
+				},
+			],
+			returnType: { type: "String" },
+			documentation: {
+				description: "Represents the List and its items as a String.",
+				parameters: {},
+				returns: "the String representation of the List.",
+				position: null,
+			},
+		} as common.MethodType,
 		length: {
 			type: "SimpleMethod",
 			generics: [],

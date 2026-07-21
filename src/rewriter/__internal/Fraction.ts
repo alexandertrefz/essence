@@ -5,6 +5,8 @@ import { createBoolean, negate } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -342,3 +344,21 @@ export function toString__overload$2(
 }
 
 // #endregion
+
+export function compareTo(
+	originalFraction: FractionType,
+	otherFraction: FractionType,
+): OrderingType {
+	const lhs =
+		originalFraction.fraction.numerator * otherFraction.fraction.denominator
+	const rhs =
+		otherFraction.fraction.numerator * originalFraction.fraction.denominator
+
+	if (lhs < rhs) {
+		return less
+	} else if (lhs > rhs) {
+		return greater
+	} else {
+		return equal
+	}
+}
