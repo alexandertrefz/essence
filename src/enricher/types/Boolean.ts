@@ -7,6 +7,7 @@ export const namespace: common.NamespaceType = {
 	name: "Boolean",
 	generics: [],
 	targetType: type,
+	conformsTo: ["Equatable", "Printable"],
 	properties: {},
 	methods: {
 		negate: {

@@ -467,6 +467,18 @@ function matchTypes(
 		return true
 	}
 
+	if (lhs.type === "Less" && rhs.type === "Less") {
+		return true
+	}
+
+	if (lhs.type === "Equal" && rhs.type === "Equal") {
+		return true
+	}
+
+	if (lhs.type === "Greater" && rhs.type === "Greater") {
+		return true
+	}
+
 	if (lhs.type === "String" && rhs.type === "String") {
 		return true
 	}

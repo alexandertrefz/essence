@@ -7,6 +7,7 @@ export const namespace: common.NamespaceType = {
 	name: "Fraction",
 	generics: [],
 	targetType: type,
+	conformsTo: ["Equatable", "Printable", "Comparable"],
 	properties: {},
 	methods: {
 		of: {
@@ -369,5 +370,35 @@ export const namespace: common.NamespaceType = {
 				},
 			],
 		} as common.OverloadedMethodType,
+		compareTo: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Fraction" },
+				},
+				{
+					name: null,
+					type: { type: "Fraction" },
+					documentation: "the Fraction to order against",
+				},
+			],
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Less" },
+					{ type: "Equal" },
+					{ type: "Greater" },
+				],
+			},
+			documentation: {
+				description: "Orders the Fraction against another Fraction.",
+				parameters: {},
+				returns:
+					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+				position: null,
+			},
+		},
 	},
 }

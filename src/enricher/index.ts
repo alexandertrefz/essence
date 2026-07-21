@@ -22,9 +22,21 @@ import {
 import { namespace as listNamespace, type as listType } from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
 import {
+	namespace as nothingNamespace,
+	type as nothingType,
+} from "./types/Nothing"
+import {
 	namespace as numberNamespace,
 	type as numberType,
 } from "./types/Number"
+import {
+	equalType,
+	greaterType,
+	lessType,
+	namespace as orderingNamespace,
+	type as orderingType,
+} from "./types/Ordering"
+import { Comparable, Equatable, Printable } from "./types/Protocols"
 import {
 	namespace as recordNamespace,
 	type as recordType,
@@ -49,6 +61,8 @@ export const enrich = (
 				Integer: integerNamespace,
 				Fraction: fractionNamespace,
 				Number: numberNamespace,
+				Nothing: nothingNamespace,
+				Ordering: orderingNamespace,
 				Record: recordNamespace,
 				List: listNamespace,
 			}
@@ -58,7 +72,7 @@ export const enrich = (
 				members,
 				constants: new Set(Object.keys(members)),
 				types: {
-					Nothing: { type: "Nothing" },
+					Nothing: nothingType,
 					Boolean: booleanType,
 					String: stringType,
 					Integer: integerType,
@@ -66,8 +80,16 @@ export const enrich = (
 					Record: recordType,
 					Number: numberType,
 					List: listType,
+					Less: lessType,
+					Equal: equalType,
+					Greater: greaterType,
+					Ordering: orderingType,
 				},
-				protocols: {},
+				protocols: {
+					Equatable,
+					Printable,
+					Comparable,
+				},
 			}
 
 			return {

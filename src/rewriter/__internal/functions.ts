@@ -11,7 +11,7 @@ import { type AnyType, typeKeySymbol } from "./type"
 
 const singleLineMaxLength = 60
 
-function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
+export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
@@ -74,6 +74,12 @@ function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		return boolToString(obj).value
 	} else if (obj[typeKeySymbol] === "String") {
 		return `"${obj.value}"`
+	} else if (
+		obj[typeKeySymbol] === "Less" ||
+		obj[typeKeySymbol] === "Equal" ||
+		obj[typeKeySymbol] === "Greater"
+	) {
+		return obj[typeKeySymbol]
 	} else {
 		return "Nothing"
 	}

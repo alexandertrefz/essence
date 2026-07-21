@@ -70,3 +70,8 @@ export function doesNotContain(
 ): BooleanType {
 	return createBoolean(!originalString.value.includes(otherString.value))
 }
+
+// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
+export function toString(originalString: StringType): StringType {
+	return originalString
+}

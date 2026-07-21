@@ -7,6 +7,7 @@ export const namespace: common.NamespaceType = {
 	name: "Record",
 	generics: [],
 	targetType: type,
+	conformsTo: ["Equatable", "Printable"],
 	properties: {},
 	methods: {
 		is: {
