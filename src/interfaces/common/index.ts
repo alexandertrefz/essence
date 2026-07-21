@@ -64,21 +64,6 @@ export type NothingType = {
 	type: "Nothing"
 }
 
-// NOTE: The unit Types of the builtin `Ordering` Union (`Less | Equal |
-// Greater`), following the Nothing precedent — each is a tagged singleton at
-// runtime, produced via the `Ordering` Namespace's static properties.
-export type LessType = {
-	type: "Less"
-}
-
-export type EqualType = {
-	type: "Equal"
-}
-
-export type GreaterType = {
-	type: "Greater"
-}
-
 export type BooleanType = {
 	type: "Boolean"
 }
@@ -175,9 +160,6 @@ export type MethodType =
 
 export type PrimitiveType =
 	| NothingType
-	| LessType
-	| EqualType
-	| GreaterType
 	| BooleanType
 	| StringType
 	| IntegerType

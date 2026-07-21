@@ -1,13 +1,30 @@
 import type { common } from "../../interfaces/index"
 
-export const lessType: common.LessType = { type: "Less" }
-export const equalType: common.EqualType = { type: "Equal" }
-export const greaterType: common.GreaterType = { type: "Greater" }
+// NOTE: `Ordering` is the builtin Choice — three unit Cases, written
+// `Ordering#Less`, `Ordering#Equal` and `Ordering#Greater` and matched as
+// `case #Less` etc., with full exhaustiveness checking like any other Choice.
+export const lessType: common.CaseType = {
+	type: "Case",
+	choice: "Ordering",
+	name: "Less",
+	members: {},
+}
+export const equalType: common.CaseType = {
+	type: "Case",
+	choice: "Ordering",
+	name: "Equal",
+	members: {},
+}
+export const greaterType: common.CaseType = {
+	type: "Case",
+	choice: "Ordering",
+	name: "Greater",
+	members: {},
+}
 
-// NOTE: `Ordering` is the builtin Union of the three unit Types — matchable
-// with full exhaustiveness checking, like any other Union.
 export const type: common.UnionType = {
 	type: "UnionType",
+	name: "Ordering",
 	types: [lessType, equalType, greaterType],
 }
 
@@ -17,11 +34,9 @@ export const namespace: common.NamespaceType = {
 	targetType: type,
 	generics: [],
 	conformsTo: ["Equatable", "Printable"],
-	properties: {
-		less: lessType,
-		equal: equalType,
-		greater: greaterType,
-	},
+	// NOTE: No properties — the Cases are reached as `Ordering#Less` etc.,
+	// like those of any other Choice.
+	properties: {},
 	methods: {
 		is: {
 			type: "SimpleMethod",

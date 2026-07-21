@@ -37,14 +37,14 @@ implementation {
 
 	function smallerOf <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 		<- match a::compareTo(b) -> Item {
-			case Less    { <- a }
-			case Equal   { <- a }
-			case Greater { <- b }
+			case #Less    { <- a }
+			case #Equal   { <- a }
+			case #Greater { <- b }
 		}
 	}
 
 	__print(smallerOf(5, 3))
 	__print(smallerOf(1/2, 1/3))
 	__print(1::compareTo(2)::toString())
-	__print(Ordering.less::is(1::compareTo(2)))
+	__print(Ordering#Less::is(1::compareTo(2)))
 }

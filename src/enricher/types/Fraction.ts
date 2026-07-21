@@ -1,4 +1,5 @@
 import type { common } from "../../interfaces/index"
+import { type as orderingType } from "./Ordering"
 
 export const type: common.FractionType = { type: "Fraction" }
 
@@ -384,19 +385,12 @@ export const namespace: common.NamespaceType = {
 					documentation: "the Fraction to order against",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [
-					{ type: "Less" },
-					{ type: "Equal" },
-					{ type: "Greater" },
-				],
-			},
+			returnType: orderingType,
 			documentation: {
 				description: "Orders the Fraction against another Fraction.",
 				parameters: {},
 				returns:
-					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+					"`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
 				position: null,
 			},
 		},

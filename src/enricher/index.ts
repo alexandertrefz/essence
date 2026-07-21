@@ -31,9 +31,6 @@ import {
 	type as numberType,
 } from "./types/Number"
 import {
-	equalType,
-	greaterType,
-	lessType,
 	namespace as orderingNamespace,
 	type as orderingType,
 } from "./types/Ordering"
@@ -81,9 +78,6 @@ export const enrich = (
 					Record: recordType,
 					Number: numberType,
 					List: listType,
-					Less: lessType,
-					Equal: equalType,
-					Greater: greaterType,
 					Ordering: orderingType,
 				},
 				protocols: {

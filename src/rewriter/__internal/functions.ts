@@ -74,12 +74,24 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		return boolToString(obj).value
 	} else if (obj[typeKeySymbol] === "String") {
 		return `"${obj.value}"`
-	} else if (
-		obj[typeKeySymbol] === "Less" ||
-		obj[typeKeySymbol] === "Equal" ||
-		obj[typeKeySymbol] === "Greater"
-	) {
-		return obj[typeKeySymbol]
+	} else if (obj[typeKeySymbol].includes("#")) {
+		// NOTE: Case values print as their tag, with the payload spelled out
+		// like a Record when the Case carries one.
+		let payloadEntries = Object.entries(obj)
+
+		if (payloadEntries.length === 0) {
+			return obj[typeKeySymbol]
+		}
+
+		let payload = {
+			...Object.fromEntries(payloadEntries),
+			[typeKeySymbol]: "Record",
+		}
+
+		return `${obj[typeKeySymbol]} ${getStringRepresentation(
+			payload as never,
+			indentLevel,
+		)}`
 	} else {
 		return "Nothing"
 	}

@@ -847,10 +847,6 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Fractions"
 		case "Nothing":
 			return "Nothings"
-		case "Less":
-		case "Equal":
-		case "Greater":
-			return "Orderings"
 		case "String":
 			return "Strings"
 		case "Unknown":

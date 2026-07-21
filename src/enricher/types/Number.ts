@@ -1,4 +1,5 @@
 import type { common } from "../../interfaces/index"
+import { type as orderingType } from "./Ordering"
 
 export const type: common.UnionType = {
 	type: "UnionType",
@@ -87,20 +88,13 @@ export const namespace: common.NamespaceType = {
 					documentation: "the Number to order against",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [
-					{ type: "Less" },
-					{ type: "Equal" },
-					{ type: "Greater" },
-				],
-			},
+			returnType: orderingType,
 			documentation: {
 				description:
 					"Orders the Number against another Number by numeric value, across Integers and Fractions.",
 				parameters: {},
 				returns:
-					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+					"`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
 				position: null,
 			},
 		} as common.MethodType,

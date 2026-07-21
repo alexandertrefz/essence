@@ -4,16 +4,18 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-export type LessType = { [typeKeySymbol]: "Less" }
-export type EqualType = { [typeKeySymbol]: "Equal" }
-export type GreaterType = { [typeKeySymbol]: "Greater" }
+// NOTE: `Ordering` is the builtin Choice — its values carry Case tags
+// (`"Ordering#Less"`) exactly like user-declared Cases do.
+export type LessType = { [typeKeySymbol]: "Ordering#Less" }
+export type EqualType = { [typeKeySymbol]: "Ordering#Equal" }
+export type GreaterType = { [typeKeySymbol]: "Ordering#Greater" }
 export type OrderingType = LessType | EqualType | GreaterType
 
-// NOTE: Unit values, following the Nothing precedent — one shared instance
-// per variant, produced via the Ordering Namespace's static properties.
-export const less: LessType = { [typeKeySymbol]: "Less" }
-export const equal: EqualType = { [typeKeySymbol]: "Equal" }
-export const greater: GreaterType = { [typeKeySymbol]: "Greater" }
+// NOTE: Shared unit instances for the compare Methods — Case equality goes
+// by tag, so these being singletons is an optimisation, not a semantic.
+export const less: LessType = { [typeKeySymbol]: "Ordering#Less" }
+export const equal: EqualType = { [typeKeySymbol]: "Ordering#Equal" }
+export const greater: GreaterType = { [typeKeySymbol]: "Ordering#Greater" }
 
 export function is(
 	originalOrdering: OrderingType,
@@ -34,5 +36,6 @@ export function isNot(
 }
 
 export function toString(ordering: OrderingType): StringType {
-	return createString(ordering[typeKeySymbol])
+	// NOTE: The tag is `Ordering#Less` — printed without the Choice prefix.
+	return createString(ordering[typeKeySymbol].split("#")[1])
 }
