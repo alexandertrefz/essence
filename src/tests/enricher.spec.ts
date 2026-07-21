@@ -755,4 +755,190 @@ describe("Enricher", () => {
 			)
 		})
 	})
+
+	describe("Protocol Conformance", () => {
+		it("should accept a conforming Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Equatable {
+						is(_ other: Self) -> Boolean
+					}
+
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorEquatable for Vector is Equatable {
+						is(_ other: Vector) -> Boolean {
+							<- true
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept conformance to a Protocol declared below the Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorEquatable for Vector is Equatable {
+						is(_ other: Vector) -> Boolean {
+							<- true
+						}
+					}
+
+					protocol Equatable {
+						is(_ other: Self) -> Boolean
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept an overloaded Method fulfilling a simple requirement", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Printable {
+						toString() -> String
+					}
+
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorPrintable for Vector is Printable {
+						overload toString {
+							() -> String {
+								<- "vector"
+							}
+
+							(_ prefix: String) -> String {
+								<- prefix
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report a missing Method", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Equatable {
+					is(_ other: Self) -> Boolean
+				}
+
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorEquatable for Vector is Equatable {}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'VectorEquatable' does not conform to Protocol 'Equatable': it is missing Method 'is'.",
+			)
+		})
+
+		it("should report a mismatched Method signature", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorPrintable for Vector is Printable {
+					toString() -> Boolean {
+						<- true
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'VectorPrintable' does not conform to Protocol 'Printable': Method 'toString' does not match the Protocol's signature.",
+			)
+		})
+
+		it("should report an undeclared Protocol in a Conformance Clause", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorEquatable for Vector is Undeclared {}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Undeclared' is not declared.",
+			)
+		})
+
+		it("should reject a Conformance Clause on an untyped Namespace", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				namespace Helpers is Printable {}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Only Namespaces with a target Type ('for …') can conform to a Protocol.",
+			)
+		})
+
+		it("should reject a Conformance Clause on a generic Namespace", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				namespace ListPrintable<infer Item> for List<Item> is Printable {
+					toString() -> String {
+						<- "list"
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Generic Namespaces can not declare Protocol conformance (yet).",
+			)
+		})
+
+		it("should check static Method requirements", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Creatable {
+						static create() -> Self
+					}
+
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorCreatable for Vector is Creatable {
+						static create() -> Vector {
+							<- { x = 0, y = 0 }
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should reject a simple Method fulfilling a static requirement", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Creatable {
+					static create() -> Self
+				}
+
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorCreatable for Vector is Creatable {
+					create() -> Vector {
+						<- { x = 0, y = 0 }
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'VectorCreatable' does not conform to Protocol 'Creatable': Method 'create' does not match the Protocol's signature.",
+			)
+		})
+	})
 })

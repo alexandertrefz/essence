@@ -261,6 +261,119 @@ function signatureMatches(
 	return matchTypes(expected.returnType, actual.returnType, context)
 }
 
+// #region Protocol Conformance
+
+// NOTE: Maps each Protocol Method's *emitted* name (with `__overload$N`
+// suffixes for overloaded Protocol Methods) to the fulfilling Namespace
+// Method's emitted name. This is the single source of truth for both
+// conformance checking and conformance-value codegen — bound Method bodies
+// compile against the Protocol's names, the map translates them to whatever
+// the Namespace actually exports (a Simple requirement may well be fulfilled
+// by one overload of an Overloaded Namespace Method).
+export type ConformanceMethodMap = Record<string, string>
+
+export type ConformanceCheckResult =
+	| { kind: "conforms"; methodMap: ConformanceMethodMap }
+	| { kind: "missing"; methodName: string }
+	| { kind: "mismatched"; methodName: string }
+
+export function computeConformanceMethodMap(
+	protocol: common.ProtocolType,
+	namespace: common.NamespaceType,
+	target: common.Type,
+): ConformanceCheckResult {
+	let methodMap: ConformanceMethodMap = {}
+	let selfBindings: GenericBindings = new Map([["Self", target]])
+
+	for (let [methodName, requirement] of Object.entries(protocol.methods)) {
+		let substituted = applyGenericBindings(
+			requirement,
+			selfBindings,
+		) as common.MethodType
+		let implementation = namespace.methods[methodName]
+
+		if (implementation === undefined) {
+			return { kind: "missing", methodName }
+		}
+
+		if (
+			substituted.type === "SimpleMethod" ||
+			substituted.type === "StaticMethod"
+		) {
+			let fulfillingName = findFulfillingMethodName(
+				methodName,
+				substituted,
+				substituted.type === "StaticMethod",
+				implementation,
+			)
+
+			if (fulfillingName === null) {
+				return { kind: "mismatched", methodName }
+			}
+
+			methodMap[methodName] = fulfillingName
+		} else {
+			let requiresStatic = substituted.type === "OverloadedStaticMethod"
+
+			for (let [index, overload] of substituted.overloads.entries()) {
+				let fulfillingName = findFulfillingMethodName(
+					methodName,
+					overload,
+					requiresStatic,
+					implementation,
+				)
+
+				if (fulfillingName === null) {
+					return { kind: "mismatched", methodName }
+				}
+
+				methodMap[resolveOverloadedMethodName(methodName, index)] =
+					fulfillingName
+			}
+		}
+	}
+
+	return { kind: "conforms", methodMap }
+}
+
+// NOTE: A Simple requirement is fulfilled by a Simple Method or by the first
+// matching overload of an Overloaded one — mirroring how invocations resolve
+// their overload. Staticness must agree; the emitted name of the fulfilling
+// Method (with its own overload suffix) is returned.
+function findFulfillingMethodName(
+	methodName: string,
+	requirement: common.BaseFunction,
+	requiresStatic: boolean,
+	implementation: common.MethodType,
+): string | null {
+	if (
+		implementation.type === "SimpleMethod" ||
+		implementation.type === "StaticMethod"
+	) {
+		if ((implementation.type === "StaticMethod") !== requiresStatic) {
+			return null
+		}
+
+		return signatureMatches(requirement, implementation, null)
+			? methodName
+			: null
+	}
+
+	if ((implementation.type === "OverloadedStaticMethod") !== requiresStatic) {
+		return null
+	}
+
+	for (let [index, overload] of implementation.overloads.entries()) {
+		if (signatureMatches(requirement, overload, null)) {
+			return resolveOverloadedMethodName(methodName, index)
+		}
+	}
+
+	return null
+}
+
+// #endregion
+
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }

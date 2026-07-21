@@ -2,6 +2,7 @@ import { reportError } from "../diagnostics/index"
 import { matchesType } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import {
+	checkProtocolConformance,
 	resolveCombinationType,
 	resolveFunctionValueType,
 	resolveListValueType,
@@ -734,6 +735,8 @@ export function enrichNamespaceDefinitionStatement(
 		declareVariableInScope(node.name, type, scope, true)
 	}
 
+	checkProtocolConformance(node, type, scope)
+
 	// NOTE: Namespace Generics are visible in every Method — bodies reference
 	// them as opaque GenericUses.
 	let genericTypes: Record<string, common.Type> = {}
@@ -755,6 +758,10 @@ export function enrichNamespaceDefinitionStatement(
 	return {
 		nodeType: "NamespaceDefinitionStatement",
 		targetType: type.targetType,
+		conformsTo: node.conformsTo.map((identifier) => ({
+			name: identifier.content,
+			position: identifier.position,
+		})),
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
 		methods: enrichMethods(
