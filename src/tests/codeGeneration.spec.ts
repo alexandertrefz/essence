@@ -434,9 +434,9 @@ describe("Code Generation", () => {
 			const code = generate(`implementation {
 				function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 					<- match a::compareTo(b) -> Item {
-						case Less    { <- a }
-						case Equal   { <- a }
-						case Greater { <- b }
+						case #Less    { <- a }
+						case #Equal   { <- a }
+						case #Greater { <- b }
 					}
 				}
 

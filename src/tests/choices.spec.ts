@@ -381,6 +381,16 @@ describe("Choices", () => {
 				"Case '#Go' is ambiguous — it is declared by the Choices 'A', 'B'. Prefix it with its Choice's name.",
 			)
 		})
+
+		it("resolves bare Ordering Cases", () => {
+			expect(
+				messagesOf(`implementation {
+					constant smaller: Ordering = #Less
+
+					__print(smaller::is(1::compareTo(2)))
+				}`),
+			).toEqual([])
+		})
 	})
 
 	describe("Contextual Case Resolution", () => {
@@ -456,6 +466,38 @@ describe("Choices", () => {
 			expect(messages).not.toContain(
 				"No Choice in scope declares a Case '#Go'.",
 			)
+		})
+	})
+
+	describe("Ordering as a Choice", () => {
+		it("constructs and matches Ordering Cases like any other Choice", () => {
+			expect(
+				messagesOf(`implementation {
+					__print(match 1::compareTo(2) -> String {
+						case #Less { <- "smaller" }
+						case #Equal { <- "same" }
+						case #Greater { <- "bigger" }
+					})
+
+					__print(Ordering#Less::is(1::compareTo(2)))
+				}`),
+			).toEqual([])
+		})
+
+		it("no longer exposes the Cases as Namespace properties", () => {
+			expect(
+				messagesOf(`implementation {
+					constant smaller = Ordering.less
+				}`),
+			).toContain("Namespace 'Ordering' has no member 'less'.")
+		})
+
+		it("no longer declares the Cases as standalone Types", () => {
+			expect(
+				messagesOf(`implementation {
+					constant smaller: Less = Ordering#Less
+				}`),
+			).toContain("Type 'Less' is not declared.")
 		})
 	})
 

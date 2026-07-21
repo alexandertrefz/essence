@@ -1229,9 +1229,9 @@ describe("Enricher", () => {
 					constant ordering = 5::compareTo(7)
 
 					constant description = match ordering -> String {
-						case Less    { <- "smaller" }
-						case Equal   { <- "same" }
-						case Greater { <- "bigger" }
+						case #Less    { <- "smaller" }
+						case #Equal   { <- "same" }
+						case #Greater { <- "bigger" }
 					}
 				}`),
 			).toEqual([])
@@ -1250,7 +1250,7 @@ describe("Enricher", () => {
 					__print(describeValue(true))
 					__print(describeValue(nothing))
 					__print(describeValue({ x = 1 }))
-					__print(describeValue(Ordering.less))
+					__print(describeValue(Ordering#Less))
 				}`),
 			).toEqual([])
 		})
@@ -1260,9 +1260,9 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 						<- match a::compareTo(b) -> Item {
-							case Less    { <- a }
-							case Equal   { <- a }
-							case Greater { <- b }
+							case #Less    { <- a }
+							case #Equal   { <- a }
+							case #Greater { <- b }
 						}
 					}
 
@@ -1276,8 +1276,8 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant nothingSame: Boolean = nothing::is(nothing)
-					constant orderingSame: Boolean = Ordering.less::is(Ordering.less)
-					constant orderingText: String = Ordering.greater::toString()
+					constant orderingSame: Boolean = Ordering#Less::is(Ordering#Less)
+					constant orderingText: String = Ordering#Greater::toString()
 				}`),
 			).toEqual([])
 		})
@@ -1291,9 +1291,9 @@ describe("Enricher", () => {
 
 					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 						<- match a::compareTo(b) -> Item {
-							case Less    { <- a }
-							case Equal   { <- a }
-							case Greater { <- b }
+							case #Less    { <- a }
+							case #Equal   { <- a }
+							case #Greater { <- b }
 						}
 					}
 
@@ -1331,7 +1331,7 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant text: String = 5::compareTo(7)::toString()
-					constant same: Boolean = 5::compareTo(7)::is(Ordering.less)
+					constant same: Boolean = 5::compareTo(7)::is(Ordering#Less)
 				}`),
 			).toEqual([])
 		})
@@ -1404,7 +1404,7 @@ describe("Enricher", () => {
 		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
 			let invocation = lastConstantValue(`implementation {
 				constant ordering = 5::compareTo(7)
-				constant same = ordering::is(Ordering.less)
+				constant same = ordering::is(Ordering#Less)
 			}`)
 
 			expect(invocation.namespace.name).toBe("Ordering")
@@ -1657,9 +1657,9 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant ordered = match 5::compareTo(1/2) -> String {
-						case Less    { <- "smaller" }
-						case Equal   { <- "same" }
-						case Greater { <- "bigger" }
+						case #Less    { <- "smaller" }
+						case #Equal   { <- "same" }
+						case #Greater { <- "bigger" }
 					}
 				}`),
 			).toEqual([])
