@@ -8,7 +8,7 @@ implementation {
 	}
 
 	variable list: List<Rational> = []
-	variable tao = list::append(Number.TAO)::firstItem()
+	variable tau = list::append(Number.TAU)::firstItem()
 
 	list = list::append(1/1)
 	list = list::append(contentsOf [2/1])
