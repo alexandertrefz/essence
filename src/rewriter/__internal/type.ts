@@ -10,6 +10,26 @@ import type { StringType } from "./String"
 
 export const typeKeySymbol = Symbol("$type")
 
+// NOTE: The runtime half of Union Method dispatch — each case holds a member
+// Type descriptor, the statically chosen Method, and that Method's hidden
+// conformance Arguments. The Enricher orders the cases most specific first
+// and only emits a dispatch when some case is guaranteed to match.
+export function dispatchMethod(
+	receiver: AnyType,
+	args: Array<unknown>,
+	cases: Array<
+		[common.Type, (...args: Array<unknown>) => unknown, Array<unknown>]
+	>,
+): unknown {
+	for (let [type, method, conformanceArguments] of cases) {
+		if (isValueOfType(receiver, type)) {
+			return method(receiver, ...args, ...conformanceArguments)
+		}
+	}
+
+	throw new Error("No dispatch case matched the receiver.")
+}
+
 export type AnyType =
 	| RecordType
 	| ListType<any>

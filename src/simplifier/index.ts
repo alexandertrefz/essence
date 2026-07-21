@@ -110,7 +110,13 @@ function simplifyNativeFunctionInvocation(
 
 function simplifyMethodInvocation(
 	node: common.typed.MethodInvocationNode,
-): common.typedSimple.MethodInvocationNode {
+):
+	| common.typedSimple.MethodInvocationNode
+	| common.typedSimple.UnionMethodInvocationNode {
+	if (node.dispatch !== null) {
+		return simplifyUnionMethodInvocation(node, node.dispatch)
+	}
+
 	if (node.overloadedMethodIndex !== null) {
 		node.member.name = resolveOverloadedMethodName(
 			node.member.name,
@@ -135,6 +141,36 @@ function simplifyMethodInvocation(
 			...node.arguments.map((arg) => simplifyArgument(arg)),
 			...simplifyConformanceArguments(node.conformances),
 		],
+		type: node.type,
+	}
+}
+
+// NOTE: A dispatched Invocation flattens into one statically resolved target
+// per member Type — the receiver and the shared Arguments are emitted once,
+// and each case carries its overload-mangled Method name plus the hidden
+// conformance Arguments that target requires.
+function simplifyUnionMethodInvocation(
+	node: common.typed.MethodInvocationNode,
+	dispatch: Array<common.DispatchCase>,
+): common.typedSimple.UnionMethodInvocationNode {
+	return {
+		nodeType: "UnionMethodInvocation",
+		base: simplifyExpression(node.base),
+		cases: dispatch.map((dispatchCase) => ({
+			memberType: dispatchCase.memberType,
+			namespaceName: dispatchCase.namespaceName,
+			methodName:
+				dispatchCase.overloadedMethodIndex !== null
+					? resolveOverloadedMethodName(
+							node.member.name,
+							dispatchCase.overloadedMethodIndex,
+						)
+					: node.member.name,
+			conformanceArguments: simplifyConformanceArguments(
+				dispatchCase.conformances,
+			),
+		})),
+		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
 	}
 }

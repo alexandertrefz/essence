@@ -12,6 +12,7 @@ import { namespace as stringNamespace } from "../enricher/types/String"
 import {
 	applyGenericBindings,
 	createInferenceContext,
+	flattenUnionMembers,
 	type GenericBindings,
 	matchesTypeWithBindings,
 } from "../helpers/index"
@@ -53,6 +54,14 @@ export function targetTypeMatches(
 	let context = createInferenceContext(namespace.generics)
 
 	if (namespace.targetType.type === "UnionType") {
+		// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches the
+		// Union target as a whole — the per-member check below only covers
+		// receivers of a single member Type. Mirrors the Enricher's
+		// `resolveMethodLookupNamespacesForReceiverType`.
+		if (matchesTypeWithBindings(namespace.targetType, baseType, context)) {
+			return true
+		}
+
 		return namespace.targetType.types.some((type) =>
 			matchesTypeWithBindings(type, baseType, context),
 		)
@@ -102,14 +111,94 @@ export function matchingNamespaces(
 		]
 	}
 
-	let namespaces = [
+	let allNamespaces = [
 		...builtinNamespaces,
 		...collectNamespaceTypes(documentText),
-	].filter((namespace) => targetTypeMatches(namespace, baseType))
+	]
+
+	let namespaces =
+		baseType.type === "UnionType"
+			? unionReceiverNamespaces(baseType, allNamespaces)
+			: allNamespaces.filter((namespace) =>
+					targetTypeMatches(namespace, baseType),
+				)
 
 	return specifierName === null
 		? namespaces
 		: namespaces.filter((namespace) => namespace.name === specifierName)
+}
+
+// NOTE: A Union-typed receiver reaches a Method either through a Namespace
+// covering the whole Union or through per-member dispatch — a Method is
+// dispatchable only when every member resolves it. Member Namespaces are
+// therefore listed with their Methods narrowed to the dispatchable names,
+// minus those a covering Namespace already provides (the Enricher prefers
+// the covering Namespace for those).
+function unionReceiverNamespaces(
+	baseType: common.UnionType,
+	allNamespaces: Array<common.NamespaceType>,
+): Array<common.NamespaceType> {
+	let coveringNamespaces = allNamespaces.filter((namespace) =>
+		targetTypeMatches(namespace, baseType),
+	)
+	let memberNamespaceSets = flattenUnionMembers(baseType).map((member) =>
+		allNamespaces.filter((namespace) =>
+			targetTypeMatches(namespace, member),
+		),
+	)
+
+	let dispatchableNames: Set<string> | null = null
+
+	for (let memberNamespaces of memberNamespaceSets) {
+		let names = new Set(
+			memberNamespaces.flatMap((namespace) =>
+				Object.keys(namespace.methods),
+			),
+		)
+
+		if (dispatchableNames === null) {
+			dispatchableNames = names
+		} else {
+			let previousNames: Set<string> = dispatchableNames
+			dispatchableNames = new Set(
+				[...previousNames].filter((name) => names.has(name)),
+			)
+		}
+	}
+
+	let coveredNames = new Set(
+		coveringNamespaces.flatMap((namespace) =>
+			Object.keys(namespace.methods),
+		),
+	)
+
+	let namespaces = [...coveringNamespaces]
+	let seenNames = new Set(
+		coveringNamespaces.map((namespace) => namespace.name),
+	)
+
+	for (let memberNamespaces of memberNamespaceSets) {
+		for (let namespace of memberNamespaces) {
+			if (seenNames.has(namespace.name)) {
+				continue
+			}
+
+			seenNames.add(namespace.name)
+
+			let methods = Object.fromEntries(
+				Object.entries(namespace.methods).filter(
+					([name]) =>
+						dispatchableNames?.has(name) && !coveredNames.has(name),
+				),
+			)
+
+			if (Object.keys(methods).length > 0) {
+				namespaces.push({ ...namespace, methods })
+			}
+		}
+	}
+
+	return namespaces
 }
 
 // NOTE: A best-effort Enrichment of the whole (unmodified) document — a

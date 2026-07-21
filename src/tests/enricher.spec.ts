@@ -1342,4 +1342,181 @@ describe("Enricher", () => {
 			)
 		})
 	})
+
+	describe("Union Method Dispatch", () => {
+		function lastConstantValue(
+			source: string,
+		): common.typed.MethodInvocationNode {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+			let value = constants[constants.length - 1].value
+
+			expect(value.nodeType).toBe("MethodInvocation")
+
+			if (value.nodeType !== "MethodInvocation") {
+				throw new Error("Last Constant is not a MethodInvocation.")
+			}
+
+			return value
+		}
+
+		it("should dispatch a Number receiver to the Integer and Fraction Namespaces", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant number: Number = 5
+				constant doubled = number::multiplyWith(2)
+			}`)
+
+			expect(invocation.namespace.name).toBe("")
+			expect(invocation.dispatch).not.toBeNull()
+			expect(
+				invocation.dispatch?.map(
+					(dispatchCase) => dispatchCase.namespaceName,
+				),
+			).toEqual(["Integer", "Fraction"])
+			expect(invocation.type).toEqual({
+				type: "UnionType",
+				types: [{ type: "Integer" }, { type: "Fraction" }],
+			})
+		})
+
+		it("should collapse identical branch return Types", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant number: Number = 5
+				constant text = number::toString()
+			}`)
+
+			expect(invocation.dispatch).not.toBeNull()
+			expect(invocation.type).toEqual({ type: "String" })
+		})
+
+		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant ordering = 5::compareTo(7)
+				constant same = ordering::is(Ordering.less)
+			}`)
+
+			expect(invocation.namespace.name).toBe("Ordering")
+			expect(invocation.dispatch).toBeNull()
+			expect(invocation.type).toEqual({ type: "Boolean" })
+		})
+
+		it("should dispatch across unrelated member Namespaces", () => {
+			let invocation = lastConstantValue(`implementation {
+				constant quotient = 10::divideBy(0)
+				constant text = quotient::toString()
+			}`)
+
+			expect(invocation.dispatch).not.toBeNull()
+			expect(invocation.type).toEqual({ type: "String" })
+		})
+
+		it("should union distinct branch return Types through user Namespaces", () => {
+			let invocation = lastConstantValue(`implementation {
+				namespace IntegerTag for Integer {
+					tag() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace BooleanTag for Boolean {
+					tag() -> Integer {
+						<- 1
+					}
+				}
+
+				constant value: Integer | Boolean = 5
+				constant tagged = value::tag()
+			}`)
+
+			expect(
+				invocation.dispatch?.map(
+					(dispatchCase) => dispatchCase.namespaceName,
+				),
+			).toEqual(["IntegerTag", "BooleanTag"])
+			expect(invocation.type).toEqual({
+				type: "UnionType",
+				types: [{ type: "String" }, { type: "Integer" }],
+			})
+		})
+
+		it("should reject the call when a member Type lacks the Method", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant value: Integer | Boolean = 5
+				constant bad = value::multiplyWith(2)
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"Could not find a method named 'multiplyWith' for Type 'Boolean', a member of this value's Union Type.",
+				),
+			).toBe(true)
+		})
+
+		it("should reject the call when a member Type rejects the Arguments", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant number: Number = 5
+				constant bad = number::is(21)
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"Passed arguments do not match any overload for Type 'Fraction', a member of this value's Union Type.",
+				),
+			).toBe(true)
+		})
+
+		it("should reject ambiguous resolution for a member Type", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace TagA for Integer {
+					tag() -> String {
+						<- "a"
+					}
+				}
+
+				namespace TagB for Integer {
+					tag() -> String {
+						<- "b"
+					}
+				}
+
+				namespace BooleanTag for Boolean {
+					tag() -> String {
+						<- "boolean"
+					}
+				}
+
+				constant value: Integer | Boolean = 5
+				constant bad = value::tag()
+			}`)
+
+			expect(
+				diagnostics.some((diagnostic) =>
+					diagnostic.message.startsWith(
+						"Passed arguments matched more than 1 Namespace for Type 'Integer', a member of this value's Union Type",
+					),
+				),
+			).toBe(true)
+		})
+
+		it("should dispatch a bounded Type Parameter member through its conformance", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
+						<- items::firstItem()::toString()
+					}
+
+					constant text: String = firstText([1, 2])
+				}`),
+			).toEqual([])
+		})
+	})
 })
