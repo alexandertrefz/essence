@@ -176,7 +176,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: { type: "Integer" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "Nothing" }],
+					},
 				},
 				{
 					generics: [],
@@ -191,7 +194,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: { type: "Rational" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Rational" }, { type: "Nothing" }],
+					},
 				},
 				{
 					generics: [],
@@ -216,7 +222,11 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Integer" }, { type: "Rational" }],
+						types: [
+							{ type: "Integer" },
+							{ type: "Rational" },
+							{ type: "Nothing" },
+						],
 					},
 				},
 			],
@@ -299,7 +309,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: { type: "Integer" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "Nothing" }],
+					},
 				},
 				{
 					generics: [],
@@ -314,7 +327,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: { type: "Rational" },
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Rational" }, { type: "Nothing" }],
+					},
 				},
 				{
 					generics: [],
@@ -339,7 +355,11 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Integer" }, { type: "Rational" }],
+						types: [
+							{ type: "Integer" },
+							{ type: "Rational" },
+							{ type: "Nothing" },
+						],
 					},
 				},
 			],
