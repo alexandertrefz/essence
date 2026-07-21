@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util"
 import { reportError } from "../diagnostics/index"
 import {
 	applyGenericBindings,
+	computeConformanceMethodMap,
 	createInferenceContext,
 	type GenericBindings,
 	type MatchableArgument,
@@ -824,6 +825,7 @@ export function resolveNamespaceDefinitionStatementType(
 		generics: resolveGenericDeclarations(node.generics, scope),
 		properties: {},
 		methods: {},
+		conformsTo: node.conformsTo.map((identifier) => identifier.content),
 	}
 
 	let properties: Record<string, common.Type> = {}
@@ -940,6 +942,64 @@ function resolveProtocolMethodType(
 				resolveProtocolSignature(signature, scope, null),
 			),
 			documentation: node.documentation ?? undefined,
+		}
+	}
+}
+
+// NOTE: Called from the Enricher, never from speculative hoisting — a
+// Namespace with a broken conformance clause is still a perfectly usable
+// Namespace and must hoist; only the clause itself is diagnosed.
+export function checkProtocolConformance(
+	node: parser.NamespaceDefinitionStatementNode,
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+): void {
+	for (let identifier of node.conformsTo) {
+		let protocol = findProtocolInScope(identifier.content, scope)
+
+		if (protocol === null) {
+			reportError(
+				`Protocol '${identifier.content}' is not declared.`,
+				identifier.position,
+			)
+
+			continue
+		}
+
+		if (namespaceType.targetType === null) {
+			reportError(
+				"Only Namespaces with a target Type ('for …') can conform to a Protocol.",
+				identifier.position,
+			)
+
+			continue
+		}
+
+		if (namespaceType.generics.length > 0) {
+			reportError(
+				"Generic Namespaces can not declare Protocol conformance (yet).",
+				identifier.position,
+			)
+
+			continue
+		}
+
+		let result = computeConformanceMethodMap(
+			protocol,
+			namespaceType,
+			namespaceType.targetType,
+		)
+
+		if (result.kind === "missing") {
+			reportError(
+				`Namespace '${namespaceType.name}' does not conform to Protocol '${protocol.name}': it is missing Method '${result.methodName}'.`,
+				identifier.position,
+			)
+		} else if (result.kind === "mismatched") {
+			reportError(
+				`Namespace '${namespaceType.name}' does not conform to Protocol '${protocol.name}': Method '${result.methodName}' does not match the Protocol's signature.`,
+				identifier.position,
+			)
 		}
 	}
 }

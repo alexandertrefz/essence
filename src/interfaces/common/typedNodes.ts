@@ -281,6 +281,7 @@ export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
 	targetType: Type | null
+	conformsTo: Array<{ name: string; position: Position }>
 	properties: Record<string, NamespaceProperty>
 	methods: Methods
 	position: Position

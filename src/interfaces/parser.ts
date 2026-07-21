@@ -286,6 +286,7 @@ export interface NamespaceDefinitionStatementNode {
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	targetType: TypeDeclarationNode | null
+	conformsTo: Array<IdentifierNode>
 	properties: Record<string, NamespacePropertyNode>
 	methods: NamespaceMethods
 	position: Position

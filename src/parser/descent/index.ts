@@ -22,7 +22,7 @@ type BlockResult = {
 
 type NamespaceBodyNode = Parameters<
 	typeof generators.namespaceDefinitionStatement
->[3][number]
+>[4][number]
 
 // NOTE: These token types form the Identifier rule of the grammar — the
 // keywords `with`, `static`, `case` and `infer` are valid Identifiers.
@@ -420,6 +420,22 @@ class DescentParser {
 			targetType = this.parseType()
 		}
 
+		// NOTE: `is` is contextual, not a keyword — `::is()` Method calls rely
+		// on it lexing as an ordinary Identifier.
+		let conformsTo: Array<parser.IdentifierNode> = []
+		let peeked = this.tokens.peek()
+		if (peeked?.type === TokenType.Identifier && peeked.value === "is") {
+			this.tokens.next()
+
+			conformsTo.push(this.parseIdentifier())
+
+			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+				this.tokens.next()
+
+				conformsTo.push(this.parseIdentifier())
+			}
+		}
+
 		this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
@@ -429,6 +445,7 @@ class DescentParser {
 			name,
 			generics,
 			targetType,
+			conformsTo,
 			body,
 			{
 				start: keyword.position.start,

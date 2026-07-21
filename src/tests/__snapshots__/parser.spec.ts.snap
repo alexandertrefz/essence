@@ -9013,6 +9013,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -9076,6 +9077,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -9172,6 +9174,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -9300,6 +9303,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -9526,6 +9530,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -9914,6 +9919,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -10288,6 +10294,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -10807,6 +10814,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -11066,6 +11074,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -11155,6 +11164,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -11277,6 +11287,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {},
@@ -11431,6 +11442,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -11683,6 +11695,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -12097,6 +12110,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -12497,6 +12511,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -13042,6 +13057,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -13327,6 +13343,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -13579,6 +13596,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -13993,6 +14011,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -14393,6 +14412,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -14938,6 +14958,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -15223,6 +15244,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [],
         "documentation": null,
         "generics": [],
         "methods": {
@@ -15493,6 +15515,1290 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
     "end": {
       "column": 8,
       "line": 13,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse an empty ProtocolDeclarationStatement 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {},
+        "name": {
+          "content": "Printable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 36,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 39,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 41,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 41,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a simple Method Signature 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {
+          "toString": {
+            "name": {
+              "content": "toString",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 16,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [],
+              "position": {
+                "end": {
+                  "column": 28,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 3,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 28,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 28,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 22,
+                      "line": 3,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Printable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 4,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a Self Parameter 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {
+          "is": {
+            "name": {
+              "content": "is",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 10,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [
+                {
+                  "documentation": null,
+                  "externalName": null,
+                  "internalName": {
+                    "content": "other",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 18,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 13,
+                        "line": 3,
+                      },
+                    },
+                  },
+                  "nodeType": "Parameter",
+                  "position": {
+                    "end": {
+                      "column": 24,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 11,
+                      "line": 3,
+                    },
+                  },
+                  "type": {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 24,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 20,
+                        "line": 3,
+                      },
+                    },
+                    "type": {
+                      "content": "Self",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 24,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 20,
+                          "line": 3,
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+              "position": {
+                "end": {
+                  "column": 36,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 10,
+                  "line": 3,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 36,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 29,
+                    "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "Boolean",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 36,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 29,
+                      "line": 3,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "isNot": {
+            "name": {
+              "content": "isNot",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 13,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 4,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [
+                {
+                  "documentation": null,
+                  "externalName": null,
+                  "internalName": {
+                    "content": "other",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 21,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 16,
+                        "line": 4,
+                      },
+                    },
+                  },
+                  "nodeType": "Parameter",
+                  "position": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 14,
+                      "line": 4,
+                    },
+                  },
+                  "type": {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 27,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 23,
+                        "line": 4,
+                      },
+                    },
+                    "type": {
+                      "content": "Self",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 27,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 23,
+                          "line": 4,
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 4,
+                },
+                "start": {
+                  "column": 13,
+                  "line": 4,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 39,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 32,
+                    "line": 4,
+                  },
+                },
+                "type": {
+                  "content": "Boolean",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 39,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 32,
+                      "line": 4,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Equatable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 5,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 6,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 6,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a static Method Signature 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {
+          "create": {
+            "name": {
+              "content": "create",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 21,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 15,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "StaticProtocolMethod",
+            "signature": {
+              "documentation": null,
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [],
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 21,
+                  "line": 3,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 31,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 27,
+                    "line": 3,
+                  },
+                },
+                "type": {
+                  "content": "Self",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 31,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 27,
+                      "line": 3,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Creatable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 4,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded Method Signature 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {
+          "combine": {
+            "documentation": null,
+            "name": {
+              "content": "combine",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 24,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 17,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "OverloadedProtocolMethod",
+            "signatures": [
+              {
+                "documentation": null,
+                "nodeType": "ProtocolMethodSignature",
+                "parameters": [
+                  {
+                    "documentation": null,
+                    "externalName": null,
+                    "internalName": {
+                      "content": "other",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 17,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 12,
+                          "line": 4,
+                        },
+                      },
+                    },
+                    "nodeType": "Parameter",
+                    "position": {
+                      "end": {
+                        "column": 23,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 10,
+                        "line": 4,
+                      },
+                    },
+                    "type": {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 23,
+                          "line": 4,
+                        },
+                        "start": {
+                          "column": 19,
+                          "line": 4,
+                        },
+                      },
+                      "type": {
+                        "content": "Self",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 23,
+                            "line": 4,
+                          },
+                          "start": {
+                            "column": 19,
+                            "line": 4,
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+                "position": {
+                  "end": {
+                    "column": 32,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 9,
+                    "line": 4,
+                  },
+                },
+                "returnType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 32,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 28,
+                      "line": 4,
+                    },
+                  },
+                  "type": {
+                    "content": "Self",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 32,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 28,
+                        "line": 4,
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                "documentation": null,
+                "nodeType": "ProtocolMethodSignature",
+                "parameters": [
+                  {
+                    "documentation": null,
+                    "externalName": null,
+                    "internalName": {
+                      "content": "others",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 18,
+                          "line": 5,
+                        },
+                        "start": {
+                          "column": 12,
+                          "line": 5,
+                        },
+                      },
+                    },
+                    "nodeType": "Parameter",
+                    "position": {
+                      "end": {
+                        "column": 30,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 10,
+                        "line": 5,
+                      },
+                    },
+                    "type": {
+                      "baseType": {
+                        "nodeType": "IdentifierTypeDeclaration",
+                        "position": {
+                          "end": {
+                            "column": 24,
+                            "line": 5,
+                          },
+                          "start": {
+                            "column": 20,
+                            "line": 5,
+                          },
+                        },
+                        "type": {
+                          "content": "List",
+                          "nodeType": "Identifier",
+                          "position": {
+                            "end": {
+                              "column": 24,
+                              "line": 5,
+                            },
+                            "start": {
+                              "column": 20,
+                              "line": 5,
+                            },
+                          },
+                        },
+                      },
+                      "generics": [
+                        {
+                          "nodeType": "IdentifierTypeDeclaration",
+                          "position": {
+                            "end": {
+                              "column": 29,
+                              "line": 5,
+                            },
+                            "start": {
+                              "column": 25,
+                              "line": 5,
+                            },
+                          },
+                          "type": {
+                            "content": "Self",
+                            "nodeType": "Identifier",
+                            "position": {
+                              "end": {
+                                "column": 29,
+                                "line": 5,
+                              },
+                              "start": {
+                                "column": 25,
+                                "line": 5,
+                              },
+                            },
+                          },
+                        },
+                      ],
+                      "nodeType": "GenericTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 30,
+                          "line": 5,
+                        },
+                        "start": {
+                          "column": 24,
+                          "line": 5,
+                        },
+                      },
+                    },
+                  },
+                ],
+                "position": {
+                  "end": {
+                    "column": 39,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 9,
+                    "line": 5,
+                  },
+                },
+                "returnType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 39,
+                      "line": 5,
+                    },
+                    "start": {
+                      "column": 35,
+                      "line": 5,
+                    },
+                  },
+                  "type": {
+                    "content": "Self",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 39,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 35,
+                        "line": 5,
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        "name": {
+          "content": "Combinable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 26,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 7,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 8,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 8,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded static Method Signature 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "methods": {
+          "create": {
+            "documentation": null,
+            "name": {
+              "content": "create",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 30,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 24,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "OverloadedStaticProtocolMethod",
+            "signatures": [
+              {
+                "documentation": null,
+                "nodeType": "ProtocolMethodSignature",
+                "parameters": [],
+                "position": {
+                  "end": {
+                    "column": 19,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 9,
+                    "line": 4,
+                  },
+                },
+                "returnType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 19,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 15,
+                      "line": 4,
+                    },
+                  },
+                  "type": {
+                    "content": "Self",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 19,
+                        "line": 4,
+                      },
+                      "start": {
+                        "column": 15,
+                        "line": 4,
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                "documentation": null,
+                "nodeType": "ProtocolMethodSignature",
+                "parameters": [
+                  {
+                    "documentation": null,
+                    "externalName": null,
+                    "internalName": {
+                      "content": "description",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 23,
+                          "line": 5,
+                        },
+                        "start": {
+                          "column": 12,
+                          "line": 5,
+                        },
+                      },
+                    },
+                    "nodeType": "Parameter",
+                    "position": {
+                      "end": {
+                        "column": 31,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 10,
+                        "line": 5,
+                      },
+                    },
+                    "type": {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 31,
+                          "line": 5,
+                        },
+                        "start": {
+                          "column": 25,
+                          "line": 5,
+                        },
+                      },
+                      "type": {
+                        "content": "String",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 31,
+                            "line": 5,
+                          },
+                          "start": {
+                            "column": 25,
+                            "line": 5,
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+                "position": {
+                  "end": {
+                    "column": 40,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 9,
+                    "line": 5,
+                  },
+                },
+                "returnType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 40,
+                      "line": 5,
+                    },
+                    "start": {
+                      "column": 36,
+                      "line": 5,
+                    },
+                  },
+                  "type": {
+                    "content": "Self",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 40,
+                        "line": 5,
+                      },
+                      "start": {
+                        "column": 36,
+                        "line": 5,
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        "name": {
+          "content": "Creatable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 7,
+          },
+          "start": {
+            "column": 7,
+            "line": 2,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 8,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 8,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements should parse a documented ProtocolDeclarationStatement 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": {
+          "description": "Anything that can represent itself as a String.",
+          "parameters": {},
+          "position": {
+            "end": {
+              "column": 57,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
+          "returns": null,
+        },
+        "methods": {
+          "toString": {
+            "name": {
+              "content": "toString",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 16,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 8,
+                  "line": 5,
+                },
+              },
+            },
+            "nodeType": "SimpleProtocolMethod",
+            "signature": {
+              "documentation": {
+                "description": "The String representation.",
+                "parameters": {},
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 4,
+                  },
+                  "start": {
+                    "column": 8,
+                    "line": 4,
+                  },
+                },
+                "returns": null,
+              },
+              "nodeType": "ProtocolMethodSignature",
+              "parameters": [],
+              "position": {
+                "end": {
+                  "column": 28,
+                  "line": 5,
+                },
+                "start": {
+                  "column": 16,
+                  "line": 5,
+                },
+              },
+              "returnType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 28,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 5,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 28,
+                      "line": 5,
+                    },
+                    "start": {
+                      "column": 22,
+                      "line": 5,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "name": {
+          "content": "Printable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 3,
+            },
+            "start": {
+              "column": 16,
+              "line": 3,
+            },
+          },
+        },
+        "nodeType": "ProtocolDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 8,
+            "line": 6,
+          },
+          "start": {
+            "column": 7,
+            "line": 3,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 7,
+        "line": 7,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 7,
+      "line": 7,
     },
     "start": {
       "column": 1,
@@ -16922,32 +18228,49 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
 }
 `;
 
-exports[`Parser Statements ProtocolDeclarationStatements should parse an empty ProtocolDeclarationStatement 1`] = `
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with a Conformance Clause 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 69,
+                "line": 1,
+              },
+              "start": {
+                "column": 60,
+                "line": 1,
+              },
+            },
+          },
+        ],
         "documentation": null,
+        "generics": [],
         "methods": {},
         "name": {
-          "content": "Printable",
+          "content": "IntegerEquatable",
           "nodeType": "Identifier",
           "position": {
             "end": {
-              "column": 36,
+              "column": 44,
               "line": 1,
             },
             "start": {
-              "column": 27,
+              "column": 28,
               "line": 1,
             },
           },
         },
-        "nodeType": "ProtocolDeclarationStatement",
+        "nodeType": "NamespaceDefinitionStatement",
         "position": {
           "end": {
-            "column": 39,
+            "column": 72,
             "line": 1,
           },
           "start": {
@@ -16955,11 +18278,39 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
             "line": 1,
           },
         },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 56,
+              "line": 1,
+            },
+            "start": {
+              "column": 49,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 56,
+                "line": 1,
+              },
+              "start": {
+                "column": 49,
+                "line": 1,
+              },
+            },
+          },
+        },
       },
     ],
     "position": {
       "end": {
-        "column": 41,
+        "column": 74,
         "line": 1,
       },
       "start": {
@@ -16971,7 +18322,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 41,
+      "column": 74,
       "line": 1,
     },
     "start": {
@@ -16982,105 +18333,104 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
 }
 `;
 
-exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a simple Method Signature 1`] = `
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with multiple Conformance Clauses 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
-        "documentation": null,
-        "methods": {
-          "toString": {
-            "name": {
-              "content": "toString",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 16,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 8,
-                  "line": 3,
-                },
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 69,
+                "line": 1,
               },
-            },
-            "nodeType": "SimpleProtocolMethod",
-            "signature": {
-              "documentation": null,
-              "nodeType": "ProtocolMethodSignature",
-              "parameters": [],
-              "position": {
-                "end": {
-                  "column": 28,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 16,
-                  "line": 3,
-                },
-              },
-              "returnType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 28,
-                    "line": 3,
-                  },
-                  "start": {
-                    "column": 22,
-                    "line": 3,
-                  },
-                },
-                "type": {
-                  "content": "String",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 28,
-                      "line": 3,
-                    },
-                    "start": {
-                      "column": 22,
-                      "line": 3,
-                    },
-                  },
-                },
+              "start": {
+                "column": 60,
+                "line": 1,
               },
             },
           },
-        },
+          {
+            "content": "Printable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 80,
+                "line": 1,
+              },
+              "start": {
+                "column": 71,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [],
+        "methods": {},
         "name": {
-          "content": "Printable",
+          "content": "IntegerEquatable",
           "nodeType": "Identifier",
           "position": {
             "end": {
-              "column": 25,
-              "line": 2,
+              "column": 44,
+              "line": 1,
             },
             "start": {
-              "column": 16,
-              "line": 2,
+              "column": 28,
+              "line": 1,
             },
           },
         },
-        "nodeType": "ProtocolDeclarationStatement",
+        "nodeType": "NamespaceDefinitionStatement",
         "position": {
           "end": {
-            "column": 8,
-            "line": 4,
+            "column": 83,
+            "line": 1,
           },
           "start": {
-            "column": 7,
-            "line": 2,
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 56,
+              "line": 1,
+            },
+            "start": {
+              "column": 49,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 56,
+                "line": 1,
+              },
+              "start": {
+                "column": 49,
+                "line": 1,
+              },
+            },
           },
         },
       },
     ],
     "position": {
       "end": {
-        "column": 7,
-        "line": 5,
+        "column": 85,
+        "line": 1,
       },
       "start": {
         "column": 1,
@@ -17091,8 +18441,8 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 7,
-      "line": 5,
+      "column": 85,
+      "line": 1,
     },
     "start": {
       "column": 1,
@@ -17102,448 +18452,141 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 }
 `;
 
-exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a Self Parameter 1`] = `
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse an untyped Namespace with a Conformance Clause 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 44,
+                "line": 1,
+              },
+              "start": {
+                "column": 35,
+                "line": 1,
+              },
+            },
+          },
+        ],
         "documentation": null,
+        "generics": [],
+        "methods": {},
+        "name": {
+          "content": "Foo",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 31,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 47,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": null,
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 49,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 49,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should still parse a Method named is 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [],
+        "documentation": null,
+        "generics": [],
         "methods": {
           "is": {
-            "name": {
-              "content": "is",
-              "nodeType": "Identifier",
+            "method": {
+              "nodeType": "FunctionValue",
               "position": {
                 "end": {
-                  "column": 10,
+                  "column": 52,
                   "line": 3,
                 },
                 "start": {
-                  "column": 8,
+                  "column": 11,
                   "line": 3,
                 },
               },
-            },
-            "nodeType": "SimpleProtocolMethod",
-            "signature": {
-              "documentation": null,
-              "nodeType": "ProtocolMethodSignature",
-              "parameters": [
-                {
-                  "documentation": null,
-                  "externalName": null,
-                  "internalName": {
-                    "content": "other",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 18,
-                        "line": 3,
-                      },
-                      "start": {
-                        "column": 13,
-                        "line": 3,
-                      },
-                    },
-                  },
-                  "nodeType": "Parameter",
-                  "position": {
-                    "end": {
-                      "column": 24,
-                      "line": 3,
-                    },
-                    "start": {
-                      "column": 11,
-                      "line": 3,
-                    },
-                  },
-                  "type": {
-                    "nodeType": "IdentifierTypeDeclaration",
-                    "position": {
-                      "end": {
-                        "column": 24,
-                        "line": 3,
-                      },
-                      "start": {
-                        "column": 20,
-                        "line": 3,
-                      },
-                    },
-                    "type": {
-                      "content": "Self",
-                      "nodeType": "Identifier",
+              "value": {
+                "body": [
+                  {
+                    "expression": {
+                      "nodeType": "BooleanValue",
                       "position": {
                         "end": {
-                          "column": 24,
+                          "column": 50,
                           "line": 3,
                         },
                         "start": {
-                          "column": 20,
+                          "column": 46,
                           "line": 3,
                         },
                       },
+                      "value": true,
                     },
-                  },
-                },
-              ],
-              "position": {
-                "end": {
-                  "column": 36,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 10,
-                  "line": 3,
-                },
-              },
-              "returnType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 36,
-                    "line": 3,
-                  },
-                  "start": {
-                    "column": 29,
-                    "line": 3,
-                  },
-                },
-                "type": {
-                  "content": "Boolean",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 36,
-                      "line": 3,
-                    },
-                    "start": {
-                      "column": 29,
-                      "line": 3,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          "isNot": {
-            "name": {
-              "content": "isNot",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 13,
-                  "line": 4,
-                },
-                "start": {
-                  "column": 8,
-                  "line": 4,
-                },
-              },
-            },
-            "nodeType": "SimpleProtocolMethod",
-            "signature": {
-              "documentation": null,
-              "nodeType": "ProtocolMethodSignature",
-              "parameters": [
-                {
-                  "documentation": null,
-                  "externalName": null,
-                  "internalName": {
-                    "content": "other",
-                    "nodeType": "Identifier",
+                    "nodeType": "ReturnStatement",
                     "position": {
                       "end": {
-                        "column": 21,
-                        "line": 4,
+                        "column": 50,
+                        "line": 3,
                       },
                       "start": {
-                        "column": 16,
-                        "line": 4,
+                        "column": 43,
+                        "line": 3,
                       },
                     },
                   },
-                  "nodeType": "Parameter",
-                  "position": {
-                    "end": {
-                      "column": 27,
-                      "line": 4,
-                    },
-                    "start": {
-                      "column": 14,
-                      "line": 4,
-                    },
-                  },
-                  "type": {
-                    "nodeType": "IdentifierTypeDeclaration",
-                    "position": {
-                      "end": {
-                        "column": 27,
-                        "line": 4,
-                      },
-                      "start": {
-                        "column": 23,
-                        "line": 4,
-                      },
-                    },
-                    "type": {
-                      "content": "Self",
-                      "nodeType": "Identifier",
-                      "position": {
-                        "end": {
-                          "column": 27,
-                          "line": 4,
-                        },
-                        "start": {
-                          "column": 23,
-                          "line": 4,
-                        },
-                      },
-                    },
-                  },
-                },
-              ],
-              "position": {
-                "end": {
-                  "column": 39,
-                  "line": 4,
-                },
-                "start": {
-                  "column": 13,
-                  "line": 4,
-                },
-              },
-              "returnType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 39,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 32,
-                    "line": 4,
-                  },
-                },
-                "type": {
-                  "content": "Boolean",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 39,
-                      "line": 4,
-                    },
-                    "start": {
-                      "column": 32,
-                      "line": 4,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        "name": {
-          "content": "Equatable",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 25,
-              "line": 2,
-            },
-            "start": {
-              "column": 16,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "ProtocolDeclarationStatement",
-        "position": {
-          "end": {
-            "column": 8,
-            "line": 5,
-          },
-          "start": {
-            "column": 7,
-            "line": 2,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 7,
-        "line": 6,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 7,
-      "line": 6,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a static Method Signature 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "documentation": null,
-        "methods": {
-          "create": {
-            "name": {
-              "content": "create",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 21,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 15,
-                  "line": 3,
-                },
-              },
-            },
-            "nodeType": "StaticProtocolMethod",
-            "signature": {
-              "documentation": null,
-              "nodeType": "ProtocolMethodSignature",
-              "parameters": [],
-              "position": {
-                "end": {
-                  "column": 31,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 21,
-                  "line": 3,
-                },
-              },
-              "returnType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 31,
-                    "line": 3,
-                  },
-                  "start": {
-                    "column": 27,
-                    "line": 3,
-                  },
-                },
-                "type": {
-                  "content": "Self",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 31,
-                      "line": 3,
-                    },
-                    "start": {
-                      "column": 27,
-                      "line": 3,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        "name": {
-          "content": "Creatable",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 25,
-              "line": 2,
-            },
-            "start": {
-              "column": 16,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "ProtocolDeclarationStatement",
-        "position": {
-          "end": {
-            "column": 8,
-            "line": 4,
-          },
-          "start": {
-            "column": 7,
-            "line": 2,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 7,
-        "line": 5,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 7,
-      "line": 5,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded Method Signature 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "documentation": null,
-        "methods": {
-          "combine": {
-            "documentation": null,
-            "name": {
-              "content": "combine",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 24,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 17,
-                  "line": 3,
-                },
-              },
-            },
-            "nodeType": "OverloadedProtocolMethod",
-            "signatures": [
-              {
+                ],
                 "documentation": null,
-                "nodeType": "ProtocolMethodSignature",
+                "generics": [],
+                "nodeType": "FunctionDefinition",
                 "parameters": [
                   {
                     "documentation": null,
@@ -17553,638 +18596,160 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                       "nodeType": "Identifier",
                       "position": {
                         "end": {
-                          "column": 17,
-                          "line": 4,
-                        },
-                        "start": {
-                          "column": 12,
-                          "line": 4,
-                        },
-                      },
-                    },
-                    "nodeType": "Parameter",
-                    "position": {
-                      "end": {
-                        "column": 23,
-                        "line": 4,
-                      },
-                      "start": {
-                        "column": 10,
-                        "line": 4,
-                      },
-                    },
-                    "type": {
-                      "nodeType": "IdentifierTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 23,
-                          "line": 4,
-                        },
-                        "start": {
                           "column": 19,
-                          "line": 4,
+                          "line": 3,
                         },
-                      },
-                      "type": {
-                        "content": "Self",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 23,
-                            "line": 4,
-                          },
-                          "start": {
-                            "column": 19,
-                            "line": 4,
-                          },
+                        "start": {
+                          "column": 14,
+                          "line": 3,
                         },
                       },
                     },
-                  },
-                ],
-                "position": {
-                  "end": {
-                    "column": 32,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 9,
-                    "line": 4,
-                  },
-                },
-                "returnType": {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 32,
-                      "line": 4,
-                    },
-                    "start": {
-                      "column": 28,
-                      "line": 4,
-                    },
-                  },
-                  "type": {
-                    "content": "Self",
-                    "nodeType": "Identifier",
+                    "nodeType": "Parameter",
                     "position": {
                       "end": {
-                        "column": 32,
-                        "line": 4,
-                      },
-                      "start": {
                         "column": 28,
-                        "line": 4,
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                "documentation": null,
-                "nodeType": "ProtocolMethodSignature",
-                "parameters": [
-                  {
-                    "documentation": null,
-                    "externalName": null,
-                    "internalName": {
-                      "content": "others",
-                      "nodeType": "Identifier",
-                      "position": {
-                        "end": {
-                          "column": 18,
-                          "line": 5,
-                        },
-                        "start": {
-                          "column": 12,
-                          "line": 5,
-                        },
-                      },
-                    },
-                    "nodeType": "Parameter",
-                    "position": {
-                      "end": {
-                        "column": 30,
-                        "line": 5,
+                        "line": 3,
                       },
                       "start": {
-                        "column": 10,
-                        "line": 5,
-                      },
-                    },
-                    "type": {
-                      "baseType": {
-                        "nodeType": "IdentifierTypeDeclaration",
-                        "position": {
-                          "end": {
-                            "column": 24,
-                            "line": 5,
-                          },
-                          "start": {
-                            "column": 20,
-                            "line": 5,
-                          },
-                        },
-                        "type": {
-                          "content": "List",
-                          "nodeType": "Identifier",
-                          "position": {
-                            "end": {
-                              "column": 24,
-                              "line": 5,
-                            },
-                            "start": {
-                              "column": 20,
-                              "line": 5,
-                            },
-                          },
-                        },
-                      },
-                      "generics": [
-                        {
-                          "nodeType": "IdentifierTypeDeclaration",
-                          "position": {
-                            "end": {
-                              "column": 29,
-                              "line": 5,
-                            },
-                            "start": {
-                              "column": 25,
-                              "line": 5,
-                            },
-                          },
-                          "type": {
-                            "content": "Self",
-                            "nodeType": "Identifier",
-                            "position": {
-                              "end": {
-                                "column": 29,
-                                "line": 5,
-                              },
-                              "start": {
-                                "column": 25,
-                                "line": 5,
-                              },
-                            },
-                          },
-                        },
-                      ],
-                      "nodeType": "GenericTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 30,
-                          "line": 5,
-                        },
-                        "start": {
-                          "column": 24,
-                          "line": 5,
-                        },
-                      },
-                    },
-                  },
-                ],
-                "position": {
-                  "end": {
-                    "column": 39,
-                    "line": 5,
-                  },
-                  "start": {
-                    "column": 9,
-                    "line": 5,
-                  },
-                },
-                "returnType": {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 39,
-                      "line": 5,
-                    },
-                    "start": {
-                      "column": 35,
-                      "line": 5,
-                    },
-                  },
-                  "type": {
-                    "content": "Self",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 39,
-                        "line": 5,
-                      },
-                      "start": {
-                        "column": 35,
-                        "line": 5,
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-        "name": {
-          "content": "Combinable",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 26,
-              "line": 2,
-            },
-            "start": {
-              "column": 16,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "ProtocolDeclarationStatement",
-        "position": {
-          "end": {
-            "column": 8,
-            "line": 7,
-          },
-          "start": {
-            "column": 7,
-            "line": 2,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 7,
-        "line": 8,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 7,
-      "line": 8,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded static Method Signature 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "documentation": null,
-        "methods": {
-          "create": {
-            "documentation": null,
-            "name": {
-              "content": "create",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 30,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 24,
-                  "line": 3,
-                },
-              },
-            },
-            "nodeType": "OverloadedStaticProtocolMethod",
-            "signatures": [
-              {
-                "documentation": null,
-                "nodeType": "ProtocolMethodSignature",
-                "parameters": [],
-                "position": {
-                  "end": {
-                    "column": 19,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 9,
-                    "line": 4,
-                  },
-                },
-                "returnType": {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 19,
-                      "line": 4,
-                    },
-                    "start": {
-                      "column": 15,
-                      "line": 4,
-                    },
-                  },
-                  "type": {
-                    "content": "Self",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 19,
-                        "line": 4,
-                      },
-                      "start": {
-                        "column": 15,
-                        "line": 4,
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                "documentation": null,
-                "nodeType": "ProtocolMethodSignature",
-                "parameters": [
-                  {
-                    "documentation": null,
-                    "externalName": null,
-                    "internalName": {
-                      "content": "description",
-                      "nodeType": "Identifier",
-                      "position": {
-                        "end": {
-                          "column": 23,
-                          "line": 5,
-                        },
-                        "start": {
-                          "column": 12,
-                          "line": 5,
-                        },
-                      },
-                    },
-                    "nodeType": "Parameter",
-                    "position": {
-                      "end": {
-                        "column": 31,
-                        "line": 5,
-                      },
-                      "start": {
-                        "column": 10,
-                        "line": 5,
+                        "column": 12,
+                        "line": 3,
                       },
                     },
                     "type": {
                       "nodeType": "IdentifierTypeDeclaration",
                       "position": {
                         "end": {
-                          "column": 31,
-                          "line": 5,
+                          "column": 28,
+                          "line": 3,
                         },
                         "start": {
-                          "column": 25,
-                          "line": 5,
+                          "column": 21,
+                          "line": 3,
                         },
                       },
                       "type": {
-                        "content": "String",
+                        "content": "Integer",
                         "nodeType": "Identifier",
                         "position": {
                           "end": {
-                            "column": 31,
-                            "line": 5,
+                            "column": 28,
+                            "line": 3,
                           },
                           "start": {
-                            "column": 25,
-                            "line": 5,
+                            "column": 21,
+                            "line": 3,
                           },
                         },
                       },
                     },
                   },
                 ],
-                "position": {
-                  "end": {
-                    "column": 40,
-                    "line": 5,
-                  },
-                  "start": {
-                    "column": 9,
-                    "line": 5,
-                  },
-                },
                 "returnType": {
                   "nodeType": "IdentifierTypeDeclaration",
                   "position": {
                     "end": {
                       "column": 40,
-                      "line": 5,
+                      "line": 3,
                     },
                     "start": {
-                      "column": 36,
-                      "line": 5,
+                      "column": 33,
+                      "line": 3,
                     },
                   },
                   "type": {
-                    "content": "Self",
+                    "content": "Boolean",
                     "nodeType": "Identifier",
                     "position": {
                       "end": {
                         "column": 40,
-                        "line": 5,
+                        "line": 3,
                       },
                       "start": {
-                        "column": 36,
-                        "line": 5,
+                        "column": 33,
+                        "line": 3,
                       },
                     },
                   },
                 },
               },
-            ],
-          },
-        },
-        "name": {
-          "content": "Creatable",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 25,
-              "line": 2,
             },
-            "start": {
-              "column": 16,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "ProtocolDeclarationStatement",
-        "position": {
-          "end": {
-            "column": 8,
-            "line": 7,
-          },
-          "start": {
-            "column": 7,
-            "line": 2,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 7,
-        "line": 8,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 7,
-      "line": 8,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements should parse a documented ProtocolDeclarationStatement 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "documentation": {
-          "description": "Anything that can represent itself as a String.",
-          "parameters": {},
-          "position": {
-            "end": {
-              "column": 57,
-              "line": 2,
-            },
-            "start": {
-              "column": 7,
-              "line": 2,
-            },
-          },
-          "returns": null,
-        },
-        "methods": {
-          "toString": {
             "name": {
-              "content": "toString",
+              "content": "is",
               "nodeType": "Identifier",
               "position": {
                 "end": {
-                  "column": 16,
-                  "line": 5,
+                  "column": 11,
+                  "line": 3,
                 },
                 "start": {
-                  "column": 8,
-                  "line": 5,
+                  "column": 9,
+                  "line": 3,
                 },
               },
             },
-            "nodeType": "SimpleProtocolMethod",
-            "signature": {
-              "documentation": {
-                "description": "The String representation.",
-                "parameters": {},
-                "position": {
-                  "end": {
-                    "column": 37,
-                    "line": 4,
-                  },
-                  "start": {
-                    "column": 8,
-                    "line": 4,
-                  },
-                },
-                "returns": null,
-              },
-              "nodeType": "ProtocolMethodSignature",
-              "parameters": [],
-              "position": {
-                "end": {
-                  "column": 28,
-                  "line": 5,
-                },
-                "start": {
-                  "column": 16,
-                  "line": 5,
-                },
-              },
-              "returnType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 28,
-                    "line": 5,
-                  },
-                  "start": {
-                    "column": 22,
-                    "line": 5,
-                  },
-                },
-                "type": {
-                  "content": "String",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 28,
-                      "line": 5,
-                    },
-                    "start": {
-                      "column": 22,
-                      "line": 5,
-                    },
-                  },
-                },
-              },
-            },
+            "nodeType": "SimpleMethod",
           },
         },
         "name": {
-          "content": "Printable",
+          "content": "IntegerHelpers",
           "nodeType": "Identifier",
           "position": {
             "end": {
-              "column": 25,
-              "line": 3,
+              "column": 32,
+              "line": 2,
             },
             "start": {
-              "column": 16,
-              "line": 3,
+              "column": 18,
+              "line": 2,
             },
           },
         },
-        "nodeType": "ProtocolDeclarationStatement",
+        "nodeType": "NamespaceDefinitionStatement",
         "position": {
           "end": {
-            "column": 8,
-            "line": 6,
+            "column": 9,
+            "line": 4,
           },
           "start": {
-            "column": 7,
-            "line": 3,
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 2,
+            },
+            "start": {
+              "column": 37,
+              "line": 2,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 44,
+                "line": 2,
+              },
+              "start": {
+                "column": 37,
+                "line": 2,
+              },
+            },
           },
         },
       },
     ],
     "position": {
       "end": {
-        "column": 7,
-        "line": 7,
+        "column": 8,
+        "line": 5,
       },
       "start": {
         "column": 1,
@@ -18195,8 +18760,8 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 7,
-      "line": 7,
+      "column": 8,
+      "line": 5,
     },
     "start": {
       "column": 1,

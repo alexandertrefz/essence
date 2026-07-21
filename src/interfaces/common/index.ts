@@ -165,6 +165,10 @@ export type NamespaceType = {
 	generics: Array<GenericDeclaration>
 	properties: Record<string, Type | GenericUse>
 	methods: Record<string, MethodType>
+	// NOTE: Names of the Protocols this Namespace declares conformance to via
+	// its `is` clause. Optional so the hand written builtin Namespaces stay
+	// valid until they conform.
+	conformsTo?: Array<string>
 }
 
 // NOTE: Deliberately NOT part of `Type` — a Protocol is not a Type. It is
