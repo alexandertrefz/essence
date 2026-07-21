@@ -92,11 +92,12 @@ function validateExpression(
 			return validateMatch(node)
 		case "FunctionValue":
 			return validateFunctionValue(node)
+		case "FractionValue":
+			return validateFractionValue(node)
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
 		case "BooleanValue":
 		case "NothingValue":
 		case "ListValue":
@@ -343,6 +344,19 @@ function validateFunctionValue(
 	node: common.typed.FunctionValueNode,
 ): common.typed.FunctionValueNode {
 	validateFunctionDefinition(node.value, node.position)
+
+	return node
+}
+
+function validateFractionValue(
+	node: common.typed.FractionValueNode,
+): common.typed.FractionValueNode {
+	if (BigInt(node.denominator) === 0n) {
+		reportError(
+			"A Fraction can not have a denominator of zero.",
+			node.position,
+		)
+	}
 
 	return node
 }

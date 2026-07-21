@@ -317,6 +317,37 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
+		it("should report Fraction literals with a zero denominator", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = 1/0
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].message).toBe(
+				"A Fraction can not have a denominator of zero.",
+			)
+		})
+
+		it("should type Divisions as Fraction | Nothing", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant a: Fraction | Nothing = 1::divideBy(2)
+					constant b: Fraction | Nothing = 1/2::divideBy(2)
+					constant c: Fraction | Nothing = Fraction.of(1, over 2)
+				}`),
+			).toEqual([])
+
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a: Fraction = 1::divideBy(2)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Wrong Assignment Value Type for Constant 'a'.",
+			)
+		})
+
 		it("should treat Generics as opaque inside Generic Functions", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				function broken <infer T>(_ value: T) -> T {
