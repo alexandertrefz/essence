@@ -33,6 +33,7 @@ export type ExpressionNode =
 	| NativeFunctionInvocationNode
 	| FunctionInvocationNode
 	| MethodInvocationNode
+	| UnionMethodInvocationNode
 	| ValueNode
 	| LookupNode
 	| IdentifierNode
@@ -72,6 +73,25 @@ export interface MethodInvocationNode {
 	}
 	arguments: Array<ArgumentNode>
 	type: Type
+}
+
+// NOTE: A Method Invocation on a Union-typed receiver — one statically
+// resolved target per member Type, picked at runtime by the receiver's
+// actual Type. `methodName` is already overload-mangled, and each case
+// carries the hidden conformance Arguments its target requires.
+export interface UnionMethodInvocationNode {
+	nodeType: "UnionMethodInvocation"
+	base: ExpressionNode
+	cases: Array<UnionMethodDispatchCase>
+	arguments: Array<ArgumentNode>
+	type: Type
+}
+
+export type UnionMethodDispatchCase = {
+	memberType: Type
+	namespaceName: string
+	methodName: string
+	conformanceArguments: Array<ArgumentNode>
 }
 
 export type ValueNode =

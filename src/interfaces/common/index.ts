@@ -249,6 +249,17 @@ export type Conformance = {
 	source: ConformanceSource
 }
 
+// NOTE: One branch of a Method Invocation on a Union-typed receiver. The
+// Method is resolved statically for every member Type of the Union — the
+// branch to run is picked at runtime by the receiver's actual Type, but each
+// branch's Namespace, overload and conformances are fixed at compile time.
+export type DispatchCase = {
+	memberType: Type
+	namespaceName: string
+	overloadedMethodIndex: number | null
+	conformances: Array<Conformance>
+}
+
 export type Type =
 	| UnknownType
 	| ErrorType

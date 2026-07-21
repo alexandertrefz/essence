@@ -17,7 +17,7 @@ import * as number from "../rewriter/__internal/Number"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as record from "../rewriter/__internal/Record"
 import * as string from "../rewriter/__internal/String"
-import { isValueOfType } from "../rewriter/__internal/type"
+import { dispatchMethod, isValueOfType } from "../rewriter/__internal/type"
 
 const booleanTrue = () => boolean.createBoolean(true)
 const booleanFalse = () => boolean.createBoolean(false)
@@ -5589,6 +5589,54 @@ describe("Rewriter", () => {
 				expect(nothingModule.toString(nothing())).toEqual(
 					string.createString("Nothing"),
 				)
+			})
+		})
+
+		describe("Union Method dispatch", () => {
+			it("runs the first case whose member Type accepts the receiver", () => {
+				let cases: Parameters<typeof dispatchMethod>[2] = [
+					[
+						{ type: "Nothing" },
+						nothingModule.toString as (
+							...args: Array<unknown>
+						) => unknown,
+						[],
+					],
+					[
+						{ type: "Integer" },
+						integer.toString as (
+							...args: Array<unknown>
+						) => unknown,
+						[],
+					],
+				]
+
+				expect(dispatchMethod(integerTwo(), [], cases)).toEqual(
+					string.createString("2"),
+				)
+				expect(dispatchMethod(nothing(), [], cases)).toEqual(
+					string.createString("Nothing"),
+				)
+			})
+
+			it("appends the matched case's conformance Arguments", () => {
+				let receivedArguments: Array<unknown> = []
+				let method = (...args: Array<unknown>) => {
+					receivedArguments = args
+					return nothing()
+				}
+
+				dispatchMethod(
+					integerTwo(),
+					["shared"],
+					[[{ type: "Integer" }, method, ["conformance"]]],
+				)
+
+				expect(receivedArguments).toEqual([
+					integerTwo(),
+					"shared",
+					"conformance",
+				])
 			})
 		})
 	})

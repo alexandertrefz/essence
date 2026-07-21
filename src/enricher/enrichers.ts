@@ -113,7 +113,7 @@ export function enrichMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.MethodInvocationNode {
-	let { namespace, type, overloadedMethodIndex, conformances } =
+	let { namespace, type, overloadedMethodIndex, conformances, dispatch } =
 		resolveMethodInvocation(node, scope)
 
 	return {
@@ -131,6 +131,7 @@ export function enrichMethodInvocation(
 		type,
 		overloadedMethodIndex,
 		conformances,
+		dispatch,
 	}
 }
 
