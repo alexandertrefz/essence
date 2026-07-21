@@ -1205,6 +1205,117 @@ describe("Parser", () => {
 			})
 		})
 
+		describe("ProtocolDeclarationStatements", () => {
+			it("should parse an empty ProtocolDeclarationStatement", () => {
+				let input: parser.Program = parse(
+					"implementation { protocol Printable {} }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a ProtocolDeclarationStatement with a simple Method Signature", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Printable {
+							toString() -> String
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a ProtocolDeclarationStatement with a Self Parameter", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Equatable {
+							is(_ other: Self) -> Boolean
+							isNot(_ other: Self) -> Boolean
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a ProtocolDeclarationStatement with a static Method Signature", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Creatable {
+							static create() -> Self
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a ProtocolDeclarationStatement with an overloaded Method Signature", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Combinable {
+							overload combine {
+								(_ other: Self) -> Self
+								(_ others: List<Self>) -> Self
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a ProtocolDeclarationStatement with an overloaded static Method Signature", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						protocol Creatable {
+							overload static create {
+								() -> Self
+								(_ description: String) -> Self
+							}
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse a documented ProtocolDeclarationStatement", () => {
+				let input: parser.Program = parse(
+					`implementation {
+						§§ Anything that can represent itself as a String.
+						protocol Printable {
+							§§ The String representation.
+							toString() -> String
+						}
+					}`,
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should not parse a Protocol Method Signature with a body", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation {
+						protocol Printable {
+							toString() -> String { <- "" }
+						}
+					}`,
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
+			})
+
+			it("should recover from an unclosed Protocol body", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					"implementation { protocol Printable {",
+				)
+
+				expect(containsErrors(diagnostics)).toBe(true)
+			})
+		})
+
 		describe("TypeAliasStatements", () => {
 			it("should parse TypeAlias Statements with SimpleTypes", () => {
 				let input: parser.Program = parse(

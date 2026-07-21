@@ -707,7 +707,14 @@ export function resolveIdentifierType(
 	let result = findVariableInScope(name, scope)
 
 	if (result === null) {
-		reportError(`Variable '${name}' is not declared.`, node.position)
+		if (findProtocolInScope(name, scope) !== null) {
+			reportError(
+				`Protocol '${name}' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is ${name}>') and Namespace conformance clauses ('is ${name}').`,
+				node.position,
+			)
+		} else {
+			reportError(`Variable '${name}' is not declared.`, node.position)
+		}
 
 		return { type: "Error" }
 	} else {
@@ -740,6 +747,13 @@ export function resolveGenericDeclarations(
 	return generics.map((generic) => {
 		let defaultType = null
 
+		if (generic.name.content === "Self") {
+			reportError(
+				"'Self' is a reserved Type name.",
+				generic.name.position,
+			)
+		}
+
 		if (generic.defaultType) {
 			defaultType = resolveType(generic.defaultType, scope)
 		}
@@ -768,7 +782,13 @@ export function scopeWithGenerics(
 		}
 	}
 
-	return { parent: scope, members: {}, constants: new Set(), types }
+	return {
+		parent: scope,
+		members: {},
+		constants: new Set(),
+		types,
+		protocols: {},
+	}
 }
 
 export function resolveFunctionDefinitionType(
@@ -824,6 +844,7 @@ export function resolveNamespaceDefinitionStatementType(
 				members: { [node.name.content]: resultType },
 				constants: new Set([node.name.content]),
 				types: {},
+				protocols: {},
 			},
 			resultType.targetType,
 			resultType.generics,
@@ -836,10 +857,104 @@ export function resolveNamespaceDefinitionStatementType(
 	return resultType
 }
 
+export function resolveProtocolDeclarationStatementType(
+	node: parser.ProtocolDeclarationStatementNode,
+	scope: enricher.Scope,
+): common.ProtocolType {
+	// NOTE: `Self` stands for the conforming Namespace's target Type — inside
+	// the signatures it is an ordinary GenericUse, substituted wherever the
+	// Protocol is used against a concrete Type.
+	let selfType: common.GenericUse = { type: "GenericUse", name: "Self" }
+	let signatureScope: enricher.Scope = {
+		parent: scope,
+		members: {},
+		constants: new Set(),
+		types: { Self: selfType },
+		protocols: {},
+	}
+
+	let methods: Record<string, common.MethodType> = {}
+
+	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		methods[methodName] = resolveProtocolMethodType(
+			methodValue,
+			signatureScope,
+			selfType,
+		)
+	}
+
+	return {
+		type: "Protocol",
+		name: node.name.content,
+		methods,
+		documentation: node.documentation ?? undefined,
+	}
+}
+
+function resolveProtocolSignature(
+	signature: parser.ProtocolMethodSignatureNode,
+	scope: enricher.Scope,
+	selfType: common.GenericUse | null,
+): common.BaseFunction {
+	let parameterTypes = resolveParameterTypes(signature, scope)
+
+	if (selfType !== null) {
+		parameterTypes = [{ name: null, type: selfType }, ...parameterTypes]
+	}
+
+	return {
+		generics: [],
+		parameterTypes,
+		returnType: resolveType(signature.returnType, scope),
+		documentation: signature.documentation ?? undefined,
+	}
+}
+
+function resolveProtocolMethodType(
+	node: parser.ProtocolMethods[string],
+	scope: enricher.Scope,
+	selfType: common.GenericUse,
+): common.MethodType {
+	if (node.nodeType === "SimpleProtocolMethod") {
+		return {
+			type: "SimpleMethod",
+			...resolveProtocolSignature(node.signature, scope, selfType),
+		}
+	} else if (node.nodeType === "StaticProtocolMethod") {
+		return {
+			type: "StaticMethod",
+			...resolveProtocolSignature(node.signature, scope, null),
+		}
+	} else if (node.nodeType === "OverloadedProtocolMethod") {
+		return {
+			type: "OverloadedMethod",
+			overloads: node.signatures.map((signature) =>
+				resolveProtocolSignature(signature, scope, selfType),
+			),
+			documentation: node.documentation ?? undefined,
+		}
+	} else {
+		return {
+			type: "OverloadedStaticMethod",
+			overloads: node.signatures.map((signature) =>
+				resolveProtocolSignature(signature, scope, null),
+			),
+			documentation: node.documentation ?? undefined,
+		}
+	}
+}
+
 export function resolveTypeAliasStatementType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 ): common.Type {
+	// NOTE: Checked here as well as in declareTypeInScope — hoisting resolves
+	// speculatively and would otherwise register the reserved name without
+	// ever reaching the declaration check.
+	if (node.name.content === "Self") {
+		reportError("'Self' is a reserved Type name.", node.name.position)
+	}
+
 	if (node.generics.length === 0) {
 		return resolveType(node.type, scope)
 	}
@@ -903,7 +1018,14 @@ export function resolveIdentifierTypeDeclarationType(
 	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
-		reportError(`Type '${name}' is not declared.`, node.position)
+		if (findProtocolInScope(name, scope) !== null) {
+			reportError(
+				`Protocol '${name}' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is ${name}>') and Namespace conformance clauses ('is ${name}').`,
+				node.position,
+			)
+		} else {
+			reportError(`Type '${name}' is not declared.`, node.position)
+		}
 
 		return { type: "Error" }
 	}
@@ -1058,6 +1180,25 @@ export function findTypeInScope(
 	}
 }
 
+export function findProtocolInScope(
+	name: string,
+	scope: enricher.Scope,
+): common.ProtocolType | null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (true) {
+		if (searchScope === null) {
+			return null
+		}
+
+		if (Object.hasOwn(searchScope.protocols, name)) {
+			return searchScope.protocols[name]
+		} else {
+			searchScope = searchScope.parent
+		}
+	}
+}
+
 export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
@@ -1154,7 +1295,10 @@ export function resolveMethodLookupBaseNamespaces(
 // since a call site writes the external one and the body reads the internal
 // one.
 function resolveParameterTypes(
-	definition: parser.FunctionDefinitionNode,
+	definition: {
+		parameters: Array<parser.ParameterNode>
+		documentation: common.Documentation | null
+	},
 	scope: enricher.Scope,
 ): Array<common.Parameter> {
 	return definition.parameters.map((parameter) => ({

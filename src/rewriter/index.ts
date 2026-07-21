@@ -64,6 +64,8 @@ function rewriteStatement(
 			return rewriteNamespaceDefinitionStatement(node)
 		case "TypeAliasStatement":
 			return rewriteTypeAliasStatement(node)
+		case "ProtocolDeclarationStatement":
+			return rewriteProtocolDeclarationStatement(node)
 		case "ChoiceStatement":
 			return rewriteChoiceStatement(node)
 		case "ReturnStatement":
@@ -139,6 +141,12 @@ function rewriteNamespaceDefinitionStatement(
 
 function rewriteTypeAliasStatement(
 	_node: common.typedSimple.TypeAliasStatementNode,
+): estree.EmptyStatement {
+	return { type: "EmptyStatement" }
+}
+
+function rewriteProtocolDeclarationStatement(
+	_node: common.typedSimple.ProtocolDeclarationStatementNode,
 ): estree.EmptyStatement {
 	return { type: "EmptyStatement" }
 }

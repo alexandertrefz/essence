@@ -39,6 +39,7 @@ export enum TokenType {
 	KeywordCase = "KeywordCase",
 	KeywordWith = "KeywordWith",
 	KeywordNamespace = "KeywordNamespace",
+	KeywordProtocol = "KeywordProtocol",
 	KeywordFor = "KeywordFor",
 	KeywordInfer = "KeywordInfer",
 	//

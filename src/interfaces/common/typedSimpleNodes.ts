@@ -165,6 +165,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
 	| ChoiceStatementNode
 	| ReturnStatementNode
@@ -197,6 +198,11 @@ export interface NamespaceDefinitionStatementNode {
 	properties: Record<string, ExpressionNode>
 	methods: Methods
 	type: NamespaceType
+}
+
+export interface ProtocolDeclarationStatementNode {
+	nodeType: "ProtocolDeclarationStatement"
+	name: IdentifierNode
 }
 
 export interface TypeAliasStatementNode {

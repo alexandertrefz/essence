@@ -386,4 +386,19 @@ describe("Code Generation", () => {
 			).not.toThrow()
 		})
 	})
+
+	describe("Protocols", () => {
+		it("should erase Protocol declarations from the emitted JavaScript", () => {
+			const code = generate(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				__print("done")
+			}`)
+
+			expect(code).not.toContain("Printable")
+			expect(code).not.toContain("toString")
+		})
+	})
 })
