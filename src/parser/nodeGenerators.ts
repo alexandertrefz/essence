@@ -111,13 +111,13 @@ export function integerValueNode(
 	}
 }
 
-export function fractionValueNode(
+export function rationalValueNode(
 	numerator: string,
 	denominator: string,
 	position: common.Position,
-): parser.FractionValueNode {
+): parser.RationalValueNode {
 	return {
-		nodeType: "FractionValue",
+		nodeType: "RationalValue",
 		numerator,
 		denominator,
 		position,

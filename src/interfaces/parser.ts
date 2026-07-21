@@ -73,7 +73,7 @@ export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
 	| IntegerValueNode
-	| FractionValueNode
+	| RationalValueNode
 	| BooleanValueNode
 	| NothingValueNode
 	| FunctionValueNode
@@ -105,8 +105,8 @@ export type IntegerValueNode = {
 	position: Position
 }
 
-export type FractionValueNode = {
-	nodeType: "FractionValue"
+export type RationalValueNode = {
+	nodeType: "RationalValue"
 	numerator: string
 	denominator: string
 	position: Position
@@ -225,7 +225,7 @@ export interface LiteralMatcherNode {
 export type LiteralMatcherValueNode =
 	| StringValueNode
 	| IntegerValueNode
-	| FractionValueNode
+	| RationalValueNode
 	| BooleanValueNode
 	| NothingValueNode
 

@@ -227,7 +227,7 @@ function visitNode(
 		case "Self":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
+		case "RationalValue":
 		case "BooleanValue":
 		case "NothingValue":
 			return

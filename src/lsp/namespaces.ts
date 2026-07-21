@@ -1,12 +1,12 @@
 import { enrich } from "../enricher/index"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
-import { namespace as fractionNamespace } from "../enricher/types/Fraction"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as listNamespace } from "../enricher/types/List"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import { namespace as numberNamespace } from "../enricher/types/Number"
 import { namespace as orderingNamespace } from "../enricher/types/Ordering"
 import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
+import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
 import {
@@ -29,7 +29,7 @@ export const builtinNamespaces: Array<common.NamespaceType> = [
 	stringNamespace,
 	booleanNamespace,
 	integerNamespace,
-	fractionNamespace,
+	rationalNamespace,
 	numberNamespace,
 	nothingNamespace,
 	orderingNamespace,

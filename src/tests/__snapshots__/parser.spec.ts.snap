@@ -6215,14 +6215,14 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
 }
 `;
 
-exports[`Parser Expressions Literals FractionLiterals should parse FractionLiterals 1`] = `
+exports[`Parser Expressions Literals RationalLiterals should parse RationalLiterals 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
         "denominator": "2",
-        "nodeType": "FractionValue",
+        "nodeType": "RationalValue",
         "numerator": "3",
         "position": {
           "end": {
@@ -6261,14 +6261,14 @@ exports[`Parser Expressions Literals FractionLiterals should parse FractionLiter
 }
 `;
 
-exports[`Parser Expressions Literals FractionLiterals should parse FractionLiterals with underscores 1`] = `
+exports[`Parser Expressions Literals RationalLiterals should parse RationalLiterals with underscores 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
         "denominator": "9",
-        "nodeType": "FractionValue",
+        "nodeType": "RationalValue",
         "numerator": "1000",
         "position": {
           "end": {
@@ -6307,14 +6307,14 @@ exports[`Parser Expressions Literals FractionLiterals should parse FractionLiter
 }
 `;
 
-exports[`Parser Expressions Literals FractionLiterals should parse negative numerator FractionLiterals 1`] = `
+exports[`Parser Expressions Literals RationalLiterals should parse negative numerator RationalLiterals 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
         "denominator": "2",
-        "nodeType": "FractionValue",
+        "nodeType": "RationalValue",
         "numerator": "-3",
         "position": {
           "end": {
@@ -6353,14 +6353,14 @@ exports[`Parser Expressions Literals FractionLiterals should parse negative nume
 }
 `;
 
-exports[`Parser Expressions Literals FractionLiterals should parse negative denominator FractionLiterals 1`] = `
+exports[`Parser Expressions Literals RationalLiterals should parse negative denominator RationalLiterals 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
         "denominator": "-2",
-        "nodeType": "FractionValue",
+        "nodeType": "RationalValue",
         "numerator": "3",
         "position": {
           "end": {
@@ -6399,14 +6399,14 @@ exports[`Parser Expressions Literals FractionLiterals should parse negative deno
 }
 `;
 
-exports[`Parser Expressions Literals FractionLiterals should parse fully negative FractionLiterals 1`] = `
+exports[`Parser Expressions Literals RationalLiterals should parse fully negative RationalLiterals 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
         "denominator": "-2",
-        "nodeType": "FractionValue",
+        "nodeType": "RationalValue",
         "numerator": "-3",
         "position": {
           "end": {
@@ -6748,7 +6748,7 @@ exports[`Parser Expressions Match should parse match expression with function in
                 },
               },
               "type": {
-                "content": "Fraction",
+                "content": "Rational",
                 "nodeType": "Identifier",
                 "position": {
                   "end": {
@@ -7876,7 +7876,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
                             },
                           },
                           "type": {
-                            "content": "Fraction",
+                            "content": "Rational",
                             "nodeType": "Identifier",
                             "position": {
                               "end": {
@@ -8569,7 +8569,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
                             },
                           },
                           "type": {
-                            "content": "Fraction",
+                            "content": "Rational",
                             "nodeType": "Identifier",
                             "position": {
                               "end": {
@@ -17755,7 +17755,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
                             },
                           },
                           "type": {
-                            "content": "Fraction",
+                            "content": "Rational",
                             "nodeType": "Identifier",
                             "position": {
                               "end": {

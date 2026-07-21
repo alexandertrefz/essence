@@ -78,14 +78,14 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
-							documentation: "the Fraction to add",
+							type: { type: "Rational" },
+							documentation: "the Rational to add",
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 					documentation: {
 						description:
-							"Adds a Fraction to an Integer. The result is a Fraction, since the sum need not be whole.",
+							"Adds a Rational to an Integer. The result is a Rational, since the sum need not be whole.",
 						parameters: {},
 						returns: null,
 						position: null,
@@ -126,10 +126,10 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 			],
 		},
@@ -151,7 +151,7 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Fraction" }, { type: "Nothing" }],
+						types: [{ type: "Rational" }, { type: "Nothing" }],
 					},
 				},
 				{
@@ -163,12 +163,12 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Fraction" }, { type: "Nothing" }],
+						types: [{ type: "Rational" }, { type: "Nothing" }],
 					},
 				},
 			],
@@ -200,10 +200,10 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 			],
 		},
@@ -234,7 +234,7 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -268,7 +268,7 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -302,7 +302,7 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -336,7 +336,7 @@ export const namespace: common.NamespaceType = {
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },

@@ -1,10 +1,10 @@
 import type { common } from "../../interfaces/index"
 import type { BooleanType } from "./Boolean"
-import type { FractionType } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
 import type { OrderingType } from "./Ordering"
+import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 
@@ -54,7 +54,7 @@ export type AnyType =
 	| ListType<any>
 	| StringType
 	| IntegerType
-	| FractionType
+	| RationalType
 	| BooleanType
 	| NothingType
 	| OrderingType
@@ -69,8 +69,8 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		return value[typeKeySymbol] === "String"
 	} else if (type.type === "Integer") {
 		return value[typeKeySymbol] === "Integer"
-	} else if (type.type === "Fraction") {
-		return value[typeKeySymbol] === "Fraction"
+	} else if (type.type === "Rational") {
+		return value[typeKeySymbol] === "Rational"
 	} else if (type.type === "Record") {
 		if (value[typeKeySymbol] !== "Record") {
 			return false

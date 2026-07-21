@@ -505,7 +505,7 @@ function matchTypes(
 		return true
 	}
 
-	if (lhs.type === "Fraction" && rhs.type === "Fraction") {
+	if (lhs.type === "Rational" && rhs.type === "Rational") {
 		return true
 	}
 

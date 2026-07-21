@@ -39,8 +39,8 @@ export function resolveType(
 			return { type: "String" }
 		case "IntegerValue":
 			return { type: "Integer" }
-		case "FractionValue":
-			return { type: "Fraction" }
+		case "RationalValue":
+			return { type: "Rational" }
 		case "BooleanValue":
 			return { type: "Boolean" }
 		case "NothingValue":
@@ -680,7 +680,7 @@ function isRuntimeCatchAllType(type: common.Type): boolean {
 // NOTE: The same specificity rule conformance resolution uses, applied to
 // Method resolution: when several Namespaces resolve a Method, one whose
 // target Type is strictly more specific by assignability wins (`Integer`
-// beats `Integer | Fraction` for an Integer receiver). This is what lets a
+// beats `Integer | Rational` for an Integer receiver). This is what lets a
 // Namespace covering a Union carry the Union-level behaviour without making
 // every member-typed invocation ambiguous. Remaining ties stay a hard error.
 function filterMostSpecificByTarget<Candidate>(
@@ -843,8 +843,8 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Booleans"
 		case "Integer":
 			return "Integers"
-		case "Fraction":
-			return "Fractions"
+		case "Rational":
+			return "Rationals"
 		case "Nothing":
 			return "Nothings"
 		case "String":

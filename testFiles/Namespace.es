@@ -6,9 +6,9 @@ implementation {
 		}
 	}
 
-	namespace StringForFraction for Fraction {
+	namespace StringForRational for Rational {
 		string(_ foo: Boolean) -> String {
-			<- "stringForFraction: "::append(@::toString())
+			<- "stringForRational: "::append(@::toString())
 		}
 	}
 
@@ -17,7 +17,7 @@ implementation {
 			<- "stringForNumber: "::append(
 				match @ -> String {
 					case Integer  { <- @::toString() }
-					case Fraction { <- @::toString() }
+					case Rational { <- @::toString() }
 				}
 			)
 		}
@@ -25,7 +25,7 @@ implementation {
 
 	__print(1::add(2)::string())
 	__print(1::add(2)::string(false))
-	__print(1::add(2/1)::<StringForFraction>string(false))
+	__print(1::add(2/1)::<StringForRational>string(false))
 	__print(1::add(2/1)::<StringForNumber>string(false))
 
 	§ § Namespace for Record Type
