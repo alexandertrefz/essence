@@ -192,6 +192,21 @@ export function identifier(
 	}
 }
 
+export function caseValueNode(
+	choice: parser.IdentifierNode | null,
+	caseName: parser.IdentifierNode,
+	value: parser.ExpressionNode | null,
+	position: common.Position,
+): parser.CaseValueNode {
+	return {
+		nodeType: "CaseValue",
+		choice,
+		caseName,
+		value,
+		position,
+	}
+}
+
 export function combination(
 	lhs: parser.ExpressionNode,
 	rhs: parser.ExpressionNode,
@@ -240,6 +255,19 @@ export function literalMatcher(
 	return {
 		nodeType: "LiteralMatcher",
 		value,
+		position,
+	}
+}
+
+export function caseMatcher(
+	choice: parser.IdentifierNode | null,
+	caseName: parser.IdentifierNode,
+	position: common.Position,
+): parser.CaseMatcherNode {
+	return {
+		nodeType: "CaseMatcher",
+		choice,
+		caseName,
 		position,
 	}
 }
@@ -448,6 +476,21 @@ export function functionStatement(
 	position: common.Position,
 ): parser.FunctionStatementNode {
 	return { nodeType: "FunctionStatement", name, value, position }
+}
+
+export function choiceDeclarationStatement(
+	name: parser.IdentifierNode,
+	cases: Array<parser.ChoiceCaseNode>,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.ChoiceDeclarationStatementNode {
+	return {
+		nodeType: "ChoiceDeclarationStatement",
+		name,
+		cases,
+		position,
+		documentation,
+	}
 }
 
 export function typeAliasStatement(

@@ -1,7 +1,12 @@
 import type { common } from "../interfaces/index"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
-import { printSignature, printType, signaturesOf } from "./printType"
+import {
+	printCaseWithPayload,
+	printSignature,
+	printType,
+	signaturesOf,
+} from "./printType"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
 // its inferred Type there. The smallest typed node containing the cursor
@@ -346,6 +351,74 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "Self":
 			consider(state, node.position, node.type, "@")
 			return
+		case "CaseValue":
+			consider(state, node.position, node.type, null)
+
+			// NOTE: The Choice's half names the Union, the Case's half the
+			// constructed Case — both are hoverable on their own.
+			if (node.choice !== null) {
+				visitIdentifier(node.choice, state)
+			}
+
+			if (node.type.type === "Case") {
+				if (wins(state, node.caseName.position)) {
+					state.best = {
+						position: node.caseName.position,
+						content: printCaseWithPayload(node.type),
+						documentation: null,
+					}
+				}
+			} else {
+				visitIdentifier(node.caseName, state)
+			}
+
+			if (node.value !== null) {
+				visitNode(node.value, state)
+			}
+
+			return
+		case "ChoiceDeclarationStatement": {
+			// NOTE: Like a Protocol, a Choice's declaration Hover is spelled
+			// by hand — the keyword, the name, and each Case with its payload
+			// shape.
+			let caseLine = (caseType: common.CaseType): string => {
+				let members = Object.entries(caseType.members).map(
+					([memberName, memberType]) =>
+						`${memberName}: ${printType(memberType)}`,
+				)
+
+				return members.length === 0
+					? `#${caseType.name}`
+					: `#${caseType.name} { ${members.join(", ")} }`
+			}
+
+			let content = [
+				`choice ${node.name.content}`,
+				...node.cases.map((choiceCase) => caseLine(choiceCase.type)),
+			].join("\n")
+
+			for (let position of [node.position, node.name.position]) {
+				if (wins(state, position)) {
+					state.best = {
+						position,
+						content,
+						documentation: renderDocumentation(node.documentation),
+					}
+				}
+			}
+
+			for (let choiceCase of node.cases) {
+				if (wins(state, choiceCase.name.position)) {
+					state.best = {
+						position: choiceCase.name.position,
+						content: printCaseWithPayload(choiceCase.type),
+						documentation: null,
+					}
+				}
+			}
+
+			return
+		}
 		case "StringValue":
 		case "IntegerValue":
 		case "FractionValue":

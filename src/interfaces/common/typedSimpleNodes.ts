@@ -1,5 +1,7 @@
 import type {
 	BooleanType,
+	CaseType,
+	ErrorType,
 	FractionType,
 	FunctionType,
 	IntegerType,
@@ -40,6 +42,17 @@ export type ExpressionNode =
 	| CombinationNode
 	| MatchNode
 	| ConformanceValueNode
+	| CaseValueNode
+
+// NOTE: A Case construction, reduced to its runtime essentials — the tag the
+// value carries (`"CalculatorOperation#Add"`) and the payload Record it is
+// built from (null for unit Cases).
+export interface CaseValueNode {
+	nodeType: "CaseValue"
+	tag: string
+	value: ExpressionNode | null
+	type: CaseType | ErrorType
+}
 
 // NOTE: The value passed for a Protocol-bounded Type Parameter — rewritten
 // into an object literal that maps each Protocol Method's emitted name onto
@@ -198,7 +211,7 @@ export type StatementNode =
 	| NamespaceDefinitionStatementNode
 	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
-	| ChoiceStatementNode
+	| ConditionalStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
 
@@ -242,8 +255,8 @@ export interface TypeAliasStatementNode {
 	type: Type
 }
 
-export interface ChoiceStatementNode {
-	nodeType: "ChoiceStatement"
+export interface ConditionalStatementNode {
+	nodeType: "ConditionalStatement"
 	condition: ExpressionNode
 	trueBody: Array<ImplementationNode>
 	falseBody: Array<ImplementationNode>

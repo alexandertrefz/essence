@@ -30,6 +30,25 @@ export function dispatchMethod(
 	throw new Error("No dispatch case matched the receiver.")
 }
 
+// NOTE: The runtime shape of a constructed Choice Case — the payload's
+// members with the Case's tag (`"CalculatorOperation#Add"`) on the hidden
+// Type key. Unit Cases simply carry no further members.
+export type CaseInstanceType = {
+	[typeKeySymbol]: string
+	[key: string]: AnyType
+}
+
+export function createCase(
+	tag: string,
+	payload?: Record<string, AnyType>,
+): CaseInstanceType {
+	return { ...payload, [typeKeySymbol]: tag }
+}
+
+// NOTE: CaseInstanceType is deliberately NOT part of AnyType — its
+// `[typeKeySymbol]: string` would defeat the tag-based narrowing every
+// runtime helper relies on. Case values still flow through these helpers at
+// runtime; only the compile-time union stays precise.
 export type AnyType =
 	| RecordType
 	| ListType<any>
@@ -69,6 +88,10 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 			([name, memberType]) =>
 				name in value && isValueOfType(value[name], memberType),
 		)
+	} else if (type.type === "Case") {
+		// NOTE: Nominal — only the tag decides, the payload's structure never
+		// does. A structurally identical plain Record is not this Case.
+		return value[typeKeySymbol] === `${type.choice}#${type.name}`
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))
 	} else if (type.type === "GenericUse") {

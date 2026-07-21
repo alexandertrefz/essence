@@ -67,8 +67,8 @@ function rewriteStatement(
 			return rewriteTypeAliasStatement(node)
 		case "ProtocolDeclarationStatement":
 			return rewriteProtocolDeclarationStatement(node)
-		case "ChoiceStatement":
-			return rewriteChoiceStatement(node)
+		case "ConditionalStatement":
+			return rewriteConditionalStatement(node)
 		case "ReturnStatement":
 			return rewriteReturnStatement(node)
 		case "FunctionStatement":
@@ -152,15 +152,15 @@ function rewriteProtocolDeclarationStatement(
 	return { type: "EmptyStatement" }
 }
 
-function rewriteChoiceStatement(
-	node: common.typedSimple.ChoiceStatementNode,
+function rewriteConditionalStatement(
+	node: common.typedSimple.ConditionalStatementNode,
 ): estree.IfStatement {
 	let alternate: estree.Statement | null = null
 
 	if (node.falseBody.length > 0) {
 		if (
 			node.falseBody.length === 1 &&
-			node.falseBody[0].nodeType === "ChoiceStatement"
+			node.falseBody[0].nodeType === "ConditionalStatement"
 		) {
 			alternate = rewriteStatement(node.falseBody[0])
 		} else {
@@ -262,6 +262,35 @@ function rewriteExpression(
 			return rewriteMatch(node)
 		case "ConformanceValue":
 			return rewriteConformanceValue(node)
+		case "CaseValue":
+			return rewriteCaseValue(node)
+	}
+}
+
+// NOTE: A Case is its payload Record with a nominal tag riding along on the
+// hidden Type key — `$type.createCase` copies the payload and stamps the tag,
+// which is what lets `@.left`-style member access work on the Case value
+// directly.
+function rewriteCaseValue(
+	node: common.typedSimple.CaseValueNode,
+): estree.CallExpression {
+	let args: Array<estree.Expression> = [{ type: "Literal", value: node.tag }]
+
+	if (node.value !== null) {
+		args.push(rewriteExpression(node.value))
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "createCase" },
+			computed: false,
+		},
+		arguments: args,
 	}
 }
 

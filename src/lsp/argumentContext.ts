@@ -207,7 +207,22 @@ function visitNode(
 		case "FunctionValue":
 			visitBody(node.value.body, null, state)
 			return
+		case "CaseValue":
+			if (node.value !== null) {
+				// NOTE: The payload's expected shape is the Case's Record —
+				// that is what makes labels complete inside the payload.
+				visitNode(
+					node.value,
+					node.type.type === "Case"
+						? { type: "Record", members: node.type.members }
+						: null,
+					state,
+				)
+			}
+
+			return
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

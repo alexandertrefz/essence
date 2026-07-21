@@ -19,6 +19,7 @@ export enum TokenType {
 	SymbolRightBracket = "SymbolRightBracket",
 	SymbolLeftAngle = "SymbolLeftAngle",
 	SymbolRightAngle = "SymbolRightAngle",
+	SymbolHash = "SymbolHash",
 	//
 	LiteralTrue = "LiteralTrue",
 	LiteralFalse = "LiteralFalse",
@@ -42,6 +43,7 @@ export enum TokenType {
 	KeywordProtocol = "KeywordProtocol",
 	KeywordFor = "KeywordFor",
 	KeywordInfer = "KeywordInfer",
+	KeywordChoice = "KeywordChoice",
 	//
 	Identifier = "Identifier",
 	Linebreak = "Linebreak",

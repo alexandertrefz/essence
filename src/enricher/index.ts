@@ -2,6 +2,7 @@ import { collectDiagnostics, reportError } from "../diagnostics/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import { enrichNode } from "./enrichers"
 import {
+	resolveChoiceDeclarationStatementType,
 	resolveNamespaceDefinitionStatementType,
 	resolveProtocolDeclarationStatementType,
 	resolveType,
@@ -108,6 +109,7 @@ export const enrich = (
 
 type HoistableStatementNode =
 	| parser.TypeAliasStatementNode
+	| parser.ChoiceDeclarationStatementNode
 	| parser.FunctionStatementNode
 	| parser.NamespaceDefinitionStatementNode
 	| parser.ProtocolDeclarationStatementNode
@@ -117,6 +119,7 @@ function isHoistable(
 ): node is HoistableStatementNode {
 	return (
 		node.nodeType === "TypeAliasStatement" ||
+		node.nodeType === "ChoiceDeclarationStatement" ||
 		node.nodeType === "FunctionStatement" ||
 		node.nodeType === "NamespaceDefinitionStatement" ||
 		node.nodeType === "ProtocolDeclarationStatement"
@@ -154,6 +157,13 @@ function hoistDeclarations(
 					(): common.Type | common.ProtocolType => {
 						if (node.nodeType === "TypeAliasStatement") {
 							return resolveTypeAliasStatementType(node, scope)
+						} else if (
+							node.nodeType === "ChoiceDeclarationStatement"
+						) {
+							return resolveChoiceDeclarationStatementType(
+								node,
+								scope,
+							)
 						} else if (node.nodeType === "FunctionStatement") {
 							return resolveType(node.value, scope)
 						} else if (
@@ -177,7 +187,8 @@ function hoistDeclarations(
 			}
 
 			let targetMap: Record<string, common.Type | common.ProtocolType> =
-				node.nodeType === "TypeAliasStatement"
+				node.nodeType === "TypeAliasStatement" ||
+				node.nodeType === "ChoiceDeclarationStatement"
 					? scope.types
 					: node.nodeType === "ProtocolDeclarationStatement"
 						? scope.protocols

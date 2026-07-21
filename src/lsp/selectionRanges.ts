@@ -142,6 +142,12 @@ function collectFromNode(
 		case "Lookup":
 			descend(node.base, cursor, chain)
 			return
+		case "CaseValue":
+			if (node.value !== null) {
+				descend(node.value, cursor, chain)
+			}
+
+			return
 		case "Identifier":
 		case "Self":
 		case "StringValue":

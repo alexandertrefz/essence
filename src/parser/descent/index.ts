@@ -25,13 +25,15 @@ type NamespaceBodyNode = Parameters<
 >[4][number]
 
 // NOTE: These token types form the Identifier rule of the grammar — the
-// keywords `with`, `static`, `case` and `infer` are valid Identifiers.
+// keywords `with`, `static`, `case`, `infer` and `choice` are valid
+// Identifiers.
 const identifierTokenTypes = [
 	TokenType.Identifier,
 	TokenType.KeywordWith,
 	TokenType.KeywordStatic,
 	TokenType.KeywordCase,
 	TokenType.KeywordInfer,
+	TokenType.KeywordChoice,
 ]
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -63,6 +65,7 @@ const statementStartTokenTypes = [
 	TokenType.KeywordImplementation,
 	TokenType.KeywordOverload,
 	TokenType.KeywordStatic,
+	TokenType.KeywordChoice,
 ]
 
 class DescentParser {
@@ -279,6 +282,16 @@ class DescentParser {
 				return this.parseFunctionStatement()
 		}
 
+		// NOTE: `choice` is a valid Identifier, so it only opens a Choice
+		// Declaration when the Choice's name follows — `choice = 5` stays an
+		// assignment to a variable named `choice`.
+		if (
+			token.type === TokenType.KeywordChoice &&
+			isIdentifierToken(this.tokens.peek(1))
+		) {
+			return this.parseChoiceDeclarationStatement()
+		}
+
 		if (
 			token.type === TokenType.SymbolLeftAngle &&
 			this.tokens.peek(1)?.type === TokenType.SymbolDash
@@ -361,6 +374,49 @@ class DescentParser {
 			{ start: keyword.position.start, end: type.position.end },
 			this.tokens.documentationAbove(keyword.position.start.line),
 		)
+	}
+
+	protected parseChoiceDeclarationStatement(): parser.ChoiceDeclarationStatementNode {
+		let keyword = this.tokens.expect(TokenType.KeywordChoice)
+		let name = this.parseIdentifier()
+
+		this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		let cases: Array<parser.ChoiceCaseNode> = []
+
+		if (this.tokens.peek()?.type !== TokenType.SymbolRightBrace) {
+			cases.push(this.parseChoiceCase())
+
+			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+				this.tokens.next()
+
+				if (this.tokens.peek()?.type === TokenType.SymbolRightBrace) {
+					break
+				}
+
+				cases.push(this.parseChoiceCase())
+			}
+		}
+
+		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
+
+		return generators.choiceDeclarationStatement(
+			name,
+			cases,
+			{ start: keyword.position.start, end: rightBrace.position.end },
+			this.tokens.documentationAbove(keyword.position.start.line),
+		)
+	}
+
+	protected parseChoiceCase(): parser.ChoiceCaseNode {
+		let name = this.parseIdentifier()
+		let type: parser.RecordTypeDeclarationNode | null = null
+
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			type = this.parseRecordType()
+		}
+
+		return { name, type }
 	}
 
 	protected parseFunctionStatement(): parser.FunctionStatementNode {
@@ -746,6 +802,16 @@ class DescentParser {
 	protected parsePrimaryExpression(): parser.ExpressionNode {
 		let token = this.peekOrFail("an Expression")
 
+		// NOTE: `ChoiceName#CaseName` — recognised before the typed-Record
+		// backtrack, since a `#` can never follow the Type of a typed Record
+		// literal.
+		if (
+			isIdentifierToken(token) &&
+			this.tokens.peek(1)?.type === TokenType.SymbolHash
+		) {
+			return this.parseCaseValue()
+		}
+
 		if (
 			isIdentifierToken(token) ||
 			token.type === TokenType.SymbolLeftBrace
@@ -762,6 +828,8 @@ class DescentParser {
 		switch (token.type) {
 			case TokenType.SymbolUnderscore:
 				return this.parseNativeFunctionInvocation()
+			case TokenType.SymbolHash:
+				return this.parseCaseValue()
 			case TokenType.KeywordMatch:
 				return this.parseMatch()
 			case TokenType.SymbolAt:
@@ -794,6 +862,8 @@ class DescentParser {
 			case TokenType.KeywordWith:
 			case TokenType.KeywordStatic:
 			case TokenType.KeywordCase:
+			case TokenType.KeywordInfer:
+			case TokenType.KeywordChoice:
 				return this.parseIdentifier()
 			default:
 				fail(
@@ -813,6 +883,41 @@ class DescentParser {
 		return generators.nativeFunctionInvocation(name, argumentList.args, {
 			start: firstUnderscore.position.start,
 			end: argumentList.position.end,
+		})
+	}
+
+	// NOTE: The payload parens are part of the construction syntax — they are
+	// consumed here rather than left to the invocation postfix loop, because a
+	// Case is a value, not a Function. Empty parens construct a unit Case.
+	// Without a leading Identifier this parses the bare form (`#Add({ … })`).
+	protected parseCaseValue(): parser.CaseValueNode {
+		let choice: parser.IdentifierNode | null = null
+		let hash: Token
+
+		if (this.tokens.peek()?.type === TokenType.SymbolHash) {
+			hash = this.tokens.next()
+		} else {
+			choice = this.parseIdentifier()
+			hash = this.tokens.expect(TokenType.SymbolHash)
+		}
+
+		let caseName = this.parseIdentifier()
+		let value: parser.ExpressionNode | null = null
+		let end = caseName.position.end
+
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftParen) {
+			this.tokens.next()
+
+			if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
+				value = this.parseExpression()
+			}
+
+			end = this.tokens.expect(TokenType.SymbolRightParen).position.end
+		}
+
+		return generators.caseValueNode(choice, caseName, value, {
+			start: choice?.position.start ?? hash.position.start,
+			end,
 		})
 	}
 
@@ -867,6 +972,36 @@ class DescentParser {
 		// `name = value` members alongside `name: Type` ones.
 		if (token?.type === TokenType.SymbolLeftBrace) {
 			return this.parseRecordMatcher()
+		}
+
+		// NOTE: `case #Add` — the bare form resolves against the matched
+		// value's own Union; `case CalculatorOperation#Add` is the prefixed
+		// form for when that is ambiguous.
+		if (token?.type === TokenType.SymbolHash) {
+			this.tokens.next()
+
+			let caseName = this.parseIdentifier()
+
+			return generators.caseMatcher(null, caseName, {
+				start: token.position.start,
+				end: caseName.position.end,
+			})
+		}
+
+		if (
+			isIdentifierToken(token) &&
+			this.tokens.peek(1)?.type === TokenType.SymbolHash
+		) {
+			let choice = this.parseIdentifier()
+
+			this.tokens.expect(TokenType.SymbolHash)
+
+			let caseName = this.parseIdentifier()
+
+			return generators.caseMatcher(choice, caseName, {
+				start: choice.position.start,
+				end: caseName.position.end,
+			})
 		}
 
 		return this.parseType()
