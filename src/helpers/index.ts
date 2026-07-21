@@ -509,6 +509,14 @@ function matchTypes(
 		return true
 	}
 
+	if (lhs.type === "Algebraic" && rhs.type === "Algebraic") {
+		return true
+	}
+
+	if (lhs.type === "Transcendental" && rhs.type === "Transcendental") {
+		return true
+	}
+
 	if (lhs.type === "UnionType") {
 		let lhsMembers = orderUnionMembersForMatching(lhs.types, context)
 

@@ -1,5 +1,11 @@
 import { Fraction } from "bigint-fraction"
 
+import type { AlgebraicType } from "./Algebraic"
+import {
+	compareTo as compareAlgebraicTo,
+	is as algebraicIs,
+	toString as algebraicToString,
+} from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -16,12 +22,26 @@ import {
 	toString__overload$1 as rationalToString,
 } from "./Rational"
 import type { StringType } from "./String"
+import type { TranscendentalType } from "./Transcendental"
+import {
+	compareTranscendentals,
+	createTranscendental,
+	is as transcendentalIs,
+	signRelativeTo,
+	toString as transcendentalToString,
+} from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
 // #region Constants
 
-export const PI = createRational(355n, 113n)
-export const TAU = createRational(710n, 113n)
+export const PI = createTranscendental(
+	{ numerator: 0n, denominator: 1n },
+	{ numerator: 1n, denominator: 1n },
+) as TranscendentalType
+export const TAU = createTranscendental(
+	{ numerator: 0n, denominator: 1n },
+	{ numerator: 2n, denominator: 1n },
+) as TranscendentalType
 
 // #endregion
 
@@ -351,7 +371,13 @@ export function greatestNumber__overload$7(
 
 // #region Union-level Methods
 
-export type NumberType = IntegerType | RationalType
+export type NumberType =
+	| IntegerType
+	| RationalType
+	| AlgebraicType
+	| TranscendentalType
+
+type RationalKind = IntegerType | RationalType
 
 // NOTE: The cross-member semantics of `Number`: two Numbers are compared by
 // numeric value, so the Integer `1` and the Rational `1/1` are the same
@@ -359,7 +385,7 @@ export type NumberType = IntegerType | RationalType
 // Cross-multiplication keeps everything in bigint arithmetic; equality is
 // sign-safe, and the ordering comparisons assume positive denominators like
 // the rest of the runtime does.
-function numeratorOf(number: NumberType): bigint {
+function numeratorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
 		return number.value
 	} else {
@@ -367,7 +393,7 @@ function numeratorOf(number: NumberType): bigint {
 	}
 }
 
-function denominatorOf(number: NumberType): bigint {
+function denominatorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
 		return 1n
 	} else {
@@ -376,9 +402,37 @@ function denominatorOf(number: NumberType): bigint {
 }
 
 export function is(number: NumberType, other: NumberType): BooleanType {
+	const numberKind = number[typeKeySymbol]
+	const otherKind = other[typeKeySymbol]
+
+	if (numberKind === "Algebraic" || otherKind === "Algebraic") {
+		// NOTE: An Algebraic is irrational by construction — it can only ever
+		// equal another Algebraic.
+		if (numberKind === "Algebraic" && otherKind === "Algebraic") {
+			return algebraicIs(number as AlgebraicType, other as AlgebraicType)
+		}
+
+		return createBoolean(false)
+	}
+
+	if (numberKind === "Transcendental" || otherKind === "Transcendental") {
+		// NOTE: A Transcendental is provably not algebraic — it can only ever
+		// equal another Transcendental.
+		if (numberKind === "Transcendental" && otherKind === "Transcendental") {
+			return transcendentalIs(
+				number as TranscendentalType,
+				other as TranscendentalType,
+			)
+		}
+
+		return createBoolean(false)
+	}
+
 	return createBoolean(
-		numeratorOf(number) * denominatorOf(other) ===
-			numeratorOf(other) * denominatorOf(number),
+		numeratorOf(number as RationalKind) *
+			denominatorOf(other as RationalKind) ===
+			numeratorOf(other as RationalKind) *
+				denominatorOf(number as RationalKind),
 	)
 }
 
@@ -389,14 +443,77 @@ export function isNot(number: NumberType, other: NumberType): BooleanType {
 export function toString(number: NumberType): StringType {
 	if (number[typeKeySymbol] === "Integer") {
 		return integerToString(number)
-	} else {
+	} else if (number[typeKeySymbol] === "Rational") {
 		return rationalToString(number)
+	} else if (number[typeKeySymbol] === "Algebraic") {
+		return algebraicToString(number)
+	} else {
+		return transcendentalToString(number)
 	}
 }
 
+// NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
+// Every cross-kind cell is total and exact, because equality across kinds is
+// impossible by definition; only comparing two Transcendentals could ever
+// need refinement, and within the current linear-in-π grammar even that cell
+// is exact.
 export function compareTo(number: NumberType, other: NumberType): OrderingType {
-	let lhs = numeratorOf(number) * denominatorOf(other)
-	let rhs = numeratorOf(other) * denominatorOf(number)
+	const numberKind = number[typeKeySymbol]
+	const otherKind = other[typeKeySymbol]
+
+	if (numberKind === "Transcendental") {
+		if (otherKind === "Transcendental") {
+			return compareTranscendentals(
+				number as TranscendentalType,
+				other as TranscendentalType,
+			)
+		}
+
+		return signRelativeTo(
+			number as TranscendentalType,
+			other as RationalKind | AlgebraicType,
+		) < 0n
+			? less
+			: greater
+	}
+
+	if (otherKind === "Transcendental") {
+		return signRelativeTo(
+			other as TranscendentalType,
+			number as RationalKind | AlgebraicType,
+		) < 0n
+			? greater
+			: less
+	}
+
+	if (numberKind === "Algebraic") {
+		return compareAlgebraicTo(
+			number as AlgebraicType,
+			other as RationalKind | AlgebraicType,
+		)
+	}
+
+	if (otherKind === "Algebraic") {
+		const inverted = compareAlgebraicTo(
+			other as AlgebraicType,
+			number as RationalKind,
+		)
+
+		if (inverted === less) {
+			return greater
+		} else if (inverted === greater) {
+			return less
+		}
+
+		return equal
+	}
+
+	let lhs =
+		numeratorOf(number as RationalKind) *
+		denominatorOf(other as RationalKind)
+	let rhs =
+		numeratorOf(other as RationalKind) *
+		denominatorOf(number as RationalKind)
 
 	if (lhs < rhs) {
 		return less

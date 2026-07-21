@@ -1,5 +1,14 @@
 import { Fraction } from "bigint-fraction"
 
+import type { AlgebraicType } from "./Algebraic"
+import {
+	add as algebraicAdd,
+	bigRationalOf,
+	dividedInto as algebraicDividedInto,
+	multiplyWith as algebraicMultiplyWith,
+	squareRootOfRational,
+	subtractedFrom as algebraicSubtractedFrom,
+} from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { createBoolean, negate } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -9,6 +18,12 @@ import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
 import { createString } from "./String"
+import type { TranscendentalType } from "./Transcendental"
+import {
+	add as transcendentalAdd,
+	multiplyWith as transcendentalMultiplyWith,
+	subtractedFrom as transcendentalSubtractedFrom,
+} from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
 export type RationalType = { [typeKeySymbol]: "Rational"; rational: Fraction }
@@ -362,3 +377,62 @@ export function compareTo(
 		return equal
 	}
 }
+
+// #region Irrational operands
+
+export function add__overload$3(
+	rational: RationalType,
+	algebraic: AlgebraicType,
+): AlgebraicType {
+	return algebraicAdd(algebraic, rational)
+}
+
+export function add__overload$4(
+	rational: RationalType,
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	return transcendentalAdd(transcendental, rational)
+}
+
+export function subtract__overload$3(
+	rational: RationalType,
+	algebraic: AlgebraicType,
+): AlgebraicType {
+	return algebraicSubtractedFrom(algebraic, rational)
+}
+
+export function subtract__overload$4(
+	rational: RationalType,
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	return transcendentalSubtractedFrom(transcendental, rational)
+}
+
+export function multiplyWith__overload$3(
+	rational: RationalType,
+	algebraic: AlgebraicType,
+): AlgebraicType | RationalType {
+	return algebraicMultiplyWith(algebraic, rational)
+}
+
+export function multiplyWith__overload$4(
+	rational: RationalType,
+	transcendental: TranscendentalType,
+): TranscendentalType | RationalType {
+	return transcendentalMultiplyWith(transcendental, rational)
+}
+
+export function divideBy__overload$3(
+	rational: RationalType,
+	algebraic: AlgebraicType,
+): AlgebraicType | RationalType {
+	return algebraicDividedInto(algebraic, rational)
+}
+
+export function squareRoot(
+	rational: RationalType,
+): RationalType | AlgebraicType | NothingType {
+	return squareRootOfRational(bigRationalOf(rational))
+}
+
+// #endregion

@@ -1,5 +1,13 @@
 import { Fraction } from "bigint-fraction"
 
+import type { AlgebraicType } from "./Algebraic"
+import {
+	add as algebraicAdd,
+	dividedInto as algebraicDividedInto,
+	multiplyWith as algebraicMultiplyWith,
+	squareRootOfRational,
+	subtractedFrom as algebraicSubtractedFrom,
+} from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { NothingType } from "./Nothing"
@@ -10,6 +18,12 @@ import type { RationalType } from "./Rational"
 import { createRational } from "./Rational"
 import type { StringType } from "./String"
 import { createString } from "./String"
+import type { TranscendentalType } from "./Transcendental"
+import {
+	add as transcendentalAdd,
+	multiplyWith as transcendentalMultiplyWith,
+	subtractedFrom as transcendentalSubtractedFrom,
+} from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
 export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
@@ -247,3 +261,72 @@ export function compareTo(
 		return equal
 	}
 }
+
+// #region Irrational operands
+
+export function add__overload$3(
+	integer: IntegerType,
+	algebraic: AlgebraicType,
+): AlgebraicType {
+	return algebraicAdd(algebraic, integer)
+}
+
+export function add__overload$4(
+	integer: IntegerType,
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	return transcendentalAdd(transcendental, integer)
+}
+
+export function subtract__overload$3(
+	integer: IntegerType,
+	algebraic: AlgebraicType,
+): AlgebraicType {
+	return algebraicSubtractedFrom(algebraic, integer)
+}
+
+export function subtract__overload$4(
+	integer: IntegerType,
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	return transcendentalSubtractedFrom(transcendental, integer)
+}
+
+export function multiplyWith__overload$3(
+	integer: IntegerType,
+	algebraic: AlgebraicType,
+): AlgebraicType | RationalType {
+	return algebraicMultiplyWith(algebraic, integer)
+}
+
+export function multiplyWith__overload$4(
+	integer: IntegerType,
+	transcendental: TranscendentalType,
+): TranscendentalType | RationalType {
+	return transcendentalMultiplyWith(transcendental, integer)
+}
+
+export function divideBy__overload$3(
+	integer: IntegerType,
+	algebraic: AlgebraicType,
+): AlgebraicType | RationalType {
+	return algebraicDividedInto(algebraic, integer)
+}
+
+export function squareRoot(
+	integer: IntegerType,
+): IntegerType | AlgebraicType | NothingType {
+	const root = squareRootOfRational({
+		numerator: integer.value,
+		denominator: 1n,
+	})
+
+	if (root[typeKeySymbol] === "Rational") {
+		// NOTE: A whole number's exact root is whole — surface it as one.
+		return createInteger(root.rational.numerator)
+	}
+
+	return root
+}
+
+// #endregion

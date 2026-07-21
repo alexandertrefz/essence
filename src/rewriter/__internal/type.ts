@@ -1,4 +1,5 @@
 import type { common } from "../../interfaces/index"
+import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
@@ -7,6 +8,7 @@ import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
+import type { TranscendentalType } from "./Transcendental"
 
 export const typeKeySymbol = Symbol("$type")
 
@@ -55,6 +57,8 @@ export type AnyType =
 	| StringType
 	| IntegerType
 	| RationalType
+	| AlgebraicType
+	| TranscendentalType
 	| BooleanType
 	| NothingType
 	| OrderingType
@@ -71,6 +75,10 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		return value[typeKeySymbol] === "Integer"
 	} else if (type.type === "Rational") {
 		return value[typeKeySymbol] === "Rational"
+	} else if (type.type === "Algebraic") {
+		return value[typeKeySymbol] === "Algebraic"
+	} else if (type.type === "Transcendental") {
+		return value[typeKeySymbol] === "Transcendental"
 	} else if (type.type === "Record") {
 		if (value[typeKeySymbol] !== "Record") {
 			return false

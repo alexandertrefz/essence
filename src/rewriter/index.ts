@@ -17,6 +17,14 @@ export function rewrite(program: common.typedSimple.Program): string {
 			internalImport([importNamespaceSpecifier("String")], "String"),
 			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
 			internalImport([importNamespaceSpecifier("Rational")], "Rational"),
+			internalImport(
+				[importNamespaceSpecifier("Algebraic")],
+				"Algebraic",
+			),
+			internalImport(
+				[importNamespaceSpecifier("Transcendental")],
+				"Transcendental",
+			),
 			internalImport([importNamespaceSpecifier("Number")], "Number"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
