@@ -41,7 +41,7 @@ implementation {
 	__print(match result -> String {
 		case Nothing { <- "nothing" }
 		case Integer { <- @::toString() }
-		case Fraction { <- @::toString() }
+		case Rational { <- @::toString() }
 	})
 
 	constant cleared: CalculatorOperation = #ClearAll

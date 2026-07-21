@@ -2,12 +2,12 @@ import { Fraction } from "bigint-fraction"
 
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
-import type { FractionType } from "./Fraction"
-import { createFraction } from "./Fraction"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
+import type { RationalType } from "./Rational"
+import { createRational } from "./Rational"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
@@ -43,12 +43,12 @@ export function add__overload$1(
 
 export function add__overload$2(
 	originalNumber: IntegerType,
-	other: FractionType,
-): FractionType {
-	let clonedFraction = other.fraction.clone()
-	clonedFraction.add(originalNumber.value)
+	other: RationalType,
+): RationalType {
+	let clonedRational = other.rational.clone()
+	clonedRational.add(originalNumber.value)
 
-	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Rational", rational: clonedRational }
 }
 
 // #endregion
@@ -64,12 +64,12 @@ export function subtract__overload$1(
 
 export function subtract__overload$2(
 	originalNumber: IntegerType,
-	other: FractionType,
-): FractionType {
-	let fraction = new Fraction(originalNumber.value, 1)
-	fraction.subtract(other.fraction)
+	other: RationalType,
+): RationalType {
+	let rational = new Fraction(originalNumber.value, 1)
+	rational.subtract(other.rational)
 
-	return { [typeKeySymbol]: "Fraction", fraction }
+	return { [typeKeySymbol]: "Rational", rational }
 }
 
 // #endregion
@@ -79,28 +79,28 @@ export function subtract__overload$2(
 export function divideBy__overload$1(
 	numerator: IntegerType,
 	denominator: IntegerType,
-): FractionType | NothingType {
+): RationalType | NothingType {
 	if (denominator.value === 0n) {
 		return createNothing()
 	}
 
-	return createFraction(numerator.value, denominator.value)
+	return createRational(numerator.value, denominator.value)
 }
 
 export function divideBy__overload$2(
 	numerator: IntegerType,
-	denominator: FractionType,
-): FractionType | NothingType {
+	denominator: RationalType,
+): RationalType | NothingType {
 	let numerator1 = numerator.value
 	let denominator1 = 1n
-	let numerator2 = denominator.fraction.numerator
-	let denominator2 = denominator.fraction.denominator
+	let numerator2 = denominator.rational.numerator
+	let denominator2 = denominator.rational.denominator
 
 	if (numerator2 === 0n) {
 		return createNothing()
 	}
 
-	return createFraction(numerator1 * denominator2, denominator1 * numerator2)
+	return createRational(numerator1 * denominator2, denominator1 * numerator2)
 }
 
 // #endregion
@@ -116,12 +116,12 @@ export function multiplyWith__overload$1(
 
 export function multiplyWith__overload$2(
 	originalNumber: IntegerType,
-	other: FractionType,
-): FractionType {
-	let clonedFraction = other.fraction.clone()
-	clonedFraction.multiply(originalNumber.value)
+	other: RationalType,
+): RationalType {
+	let clonedRational = other.rational.clone()
+	clonedRational.multiply(originalNumber.value)
 
-	return { [typeKeySymbol]: "Fraction", fraction: clonedFraction }
+	return { [typeKeySymbol]: "Rational", rational: clonedRational }
 }
 
 // #endregion
@@ -137,17 +137,17 @@ export function isLessThan__overload$1(
 
 export function isLessThan__overload$2(
 	integer: IntegerType,
-	fraction: FractionType,
+	rational: RationalType,
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = fraction.fraction.numerator
-	const denominator2 = fraction.fraction.denominator
+	const numerator2 = rational.rational.numerator
+	const denominator2 = rational.rational.denominator
 
-	const fraction1 = numerator1 * denominator2
-	const fraction2 = numerator2 * denominator1
+	const rational1 = numerator1 * denominator2
+	const rational2 = numerator2 * denominator1
 
-	return createBoolean(fraction1 < fraction2)
+	return createBoolean(rational1 < rational2)
 }
 
 // #endregion
@@ -163,17 +163,17 @@ export function isLessThanOrEqualTo__overload$1(
 
 export function isLessThanOrEqualTo__overload$2(
 	integer: IntegerType,
-	fraction: FractionType,
+	rational: RationalType,
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = fraction.fraction.numerator
-	const denominator2 = fraction.fraction.denominator
+	const numerator2 = rational.rational.numerator
+	const denominator2 = rational.rational.denominator
 
-	const fraction1 = numerator1 * denominator2
-	const fraction2 = numerator2 * denominator1
+	const rational1 = numerator1 * denominator2
+	const rational2 = numerator2 * denominator1
 
-	return createBoolean(fraction1 <= fraction2)
+	return createBoolean(rational1 <= rational2)
 }
 
 // #endregion
@@ -189,17 +189,17 @@ export function isGreaterThan__overload$1(
 
 export function isGreaterThan__overload$2(
 	integer: IntegerType,
-	fraction: FractionType,
+	rational: RationalType,
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = fraction.fraction.numerator
-	const denominator2 = fraction.fraction.denominator
+	const numerator2 = rational.rational.numerator
+	const denominator2 = rational.rational.denominator
 
-	const fraction1 = numerator1 * denominator2
-	const fraction2 = numerator2 * denominator1
+	const rational1 = numerator1 * denominator2
+	const rational2 = numerator2 * denominator1
 
-	return createBoolean(fraction1 > fraction2)
+	return createBoolean(rational1 > rational2)
 }
 
 // #endregion
@@ -215,17 +215,17 @@ export function isGreaterThanOrEqualTo__overload$1(
 
 export function isGreaterThanOrEqualTo__overload$2(
 	integer: IntegerType,
-	fraction: FractionType,
+	rational: RationalType,
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = fraction.fraction.numerator
-	const denominator2 = fraction.fraction.denominator
+	const numerator2 = rational.rational.numerator
+	const denominator2 = rational.rational.denominator
 
-	const fraction1 = numerator1 * denominator2
-	const fraction2 = numerator2 * denominator1
+	const rational1 = numerator1 * denominator2
+	const rational2 = numerator2 * denominator1
 
-	return createBoolean(fraction1 >= fraction2)
+	return createBoolean(rational1 >= rational2)
 }
 
 // #endregion

@@ -580,8 +580,8 @@ describe("Parser", () => {
 				})
 			})
 
-			describe("FractionLiterals", () => {
-				it("should parse FractionLiterals", () => {
+			describe("RationalLiterals", () => {
+				it("should parse RationalLiterals", () => {
 					let input: parser.Program = parse(
 						"implementation { 3 / 2 }",
 					)
@@ -589,7 +589,7 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse FractionLiterals with underscores", () => {
+				it("should parse RationalLiterals with underscores", () => {
 					let input: parser.Program = parse(
 						"implementation { 1_000 / 9 }",
 					)
@@ -597,7 +597,7 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse negative numerator FractionLiterals", () => {
+				it("should parse negative numerator RationalLiterals", () => {
 					let input: parser.Program = parse(
 						"implementation { -3 / 2 }",
 					)
@@ -605,7 +605,7 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse negative denominator FractionLiterals", () => {
+				it("should parse negative denominator RationalLiterals", () => {
 					let input: parser.Program = parse(
 						"implementation { 3 / -2 }",
 					)
@@ -613,7 +613,7 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 
-				it("should parse fully negative FractionLiterals", () => {
+				it("should parse fully negative RationalLiterals", () => {
 					let input: parser.Program = parse(
 						"implementation { -3 / -2 }",
 					)
@@ -654,7 +654,7 @@ describe("Parser", () => {
 								<- 1
 							}
 
-							case Fraction {
+							case Rational {
 								<- 2
 							}
 						}
@@ -754,7 +754,7 @@ describe("Parser", () => {
 
 			it("should parse ConstantDeclarationStatement with complex Record Type", () => {
 				let input: parser.Program = parse(
-					"implementation { constant identifier: { key: { key: Integer | Fraction } } = { key = { key = 1 } } }",
+					"implementation { constant identifier: { key: { key: Integer | Rational } } = { key = { key = 1 } } }",
 				)
 
 				expect(input).toMatchSnapshot()
@@ -796,7 +796,7 @@ describe("Parser", () => {
 
 			it("should parse VariableDeclarationStatement with complex Record Type", () => {
 				let input: parser.Program = parse(
-					"implementation { variable identifier: { key: { key: Integer | Fraction } } = { key = { key = 1 } } }",
+					"implementation { variable identifier: { key: { key: Integer | Rational } } = { key = { key = 1 } } }",
 				)
 
 				expect(input).toMatchSnapshot()
@@ -1407,7 +1407,7 @@ describe("Parser", () => {
 
 			it("should parse TypeAlias Statements with complex Record Types", () => {
 				let input: parser.Program = parse(
-					"implementation { type Type = { key: { key: Integer | Fraction } } }",
+					"implementation { type Type = { key: { key: Integer | Rational } } }",
 				)
 
 				expect(input).toMatchSnapshot()

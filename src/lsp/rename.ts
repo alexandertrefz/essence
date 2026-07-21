@@ -121,7 +121,7 @@ const builtinValues = [
 	"String",
 	"Boolean",
 	"Integer",
-	"Fraction",
+	"Rational",
 	"Number",
 	"Nothing",
 	"Ordering",
@@ -134,7 +134,7 @@ const builtinTypes = [
 	"Boolean",
 	"String",
 	"Integer",
-	"Fraction",
+	"Rational",
 	"Record",
 	"Number",
 	"List",
@@ -836,7 +836,7 @@ function walkNode(
 		case "Self":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
+		case "RationalValue":
 		case "BooleanValue":
 		case "NothingValue":
 			return
@@ -1462,7 +1462,7 @@ function walkTypedNode(
 		case "Self":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
+		case "RationalValue":
 		case "BooleanValue":
 		case "NothingValue":
 			return

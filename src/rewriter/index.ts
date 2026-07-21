@@ -16,7 +16,7 @@ export function rewrite(program: common.typedSimple.Program): string {
 		body: [
 			internalImport([importNamespaceSpecifier("String")], "String"),
 			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
-			internalImport([importNamespaceSpecifier("Fraction")], "Fraction"),
+			internalImport([importNamespaceSpecifier("Rational")], "Rational"),
 			internalImport([importNamespaceSpecifier("Number")], "Number"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
@@ -244,8 +244,8 @@ function rewriteExpression(
 			return rewriteStringValue(node)
 		case "IntegerValue":
 			return rewriteIntegerValue(node)
-		case "FractionValue":
-			return rewriteFractionValue(node)
+		case "RationalValue":
+			return rewriteRationalValue(node)
 		case "BooleanValue":
 			return rewriteBooleanValue(node)
 		case "NothingValue":
@@ -593,8 +593,8 @@ function rewriteIntegerValue(
 	}
 }
 
-function rewriteFractionValue(
-	node: common.typedSimple.FractionValueNode,
+function rewriteRationalValue(
+	node: common.typedSimple.RationalValueNode,
 ): estree.CallExpression {
 	return {
 		type: "CallExpression",
@@ -604,11 +604,11 @@ function rewriteFractionValue(
 			optional: false,
 			object: {
 				type: "Identifier",
-				name: "Fraction",
+				name: "Rational",
 			},
 			property: {
 				type: "Identifier",
-				name: "createFraction",
+				name: "createRational",
 			},
 			computed: false,
 		},

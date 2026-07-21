@@ -2,12 +2,12 @@ implementation {
 
 	function greaterThanTwo(_ item: Number) -> Boolean {
 		<- match item -> Boolean {
-			case Fraction { <- @::isGreaterThan(2) }
+			case Rational { <- @::isGreaterThan(2) }
 			case Integer  { <- @::isGreaterThan(2) }
 		}
 	}
 
-	variable list: List<Fraction> = []
+	variable list: List<Rational> = []
 	variable tao = list::append(Number.TAO)::firstItem()
 
 	list = list::append(1/1)
@@ -18,7 +18,7 @@ implementation {
 	list = list::append(contentsOf [3/1, 4/1, 5/1])
 
 	__print(list)
-	__print(list::removeEvery(where (_ item: Fraction) -> Boolean {
+	__print(list::removeEvery(where (_ item: Rational) -> Boolean {
 		<- item::isGreaterThan(2)
 	}))
 

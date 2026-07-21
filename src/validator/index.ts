@@ -52,7 +52,7 @@ function validateImplementationNode(
 		case "RecordValue":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
+		case "RationalValue":
 		case "BooleanValue":
 		case "NothingValue":
 		case "FunctionValue":
@@ -98,8 +98,8 @@ function validateExpression(
 			return validateCaseValue(node)
 		case "FunctionValue":
 			return validateFunctionValue(node)
-		case "FractionValue":
-			return validateFractionValue(node)
+		case "RationalValue":
+			return validateRationalValue(node)
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
 				validateNoBoundFunctionValue(member)
@@ -452,12 +452,12 @@ function validateFunctionValue(
 	return node
 }
 
-function validateFractionValue(
-	node: common.typed.FractionValueNode,
-): common.typed.FractionValueNode {
+function validateRationalValue(
+	node: common.typed.RationalValueNode,
+): common.typed.RationalValueNode {
 	if (BigInt(node.denominator) === 0n) {
 		reportError(
-			"A Fraction can not have a denominator of zero.",
+			"A Rational can not have a denominator of zero.",
 			node.position,
 		)
 	}

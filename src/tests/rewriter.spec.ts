@@ -3,18 +3,18 @@ import { describe, expect, it } from "bun:test"
 import { Fraction } from "bigint-fraction"
 
 import * as boolean from "../rewriter/__internal/Boolean"
-import * as fraction from "../rewriter/__internal/Fraction"
 import * as integer from "../rewriter/__internal/Integer"
 import {
 	anyIs,
 	anyIsNot,
-	isFirstFractionBigger,
+	isFirstRationalBigger,
 } from "../rewriter/__internal/internalHelpers"
 import * as list from "../rewriter/__internal/List"
 import * as nothingModule from "../rewriter/__internal/Nothing"
 import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
 import * as ordering from "../rewriter/__internal/Ordering"
+import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
 import * as string from "../rewriter/__internal/String"
 import { dispatchMethod, isValueOfType } from "../rewriter/__internal/type"
@@ -28,10 +28,10 @@ const integerOne = () => integer.createInteger(1n)
 const integerTwo = () => integer.createInteger(2n)
 const integerHundred = () => integer.createInteger(100n)
 
-const fractionOneHalf = () => fraction.createFraction(1n, 2n)
-const fractionOne = () => fraction.createFraction(1n, 1n)
-const fractionTwo = () => fraction.createFraction(2n, 1n)
-const fractionHundred = () => fraction.createFraction(100n, 1n)
+const rationalOneHalf = () => rational.createRational(1n, 2n)
+const rationalOne = () => rational.createRational(1n, 1n)
+const rationalTwo = () => rational.createRational(2n, 1n)
+const rationalHundred = () => rational.createRational(100n, 1n)
 
 const listEmpty = () => list.createList([])
 
@@ -42,33 +42,33 @@ const nothing = () => createNothing()
 describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
-			describe("isFirstFractionBigger", () => {
-				it("returns true of the first fraction is bigger", () => {
+			describe("isFirstRationalBigger", () => {
+				it("returns true of the first rational is bigger", () => {
 					expect(
-						isFirstFractionBigger(
+						isFirstRationalBigger(
 							new Fraction(1, 2),
 							new Fraction(1, 3),
 						),
 					).toBeTrue()
 
 					expect(
-						isFirstFractionBigger(
+						isFirstRationalBigger(
 							new Fraction(2, 8),
 							new Fraction(3, 24),
 						),
 					).toBeTrue()
 				})
 
-				it("returns false of the second fraction is bigger", () => {
+				it("returns false of the second rational is bigger", () => {
 					expect(
-						isFirstFractionBigger(
+						isFirstRationalBigger(
 							new Fraction(1, 2),
 							new Fraction(2, 3),
 						),
 					).toBeFalse()
 
 					expect(
-						isFirstFractionBigger(
+						isFirstRationalBigger(
 							new Fraction(2, 8),
 							new Fraction(7, 24),
 						),
@@ -93,15 +93,15 @@ describe("Rewriter", () => {
 					expect(anyIs(integerHundred(), integerHundred())).toBeTrue()
 
 					expect(
-						anyIs(fractionOneHalf(), fractionOneHalf()),
+						anyIs(rationalOneHalf(), rationalOneHalf()),
 					).toBeTrue()
 
-					expect(anyIs(fractionOne(), fractionOne())).toBeTrue()
+					expect(anyIs(rationalOne(), rationalOne())).toBeTrue()
 
-					expect(anyIs(fractionTwo(), fractionTwo())).toBeTrue()
+					expect(anyIs(rationalTwo(), rationalTwo())).toBeTrue()
 
 					expect(
-						anyIs(fractionHundred(), fractionHundred()),
+						anyIs(rationalHundred(), rationalHundred()),
 					).toBeTrue()
 
 					expect(anyIs(stringEmpty(), stringEmpty())).toBeTrue()
@@ -152,7 +152,7 @@ describe("Rewriter", () => {
 
 					expect(anyIs(nothing(), integerOne())).toBeFalse()
 
-					expect(anyIs(nothing(), fractionOne())).toBeFalse()
+					expect(anyIs(nothing(), rationalOne())).toBeFalse()
 
 					expect(anyIs(nothing(), stringEmpty())).toBeFalse()
 
@@ -166,7 +166,7 @@ describe("Rewriter", () => {
 
 					expect(anyIs(integerOne(), nothing())).toBeFalse()
 
-					expect(anyIs(fractionOne(), nothing())).toBeFalse()
+					expect(anyIs(rationalOne(), nothing())).toBeFalse()
 
 					expect(anyIs(stringEmpty(), nothing())).toBeFalse()
 
@@ -195,15 +195,15 @@ describe("Rewriter", () => {
 					).toBeFalse()
 
 					expect(
-						anyIsNot(fractionOneHalf(), fractionOneHalf()),
+						anyIsNot(rationalOneHalf(), rationalOneHalf()),
 					).toBeFalse()
 
-					expect(anyIsNot(fractionOne(), fractionOne())).toBeFalse()
+					expect(anyIsNot(rationalOne(), rationalOne())).toBeFalse()
 
-					expect(anyIsNot(fractionTwo(), fractionTwo())).toBeFalse()
+					expect(anyIsNot(rationalTwo(), rationalTwo())).toBeFalse()
 
 					expect(
-						anyIsNot(fractionHundred(), fractionHundred()),
+						anyIsNot(rationalHundred(), rationalHundred()),
 					).toBeFalse()
 
 					expect(anyIsNot(stringEmpty(), stringEmpty())).toBeFalse()
@@ -254,7 +254,7 @@ describe("Rewriter", () => {
 
 					expect(anyIsNot(nothing(), integerOne())).toBeTrue()
 
-					expect(anyIsNot(nothing(), fractionOne())).toBeTrue()
+					expect(anyIsNot(nothing(), rationalOne())).toBeTrue()
 
 					expect(anyIsNot(nothing(), stringEmpty())).toBeTrue()
 
@@ -268,7 +268,7 @@ describe("Rewriter", () => {
 
 					expect(anyIsNot(integerOne(), nothing())).toBeTrue()
 
-					expect(anyIsNot(fractionOne(), nothing())).toBeTrue()
+					expect(anyIsNot(rationalOne(), nothing())).toBeTrue()
 
 					expect(anyIsNot(stringEmpty(), nothing())).toBeTrue()
 
@@ -313,8 +313,8 @@ describe("Rewriter", () => {
 					).toBeTrue()
 
 					expect(
-						isValueOfType(fractionOne(), {
-							type: "Fraction",
+						isValueOfType(rationalOne(), {
+							type: "Rational",
 						}),
 					).toBeTrue()
 				})
@@ -352,7 +352,7 @@ describe("Rewriter", () => {
 
 					expect(
 						isValueOfType(nothing(), {
-							type: "Fraction",
+							type: "Rational",
 						}),
 					).toBeFalse()
 				})
@@ -1007,34 +1007,34 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(101n))
 				})
 
-				it("adds an integer and a fraction correctly", () => {
+				it("adds an integer and a rational correctly", () => {
 					expect(
 						integer.add__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(3n, 2n))
+					).toEqual(rational.createRational(3n, 2n))
 
 					expect(
 						integer.add__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(201n, 2n))
+					).toEqual(rational.createRational(201n, 2n))
 
 					expect(
 						integer.add__overload$2(
 							integerOne(),
-							fraction.createFraction(-1n, 2n),
+							rational.createRational(-1n, 2n),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						integer.add__overload$2(
 							integerOne(),
-							fraction.createFraction(1n, -2n),
+							rational.createRational(1n, -2n),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 				})
 			})
 
@@ -1062,27 +1062,27 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(-99n))
 				})
 
-				it("subtracts a fraction from an integer correctly", () => {
+				it("subtracts a rational from an integer correctly", () => {
 					expect(
 						integer.subtract__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						integer.subtract__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(199n, 2n))
+					).toEqual(rational.createRational(199n, 2n))
 
 					expect(
 						integer.subtract__overload$2(
 							integerOne(),
-							fraction.createFraction(-1n, 2n),
+							rational.createRational(-1n, 2n),
 						),
-					).toEqual(fraction.createFraction(3n, 2n))
+					).toEqual(rational.createRational(3n, 2n))
 				})
 			})
 
@@ -1117,36 +1117,36 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(200n))
 				})
 
-				it("multiplies an integer and a fraction correctly", () => {
+				it("multiplies an integer and a rational correctly", () => {
 					expect(
 						integer.multiplyWith__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
-					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
+					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
 						integer.multiplyWith__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 
-					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
+					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
 						integer.multiplyWith__overload$2(
 							integerTwo(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(2n, 2n))
+					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
 						integer.multiplyWith__overload$2(
 							integerTwo(),
-							fraction.createFraction(50n, 1n),
+							rational.createRational(50n, 1n),
 						),
-					).toEqual(fraction.createFraction(100n, 1n))
+					).toEqual(rational.createRational(100n, 1n))
 				})
 			})
 
@@ -1157,44 +1157,44 @@ describe("Rewriter", () => {
 							integerOne(),
 							integerOne(),
 						),
-					).toEqual(fraction.createFraction(1n, 1n))
+					).toEqual(rational.createRational(1n, 1n))
 
 					expect(
 						integer.divideBy__overload$1(
 							integerOne(),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(1n, 2n))
+					).toEqual(rational.createRational(1n, 2n))
 
 					expect(
 						integer.divideBy__overload$1(
 							integerHundred(),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 				})
 
-				it("divides an integer and a fraction correctly", () => {
+				it("divides an integer and a rational correctly", () => {
 					expect(
 						integer.divideBy__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(2n, 1n))
+					).toEqual(rational.createRational(2n, 1n))
 
 					expect(
 						integer.divideBy__overload$2(
 							integerOne(),
-							fraction.createFraction(2n, 1n),
+							rational.createRational(2n, 1n),
 						),
-					).toEqual(fraction.createFraction(1n, 2n))
+					).toEqual(rational.createRational(1n, 2n))
 
 					expect(
 						integer.divideBy__overload$2(
 							integerHundred(),
-							fraction.createFraction(2n, 1n),
+							rational.createRational(2n, 1n),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 				})
 
 				it("returns Nothing when dividing by zero", () => {
@@ -1208,7 +1208,7 @@ describe("Rewriter", () => {
 					expect(
 						integer.divideBy__overload$2(
 							integerOne(),
-							fraction.createFraction(0n, 1n),
+							rational.createRational(0n, 1n),
 						),
 					).toEqual(nothing())
 				})
@@ -1261,49 +1261,49 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThan__overload$2(
 							integerZero(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerZero(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerZero(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerZero(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerTwo(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -1340,21 +1340,21 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerTwo(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerHundred(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -1405,42 +1405,42 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerTwo(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerHundred(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThan__overload$2(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -1493,49 +1493,49 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -1572,21 +1572,21 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -1637,42 +1637,42 @@ describe("Rewriter", () => {
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -1725,49 +1725,49 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerZero(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerZero(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerZero(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerZero(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerTwo(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -1804,21 +1804,21 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerTwo(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerHundred(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -1869,42 +1869,42 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerTwo(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerHundred(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -1957,49 +1957,49 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerZero(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 				})
@@ -2036,21 +2036,21 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -2101,42 +2101,42 @@ describe("Rewriter", () => {
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 				})
@@ -2163,375 +2163,375 @@ describe("Rewriter", () => {
 			})
 		})
 
-		describe("Fraction", () => {
+		describe("Rational", () => {
 			describe("of", () => {
-				it("creates a fraction", () => {
-					expect(fraction.of(integerOne(), integerTwo())).toEqual(
-						fractionOneHalf(),
+				it("creates a rational", () => {
+					expect(rational.of(integerOne(), integerTwo())).toEqual(
+						rationalOneHalf(),
 					)
 				})
 
 				it("returns Nothing for a zero denominator", () => {
-					expect(fraction.of(integerOne(), integerZero())).toEqual(
+					expect(rational.of(integerOne(), integerZero())).toEqual(
 						nothing(),
 					)
 				})
 			})
 
 			describe("is", () => {
-				it("returns true if both fractions are the same", () => {
+				it("returns true if both rationals are the same", () => {
 					expect(
-						fraction.is(fractionOneHalf(), fractionOneHalf()),
+						rational.is(rationalOneHalf(), rationalOneHalf()),
 					).toEqual(booleanTrue())
 
-					expect(fraction.is(fractionOne(), fractionOne())).toEqual(
+					expect(rational.is(rationalOne(), rationalOne())).toEqual(
 						booleanTrue(),
 					)
 
-					expect(fraction.is(fractionTwo(), fractionTwo())).toEqual(
+					expect(rational.is(rationalTwo(), rationalTwo())).toEqual(
 						booleanTrue(),
 					)
 
 					expect(
-						fraction.is(fractionHundred(), fractionHundred()),
+						rational.is(rationalHundred(), rationalHundred()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.is(
-							fractionOne(),
-							fraction.divideBy__overload$1(
-								fractionTwo(),
-								fractionTwo(),
-							) as fraction.FractionType,
+						rational.is(
+							rationalOne(),
+							rational.divideBy__overload$1(
+								rationalTwo(),
+								rationalTwo(),
+							) as rational.RationalType,
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.is(
-							fraction.divideBy__overload$1(
-								fractionTwo(),
-								fractionTwo(),
-							) as fraction.FractionType,
-							fractionOne(),
+						rational.is(
+							rational.divideBy__overload$1(
+								rationalTwo(),
+								rationalTwo(),
+							) as rational.RationalType,
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 				})
 
-				it("returns false if the fractions are not the same", () => {
-					expect(fraction.is(fractionOne(), fractionTwo())).toEqual(
+				it("returns false if the rationals are not the same", () => {
+					expect(rational.is(rationalOne(), rationalTwo())).toEqual(
 						booleanFalse(),
 					)
 
-					expect(fraction.is(fractionTwo(), fractionOne())).toEqual(
+					expect(rational.is(rationalTwo(), rationalOne())).toEqual(
 						booleanFalse(),
 					)
 
 					expect(
-						fraction.is(fractionHundred(), fractionOneHalf()),
+						rational.is(rationalHundred(), rationalOneHalf()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.is(fractionOneHalf(), fractionHundred()),
+						rational.is(rationalOneHalf(), rationalHundred()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.is(fractionOne(), fractionOneHalf()),
+						rational.is(rationalOne(), rationalOneHalf()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.is(fractionOneHalf(), fractionOne()),
+						rational.is(rationalOneHalf(), rationalOne()),
 					).toEqual(booleanFalse())
 				})
 			})
 
 			describe("isNot", () => {
-				it("returns true if the fractions are not the same", () => {
+				it("returns true if the rationals are not the same", () => {
 					expect(
-						fraction.isNot(fractionOne(), fractionOneHalf()),
+						rational.isNot(rationalOne(), rationalOneHalf()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionOne(), fractionTwo()),
+						rational.isNot(rationalOne(), rationalTwo()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionOne(), fractionHundred()),
+						rational.isNot(rationalOne(), rationalHundred()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionOneHalf(), fractionOne()),
+						rational.isNot(rationalOneHalf(), rationalOne()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionOneHalf(), fractionTwo()),
+						rational.isNot(rationalOneHalf(), rationalTwo()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionOneHalf(), fractionHundred()),
+						rational.isNot(rationalOneHalf(), rationalHundred()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionTwo(), fractionOneHalf()),
+						rational.isNot(rationalTwo(), rationalOneHalf()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionTwo(), fractionOne()),
+						rational.isNot(rationalTwo(), rationalOne()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionTwo(), fractionHundred()),
+						rational.isNot(rationalTwo(), rationalHundred()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionHundred(), fractionOneHalf()),
+						rational.isNot(rationalHundred(), rationalOneHalf()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionHundred(), fractionOne()),
+						rational.isNot(rationalHundred(), rationalOne()),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isNot(fractionHundred(), fractionTwo()),
+						rational.isNot(rationalHundred(), rationalTwo()),
 					).toEqual(booleanTrue())
 				})
 
-				it("returns false if the fractions are the same", () => {
+				it("returns false if the rationals are the same", () => {
 					expect(
-						fraction.isNot(fractionOneHalf(), fractionOneHalf()),
+						rational.isNot(rationalOneHalf(), rationalOneHalf()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isNot(fractionOne(), fractionOne()),
+						rational.isNot(rationalOne(), rationalOne()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isNot(fractionTwo(), fractionTwo()),
+						rational.isNot(rationalTwo(), rationalTwo()),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isNot(fractionHundred(), fractionHundred()),
+						rational.isNot(rationalHundred(), rationalHundred()),
 					).toEqual(booleanFalse())
 				})
 			})
 
 			describe("add", () => {
-				it("adds 2 fractions correctly", () => {
+				it("adds 2 rationals correctly", () => {
 					expect(
-						fraction.add__overload$1(
-							fractionOneHalf(),
-							fractionOneHalf(),
+						rational.add__overload$1(
+							rationalOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(4n, 4n))
+					).toEqual(rational.createRational(4n, 4n))
 
 					expect(
-						fraction.add__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.add__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
-					).toEqual(fraction.createFraction(101n, 1n))
+					).toEqual(rational.createRational(101n, 1n))
 
 					expect(
-						fraction.add__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.add__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
-					).toEqual(fraction.createFraction(101n, 1n))
+					).toEqual(rational.createRational(101n, 1n))
 				})
 
-				it("adds a fraction and an integer correctly", () => {
+				it("adds a rational and an integer correctly", () => {
 					expect(
-						fraction.add__overload$2(
-							fractionOneHalf(),
+						rational.add__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
-					).toEqual(fraction.createFraction(3n, 2n))
+					).toEqual(rational.createRational(3n, 2n))
 
 					expect(
-						fraction.add__overload$2(
-							fractionOneHalf(),
+						rational.add__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
-					).toEqual(fraction.createFraction(201n, 2n))
+					).toEqual(rational.createRational(201n, 2n))
 
 					expect(
-						fraction.add__overload$2(
-							fraction.createFraction(-1n, 2n),
+						rational.add__overload$2(
+							rational.createRational(-1n, 2n),
 							integerOne(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 				})
 			})
 
 			describe("subtract", () => {
-				it("subtract 2 fractions correctly", () => {
+				it("subtract 2 rationals correctly", () => {
 					expect(
-						fraction.subtract__overload$1(
-							fractionTwo(),
-							fractionOne(),
+						rational.subtract__overload$1(
+							rationalTwo(),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
-						fraction.subtract__overload$1(
-							fraction.createFraction(100n, 1n),
-							fractionOne(),
+						rational.subtract__overload$1(
+							rational.createRational(100n, 1n),
+							rationalOne(),
 						),
-					).toEqual(fraction.createFraction(99n, 1n))
+					).toEqual(rational.createRational(99n, 1n))
 
 					expect(
-						fraction.subtract__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.subtract__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
-					).toEqual(fraction.createFraction(-99n, 1n))
+					).toEqual(rational.createRational(-99n, 1n))
 				})
 
-				it("subtracts an integer from a fraction correctly", () => {
+				it("subtracts an integer from a rational correctly", () => {
 					expect(
-						fraction.subtract__overload$2(
-							fractionTwo(),
+						rational.subtract__overload$2(
+							rationalTwo(),
 							integerOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
-						fraction.subtract__overload$2(
-							fractionHundred(),
+						rational.subtract__overload$2(
+							rationalHundred(),
 							integerOne(),
 						),
-					).toEqual(fraction.createFraction(99n, 1n))
+					).toEqual(rational.createRational(99n, 1n))
 				})
 			})
 
 			describe("multiply", () => {
-				it("multiplies 2 fractions correctly", () => {
+				it("multiplies 2 rationals correctly", () => {
 					expect(
-						fraction.multiplyWith__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.multiplyWith__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
-						fraction.multiplyWith__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.multiplyWith__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
-						fraction.multiplyWith__overload$1(
-							fractionTwo(),
-							fractionTwo(),
+						rational.multiplyWith__overload$1(
+							rationalTwo(),
+							rationalTwo(),
 						),
-					).toEqual(fraction.createFraction(4n, 1n))
+					).toEqual(rational.createRational(4n, 1n))
 
 					expect(
-						fraction.multiplyWith__overload$1(
-							fractionTwo(),
-							fractionHundred(),
+						rational.multiplyWith__overload$1(
+							rationalTwo(),
+							rationalHundred(),
 						),
-					).toEqual(fraction.createFraction(200n, 1n))
+					).toEqual(rational.createRational(200n, 1n))
 				})
 
-				it("multiplies a fraction and an integer correctly", () => {
+				it("multiplies a rational and an integer correctly", () => {
 					expect(
-						fraction.multiplyWith__overload$2(
-							fractionOneHalf(),
+						rational.multiplyWith__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
-					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
+					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						fraction.multiplyWith__overload$2(
-							fractionOneHalf(),
+						rational.multiplyWith__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 
-					// NOTE: Fractions are not automatically reduced, so we need to compare against the common demoninator
+					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						fraction.multiplyWith__overload$2(
-							fractionOneHalf(),
+						rational.multiplyWith__overload$2(
+							rationalOneHalf(),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(2n, 2n))
+					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
-						fraction.multiplyWith__overload$2(
-							fraction.createFraction(50n, 1n),
+						rational.multiplyWith__overload$2(
+							rational.createRational(50n, 1n),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(100n, 1n))
+					).toEqual(rational.createRational(100n, 1n))
 				})
 			})
 
 			describe("divide", () => {
-				it("divides 2 fractions correctly", () => {
+				it("divides 2 rationals correctly", () => {
 					expect(
-						fraction.divideBy__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.divideBy__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
-					).toEqual(fraction.createFraction(1n, 1n))
+					).toEqual(rational.createRational(1n, 1n))
 
 					expect(
-						fraction.divideBy__overload$1(
-							fractionOne(),
-							fractionTwo(),
+						rational.divideBy__overload$1(
+							rationalOne(),
+							rationalTwo(),
 						),
-					).toEqual(fraction.createFraction(1n, 2n))
+					).toEqual(rational.createRational(1n, 2n))
 
 					expect(
-						fraction.divideBy__overload$1(
-							fractionOne(),
-							fractionOneHalf(),
+						rational.divideBy__overload$1(
+							rationalOne(),
+							rationalOneHalf(),
 						),
-					).toEqual(fraction.createFraction(2n, 1n))
+					).toEqual(rational.createRational(2n, 1n))
 
 					expect(
-						fraction.divideBy__overload$1(
-							fractionHundred(),
-							fractionTwo(),
+						rational.divideBy__overload$1(
+							rationalHundred(),
+							rationalTwo(),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 				})
 
-				it("divides a fraction and an integer correctly", () => {
+				it("divides a rational and an integer correctly", () => {
 					expect(
-						fraction.divideBy__overload$2(
-							fractionOne(),
+						rational.divideBy__overload$2(
+							rationalOne(),
 							integerOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
-						fraction.divideBy__overload$2(
-							fraction.createFraction(2n, 1n),
+						rational.divideBy__overload$2(
+							rational.createRational(2n, 1n),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(2n, 2n))
+					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
-						fraction.divideBy__overload$2(
-							fractionHundred(),
+						rational.divideBy__overload$2(
+							rationalHundred(),
 							integerTwo(),
 						),
-					).toEqual(fraction.createFraction(100n, 2n))
+					).toEqual(rational.createRational(100n, 2n))
 				})
 
 				it("returns Nothing when dividing by zero", () => {
 					expect(
-						fraction.divideBy__overload$1(
-							fractionOne(),
-							fraction.createFraction(0n, 1n),
+						rational.divideBy__overload$1(
+							rationalOne(),
+							rational.createRational(0n, 1n),
 						),
 					).toEqual(nothing())
 
 					expect(
-						fraction.divideBy__overload$2(
-							fractionOne(),
+						rational.divideBy__overload$2(
+							rationalOne(),
 							integerZero(),
 						),
 					).toEqual(nothing())
@@ -2541,85 +2541,85 @@ describe("Rewriter", () => {
 			describe("isLessThan", () => {
 				it("returns true if the first number is less than the second", () => {
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOneHalf(),
-							fractionOne(),
+						rational.isLessThan__overload$1(
+							rationalOneHalf(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOneHalf(),
-							fractionTwo(),
+						rational.isLessThan__overload$1(
+							rationalOneHalf(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOneHalf(),
-							fractionHundred(),
+						rational.isLessThan__overload$1(
+							rationalOneHalf(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOne(),
-							fractionTwo(),
+						rational.isLessThan__overload$1(
+							rationalOne(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.isLessThan__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionTwo(),
-							fractionHundred(),
+						rational.isLessThan__overload$1(
+							rationalTwo(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOneHalf(),
+						rational.isLessThan__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOneHalf(),
+						rational.isLessThan__overload$2(
+							rationalOneHalf(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOneHalf(),
+						rational.isLessThan__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOne(),
+						rational.isLessThan__overload$2(
+							rationalOne(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOne(),
+						rational.isLessThan__overload$2(
+							rationalOne(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionTwo(),
+						rational.isLessThan__overload$2(
+							rationalTwo(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
@@ -2627,50 +2627,50 @@ describe("Rewriter", () => {
 
 				it("returns false if the numbers are equal", () => {
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOneHalf(),
-							fractionOneHalf(),
+						rational.isLessThan__overload$1(
+							rationalOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.isLessThan__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionTwo(),
-							fractionTwo(),
+						rational.isLessThan__overload$1(
+							rationalTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionHundred(),
-							fractionHundred(),
+						rational.isLessThan__overload$1(
+							rationalHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOne(),
+						rational.isLessThan__overload$2(
+							rationalOne(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionTwo(),
+						rational.isLessThan__overload$2(
+							rationalTwo(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionHundred(),
+						rational.isLessThan__overload$2(
+							rationalHundred(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
@@ -2678,85 +2678,85 @@ describe("Rewriter", () => {
 
 				it("returns false if the first number is bigger than the second", () => {
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionHundred(),
-							fractionTwo(),
+						rational.isLessThan__overload$1(
+							rationalHundred(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.isLessThan__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionHundred(),
-							fractionOneHalf(),
+						rational.isLessThan__overload$1(
+							rationalHundred(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionTwo(),
-							fractionOne(),
+						rational.isLessThan__overload$1(
+							rationalTwo(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionTwo(),
-							fractionOneHalf(),
+						rational.isLessThan__overload$1(
+							rationalTwo(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$1(
-							fractionOne(),
-							fractionOneHalf(),
+						rational.isLessThan__overload$1(
+							rationalOne(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionOne(),
+						rational.isLessThan__overload$2(
+							rationalOne(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionTwo(),
+						rational.isLessThan__overload$2(
+							rationalTwo(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionTwo(),
+						rational.isLessThan__overload$2(
+							rationalTwo(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionHundred(),
+						rational.isLessThan__overload$2(
+							rationalHundred(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionHundred(),
+						rational.isLessThan__overload$2(
+							rationalHundred(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThan__overload$2(
-							fractionHundred(),
+						rational.isLessThan__overload$2(
+							rationalHundred(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
@@ -2766,85 +2766,85 @@ describe("Rewriter", () => {
 			describe("isLessThanOrEqualTo", () => {
 				it("returns true if the first number is less than the second", () => {
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
@@ -2852,50 +2852,50 @@ describe("Rewriter", () => {
 
 				it("returns true if the numbers are equal", () => {
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
@@ -2903,85 +2903,85 @@ describe("Rewriter", () => {
 
 				it("returns false if the first number is bigger than the second", () => {
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerZero(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isLessThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isLessThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
@@ -2991,85 +2991,85 @@ describe("Rewriter", () => {
 			describe("isGreaterThan", () => {
 				it("returns false if the first number is less than the second", () => {
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOneHalf(),
-							fractionOne(),
+						rational.isGreaterThan__overload$1(
+							rationalOneHalf(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOneHalf(),
-							fractionTwo(),
+						rational.isGreaterThan__overload$1(
+							rationalOneHalf(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOneHalf(),
-							fractionHundred(),
+						rational.isGreaterThan__overload$1(
+							rationalOneHalf(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOne(),
-							fractionTwo(),
+						rational.isGreaterThan__overload$1(
+							rationalOne(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.isGreaterThan__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionTwo(),
-							fractionHundred(),
+						rational.isGreaterThan__overload$1(
+							rationalTwo(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$2(
+							rationalOneHalf(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOne(),
+						rational.isGreaterThan__overload$2(
+							rationalOne(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOne(),
+						rational.isGreaterThan__overload$2(
+							rationalOne(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionTwo(),
+						rational.isGreaterThan__overload$2(
+							rationalTwo(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
@@ -3077,50 +3077,50 @@ describe("Rewriter", () => {
 
 				it("returns false if the numbers are equal", () => {
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOneHalf(),
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$1(
+							rationalOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.isGreaterThan__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionTwo(),
-							fractionTwo(),
+						rational.isGreaterThan__overload$1(
+							rationalTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionHundred(),
-							fractionHundred(),
+						rational.isGreaterThan__overload$1(
+							rationalHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOne(),
+						rational.isGreaterThan__overload$2(
+							rationalOne(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionTwo(),
+						rational.isGreaterThan__overload$2(
+							rationalTwo(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionHundred(),
+						rational.isGreaterThan__overload$2(
+							rationalHundred(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
@@ -3128,92 +3128,92 @@ describe("Rewriter", () => {
 
 				it("returns true if the first number is bigger than the second", () => {
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionHundred(),
-							fractionTwo(),
+						rational.isGreaterThan__overload$1(
+							rationalHundred(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.isGreaterThan__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionHundred(),
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$1(
+							rationalHundred(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionTwo(),
-							fractionOne(),
+						rational.isGreaterThan__overload$1(
+							rationalTwo(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionTwo(),
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$1(
+							rationalTwo(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$1(
-							fractionOne(),
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$1(
+							rationalOne(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThan__overload$2(
+							rationalOneHalf(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionOne(),
+						rational.isGreaterThan__overload$2(
+							rationalOne(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionTwo(),
+						rational.isGreaterThan__overload$2(
+							rationalTwo(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionTwo(),
+						rational.isGreaterThan__overload$2(
+							rationalTwo(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionHundred(),
+						rational.isGreaterThan__overload$2(
+							rationalHundred(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionHundred(),
+						rational.isGreaterThan__overload$2(
+							rationalHundred(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThan__overload$2(
-							fractionHundred(),
+						rational.isGreaterThan__overload$2(
+							rationalHundred(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
@@ -3223,85 +3223,85 @@ describe("Rewriter", () => {
 			describe("isGreaterThanOrEqualTo", () => {
 				it("returns false if the first number is less than the second", () => {
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerOne(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerTwo(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerHundred(),
 						),
 					).toEqual(booleanFalse())
@@ -3309,50 +3309,50 @@ describe("Rewriter", () => {
 
 				it("returns true if the numbers are equal", () => {
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOneHalf(),
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalHundred(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerHundred(),
 						),
 					).toEqual(booleanTrue())
@@ -3360,92 +3360,92 @@ describe("Rewriter", () => {
 
 				it("returns true if the first number is bigger than the second", () => {
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalTwo(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionHundred(),
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalHundred(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionTwo(),
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalTwo(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$1(
-							fractionOne(),
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$1(
+							rationalOne(),
+							rationalOneHalf(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOneHalf(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOneHalf(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionOne(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalOne(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionTwo(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalTwo(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerZero(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerOne(),
 						),
 					).toEqual(booleanTrue())
 
 					expect(
-						fraction.isGreaterThanOrEqualTo__overload$2(
-							fractionHundred(),
+						rational.isGreaterThanOrEqualTo__overload$2(
+							rationalHundred(),
 							integerTwo(),
 						),
 					).toEqual(booleanTrue())
@@ -3455,19 +3455,19 @@ describe("Rewriter", () => {
 			describe("toString", () => {
 				it("returns the correct strings", () => {
 					expect(
-						fraction.toString__overload$1(fractionOneHalf()),
+						rational.toString__overload$1(rationalOneHalf()),
 					).toEqual(string.createString("1/2"))
 
 					expect(
-						fraction.toString__overload$2(
-							fractionOneHalf(),
-							string.createString("fraction"),
+						rational.toString__overload$2(
+							rationalOneHalf(),
+							string.createString("rational"),
 						),
 					).toEqual(string.createString("1/2"))
 
 					expect(
-						fraction.toString__overload$2(
-							fractionOneHalf(),
+						rational.toString__overload$2(
+							rationalOneHalf(),
 							string.createString("decimal"),
 						),
 					).toEqual(string.createString("0.5"))
@@ -3507,113 +3507,113 @@ describe("Rewriter", () => {
 					).toEqual(integer.createInteger(-2n))
 				})
 
-				it("returns the smaller of 2 fractions", () => {
+				it("returns the smaller of 2 rationals", () => {
 					expect(
 						number.lowestNumber__overload$2(
-							fractionOne(),
-							fractionTwo(),
+							rationalOne(),
+							rationalTwo(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$2(
-							fractionTwo(),
-							fractionOne(),
+							rationalTwo(),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$2(
-							fractionHundred(),
-							fractionTwo(),
+							rationalHundred(),
+							rationalTwo(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.lowestNumber__overload$2(
-							fractionOne(),
-							fractionOneHalf(),
+							rationalOne(),
+							rationalOneHalf(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						number.lowestNumber__overload$2(
-							fraction.createFraction(-1n, 1n),
-							fractionOne(),
+							rational.createRational(-1n, 1n),
+							rationalOne(),
 						),
-					).toEqual(fraction.createFraction(-1n, 1n))
+					).toEqual(rational.createRational(-1n, 1n))
 				})
 
-				it("returns the smaller number of an integer and a fraction", () => {
+				it("returns the smaller number of an integer and a rational", () => {
 					expect(
 						number.lowestNumber__overload$3(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.lowestNumber__overload$3(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$3(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.lowestNumber__overload$3(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						number.lowestNumber__overload$3(
 							integer.createInteger(-1n),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(integer.createInteger(-1n))
 
 					expect(
 						number.lowestNumber__overload$4(
-							fractionOne(),
+							rationalOne(),
 							integerTwo(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$4(
-							fractionTwo(),
+							rationalTwo(),
 							integerOne(),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.lowestNumber__overload$4(
-							fractionHundred(),
+							rationalHundred(),
 							integerTwo(),
 						),
 					).toEqual(integerTwo())
 
 					expect(
 						number.lowestNumber__overload$4(
-							fractionOneHalf(),
+							rationalOneHalf(),
 							integerOne(),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						number.lowestNumber__overload$4(
-							fraction.createFraction(-1n, 1n),
+							rational.createRational(-1n, 1n),
 							integerOne(),
 						),
-					).toEqual(fraction.createFraction(-1n, 1n))
+					).toEqual(rational.createRational(-1n, 1n))
 				})
 
 				it("returns the smallest number of a list", () => {
@@ -3650,49 +3650,49 @@ describe("Rewriter", () => {
 					expect(
 						number.lowestNumber__overload$6(
 							list.createList([
-								fractionOne(),
-								fractionTwo(),
-								fractionHundred(),
+								rationalOne(),
+								rationalTwo(),
+								rationalHundred(),
 							]),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$6(
 							list.createList([
-								fractionTwo(),
-								fractionOne(),
-								fractionHundred(),
+								rationalTwo(),
+								rationalOne(),
+								rationalHundred(),
 							]),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$6(
 							list.createList([
-								fractionHundred(),
-								fractionTwo(),
-								fractionOne(),
+								rationalHundred(),
+								rationalTwo(),
+								rationalOne(),
 							]),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$6(
 							list.createList([
-								fractionHundred(),
-								fractionTwo(),
-								fractionOneHalf(),
-								fractionOne(),
+								rationalHundred(),
+								rationalTwo(),
+								rationalOneHalf(),
+								rationalOne(),
 							]),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 
 					expect(
 						number.lowestNumber__overload$7(
 							list.createList([
 								integerOne(),
-								fractionTwo(),
+								rationalTwo(),
 								integerHundred(),
 							]),
 						),
@@ -3702,16 +3702,16 @@ describe("Rewriter", () => {
 						number.lowestNumber__overload$7(
 							list.createList([
 								integerTwo(),
-								fractionOne(),
+								rationalOne(),
 								integerHundred(),
 							]),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.lowestNumber__overload$7(
 							list.createList([
-								fractionHundred(),
+								rationalHundred(),
 								integerTwo(),
 								integerOne(),
 							]),
@@ -3722,12 +3722,12 @@ describe("Rewriter", () => {
 						number.lowestNumber__overload$7(
 							list.createList([
 								integerHundred(),
-								fractionOne(),
-								fractionOneHalf(),
+								rationalOne(),
+								rationalOneHalf(),
 								integerOne(),
 							]),
 						),
-					).toEqual(fractionOneHalf())
+					).toEqual(rationalOneHalf())
 				})
 			})
 
@@ -3762,110 +3762,110 @@ describe("Rewriter", () => {
 					).toEqual(integerTwo())
 				})
 
-				it("returns the larger of 2 fractions", () => {
+				it("returns the larger of 2 rationals", () => {
 					expect(
 						number.greatestNumber__overload$2(
-							fractionOne(),
-							fractionTwo(),
+							rationalOne(),
+							rationalTwo(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.greatestNumber__overload$2(
-							fractionTwo(),
-							fractionOne(),
+							rationalTwo(),
+							rationalOne(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.greatestNumber__overload$2(
-							fractionHundred(),
-							fractionTwo(),
+							rationalHundred(),
+							rationalTwo(),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$2(
-							fractionOne(),
-							fractionOneHalf(),
+							rationalOne(),
+							rationalOneHalf(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.greatestNumber__overload$2(
-							fraction.createFraction(-1n, 1n),
-							fractionOne(),
+							rational.createRational(-1n, 1n),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 				})
 
-				it("returns the larger number of an integer and a fraction", () => {
+				it("returns the larger number of an integer and a rational", () => {
 					expect(
 						number.greatestNumber__overload$3(
 							integerOne(),
-							fractionTwo(),
+							rationalTwo(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.greatestNumber__overload$3(
 							integerTwo(),
-							fractionOne(),
+							rationalOne(),
 						),
 					).toEqual(integerTwo())
 
 					expect(
 						number.greatestNumber__overload$3(
 							integerHundred(),
-							fractionTwo(),
+							rationalTwo(),
 						),
 					).toEqual(integerHundred())
 
 					expect(
 						number.greatestNumber__overload$3(
 							integerOne(),
-							fractionOneHalf(),
+							rationalOneHalf(),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.greatestNumber__overload$3(
 							integer.createInteger(-1n),
-							fractionOne(),
+							rationalOne(),
 						),
-					).toEqual(fractionOne())
+					).toEqual(rationalOne())
 
 					expect(
 						number.greatestNumber__overload$4(
-							fractionOne(),
+							rationalOne(),
 							integerTwo(),
 						),
 					).toEqual(integerTwo())
 
 					expect(
 						number.greatestNumber__overload$4(
-							fractionTwo(),
+							rationalTwo(),
 							integerOne(),
 						),
-					).toEqual(fractionTwo())
+					).toEqual(rationalTwo())
 
 					expect(
 						number.greatestNumber__overload$4(
-							fractionHundred(),
+							rationalHundred(),
 							integerTwo(),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$4(
-							fractionOneHalf(),
+							rationalOneHalf(),
 							integerOne(),
 						),
 					).toEqual(integerOne())
 
 					expect(
 						number.greatestNumber__overload$4(
-							fraction.createFraction(-1n, 1n),
+							rational.createRational(-1n, 1n),
 							integerOne(),
 						),
 					).toEqual(integerOne())
@@ -3905,49 +3905,49 @@ describe("Rewriter", () => {
 					expect(
 						number.greatestNumber__overload$6(
 							list.createList([
-								fractionOne(),
-								fractionTwo(),
-								fractionHundred(),
+								rationalOne(),
+								rationalTwo(),
+								rationalHundred(),
 							]),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$6(
 							list.createList([
-								fractionTwo(),
-								fractionOne(),
-								fractionHundred(),
+								rationalTwo(),
+								rationalOne(),
+								rationalHundred(),
 							]),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$6(
 							list.createList([
-								fractionHundred(),
-								fractionTwo(),
-								fractionOne(),
+								rationalHundred(),
+								rationalTwo(),
+								rationalOne(),
 							]),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$6(
 							list.createList([
-								fractionHundred(),
-								fractionTwo(),
-								fractionOneHalf(),
-								fractionOne(),
+								rationalHundred(),
+								rationalTwo(),
+								rationalOneHalf(),
+								rationalOne(),
 							]),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$7(
 							list.createList([
 								integerOne(),
-								fractionTwo(),
+								rationalTwo(),
 								integerHundred(),
 							]),
 						),
@@ -3957,7 +3957,7 @@ describe("Rewriter", () => {
 						number.greatestNumber__overload$7(
 							list.createList([
 								integerTwo(),
-								fractionOne(),
+								rationalOne(),
 								integerHundred(),
 							]),
 						),
@@ -3966,18 +3966,18 @@ describe("Rewriter", () => {
 					expect(
 						number.greatestNumber__overload$7(
 							list.createList([
-								fractionHundred(),
+								rationalHundred(),
 								integerTwo(),
 								integerOne(),
 							]),
 						),
-					).toEqual(fractionHundred())
+					).toEqual(rationalHundred())
 
 					expect(
 						number.greatestNumber__overload$7(
 							list.createList([
-								fractionOneHalf(),
-								fractionOne(),
+								rationalOneHalf(),
+								rationalOne(),
 								integerHundred(),
 								integerOne(),
 							]),
@@ -4017,8 +4017,8 @@ describe("Rewriter", () => {
 
 					expect(
 						list.is(
-							list.createList([fractionOne()]),
-							list.createList([fractionOne()]),
+							list.createList([rationalOne()]),
+							list.createList([rationalOne()]),
 						),
 					).toEqual(booleanTrue())
 
@@ -4027,14 +4027,14 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
@@ -4055,7 +4055,7 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
@@ -4063,7 +4063,7 @@ describe("Rewriter", () => {
 								stringEmpty(),
 								integerOne(),
 								nothing(),
-								fractionHundred(),
+								rationalHundred(),
 								booleanFalse(),
 							]),
 						),
@@ -4081,7 +4081,7 @@ describe("Rewriter", () => {
 					expect(
 						list.is(
 							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerOne(), fractionTwo()]),
+							list.createList([integerOne(), rationalTwo()]),
 						),
 					).toEqual(booleanFalse())
 
@@ -4094,8 +4094,8 @@ describe("Rewriter", () => {
 
 					expect(
 						list.is(
-							list.createList([fractionOne()]),
-							list.createList([fractionOneHalf()]),
+							list.createList([rationalOne()]),
+							list.createList([rationalOneHalf()]),
 						),
 					).toEqual(booleanFalse())
 
@@ -4104,14 +4104,14 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanTrue(),
 							]),
@@ -4135,7 +4135,7 @@ describe("Rewriter", () => {
 								integerTwo(),
 								integerHundred(),
 							]),
-							list.createList([integerOne(), fractionTwo()]),
+							list.createList([integerOne(), rationalTwo()]),
 						),
 					).toEqual(booleanFalse())
 
@@ -4180,8 +4180,8 @@ describe("Rewriter", () => {
 
 					expect(
 						list.isNot(
-							list.createList([fractionOne()]),
-							list.createList([fractionOne()]),
+							list.createList([rationalOne()]),
+							list.createList([rationalOne()]),
 						),
 					).toEqual(booleanFalse())
 
@@ -4190,14 +4190,14 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
@@ -4218,7 +4218,7 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
@@ -4226,7 +4226,7 @@ describe("Rewriter", () => {
 								stringEmpty(),
 								integerOne(),
 								nothing(),
-								fractionHundred(),
+								rationalHundred(),
 								booleanFalse(),
 							]),
 						),
@@ -4244,7 +4244,7 @@ describe("Rewriter", () => {
 					expect(
 						list.isNot(
 							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerOne(), fractionTwo()]),
+							list.createList([integerOne(), rationalTwo()]),
 						),
 					).toEqual(booleanTrue())
 
@@ -4257,8 +4257,8 @@ describe("Rewriter", () => {
 
 					expect(
 						list.isNot(
-							list.createList([fractionOne()]),
-							list.createList([fractionOneHalf()]),
+							list.createList([rationalOne()]),
+							list.createList([rationalOneHalf()]),
 						),
 					).toEqual(booleanTrue())
 
@@ -4267,14 +4267,14 @@ describe("Rewriter", () => {
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanFalse(),
 							]),
 							list.createList([
 								stringEmpty(),
 								integerOne(),
-								fractionHundred(),
+								rationalHundred(),
 								nothing(),
 								booleanTrue(),
 							]),
@@ -4311,7 +4311,7 @@ describe("Rewriter", () => {
 								integerOne(),
 								stringEmpty(),
 								integerHundred(),
-								fractionOneHalf(),
+								rationalOneHalf(),
 							]),
 						),
 					).toEqual(integer.createInteger(4n))
@@ -4335,7 +4335,7 @@ describe("Rewriter", () => {
 					).toEqual(booleanTrue())
 
 					expect(
-						list.hasItems(list.createList([fractionOne()])),
+						list.hasItems(list.createList([rationalOne()])),
 					).toEqual(booleanTrue())
 
 					expect(
@@ -4363,7 +4363,7 @@ describe("Rewriter", () => {
 					).toEqual(booleanFalse())
 
 					expect(
-						list.isEmpty(list.createList([fractionOne()])),
+						list.isEmpty(list.createList([rationalOne()])),
 					).toEqual(booleanFalse())
 
 					expect(
@@ -5548,14 +5548,14 @@ describe("Rewriter", () => {
 				)
 			})
 
-			it("orders Fractions with compareTo", () => {
+			it("orders Rationals with compareTo", () => {
 				expect(
-					fraction.compareTo(fractionOneHalf(), fractionOne()),
+					rational.compareTo(rationalOneHalf(), rationalOne()),
 				).toBe(ordering.less)
-				expect(fraction.compareTo(fractionOne(), fractionOne())).toBe(
+				expect(rational.compareTo(rationalOne(), rationalOne())).toBe(
 					ordering.equal,
 				)
-				expect(fraction.compareTo(fractionTwo(), fractionOne())).toBe(
+				expect(rational.compareTo(rationalTwo(), rationalOne())).toBe(
 					ordering.greater,
 				)
 			})
@@ -5594,24 +5594,24 @@ describe("Rewriter", () => {
 
 		describe("Number", () => {
 			it("compares numerically across members", () => {
-				expect(number.is(integerOne(), fractionOne()).value).toBe(true)
-				expect(number.is(integerOne(), fractionOneHalf()).value).toBe(
+				expect(number.is(integerOne(), rationalOne()).value).toBe(true)
+				expect(number.is(integerOne(), rationalOneHalf()).value).toBe(
 					false,
 				)
 				expect(
-					number.isNot(integerOne(), fractionOneHalf()).value,
+					number.isNot(integerOne(), rationalOneHalf()).value,
 				).toBe(true)
 				expect(number.is(integerTwo(), integerTwo()).value).toBe(true)
 			})
 
 			it("orders numerically across members", () => {
-				expect(number.compareTo(integerOne(), fractionOneHalf())).toBe(
+				expect(number.compareTo(integerOne(), rationalOneHalf())).toBe(
 					ordering.greater,
 				)
-				expect(number.compareTo(fractionOneHalf(), integerOne())).toBe(
+				expect(number.compareTo(rationalOneHalf(), integerOne())).toBe(
 					ordering.less,
 				)
-				expect(number.compareTo(integerOne(), fractionOne())).toBe(
+				expect(number.compareTo(integerOne(), rationalOne())).toBe(
 					ordering.equal,
 				)
 				expect(number.compareTo(integerTwo(), integerHundred())).toBe(
@@ -5623,7 +5623,7 @@ describe("Rewriter", () => {
 				expect(number.toString(integerTwo())).toEqual(
 					string.createString("2"),
 				)
-				expect(number.toString(fractionOneHalf())).toEqual(
+				expect(number.toString(rationalOneHalf())).toEqual(
 					string.createString("1/2"),
 				)
 			})

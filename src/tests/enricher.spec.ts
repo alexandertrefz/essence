@@ -2,12 +2,12 @@ import { describe, expect, it } from "bun:test"
 
 import { enrich } from "../enricher/index"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
-import { namespace as fractionNamespace } from "../enricher/types/Fraction"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import { namespace as numberNamespace } from "../enricher/types/Number"
 import { namespace as orderingNamespace } from "../enricher/types/Ordering"
 import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
+import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
 import { computeConformanceMethodMap } from "../helpers/index"
@@ -553,7 +553,7 @@ describe("Enricher", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				type Maybe<Value> = Value | Nothing
 
-				constant a: Maybe<Fraction> = 1/2
+				constant a: Maybe<Rational> = 1/2
 			}`)
 
 			expect(diagnostics).toEqual([])
@@ -565,7 +565,7 @@ describe("Enricher", () => {
 			if (constant.nodeType === "ConstantDeclarationStatement") {
 				expect(constant.declaredType).toEqual({
 					type: "UnionType",
-					types: [{ type: "Fraction" }, { type: "Nothing" }],
+					types: [{ type: "Rational" }, { type: "Nothing" }],
 				})
 			}
 		})
@@ -584,7 +584,7 @@ describe("Enricher", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Maybe<Value> = Value | Nothing
 
-				constant a: Maybe<Fraction, Integer> = 1/2
+				constant a: Maybe<Rational, Integer> = 1/2
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1194,7 +1194,7 @@ describe("Enricher", () => {
 				stringNamespace,
 				booleanNamespace,
 				integerNamespace,
-				fractionNamespace,
+				rationalNamespace,
 				numberNamespace,
 				recordNamespace,
 				nothingNamespace,
@@ -1267,7 +1267,7 @@ describe("Enricher", () => {
 					}
 
 					constant smallerInteger: Integer = smaller(5, 3)
-					constant smallerFraction: Fraction = smaller(1/2, 1/3)
+					constant smallerRational: Rational = smaller(1/2, 1/3)
 				}`),
 			).toEqual([])
 		})
@@ -1372,7 +1372,7 @@ describe("Enricher", () => {
 			return value
 		}
 
-		it("should dispatch a Number receiver to the Integer and Fraction Namespaces", () => {
+		it("should dispatch a Number receiver to the Integer and Rational Namespaces", () => {
 			let invocation = lastConstantValue(`implementation {
 				constant number: Number = 5
 				constant doubled = number::multiplyWith(2)
@@ -1384,10 +1384,10 @@ describe("Enricher", () => {
 				invocation.dispatch?.map(
 					(dispatchCase) => dispatchCase.namespaceName,
 				),
-			).toEqual(["Integer", "Fraction"])
+			).toEqual(["Integer", "Rational"])
 			expect(invocation.type).toEqual({
 				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Fraction" }],
+				types: [{ type: "Integer" }, { type: "Rational" }],
 			})
 		})
 

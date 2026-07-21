@@ -76,8 +76,8 @@ export type IntegerType = {
 	type: "Integer"
 }
 
-export type FractionType = {
-	type: "Fraction"
+export type RationalType = {
+	type: "Rational"
 }
 
 export type RecordType = {
@@ -163,7 +163,7 @@ export type PrimitiveType =
 	| BooleanType
 	| StringType
 	| IntegerType
-	| FractionType
+	| RationalType
 	| RecordType
 	| CaseType
 	| ListType
@@ -225,7 +225,7 @@ export type GenericUse = {
 }
 
 // NOTE: The unapplied form of a generic Type Alias — use sites apply Type
-// Arguments (`Maybe<Fraction>`), which substitutes them into `aliasedType`.
+// Arguments (`Maybe<Rational>`), which substitutes them into `aliasedType`.
 export type GenericAliasType = {
 	type: "GenericAlias"
 	name: string

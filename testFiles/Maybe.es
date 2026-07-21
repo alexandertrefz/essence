@@ -30,7 +30,7 @@ implementation {
 
 	constant list = [1, 2, 3]
 
-	constant maybeFraction: Maybe<Fraction> = list::firstItem()::andThen((_ item: Integer) -> Fraction {
+	constant maybeRational: Maybe<Rational> = list::firstItem()::andThen((_ item: Integer) -> Rational {
 		<- item::multiplyWith(1/5)
 	})
 

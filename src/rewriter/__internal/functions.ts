@@ -1,10 +1,10 @@
 import type { BooleanType } from "./Boolean"
 import { toString as boolToString } from "./Boolean"
-import type { FractionType } from "./Fraction"
-import { toString__overload$1 as fractionToString } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import { toString as integerToString } from "./Integer"
 import type { ListType } from "./List"
+import type { RationalType } from "./Rational"
+import { toString__overload$1 as rationalToString } from "./Rational"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -66,8 +66,8 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 		} else {
 			return "[]"
 		}
-	} else if (obj[typeKeySymbol] === "Fraction") {
-		return fractionToString(obj).value
+	} else if (obj[typeKeySymbol] === "Rational") {
+		return rationalToString(obj).value
 	} else if (obj[typeKeySymbol] === "Integer") {
 		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {
@@ -102,7 +102,7 @@ export function print(
 		| ListType<any>
 		| StringType
 		| IntegerType
-		| FractionType
+		| RationalType
 		| BooleanType
 		| RecordType,
 ) {

@@ -13,10 +13,6 @@ import {
 	type as booleanType,
 } from "./types/Boolean"
 import {
-	namespace as fractionNamespace,
-	type as fractionType,
-} from "./types/Fraction"
-import {
 	namespace as integerNamespace,
 	type as integerType,
 } from "./types/Integer"
@@ -35,6 +31,10 @@ import {
 	type as orderingType,
 } from "./types/Ordering"
 import { Comparable, Equatable, Printable } from "./types/Protocols"
+import {
+	namespace as rationalNamespace,
+	type as rationalType,
+} from "./types/Rational"
 import {
 	namespace as recordNamespace,
 	type as recordType,
@@ -57,7 +57,7 @@ export const enrich = (
 				String: stringNamespace,
 				Boolean: booleanNamespace,
 				Integer: integerNamespace,
-				Fraction: fractionNamespace,
+				Rational: rationalNamespace,
 				Number: numberNamespace,
 				Nothing: nothingNamespace,
 				Ordering: orderingNamespace,
@@ -74,7 +74,7 @@ export const enrich = (
 					Boolean: booleanType,
 					String: stringType,
 					Integer: integerType,
-					Fraction: fractionType,
+					Rational: rationalType,
 					Record: recordType,
 					Number: numberType,
 					List: listType,

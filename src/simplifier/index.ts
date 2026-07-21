@@ -32,7 +32,7 @@ function simplifyImplementationNode(
 		case "RecordValue":
 		case "StringValue":
 		case "IntegerValue":
-		case "FractionValue":
+		case "RationalValue":
 		case "BooleanValue":
 		case "NothingValue":
 		case "FunctionValue":
@@ -78,8 +78,8 @@ function simplifyExpression(
 			return simplifyStringValue(node)
 		case "IntegerValue":
 			return simplifyIntegerValue(node)
-		case "FractionValue":
-			return simplifyFractionValue(node)
+		case "RationalValue":
+			return simplifyRationalValue(node)
 		case "BooleanValue":
 			return simplifyBooleanValue(node)
 		case "NothingValue":
@@ -288,11 +288,11 @@ function simplifyIntegerValue(
 	}
 }
 
-function simplifyFractionValue(
-	node: common.typed.FractionValueNode,
-): common.typedSimple.FractionValueNode {
+function simplifyRationalValue(
+	node: common.typed.RationalValueNode,
+): common.typedSimple.RationalValueNode {
 	return {
-		nodeType: "FractionValue",
+		nodeType: "RationalValue",
 		numerator: node.numerator,
 		denominator: node.denominator,
 		type: node.type,

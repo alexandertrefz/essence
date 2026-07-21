@@ -160,8 +160,8 @@ describe("Helpers", () => {
 		const integerPrimitive: PrimitiveType = {
 			type: "Integer",
 		}
-		const fractionPrimitive: PrimitiveType = {
-			type: "Fraction",
+		const rationalPrimitive: PrimitiveType = {
+			type: "Rational",
 		}
 		const stringPrimitive: PrimitiveType = {
 			type: "String",
@@ -217,9 +217,9 @@ describe("Helpers", () => {
 			types: [integerPrimitive, stringPrimitive],
 		}
 
-		const unionTypeIntegerFraction: UnionType = {
+		const unionTypeIntegerRational: UnionType = {
 			type: "UnionType",
-			types: [integerPrimitive, fractionPrimitive],
+			types: [integerPrimitive, rationalPrimitive],
 		}
 
 		// #endregion
@@ -570,7 +570,7 @@ describe("Helpers", () => {
 		it("should match anything to UnknownType", () => {
 			expect(matchesType(unknown, booleanPrimitive)).toBe(true)
 			expect(matchesType(unknown, integerPrimitive)).toBe(true)
-			expect(matchesType(unknown, fractionPrimitive)).toBe(true)
+			expect(matchesType(unknown, rationalPrimitive)).toBe(true)
 			expect(matchesType(unknown, stringPrimitive)).toBe(true)
 
 			expect(matchesType(unknown, unionTypeStringInteger)).toBe(true)
@@ -602,26 +602,26 @@ describe("Helpers", () => {
 		it("should match matching PrimitiveTypes", () => {
 			expect(matchesType(booleanPrimitive, booleanPrimitive)).toBe(true)
 			expect(matchesType(integerPrimitive, integerPrimitive)).toBe(true)
-			expect(matchesType(fractionPrimitive, fractionPrimitive)).toBe(true)
+			expect(matchesType(rationalPrimitive, rationalPrimitive)).toBe(true)
 			expect(matchesType(stringPrimitive, stringPrimitive)).toBe(true)
 		})
 
 		it("should not match mismatched PrimitiveTypes", () => {
 			expect(matchesType(booleanPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(booleanPrimitive, integerPrimitive)).toBe(false)
-			expect(matchesType(booleanPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(booleanPrimitive, rationalPrimitive)).toBe(false)
 
 			expect(matchesType(stringPrimitive, booleanPrimitive)).toBe(false)
 			expect(matchesType(stringPrimitive, integerPrimitive)).toBe(false)
-			expect(matchesType(stringPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(stringPrimitive, rationalPrimitive)).toBe(false)
 
 			expect(matchesType(integerPrimitive, stringPrimitive)).toBe(false)
 			expect(matchesType(integerPrimitive, booleanPrimitive)).toBe(false)
-			expect(matchesType(integerPrimitive, fractionPrimitive)).toBe(false)
+			expect(matchesType(integerPrimitive, rationalPrimitive)).toBe(false)
 
-			expect(matchesType(fractionPrimitive, stringPrimitive)).toBe(false)
-			expect(matchesType(fractionPrimitive, integerPrimitive)).toBe(false)
-			expect(matchesType(fractionPrimitive, booleanPrimitive)).toBe(false)
+			expect(matchesType(rationalPrimitive, stringPrimitive)).toBe(false)
+			expect(matchesType(rationalPrimitive, integerPrimitive)).toBe(false)
+			expect(matchesType(rationalPrimitive, booleanPrimitive)).toBe(false)
 		})
 
 		it("should match matching record types", () => {
@@ -665,52 +665,52 @@ describe("Helpers", () => {
 
 		it("should not match mismatched UnionTypes", () => {
 			expect(
-				matchesType(unionTypeStringInteger, unionTypeIntegerFraction),
+				matchesType(unionTypeStringInteger, unionTypeIntegerRational),
 			).toBe(false)
 			expect(
-				matchesType(unionTypeIntegerFraction, unionTypeStringInteger),
+				matchesType(unionTypeIntegerRational, unionTypeStringInteger),
 			).toBe(false)
-			expect(matchesType(unionTypeStringInteger, fractionPrimitive)).toBe(
+			expect(matchesType(unionTypeStringInteger, rationalPrimitive)).toBe(
 				false,
 			)
 		})
 
 		it("should match UnionTypes that are a subset of the expected UnionType", () => {
-			const unionTypeStringIntegerFraction: UnionType = {
+			const unionTypeStringIntegerRational: UnionType = {
 				type: "UnionType",
-				types: [stringPrimitive, integerPrimitive, fractionPrimitive],
+				types: [stringPrimitive, integerPrimitive, rationalPrimitive],
 			}
 
 			expect(
 				matchesType(
-					unionTypeStringIntegerFraction,
+					unionTypeStringIntegerRational,
 					unionTypeStringInteger,
 				),
 			).toBe(true)
 			expect(
 				matchesType(
-					unionTypeStringIntegerFraction,
-					unionTypeIntegerFraction,
+					unionTypeStringIntegerRational,
+					unionTypeIntegerRational,
 				),
 			).toBe(true)
 		})
 
 		it("should not match UnionTypes that are a superset of the expected UnionType", () => {
-			const unionTypeStringIntegerFraction: UnionType = {
+			const unionTypeStringIntegerRational: UnionType = {
 				type: "UnionType",
-				types: [stringPrimitive, integerPrimitive, fractionPrimitive],
+				types: [stringPrimitive, integerPrimitive, rationalPrimitive],
 			}
 
 			expect(
 				matchesType(
 					unionTypeStringInteger,
-					unionTypeStringIntegerFraction,
+					unionTypeStringIntegerRational,
 				),
 			).toBe(false)
 			expect(
 				matchesType(
-					unionTypeIntegerFraction,
-					unionTypeStringIntegerFraction,
+					unionTypeIntegerRational,
+					unionTypeStringIntegerRational,
 				),
 			).toBe(false)
 		})
@@ -1071,11 +1071,11 @@ describe("Helpers", () => {
 				returnType: { type: "String" },
 			}
 
-			const takesIntegerOrFractionFunctionType: FunctionType = {
+			const takesIntegerOrRationalFunctionType: FunctionType = {
 				type: "Function",
 				generics: [],
 				parameterTypes: [
-					{ name: null, type: unionTypeIntegerFraction },
+					{ name: null, type: unionTypeIntegerRational },
 				],
 				returnType: { type: "String" },
 			}
@@ -1087,11 +1087,11 @@ describe("Helpers", () => {
 				returnType: { type: "Integer" },
 			}
 
-			const returnsIntegerOrFractionFunctionType: FunctionType = {
+			const returnsIntegerOrRationalFunctionType: FunctionType = {
 				type: "Function",
 				generics: [],
 				parameterTypes: [],
-				returnType: unionTypeIntegerFraction,
+				returnType: unionTypeIntegerRational,
 			}
 
 			const takesIntegerSimpleMethodType: MethodType = {
@@ -1101,11 +1101,11 @@ describe("Helpers", () => {
 				returnType: { type: "String" },
 			}
 
-			const takesIntegerOrFractionSimpleMethodType: MethodType = {
+			const takesIntegerOrRationalSimpleMethodType: MethodType = {
 				type: "SimpleMethod",
 				generics: [],
 				parameterTypes: [
-					{ name: null, type: unionTypeIntegerFraction },
+					{ name: null, type: unionTypeIntegerRational },
 				],
 				returnType: { type: "String" },
 			}
@@ -1117,11 +1117,11 @@ describe("Helpers", () => {
 				returnType: { type: "Integer" },
 			}
 
-			const returnsIntegerOrFractionSimpleMethodType: MethodType = {
+			const returnsIntegerOrRationalSimpleMethodType: MethodType = {
 				type: "SimpleMethod",
 				generics: [],
 				parameterTypes: [],
-				returnType: unionTypeIntegerFraction,
+				returnType: unionTypeIntegerRational,
 			}
 
 			const takesIntegerStaticMethodType: MethodType = {
@@ -1131,11 +1131,11 @@ describe("Helpers", () => {
 				returnType: { type: "String" },
 			}
 
-			const takesIntegerOrFractionStaticMethodType: MethodType = {
+			const takesIntegerOrRationalStaticMethodType: MethodType = {
 				type: "StaticMethod",
 				generics: [],
 				parameterTypes: [
-					{ name: null, type: unionTypeIntegerFraction },
+					{ name: null, type: unionTypeIntegerRational },
 				],
 				returnType: { type: "String" },
 			}
@@ -1153,13 +1153,13 @@ describe("Helpers", () => {
 				],
 			}
 
-			const takesIntegerOrFractionOverloadedMethodType: MethodType = {
+			const takesIntegerOrRationalOverloadedMethodType: MethodType = {
 				type: "OverloadedMethod",
 				overloads: [
 					{
 						generics: [],
 						parameterTypes: [
-							{ name: null, type: unionTypeIntegerFraction },
+							{ name: null, type: unionTypeIntegerRational },
 						],
 						returnType: { type: "String" },
 					},
@@ -1170,7 +1170,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						takesIntegerFunctionType,
-						takesIntegerOrFractionFunctionType,
+						takesIntegerOrRationalFunctionType,
 					),
 				).toBe(true)
 			})
@@ -1178,7 +1178,7 @@ describe("Helpers", () => {
 			it("should reject Functions with narrower parameter types", () => {
 				expect(
 					matchesType(
-						takesIntegerOrFractionFunctionType,
+						takesIntegerOrRationalFunctionType,
 						takesIntegerFunctionType,
 					),
 				).toBe(false)
@@ -1187,7 +1187,7 @@ describe("Helpers", () => {
 			it("should accept Functions with narrower return types (covariance)", () => {
 				expect(
 					matchesType(
-						returnsIntegerOrFractionFunctionType,
+						returnsIntegerOrRationalFunctionType,
 						returnsIntegerFunctionType,
 					),
 				).toBe(true)
@@ -1197,7 +1197,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						returnsIntegerFunctionType,
-						returnsIntegerOrFractionFunctionType,
+						returnsIntegerOrRationalFunctionType,
 					),
 				).toBe(false)
 			})
@@ -1206,7 +1206,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						takesIntegerSimpleMethodType,
-						takesIntegerOrFractionSimpleMethodType,
+						takesIntegerOrRationalSimpleMethodType,
 					),
 				).toBe(true)
 			})
@@ -1214,7 +1214,7 @@ describe("Helpers", () => {
 			it("should reject SimpleMethods with narrower parameter types", () => {
 				expect(
 					matchesType(
-						takesIntegerOrFractionSimpleMethodType,
+						takesIntegerOrRationalSimpleMethodType,
 						takesIntegerSimpleMethodType,
 					),
 				).toBe(false)
@@ -1223,7 +1223,7 @@ describe("Helpers", () => {
 			it("should accept SimpleMethods with narrower return types (covariance)", () => {
 				expect(
 					matchesType(
-						returnsIntegerOrFractionSimpleMethodType,
+						returnsIntegerOrRationalSimpleMethodType,
 						returnsIntegerSimpleMethodType,
 					),
 				).toBe(true)
@@ -1233,7 +1233,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						returnsIntegerSimpleMethodType,
-						returnsIntegerOrFractionSimpleMethodType,
+						returnsIntegerOrRationalSimpleMethodType,
 					),
 				).toBe(false)
 			})
@@ -1242,7 +1242,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						takesIntegerStaticMethodType,
-						takesIntegerOrFractionStaticMethodType,
+						takesIntegerOrRationalStaticMethodType,
 					),
 				).toBe(true)
 			})
@@ -1250,7 +1250,7 @@ describe("Helpers", () => {
 			it("should reject StaticMethods with narrower parameter types", () => {
 				expect(
 					matchesType(
-						takesIntegerOrFractionStaticMethodType,
+						takesIntegerOrRationalStaticMethodType,
 						takesIntegerStaticMethodType,
 					),
 				).toBe(false)
@@ -1260,7 +1260,7 @@ describe("Helpers", () => {
 				expect(
 					matchesType(
 						takesIntegerOverloadedMethodType,
-						takesIntegerOrFractionOverloadedMethodType,
+						takesIntegerOrRationalOverloadedMethodType,
 					),
 				).toBe(true)
 			})
@@ -1268,7 +1268,7 @@ describe("Helpers", () => {
 			it("should reject OverloadedMethods with narrower parameter types", () => {
 				expect(
 					matchesType(
-						takesIntegerOrFractionOverloadedMethodType,
+						takesIntegerOrRationalOverloadedMethodType,
 						takesIntegerOverloadedMethodType,
 					),
 				).toBe(false)
@@ -1291,7 +1291,7 @@ describe("Helpers", () => {
 			expect(
 				matchesType(
 					noArgumentOverloadedStaticMethodType,
-					fractionPrimitive,
+					rationalPrimitive,
 				),
 			).toBe(false)
 			// expect(
@@ -1332,7 +1332,7 @@ describe("Helpers", () => {
 	describe("Generic Inference", () => {
 		const genericT: GenericUse = { type: "GenericUse", name: "T" }
 		const integer: Type = { type: "Integer" }
-		const fraction: Type = { type: "Fraction" }
+		const rational: Type = { type: "Rational" }
 		const string: Type = { type: "String" }
 		const nothing: Type = { type: "Nothing" }
 
@@ -1382,20 +1382,20 @@ describe("Helpers", () => {
 
 			it("should check later occurrences against the binding", () => {
 				let context = inferContextFor(["T"])
-				let integerOrFraction: UnionType = {
+				let integerOrRational: UnionType = {
 					type: "UnionType",
-					types: [integer, fraction],
+					types: [integer, rational],
 				}
 
 				expect(
 					matchesTypeWithBindings(
 						genericT,
-						integerOrFraction,
+						integerOrRational,
 						context,
 					),
 				).toBe(true)
 				expect(
-					matchesTypeWithBindings(genericT, fraction, context),
+					matchesTypeWithBindings(genericT, rational, context),
 				).toBe(true)
 				expect(matchesTypeWithBindings(genericT, string, context)).toBe(
 					false,
