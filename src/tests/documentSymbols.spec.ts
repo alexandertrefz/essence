@@ -140,4 +140,29 @@ describe("Document Symbols", () => {
 		expect(combine.range.start.line).toBe(3)
 		expect(combine.range.end.line).toBe(9)
 	})
+	it("should list a Protocol with its Method requirements", () => {
+		let symbols = symbolsOf(
+			[
+				"implementation {",
+				"\tprotocol Creatable {",
+				"\t\ttoText() -> String",
+				"\t\tstatic create() -> Self",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+
+		expect(symbols).toHaveLength(1)
+
+		let protocol = symbols[0]
+
+		expect(protocol.name).toBe("Creatable")
+		expect(protocol.kind).toBe("protocol")
+		expect(
+			protocol.children.map((child) => [child.name, child.kind]),
+		).toEqual([
+			["toText", "method"],
+			["create", "staticMethod"],
+		])
+	})
 })

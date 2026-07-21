@@ -220,6 +220,42 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			)
 			visitIdentifier(node.name, state, undefined, node.documentation)
 			return
+		case "ProtocolDeclarationStatement": {
+			// NOTE: A Protocol is not a Type, so its Hover is spelled by hand —
+			// the declaration keyword, the name, and each required signature.
+			let requirements = Object.entries(node.protocolType.methods)
+				.flatMap(([name, method]) => {
+					let signatures = signaturesOf(method) ?? []
+					let isStatic =
+						method.type === "StaticMethod" ||
+						method.type === "OverloadedStaticMethod"
+
+					return signatures.map((signature) =>
+						printSignature(
+							signature,
+							isStatic ? `static ${name}` : name,
+						),
+					)
+				})
+				.join("\n")
+
+			let content =
+				requirements === ""
+					? `protocol ${node.name.content}`
+					: `protocol ${node.name.content}\n${requirements}`
+
+			for (let position of [node.position, node.name.position]) {
+				if (wins(state, position)) {
+					state.best = {
+						position,
+						content,
+						documentation: renderDocumentation(node.documentation),
+					}
+				}
+			}
+
+			return
+		}
 		case "IfStatement":
 			visitNode(node.condition, state)
 			visitBody(node.body, state)

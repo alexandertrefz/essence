@@ -76,6 +76,9 @@ function collectFromNode(
 		case "TypeAliasStatement":
 			addRange(ranges, node.position)
 			return
+		case "ProtocolDeclarationStatement":
+			addRange(ranges, node.position)
+			return
 		case "IfStatement":
 			addRange(ranges, node.position)
 			collectFromNode(node.condition, ranges)
