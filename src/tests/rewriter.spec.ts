@@ -5592,6 +5592,43 @@ describe("Rewriter", () => {
 			})
 		})
 
+		describe("Number", () => {
+			it("compares numerically across members", () => {
+				expect(number.is(integerOne(), fractionOne()).value).toBe(true)
+				expect(number.is(integerOne(), fractionOneHalf()).value).toBe(
+					false,
+				)
+				expect(
+					number.isNot(integerOne(), fractionOneHalf()).value,
+				).toBe(true)
+				expect(number.is(integerTwo(), integerTwo()).value).toBe(true)
+			})
+
+			it("orders numerically across members", () => {
+				expect(number.compareTo(integerOne(), fractionOneHalf())).toBe(
+					ordering.greater,
+				)
+				expect(number.compareTo(fractionOneHalf(), integerOne())).toBe(
+					ordering.less,
+				)
+				expect(number.compareTo(integerOne(), fractionOne())).toBe(
+					ordering.equal,
+				)
+				expect(number.compareTo(integerTwo(), integerHundred())).toBe(
+					ordering.less,
+				)
+			})
+
+			it("represents each member in its own notation", () => {
+				expect(number.toString(integerTwo())).toEqual(
+					string.createString("2"),
+				)
+				expect(number.toString(fractionOneHalf())).toEqual(
+					string.createString("1/2"),
+				)
+			})
+		})
+
 		describe("Union Method dispatch", () => {
 			it("runs the first case whose member Type accepts the receiver", () => {
 				let cases: Parameters<typeof dispatchMethod>[2] = [
