@@ -4,6 +4,7 @@ import type { common, enricher, parser } from "../interfaces/index"
 import {
 	checkProtocolConformance,
 	resolveCombinationType,
+	resolveFunctionInvocation,
 	resolveFunctionValueType,
 	resolveListValueType,
 	resolveMethodInvocation,
@@ -112,10 +113,8 @@ export function enrichMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.MethodInvocationNode {
-	let { namespace, type, overloadedMethodIndex } = resolveMethodInvocation(
-		node,
-		scope,
-	)
+	let { namespace, type, overloadedMethodIndex, conformances } =
+		resolveMethodInvocation(node, scope)
 
 	return {
 		nodeType: "MethodInvocation",
@@ -131,6 +130,7 @@ export function enrichMethodInvocation(
 		namespace,
 		type,
 		overloadedMethodIndex,
+		conformances,
 	}
 }
 
@@ -138,6 +138,8 @@ export function enrichFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionInvocationNode {
+	let { type, conformances } = resolveFunctionInvocation(node, scope)
+
 	return {
 		nodeType: "FunctionInvocation",
 		name: enrichExpression(node.name, scope),
@@ -145,8 +147,9 @@ export function enrichFunctionInvocation(
 			enrichArgument(argument, scope),
 		),
 		position: node.position,
-		type: resolveType(node, scope),
+		type,
 		overloadedMethodIndex: null,
+		conformances,
 	}
 }
 
@@ -175,6 +178,9 @@ export function enrichMethodFunctionDefinition(
 		types[generic.name.content] = {
 			type: "GenericUse",
 			name: generic.name.content,
+			...(generic.constraint !== null
+				? { constraint: generic.constraint.content }
+				: {}),
 		}
 	}
 
@@ -214,6 +220,7 @@ export function enrichGenericDeclarationNode(
 			: null,
 		name: node.name.content,
 		inferred: node.inferred,
+		constraint: node.constraint?.content ?? null,
 		position: node.position,
 	}
 }
@@ -230,6 +237,9 @@ export function enrichFunctionDefinition(
 		types[generic.name.content] = {
 			type: "GenericUse",
 			name: generic.name.content,
+			...(generic.constraint !== null
+				? { constraint: generic.constraint.content }
+				: {}),
 		}
 	}
 
@@ -736,6 +746,18 @@ export function enrichNamespaceDefinitionStatement(
 	}
 
 	checkProtocolConformance(node, type, scope)
+
+	// NOTE: Method definitions only carry their own Generics, so a
+	// Namespace-level bound has no way to thread its conformance parameter
+	// into the Methods — rejected until conditional conformance lands.
+	for (let generic of node.generics) {
+		if (generic.constraint !== null) {
+			reportError(
+				"Namespace Type Parameters can not have Protocol bounds (yet).",
+				generic.constraint.position,
+			)
+		}
+	}
 
 	// NOTE: Namespace Generics are visible in every Method — bodies reference
 	// them as opaque GenericUses.

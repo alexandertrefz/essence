@@ -941,4 +941,231 @@ describe("Enricher", () => {
 			)
 		})
 	})
+
+	describe("Protocol Bounds", () => {
+		const printableSetup = `
+			protocol Printable {
+				toString() -> String
+			}
+
+			type Vector = { x: Number, y: Number }
+
+			namespace VectorPrintable for Vector is Printable {
+				toString() -> String {
+					<- "vector"
+				}
+			}
+		`
+
+		it("should resolve Methods through a Protocol bound and pass the bound at the call site", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${printableSetup}
+
+					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					constant text: String = describeValue({ x = 1, y = 2 })
+				}`),
+			).toEqual([])
+		})
+
+		it("should resolve Self Parameters through a Protocol bound", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Equatable {
+						is(_ other: Self) -> Boolean
+					}
+
+					type Vector = { x: Number, y: Number }
+
+					namespace VectorEquatable for Vector is Equatable {
+						is(_ other: Vector) -> Boolean {
+							<- true
+						}
+					}
+
+					function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+						<- a::is(b)
+					}
+
+					constant result: Boolean = areEqual({ x = 1, y = 2 }, { x = 3, y = 4 })
+				}`),
+			).toEqual([])
+		})
+
+		it("should reject a mismatched Argument for a Self Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Equatable {
+					is(_ other: Self) -> Boolean
+				}
+
+				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::is(1)
+				}
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"Passed arguments do not match any overload.",
+				),
+			).toBe(true)
+		})
+
+		it("should not resolve Methods on an unbounded Type Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function describeValue <infer Value>(_ value: Value) -> String {
+					<- value::toString()
+				}
+			}`)
+
+			expect(diagnostics.length).toBeGreaterThan(0)
+			expect(diagnostics[0].message).toBe(
+				"Could not find a Namespace for this value (method 'toString').",
+			)
+		})
+
+		it("should report a binding without a conforming Namespace", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				constant text = describeValue(true)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Type 'Boolean' does not conform to Protocol 'Printable': no conforming Namespace is in scope.",
+			)
+		})
+
+		it("should forward a bound between bounded Functions", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${printableSetup}
+
+					function inner <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					function outer <infer Item is Printable>(_ item: Item) -> String {
+						<- inner(item)
+					}
+
+					constant text: String = outer({ x = 1, y = 2 })
+				}`),
+			).toEqual([])
+		})
+
+		it("should reject forwarding a Type Parameter without the required bound", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				protocol Equatable {
+					is(_ other: Self) -> Boolean
+				}
+
+				function inner <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				function outer <infer Item is Equatable>(_ item: Item) -> String {
+					<- inner(item)
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Type Parameter 'Item' does not conform to Protocol 'Printable' — it carries no such bound.",
+			)
+		})
+
+		it("should report ambiguous conforming Namespaces", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${printableSetup}
+
+				namespace VectorPrintableToo for Vector is Printable {
+					toString() -> String {
+						<- "vector, too"
+					}
+				}
+
+				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				constant text = describeValue({ x = 1, y = 2 })
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(
+				diagnostics[0].message.startsWith(
+					"Multiple Namespaces conform to Protocol 'Printable' for Type 'Record', please disambiguate.",
+				),
+			).toBe(true)
+		})
+
+		it("should prefer the exact target over a covering Union target", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${printableSetup}
+
+					namespace MaybeVectorPrintable for Vector | Nothing is Printable {
+						toString() -> String {
+							<- "maybe a vector"
+						}
+					}
+
+					function describeValue <infer Value is Printable>(_ value: Value) -> String {
+						<- value::toString()
+					}
+
+					constant vector: Vector = { x = 1, y = 2 }
+					constant text: String = describeValue(vector)
+				}`),
+			).toEqual([])
+		})
+
+		it("should reject an unknown Protocol in a bound", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function describeValue <infer Value is Undeclared>(_ value: Value) -> String {
+					<- ""
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Undeclared' is not declared.",
+			)
+		})
+
+		it("should reject bounds on Namespace Type Parameters", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				namespace Wrapper<infer Item is Printable> for List<Item> {
+					firstText() -> String {
+						<- ""
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Namespace Type Parameters can not have Protocol bounds (yet).",
+			)
+		})
+	})
 })

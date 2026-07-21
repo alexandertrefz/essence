@@ -38,6 +38,17 @@ export type ExpressionNode =
 	| IdentifierNode
 	| CombinationNode
 	| MatchNode
+	| ConformanceValueNode
+
+// NOTE: The value passed for a Protocol-bounded Type Parameter — rewritten
+// into an object literal that maps each Protocol Method's emitted name onto
+// the conforming Namespace's fulfilling Method.
+export interface ConformanceValueNode {
+	nodeType: "ConformanceValue"
+	namespaceName: string
+	methodMap: Record<string, string>
+	type: Type
+}
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation"

@@ -1,5 +1,6 @@
 import type {
 	BooleanType,
+	Conformance,
 	Documentation,
 	FractionType,
 	FunctionType,
@@ -68,6 +69,7 @@ export interface MethodInvocationNode {
 	}
 	type: Type
 	overloadedMethodIndex: number | null
+	conformances: Array<Conformance>
 }
 
 export interface FunctionInvocationNode {
@@ -77,6 +79,7 @@ export interface FunctionInvocationNode {
 	position: Position
 	type: Type
 	overloadedMethodIndex: number | null
+	conformances: Array<Conformance>
 }
 
 export type ValueNode =
@@ -354,6 +357,7 @@ export interface GenericDeclarationNode {
 	name: string
 	defaultType: Type | null
 	inferred: boolean
+	constraint: string | null
 	position: Position
 }
 

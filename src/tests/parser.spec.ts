@@ -1315,6 +1315,32 @@ describe("Parser", () => {
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
+			describe("Generic Bounds", () => {
+				it("should parse a bounded Generic on a Function", () => {
+					let input: parser.Program = parse(
+						`implementation {
+							function smallest <infer Item is Comparable>(_ list: List<Item>) -> Item | Nothing {
+								<- nothing
+							}
+						}`,
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse a bounded Generic with a default Type", () => {
+					let input: parser.Program = parse(
+						`implementation {
+							function describe <infer Value is Printable = String>(_ value: Value) -> String {
+								<- ""
+							}
+						}`,
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+			})
+
 			describe("Conformance Clauses", () => {
 				it("should parse a Namespace with a Conformance Clause", () => {
 					let input: parser.Program = parse(

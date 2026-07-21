@@ -388,4 +388,93 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 	})
+
+	describe("Protocol Bounds", () => {
+		const boundFunctionSetup = `
+			protocol Printable {
+				toString() -> String
+			}
+
+			type Vector = { x: Number, y: Number }
+
+			namespace VectorPrintable for Vector is Printable {
+				toString() -> String {
+					<- "vector"
+				}
+			}
+
+			function describeValue <infer Value is Printable>(_ value: Value) -> String {
+				<- value::toString()
+			}
+		`
+
+		const boundValueMessage =
+			"A Function with Protocol-bound Type Parameters can not be used as a value (yet) — call it directly."
+
+		it("should allow calling a bounded Function directly", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${boundFunctionSetup}
+
+					__print(describeValue({ x = 1, y = 2 }))
+				}`),
+			).toEqual([])
+		})
+
+		it("should reject a bounded Function as a Constant value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${boundFunctionSetup}
+
+				constant reference = describeValue
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.message === boundValueMessage,
+				),
+			).toBe(true)
+		})
+
+		it("should reject a bounded Function as an Argument", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${boundFunctionSetup}
+
+				__print(describeValue)
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.message === boundValueMessage,
+				),
+			).toBe(true)
+		})
+
+		it("should reject a bounded Function inside a List", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${boundFunctionSetup}
+
+				constant references = [describeValue]
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.message === boundValueMessage,
+				),
+			).toBe(true)
+		})
+
+		it("should reject a bounded Function as a Record member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${boundFunctionSetup}
+
+				constant references = { transform = describeValue }
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.message === boundValueMessage,
+				),
+			).toBe(true)
+		})
+	})
 })

@@ -290,11 +290,14 @@ export function computeConformanceMethodMap(
 			requirement,
 			selfBindings,
 		) as common.MethodType
-		let implementation = namespace.methods[methodName]
 
-		if (implementation === undefined) {
+		// NOTE: Object.hasOwn, not a plain index — a Method named `toString`
+		// would otherwise find Object.prototype.toString on the record.
+		if (!Object.hasOwn(namespace.methods, methodName)) {
 			return { kind: "missing", methodName }
 		}
+
+		let implementation = namespace.methods[methodName]
 
 		if (
 			substituted.type === "SimpleMethod" ||
