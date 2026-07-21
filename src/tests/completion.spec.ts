@@ -134,6 +134,35 @@ describe("Completion", () => {
 			expect(labelsOf(source, { line: 2, column: 6 })).toContain("string")
 		})
 
+		it("should list Protocol Methods on a bounded Type Parameter", () => {
+			let source = [
+				"implementation {",
+				"\tfunction describeValue <infer Value is Printable>(_ value: Value) -> String {",
+				"\t\t<- value::",
+				"\t}",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 13 })
+
+			expect(labels).toContain("toString")
+		})
+
+		it("should list a user Protocol's Methods on a bounded Type Parameter", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"\tfunction measure <infer Value is Sizable>(_ value: Value) -> Integer {",
+				"\t\t<- value::",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 6, column: 13 })).toContain("size")
+		})
+
 		it("should filter by an explicit Namespace specifier", () => {
 			let source = [
 				"implementation {",

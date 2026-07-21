@@ -11,6 +11,7 @@ export type DocumentSymbolKind =
 	| "variable"
 	| "function"
 	| "namespace"
+	| "protocol"
 	| "typeAlias"
 	| "member"
 	| "method"
@@ -87,9 +88,51 @@ function symbolForStatement(
 				selectionRange: node.name.position,
 				children: namespaceMembers(node),
 			}
+		case "ProtocolDeclarationStatement":
+			return {
+				name: node.name.content,
+				kind: "protocol",
+				range: node.position,
+				selectionRange: node.name.position,
+				children: protocolMembers(node),
+			}
 		default:
 			return null
 	}
+}
+
+function protocolMembers(
+	node: parser.ProtocolDeclarationStatementNode,
+): Array<DocumentSymbolEntry> {
+	let members: Array<DocumentSymbolEntry> = []
+
+	for (let member of Object.values(node.methods)) {
+		let signatures =
+			member.nodeType === "OverloadedProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+				? member.signatures
+				: [member.signature]
+
+		let isStatic =
+			member.nodeType === "StaticProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+
+		let range = member.name.position
+
+		for (let signature of signatures) {
+			range = unionOfPositions(range, signature.position)
+		}
+
+		members.push({
+			name: member.name.content,
+			kind: isStatic ? "staticMethod" : "method",
+			range,
+			selectionRange: member.name.position,
+			children: [],
+		})
+	}
+
+	return members
 }
 
 function recordTypeMembers(

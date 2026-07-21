@@ -3,11 +3,16 @@ import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as fractionNamespace } from "../enricher/types/Fraction"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as listNamespace } from "../enricher/types/List"
+import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import { namespace as numberNamespace } from "../enricher/types/Number"
+import { namespace as orderingNamespace } from "../enricher/types/Ordering"
+import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
 import {
+	applyGenericBindings,
 	createInferenceContext,
+	type GenericBindings,
 	matchesTypeWithBindings,
 } from "../helpers/index"
 import type { common } from "../interfaces/index"
@@ -25,8 +30,16 @@ export const builtinNamespaces: Array<common.NamespaceType> = [
 	integerNamespace,
 	fractionNamespace,
 	numberNamespace,
+	nothingNamespace,
+	orderingNamespace,
 	recordNamespace,
 	listNamespace,
+]
+
+export const builtinProtocols: Array<common.ProtocolType> = [
+	Equatable,
+	Printable,
+	Comparable,
 ]
 
 export function targetTypeMatches(
@@ -53,6 +66,42 @@ export function matchingNamespaces(
 	baseType: common.Type,
 	specifierName: string | null,
 ): Array<common.NamespaceType> {
+	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
+	// resolves only through its Protocol — mirroring the Enricher's Method
+	// resolution, but named after the Protocol for readable listings.
+	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
+		let constraint = baseType.constraint
+		let protocol = [
+			...builtinProtocols,
+			...collectProtocolTypes(documentText),
+		].find((candidate) => candidate.name === constraint)
+
+		if (protocol === undefined) {
+			return []
+		}
+
+		let selfBindings: GenericBindings = new Map([["Self", baseType]])
+		let methods: Record<string, common.MethodType> = {}
+
+		for (let [methodName, method] of Object.entries(protocol.methods)) {
+			methods[methodName] = applyGenericBindings(
+				method,
+				selfBindings,
+			) as common.MethodType
+		}
+
+		return [
+			{
+				type: "Namespace",
+				name: protocol.name,
+				targetType: baseType,
+				generics: [],
+				properties: {},
+				methods,
+			},
+		]
+	}
+
 	let namespaces = [
 		...builtinNamespaces,
 		...collectNamespaceTypes(documentText),
@@ -101,5 +150,25 @@ function collectNamespaceTypesInBody(
 		} else if (node.nodeType === "FunctionStatement") {
 			collectNamespaceTypesInBody(node.value.body, namespaces)
 		}
+	}
+}
+
+export function collectProtocolTypes(
+	documentText: string,
+): Array<common.ProtocolType> {
+	try {
+		let { program } = parseWithDiagnostics(documentText)
+		let { program: enrichedProgram } = enrich(program)
+		let protocols: Array<common.ProtocolType> = []
+
+		for (let node of enrichedProgram.implementation.nodes) {
+			if (node.nodeType === "ProtocolDeclarationStatement") {
+				protocols.push(node.protocolType)
+			}
+		}
+
+		return protocols
+	} catch {
+		return []
 	}
 }
