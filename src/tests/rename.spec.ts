@@ -796,4 +796,55 @@ describe("identifierPattern", () => {
 			"42::string()".match(new RegExp(identifierPattern, "g")),
 		).toEqual(["42", "string"])
 	})
+	describe("Protocols", () => {
+		it("should rename a Protocol together with its Conformance Clauses and bounds", () => {
+			let source = [
+				"implementation {",
+				"\tprotocol Sizable {",
+				"\t\tsize() -> Integer",
+				"\t}",
+				"\tnamespace IntegerSizable for Integer is Sizable {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"\tfunction measure <infer Value is Sizable>(_ value: Value) -> Integer {",
+				"\t\t<- value::size()",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(rename(source, { line: 2, column: 12 }, "Measurable")).toBe(
+				[
+					"implementation {",
+					"\tprotocol Measurable {",
+					"\t\tsize() -> Integer",
+					"\t}",
+					"\tnamespace IntegerSizable for Integer is Measurable {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"\t}",
+					"\tfunction measure <infer Value is Measurable>(_ value: Value) -> Integer {",
+					"\t\t<- value::size()",
+					"\t}",
+					"}",
+				].join("\n"),
+			)
+		})
+
+		it("should not rename a builtin Protocol", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Wrapper for Integer is Printable {",
+				"\t\ttoString() -> String {",
+				'\t\t\t<- "one"',
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(findOccurrence(source, { line: 2, column: 38 })).toBeNull()
+		})
+	})
 })

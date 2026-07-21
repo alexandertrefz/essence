@@ -25,6 +25,7 @@ export type DeclarationKind =
 	| "function"
 	| "parameter"
 	| "namespace"
+	| "protocol"
 	| "type"
 	| "generic"
 	| "method"
@@ -122,6 +123,8 @@ const builtinValues = [
 	"Integer",
 	"Fraction",
 	"Number",
+	"Nothing",
+	"Ordering",
 	"Record",
 	"List",
 ]
@@ -135,7 +138,13 @@ const builtinTypes = [
 	"Record",
 	"Number",
 	"List",
+	"Less",
+	"Equal",
+	"Greater",
+	"Ordering",
 ]
+
+const builtinProtocols = ["Equatable", "Printable", "Comparable"]
 
 const reservedWords = new Set([
 	"if",
@@ -151,6 +160,7 @@ const reservedWords = new Set([
 	"case",
 	"with",
 	"namespace",
+	"protocol",
 	"for",
 	"infer",
 	"true",
@@ -284,6 +294,19 @@ export function indexProgram(
 		topLevelScope.types.set(name, {
 			builtin: true,
 			kind: "type",
+			definition: null,
+			visibleFrom: null,
+			occurrences: [],
+		})
+	}
+
+	// NOTE: Protocols share the `types` symbol space here — they are only
+	// nameable in Type-like positions (bounds, conformance clauses), and the
+	// Enricher keeps them apart where it matters.
+	for (let name of builtinProtocols) {
+		topLevelScope.types.set(name, {
+			builtin: true,
+			kind: "protocol",
 			definition: null,
 			visibleFrom: null,
 			occurrences: [],
@@ -481,6 +504,16 @@ function hoistDeclarations(
 					occurrences: [],
 				})
 			}
+		} else if (node.nodeType === "ProtocolDeclarationStatement") {
+			if (!scope.types.has(node.name.content)) {
+				scope.types.set(node.name.content, {
+					builtin: false,
+					kind: "protocol",
+					definition: null,
+					visibleFrom: null,
+					occurrences: [],
+				})
+			}
 		} else if (
 			node.nodeType === "FunctionStatement" ||
 			node.nodeType === "NamespaceDefinitionStatement"
@@ -608,6 +641,9 @@ function walkNode(
 		}
 		case "NamespaceDefinitionStatement":
 			walkNamespaceDefinition(node, scope, context)
+			return
+		case "ProtocolDeclarationStatement":
+			walkProtocolDeclaration(node, scope, context)
 			return
 		case "TypeAliasStatement": {
 			declareInScope(scope, "types", node.name, "type", context)
@@ -800,10 +836,14 @@ function scopeWithGenerics(
 	let genericScope = createScope(scope)
 
 	for (let generic of generics) {
-		// NOTE: Default Types resolve in the outer Scope, exactly like the
-		// Enricher's `resolveGenericDeclarations`.
+		// NOTE: Default Types and Protocol bounds resolve in the outer Scope,
+		// exactly like the Enricher's `resolveGenericDeclarations`.
 		if (generic.defaultType !== null) {
 			walkTypeDeclaration(generic.defaultType, scope, context)
+		}
+
+		if (generic.constraint !== null) {
+			reference(scope, "types", generic.constraint, context)
 		}
 
 		declareInScope(
@@ -908,12 +948,75 @@ function walkFunctionDefinition(
 	walkBody(definition.body, functionScope, context, { hoist: false })
 }
 
+function walkProtocolDeclaration(
+	node: parser.ProtocolDeclarationStatementNode,
+	scope: Scope,
+	context: WalkContext,
+) {
+	declareInScope(scope, "types", node.name, "protocol", context)
+
+	// NOTE: `Self` is visible inside the signatures — builtin, so it colours
+	// like a Type Parameter but can not be renamed.
+	let selfScope = createScope(scope)
+
+	selfScope.types.set("Self", {
+		builtin: true,
+		kind: "generic",
+		definition: null,
+		visibleFrom: null,
+		occurrences: [],
+	})
+
+	for (let member of Object.values(node.methods)) {
+		// NOTE: Standalone Declarations — a Protocol Method's use sites
+		// resolve through conformance values, which the index does not link
+		// (yet); the name still declares, colours and folds like a Method.
+		let declaration: Declaration = {
+			builtin: false,
+			kind:
+				member.nodeType === "StaticProtocolMethod" ||
+				member.nodeType === "OverloadedStaticProtocolMethod"
+					? "staticMethod"
+					: "method",
+			definition: member.name.position,
+			visibleFrom: null,
+			occurrences: [],
+		}
+
+		record(
+			declaration,
+			member.name.content,
+			member.name.position,
+			context.index,
+			"write",
+		)
+
+		let signatures =
+			member.nodeType === "OverloadedProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+				? member.signatures
+				: [member.signature]
+
+		for (let signature of signatures) {
+			for (let parameter of signature.parameters) {
+				walkTypeDeclaration(parameter.type, selfScope, context)
+			}
+
+			walkTypeDeclaration(signature.returnType, selfScope, context)
+		}
+	}
+}
+
 function walkNamespaceDefinition(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: Scope,
 	context: WalkContext,
 ) {
 	declareInScope(scope, "values", node.name, "namespace", context)
+
+	for (let identifier of node.conformsTo) {
+		reference(scope, "types", identifier, context)
+	}
 
 	// NOTE: Property and Method names are declared as Namespace member
 	// symbols — the typed pass binds their use sites, which resolve through

@@ -231,6 +231,20 @@ describe("Hover", () => {
 		expect(hover(source, { line: 2, column: 39 })).toBe("String")
 	})
 
+	it("should describe a Protocol declaration with its requirements", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 12 })).toBe(
+			"protocol Sizable\nsize() -> Integer",
+		)
+	})
+
 	it("should return null outside of any typed node", () => {
 		let source = ["implementation {", "\tconstant a = 1", "}"].join("\n")
 

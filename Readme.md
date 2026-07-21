@@ -28,7 +28,7 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 * Compact & Readable Syntax
 * Algebraic Data Types
 * Modules
-* Interfaces
+* Protocols
 * Generics
 * Named Parameters
 * Arbitrary Precision Numbers
