@@ -3,6 +3,7 @@ import type { common, enricher, parser } from "../interfaces/index"
 import { enrichNode } from "./enrichers"
 import {
 	resolveNamespaceDefinitionStatementType,
+	resolveProtocolDeclarationStatementType,
 	resolveType,
 	resolveTypeAliasStatementType,
 } from "./resolvers"
@@ -66,6 +67,7 @@ export const enrich = (
 					Number: numberType,
 					List: listType,
 				},
+				protocols: {},
 			}
 
 			return {
@@ -86,6 +88,7 @@ type HoistableStatementNode =
 	| parser.TypeAliasStatementNode
 	| parser.FunctionStatementNode
 	| parser.NamespaceDefinitionStatementNode
+	| parser.ProtocolDeclarationStatementNode
 
 function isHoistable(
 	node: parser.ImplementationNode,
@@ -93,7 +96,8 @@ function isHoistable(
 	return (
 		node.nodeType === "TypeAliasStatement" ||
 		node.nodeType === "FunctionStatement" ||
-		node.nodeType === "NamespaceDefinitionStatement"
+		node.nodeType === "NamespaceDefinitionStatement" ||
+		node.nodeType === "ProtocolDeclarationStatement"
 	)
 }
 
@@ -119,32 +123,43 @@ function hoistDeclarations(
 
 		for (let node of pendingNodes) {
 			let speculation: {
-				result: common.Type
+				result: common.Type | common.ProtocolType
 				diagnostics: Array<common.Diagnostic>
 			}
 
 			try {
-				speculation = collectDiagnostics((): common.Type => {
-					if (node.nodeType === "TypeAliasStatement") {
-						return resolveTypeAliasStatementType(node, scope)
-					} else if (node.nodeType === "FunctionStatement") {
-						return resolveType(node.value, scope)
-					} else {
-						return resolveNamespaceDefinitionStatementType(
-							node,
-							scope,
-						)
-					}
-				})
+				speculation = collectDiagnostics(
+					(): common.Type | common.ProtocolType => {
+						if (node.nodeType === "TypeAliasStatement") {
+							return resolveTypeAliasStatementType(node, scope)
+						} else if (node.nodeType === "FunctionStatement") {
+							return resolveType(node.value, scope)
+						} else if (
+							node.nodeType === "ProtocolDeclarationStatement"
+						) {
+							return resolveProtocolDeclarationStatementType(
+								node,
+								scope,
+							)
+						} else {
+							return resolveNamespaceDefinitionStatementType(
+								node,
+								scope,
+							)
+						}
+					},
+				)
 			} catch {
 				remainingNodes.push(node)
 				continue
 			}
 
-			let targetMap =
+			let targetMap: Record<string, common.Type | common.ProtocolType> =
 				node.nodeType === "TypeAliasStatement"
 					? scope.types
-					: scope.members
+					: node.nodeType === "ProtocolDeclarationStatement"
+						? scope.protocols
+						: scope.members
 
 			if (
 				speculation.diagnostics.length === 0 &&
@@ -152,7 +167,10 @@ function hoistDeclarations(
 			) {
 				targetMap[node.name.content] = speculation.result
 
-				if (node.nodeType !== "TypeAliasStatement") {
+				if (
+					node.nodeType === "FunctionStatement" ||
+					node.nodeType === "NamespaceDefinitionStatement"
+				) {
 					scope.constants.add(node.name.content)
 				}
 

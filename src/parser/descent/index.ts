@@ -271,6 +271,8 @@ class DescentParser {
 				return this.parseTypeAliasStatement()
 			case TokenType.KeywordNamespace:
 				return this.parseNamespaceDefinitionStatement()
+			case TokenType.KeywordProtocol:
+				return this.parseProtocolDeclarationStatement()
 			case TokenType.KeywordIf:
 				return this.parseIfStatement()
 			case TokenType.KeywordFunction:
@@ -526,6 +528,115 @@ class DescentParser {
 			name,
 			method: this.parseOptionallyGenericFunctionLiteral(),
 		}
+	}
+
+	protected parseProtocolDeclarationStatement(): parser.ProtocolDeclarationStatementNode {
+		let keyword = this.tokens.expect(TokenType.KeywordProtocol)
+		let name = this.parseIdentifier()
+
+		this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		let body = this.parseStatementList(() => this.parseProtocolBodyNode())
+		let closingPosition = this.parseClosingBrace()
+
+		return generators.protocolDeclarationStatement(
+			name,
+			body,
+			{
+				start: keyword.position.start,
+				end: closingPosition.end,
+			},
+			this.tokens.documentationAbove(keyword.position.start.line),
+		)
+	}
+
+	protected parseProtocolBodyNode(): parser.ProtocolMethods[string] {
+		let token = this.peekOrFail()
+
+		// NOTE: A signature takes its Documentation from its own line — an
+		// `overload` block owns no signature line, so its Documentation is
+		// read here.
+		let documentation = this.tokens.documentationAbove(
+			token.position.start.line,
+		)
+
+		if (token.type === TokenType.KeywordOverload) {
+			this.tokens.next()
+
+			let isStatic = false
+			if (
+				this.tokens.peek()?.type === TokenType.KeywordStatic &&
+				isIdentifierToken(this.tokens.peek(1))
+			) {
+				this.tokens.next()
+				isStatic = true
+			}
+
+			let name = this.parseIdentifier()
+
+			this.tokens.expect(TokenType.SymbolLeftBrace)
+
+			let signatures = this.parseStatementList(() =>
+				this.parseProtocolMethodSignature(),
+			)
+
+			this.parseClosingBrace()
+
+			if (isStatic) {
+				return {
+					nodeType: "OverloadedStaticProtocolMethod",
+					name,
+					signatures,
+					documentation,
+				}
+			}
+
+			return {
+				nodeType: "OverloadedProtocolMethod",
+				name,
+				signatures,
+				documentation,
+			}
+		}
+
+		if (
+			token.type === TokenType.KeywordStatic &&
+			isIdentifierToken(this.tokens.peek(1))
+		) {
+			this.tokens.next()
+
+			let name = this.parseIdentifier()
+
+			return {
+				nodeType: "StaticProtocolMethod",
+				name,
+				signature: this.parseProtocolMethodSignature(),
+			}
+		}
+
+		let name = this.parseIdentifier()
+
+		return {
+			nodeType: "SimpleProtocolMethod",
+			name,
+			signature: this.parseProtocolMethodSignature(),
+		}
+	}
+
+	protected parseProtocolMethodSignature(): parser.ProtocolMethodSignatureNode {
+		let documentation = this.documentationHere()
+		let parameterList = this.parseParameterList()
+		let returnType = this.parseReturnType()
+
+		return generators.protocolMethodSignature(
+			parameterList.parameters,
+			returnType,
+			{
+				start: parameterList.position.start,
+				end: returnType.position.end,
+			},
+			documentation,
+		)
 	}
 
 	protected parseOptionalDeclarationType(): parser.TypeDeclarationNode | null {

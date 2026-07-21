@@ -55,6 +55,7 @@ const keywords = [
 	"case",
 	"with",
 	"namespace",
+	"protocol",
 	"for",
 	"infer",
 ]
@@ -130,6 +131,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordWith
 	} else if (value === "namespace") {
 		return TokenType.KeywordNamespace
+	} else if (value === "protocol") {
+		return TokenType.KeywordProtocol
 	} else if (value === "for") {
 		return TokenType.KeywordFor
 	} else if (value === "infer") {

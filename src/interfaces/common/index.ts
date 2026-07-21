@@ -167,6 +167,18 @@ export type NamespaceType = {
 	methods: Record<string, MethodType>
 }
 
+// NOTE: Deliberately NOT part of `Type` — a Protocol is not a Type. It is
+// only nameable as a Generic bound (`<infer T is Comparable>`) and in a
+// Namespace conformance clause (`is Comparable`), which keeps it out of
+// every Type position structurally. `Self` appears in its signatures as a
+// GenericUse named "Self".
+export type ProtocolType = {
+	type: "Protocol"
+	name: string
+	methods: Record<string, MethodType>
+	documentation?: Documentation
+}
+
 export type UnionType = {
 	type: "UnionType"
 	types: Array<Type | GenericUse>

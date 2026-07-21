@@ -616,4 +616,143 @@ describe("Enricher", () => {
 			).toEqual({ type: "Integer" })
 		})
 	})
+
+	describe("Protocols", () => {
+		it("should accept a well-formed Protocol declaration", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Equatable {
+						is(_ other: Self) -> Boolean
+						isNot(_ other: Self) -> Boolean
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept static and overloaded Protocol Method Signatures", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Creatable {
+						static create() -> Self
+
+						overload combine {
+							(_ other: Self) -> Self
+							(_ others: List<Self>) -> Self
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report duplicate Protocol declarations", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				protocol Printable {
+					toString() -> String
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Printable' is already declared.",
+			)
+		})
+
+		it("should reject a Protocol used as a Type annotation", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				constant value: Printable = "text"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+			)
+		})
+
+		it("should reject a Protocol used as a Union member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				constant value: Printable | Nothing = nothing
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+			)
+		})
+
+		it("should reject a Protocol used as a Match Case", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				variable value: Integer | Nothing = 1
+
+				constant result = match value -> Integer {
+					case Printable { <- 0 }
+					case Integer { <- @ }
+					case Nothing { <- 0 }
+				}
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"Protocol 'Printable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+				),
+			).toBe(true)
+		})
+
+		it("should reject a Protocol used as a value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				constant value = Printable
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"Protocol 'Printable' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is Printable>') and Namespace conformance clauses ('is Printable').",
+			)
+		})
+
+		it("should reserve Self as a Generic name", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function identity <Self>(_ value: Self) -> Self {
+					<- value
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"'Self' is a reserved Type name.",
+			)
+		})
+
+		it("should reserve Self as a Type Alias name", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Self = String
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].message).toBe(
+				"'Self' is a reserved Type name.",
+			)
+		})
+	})
 })

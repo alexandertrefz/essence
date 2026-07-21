@@ -505,6 +505,38 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
+
+		it("should lex protocol", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "protocol"
+			output = {
+				value: "protocol",
+				type: TokenType.KeywordProtocol,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex is as an Identifier", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "is"
+			output = {
+				value: "is",
+				type: TokenType.Identifier,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
 	})
 
 	describe("Symbols", () => {
