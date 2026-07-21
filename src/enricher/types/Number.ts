@@ -5,16 +5,105 @@ export const type: common.UnionType = {
 	types: [{ type: "Integer" }, { type: "Fraction" }],
 }
 
+// NOTE: The Union-level behaviour of `Number` — cross-member semantics only
+// a covering Namespace can define. `is` is numeric equality (`1 is 1/1` is
+// true), while the member Namespaces stay representational; Method target
+// specificity routes single-member receivers to those, so these Methods only
+// answer for Union-typed receivers and mixed-member Arguments.
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Number",
 	targetType: type,
+	conformsTo: ["Equatable", "Printable", "Comparable"],
 	generics: [],
 	properties: {
 		PI: { type: "Fraction" },
 		TAO: { type: "Fraction" },
 	},
 	methods: {
+		is: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type },
+				{
+					name: null,
+					type,
+					documentation: "the Number to compare against",
+				},
+			],
+			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the Number has the same numeric value as another Number — an Integer and a Fraction are the same Number when their values are equal, so `1 is 1/1` holds.",
+				parameters: {},
+				returns:
+					"`true` when both Numbers have the same numeric value.",
+				position: null,
+			},
+		} as common.MethodType,
+		isNot: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type },
+				{
+					name: null,
+					type,
+					documentation: "the Number to compare against",
+				},
+			],
+			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the Number has a different numeric value than another Number.",
+				parameters: {},
+				returns:
+					"`true` when the Numbers have different numeric values.",
+				position: null,
+			},
+		} as common.MethodType,
+		toString: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [{ name: null, type }],
+			returnType: { type: "String" },
+			documentation: {
+				description:
+					"Represents the Number as a String, in the notation of the member Type it currently holds.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
+		} as common.MethodType,
+		compareTo: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type },
+				{
+					name: null,
+					type,
+					documentation: "the Number to order against",
+				},
+			],
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "Less" },
+					{ type: "Equal" },
+					{ type: "Greater" },
+				],
+			},
+			documentation: {
+				description:
+					"Orders the Number against another Number by numeric value, across Integers and Fractions.",
+				parameters: {},
+				returns:
+					"`Ordering.less`, `Ordering.equal` or `Ordering.greater`.",
+				position: null,
+			},
+		} as common.MethodType,
 		lowestNumber: {
 			type: "OverloadedStaticMethod",
 			overloads: [
