@@ -368,6 +368,42 @@ export function namespaceDefinitionStatement(
 	}
 }
 
+export function protocolDeclarationStatement(
+	name: parser.IdentifierNode,
+	body: Array<parser.ProtocolMethods[string]>,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.ProtocolDeclarationStatementNode {
+	const methods = body.reduce<parser.ProtocolMethods>((prev, curr) => {
+		prev[curr.name.content] = curr
+
+		return prev
+	}, {})
+
+	return {
+		nodeType: "ProtocolDeclarationStatement",
+		name,
+		methods,
+		position,
+		documentation,
+	}
+}
+
+export function protocolMethodSignature(
+	parameters: Array<parser.ParameterNode>,
+	returnType: parser.TypeDeclarationNode,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.ProtocolMethodSignatureNode {
+	return {
+		nodeType: "ProtocolMethodSignature",
+		parameters,
+		returnType,
+		position,
+		documentation,
+	}
+}
+
 export function ifElseStatementNode(
 	ifStatement: parser.IfStatementNode,
 	falseBody:

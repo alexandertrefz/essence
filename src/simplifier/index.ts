@@ -46,6 +46,7 @@ function simplifyImplementationNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -331,6 +332,8 @@ function simplifyStatement(
 			return simplifyVariableAssignmentStatement(node)
 		case "NamespaceDefinitionStatement":
 			return simplifyNamespaceDefinitionStatement(node)
+		case "ProtocolDeclarationStatement":
+			return simplifyProtocolDeclarationStatement(node)
 		case "TypeAliasStatement":
 			return simplifyTypeAliasStatement(node)
 		case "IfElseStatement":
@@ -391,6 +394,18 @@ function simplifyNamespaceDefinitionStatement(
 		),
 		methods: simplifyMethods(node.methods, node.type),
 		type: node.type,
+	}
+}
+
+// NOTE: Protocols are contracts only — they are erased here and emit no
+// JavaScript. Conformance values passed at call sites are their only runtime
+// footprint.
+function simplifyProtocolDeclarationStatement(
+	node: common.typed.ProtocolDeclarationStatementNode,
+): common.typedSimple.ProtocolDeclarationStatementNode {
+	return {
+		nodeType: "ProtocolDeclarationStatement",
+		name: simplifyIdentifier(node.name),
 	}
 }
 

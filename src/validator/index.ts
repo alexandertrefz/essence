@@ -65,6 +65,7 @@ function validateImplementationNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "TypeAliasStatement":
+		case "ProtocolDeclarationStatement":
 		case "NamespaceDefinitionStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -377,6 +378,7 @@ function validateStatement(
 		case "VariableAssignmentStatement":
 			return validateVariableAssignmentStatement(node)
 		case "TypeAliasStatement":
+		case "ProtocolDeclarationStatement":
 			return node
 		case "NamespaceDefinitionStatement":
 			return validateNamespaceDefinitionStatement(node)

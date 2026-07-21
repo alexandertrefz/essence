@@ -242,6 +242,8 @@ function findProbeLookupInNode(
 		}
 		case "ReturnStatement":
 			return findProbeLookupInNode(node.expression)
+		case "ProtocolDeclarationStatement":
+			return null
 		case "NativeFunctionInvocation":
 			return findProbeLookupInArguments(node.arguments)
 		case "MethodInvocation":

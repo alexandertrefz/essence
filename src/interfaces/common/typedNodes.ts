@@ -8,6 +8,7 @@ import type {
 	NamespaceType,
 	NothingType,
 	Position,
+	ProtocolType,
 	RecordType,
 	StringType,
 	Type,
@@ -203,6 +204,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
@@ -283,6 +285,14 @@ export interface NamespaceDefinitionStatementNode {
 	methods: Methods
 	position: Position
 	type: NamespaceType
+	documentation: Documentation | null
+}
+
+export interface ProtocolDeclarationStatementNode {
+	nodeType: "ProtocolDeclarationStatement"
+	name: IdentifierNode
+	protocolType: ProtocolType
+	position: Position
 	documentation: Documentation | null
 }
 

@@ -7,6 +7,7 @@ import {
 	resolveListValueType,
 	resolveMethodInvocation,
 	resolveNamespaceDefinitionStatementType,
+	resolveProtocolDeclarationStatementType,
 	resolveRecordValueType,
 	resolveType,
 	resolveTypeAliasStatementType,
@@ -39,6 +40,7 @@ export function enrichNode(
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement":
 		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
 		case "IfElseStatement":
 		case "IfStatement":
@@ -180,6 +182,7 @@ export function enrichMethodFunctionDefinition(
 		members: {},
 		constants: new Set(),
 		types,
+		protocols: {},
 	} satisfies enricher.Scope
 
 	if (selfType !== null) {
@@ -234,6 +237,7 @@ export function enrichFunctionDefinition(
 		members: {},
 		constants: new Set<string>(),
 		types,
+		protocols: {},
 	} satisfies enricher.Scope
 
 	return {
@@ -488,6 +492,7 @@ export function enrichMatch(
 				members: {},
 				constants: new Set(),
 				types: {},
+				protocols: {},
 			} satisfies enricher.Scope
 
 			let literal: common.typed.ExpressionNode | null = null
@@ -591,6 +596,8 @@ export function enrichStatement(
 			return enrichVariableAssignmentStatement(node, scope)
 		case "NamespaceDefinitionStatement":
 			return enrichNamespaceDefinitionStatement(node, scope, isHoisted)
+		case "ProtocolDeclarationStatement":
+			return enrichProtocolDeclarationStatement(node, scope, isHoisted)
 		case "TypeAliasStatement":
 			return enrichTypeAliasStatement(node, scope, isHoisted)
 		case "IfElseStatement":
@@ -742,6 +749,7 @@ export function enrichNamespaceDefinitionStatement(
 		members: {},
 		constants: new Set(),
 		types: genericTypes,
+		protocols: {},
 	} satisfies enricher.Scope
 
 	return {
@@ -757,6 +765,28 @@ export function enrichNamespaceDefinitionStatement(
 		),
 		position: node.position,
 		type,
+		documentation: node.documentation,
+	}
+}
+
+export function enrichProtocolDeclarationStatement(
+	node: parser.ProtocolDeclarationStatementNode,
+	scope: enricher.Scope,
+	isHoisted = false,
+): common.typed.ProtocolDeclarationStatementNode {
+	const protocolType = resolveProtocolDeclarationStatementType(node, scope)
+
+	if (!isHoisted) {
+		declareProtocolInScope(node.name, protocolType, scope)
+	}
+
+	return {
+		nodeType: "ProtocolDeclarationStatement",
+		// NOTE: A Protocol is not a Type, so its name carries no Type of its
+		// own — Unknown, rather than misleadingly borrowing one.
+		name: enrichIdentifier(node.name, scope, { type: "Unknown" }),
+		protocolType,
+		position: node.position,
 		documentation: node.documentation,
 	}
 }
@@ -790,12 +820,14 @@ export function enrichIfElseStatementNode(
 		members: {},
 		constants: new Set(),
 		types: {},
+		protocols: {},
 	} satisfies enricher.Scope
 	let falseScope = {
 		parent: scope,
 		members: {},
 		constants: new Set(),
 		types: {},
+		protocols: {},
 	} satisfies enricher.Scope
 
 	return {
@@ -816,6 +848,7 @@ export function enrichIfStatement(
 		members: {},
 		constants: new Set(),
 		types: {},
+		protocols: {},
 	} satisfies enricher.Scope
 
 	return {
@@ -913,7 +946,12 @@ function declareTypeInScope(
 	const variableName =
 		typeof identifier === "string" ? identifier : identifier.content
 
-	if (scope.types[variableName] != null) {
+	if (variableName === "Self") {
+		reportError(
+			"'Self' is a reserved Type name.",
+			typeof identifier === "string" ? null : identifier.position,
+		)
+	} else if (scope.types[variableName] != null) {
 		reportError(
 			`Type '${variableName}' is already declared.`,
 			typeof identifier === "string" ? null : identifier.position,
@@ -921,6 +959,23 @@ function declareTypeInScope(
 	}
 
 	scope.types[variableName] = type
+
+	return scope
+}
+
+function declareProtocolInScope(
+	identifier: parser.IdentifierNode,
+	protocolType: common.ProtocolType,
+	scope: enricher.Scope,
+): enricher.Scope {
+	if (scope.protocols[identifier.content] != null) {
+		reportError(
+			`Protocol '${identifier.content}' is already declared.`,
+			identifier.position,
+		)
+	}
+
+	scope.protocols[identifier.content] = protocolType
 
 	return scope
 }

@@ -211,6 +211,7 @@ export type StatementNode =
 	| VariableDeclarationStatementNode
 	| VariableAssignmentStatementNode
 	| NamespaceDefinitionStatementNode
+	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
@@ -287,6 +288,56 @@ export interface NamespaceDefinitionStatementNode {
 	targetType: TypeDeclarationNode | null
 	properties: Record<string, NamespacePropertyNode>
 	methods: NamespaceMethods
+	position: Position
+	documentation: Documentation | null
+}
+
+export interface ProtocolMethodSignatureNode {
+	nodeType: "ProtocolMethodSignature"
+	parameters: Array<ParameterNode>
+	returnType: TypeDeclarationNode
+	position: Position
+	documentation: Documentation | null
+}
+
+export interface SimpleProtocolMethod {
+	nodeType: "SimpleProtocolMethod"
+	name: IdentifierNode
+	signature: ProtocolMethodSignatureNode
+}
+
+export interface StaticProtocolMethod {
+	nodeType: "StaticProtocolMethod"
+	name: IdentifierNode
+	signature: ProtocolMethodSignatureNode
+}
+
+export interface OverloadedProtocolMethod {
+	nodeType: "OverloadedProtocolMethod"
+	name: IdentifierNode
+	signatures: Array<ProtocolMethodSignatureNode>
+	documentation: Documentation | null
+}
+
+export interface OverloadedStaticProtocolMethod {
+	nodeType: "OverloadedStaticProtocolMethod"
+	name: IdentifierNode
+	signatures: Array<ProtocolMethodSignatureNode>
+	documentation: Documentation | null
+}
+
+export type ProtocolMethods = Record<
+	string,
+	| SimpleProtocolMethod
+	| StaticProtocolMethod
+	| OverloadedProtocolMethod
+	| OverloadedStaticProtocolMethod
+>
+
+export interface ProtocolDeclarationStatementNode {
+	nodeType: "ProtocolDeclarationStatement"
+	name: IdentifierNode
+	methods: ProtocolMethods
 	position: Position
 	documentation: Documentation | null
 }
