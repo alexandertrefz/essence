@@ -25,7 +25,7 @@ implementation {
 	function describeArea <infer Shape is Measurable>(_ shape: Shape) -> String {
 		<- match shape::area() -> String {
 			case Integer  { <- @::toString() }
-			case Fraction { <- @::toString() }
+			case Rational { <- @::toString() }
 		}
 	}
 

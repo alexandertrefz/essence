@@ -2,7 +2,7 @@ import type {
 	BooleanType,
 	CaseType,
 	ErrorType,
-	FractionType,
+	RationalType,
 	FunctionType,
 	IntegerType,
 	ListType,
@@ -111,7 +111,7 @@ export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
 	| IntegerValueNode
-	| FractionValueNode
+	| RationalValueNode
 	| BooleanValueNode
 	| NothingValueNode
 	| FunctionValueNode
@@ -135,11 +135,11 @@ export type IntegerValueNode = {
 	type: IntegerType
 }
 
-export type FractionValueNode = {
-	nodeType: "FractionValue"
+export type RationalValueNode = {
+	nodeType: "RationalValue"
 	numerator: string
 	denominator: string
-	type: FractionType
+	type: RationalType
 }
 
 export type BooleanValueNode = {

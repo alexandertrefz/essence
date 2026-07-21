@@ -136,7 +136,7 @@ describe("Validator", () => {
 							<- @
 						}
 
-						case Fraction {
+						case Rational {
 							<- @
 						}
 					}
@@ -157,13 +157,13 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"Match Expression does not handle Type 'Fraction'.",
+				"Match Expression does not handle Type 'Rational'.",
 			)
 		})
 
 		it("should warn about unreachable Match cases", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				type Value = Integer | Fraction
+				type Value = Integer | Rational
 
 				constant value: Value = 5
 				constant a = match value -> Value {
@@ -171,7 +171,7 @@ describe("Validator", () => {
 						<- @
 					}
 
-					case Fraction {
+					case Rational {
 						<- @
 					}
 
@@ -265,7 +265,7 @@ describe("Validator", () => {
 						<- @
 					}
 
-					case Fraction {
+					case Rational {
 						__print(@)
 					}
 				}
@@ -317,7 +317,7 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		it("should report Fraction literals with a zero denominator", () => {
+		it("should report Rational literals with a zero denominator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = 1/0
 			}`)
@@ -325,21 +325,21 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"A Fraction can not have a denominator of zero.",
+				"A Rational can not have a denominator of zero.",
 			)
 		})
 
-		it("should type Divisions as Fraction | Nothing", () => {
+		it("should type Divisions as Rational | Nothing", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant a: Fraction | Nothing = 1::divideBy(2)
-					constant b: Fraction | Nothing = 1/2::divideBy(2)
-					constant c: Fraction | Nothing = Fraction.of(1, over 2)
+					constant a: Rational | Nothing = 1::divideBy(2)
+					constant b: Rational | Nothing = 1/2::divideBy(2)
+					constant c: Rational | Nothing = Rational.of(1, over 2)
 				}`),
 			).toEqual([])
 
 			let diagnostics = diagnosticsFor(`implementation {
-				constant a: Fraction = 1::divideBy(2)
+				constant a: Rational = 1::divideBy(2)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)

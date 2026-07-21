@@ -58,11 +58,11 @@ describe("Code Generation", () => {
 		it("emits every Handler of a Match", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Fraction | String | Nothing = nothing
+					variable value: Integer | Rational | String | Nothing = nothing
 
 					__print(match value -> String {
 						case Integer  { <- "handled integer" }
-						case Fraction { <- "handled fraction" }
+						case Rational { <- "handled rational" }
 						case String   { <- "handled string" }
 						case Nothing  { <- "handled nothing" }
 					})
@@ -70,7 +70,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("handled integer")
-			expect(generated).toContain("handled fraction")
+			expect(generated).toContain("handled rational")
 			expect(generated).toContain("handled string")
 			expect(generated).toContain("handled nothing")
 		})
@@ -78,11 +78,11 @@ describe("Code Generation", () => {
 		it("nests the Handlers so that each one is the alternate of the last", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Fraction | Nothing = nothing
+					variable value: Integer | Rational | Nothing = nothing
 
 					__print(match value -> String {
 						case Integer  { <- "a" }
-						case Fraction { <- "b" }
+						case Rational { <- "b" }
 						case Nothing  { <- "c" }
 					})
 				}
@@ -98,10 +98,10 @@ describe("Code Generation", () => {
 		it("serialises the member list of a Union Matcher as an Array", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Fraction | Nothing = nothing
+					variable value: Integer | Rational | Nothing = nothing
 
 					__print(match value -> String {
-						case Integer | Fraction { <- "number" }
+						case Integer | Rational { <- "number" }
 						case Nothing            { <- "nothing" }
 					})
 				}
@@ -114,7 +114,7 @@ describe("Code Generation", () => {
 		it("emits a wildcard Handler alongside the Handlers before it", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Fraction | Nothing = nothing
+					variable value: Integer | Rational | Nothing = nothing
 
 					__print(match value -> String {
 						case Nothing { <- "handled nothing" }
@@ -497,7 +497,7 @@ describe("Code Generation", () => {
 			}`)
 
 			expect(code).toContain("Integer.multiplyWith__overload$")
-			expect(code).toContain("Fraction.multiplyWith__overload$")
+			expect(code).toContain("Rational.multiplyWith__overload$")
 		})
 
 		it("should dispatch a bounded Type Parameter member through the conformance parameter", () => {

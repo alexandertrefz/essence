@@ -202,7 +202,7 @@ describe("Hover", () => {
 		)
 
 		expect(hover(source, { line: 2, column: 13 })).toBe(
-			"add(_ Fraction) -> Fraction",
+			"add(_ Rational) -> Rational",
 		)
 	})
 

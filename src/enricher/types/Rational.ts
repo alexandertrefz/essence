@@ -1,11 +1,11 @@
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
-export const type: common.FractionType = { type: "Fraction" }
+export const type: common.RationalType = { type: "Rational" }
 
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
-	name: "Fraction",
+	name: "Rational",
 	generics: [],
 	targetType: type,
 	conformsTo: ["Equatable", "Printable", "Comparable"],
@@ -26,7 +26,7 @@ export const namespace: common.NamespaceType = {
 			],
 			returnType: {
 				type: "UnionType",
-				types: [{ type: "Fraction" }, { type: "Nothing" }],
+				types: [{ type: "Rational" }, { type: "Nothing" }],
 			},
 		},
 
@@ -37,11 +37,11 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Fraction" },
+					type: { type: "Rational" },
 				},
 				{
 					name: null,
-					type: { type: "Fraction" },
+					type: { type: "Rational" },
 				},
 			],
 			returnType: { type: "Boolean" },
@@ -54,11 +54,11 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Fraction" },
+					type: { type: "Rational" },
 				},
 				{
 					name: null,
-					type: { type: "Fraction" },
+					type: { type: "Rational" },
 				},
 			],
 			returnType: { type: "Boolean" },
@@ -72,28 +72,28 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 				{
 					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
 							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 			],
 		},
@@ -106,28 +106,28 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 				{
 					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
 							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 			],
 		},
@@ -140,16 +140,16 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Fraction" }, { type: "Nothing" }],
+						types: [{ type: "Rational" }, { type: "Nothing" }],
 					},
 				},
 				{
@@ -157,7 +157,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
@@ -166,7 +166,7 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: {
 						type: "UnionType",
-						types: [{ type: "Fraction" }, { type: "Nothing" }],
+						types: [{ type: "Rational" }, { type: "Nothing" }],
 					},
 				},
 			],
@@ -180,28 +180,28 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 				{
 					generics: [],
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
 							type: { type: "Integer" },
 						},
 					],
-					returnType: { type: "Fraction" },
+					returnType: { type: "Rational" },
 				},
 			],
 		},
@@ -214,11 +214,11 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -228,7 +228,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
@@ -248,11 +248,11 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -262,7 +262,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
@@ -282,11 +282,11 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -296,7 +296,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
@@ -316,11 +316,11 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "Boolean" },
@@ -330,7 +330,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: null,
@@ -350,7 +350,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 					],
 					returnType: { type: "String" },
@@ -360,7 +360,7 @@ export const namespace: common.NamespaceType = {
 					parameterTypes: [
 						{
 							name: null,
-							type: { type: "Fraction" },
+							type: { type: "Rational" },
 						},
 						{
 							name: "formatAs",
@@ -377,17 +377,17 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: { type: "Fraction" },
+					type: { type: "Rational" },
 				},
 				{
 					name: null,
-					type: { type: "Fraction" },
-					documentation: "the Fraction to order against",
+					type: { type: "Rational" },
+					documentation: "the Rational to order against",
 				},
 			],
 			returnType: orderingType,
 			documentation: {
-				description: "Orders the Fraction against another Fraction.",
+				description: "Orders the Rational against another Rational.",
 				parameters: {},
 				returns:
 					"`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",

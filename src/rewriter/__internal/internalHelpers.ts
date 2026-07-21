@@ -1,10 +1,10 @@
 import type { Fraction } from "bigint-fraction"
 
 import { is as boolIs } from "./Boolean"
-import { is as fractionIs } from "./Fraction"
 import type { IntegerType } from "./Integer"
 import { is as integerIs } from "./Integer"
 import { is as listIs } from "./List"
+import { is as rationalIs } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
@@ -15,16 +15,16 @@ export function getInt32(number: IntegerType): number {
 	return Number(BigInt.asIntN(32, number.value))
 }
 
-export function isFirstFractionBigger(
-	firstFraction: Fraction,
-	secondFraction: Fraction,
+export function isFirstRationalBigger(
+	firstRational: Fraction,
+	secondRational: Fraction,
 ): boolean {
-	if (firstFraction.denominator === secondFraction.denominator) {
-		return firstFraction.numerator > secondFraction.numerator
+	if (firstRational.denominator === secondRational.denominator) {
+		return firstRational.numerator > secondRational.numerator
 	} else {
 		return (
-			firstFraction.numerator * secondFraction.denominator >
-			secondFraction.numerator * firstFraction.denominator
+			firstRational.numerator * secondRational.denominator >
+			secondRational.numerator * firstRational.denominator
 		)
 	}
 }
@@ -51,10 +51,10 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 	) {
 		return integerIs(a, b).value
 	} else if (
-		a[typeKeySymbol] === "Fraction" &&
-		b[typeKeySymbol] === "Fraction"
+		a[typeKeySymbol] === "Rational" &&
+		b[typeKeySymbol] === "Rational"
 	) {
-		return fractionIs(a, b).value
+		return rationalIs(a, b).value
 	} else if (
 		a[typeKeySymbol] === "Record" && //
 		b[typeKeySymbol] === "Record"

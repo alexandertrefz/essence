@@ -1252,7 +1252,7 @@ class DescentParser {
 
 	protected parseNumberLiteral():
 		| parser.IntegerValueNode
-		| parser.FractionValueNode {
+		| parser.RationalValueNode {
 		let numerator = this.parseInteger()
 
 		if (this.tokens.peek()?.type === TokenType.SymbolSlash) {
@@ -1260,7 +1260,7 @@ class DescentParser {
 
 			let denominator = this.parseInteger()
 
-			return generators.fractionValueNode(
+			return generators.rationalValueNode(
 				numerator.value,
 				denominator.value,
 				{
