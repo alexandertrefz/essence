@@ -1314,6 +1314,44 @@ describe("Parser", () => {
 
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
+
+			describe("Conformance Clauses", () => {
+				it("should parse a Namespace with a Conformance Clause", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace IntegerEquatable for Integer is Equatable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse a Namespace with multiple Conformance Clauses", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace IntegerEquatable for Integer is Equatable, Printable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse an untyped Namespace with a Conformance Clause", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace Foo is Equatable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should still parse a Method named is", () => {
+					let input: parser.Program = parse(
+						`implementation {
+							namespace IntegerHelpers for Integer {
+								is(_ other: Integer) -> Boolean { <- true }
+							}
+						}`,
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+			})
 		})
 
 		describe("TypeAliasStatements", () => {

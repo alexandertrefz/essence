@@ -305,6 +305,7 @@ export function namespaceDefinitionStatement(
 	name: parser.IdentifierNode,
 	generics: Array<parser.GenericDeclarationNode>,
 	targetType: parser.TypeDeclarationNode | null,
+	conformsTo: Array<parser.IdentifierNode>,
 	body: Array<NamespaceProperty | NamespaceMethod>,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
@@ -359,6 +360,7 @@ export function namespaceDefinitionStatement(
 	return {
 		nodeType: "NamespaceDefinitionStatement",
 		targetType,
+		conformsTo,
 		name,
 		generics,
 		position,
