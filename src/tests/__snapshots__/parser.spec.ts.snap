@@ -3531,6 +3531,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "documentation": null,
           "generics": [
             {
+              "constraint": null,
               "defaultType": null,
               "inferred": false,
               "name": {
@@ -3667,6 +3668,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "documentation": null,
           "generics": [
             {
+              "constraint": null,
               "defaultType": null,
               "inferred": false,
               "name": {
@@ -3873,6 +3875,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "documentation": null,
           "generics": [
             {
+              "constraint": null,
               "defaultType": null,
               "inferred": false,
               "name": {
@@ -4079,6 +4082,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
           "documentation": null,
           "generics": [
             {
+              "constraint": null,
               "defaultType": null,
               "inferred": false,
               "name": {
@@ -4272,6 +4276,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
           "documentation": null,
           "generics": [
             {
+              "constraint": null,
               "defaultType": null,
               "inferred": false,
               "name": {
@@ -16808,6 +16813,549 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
 }
 `;
 
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with a Conformance Clause 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 69,
+                "line": 1,
+              },
+              "start": {
+                "column": 60,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [],
+        "methods": {},
+        "name": {
+          "content": "IntegerEquatable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 72,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 56,
+              "line": 1,
+            },
+            "start": {
+              "column": 49,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 56,
+                "line": 1,
+              },
+              "start": {
+                "column": 49,
+                "line": 1,
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 74,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 74,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with multiple Conformance Clauses 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 69,
+                "line": 1,
+              },
+              "start": {
+                "column": 60,
+                "line": 1,
+              },
+            },
+          },
+          {
+            "content": "Printable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 80,
+                "line": 1,
+              },
+              "start": {
+                "column": 71,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [],
+        "methods": {},
+        "name": {
+          "content": "IntegerEquatable",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 83,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 56,
+              "line": 1,
+            },
+            "start": {
+              "column": 49,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 56,
+                "line": 1,
+              },
+              "start": {
+                "column": 49,
+                "line": 1,
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 85,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 85,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse an untyped Namespace with a Conformance Clause 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "content": "Equatable",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 44,
+                "line": 1,
+              },
+              "start": {
+                "column": 35,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [],
+        "methods": {},
+        "name": {
+          "content": "Foo",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 31,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 47,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": null,
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 49,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 49,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should still parse a Method named is 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [],
+        "documentation": null,
+        "generics": [],
+        "methods": {
+          "is": {
+            "method": {
+              "nodeType": "FunctionValue",
+              "position": {
+                "end": {
+                  "column": 52,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 11,
+                  "line": 3,
+                },
+              },
+              "value": {
+                "body": [
+                  {
+                    "expression": {
+                      "nodeType": "BooleanValue",
+                      "position": {
+                        "end": {
+                          "column": 50,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 46,
+                          "line": 3,
+                        },
+                      },
+                      "value": true,
+                    },
+                    "nodeType": "ReturnStatement",
+                    "position": {
+                      "end": {
+                        "column": 50,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 43,
+                        "line": 3,
+                      },
+                    },
+                  },
+                ],
+                "documentation": null,
+                "generics": [],
+                "nodeType": "FunctionDefinition",
+                "parameters": [
+                  {
+                    "documentation": null,
+                    "externalName": null,
+                    "internalName": {
+                      "content": "other",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 19,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 14,
+                          "line": 3,
+                        },
+                      },
+                    },
+                    "nodeType": "Parameter",
+                    "position": {
+                      "end": {
+                        "column": 28,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 12,
+                        "line": 3,
+                      },
+                    },
+                    "type": {
+                      "nodeType": "IdentifierTypeDeclaration",
+                      "position": {
+                        "end": {
+                          "column": 28,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 21,
+                          "line": 3,
+                        },
+                      },
+                      "type": {
+                        "content": "Integer",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 28,
+                            "line": 3,
+                          },
+                          "start": {
+                            "column": 21,
+                            "line": 3,
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+                "returnType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 40,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 33,
+                      "line": 3,
+                    },
+                  },
+                  "type": {
+                    "content": "Boolean",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 40,
+                        "line": 3,
+                      },
+                      "start": {
+                        "column": 33,
+                        "line": 3,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "name": {
+              "content": "is",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 11,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
+            },
+            "nodeType": "SimpleMethod",
+          },
+        },
+        "name": {
+          "content": "IntegerHelpers",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 32,
+              "line": 2,
+            },
+            "start": {
+              "column": 18,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 9,
+            "line": 4,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 2,
+            },
+            "start": {
+              "column": 37,
+              "line": 2,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 44,
+                "line": 2,
+              },
+              "start": {
+                "column": 37,
+                "line": 2,
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with SimpleTypes 1`] = `
 {
   "implementation": {
@@ -18228,484 +18776,27 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
 }
 `;
 
-exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with a Conformance Clause 1`] = `
+exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic on a Function 1`] = `
 {
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
       {
-        "conformsTo": [
-          {
-            "content": "Equatable",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 69,
-                "line": 1,
-              },
-              "start": {
-                "column": 60,
-                "line": 1,
-              },
-            },
-          },
-        ],
-        "documentation": null,
-        "generics": [],
-        "methods": {},
         "name": {
-          "content": "IntegerEquatable",
+          "content": "smallest",
           "nodeType": "Identifier",
           "position": {
             "end": {
-              "column": 44,
-              "line": 1,
-            },
-            "start": {
-              "column": 28,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "NamespaceDefinitionStatement",
-        "position": {
-          "end": {
-            "column": 72,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "properties": {},
-        "targetType": {
-          "nodeType": "IdentifierTypeDeclaration",
-          "position": {
-            "end": {
-              "column": 56,
-              "line": 1,
-            },
-            "start": {
-              "column": 49,
-              "line": 1,
-            },
-          },
-          "type": {
-            "content": "Integer",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 56,
-                "line": 1,
-              },
-              "start": {
-                "column": 49,
-                "line": 1,
-              },
-            },
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 74,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 74,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with multiple Conformance Clauses 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "conformsTo": [
-          {
-            "content": "Equatable",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 69,
-                "line": 1,
-              },
-              "start": {
-                "column": 60,
-                "line": 1,
-              },
-            },
-          },
-          {
-            "content": "Printable",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 80,
-                "line": 1,
-              },
-              "start": {
-                "column": 71,
-                "line": 1,
-              },
-            },
-          },
-        ],
-        "documentation": null,
-        "generics": [],
-        "methods": {},
-        "name": {
-          "content": "IntegerEquatable",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 44,
-              "line": 1,
-            },
-            "start": {
-              "column": 28,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "NamespaceDefinitionStatement",
-        "position": {
-          "end": {
-            "column": 83,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "properties": {},
-        "targetType": {
-          "nodeType": "IdentifierTypeDeclaration",
-          "position": {
-            "end": {
-              "column": 56,
-              "line": 1,
-            },
-            "start": {
-              "column": 49,
-              "line": 1,
-            },
-          },
-          "type": {
-            "content": "Integer",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 56,
-                "line": 1,
-              },
-              "start": {
-                "column": 49,
-                "line": 1,
-              },
-            },
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 85,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 85,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse an untyped Namespace with a Conformance Clause 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "conformsTo": [
-          {
-            "content": "Equatable",
-            "nodeType": "Identifier",
-            "position": {
-              "end": {
-                "column": 44,
-                "line": 1,
-              },
-              "start": {
-                "column": 35,
-                "line": 1,
-              },
-            },
-          },
-        ],
-        "documentation": null,
-        "generics": [],
-        "methods": {},
-        "name": {
-          "content": "Foo",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 31,
-              "line": 1,
-            },
-            "start": {
-              "column": 28,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "NamespaceDefinitionStatement",
-        "position": {
-          "end": {
-            "column": 47,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-        "properties": {},
-        "targetType": null,
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 49,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 49,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should still parse a Method named is 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "conformsTo": [],
-        "documentation": null,
-        "generics": [],
-        "methods": {
-          "is": {
-            "method": {
-              "nodeType": "FunctionValue",
-              "position": {
-                "end": {
-                  "column": 52,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 11,
-                  "line": 3,
-                },
-              },
-              "value": {
-                "body": [
-                  {
-                    "expression": {
-                      "nodeType": "BooleanValue",
-                      "position": {
-                        "end": {
-                          "column": 50,
-                          "line": 3,
-                        },
-                        "start": {
-                          "column": 46,
-                          "line": 3,
-                        },
-                      },
-                      "value": true,
-                    },
-                    "nodeType": "ReturnStatement",
-                    "position": {
-                      "end": {
-                        "column": 50,
-                        "line": 3,
-                      },
-                      "start": {
-                        "column": 43,
-                        "line": 3,
-                      },
-                    },
-                  },
-                ],
-                "documentation": null,
-                "generics": [],
-                "nodeType": "FunctionDefinition",
-                "parameters": [
-                  {
-                    "documentation": null,
-                    "externalName": null,
-                    "internalName": {
-                      "content": "other",
-                      "nodeType": "Identifier",
-                      "position": {
-                        "end": {
-                          "column": 19,
-                          "line": 3,
-                        },
-                        "start": {
-                          "column": 14,
-                          "line": 3,
-                        },
-                      },
-                    },
-                    "nodeType": "Parameter",
-                    "position": {
-                      "end": {
-                        "column": 28,
-                        "line": 3,
-                      },
-                      "start": {
-                        "column": 12,
-                        "line": 3,
-                      },
-                    },
-                    "type": {
-                      "nodeType": "IdentifierTypeDeclaration",
-                      "position": {
-                        "end": {
-                          "column": 28,
-                          "line": 3,
-                        },
-                        "start": {
-                          "column": 21,
-                          "line": 3,
-                        },
-                      },
-                      "type": {
-                        "content": "Integer",
-                        "nodeType": "Identifier",
-                        "position": {
-                          "end": {
-                            "column": 28,
-                            "line": 3,
-                          },
-                          "start": {
-                            "column": 21,
-                            "line": 3,
-                          },
-                        },
-                      },
-                    },
-                  },
-                ],
-                "returnType": {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 40,
-                      "line": 3,
-                    },
-                    "start": {
-                      "column": 33,
-                      "line": 3,
-                    },
-                  },
-                  "type": {
-                    "content": "Boolean",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 40,
-                        "line": 3,
-                      },
-                      "start": {
-                        "column": 33,
-                        "line": 3,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            "name": {
-              "content": "is",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 11,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 9,
-                  "line": 3,
-                },
-              },
-            },
-            "nodeType": "SimpleMethod",
-          },
-        },
-        "name": {
-          "content": "IntegerHelpers",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 32,
+              "column": 25,
               "line": 2,
             },
             "start": {
-              "column": 18,
+              "column": 17,
               "line": 2,
             },
           },
         },
-        "nodeType": "NamespaceDefinitionStatement",
+        "nodeType": "FunctionStatement",
         "position": {
           "end": {
             "column": 9,
@@ -18716,30 +18807,495 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
             "line": 2,
           },
         },
-        "properties": {},
-        "targetType": {
-          "nodeType": "IdentifierTypeDeclaration",
-          "position": {
-            "end": {
-              "column": 44,
-              "line": 2,
+        "value": {
+          "body": [
+            {
+              "expression": {
+                "nodeType": "NothingValue",
+                "position": {
+                  "end": {
+                    "column": 19,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 12,
+                    "line": 3,
+                  },
+                },
+              },
+              "nodeType": "ReturnStatement",
+              "position": {
+                "end": {
+                  "column": 19,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
             },
-            "start": {
-              "column": 37,
-              "line": 2,
+          ],
+          "documentation": null,
+          "generics": [
+            {
+              "constraint": {
+                "content": "Comparable",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 2,
+                  },
+                },
+              },
+              "defaultType": null,
+              "inferred": true,
+              "name": {
+                "content": "Item",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "GenericDeclarationNode",
+              "position": {
+                "end": {
+                  "column": 51,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 27,
+                  "line": 2,
+                },
+              },
             },
-          },
-          "type": {
-            "content": "Integer",
-            "nodeType": "Identifier",
+          ],
+          "nodeType": "FunctionDefinition",
+          "parameters": [
+            {
+              "documentation": null,
+              "externalName": null,
+              "internalName": {
+                "content": "list",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 59,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 55,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "Parameter",
+              "position": {
+                "end": {
+                  "column": 71,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 53,
+                  "line": 2,
+                },
+              },
+              "type": {
+                "baseType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 65,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 61,
+                      "line": 2,
+                    },
+                  },
+                  "type": {
+                    "content": "List",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 65,
+                        "line": 2,
+                      },
+                      "start": {
+                        "column": 61,
+                        "line": 2,
+                      },
+                    },
+                  },
+                },
+                "generics": [
+                  {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 70,
+                        "line": 2,
+                      },
+                      "start": {
+                        "column": 66,
+                        "line": 2,
+                      },
+                    },
+                    "type": {
+                      "content": "Item",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 70,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 66,
+                          "line": 2,
+                        },
+                      },
+                    },
+                  },
+                ],
+                "nodeType": "GenericTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 71,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 65,
+                    "line": 2,
+                  },
+                },
+              },
+            },
+          ],
+          "returnType": {
+            "nodeType": "UnionTypeDeclaration",
             "position": {
               "end": {
-                "column": 44,
+                "column": 90,
                 "line": 2,
               },
               "start": {
-                "column": 37,
+                "column": 76,
                 "line": 2,
+              },
+            },
+            "types": [
+              {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 80,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 76,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 80,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 76,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+              {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 90,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 83,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Nothing",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 90,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 83,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic with a default Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "describe",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 17,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "FunctionStatement",
+        "position": {
+          "end": {
+            "column": 9,
+            "line": 4,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "value": {
+          "body": [
+            {
+              "expression": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 14,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 12,
+                    "line": 3,
+                  },
+                },
+                "value": "",
+              },
+              "nodeType": "ReturnStatement",
+              "position": {
+                "end": {
+                  "column": 14,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
+            },
+          ],
+          "documentation": null,
+          "generics": [
+            {
+              "constraint": {
+                "content": "Printable",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 42,
+                    "line": 2,
+                  },
+                },
+              },
+              "defaultType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 60,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 54,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 60,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 54,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+              "inferred": true,
+              "name": {
+                "content": "Value",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "GenericDeclarationNode",
+              "position": {
+                "end": {
+                  "column": 60,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 27,
+                  "line": 2,
+                },
+              },
+            },
+          ],
+          "nodeType": "FunctionDefinition",
+          "parameters": [
+            {
+              "documentation": null,
+              "externalName": null,
+              "internalName": {
+                "content": "value",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 69,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 64,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "Parameter",
+              "position": {
+                "end": {
+                  "column": 76,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 62,
+                  "line": 2,
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 76,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 71,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Value",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 76,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 71,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+          "returnType": {
+            "nodeType": "IdentifierTypeDeclaration",
+            "position": {
+              "end": {
+                "column": 87,
+                "line": 2,
+              },
+              "start": {
+                "column": 81,
+                "line": 2,
+              },
+            },
+            "type": {
+              "content": "String",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 87,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 81,
+                  "line": 2,
+                },
               },
             },
           },

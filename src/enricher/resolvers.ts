@@ -8,6 +8,7 @@ import {
 	type GenericBindings,
 	type MatchableArgument,
 	matchArguments,
+	matchesType,
 	matchesTypeWithBindings,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
@@ -92,6 +93,9 @@ export function resolveFunctionTypeDeclarationType(
 type InferredInvocation = {
 	returnType: common.Type
 	unboundGenerics: Array<string>
+	// NOTE: What the invocation bound each Type Parameter to — conformance
+	// resolution for Protocol bounds reads the winning candidate's bindings.
+	bindings: GenericBindings
 }
 
 // NOTE: Matches an invocation's Arguments left to right against a signature,
@@ -112,7 +116,11 @@ function inferInvocation(
 			return undefined
 		}
 
-		return { returnType: signature.returnType, unboundGenerics: [] }
+		return {
+			returnType: signature.returnType,
+			unboundGenerics: [],
+			bindings: new Map(),
+		}
 	}
 
 	let context = createInferenceContext(signature.generics)
@@ -135,6 +143,7 @@ function substituteInferredReturnType(
 	signature: common.BaseFunction,
 	bindings: GenericBindings,
 ): InferredInvocation {
+	let originalBindings = bindings
 	let unboundGenerics = signature.generics
 		.filter((generic) => !bindings.has(generic.name))
 		.map((generic) => generic.name)
@@ -150,6 +159,7 @@ function substituteInferredReturnType(
 	return {
 		returnType: applyGenericBindings(signature.returnType, bindings),
 		unboundGenerics,
+		bindings: originalBindings,
 	}
 }
 
@@ -233,6 +243,8 @@ export function resolveInvokedMethodInNamespace(
 			returnType: common.Type
 			overloadedMethodIndex: number | null
 			unboundGenerics: Array<string>
+			signatureGenerics: Array<common.GenericDeclaration>
+			bindings: GenericBindings
 	  }
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
@@ -270,6 +282,8 @@ export function resolveInvokedMethodInNamespace(
 			returnType: inferred.returnType,
 			overloadedMethodIndex: null,
 			unboundGenerics: inferred.unboundGenerics,
+			signatureGenerics: methodType.generics,
+			bindings: inferred.bindings,
 		}
 	} else if (
 		methodType.type === "OverloadedMethod" ||
@@ -288,6 +302,8 @@ export function resolveInvokedMethodInNamespace(
 					overloadedMethodIndex: overloadIndex,
 					returnType: inferred.returnType,
 					unboundGenerics: inferred.unboundGenerics,
+					signatureGenerics: overload.generics,
+					bindings: inferred.bindings,
 				}
 			}
 		}
@@ -305,6 +321,7 @@ function resolveFailedMethodInvocation(): {
 	namespace: { name: string; type: common.NamespaceType }
 	type: common.Type
 	overloadedMethodIndex: number | null
+	conformances: Array<common.Conformance>
 } {
 	return {
 		namespace: {
@@ -320,6 +337,7 @@ function resolveFailedMethodInvocation(): {
 		},
 		type: { type: "Error" },
 		overloadedMethodIndex: null,
+		conformances: [],
 	}
 }
 
@@ -330,6 +348,7 @@ export function resolveMethodInvocation(
 	namespace: { name: string; type: common.NamespaceType }
 	type: common.Type
 	overloadedMethodIndex: number | null
+	conformances: Array<common.Conformance>
 } {
 	let namespaces = resolveMethodLookupBaseNamespaces(node, scope)
 
@@ -378,6 +397,8 @@ export function resolveMethodInvocation(
 				overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 				type: resolvedMethod.returnType,
 				unboundGenerics: resolvedMethod.unboundGenerics,
+				signatureGenerics: resolvedMethod.signatureGenerics,
+				bindings: resolvedMethod.bindings,
 			})
 		}
 	}
@@ -401,6 +422,12 @@ export function resolveMethodInvocation(
 			namespace: resolvedMethod.namespace,
 			type: resolvedMethod.type,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
+			conformances: resolveConformances(
+				resolvedMethod.signatureGenerics,
+				resolvedMethod.bindings,
+				scope,
+				node.position,
+			),
 		}
 	} else {
 		reportError(
@@ -427,10 +454,10 @@ export function resolveMethodInvocationType(
 	return resolveMethodInvocation(node, scope).type
 }
 
-export function resolveFunctionInvocationType(
+export function resolveFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	scope: enricher.Scope,
-): common.Type {
+): { type: common.Type; conformances: Array<common.Conformance> } {
 	const type = resolveType(node.name, scope)
 
 	if (
@@ -438,12 +465,44 @@ export function resolveFunctionInvocationType(
 		type.type === "SimpleMethod" ||
 		type.type === "StaticMethod"
 	) {
-		return resolveInferredReturnType(
-			type,
-			node.arguments,
-			node.position,
-			scope,
+		if (type.generics.length === 0) {
+			return { type: type.returnType, conformances: [] }
+		}
+
+		// NOTE: Mirrors resolveInferredReturnType, additionally keeping the
+		// bindings — conformance resolution for Protocol bounds needs to know
+		// what each Type Parameter was bound to. Argument mismatches are the
+		// Validator's to report; "Could not infer" and conformance Diagnostics
+		// only fire when the Arguments actually matched.
+		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
+			(argument) => ({
+				name: argument.name?.content ?? null,
+				getType: () => resolveType(argument.value, scope),
+			}),
 		)
+
+		let context = createInferenceContext(type.generics)
+		let matchResult = matchArguments(
+			type.parameterTypes,
+			matchableArguments,
+			{ inference: context },
+		)
+
+		let inferred = substituteInferredReturnType(type, context.bindings)
+		let conformances: Array<common.Conformance> = []
+
+		if (matchResult.type === "Match") {
+			reportUnboundGenerics(inferred.unboundGenerics, node.position)
+
+			conformances = resolveConformances(
+				type.generics,
+				inferred.bindings,
+				scope,
+				node.position,
+			)
+		}
+
+		return { type: inferred.returnType, conformances }
 	} else if (
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
@@ -461,7 +520,15 @@ export function resolveFunctionInvocationType(
 			if (inferred !== undefined) {
 				reportUnboundGenerics(inferred.unboundGenerics, node.position)
 
-				return inferred.returnType
+				return {
+					type: inferred.returnType,
+					conformances: resolveConformances(
+						overload.generics,
+						inferred.bindings,
+						scope,
+						node.position,
+					),
+				}
 			}
 		}
 
@@ -470,7 +537,7 @@ export function resolveFunctionInvocationType(
 			node.position,
 		)
 
-		return { type: "Error" }
+		return { type: { type: "Error" }, conformances: [] }
 	} else {
 		if (type.type !== "Error") {
 			reportError(
@@ -479,8 +546,15 @@ export function resolveFunctionInvocationType(
 			)
 		}
 
-		return { type: "Error" }
+		return { type: { type: "Error" }, conformances: [] }
 	}
+}
+
+export function resolveFunctionInvocationType(
+	node: parser.FunctionInvocationNode,
+	scope: enricher.Scope,
+): common.Type {
+	return resolveFunctionInvocation(node, scope).type
 }
 
 function describeTypesForCombination(type: common.Type): string {
@@ -759,10 +833,21 @@ export function resolveGenericDeclarations(
 			defaultType = resolveType(generic.defaultType, scope)
 		}
 
+		if (
+			generic.constraint !== null &&
+			findProtocolInScope(generic.constraint.content, scope) === null
+		) {
+			reportError(
+				`Protocol '${generic.constraint.content}' is not declared.`,
+				generic.constraint.position,
+			)
+		}
+
 		return {
 			name: generic.name.content,
 			infer: generic.inferred,
 			defaultType,
+			constraint: generic.constraint?.content ?? null,
 		}
 	})
 }
@@ -780,6 +865,9 @@ export function scopeWithGenerics(
 		types[generic.name.content] = {
 			type: "GenericUse",
 			name: generic.name.content,
+			...(generic.constraint !== null
+				? { constraint: generic.constraint.content }
+				: {}),
 		}
 	}
 
@@ -944,6 +1032,166 @@ function resolveProtocolMethodType(
 			documentation: node.documentation ?? undefined,
 		}
 	}
+}
+
+// NOTE: A compact, one-line description of a Type for Diagnostics — enough
+// to tell the reader which Type failed a Protocol bound.
+function describeTypeForDiagnostic(type: common.Type): string {
+	switch (type.type) {
+		case "UnionType":
+			return type.types
+				.map((memberType) => describeTypeForDiagnostic(memberType))
+				.join(" | ")
+		case "GenericUse":
+			return type.name
+		case "GenericAlias":
+			return type.name
+		case "List":
+			return `List<${describeTypeForDiagnostic(type.itemType)}>`
+		case "Namespace":
+			return `Namespace '${type.name}'`
+		default:
+			return type.type
+	}
+}
+
+// NOTE: Resolves how each Protocol-bounded Type Parameter of an invocation's
+// signature is fulfilled, given what the invocation bound it to. A binding
+// that is itself a bounded Type Parameter forwards the enclosing Function's
+// conformance parameter; a concrete binding requires exactly one conforming
+// Namespace in scope — the exact-target ones win over covering ones, and
+// anything else is a Diagnostic. Failures report and yield no source; the
+// Diagnostic gates codegen, so a missing source never reaches the Rewriter.
+export function resolveConformances(
+	generics: Array<common.GenericDeclaration>,
+	bindings: GenericBindings,
+	scope: enricher.Scope,
+	position: common.Position,
+): Array<common.Conformance> {
+	if (!generics.some((generic) => generic.constraint != null)) {
+		return []
+	}
+
+	let conformances: Array<common.Conformance> = []
+
+	for (let generic of generics) {
+		if (generic.constraint == null) {
+			continue
+		}
+
+		let binding = bindings.get(generic.name)
+
+		// NOTE: An unbound Type Parameter or an Error binding has already
+		// been diagnosed — stay silent to avoid cascades.
+		if (binding === undefined || binding.type === "Error") {
+			continue
+		}
+
+		let protocol = findProtocolInScope(generic.constraint, scope)
+
+		// NOTE: An unknown Protocol was already diagnosed at the declaration.
+		if (protocol === null) {
+			continue
+		}
+
+		if (binding.type === "GenericUse") {
+			if (binding.constraint === generic.constraint) {
+				conformances.push({
+					genericName: generic.name,
+					protocolName: generic.constraint,
+					source: {
+						kind: "parameter",
+						name: `${binding.name}__conformance`,
+					},
+				})
+			} else {
+				reportError(
+					`Type Parameter '${binding.name}' does not conform to Protocol '${generic.constraint}' — it carries no such bound.`,
+					position,
+				)
+			}
+
+			continue
+		}
+
+		let candidates: Array<{ name: string; type: common.NamespaceType }> = []
+
+		for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
+			if (
+				namespace.conformsTo === undefined ||
+				!namespace.conformsTo.includes(generic.constraint) ||
+				namespace.targetType === null ||
+				namespace.generics.length > 0
+			) {
+				continue
+			}
+
+			if (matchesType(namespace.targetType, binding)) {
+				candidates.push({ name, type: namespace })
+			}
+		}
+
+		let exactCandidates = candidates.filter((candidate) =>
+			isDeepStrictEqual(candidate.type.targetType, binding),
+		)
+
+		if (exactCandidates.length > 0) {
+			candidates = exactCandidates
+		}
+
+		if (candidates.length === 0) {
+			reportError(
+				`Type '${describeTypeForDiagnostic(binding)}' does not conform to Protocol '${generic.constraint}': no conforming Namespace is in scope.`,
+				position,
+			)
+
+			continue
+		}
+
+		if (candidates.length > 1) {
+			reportError(
+				`Multiple Namespaces conform to Protocol '${generic.constraint}' for Type '${describeTypeForDiagnostic(binding)}', please disambiguate.
+
+The matching Namespaces are:
+${candidates.map((candidate) => `    - ${candidate.name}`).join("\n")}
+`,
+				position,
+			)
+
+			continue
+		}
+
+		let candidate = candidates[0]
+		let result = computeConformanceMethodMap(
+			protocol,
+			candidate.type,
+			binding,
+		)
+
+		if (result.kind !== "conforms") {
+			// NOTE: Reachable when the Namespace covers the binding through a
+			// wider target Type (a Union) but a `Self` position makes the
+			// signatures incompatible for this narrower binding.
+			reportError(
+				`Namespace '${candidate.name}' does not conform to Protocol '${generic.constraint}' for Type '${describeTypeForDiagnostic(binding)}'.`,
+				position,
+			)
+
+			continue
+		}
+
+		conformances.push({
+			genericName: generic.name,
+			protocolName: generic.constraint,
+			source: {
+				kind: "namespace",
+				name: candidate.name,
+				methodMap: result.methodMap,
+			},
+		})
+	}
+
+	return conformances
 }
 
 // NOTE: Called from the Enricher, never from speculative hoisting — a
@@ -1307,6 +1555,40 @@ export function resolveMethodLookupBaseNamespaces(
 	// they match none, so that a broken base expression does not produce
 	// follow-up Diagnostics.
 	if (baseType.type === "Error") {
+		return matchingNamespaces
+	}
+
+	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
+	// resolves ONLY through its Protocol — a pseudo-Namespace named after the
+	// hidden conformance parameter, with `Self` substituted by the Type
+	// Parameter itself. The Simplifier emits the Namespace name as the call
+	// base, so bodies compile to `Item__conformance.method(item, …)` without
+	// any further machinery.
+	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
+		let protocol = findProtocolInScope(baseType.constraint, scope)
+
+		if (protocol !== null) {
+			let conformanceName = `${baseType.name}__conformance`
+			let selfBindings: GenericBindings = new Map([["Self", baseType]])
+			let methods: Record<string, common.MethodType> = {}
+
+			for (let [methodName, method] of Object.entries(protocol.methods)) {
+				methods[methodName] = applyGenericBindings(
+					method,
+					selfBindings,
+				) as common.MethodType
+			}
+
+			matchingNamespaces.set(conformanceName, {
+				type: "Namespace",
+				name: conformanceName,
+				targetType: baseType,
+				generics: [],
+				properties: {},
+				methods,
+			})
+		}
+
 		return matchingNamespaces
 	}
 

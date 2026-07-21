@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import {
 	applyGenericBindings,
+	computeConformanceMethodMap,
 	createInferenceContext,
 	first,
 	flatten,
@@ -21,9 +22,11 @@ import type {
 	GenericUse,
 	ListType,
 	MethodType,
+	NamespaceType,
 	OverloadedMethodType,
 	OverloadedStaticMethodType,
 	PrimitiveType,
+	ProtocolType,
 	RecordType,
 	StaticMethodType,
 	Type,
@@ -1657,6 +1660,207 @@ describe("Helpers", () => {
 						{ inference: inferContextFor(["T"]) },
 					),
 				).toEqual({ type: "Match" })
+			})
+		})
+	})
+
+	describe("computeConformanceMethodMap", () => {
+		const self: GenericUse = { type: "GenericUse", name: "Self" }
+		const integer: Type = { type: "Integer" }
+		const string: Type = { type: "String" }
+
+		const toStringRequirement: MethodType = {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [{ name: null, type: self }],
+			returnType: string,
+		}
+
+		const printable: ProtocolType = {
+			type: "Protocol",
+			name: "Printable",
+			methods: { toString: toStringRequirement },
+		}
+
+		function integerNamespace(
+			methods: NamespaceType["methods"],
+		): NamespaceType {
+			return {
+				type: "Namespace",
+				name: "IntegerPrintable",
+				targetType: integer,
+				generics: [],
+				properties: {},
+				methods,
+				conformsTo: ["Printable"],
+			}
+		}
+
+		it("maps a simple requirement onto a simple Method", () => {
+			let toStringMethod: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [{ name: null, type: integer }],
+				returnType: string,
+			}
+
+			let result = computeConformanceMethodMap(
+				printable,
+				integerNamespace({ toString: toStringMethod }),
+				integer,
+			)
+
+			expect(result).toEqual({
+				kind: "conforms",
+				methodMap: { toString: "toString" },
+			})
+		})
+
+		it("maps a simple requirement onto the first matching overload", () => {
+			let toStringMethod: MethodType = {
+				type: "OverloadedMethod",
+				overloads: [
+					{
+						generics: [],
+						parameterTypes: [
+							{ name: null, type: integer },
+							{ name: null, type: string },
+						],
+						returnType: string,
+					},
+					{
+						generics: [],
+						parameterTypes: [{ name: null, type: integer }],
+						returnType: string,
+					},
+				],
+			}
+
+			let result = computeConformanceMethodMap(
+				printable,
+				integerNamespace({ toString: toStringMethod }),
+				integer,
+			)
+
+			expect(result).toEqual({
+				kind: "conforms",
+				methodMap: { toString: "toString__overload$2" },
+			})
+		})
+
+		it("reports a missing Method", () => {
+			let result = computeConformanceMethodMap(
+				printable,
+				integerNamespace({}),
+				integer,
+			)
+
+			expect(result).toEqual({ kind: "missing", methodName: "toString" })
+		})
+
+		it("reports a mismatched return Type", () => {
+			let toStringMethod: MethodType = {
+				type: "SimpleMethod",
+				generics: [],
+				parameterTypes: [{ name: null, type: integer }],
+				returnType: { type: "Boolean" },
+			}
+
+			let result = computeConformanceMethodMap(
+				printable,
+				integerNamespace({ toString: toStringMethod }),
+				integer,
+			)
+
+			expect(result).toEqual({
+				kind: "mismatched",
+				methodName: "toString",
+			})
+		})
+
+		it("rejects mismatched staticness", () => {
+			let toStringMethod: MethodType = {
+				type: "StaticMethod",
+				generics: [],
+				parameterTypes: [{ name: null, type: integer }],
+				returnType: string,
+			}
+
+			let result = computeConformanceMethodMap(
+				printable,
+				integerNamespace({ toString: toStringMethod }),
+				integer,
+			)
+
+			expect(result).toEqual({
+				kind: "mismatched",
+				methodName: "toString",
+			})
+		})
+
+		it("maps overloaded requirements by Protocol overload order", () => {
+			const combinable: ProtocolType = {
+				type: "Protocol",
+				name: "Combinable",
+				methods: {
+					combine: {
+						type: "OverloadedMethod",
+						overloads: [
+							{
+								generics: [],
+								parameterTypes: [
+									{ name: null, type: self },
+									{ name: null, type: self },
+								],
+								returnType: self,
+							},
+							{
+								generics: [],
+								parameterTypes: [
+									{ name: null, type: self },
+									{ name: null, type: string },
+								],
+								returnType: self,
+							},
+						],
+					},
+				},
+			}
+
+			let result = computeConformanceMethodMap(
+				combinable,
+				integerNamespace({
+					combine: {
+						type: "OverloadedMethod",
+						overloads: [
+							{
+								generics: [],
+								parameterTypes: [
+									{ name: null, type: integer },
+									{ name: null, type: string },
+								],
+								returnType: integer,
+							},
+							{
+								generics: [],
+								parameterTypes: [
+									{ name: null, type: integer },
+									{ name: null, type: integer },
+								],
+								returnType: integer,
+							},
+						],
+					},
+				}),
+				integer,
+			)
+
+			expect(result).toEqual({
+				kind: "conforms",
+				methodMap: {
+					combine__overload$1: "combine__overload$2",
+					combine__overload$2: "combine__overload$1",
+				},
 			})
 		})
 	})

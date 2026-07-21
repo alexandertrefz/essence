@@ -400,5 +400,62 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("Printable")
 			expect(code).not.toContain("toString")
 		})
+
+		it("should pass a conformance value at bounded invocations", () => {
+			const code = generate(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorPrintable for Vector is Printable {
+					toString() -> String {
+						<- "vector"
+					}
+				}
+
+				function describeValue <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				__print(describeValue({ x = 1, y = 2 }))
+			}`)
+
+			// NOTE: The bounded Function gains a hidden trailing parameter, its
+			// body dispatches through it, and the call site packages the
+			// conforming Namespace's Methods into an object literal.
+			expect(code).toContain("Value__conformance")
+			expect(code).toContain("VectorPrintable.toString")
+			expect(code).toContain("Value__conformance.toString(")
+		})
+
+		it("should forward a conformance parameter between bounded Functions", () => {
+			const code = generate(`implementation {
+				protocol Printable {
+					toString() -> String
+				}
+
+				type Vector = { x: Number, y: Number }
+
+				namespace VectorPrintable for Vector is Printable {
+					toString() -> String {
+						<- "vector"
+					}
+				}
+
+				function inner <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				function outer <infer Item is Printable>(_ item: Item) -> String {
+					<- inner(item)
+				}
+
+				__print(outer({ x = 1, y = 2 }))
+			}`)
+
+			expect(code).toContain("inner(item, Item__conformance)")
+		})
 	})
 })

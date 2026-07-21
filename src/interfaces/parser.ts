@@ -399,6 +399,9 @@ export interface GenericDeclarationNode {
 	name: IdentifierNode
 	defaultType: TypeDeclarationNode | null
 	inferred: boolean
+	// NOTE: The Protocol bound of `<infer Item is Comparable>` — null when
+	// the Type Parameter is unbounded.
+	constraint: IdentifierNode | null
 	position: Position
 }
 

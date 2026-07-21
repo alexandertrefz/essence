@@ -1310,21 +1310,46 @@ class DescentParser {
 		let name = this.parseIdentifier()
 		let start = inferKeyword?.position.start ?? name.position.start
 
+		// NOTE: `is` is contextual — `<infer Item is Comparable>` bounds the
+		// Type Parameter by a Protocol.
+		let constraint: parser.IdentifierNode | null = null
+		let peeked = this.tokens.peek()
+		if (
+			peeked?.type === TokenType.Identifier &&
+			peeked.value === "is" &&
+			isIdentifierToken(this.tokens.peek(1))
+		) {
+			this.tokens.next()
+			constraint = this.parseIdentifier()
+		}
+
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			this.tokens.next()
 
 			let type = this.parseType()
 
-			return generators.genericDeclarationNode(name, type, inferred, {
-				start,
-				end: type.position.end,
-			})
+			return generators.genericDeclarationNode(
+				name,
+				type,
+				inferred,
+				constraint,
+				{
+					start,
+					end: type.position.end,
+				},
+			)
 		}
 
-		return generators.genericDeclarationNode(name, null, inferred, {
-			start,
-			end: name.position.end,
-		})
+		return generators.genericDeclarationNode(
+			name,
+			null,
+			inferred,
+			constraint,
+			{
+				start,
+				end: constraint?.position.end ?? name.position.end,
+			},
+		)
 	}
 
 	protected parseParameterList(): {

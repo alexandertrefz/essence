@@ -95,13 +95,23 @@ function validateExpression(
 			return validateFunctionValue(node)
 		case "FractionValue":
 			return validateFractionValue(node)
-		case "Combination":
 		case "RecordValue":
+			for (let member of Object.values(node.members)) {
+				validateNoBoundFunctionValue(member)
+			}
+
+			return node
+		case "ListValue":
+			for (let value of node.values) {
+				validateNoBoundFunctionValue(value)
+			}
+
+			return node
+		case "Combination":
 		case "StringValue":
 		case "IntegerValue":
 		case "BooleanValue":
 		case "NothingValue":
-		case "ListValue":
 		case "Identifier":
 		case "Self":
 			// these nodes dont need any validation
@@ -109,10 +119,49 @@ function validateExpression(
 	}
 }
 
+// NOTE: A value whose Type is a Function with Protocol-bounded Type
+// Parameters can not travel — its hidden conformance parameters only exist
+// at direct invocations, where the Enricher resolves them from the concrete
+// bindings. A stored bounded Function would later be invoked without its
+// conformances, so every value position rejects it.
+function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
+	if (isBoundFunctionType(node.type)) {
+		reportError(
+			"A Function with Protocol-bound Type Parameters can not be used as a value (yet) — call it directly.",
+			node.position,
+		)
+	}
+}
+
+function isBoundFunctionType(type: common.Type): boolean {
+	if (
+		type.type === "Function" ||
+		type.type === "SimpleMethod" ||
+		type.type === "StaticMethod"
+	) {
+		return type.generics.some((generic) => generic.constraint != null)
+	}
+
+	if (
+		type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+	) {
+		return type.overloads.some((overload) =>
+			overload.generics.some((generic) => generic.constraint != null),
+		)
+	}
+
+	return false
+}
+
 function validateNativeFunctionInvocation(
 	node: common.typed.NativeFunctionInvocationNode,
 ): common.typed.NativeFunctionInvocationNode {
 	const functionType = node.name.type
+
+	for (let argumentNode of node.arguments) {
+		validateNoBoundFunctionValue(argumentNode.value)
+	}
 
 	if (functionType.type === "Function") {
 		validateSimpleFunctionInvocation(
@@ -135,6 +184,7 @@ function validateMethodInvocation(
 ): common.typed.MethodInvocationNode {
 	for (let argumentNode of node.arguments) {
 		validateExpression(argumentNode.value)
+		validateNoBoundFunctionValue(argumentNode.value)
 	}
 
 	validateExpression(node.base)
@@ -149,6 +199,7 @@ function validateFunctionInvocation(
 
 	for (let argumentNode of node.arguments) {
 		validateExpression(argumentNode.value)
+		validateNoBoundFunctionValue(argumentNode.value)
 	}
 
 	if (
@@ -406,6 +457,7 @@ function validateConstantDeclarationStatement(
 	}
 
 	validateExpression(node.value)
+	validateNoBoundFunctionValue(node.value)
 
 	return node
 }
@@ -423,6 +475,7 @@ function validateVariableDeclarationStatement(
 	}
 
 	validateExpression(node.value)
+	validateNoBoundFunctionValue(node.value)
 
 	return node
 }
@@ -438,6 +491,7 @@ function validateVariableAssignmentStatement(
 	}
 
 	validateExpression(node.value)
+	validateNoBoundFunctionValue(node.value)
 
 	return node
 }
@@ -534,6 +588,7 @@ function validateReturnStatement(
 	}
 
 	validateExpression(node.expression)
+	validateNoBoundFunctionValue(node.expression)
 
 	return node
 }
