@@ -429,7 +429,14 @@ function findEnclosingInvocation(
 			case "FunctionValue":
 				visitBody(node.value.body)
 				return
+			case "CaseValue":
+				if (node.value !== null) {
+					visitNode(node.value)
+				}
+
+				return
 			case "TypeAliasStatement":
+			case "ChoiceDeclarationStatement":
 			case "Identifier":
 			case "Self":
 			case "StringValue":

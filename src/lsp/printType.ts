@@ -6,7 +6,15 @@ import type { common } from "../interfaces/index"
 export function printType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
+			// NOTE: A Choice's Union prints as the Choice's name — spelling
+			// out every Case would drown the Hover.
+			if (type.name !== undefined) {
+				return type.name
+			}
+
 			return type.types.map(printType).join(" | ")
+		case "Case":
+			return `${type.choice}#${type.name}`
 		case "List":
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":
@@ -33,6 +41,19 @@ export function printType(type: common.Type): string {
 		default:
 			return type.type
 	}
+}
+
+// NOTE: A Case with its payload shape spelled out — for Hovers where the
+// Case itself is the subject rather than a mention. `printType` deliberately
+// stays terse (`CalculatorOperation#Add`); this is the descriptive form.
+export function printCaseWithPayload(caseType: common.CaseType): string {
+	let members = Object.entries(caseType.members).map(
+		([memberName, memberType]) => `${memberName}: ${printType(memberType)}`,
+	)
+
+	return members.length === 0
+		? `${caseType.choice}#${caseType.name}`
+		: `${caseType.choice}#${caseType.name} { ${members.join(", ")} }`
 }
 
 // NOTE: Non-static Methods carry Self as their first Parameter Type — for

@@ -44,6 +44,7 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.SymbolRightBracket]: "]",
 	[TokenType.SymbolLeftAngle]: "<",
 	[TokenType.SymbolRightAngle]: ">",
+	[TokenType.SymbolHash]: "#",
 	[TokenType.LiteralTrue]: "true",
 	[TokenType.LiteralFalse]: "false",
 	[TokenType.LiteralNothing]: "nothing",
@@ -61,6 +62,7 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordWith]: "with",
 	[TokenType.KeywordNamespace]: "namespace",
 	[TokenType.KeywordFor]: "for",
+	[TokenType.KeywordChoice]: "choice",
 }
 
 export function describeTokenType(tokenType: lexer.TokenType): string {

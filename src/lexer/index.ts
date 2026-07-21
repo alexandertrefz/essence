@@ -58,6 +58,7 @@ const keywords = [
 	"protocol",
 	"for",
 	"infer",
+	"choice",
 ]
 const symbols = [
 	"(",
@@ -78,6 +79,7 @@ const symbols = [
 	"-",
 	"~",
 	"_",
+	"#",
 ]
 const numbers = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 const whitespaces = [" ", "\t"]
@@ -137,6 +139,8 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordFor
 	} else if (value === "infer") {
 		return TokenType.KeywordInfer
+	} else if (value === "choice") {
+		return TokenType.KeywordChoice
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */
@@ -183,6 +187,8 @@ const getSymbolType = (value: string) => {
 		return TokenType.SymbolLeftAngle
 	} else if (value === "_") {
 		return TokenType.SymbolUnderscore
+	} else if (value === "#") {
+		return TokenType.SymbolHash
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

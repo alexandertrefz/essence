@@ -1,8 +1,12 @@
 import { reportError } from "../diagnostics/index"
-import { matchesType } from "../helpers/index"
+import { flattenUnionMembers, matchesType } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import {
 	checkProtocolConformance,
+	findTypeInScope,
+	resolveCaseMatcherType,
+	resolveCaseValueType,
+	resolveChoiceDeclarationStatementType,
 	resolveCombinationType,
 	resolveFunctionInvocation,
 	resolveFunctionValueType,
@@ -37,6 +41,7 @@ export function enrichNode(
 		case "Identifier":
 		case "Self":
 		case "Match":
+		case "CaseValue":
 			return enrichExpression(node, scope)
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
@@ -44,6 +49,7 @@ export function enrichNode(
 		case "NamespaceDefinitionStatement":
 		case "ProtocolDeclarationStatement":
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "IfElseStatement":
 		case "IfStatement":
 		case "ReturnStatement":
@@ -54,9 +60,14 @@ export function enrichNode(
 
 // #region Expressions
 
+// NOTE: `expectedType` is what the surrounding position wants the Expression
+// to be — a Declaration's annotation, an Assignment's target, the declared
+// return Type at a `<-`. Only bare Case Expressions consume it (they resolve
+// against it before scanning the scope); everything else infers bottom-up.
 export function enrichExpression(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
@@ -91,6 +102,42 @@ export function enrichExpression(
 			return enrichSelf(node, scope)
 		case "Match":
 			return enrichMatch(node, scope)
+		case "CaseValue":
+			return enrichCaseValue(node, scope, expectedType)
+	}
+}
+
+export function enrichCaseValue(
+	node: parser.CaseValueNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
+): common.typed.CaseValueNode {
+	let type = resolveCaseValueType(node, scope, expectedType)
+
+	return {
+		nodeType: "CaseValue",
+		// NOTE: The Choice's name is a Type name, not a value — it is typed by
+		// Type-scope lookup, so hovering it describes the Choice's Union.
+		choice:
+			node.choice === null
+				? null
+				: {
+						nodeType: "Identifier",
+						content: node.choice.content,
+						position: node.choice.position,
+						type: findTypeInScope(node.choice.content, scope) ?? {
+							type: "Error",
+						},
+					},
+		caseName: {
+			nodeType: "Identifier",
+			content: node.caseName.content,
+			position: node.caseName.position,
+			type,
+		},
+		value: node.value === null ? null : enrichExpression(node.value, scope),
+		position: node.position,
+		type,
 	}
 }
 
@@ -185,17 +232,22 @@ export function enrichMethodFunctionDefinition(
 		}
 	}
 
-	let newScope = {
+	let newScope: enricher.Scope = {
 		parent: scope,
 		members: {},
 		constants: new Set(),
 		types,
 		protocols: {},
-	} satisfies enricher.Scope
+	}
 
 	if (selfType !== null) {
 		declareVariableInScope("@", selfType, newScope, true)
 	}
+
+	// NOTE: Resolved before the body so that `<-` Expressions can consult it
+	// — a bare Case resolves against the declared return Type first.
+	let returnType = resolveType(method.value.returnType, newScope)
+	newScope.expectedReturnType = returnType
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -206,7 +258,7 @@ export function enrichMethodFunctionDefinition(
 			enrichParameter(parameter, newScope),
 		),
 		body: method.value.body.map((node) => enrichNode(node, newScope)),
-		returnType: resolveType(method.value.returnType, newScope),
+		returnType,
 	}
 }
 
@@ -244,13 +296,18 @@ export function enrichFunctionDefinition(
 		}
 	}
 
-	let newScope = {
+	let newScope: enricher.Scope = {
 		parent: scope,
 		members: {},
 		constants: new Set<string>(),
 		types,
 		protocols: {},
-	} satisfies enricher.Scope
+	}
+
+	// NOTE: Resolved before the body so that `<-` Expressions can consult it
+	// — a bare Case resolves against the declared return Type first.
+	let returnType = resolveType(node.returnType, newScope)
+	newScope.expectedReturnType = returnType
 
 	return {
 		nodeType: "FunctionDefinition",
@@ -261,7 +318,7 @@ export function enrichFunctionDefinition(
 			enrichGenericDeclarationNode(generic, scope),
 		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
-		returnType: resolveType(node.returnType, newScope),
+		returnType,
 	}
 }
 
@@ -473,7 +530,10 @@ function resolveWildcardMatcherType(
 		return isHandled(valueType) ? { type: "Unknown" } : valueType
 	}
 
-	let remainingTypes = valueType.types.filter(
+	// NOTE: Flattened for the same reason the Validator's exhaustiveness
+	// check flattens — a nested Union member (`Number`, a Choice) is handled
+	// member by member.
+	let remainingTypes = flattenUnionMembers(valueType).filter(
 		(memberType) => !isHandled(memberType),
 	)
 
@@ -493,18 +553,23 @@ export function enrichMatch(
 	scope: enricher.Scope,
 ): common.typed.MatchNode {
 	let value = enrichExpression(node.value, scope)
+	let returnType = resolveType(node.returnType, scope)
 	let handledMatchers: Array<common.Type> = []
 
 	return {
 		nodeType: "Match",
 		value,
 		handlers: node.handlers.map((handler) => {
+			// NOTE: `expectedReturnType` is what a Handler's `<-` yields — a
+			// bare Case there resolves against the Match's declared return
+			// Type first.
 			let bodyScope = {
 				parent: scope,
 				members: {},
 				constants: new Set(),
 				types: {},
 				protocols: {},
+				expectedReturnType: returnType,
 			} satisfies enricher.Scope
 
 			let literal: common.typed.ExpressionNode | null = null
@@ -523,6 +588,12 @@ export function enrichMatch(
 				matcher = resolveWildcardMatcherType(
 					value.type,
 					handledMatchers,
+				)
+			} else if (handler.matcher.nodeType === "CaseMatcher") {
+				matcher = resolveCaseMatcherType(
+					handler.matcher,
+					value.type,
+					scope,
 				)
 			} else if (handler.matcher.nodeType === "RecordMatcher") {
 				// NOTE: Both kinds of member contribute a Type, so `@` is a
@@ -584,7 +655,7 @@ export function enrichMatch(
 			}
 		}),
 		position: node.position,
-		type: resolveType(node.returnType, scope),
+		type: returnType,
 	}
 }
 
@@ -612,6 +683,8 @@ export function enrichStatement(
 			return enrichProtocolDeclarationStatement(node, scope, isHoisted)
 		case "TypeAliasStatement":
 			return enrichTypeAliasStatement(node, scope, isHoisted)
+		case "ChoiceDeclarationStatement":
+			return enrichChoiceDeclarationStatement(node, scope, isHoisted)
 		case "IfElseStatement":
 			return enrichIfElseStatementNode(node, scope)
 		case "IfStatement":
@@ -627,23 +700,20 @@ export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
-	let type: common.Type
+	// NOTE: The annotation is the value's expected Type — a bare Case in the
+	// value resolves against it before the scope scan.
+	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
+	let value = enrichExpression(node.value, scope, declaredType)
 
-	if (node.type === null) {
-		type = resolveType(node.value, scope)
-	} else {
-		type = resolveType(node.type, scope)
-	}
-
-	declareVariableInScope(node.name, type, scope, true)
+	declareVariableInScope(node.name, declaredType ?? value.type, scope, true)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
 		name: enrichIdentifier(node.name, scope),
-		value: enrichExpression(node.value, scope),
+		value,
 		position: node.position,
-		type: resolveType(node.value, scope),
-		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
+		type: value.type,
+		declaredType,
 		documentation: node.documentation,
 	}
 }
@@ -652,27 +722,20 @@ export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
-	let type: common.Type
+	// NOTE: The annotation is the value's expected Type — a bare Case in the
+	// value resolves against it before the scope scan.
+	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
+	let value = enrichExpression(node.value, scope, declaredType)
 
-	if (node.type === null) {
-		type = resolveType(node.value, scope)
-	} else {
-		type = resolveType(node.type, scope)
-	}
-
-	declareVariableInScope(node.name, type, scope)
+	declareVariableInScope(node.name, declaredType ?? value.type, scope)
 
 	return {
 		nodeType: "VariableDeclarationStatement",
-		name: enrichIdentifier(
-			node.name,
-			scope,
-			resolveType(node.value, scope),
-		),
-		value: enrichExpression(node.value, scope),
+		name: enrichIdentifier(node.name, scope, value.type),
+		value,
 		position: node.position,
-		type: resolveType(node.value, scope),
-		declaredType: node.type !== null ? resolveType(node.type, scope) : null,
+		type: value.type,
+		declaredType,
 		documentation: node.documentation,
 	}
 }
@@ -690,10 +753,14 @@ export function enrichVariableAssignmentStatement(
 		)
 	}
 
+	let name = enrichIdentifier(node.name, scope)
+
 	return {
 		nodeType: "VariableAssignmentStatement",
-		name: enrichIdentifier(node.name, scope),
-		value: enrichExpression(node.value, scope),
+		name,
+		// NOTE: The target Variable's Type is the value's expected Type — a
+		// bare Case in the value resolves against it before the scope scan.
+		value: enrichExpression(node.value, scope, name.type),
 		position: node.position,
 	}
 }
@@ -841,6 +908,53 @@ export function enrichTypeAliasStatement(
 	}
 }
 
+export function enrichChoiceDeclarationStatement(
+	node: parser.ChoiceDeclarationStatementNode,
+	scope: enricher.Scope,
+	isHoisted = false,
+): common.typed.ChoiceDeclarationStatementNode {
+	const type = resolveChoiceDeclarationStatementType(node, scope)
+
+	if (!isHoisted) {
+		declareTypeInScope(node.name, type, scope)
+	}
+
+	let caseTypes = type.types.filter(
+		(member): member is common.CaseType => member.type === "Case",
+	)
+
+	return {
+		nodeType: "ChoiceDeclarationStatement",
+		name: enrichIdentifier(node.name, scope, type),
+		// NOTE: A duplicate Case was already diagnosed and dropped from the
+		// Union — its name Identifier borrows the surviving Case's Type so the
+		// typed tree stays complete.
+		cases: node.cases.map((choiceCase) => {
+			let caseType = caseTypes.find(
+				(candidate) => candidate.name === choiceCase.name.content,
+			) ?? {
+				type: "Case" as const,
+				choice: node.name.content,
+				name: choiceCase.name.content,
+				members: {},
+			}
+
+			return {
+				name: {
+					nodeType: "Identifier" as const,
+					content: choiceCase.name.content,
+					position: choiceCase.name.position,
+					type: caseType,
+				},
+				type: caseType,
+			}
+		}),
+		type,
+		position: node.position,
+		documentation: node.documentation,
+	}
+}
+
 export function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
@@ -895,9 +1009,29 @@ export function enrichReturnStatement(
 ): common.typed.ReturnStatementNode {
 	return {
 		nodeType: "ReturnStatement",
-		expression: enrichExpression(node.expression, scope),
+		// NOTE: The nearest declared return Type is the expected Type — the
+		// enclosing Function's, or the Match's for a Handler body.
+		expression: enrichExpression(
+			node.expression,
+			scope,
+			findExpectedReturnType(scope),
+		),
 		position: node.position,
 	}
+}
+
+function findExpectedReturnType(scope: enricher.Scope): common.Type | null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		if (searchScope.expectedReturnType !== undefined) {
+			return searchScope.expectedReturnType
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return null
 }
 
 export function enrichFunctionStatement(

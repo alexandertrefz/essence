@@ -518,6 +518,8 @@ const symbolKinds: Record<DocumentSymbolEntry["kind"], SymbolKind> = {
 	namespace: SymbolKind.Namespace,
 	protocol: SymbolKind.Interface,
 	typeAlias: SymbolKind.Interface,
+	choice: SymbolKind.Enum,
+	case: SymbolKind.EnumMember,
 	member: SymbolKind.Field,
 	method: SymbolKind.Method,
 	staticMethod: SymbolKind.Method,

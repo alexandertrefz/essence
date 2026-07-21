@@ -308,7 +308,12 @@ function findProbeLookupInNode(
 		}
 		case "FunctionValue":
 			return findProbeLookup(node.value.body)
+		case "CaseValue":
+			return node.value === null
+				? null
+				: findProbeLookupInNode(node.value)
 		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":

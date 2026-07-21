@@ -128,6 +128,16 @@ export function applyGenericBindings(
 					]),
 				),
 			}
+		case "Case":
+			return {
+				...type,
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, memberType]) => [
+						name,
+						applyGenericBindings(memberType, bindings),
+					]),
+				),
+			}
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
@@ -544,6 +554,13 @@ function matchTypes(
 		}
 
 		return false
+	}
+
+	// NOTE: Cases are nominal — a Case only matches its own Choice's Case of
+	// the same name, never a structurally identical Record (and vice versa).
+	// That identity is the entire point of declaring a Choice.
+	if (lhs.type === "Case" && rhs.type === "Case") {
+		return lhs.choice === rhs.choice && lhs.name === rhs.name
 	}
 
 	if (lhs.type === "Record" && rhs.type === "Record") {

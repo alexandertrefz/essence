@@ -30,6 +30,21 @@ export type ExpressionNode =
 	| IdentifierNode
 	| CombinationNode
 	| MatchNode
+	| CaseValueNode
+
+// NOTE: `ChoiceName#CaseName` with an optional payload —
+// `CalculatorOperation#Add({ left = 1, right = 1 })` constructs a Case,
+// `CalculatorOperation#ClearAll` references a unit Case. The payload is any
+// Expression of the Case's Record shape, not only a literal. A null `choice`
+// is the bare form (`#Add({ … })`), resolved against the Choices in scope —
+// like Namespace resolution, it asks for the prefix only on ambiguity.
+export interface CaseValueNode {
+	nodeType: "CaseValue"
+	choice: IdentifierNode | null
+	caseName: IdentifierNode
+	value: ExpressionNode | null
+	position: Position
+}
 
 export interface NativeFunctionInvocationNode {
 	nodeType: "NativeFunctionInvocation"
@@ -165,6 +180,18 @@ export type MatcherNode =
 	| WildcardMatcherNode
 	| LiteralMatcherNode
 	| RecordMatcherNode
+	| CaseMatcherNode
+
+// NOTE: `case #Add` — a bare Case Matcher resolves its name against the
+// matched value's own Union, so Cases match without their Choice's name in
+// scope. The prefixed form (`case CalculatorOperation#Add`) disambiguates
+// when two Choices in one Union share a Case name.
+export interface CaseMatcherNode {
+	nodeType: "CaseMatcher"
+	choice: IdentifierNode | null
+	caseName: IdentifierNode
+	position: Position
+}
 
 // NOTE: A Record Matcher constrains members individually — `name: Type` by
 // Type, `name = value` by value. A Matcher that constrains any member by value
@@ -213,6 +240,7 @@ export type StatementNode =
 	| NamespaceDefinitionStatementNode
 	| ProtocolDeclarationStatementNode
 	| TypeAliasStatementNode
+	| ChoiceDeclarationStatementNode
 	| IfElseStatementNode
 	| IfStatementNode
 	| ReturnStatementNode
@@ -339,6 +367,22 @@ export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
 	methods: ProtocolMethods
+	position: Position
+	documentation: Documentation | null
+}
+
+// NOTE: A Case's payload is always declared as a Record shape (or nothing at
+// all for a unit Case) — every payload member is named at the declaration, so
+// no wrapper property is ever needed to reach it.
+export interface ChoiceCaseNode {
+	name: IdentifierNode
+	type: RecordTypeDeclarationNode | null
+}
+
+export interface ChoiceDeclarationStatementNode {
+	nodeType: "ChoiceDeclarationStatement"
+	name: IdentifierNode
+	cases: Array<ChoiceCaseNode>
 	position: Position
 	documentation: Documentation | null
 }

@@ -177,7 +177,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Only Records and Namespaces have members.",
+				"Only Records, Cases and Namespaces have members.",
 			)
 		})
 
