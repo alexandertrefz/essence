@@ -33,10 +33,35 @@ export type DiagnosticSeverity = "error" | "warning"
 // wrong.
 export type DiagnosticTag = "unnecessary" | "deprecated"
 
+// NOTE: An annotated span. A `primary` Label says what is wrong at the place
+// the Diagnostic is about; a `secondary` Label points at the declaration that
+// place is being judged against — the Type it was declared with, the `{` that
+// was never closed — and is what turns a claim into an explanation.
+export type DiagnosticLabel = {
+	position: Position
+	message: string
+	kind?: "primary" | "secondary"
+	// NOTE: Lower orders render first. Only worth setting when two Labels
+	// start at the same place and the natural order reads backwards.
+	order?: number
+}
+
 export type Diagnostic = {
 	severity: DiagnosticSeverity
+	// NOTE: A short claim about what is wrong. The Types, the spans and the
+	// suggested fix belong in `labels`, `notes` and `helps` — a message that
+	// carries them itself renders as one long line above an unannotated
+	// source excerpt, which is the shape this exists to avoid.
 	message: string
+	// NOTE: THE place the Diagnostic is about — what the Language Server
+	// underlines and what deduplication keys off. The primary Label repeats
+	// it with an explanation attached.
 	position: Position | null
+	labels?: Array<DiagnosticLabel>
+	// NOTE: Context — why the rule exists, what the alternatives were.
+	notes?: Array<string>
+	// NOTE: Action — what to write instead.
+	helps?: Array<string>
 	// NOTE: A stable identifier for the kind of Diagnostic, independent of
 	// the message wording — what a Language Server client keys Quick Fixes
 	// off, and what lets a message be reworded without breaking them.

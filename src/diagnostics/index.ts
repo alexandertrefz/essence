@@ -14,9 +14,27 @@ function isDuplicate(diagnostic: common.Diagnostic): boolean {
 	return activeDiagnostics.some(
 		(existingDiagnostic) =>
 			existingDiagnostic.severity === diagnostic.severity &&
+			existingDiagnostic.code === diagnostic.code &&
 			existingDiagnostic.message === diagnostic.message &&
 			isDeepStrictEqual(existingDiagnostic.position, diagnostic.position),
 	)
+}
+
+// NOTE: Label constructors rather than object literals, so that the common
+// case — a primary Label on the Diagnostic's own Position — stays one short
+// line at the ~100 report sites and the `kind` is never left to a default.
+export function primary(
+	position: common.Position,
+	message: string,
+): common.DiagnosticLabel {
+	return { position, message, kind: "primary" }
+}
+
+export function secondary(
+	position: common.Position,
+	message: string,
+): common.DiagnosticLabel {
+	return { position, message, kind: "secondary" }
 }
 
 export function report(diagnostic: common.Diagnostic): void {
@@ -27,6 +45,9 @@ export function report(diagnostic: common.Diagnostic): void {
 
 type DiagnosticDetails = {
 	code?: common.DiagnosticCode
+	labels?: Array<common.DiagnosticLabel>
+	notes?: Array<string>
+	helps?: Array<string>
 	tags?: Array<common.DiagnosticTag>
 }
 

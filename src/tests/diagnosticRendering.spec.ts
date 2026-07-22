@@ -134,6 +134,7 @@ describe("diagnostic rendering", () => {
 			 2 │ x = 20
 			   │ ─
 			───╯
+
 			Error: Missing declaration.
 			`,
 		)
@@ -151,6 +152,175 @@ describe("diagnostic rendering", () => {
 		)
 
 		expect(output).toContain("Error: Something at the very end.")
+	})
+
+	test("renders a code in the header", () => {
+		let output = renderDiagnostic(
+			{
+				severity: "error",
+				message: "Match Expression does not handle every Case",
+				position: {
+					start: { line: 1, column: 1 },
+					end: { line: 1, column: 9 },
+				},
+				code: "missing-case",
+			},
+			new Source("constant x = 10\n"),
+			"Test.es",
+			{ color: false },
+		)
+
+		expect(output).toContain(
+			"[missing-case]\nError: Match Expression does not handle every Case",
+		)
+	})
+
+	test("renders a primary Label's message beside its span", () => {
+		let output = renderDiagnostic(
+			{
+				severity: "error",
+				message: "This value does not fit Variable 'x'",
+				position: {
+					start: { line: 2, column: 5 },
+					end: { line: 2, column: 11 },
+				},
+				labels: [
+					{
+						position: {
+							start: { line: 2, column: 5 },
+							end: { line: 2, column: 11 },
+						},
+						message: "this is a String",
+						kind: "primary",
+					},
+				],
+			},
+			new Source('variable x = 10\nx = "ten"\n'),
+			"Test.es",
+			{ color: false },
+		)
+
+		expectOutput(
+			output,
+			`
+			Error: This value does not fit Variable 'x'
+			   ╭─┤ Test.es:2:5 │
+			   │
+			 2 │ x = "ten"
+			   │     ───┬──
+			   │        ╰──── this is a String
+			───╯
+			`,
+		)
+	})
+
+	test("renders a secondary Label pointing at the declaration", () => {
+		let output = renderDiagnostic(
+			{
+				severity: "error",
+				message: "This value does not fit Variable 'x'",
+				position: {
+					start: { line: 2, column: 5 },
+					end: { line: 2, column: 11 },
+				},
+				labels: [
+					{
+						position: {
+							start: { line: 2, column: 5 },
+							end: { line: 2, column: 11 },
+						},
+						message: "this is a String",
+						kind: "primary",
+					},
+					{
+						position: {
+							start: { line: 1, column: 14 },
+							end: { line: 1, column: 16 },
+						},
+						message: "declared as Integer here",
+						kind: "secondary",
+					},
+				],
+			},
+			new Source('variable x = 10\nx = "ten"\n'),
+			"Test.es",
+			{ color: false },
+		)
+
+		expect(output).toContain("declared as Integer here")
+		expect(output).toContain("this is a String")
+		expect(output).toContain(" 1 │ variable x = 10")
+		expect(output).toContain(' 2 │ x = "ten"')
+	})
+
+	test("renders notes and helps below the source", () => {
+		let output = renderDiagnostic(
+			{
+				severity: "error",
+				message: "Case '#Green' is ambiguous",
+				position: {
+					start: { line: 1, column: 1 },
+					end: { line: 1, column: 9 },
+				},
+				notes: ["'Colour' declares it.", "'Traffic' declares it too."],
+				helps: ["Write 'Colour.Green' instead."],
+			},
+			new Source("constant x = 10\n"),
+			"Test.es",
+			{ color: false },
+		)
+
+		expect(output).toContain("Help: Write 'Colour.Green' instead.")
+		expect(output).toContain("Note 1: 'Colour' declares it.")
+		expect(output).toContain("Note 2: 'Traffic' declares it too.")
+	})
+
+	test("colors primary and secondary Labels differently", () => {
+		let output = renderDiagnostic(
+			{
+				severity: "error",
+				message: "This value does not fit Variable 'x'",
+				position: {
+					start: { line: 2, column: 5 },
+					end: { line: 2, column: 11 },
+				},
+				labels: [
+					{
+						position: {
+							start: { line: 2, column: 5 },
+							end: { line: 2, column: 11 },
+						},
+						message: "this is a String",
+						kind: "primary",
+					},
+					{
+						position: {
+							start: { line: 1, column: 14 },
+							end: { line: 1, column: 16 },
+						},
+						message: "declared as Integer here",
+						kind: "secondary",
+					},
+				],
+			},
+			new Source('variable x = 10\nx = "ten"\n'),
+			"Test.es",
+		)
+
+		// NOTE: Ariadne colors a Label's underline and arrow, not its message
+		// text, so the assertion is about the arrows: the primary one in the
+		// severity color, the secondary one in a generated 8-bit color.
+		let lines = output.split("\n")
+		let primaryArrow = lines.find((line) =>
+			line.includes("this is a String"),
+		) as string
+		let secondaryArrow = lines.find((line) =>
+			line.includes("declared as Integer here"),
+		) as string
+
+		expect(primaryArrow).toContain("\x1b[31m╰\x1b[0m")
+		expect(secondaryArrow).toContain("\x1b[38;5;")
+		expect(secondaryArrow).not.toContain("\x1b[31m")
 	})
 
 	test("colored output styles the severity header", () => {
