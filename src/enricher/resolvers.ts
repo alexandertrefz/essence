@@ -14,6 +14,10 @@ import {
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 
+// NOTE: `expectedType` is the Type the surrounding context requires of this
+// Expression, and is only ever set for an Argument being matched against a
+// parameter. Everything ignores it but a Function literal, which reads its
+// omitted annotations off it.
 export function resolveType(
 	node:
 		| parser.ExpressionNode
@@ -21,6 +25,7 @@ export function resolveType(
 		| parser.TypeDeclarationNode
 		| parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.Type {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
@@ -46,7 +51,7 @@ export function resolveType(
 		case "NothingValue":
 			return { type: "Nothing" }
 		case "FunctionValue":
-			return resolveFunctionValueType(node, scope)
+			return resolveFunctionValueType(node, scope, expectedType)
 		case "CaseValue":
 			return resolveCaseValueType(node, scope)
 		case "Lookup":
@@ -83,7 +88,7 @@ export function resolveFunctionTypeDeclarationType(
 		generics: [],
 		parameterTypes: node.parameterTypes.map((parameter) => ({
 			name: parameter.externalName?.content ?? null,
-			type: resolveType(parameter.type, scope),
+			type: resolveDeclaredType(parameter.type, scope),
 		})),
 		returnType: resolveType(node.returnType, scope),
 	}
@@ -217,7 +222,8 @@ function resolveInferredReturnType(
 	let matchableArguments: Array<MatchableArgument> = invocationArguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
-			getType: () => resolveType(argument.value, scope),
+			getType: (expectedType) =>
+				resolveType(argument.value, scope, expectedType),
 		}),
 	)
 
@@ -256,7 +262,8 @@ export function resolveInvokedMethodInNamespace(
 	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
-			getType: () => resolveType(argument.value, scope),
+			getType: (expectedType) =>
+				resolveType(argument.value, scope, expectedType),
 		}),
 	)
 
@@ -741,7 +748,8 @@ export function resolveFunctionInvocation(
 		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 			(argument) => ({
 				name: argument.name?.content ?? null,
-				getType: () => resolveType(argument.value, scope),
+				getType: (expectedType) =>
+					resolveType(argument.value, scope, expectedType),
 			}),
 		)
 
@@ -774,7 +782,8 @@ export function resolveFunctionInvocation(
 		const matchableArguments: Array<MatchableArgument> = node.arguments.map(
 			(argument) => ({
 				name: argument.name?.content ?? null,
-				getType: () => resolveType(argument.value, scope),
+				getType: (expectedType) =>
+					resolveType(argument.value, scope, expectedType),
 			}),
 		)
 
@@ -1214,8 +1223,34 @@ export function resolveRecordValueType(
 export function resolveFunctionValueType(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.FunctionType {
-	return resolveFunctionDefinitionType(node.value, scope)
+	return resolveFunctionDefinitionType(node.value, scope, expectedType)
+}
+
+// NOTE: The Enricher builds a Function literal's typed Nodes in a separate
+// pass from the one that matched it against a signature, so the Types its
+// omitted annotations resolved to have to be read back rather than worked out
+// again — there is no expected Type left to work them out from.
+//
+// A literal that is not an Argument was never matched against anything, so
+// nothing recorded it. Its annotations can only have come from its own body,
+// and this is the first and last chance to work them out.
+export function contextualFunctionTypeOf(
+	node: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+): common.FunctionType | undefined {
+	let recorded = contextualFunctionTypes.get(node)
+
+	if (recorded !== undefined) {
+		return recorded
+	}
+
+	if (!needsContext(node)) {
+		return undefined
+	}
+
+	return resolveFunctionDefinitionType(node, scope)
 }
 
 export function resolveListValueType(
@@ -1417,18 +1452,233 @@ export function scopeWithGenerics(
 	}
 }
 
+// NOTE: What a contextually typed Function literal resolved to. It is worked
+// out while the invocation's signature is being matched — the only moment the
+// expected Type is known — and read back when the same Node is enriched, which
+// happens separately and without that context. Keyed by the Node, so a
+// re-parse starts empty and nothing has to be invalidated.
+const contextualFunctionTypes = new WeakMap<
+	parser.FunctionDefinitionNode,
+	common.FunctionType
+>()
+
+function needsContext(node: parser.FunctionDefinitionNode): boolean {
+	return (
+		node.returnType === null ||
+		node.parameters.some((parameter) => parameter.type === null)
+	)
+}
+
+// NOTE: Only a Function literal in Argument position can omit an annotation,
+// and it is resolved through the contextual path below. Every Declaration
+// still parses its annotations, so a null reaching a Declaration would mean
+// the Parser produced something it has no rule for.
+export function resolveDeclaredType(
+	node: parser.TypeDeclarationNode | null,
+	scope: enricher.Scope,
+): common.Type {
+	if (node === null) {
+		return { type: "Error" }
+	}
+
+	return resolveType(node, scope)
+}
+
 export function resolveFunctionDefinitionType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.FunctionType {
-	let functionScope = scopeWithGenerics(node.generics, scope)
+	if (!needsContext(node)) {
+		let functionScope = scopeWithGenerics(node.generics, scope)
 
-	return {
+		return {
+			type: "Function",
+			generics: resolveGenericDeclarations(node.generics, scope),
+			parameterTypes: resolveParameterTypes(node, functionScope),
+			returnType: resolveDeclaredType(node.returnType, functionScope),
+			documentation: node.documentation ?? undefined,
+		}
+	}
+
+	// NOTE: The Enricher re-resolves the same Node repeatedly, and only the
+	// pass driven by Argument matching carries the expected Type — every later
+	// pass has to be answered from what that one worked out.
+	let recorded = contextualFunctionTypes.get(node)
+
+	if (expectedType === null && recorded !== undefined) {
+		return recorded
+	}
+
+	let functionScope = scopeWithGenerics(node.generics, scope)
+	let expectedFunction =
+		expectedType !== null && expectedType.type === "Function"
+			? expectedType
+			: null
+
+	let parameterTypes = resolveContextualParameterTypes(
+		node,
+		functionScope,
+		expectedFunction,
+	)
+
+	let resolved: common.FunctionType = {
 		type: "Function",
 		generics: resolveGenericDeclarations(node.generics, scope),
-		parameterTypes: resolveParameterTypes(node, functionScope),
-		returnType: resolveType(node.returnType, functionScope),
+		parameterTypes,
+		returnType: resolveContextualReturnType(
+			node,
+			functionScope,
+			parameterTypes,
+			expectedFunction,
+		),
 		documentation: node.documentation ?? undefined,
+	}
+
+	contextualFunctionTypes.set(node, resolved)
+
+	return resolved
+}
+
+// NOTE: An unannotated Parameter takes its Type *and* its label from the
+// expected signature, positionally — which is why the Parser records no
+// external name for one. An annotated Parameter is resolved exactly as it
+// always was, so the two forms can be mixed across a Parameter list.
+function resolveContextualParameterTypes(
+	node: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+	expectedFunction: common.FunctionType | null,
+): Array<common.Parameter> {
+	return node.parameters.map((parameter, index) => {
+		let documentation = parameterDocumentation(
+			parameter,
+			node.documentation,
+		)
+
+		if (parameter.type !== null) {
+			return {
+				name: parameter.externalName?.content ?? null,
+				type: resolveDeclaredType(parameter.type, scope),
+				documentation,
+			}
+		}
+
+		let expectedParameter = expectedFunction?.parameterTypes[index]
+
+		if (expectedParameter === undefined) {
+			reportError(
+				expectedFunction === null
+					? `Could not infer the Type of Parameter '${parameterLabel(parameter)}' — only a Function passed as an Argument takes its Types from the surrounding context.`
+					: `The expected Function Type takes ${expectedFunction.parameterTypes.length === 1 ? "1 Parameter" : `${expectedFunction.parameterTypes.length} Parameters`}, so there is nothing for Parameter ${index + 1} to infer from.`,
+				parameter.position,
+			)
+
+			return { name: null, type: { type: "Error" }, documentation }
+		}
+
+		return {
+			name: expectedParameter.name,
+			type: expectedParameter.type,
+			documentation,
+		}
+	})
+}
+
+// NOTE: Working out what a Function literal returns means enriching its body —
+// the Type of `<- total` can not be known without the Constants the body
+// itself declares. Only the Enricher can do that, and `enrichers` imports this
+// module rather than the other way round, so it installs the implementation
+// here as it loads. Keeping the seam on this side is what avoids an import
+// cycle.
+export type BodyReturnTypeInference = (
+	node: parser.FunctionDefinitionNode,
+	parameterTypes: Array<common.Parameter>,
+	scope: enricher.Scope,
+) => common.Type | null
+
+let inferReturnTypeFromBody: BodyReturnTypeInference | null = null
+
+export function registerBodyReturnTypeInference(
+	inference: BodyReturnTypeInference,
+): void {
+	inferReturnTypeFromBody = inference
+}
+
+function resolveContextualReturnType(
+	node: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+	parameterTypes: Array<common.Parameter>,
+	expectedFunction: common.FunctionType | null,
+): common.Type {
+	if (node.returnType !== null) {
+		return resolveType(node.returnType, scope)
+	}
+
+	// NOTE: A Parameter that could not be inferred has already been reported,
+	// and its Error Type poisons whatever the body returns — a second
+	// Diagnostic here would only restate the first in vaguer terms.
+	if (parameterTypes.some((parameter) => parameter.type.type === "Error")) {
+		return { type: "Error" }
+	}
+
+	// NOTE: An expected return Type that is still an unbound Generic says
+	// nothing — in `map`'s `(_ item: ItemType) -> Result` nothing binds
+	// `Result` but this literal's own body. The body is also the answer when
+	// there is no expected signature at all, which is how an otherwise
+	// annotated literal may leave its `-> Type` off.
+	if (
+		expectedFunction === null ||
+		containsGenericUse(expectedFunction.returnType)
+	) {
+		let inferred = inferReturnTypeFromBody?.(node, parameterTypes, scope)
+
+		if (inferred !== null && inferred !== undefined) {
+			return inferred
+		}
+
+		reportError(
+			"Could not infer the return Type from the body — give the Function an explicit `-> Type`.",
+			functionLiteralPosition(node),
+		)
+
+		return { type: "Error" }
+	}
+
+	return expectedFunction.returnType
+}
+
+function parameterLabel(parameter: parser.ParameterNode): string {
+	return (
+		parameter.internalName?.content ??
+		parameter.externalName?.content ??
+		"_"
+	)
+}
+
+function functionLiteralPosition(
+	node: parser.FunctionDefinitionNode,
+): common.Position | null {
+	return node.parameters[0]?.position ?? null
+}
+
+function containsGenericUse(type: common.Type): boolean {
+	switch (type.type) {
+		case "GenericUse":
+			return true
+		case "UnionType":
+			return type.types.some(containsGenericUse)
+		case "List":
+			return containsGenericUse(type.itemType)
+		case "Function":
+			return (
+				type.parameterTypes.some((parameter) =>
+					containsGenericUse(parameter.type),
+				) || containsGenericUse(type.returnType)
+			)
+		case "Record":
+			return Object.values(type.members).some(containsGenericUse)
+		default:
+			return false
 	}
 }
 
@@ -2233,7 +2483,7 @@ function resolveParameterTypes(
 ): Array<common.Parameter> {
 	return definition.parameters.map((parameter) => ({
 		name: parameter.externalName?.content ?? null,
-		type: resolveType(parameter.type, scope),
+		type: resolveDeclaredType(parameter.type, scope),
 		documentation: parameterDocumentation(
 			parameter,
 			definition.documentation,
@@ -2295,7 +2545,10 @@ export function resolveMethodType(
 				{ name: null, type: selfType },
 				...resolveParameterTypes(node.method.value, methodScope),
 			],
-			returnType: resolveType(node.method.value.returnType, methodScope),
+			returnType: resolveDeclaredType(
+				node.method.value.returnType,
+				methodScope,
+			),
 			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "StaticMethod") {
@@ -2314,7 +2567,10 @@ export function resolveMethodType(
 				node.method.value,
 				methodScope,
 			),
-			returnType: resolveType(node.method.value.returnType, methodScope),
+			returnType: resolveDeclaredType(
+				node.method.value.returnType,
+				methodScope,
+			),
 			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
@@ -2349,7 +2605,7 @@ export function resolveMethodType(
 						{ name: null, type: methodSelfType },
 						...resolveParameterTypes(method.value, methodScope),
 					],
-					returnType: resolveType(
+					returnType: resolveDeclaredType(
 						method.value.returnType,
 						methodScope,
 					),
@@ -2379,7 +2635,7 @@ export function resolveMethodType(
 						method.value,
 						methodScope,
 					),
-					returnType: resolveType(
+					returnType: resolveDeclaredType(
 						method.value.returnType,
 						methodScope,
 					),

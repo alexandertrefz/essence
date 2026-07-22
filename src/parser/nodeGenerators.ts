@@ -648,6 +648,7 @@ export function genericFunctionDefinition(
 	parameters: Array<parser.ParameterNode>,
 	returnType: parser.TypeDeclarationNode,
 	body: Array<parser.ImplementationNode>,
+	parameterListPosition: common.Position,
 	documentation: common.Documentation | null = null,
 ): parser.FunctionDefinitionNode {
 	return {
@@ -657,13 +658,15 @@ export function genericFunctionDefinition(
 		returnType,
 		body,
 		documentation,
+		parameterListPosition,
 	}
 }
 
 export function functionDefinition(
 	parameters: Array<parser.ParameterNode>,
-	returnType: parser.TypeDeclarationNode,
+	returnType: parser.TypeDeclarationNode | null,
 	body: Array<parser.ImplementationNode>,
+	parameterListPosition: common.Position,
 	documentation: common.Documentation | null = null,
 ): parser.FunctionDefinitionNode {
 	return {
@@ -673,13 +676,14 @@ export function functionDefinition(
 		returnType,
 		body,
 		documentation,
+		parameterListPosition,
 	}
 }
 
 export function parameter(
 	externalName: parser.IdentifierNode | null,
 	internalName: parser.IdentifierNode | null,
-	type: parser.TypeDeclarationNode,
+	type: parser.TypeDeclarationNode | null,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
 ): parser.ParameterNode {

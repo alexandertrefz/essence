@@ -37,6 +37,8 @@ implementation {
 		<- left::append(right)
 	}
 
+	join("", "")
+
 	§§ Turns Integers into something a person can read.
 	namespace Readable for Integer {
 		§§ Spells this Integer out as text.

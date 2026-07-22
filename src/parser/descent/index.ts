@@ -853,7 +853,11 @@ class DescentParser {
 			case TokenType.SymbolLeftBracket:
 				return this.parseListLiteral()
 			case TokenType.SymbolLeftParen:
-				return this.parseFunctionLiteral()
+				// NOTE: The only Function literal whose annotations may be
+				// omitted — in expression position there can be an expected
+				// signature to read them off. A Generic literal writes its own
+				// Generics, so it has nothing to infer them from.
+				return this.parseFunctionLiteral(true)
 			case TokenType.SymbolLeftAngle:
 				return this.parseGenericFunctionLiteral()
 			case TokenType.SymbolLeftBrace:
@@ -1332,10 +1336,12 @@ class DescentParser {
 		})
 	}
 
-	protected parseFunctionLiteral(): parser.FunctionValueNode {
+	protected parseFunctionLiteral(
+		allowsInferredTypes = false,
+	): parser.FunctionValueNode {
 		let documentation = this.documentationHere()
-		let parameterList = this.parseParameterList()
-		let returnType = this.parseReturnType()
+		let parameterList = this.parseParameterList(allowsInferredTypes)
+		let returnType = this.parseOptionalReturnType(allowsInferredTypes)
 		let block = this.parseBlock()
 
 		return generators.functionValueNode(
@@ -1343,6 +1349,7 @@ class DescentParser {
 				parameterList.parameters,
 				returnType,
 				block.body,
+				parameterList.position,
 				documentation,
 			),
 			{
@@ -1365,6 +1372,7 @@ class DescentParser {
 				parameterList.parameters,
 				returnType,
 				block.body,
+				parameterList.position,
 				documentation,
 			),
 			{
@@ -1487,7 +1495,7 @@ class DescentParser {
 		)
 	}
 
-	protected parseParameterList(): {
+	protected parseParameterList(allowsInferredTypes = false): {
 		parameters: Array<parser.ParameterNode>
 		position: common.Position
 	} {
@@ -1496,7 +1504,7 @@ class DescentParser {
 		let parameters: Array<parser.ParameterNode> = []
 
 		if (this.tokens.peek()?.type !== TokenType.SymbolRightParen) {
-			parameters.push(this.parseParameter())
+			parameters.push(this.parseParameter(allowsInferredTypes))
 
 			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
 				this.tokens.next()
@@ -1505,7 +1513,7 @@ class DescentParser {
 					break
 				}
 
-				parameters.push(this.parseParameter())
+				parameters.push(this.parseParameter(allowsInferredTypes))
 			}
 		}
 
@@ -1533,7 +1541,13 @@ class DescentParser {
 		return this.tokens.documentationAbove(token.position.start.line)
 	}
 
-	protected parseParameter(): parser.ParameterNode {
+	// NOTE: `allowsInferredTypes` is set only for a Function literal in
+	// expression position, where an omitted annotation has an expected
+	// signature to be read off. Every Declaration parses its annotations, so a
+	// null Type can not reach a named Function or a Method.
+	protected parseParameter(
+		allowsInferredTypes = false,
+	): parser.ParameterNode {
 		// NOTE: Only a Parameter written on a line of its own can carry a
 		// block — otherwise the first Parameter of `function greet (…)` would
 		// claim the Function's own Documentation.
@@ -1541,8 +1555,23 @@ class DescentParser {
 			? this.documentationHere()
 			: null
 
+		let annotationFollows = () =>
+			this.tokens.peek()?.type === TokenType.SymbolColon
+
 		if (this.tokens.peek()?.type === TokenType.SymbolUnderscore) {
 			let underscore = this.tokens.next()
+
+			// NOTE: A bare `_` — binds no name and takes its Type from the
+			// expected signature, the contextual counterpart of `_: Type`.
+			if (allowsInferredTypes && !isIdentifierToken(this.tokens.peek())) {
+				return generators.parameter(
+					null,
+					null,
+					null,
+					underscore.position,
+					documentation,
+				)
+			}
 
 			// NOTE: `_: Type` stops at the `_` — it drops the label *and* the
 			// name, leaving a Parameter the body has no way to refer to. `_
@@ -1566,6 +1595,21 @@ class DescentParser {
 
 			let internalName = this.parseIdentifier()
 
+			// NOTE: `_ name` — the same Parameter `_ name: Type` declares,
+			// with the Type left to the expected signature.
+			if (allowsInferredTypes && !annotationFollows()) {
+				return generators.parameter(
+					null,
+					internalName,
+					null,
+					{
+						start: underscore.position.start,
+						end: internalName.position.end,
+					},
+					documentation,
+				)
+			}
+
 			this.tokens.expect(TokenType.SymbolColon)
 
 			let type = this.parseType()
@@ -1584,6 +1628,33 @@ class DescentParser {
 		if (isIdentifierToken(this.tokens.peek())) {
 			let internalName = this.parseIdentifier()
 
+			// NOTE: A written label is only meaningful next to a written Type
+			// — an unannotated Parameter takes its label from the expected
+			// signature, so there would be nothing for this one to agree with.
+			// The label is dropped and parsing continues, so that one mistaken
+			// label does not cascade into a parse failure for the whole
+			// literal.
+			if (allowsInferredTypes && !annotationFollows()) {
+				reportError(
+					"A Parameter without a Type takes its label from the expected Function Type — write only its name.",
+					{
+						start: name.position.start,
+						end: internalName.position.end,
+					},
+				)
+
+				return generators.parameter(
+					null,
+					internalName,
+					null,
+					{
+						start: name.position.start,
+						end: internalName.position.end,
+					},
+					documentation,
+				)
+			}
+
 			this.tokens.expect(TokenType.SymbolColon)
 
 			let type = this.parseType()
@@ -1593,6 +1664,21 @@ class DescentParser {
 				internalName,
 				type,
 				{ start: name.position.start, end: type.position.end },
+				documentation,
+			)
+		}
+
+		// NOTE: A bare `item` — both the Type and the label come from the
+		// expected signature, which is why no external name is recorded. This
+		// is the one place a lone Identifier does not mean `name: Type`'s
+		// label-and-name, and it is why the annotated and unannotated forms of
+		// a lambda can not be mixed within one Parameter.
+		if (allowsInferredTypes && !annotationFollows()) {
+			return generators.parameter(
+				null,
+				name,
+				null,
+				name.position,
 				documentation,
 			)
 		}
@@ -1885,6 +1971,22 @@ class DescentParser {
 		this.tokens.expect(TokenType.SymbolRightAngle)
 
 		return this.parseType()
+	}
+
+	// NOTE: A contextually typed Function literal may go straight from its
+	// Parameter list to its block, leaving the return Type to the expected
+	// signature — or, where that leaves it Generic, to its own body.
+	protected parseOptionalReturnType(
+		allowsInferredTypes: boolean,
+	): parser.TypeDeclarationNode | null {
+		if (
+			allowsInferredTypes &&
+			this.tokens.peek()?.type !== TokenType.SymbolDash
+		) {
+			return null
+		}
+
+		return this.parseReturnType()
 	}
 
 	// #endregion

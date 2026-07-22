@@ -1,10 +1,13 @@
 import type { common } from "../interfaces/index"
 import { printType } from "./printType"
 
-// NOTE: Inlay Hints annotate Constant and Variable declarations that carry no
-// Type annotation with the Type they were inferred as.
+// NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
+// it was inferred as — Constant and Variable declarations, and the Parameters
+// and return Type of a contextually typed Function literal, which take their
+// Types from the signature they are passed to and so show them nowhere in the
+// source.
 //
-// Parameter name hints — the other common use of Inlay Hints — would be dead
+// Parameter *name* hints — the other common use of Inlay Hints — would be dead
 // weight in Essence: a Parameter either declares a label, which the call site
 // is then required to write out, or it is declared label-less with `_` and has
 // no name to show. Either way the call site already reads correctly.
@@ -67,7 +70,7 @@ function visitNode(
 			visitNode(node.value, hints)
 			return
 		case "FunctionStatement":
-			visitBody(node.value.body, hints)
+			visitFunctionDefinition(node.value, hints)
 			return
 		case "NamespaceDefinitionStatement":
 			for (let property of Object.values(node.properties)) {
@@ -82,7 +85,7 @@ function visitNode(
 						: [member.method]
 
 				for (let method of methods) {
-					visitBody(method.value.body, hints)
+					visitFunctionDefinition(method.value, hints)
 				}
 			}
 
@@ -138,7 +141,7 @@ function visitNode(
 
 			return
 		case "FunctionValue":
-			visitBody(node.value.body, hints)
+			visitFunctionDefinition(node.value, hints)
 			return
 		case "CaseValue":
 			if (node.value !== null) {
@@ -157,6 +160,44 @@ function visitNode(
 		case "NothingValue":
 			return
 	}
+}
+
+// NOTE: `inferredType` and `inferredReturnType` are set exactly when the
+// source left the annotation out, mirroring `declaredType` on a Constant.
+// A failed inference is left alone rather than shown as `Error`.
+//
+// The Parameter hint sits at the end of the Parameter, which for an
+// unannotated one is the end of its name; the return hint sits at the end of
+// the Parameter list, where the `-> Type` would have been written.
+function visitFunctionDefinition(
+	definition: common.typed.FunctionDefinitionNode,
+	hints: Array<InlayHint>,
+) {
+	for (let parameter of definition.parameters) {
+		if (
+			parameter.inferredType !== null &&
+			parameter.inferredType.type !== "Error"
+		) {
+			hints.push({
+				position: parameter.position.end,
+				label: `: ${printType(parameter.inferredType)}`,
+				kind: "type",
+			})
+		}
+	}
+
+	if (
+		definition.inferredReturnType !== null &&
+		definition.inferredReturnType.type !== "Error"
+	) {
+		hints.push({
+			position: definition.parameterListPosition.end,
+			label: ` -> ${printType(definition.inferredReturnType)}`,
+			kind: "type",
+		})
+	}
+
+	visitBody(definition.body, hints)
 }
 
 function visitArguments(

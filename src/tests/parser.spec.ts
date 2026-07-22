@@ -1315,6 +1315,69 @@ describe("Parser", () => {
 				expect(containsErrors(diagnostics)).toBe(true)
 			})
 
+			// NOTE: Annotations may only be omitted by a Function literal in
+			// expression position, where an expected signature exists to read
+			// them off. A Declaration has none, so its annotations stay
+			// mandatory.
+			describe("Contextual Function literals", () => {
+				it("should parse a Function literal without annotations", () => {
+					let input: parser.Program = parse(
+						`implementation {
+							constant kept = [1]::removeEvery(where (item) { <- true })
+						}`,
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse the underscore spellings", () => {
+					let input: parser.Program = parse(
+						`implementation {
+							constant a = f((_ item) { <- true })
+							constant b = f((_) { <- true })
+						}`,
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should reject a label on an unannotated Parameter", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						`implementation {
+							constant kept = [1]::removeEvery(where (label name) { <- true })
+						}`,
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.message),
+					).toEqual([
+						"A Parameter without a Type takes its label from the expected Function Type — write only its name.",
+					])
+				})
+
+				it("should still require annotations on a named Function", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						`implementation {
+							function twice(value) { <- value }
+						}`,
+					)
+
+					expect(containsErrors(diagnostics)).toBe(true)
+				})
+
+				it("should still require annotations on a Method", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						`implementation {
+							namespace Doubling for Integer {
+								twice(value) { <- value }
+							}
+						}`,
+					)
+
+					expect(containsErrors(diagnostics)).toBe(true)
+				})
+			})
+
 			describe("Generic Bounds", () => {
 				it("should parse a bounded Generic on a Function", () => {
 					let input: parser.Program = parse(
