@@ -676,6 +676,32 @@ const namespaceDefinition: common.NamespaceType = {
 				position: null,
 			},
 		},
+		// NOTE: The first builtin with a Protocol-bounded Type Parameter. The
+		// bound resolves the conforming Namespace at the call site — `Integer`
+		// for a `List<Integer>`, the covering `Number` for a mixed numeric
+		// List — and its `compareTo` arrives as a hidden trailing Argument.
+		// Self-contained (its own bounded `ItemType`), so the foot loop
+		// leaves it alone.
+		sorted: {
+			type: "SimpleMethod",
+			generics: [
+				{
+					name: "ItemType",
+					defaultType: null,
+					infer: true,
+					constraint: "Comparable",
+				},
+			],
+			parameterTypes: [{ name: null, type: typeResolvedWithGenericUse }],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use `sortedBy`.",
+				parameters: {},
+				returns: "the ordered List.",
+				position: null,
+			},
+		},
 		sortedBy: {
 			type: "SimpleMethod",
 			generics: [],
@@ -1018,8 +1044,9 @@ const namespaceDefinition: common.NamespaceType = {
 // Method looked up as a value re-infers `ItemType` from its receiver
 // argument. `joinWith` and `of` fix their Types outright (a String-only
 // receiver, an Integer-only result), so they have no `ItemType` to infer and
-// merging it in would only ever leave it unbound.
-const methodsWithoutItemType = new Set(["joinWith", "of"])
+// merging it in would only ever leave it unbound. `sorted` declares its own
+// `ItemType`, bounded by `Comparable`.
+const methodsWithoutItemType = new Set(["joinWith", "of", "sorted"])
 
 for (let [methodName, method] of Object.entries(namespaceDefinition.methods)) {
 	if (methodsWithoutItemType.has(methodName)) {
