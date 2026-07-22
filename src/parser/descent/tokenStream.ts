@@ -61,7 +61,9 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.KeywordCase]: "case",
 	[TokenType.KeywordWith]: "with",
 	[TokenType.KeywordNamespace]: "namespace",
+	[TokenType.KeywordProtocol]: "protocol",
 	[TokenType.KeywordFor]: "for",
+	[TokenType.KeywordInfer]: "infer",
 	[TokenType.KeywordChoice]: "choice",
 }
 

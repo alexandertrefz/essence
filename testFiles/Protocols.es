@@ -34,8 +34,10 @@ implementation {
 	__print(describeArea({ width = 3, height = 4 }))
 	__print(describeArea({ radius = 2 }))
 
-	§ The builtin Types conform to the core Protocols — Equatable, Printable
-	§ and (for the numeric Types) Comparable.
+	§ The builtin Types conform to the core Protocols — Equatable and
+	§ Printable for all of them, and Comparable for the ordered ones:
+	§ Integer, Rational, Algebraic and String. (Transcendentals order only
+	§ through Number, so they carry no Comparable conformance of their own.)
 
 	function smallerOf <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 		<- match a::compareTo(b) -> Item {

@@ -290,8 +290,9 @@ export function enrichFunctionDefinition(
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
 	// NOTE: Declared Generics are registered as GenericUses so that
-	// Parameter and Return Types can reference them. Binding them to
-	// concrete Types happens once Generic Inference is implemented.
+	// Parameter and Return Types can reference them. They stay opaque
+	// within the body; binding to concrete Types happens at each use site
+	// via Generic Inference.
 	let types: Record<string, common.Type> = {}
 	for (let generic of node.generics) {
 		types[generic.name.content] = {

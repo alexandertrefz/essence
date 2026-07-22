@@ -130,9 +130,9 @@ export type Parameter = {
 	documentation?: string
 }
 
-// NOTE: `documentation` is optional throughout, so that the hand written
-// builtin Namespaces in `enricher/types` stay valid while they are documented
-// one Method at a time.
+// NOTE: `documentation` is optional in the type, but every builtin Namespace
+// Method in `enricher/types` does carry it — the completion gate in
+// builtins.spec.ts fails on any Method that ships without documentation.
 export type BaseFunction = {
 	parameterTypes: Array<Parameter>
 	generics: Array<GenericDeclaration>
