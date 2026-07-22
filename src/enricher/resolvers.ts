@@ -1,11 +1,15 @@
 import { isDeepStrictEqual } from "node:util"
 
-import { reportError } from "../diagnostics/index"
+import { primary, reportError, secondary } from "../diagnostics/index"
 import {
 	applyGenericBindings,
 	buildUnion,
 	computeConformanceMethodMap,
+	closestMatch,
+	countOf,
 	createInferenceContext,
+	describeSignature,
+	describeType,
 	flattenUnionMembers,
 	type GenericBindings,
 	type MatchableArgument,
@@ -13,6 +17,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	unionMembersKeepingNames,
+	withArticle,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 
@@ -367,6 +372,147 @@ function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 	}
 }
 
+// NOTE: The Namespaces that were searched are the useful half of "no such
+// Method" — without them the reader can not tell whether they misspelled the
+// Method or the value is not the Type they thought it was. The near miss is
+// offered from the same set, so a suggestion is always a Method that would
+// actually resolve.
+function reportUnknownMethod(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	namespaces: Map<string, common.NamespaceType>,
+): void {
+	let methodNames = new Set<string>()
+
+	for (let namespace of namespaces.values()) {
+		for (let methodName of Object.keys(namespace.methods)) {
+			methodNames.add(methodName)
+		}
+	}
+
+	let suggestion = closestMatch(node.member.content, [...methodNames])
+	let namespaceNames = [...namespaces.keys()]
+
+	reportError(
+		`No Method named '${node.member.content}' for this value`,
+		node.member.position,
+		{
+			code: "unknown-method",
+			labels: [
+				primary(node.member.position, "no Method of this name"),
+				secondary(
+					node.base.position,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+			],
+			notes:
+				namespaceNames.length === 0
+					? []
+					: [
+							`Searched ${namespaceNames.length === 1 ? "Namespace" : "Namespaces"} ${namespaceNames
+								.map((name) => `'${name}'`)
+								.join(", ")}.`,
+						],
+			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+		},
+	)
+}
+
+// NOTE: The receiver occupies the first Parameter of every non-static Method
+// signature, but it is written to the left of the `::` rather than inside the
+// parentheses — listing it among the Arguments would describe a call nobody
+// can write.
+function describeMethodOverloads(
+	methodType: common.Type | undefined,
+): Array<Array<common.Parameter>> {
+	if (methodType === undefined) {
+		return []
+	}
+
+	let dropsReceiver =
+		methodType.type === "SimpleMethod" ||
+		methodType.type === "OverloadedMethod"
+
+	switch (methodType.type) {
+		case "SimpleMethod":
+		case "StaticMethod":
+			return [
+				dropsReceiver
+					? methodType.parameterTypes.slice(1)
+					: methodType.parameterTypes,
+			]
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return methodType.overloads.map((overload) =>
+				dropsReceiver
+					? overload.parameterTypes.slice(1)
+					: overload.parameterTypes,
+			)
+		default:
+			return []
+	}
+}
+
+function reportNoMatchingOverload(
+	node: parser.MethodInvocationNode,
+	candidates: Array<{
+		namespaceName: string
+		methodType: common.Type | undefined
+	}>,
+): void {
+	let notes: Array<string> = []
+
+	for (let candidate of candidates) {
+		for (let parameterTypes of describeMethodOverloads(
+			candidate.methodType,
+		)) {
+			notes.push(
+				`'${candidate.namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
+			)
+		}
+	}
+
+	reportError(
+		`No overload of '${node.member.content}' accepts these Arguments`,
+		node.position,
+		{
+			code: "no-matching-overload",
+			labels: [
+				primary(
+					node.position,
+					`this call passes ${countOf(node.arguments.length, "Argument")}`,
+				),
+			],
+			notes,
+		},
+	)
+}
+
+function reportAmbiguousNamespace(
+	node: parser.MethodInvocationNode,
+	namespaceNames: Array<string>,
+): void {
+	reportError(
+		`'${node.member.content}' is provided by more than one Namespace`,
+		node.position,
+		{
+			code: "ambiguous-namespace",
+			labels: [
+				primary(
+					node.member.position,
+					"these Arguments match all of them",
+				),
+			],
+			notes: namespaceNames.map(
+				(name) => `'${name}' declares '${node.member.content}'.`,
+			),
+			helps: [
+				`Name the Namespace at the call, e.g. '${namespaceNames[0]}::${node.member.content}(…)'.`,
+			],
+		},
+	)
+}
+
 export function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	scope: enricher.Scope,
@@ -388,9 +534,24 @@ export function resolveMethodInvocation(
 
 		if (baseType.type !== "Error") {
 			reportError(
-				`Could not find a Namespace for this value (method '${node.member.content}').`,
+				`No Namespace provides Methods for this value`,
 				node.base.position,
-				{ code: "no-namespace-for-value" },
+				{
+					code: "no-namespace-for-value",
+					labels: [
+						primary(
+							node.base.position,
+							`this is ${withArticle(describeType(baseType))}`,
+						),
+						secondary(
+							node.member.position,
+							`'${node.member.content}' is looked up in its Namespaces`,
+						),
+					],
+					notes: [
+						`No Namespace in scope targets ${describeType(baseType)}.`,
+					],
+				},
 			)
 		}
 
@@ -409,11 +570,7 @@ export function resolveMethodInvocation(
 			return resolveUnionMethodDispatch(node, baseType, scope)
 		}
 
-		reportError(
-			`Could not find a method named '${node.member.content}' in the Namespaces matching this value.`,
-			node.member.position,
-			{ code: "unknown-method" },
-		)
+		reportUnknownMethod(node, baseType, namespaces)
 
 		return resolveFailedMethodInvocation()
 	}
@@ -457,10 +614,14 @@ export function resolveMethodInvocation(
 			return resolveUnionMethodDispatch(node, baseType, scope)
 		}
 
-		reportError(
-			"Passed arguments do not match any overload.",
-			node.position,
-			{ code: "no-matching-overload" },
+		reportNoMatchingOverload(
+			node,
+			[...matchingNamespaces.entries()].map(
+				([namespaceName, namespaceType]) => ({
+					namespaceName,
+					methodType: namespaceType.methods[node.member.content],
+				}),
+			),
 		)
 
 		return resolveFailedMethodInvocation()
@@ -485,18 +646,9 @@ export function resolveMethodInvocation(
 			dispatch: null,
 		}
 	} else {
-		reportError(
-			`Passed arguments matched more than 1 Namespace, please disambiguate.
-
-The matching Namespaces are:
-${resolvedMethods
-	.map((method) => {
-		return `    - ${method.namespace.name}`
-	})
-	.join("\n")}
-`,
-			node.position,
-			{ code: "ambiguous-namespace" },
+		reportAmbiguousNamespace(
+			node,
+			resolvedMethods.map((method) => method.namespace.name),
 		)
 
 		return resolveFailedMethodInvocation()
@@ -534,9 +686,24 @@ function resolveUnionMethodDispatch(
 
 		if (matchingNamespaces.size === 0) {
 			reportError(
-				`Could not find a method named '${node.member.content}' for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type.`,
+				`No Method named '${node.member.content}' for ${describeType(memberType)}`,
 				node.member.position,
-				{ code: "unknown-method" },
+				{
+					code: "unknown-method",
+					labels: [
+						primary(
+							node.member.position,
+							`${describeType(memberType)} has no Method of this name`,
+						),
+						secondary(
+							node.base.position,
+							`this is ${withArticle(describeType(unionType))}`,
+						),
+					],
+					notes: [
+						`Every member of the Union must provide '${node.member.content}' — the receiver's Type is only known at runtime.`,
+					],
+				},
 			)
 
 			return resolveFailedMethodInvocation()
@@ -570,9 +737,30 @@ function resolveUnionMethodDispatch(
 
 		if (resolvedMethods.length === 0) {
 			reportError(
-				`Passed arguments do not match any overload for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type.`,
+				`No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
 				node.position,
-				{ code: "no-matching-overload" },
+				{
+					code: "no-matching-overload",
+					labels: [
+						primary(
+							node.position,
+							`this call passes ${countOf(node.arguments.length, "Argument")}`,
+						),
+						secondary(
+							node.base.position,
+							`${describeType(memberType)} is a member of this Union`,
+						),
+					],
+					notes: [...matchingNamespaces.entries()].flatMap(
+						([namespaceName, namespaceType]) =>
+							describeMethodOverloads(
+								namespaceType.methods[node.member.content],
+							).map(
+								(parameterTypes) =>
+									`'${namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
+							),
+					),
+				},
 			)
 
 			return resolveFailedMethodInvocation()
@@ -580,17 +768,24 @@ function resolveUnionMethodDispatch(
 
 		if (resolvedMethods.length > 1) {
 			reportError(
-				`Passed arguments matched more than 1 Namespace for Type '${describeTypeForDiagnostic(memberType)}', a member of this value's Union Type, please disambiguate.
-
-The matching Namespaces are:
-${resolvedMethods
-	.map((method) => {
-		return `    - ${method.namespaceName}`
-	})
-	.join("\n")}
-`,
+				`'${node.member.content}' is provided by more than one Namespace for ${describeType(memberType)}`,
 				node.position,
-				{ code: "ambiguous-namespace" },
+				{
+					code: "ambiguous-namespace",
+					labels: [
+						primary(
+							node.member.position,
+							"these Arguments match all of them",
+						),
+					],
+					notes: resolvedMethods.map(
+						(method) =>
+							`'${method.namespaceName}' declares '${node.member.content}'.`,
+					),
+					helps: [
+						`Name the Namespace at the call, e.g. '${resolvedMethods[0].namespaceName}::${node.member.content}(…)'.`,
+					],
+				},
 			)
 
 			return resolveFailedMethodInvocation()
@@ -625,9 +820,27 @@ ${resolvedMethods
 
 	if (catchAllCases.length > 1) {
 		reportError(
-			`This method can not be dispatched — ${catchAllCases.length} member Types of this value's Union Type are indistinguishable at runtime.`,
+			`'${node.member.content}' can not be dispatched on this value`,
 			node.position,
-			{ code: "undispatchable-method" },
+			{
+				code: "undispatchable-method",
+				labels: [
+					primary(
+						node.base.position,
+						`this is ${withArticle(describeType(unionType))}`,
+					),
+				],
+				notes: [
+					`${countOf(catchAllCases.length, "member Type")} of the Union are indistinguishable at runtime: ${catchAllCases
+						.map((dispatchCase) =>
+							describeType(dispatchCase.memberType),
+						)
+						.join(", ")}.`,
+				],
+				helps: [
+					"Narrow the value with a Match Expression before calling the Method.",
+				],
+			},
 		)
 
 		return resolveFailedMethodInvocation()
@@ -1874,39 +2087,6 @@ function resolveProtocolMethodType(
 	}
 }
 
-// NOTE: A compact, one-line description of a Type for Diagnostics — enough
-// to tell the reader which Type failed a Protocol bound.
-function describeTypeForDiagnostic(type: common.Type): string {
-	switch (type.type) {
-		case "UnionType":
-			if (type.name !== undefined) {
-				return type.name
-			}
-
-			if (type.alias !== undefined) {
-				return `${type.alias.name}<${type.alias.typeArguments
-					.map(describeTypeForDiagnostic)
-					.join(", ")}>`
-			}
-
-			return type.types
-				.map((memberType) => describeTypeForDiagnostic(memberType))
-				.join(" | ")
-		case "Case":
-			return `${type.choice}#${type.name}`
-		case "GenericUse":
-			return type.name
-		case "GenericAlias":
-			return type.name
-		case "List":
-			return `List<${describeTypeForDiagnostic(type.itemType)}>`
-		case "Namespace":
-			return `Namespace '${type.name}'`
-		default:
-			return type.type
-	}
-}
-
 // NOTE: Resolves how each Protocol-bounded Type Parameter of an invocation's
 // signature is fulfilled, given what the invocation bound it to. A binding
 // that is itself a bounded Type Parameter forwards the enclosing Function's
@@ -2014,7 +2194,7 @@ export function resolveConformances(
 
 		if (candidates.length === 0) {
 			reportError(
-				`Type '${describeTypeForDiagnostic(binding)}' does not conform to Protocol '${generic.constraint}': no conforming Namespace is in scope.`,
+				`Type '${describeType(binding)}' does not conform to Protocol '${generic.constraint}': no conforming Namespace is in scope.`,
 				position,
 				{ code: "unsatisfied-bound" },
 			)
@@ -2024,7 +2204,7 @@ export function resolveConformances(
 
 		if (candidates.length > 1) {
 			reportError(
-				`Multiple Namespaces conform to Protocol '${generic.constraint}' for Type '${describeTypeForDiagnostic(binding)}', please disambiguate.
+				`Multiple Namespaces conform to Protocol '${generic.constraint}' for Type '${describeType(binding)}', please disambiguate.
 
 The matching Namespaces are:
 ${candidates.map((candidate) => `    - ${candidate.name}`).join("\n")}
@@ -2048,7 +2228,7 @@ ${candidates.map((candidate) => `    - ${candidate.name}`).join("\n")}
 			// wider target Type (a Union) but a `Self` position makes the
 			// signatures incompatible for this narrower binding.
 			reportError(
-				`Namespace '${candidate.name}' does not conform to Protocol '${generic.constraint}' for Type '${describeTypeForDiagnostic(binding)}'.`,
+				`Namespace '${candidate.name}' does not conform to Protocol '${generic.constraint}' for Type '${describeType(binding)}'.`,
 				position,
 				{ code: "nonconforming-namespace" },
 			)

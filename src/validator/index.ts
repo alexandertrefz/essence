@@ -6,7 +6,11 @@ import {
 	secondary,
 } from "../diagnostics/index"
 import {
+	countOf,
 	createInferenceContext,
+	describeParameter,
+	describeSignature,
+	describeType,
 	flattenUnionMembers,
 	type MatchableArgument,
 	matchArguments,
@@ -783,48 +787,6 @@ function validateDefiniteReturn(
 	}
 }
 
-function describeType(type: common.Type): string {
-	switch (type.type) {
-		case "UnionType":
-			if (type.name !== undefined) {
-				return type.name
-			}
-
-			if (type.alias !== undefined) {
-				return `${type.alias.name}<${type.alias.typeArguments
-					.map(describeType)
-					.join(", ")}>`
-			}
-
-			return type.types.map(describeType).join(" | ")
-		case "Case":
-			return `${type.choice}#${type.name}`
-		case "List":
-			return `List<${describeType(type.itemType)}>`
-		case "GenericList":
-			return "List"
-		case "Record":
-			return `{ ${Object.entries(type.members)
-				.map(
-					([memberName, memberType]) =>
-						`${memberName}: ${describeType(memberType)}`,
-				)
-				.join(", ")} }`
-		case "Function":
-		case "SimpleMethod":
-		case "StaticMethod":
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
-			return "Function"
-		case "Namespace":
-		case "GenericUse":
-		case "GenericAlias":
-			return type.name
-		default:
-			return type.type
-	}
-}
-
 function matchableArgumentsFromTypedNodes(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): Array<MatchableArgument> {
@@ -832,32 +794,6 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		getType: () => argumentNode.type,
 	}))
-}
-
-// NOTE: A Parameter is identified by its label where it has one, and by its
-// place in the signature where it does not — `_ value: Integer` is written
-// without a label on purpose, and inventing one for the Diagnostic would name
-// something the reader can not find in the source.
-function describeParameter(
-	parameter: common.Parameter | undefined,
-	index: number,
-): string {
-	return parameter?.name != null
-		? `Parameter '${parameter.name}'`
-		: `Parameter ${index + 1}`
-}
-
-function describeSignature(parameterTypes: Array<common.Parameter>): string {
-	if (parameterTypes.length === 0) {
-		return "takes no Arguments"
-	}
-
-	return `takes ${parameterTypes.length === 1 ? "1 Argument" : `${parameterTypes.length} Arguments`}: ${parameterTypes
-		.map(
-			(parameter, index) =>
-				`${describeParameter(parameter, index)} is ${describeType(parameter.type)}`,
-		)
-		.join(", ")}`
 }
 
 function reportArityMismatch(
@@ -868,10 +804,7 @@ function reportArityMismatch(
 	reportError("This call passes the wrong number of Arguments", position, {
 		code: "argument-count-mismatch",
 		labels: [
-			primary(
-				position,
-				`passes ${argumentCount === 1 ? "1 Argument" : `${argumentCount} Arguments`}`,
-			),
+			primary(position, `passes ${countOf(argumentCount, "Argument")}`),
 		],
 		notes: [`The signature ${describeSignature(parameterTypes)}.`],
 	})

@@ -1,5 +1,131 @@
 import type { common, lexer } from "../interfaces/index"
 
+function editDistance(left: string, right: string): number {
+	let previous = Array.from({ length: right.length + 1 }, (_, i) => i)
+
+	for (let i = 1; i <= left.length; i++) {
+		let current = [i]
+
+		for (let j = 1; j <= right.length; j++) {
+			let substitution =
+				previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
+
+			current.push(
+				Math.min(previous[j] + 1, current[j - 1] + 1, substitution),
+			)
+		}
+
+		previous = current
+	}
+
+	return previous[right.length]
+}
+
+// NOTE: A suggestion is only offered when it is close enough to be plausible —
+// proposing an unrelated flag is worse than proposing nothing.
+export function closestMatch(
+	input: string,
+	candidates: Array<string>,
+): string | null {
+	let best: { name: string; distance: number } | null = null
+
+	for (let candidate of candidates) {
+		let distance = editDistance(input, candidate)
+
+		if (best === null || distance < best.distance) {
+			best = { name: candidate, distance }
+		}
+	}
+
+	if (best === null) {
+		return null
+	}
+
+	let threshold = Math.max(2, Math.floor(input.length / 3))
+
+	return best.distance <= threshold ? best.name : null
+}
+
+// NOTE: A compact, one-line description of a Type for Diagnostics — the
+// spelling a reader would recognise from their own source, not the internal
+// Type tag. `printType` in the Language Server is its Hover-oriented sibling;
+// this one is what every Diagnostic message names a Type with.
+export function describeType(type: common.Type): string {
+	switch (type.type) {
+		case "UnionType":
+			if (type.name !== undefined) {
+				return type.name
+			}
+
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(describeType)
+					.join(", ")}>`
+			}
+
+			return type.types.map(describeType).join(" | ")
+		case "Case":
+			return `${type.choice}#${type.name}`
+		case "List":
+			return `List<${describeType(type.itemType)}>`
+		case "GenericList":
+			return "List"
+		case "Record":
+			return `{ ${Object.entries(type.members)
+				.map(
+					([memberName, memberType]) =>
+						`${memberName}: ${describeType(memberType)}`,
+				)
+				.join(", ")} }`
+		case "Function":
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return "Function"
+		case "Namespace":
+			return `Namespace '${type.name}'`
+		case "GenericUse":
+		case "GenericAlias":
+			return type.name
+		default:
+			return type.type
+	}
+}
+
+// NOTE: A Parameter is identified by its label where it has one, and by its
+// place in the signature where it does not — `_ value: Integer` is written
+// without a label on purpose, and inventing one for the Diagnostic would name
+// something the reader can not find in the source.
+export function describeParameter(
+	parameter: common.Parameter | undefined,
+	index: number,
+): string {
+	return parameter?.name != null
+		? `Parameter '${parameter.name}'`
+		: `Parameter ${index + 1}`
+}
+
+export function describeSignature(
+	parameterTypes: Array<common.Parameter>,
+): string {
+	if (parameterTypes.length === 0) {
+		return "takes no Arguments"
+	}
+
+	return `takes ${countOf(parameterTypes.length, "Argument")}: ${parameterTypes
+		.map(
+			(parameter, index) =>
+				`${describeParameter(parameter, index)} is ${describeType(parameter.type)}`,
+		)
+		.join(", ")}`
+}
+
+// NOTE: For Diagnostics — "1 Argument", not "1 Arguments".
+export function countOf(count: number, singular: string): string {
+	return count === 1 ? `1 ${singular}` : `${count} ${singular}s`
+}
+
 // NOTE: For Diagnostics — "this is an Integer", not "this is a Integer".
 // Type names are the only thing this is ever applied to, and they are always
 // spelled out, so the vowel rule needs no exceptions.
