@@ -472,8 +472,8 @@ export function startServer() {
 				// is synchronous, which guarantees that here.
 				connection.sendDiagnostics({
 					uri,
-					diagnostics: analyse(document.getText()).map(
-						toLspDiagnostic,
+					diagnostics: analyse(document.getText()).map((diagnostic) =>
+						toLspDiagnostic(diagnostic, uri),
 					),
 				})
 			}, analysisDebounceInMilliseconds),
