@@ -25,6 +25,10 @@ export const enrich = (
 			let topLevelScope: enricher.Scope = {
 				parent: null,
 				members,
+				// NOTE: The builtins are declared in TypeScript, not in
+				// Essence — there is no source Position to point a
+				// Diagnostic at.
+				declarations: {},
 				constants: new Set(Object.keys(members)),
 				types: { ...builtinTypes },
 				protocols: { ...builtinProtocols },

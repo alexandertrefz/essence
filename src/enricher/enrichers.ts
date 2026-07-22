@@ -243,6 +243,7 @@ export function enrichMethodFunctionDefinition(
 	let newScope: enricher.Scope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types,
 		protocols: {},
@@ -312,6 +313,7 @@ export function enrichFunctionDefinition(
 	let newScope: enricher.Scope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set<string>(),
 		types,
 		protocols: {},
@@ -612,6 +614,7 @@ export function enrichMatch(
 			let bodyScope = {
 				parent: scope,
 				members: {},
+				declarations: {},
 				constants: new Set(),
 				types: {},
 				protocols: {},
@@ -792,6 +795,9 @@ export function enrichVariableAssignmentStatement(
 ): common.typed.VariableAssignmentStatementNode {
 	let declaringScope = findDeclaringScope(node.name.content, scope)
 
+	let declarationPosition =
+		declaringScope?.declarations[node.name.content] ?? null
+
 	if (declaringScope?.constants.has(node.name.content)) {
 		reportError(
 			`Constant '${node.name.content}' can not be reassigned.`,
@@ -807,6 +813,7 @@ export function enrichVariableAssignmentStatement(
 		// NOTE: The target Variable's Type is the value's expected Type — a
 		// bare Case in the value resolves against it before the scope scan.
 		value: enrichExpression(node.value, scope, name.type),
+		declarationPosition,
 		position: node.position,
 	}
 }
@@ -886,6 +893,7 @@ export function enrichNamespaceDefinitionStatement(
 	let methodScope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types: genericTypes,
 		protocols: {},
@@ -1008,6 +1016,7 @@ export function enrichIfElseStatementNode(
 	let trueScope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types: {},
 		protocols: {},
@@ -1015,6 +1024,7 @@ export function enrichIfElseStatementNode(
 	let falseScope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types: {},
 		protocols: {},
@@ -1036,6 +1046,7 @@ export function enrichIfStatement(
 	let bodyScope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types: {},
 		protocols: {},
@@ -1122,6 +1133,10 @@ function declareVariableInScope(
 
 	scope.members[variableName] = type
 
+	if (typeof identifier !== "string") {
+		scope.declarations[variableName] = identifier.position
+	}
+
 	if (isConstant) {
 		scope.constants.add(variableName)
 	} else {
@@ -1146,6 +1161,16 @@ function findDeclaringScope(
 	}
 
 	return null
+}
+
+// NOTE: Where the name a use refers to was declared, or null when it was
+// declared by the Compiler rather than in this file. What lets a Diagnostic
+// about a use point back at the declaration that constrains it.
+export function findDeclarationPosition(
+	name: string,
+	scope: enricher.Scope,
+): common.Position | null {
+	return findDeclaringScope(name, scope)?.declarations[name] ?? null
 }
 
 function declareTypeInScope(
@@ -1395,6 +1420,7 @@ registerBodyReturnTypeInference((node, parameterTypes, scope) => {
 		let inferenceScope: enricher.Scope = {
 			parent: scope,
 			members: {},
+			declarations: {},
 			constants: new Set<string>(),
 			types: {},
 			protocols: {},
