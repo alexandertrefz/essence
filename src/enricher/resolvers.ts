@@ -8,69 +8,24 @@ import {
 	closestMatch,
 	countOf,
 	createInferenceContext,
-	describeSignature,
 	describeType,
-	flattenUnionMembers,
 	type GenericBindings,
-	type MatchableArgument,
-	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
-	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
+import { childScope } from "./scope"
 
-// NOTE: `expectedType` is the Type the surrounding context requires of this
-// Expression, and is only ever set for an Argument being matched against a
-// parameter. Everything ignores it but a Function literal, which reads its
-// omitted annotations off it.
+// NOTE: Type-declaration and signature resolution. Expressions are no longer
+// typed here — enrichment is the only Expression walker, and a Node's Type is
+// read off its enriched children. What remains resolves the Types written in
+// annotations, plus a fully annotated Function signature.
 export function resolveType(
-	node:
-		| parser.ExpressionNode
-		| parser.FunctionDefinitionNode
-		| parser.TypeDeclarationNode
-		| parser.NamespaceDefinitionStatementNode,
+	node: parser.TypeDeclarationNode,
 	scope: enricher.Scope,
-	expectedType: common.Type | null = null,
 ): common.Type {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
-			return resolveNativeFunctionInvocationType(node, scope)
-		case "MethodInvocation":
-			return resolveMethodInvocationType(node, scope)
-		case "FunctionInvocation":
-			return resolveFunctionInvocationType(node, scope)
-		case "Combination":
-			return resolveCombinationType(node, scope)
-		case "RecordValue":
-			return resolveRecordValueType(node, scope)
-		case "ListValue":
-			return resolveListValueType(node, scope)
-		case "StringValue":
-			return { type: "String" }
-		case "IntegerValue":
-			return { type: "Integer" }
-		case "RationalValue":
-			return { type: "Rational" }
-		case "BooleanValue":
-			return { type: "Boolean" }
-		case "NothingValue":
-			return { type: "Nothing" }
-		case "FunctionValue":
-			return resolveFunctionValueType(node, scope, expectedType)
-		case "CaseValue":
-			return resolveCaseValueType(node, scope)
-		case "Lookup":
-			return resolveLookupType(node, scope)
-		case "Identifier":
-			return resolveIdentifierType(node, scope)
-		case "Self":
-			return resolveSelfType(node, scope)
-		case "FunctionDefinition":
-			return resolveFunctionDefinitionType(node, scope)
-		case "NamespaceDefinitionStatement":
-			return resolveNamespaceDefinitionStatementType(node, scope)
 		case "IdentifierTypeDeclaration":
 			return resolveIdentifierTypeDeclarationType(node, scope)
 		case "UnionTypeDeclaration":
@@ -81,8 +36,6 @@ export function resolveType(
 			return resolveGenericTypeDeclarationType(node, scope)
 		case "FunctionTypeDeclaration":
 			return resolveFunctionTypeDeclarationType(node, scope)
-		case "Match":
-			return resolveMatchType(node, scope)
 	}
 }
 
@@ -99,996 +52,6 @@ export function resolveFunctionTypeDeclarationType(
 		})),
 		returnType: resolveType(node.returnType, scope),
 	}
-}
-
-// NOTE: The result of inferring one invocation against one signature —
-// `unboundGenerics` lists Type Parameters that neither a default, the
-// receiver nor any Argument could bind. They are substituted as Error Types
-// in `returnType`; the caller reports them once the candidate is selected.
-type InferredInvocation = {
-	returnType: common.Type
-	unboundGenerics: Array<string>
-	// NOTE: What the invocation bound each Type Parameter to — conformance
-	// resolution for Protocol bounds reads the winning candidate's bindings.
-	bindings: GenericBindings
-}
-
-// NOTE: Matches an invocation's Arguments left to right against a signature,
-// binding `infer` Generics on their first occurrence (for Methods the
-// receiver is the first Argument), and seeding plain Generics with their
-// definition-time defaults. Returns undefined when the Arguments do not
-// match; a fresh context per call keeps bindings from leaking between
-// overload candidates.
-function inferInvocation(
-	signature: common.BaseFunction,
-	matchableArguments: Array<MatchableArgument>,
-): InferredInvocation | undefined {
-	if (signature.generics.length === 0) {
-		if (
-			matchArguments(signature.parameterTypes, matchableArguments)
-				.type !== "Match"
-		) {
-			return undefined
-		}
-
-		return {
-			returnType: signature.returnType,
-			unboundGenerics: [],
-			bindings: new Map(),
-		}
-	}
-
-	let context = createInferenceContext(signature.generics)
-
-	if (
-		matchArguments(signature.parameterTypes, matchableArguments, {
-			inference: context,
-		}).type !== "Match"
-	) {
-		return undefined
-	}
-
-	return substituteInferredReturnType(signature, context.bindings)
-}
-
-// NOTE: Substitutes the collected bindings into the return Type — Generics
-// that stayed unbound are substituted as Error Types, so that a single
-// "Could not infer" Diagnostic does not cascade.
-function substituteInferredReturnType(
-	signature: common.BaseFunction,
-	bindings: GenericBindings,
-): InferredInvocation {
-	let originalBindings = bindings
-	let unboundGenerics = signature.generics
-		.filter((generic) => !bindings.has(generic.name))
-		.map((generic) => generic.name)
-
-	if (unboundGenerics.length > 0) {
-		bindings = new Map(bindings)
-
-		for (let name of unboundGenerics) {
-			bindings.set(name, { type: "Error" })
-		}
-	}
-
-	return {
-		returnType: applyGenericBindings(signature.returnType, bindings),
-		unboundGenerics,
-		bindings: originalBindings,
-	}
-}
-
-function reportUnboundGenerics(
-	unboundGenerics: Array<string>,
-	position: common.Position,
-): void {
-	for (let name of unboundGenerics) {
-		reportError(
-			`Type Parameter '${name}' could not be inferred`,
-			position,
-			{
-				code: "uninferable-type-parameter",
-				labels: [
-					primary(
-						position,
-						"nothing here determines what it binds to",
-					),
-				],
-				helps: ["Write the Type Argument explicitly."],
-			},
-		)
-	}
-}
-
-export function resolveNativeFunctionInvocationType(
-	node: parser.NativeFunctionInvocationNode,
-	scope: enricher.Scope,
-): common.Type {
-	let type = resolveType(node.name, scope)
-
-	if (type.type === "Function") {
-		return resolveInferredReturnType(
-			type,
-			node.arguments,
-			node.position,
-			scope,
-		)
-	}
-
-	if (type.type !== "Error") {
-		reportError(
-			`'${node.name.content}' is not a native Function`,
-			node.name.position,
-			{
-				code: "unknown-native-function",
-				labels: [
-					primary(
-						node.name.position,
-						"the Compiler provides no such native Function",
-					),
-				],
-			},
-		)
-	}
-
-	return { type: "Error" }
-}
-
-// NOTE: Infers a Generic signature's return Type at an invocation whose
-// Argument mismatches are reported by the Validator — a failed match still
-// substitutes whatever could be bound, and "Could not infer" is only
-// reported when the Arguments actually matched.
-function resolveInferredReturnType(
-	signature: common.BaseFunction,
-	invocationArguments: Array<parser.ArgumentNode>,
-	position: common.Position,
-	scope: enricher.Scope,
-): common.Type {
-	if (signature.generics.length === 0) {
-		return signature.returnType
-	}
-
-	let matchableArguments: Array<MatchableArgument> = invocationArguments.map(
-		(argument) => ({
-			name: argument.name?.content ?? null,
-			getType: (expectedType) =>
-				resolveType(argument.value, scope, expectedType),
-		}),
-	)
-
-	let context = createInferenceContext(signature.generics)
-	let matchResult = matchArguments(
-		signature.parameterTypes,
-		matchableArguments,
-		{ inference: context },
-	)
-
-	let inferred = substituteInferredReturnType(signature, context.bindings)
-
-	if (matchResult.type === "Match") {
-		reportUnboundGenerics(inferred.unboundGenerics, position)
-	}
-
-	return inferred.returnType
-}
-
-export function resolveInvokedMethodInNamespace(
-	node: parser.MethodInvocationNode,
-	resolvedNamespace: common.NamespaceType,
-	scope: enricher.Scope,
-	receiverType: common.Type | null = null,
-):
-	| {
-			returnType: common.Type
-			overloadedMethodIndex: number | null
-			unboundGenerics: Array<string>
-			signatureGenerics: Array<common.GenericDeclaration>
-			bindings: GenericBindings
-	  }
-	| undefined {
-	let methodType = resolvedNamespace.methods[node.member.content]
-
-	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
-		(argument) => ({
-			name: argument.name?.content ?? null,
-			getType: (expectedType) =>
-				resolveType(argument.value, scope, expectedType),
-		}),
-	)
-
-	if (
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "OverloadedMethod"
-	) {
-		// NOTE: Union dispatch resolves the Method once per member Type — the
-		// override stands in for the receiver so each member is matched as if
-		// the receiver had that Type.
-		matchableArguments.unshift({
-			name: null,
-			getType: () => receiverType ?? resolveType(node.base, scope),
-		})
-	}
-
-	if (
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "StaticMethod"
-	) {
-		let inferred = inferInvocation(methodType, matchableArguments)
-
-		if (inferred === undefined) {
-			return
-		}
-
-		return {
-			returnType: inferred.returnType,
-			overloadedMethodIndex: null,
-			unboundGenerics: inferred.unboundGenerics,
-			signatureGenerics: methodType.generics,
-			bindings: inferred.bindings,
-		}
-	} else if (
-		methodType.type === "OverloadedMethod" ||
-		methodType.type === "OverloadedStaticMethod"
-	) {
-		for (
-			let overloadIndex = 0;
-			overloadIndex < methodType.overloads.length;
-			overloadIndex++
-		) {
-			let overload = methodType.overloads[overloadIndex]
-			let inferred = inferInvocation(overload, matchableArguments)
-
-			if (inferred !== undefined) {
-				return {
-					overloadedMethodIndex: overloadIndex,
-					returnType: inferred.returnType,
-					unboundGenerics: inferred.unboundGenerics,
-					signatureGenerics: overload.generics,
-					bindings: inferred.bindings,
-				}
-			}
-		}
-
-		return undefined
-	} else {
-		return undefined
-	}
-}
-
-// NOTE: Failed Method Invocations resolve to a placeholder Namespace and an
-// Error Type — the Diagnostic has already been reported, and later stages
-// only run when there are no Error Diagnostics. Dispatched Invocations reuse
-// the placeholder Namespace: their targets live in `dispatch` instead.
-function placeholderNamespace(): { name: string; type: common.NamespaceType } {
-	return {
-		name: "",
-		type: {
-			type: "Namespace",
-			targetType: null,
-			name: "",
-			generics: [],
-			properties: {},
-			methods: {},
-		},
-	}
-}
-
-type ResolvedMethodInvocation = {
-	namespace: { name: string; type: common.NamespaceType }
-	type: common.Type
-	overloadedMethodIndex: number | null
-	conformances: Array<common.Conformance>
-	dispatch: Array<common.DispatchCase> | null
-}
-
-function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
-	return {
-		namespace: placeholderNamespace(),
-		type: { type: "Error" },
-		overloadedMethodIndex: null,
-		conformances: [],
-		dispatch: null,
-	}
-}
-
-// NOTE: The Namespaces that were searched are the useful half of "no such
-// Method" — without them the reader can not tell whether they misspelled the
-// Method or the value is not the Type they thought it was. The near miss is
-// offered from the same set, so a suggestion is always a Method that would
-// actually resolve.
-function reportUnknownMethod(
-	node: parser.MethodInvocationNode,
-	baseType: common.Type,
-	namespaces: Map<string, common.NamespaceType>,
-): void {
-	let methodNames = new Set<string>()
-
-	for (let namespace of namespaces.values()) {
-		for (let methodName of Object.keys(namespace.methods)) {
-			methodNames.add(methodName)
-		}
-	}
-
-	let suggestion = closestMatch(node.member.content, [...methodNames])
-	let namespaceNames = [...namespaces.keys()]
-
-	reportError(
-		`No Method named '${node.member.content}' for this value`,
-		node.member.position,
-		{
-			code: "unknown-method",
-			labels: [
-				primary(node.member.position, "no Method of this name"),
-				secondary(
-					node.base.position,
-					`this is ${withArticle(describeType(baseType))}`,
-				),
-			],
-			notes:
-				namespaceNames.length === 0
-					? []
-					: [
-							`Searched ${namespaceNames.length === 1 ? "Namespace" : "Namespaces"} ${namespaceNames
-								.map((name) => `'${name}'`)
-								.join(", ")}.`,
-						],
-			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
-		},
-	)
-}
-
-// NOTE: The receiver occupies the first Parameter of every non-static Method
-// signature, but it is written to the left of the `::` rather than inside the
-// parentheses — listing it among the Arguments would describe a call nobody
-// can write.
-function describeMethodOverloads(
-	methodType: common.Type | undefined,
-): Array<Array<common.Parameter>> {
-	if (methodType === undefined) {
-		return []
-	}
-
-	let dropsReceiver =
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "OverloadedMethod"
-
-	switch (methodType.type) {
-		case "SimpleMethod":
-		case "StaticMethod":
-			return [
-				dropsReceiver
-					? methodType.parameterTypes.slice(1)
-					: methodType.parameterTypes,
-			]
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
-			return methodType.overloads.map((overload) =>
-				dropsReceiver
-					? overload.parameterTypes.slice(1)
-					: overload.parameterTypes,
-			)
-		default:
-			return []
-	}
-}
-
-function reportNoMatchingOverload(
-	node: parser.MethodInvocationNode,
-	candidates: Array<{
-		namespaceName: string
-		methodType: common.Type | undefined
-	}>,
-): void {
-	let notes: Array<string> = []
-
-	for (let candidate of candidates) {
-		for (let parameterTypes of describeMethodOverloads(
-			candidate.methodType,
-		)) {
-			notes.push(
-				`'${candidate.namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
-			)
-		}
-	}
-
-	reportError(
-		`No overload of '${node.member.content}' accepts these Arguments`,
-		node.position,
-		{
-			code: "no-matching-overload",
-			labels: [
-				primary(
-					node.position,
-					`this call passes ${countOf(node.arguments.length, "Argument")}`,
-				),
-			],
-			notes,
-		},
-	)
-}
-
-function reportAmbiguousNamespace(
-	node: parser.MethodInvocationNode,
-	namespaceNames: Array<string>,
-): void {
-	reportError(
-		`'${node.member.content}' is provided by more than one Namespace`,
-		node.position,
-		{
-			code: "ambiguous-namespace",
-			labels: [
-				primary(
-					node.member.position,
-					"these Arguments match all of them",
-				),
-			],
-			notes: namespaceNames.map(
-				(name) => `'${name}' declares '${node.member.content}'.`,
-			),
-			helps: [
-				`Name the Namespace at the call, e.g. '${namespaceNames[0]}::${node.member.content}(…)'.`,
-			],
-		},
-	)
-}
-
-export function resolveMethodInvocation(
-	node: parser.MethodInvocationNode,
-	scope: enricher.Scope,
-): ResolvedMethodInvocation {
-	let baseType = resolveType(node.base, scope)
-	let namespaces = resolveMethodLookupNamespacesForReceiverType(
-		baseType,
-		node.namespaceSpecifier,
-		scope,
-	)
-
-	// NOTE: A Union-typed receiver falls back to per-member dispatch whenever
-	// no Namespace covering the whole Union can resolve the Method — a
-	// covering Namespace that can (`Ordering`) keeps taking precedence.
-	if (namespaces.size === 0) {
-		if (baseType.type === "UnionType") {
-			return resolveUnionMethodDispatch(node, baseType, scope)
-		}
-
-		if (baseType.type !== "Error") {
-			reportError(
-				`No Namespace provides Methods for this value`,
-				node.base.position,
-				{
-					code: "no-namespace-for-value",
-					labels: [
-						primary(
-							node.base.position,
-							`this is ${withArticle(describeType(baseType))}`,
-						),
-						secondary(
-							node.member.position,
-							`'${node.member.content}' is looked up in its Namespaces`,
-						),
-					],
-					notes: [
-						`No Namespace in scope targets ${describeType(baseType)}.`,
-					],
-				},
-			)
-		}
-
-		return resolveFailedMethodInvocation()
-	}
-
-	let matchingNamespaces = new Map<string, common.NamespaceType>()
-	for (let [name, namespace] of namespaces) {
-		if (Object.hasOwn(namespace.methods, node.member.content)) {
-			matchingNamespaces.set(name, namespace)
-		}
-	}
-
-	if (matchingNamespaces.size === 0) {
-		if (baseType.type === "UnionType") {
-			return resolveUnionMethodDispatch(node, baseType, scope)
-		}
-
-		reportUnknownMethod(node, baseType, namespaces)
-
-		return resolveFailedMethodInvocation()
-	}
-
-	let resolvedMethods = []
-
-	for (let [namespaceName, namespaceType] of matchingNamespaces) {
-		let resolvedMethod = resolveInvokedMethodInNamespace(
-			node,
-			namespaceType,
-			scope,
-		)
-
-		if (resolvedMethod) {
-			resolvedMethods.push({
-				namespace: {
-					name: namespaceName,
-					type: namespaceType,
-				},
-				overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-				type: resolvedMethod.returnType,
-				unboundGenerics: resolvedMethod.unboundGenerics,
-				signatureGenerics: resolvedMethod.signatureGenerics,
-				bindings: resolvedMethod.bindings,
-			})
-		}
-	}
-
-	if (resolvedMethods.length > 1) {
-		resolvedMethods = filterMostSpecificByTarget(
-			resolvedMethods,
-			(candidate) => candidate.namespace.type.targetType,
-		)
-	}
-
-	if (resolvedMethods.length === 0) {
-		// NOTE: The covering Namespace has the Method but its overloads
-		// reject the Arguments — per-member dispatch may still accept them,
-		// since each member is matched with its own receiver Type.
-		if (baseType.type === "UnionType") {
-			return resolveUnionMethodDispatch(node, baseType, scope)
-		}
-
-		reportNoMatchingOverload(
-			node,
-			[...matchingNamespaces.entries()].map(
-				([namespaceName, namespaceType]) => ({
-					namespaceName,
-					methodType: namespaceType.methods[node.member.content],
-				}),
-			),
-		)
-
-		return resolveFailedMethodInvocation()
-	} else if (resolvedMethods.length === 1) {
-		let resolvedMethod = resolvedMethods[0]
-
-		// NOTE: Unbound Type Parameters are only reported for the selected
-		// candidate — losing overloads and Namespaces must not leak
-		// Diagnostics.
-		reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
-
-		return {
-			namespace: resolvedMethod.namespace,
-			type: resolvedMethod.type,
-			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-			conformances: resolveConformances(
-				resolvedMethod.signatureGenerics,
-				resolvedMethod.bindings,
-				scope,
-				node.position,
-			),
-			dispatch: null,
-		}
-	} else {
-		reportAmbiguousNamespace(
-			node,
-			resolvedMethods.map((method) => method.namespace.name),
-		)
-
-		return resolveFailedMethodInvocation()
-	}
-}
-
-// NOTE: Per-member dispatch for a Union-typed receiver — the Method is
-// resolved statically for every member Type, and the Invocation is only
-// valid when every member resolves unambiguously. Its Type is the Union of
-// the branch return Types. The receiver's actual Type picks the branch at
-// runtime, so more specific member Types are ordered first — an open Record
-// member would otherwise swallow values of any member assignable to it.
-function resolveUnionMethodDispatch(
-	node: parser.MethodInvocationNode,
-	unionType: common.UnionType,
-	scope: enricher.Scope,
-): ResolvedMethodInvocation {
-	let members = flattenUnionMembers(unionType)
-	let dispatchCases: Array<common.DispatchCase> = []
-	let caseReturnTypes: Array<common.Type> = []
-
-	for (let [memberIndex, memberType] of members.entries()) {
-		let namespaces = resolveMethodLookupNamespacesForReceiverType(
-			memberType,
-			node.namespaceSpecifier,
-			scope,
-		)
-
-		let matchingNamespaces = new Map<string, common.NamespaceType>()
-		for (let [name, namespace] of namespaces) {
-			if (Object.hasOwn(namespace.methods, node.member.content)) {
-				matchingNamespaces.set(name, namespace)
-			}
-		}
-
-		if (matchingNamespaces.size === 0) {
-			reportError(
-				`No Method named '${node.member.content}' for ${describeType(memberType)}`,
-				node.member.position,
-				{
-					code: "unknown-method",
-					labels: [
-						primary(
-							node.member.position,
-							`${describeType(memberType)} has no Method of this name`,
-						),
-						secondary(
-							node.base.position,
-							`this is ${withArticle(describeType(unionType))}`,
-						),
-					],
-					notes: [
-						`Every member of the Union must provide '${node.member.content}' — the receiver's Type is only known at runtime.`,
-					],
-				},
-			)
-
-			return resolveFailedMethodInvocation()
-		}
-
-		let resolvedMethods = []
-
-		for (let [namespaceName, namespaceType] of matchingNamespaces) {
-			let resolvedMethod = resolveInvokedMethodInNamespace(
-				node,
-				namespaceType,
-				scope,
-				memberType,
-			)
-
-			if (resolvedMethod) {
-				resolvedMethods.push({
-					namespaceName,
-					namespaceType,
-					...resolvedMethod,
-				})
-			}
-		}
-
-		if (resolvedMethods.length > 1) {
-			resolvedMethods = filterMostSpecificByTarget(
-				resolvedMethods,
-				(candidate) => candidate.namespaceType.targetType,
-			)
-		}
-
-		if (resolvedMethods.length === 0) {
-			reportError(
-				`No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
-				node.position,
-				{
-					code: "no-matching-overload",
-					labels: [
-						primary(
-							node.position,
-							`this call passes ${countOf(node.arguments.length, "Argument")}`,
-						),
-						secondary(
-							node.base.position,
-							`${describeType(memberType)} is a member of this Union`,
-						),
-					],
-					notes: [...matchingNamespaces.entries()].flatMap(
-						([namespaceName, namespaceType]) =>
-							describeMethodOverloads(
-								namespaceType.methods[node.member.content],
-							).map(
-								(parameterTypes) =>
-									`'${namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
-							),
-					),
-				},
-			)
-
-			return resolveFailedMethodInvocation()
-		}
-
-		if (resolvedMethods.length > 1) {
-			reportError(
-				`'${node.member.content}' is provided by more than one Namespace for ${describeType(memberType)}`,
-				node.position,
-				{
-					code: "ambiguous-namespace",
-					labels: [
-						primary(
-							node.member.position,
-							"these Arguments match all of them",
-						),
-					],
-					notes: resolvedMethods.map(
-						(method) =>
-							`'${method.namespaceName}' declares '${node.member.content}'.`,
-					),
-					helps: [
-						`Name the Namespace at the call, e.g. '${resolvedMethods[0].namespaceName}::${node.member.content}(…)'.`,
-					],
-				},
-			)
-
-			return resolveFailedMethodInvocation()
-		}
-
-		let resolvedMethod = resolvedMethods[0]
-
-		// NOTE: Unbound Type Parameters depend on the Arguments, which every
-		// branch shares — reporting them for the first member only keeps the
-		// Diagnostic from repeating per member.
-		if (memberIndex === 0) {
-			reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
-		}
-
-		dispatchCases.push({
-			memberType,
-			namespaceName: resolvedMethod.namespaceName,
-			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-			conformances: resolveConformances(
-				resolvedMethod.signatureGenerics,
-				resolvedMethod.bindings,
-				scope,
-				node.position,
-			),
-		})
-		caseReturnTypes.push(resolvedMethod.returnType)
-	}
-
-	let catchAllCases = dispatchCases.filter((dispatchCase) =>
-		isRuntimeCatchAllType(dispatchCase.memberType),
-	)
-
-	if (catchAllCases.length > 1) {
-		reportError(
-			`'${node.member.content}' can not be dispatched on this value`,
-			node.position,
-			{
-				code: "undispatchable-method",
-				labels: [
-					primary(
-						node.base.position,
-						`this is ${withArticle(describeType(unionType))}`,
-					),
-				],
-				notes: [
-					`${countOf(catchAllCases.length, "member Type")} of the Union are indistinguishable at runtime: ${catchAllCases
-						.map((dispatchCase) =>
-							describeType(dispatchCase.memberType),
-						)
-						.join(", ")}.`,
-				],
-				helps: [
-					"Narrow the value with a Match Expression before calling the Method.",
-				],
-			},
-		)
-
-		return resolveFailedMethodInvocation()
-	}
-
-	let sortedCases = [...dispatchCases].sort((a, b) => {
-		let aCatchAll = isRuntimeCatchAllType(a.memberType)
-		let bCatchAll = isRuntimeCatchAllType(b.memberType)
-
-		if (aCatchAll !== bCatchAll) {
-			return aCatchAll ? 1 : -1
-		}
-
-		let aIsMoreSpecific =
-			matchesType(b.memberType, a.memberType) &&
-			!matchesType(a.memberType, b.memberType)
-		let bIsMoreSpecific =
-			matchesType(a.memberType, b.memberType) &&
-			!matchesType(b.memberType, a.memberType)
-
-		if (aIsMoreSpecific) {
-			return -1
-		} else if (bIsMoreSpecific) {
-			return 1
-		} else {
-			return 0
-		}
-	})
-
-	let returnTypes: Array<common.Type> = []
-
-	for (let returnType of caseReturnTypes) {
-		// NOTE: Named nested Unions (`Ordering`, `Number`) stay whole so the
-		// invocation's Type prints by name; a member subsumed by an existing
-		// one (or subsuming existing ones) collapses so `Number` and `Integer`
-		// merge into `Number` rather than sitting side by side.
-		let members =
-			returnType.type === "UnionType" &&
-			returnType.name === undefined &&
-			returnType.alias === undefined
-				? unionMembersKeepingNames(returnType)
-				: [returnType]
-
-		for (let member of members) {
-			if (returnTypes.some((existing) => matchesType(existing, member))) {
-				continue
-			}
-
-			returnTypes = returnTypes.filter(
-				(existing) => !matchesType(member, existing),
-			)
-			returnTypes.push(member)
-		}
-	}
-
-	return {
-		namespace: placeholderNamespace(),
-		type: buildUnion(returnTypes),
-		overloadedMethodIndex: null,
-		conformances: [],
-		dispatch: sortedCases,
-	}
-}
-
-// NOTE: `isValueOfType` answers true for every value on these — such a
-// member can only ever be the last dispatch branch, and two of them can not
-// coexist in one dispatched Union.
-function isRuntimeCatchAllType(type: common.Type): boolean {
-	return type.type === "GenericUse" || type.type === "Unknown"
-}
-
-// NOTE: The same specificity rule conformance resolution uses, applied to
-// Method resolution: when several Namespaces resolve a Method, one whose
-// target Type is strictly more specific by assignability wins (`Integer`
-// beats `Integer | Rational` for an Integer receiver). This is what lets a
-// Namespace covering a Union carry the Union-level behaviour without making
-// every member-typed invocation ambiguous. Remaining ties stay a hard error.
-function filterMostSpecificByTarget<Candidate>(
-	candidates: Array<Candidate>,
-	targetOf: (candidate: Candidate) => common.Type | null,
-): Array<Candidate> {
-	function isStrictlyMoreSpecific(
-		target: common.Type | null,
-		other: common.Type | null,
-	): boolean {
-		if (target === null || other === null) {
-			return false
-		}
-
-		return matchesType(other, target) && !matchesType(target, other)
-	}
-
-	return candidates.filter(
-		(candidate) =>
-			!candidates.some(
-				(other) =>
-					other !== candidate &&
-					isStrictlyMoreSpecific(
-						targetOf(other),
-						targetOf(candidate),
-					),
-			),
-	)
-}
-
-export function resolveMethodInvocationType(
-	node: parser.MethodInvocationNode,
-	scope: enricher.Scope,
-): common.Type {
-	return resolveMethodInvocation(node, scope).type
-}
-
-export function resolveFunctionInvocation(
-	node: parser.FunctionInvocationNode,
-	scope: enricher.Scope,
-): { type: common.Type; conformances: Array<common.Conformance> } {
-	const type = resolveType(node.name, scope)
-
-	if (
-		type.type === "Function" ||
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod"
-	) {
-		if (type.generics.length === 0) {
-			return { type: type.returnType, conformances: [] }
-		}
-
-		// NOTE: Mirrors resolveInferredReturnType, additionally keeping the
-		// bindings — conformance resolution for Protocol bounds needs to know
-		// what each Type Parameter was bound to. Argument mismatches are the
-		// Validator's to report; "Could not infer" and conformance Diagnostics
-		// only fire when the Arguments actually matched.
-		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
-			(argument) => ({
-				name: argument.name?.content ?? null,
-				getType: (expectedType) =>
-					resolveType(argument.value, scope, expectedType),
-			}),
-		)
-
-		let context = createInferenceContext(type.generics)
-		let matchResult = matchArguments(
-			type.parameterTypes,
-			matchableArguments,
-			{ inference: context },
-		)
-
-		let inferred = substituteInferredReturnType(type, context.bindings)
-		let conformances: Array<common.Conformance> = []
-
-		if (matchResult.type === "Match") {
-			reportUnboundGenerics(inferred.unboundGenerics, node.position)
-
-			conformances = resolveConformances(
-				type.generics,
-				inferred.bindings,
-				scope,
-				node.position,
-			)
-		}
-
-		return { type: inferred.returnType, conformances }
-	} else if (
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	) {
-		const matchableArguments: Array<MatchableArgument> = node.arguments.map(
-			(argument) => ({
-				name: argument.name?.content ?? null,
-				getType: (expectedType) =>
-					resolveType(argument.value, scope, expectedType),
-			}),
-		)
-
-		for (let overload of type.overloads) {
-			let inferred = inferInvocation(overload, matchableArguments)
-
-			if (inferred !== undefined) {
-				reportUnboundGenerics(inferred.unboundGenerics, node.position)
-
-				return {
-					type: inferred.returnType,
-					conformances: resolveConformances(
-						overload.generics,
-						inferred.bindings,
-						scope,
-						node.position,
-					),
-				}
-			}
-		}
-
-		reportError("No overload accepts these Arguments", node.position, {
-			code: "no-matching-overload",
-			labels: [
-				primary(
-					node.position,
-					`this call passes ${countOf(node.arguments.length, "Argument")}`,
-				),
-			],
-		})
-
-		return { type: { type: "Error" }, conformances: [] }
-	} else {
-		if (type.type !== "Error") {
-			reportError(
-				"This Expression is not a Function",
-				node.name.position,
-				{
-					code: "not-a-function",
-					labels: [
-						primary(
-							node.name.position,
-							`this is ${withArticle(describeType(type))}`,
-						),
-					],
-				},
-			)
-		}
-
-		return { type: { type: "Error" }, conformances: [] }
-	}
-}
-
-export function resolveFunctionInvocationType(
-	node: parser.FunctionInvocationNode,
-	scope: enricher.Scope,
-): common.Type {
-	return resolveFunctionInvocation(node, scope).type
 }
 
 function describeTypesForCombination(type: common.Type): string {
@@ -1134,25 +97,27 @@ function describeTypesForCombination(type: common.Type): string {
 	}
 }
 
-export function resolveCombinationType(
-	node: parser.CombinationNode,
-	scope: enricher.Scope,
+// NOTE: The result Type of a Combination, computed from its operands' already
+// enriched Types. It only needs the operand Positions, to point the Diagnostics
+// at.
+export function combinationTypeOf(
+	lhsType: common.Type,
+	rhsType: common.Type,
+	lhsPosition: common.Position,
+	rhsPosition: common.Position,
 ): common.Type {
 	function isSubType(
 		lhs: common.RecordType,
 		rhs: common.RecordType,
 	): boolean {
-		for (let [rhsName, rhsType] of Object.entries(rhs.members)) {
-			if (!isDeepStrictEqual(lhs.members[rhsName], rhsType)) {
+		for (let [rhsName, rhsMemberType] of Object.entries(rhs.members)) {
+			if (!isDeepStrictEqual(lhs.members[rhsName], rhsMemberType)) {
 				return false
 			}
 		}
 
 		return true
 	}
-
-	let lhsType = resolveType(node.lhs, scope)
-	let rhsType = resolveType(node.rhs, scope)
 
 	if (lhsType.type === "Error" || rhsType.type === "Error") {
 		return { type: "Error" }
@@ -1161,12 +126,12 @@ export function resolveCombinationType(
 	if (lhsType.type !== "Record") {
 		reportError(
 			`${describeTypesForCombination(lhsType)} can not be combined`,
-			node.lhs.position,
+			lhsPosition,
 			{
 				code: "uncombinable-types",
 				labels: [
 					primary(
-						node.lhs.position,
+						lhsPosition,
 						`this is ${withArticle(describeType(lhsType))}`,
 					),
 				],
@@ -1180,12 +145,12 @@ export function resolveCombinationType(
 	if (rhsType.type !== "Record") {
 		reportError(
 			`${describeTypesForCombination(rhsType)} can not be combined`,
-			node.rhs.position,
+			rhsPosition,
 			{
 				code: "uncombinable-types",
 				labels: [
 					primary(
-						node.rhs.position,
+						rhsPosition,
 						`this is ${withArticle(describeType(rhsType))}`,
 					),
 				],
@@ -1206,16 +171,16 @@ export function resolveCombinationType(
 		} else {
 			reportError(
 				"This is not a Partial of the value it updates",
-				node.rhs.position,
+				rhsPosition,
 				{
 					code: "partial-type-mismatch",
 					labels: [
 						primary(
-							node.rhs.position,
+							rhsPosition,
 							`this is ${withArticle(describeType(rhsType))}`,
 						),
 						secondary(
-							node.lhs.position,
+							lhsPosition,
 							`this is ${withArticle(describeType(lhsType))}`,
 						),
 					],
@@ -1228,235 +193,6 @@ export function resolveCombinationType(
 			return lhsType
 		}
 	}
-}
-
-// NOTE: Resolves `ChoiceName#CaseName` to the Case's Type. The Choice's name
-// resolves through the ordinary Type scope, so a Type Alias of a Choice works
-// too (`type Op = CalculatorOperation` admits `Op#Add`).
-export function resolveCaseReference(
-	choice: parser.IdentifierNode,
-	caseName: parser.IdentifierNode,
-	scope: enricher.Scope,
-): common.CaseType | common.ErrorType {
-	let choiceType = findTypeInScope(choice.content, scope)
-
-	if (choiceType === null) {
-		reportError(
-			`Type '${choice.content}' is not declared`,
-			choice.position,
-			{
-				code: "unknown-type",
-				labels: [primary(choice.position, "no such Type")],
-				helps: suggestionHelps(choice.content, scope, "types"),
-			},
-		)
-
-		return { type: "Error" }
-	}
-
-	if (choiceType.type === "Error") {
-		return { type: "Error" }
-	}
-
-	let members =
-		choiceType.type === "UnionType"
-			? flattenUnionMembers(choiceType)
-			: [choiceType]
-
-	let caseType = members.find(
-		(member): member is common.CaseType =>
-			member.type === "Case" && member.name === caseName.content,
-	)
-
-	if (caseType === undefined) {
-		reportUnknownCase(
-			caseName,
-			`'${choice.content}'`,
-			members.flatMap((member) =>
-				member.type === "Case" ? [member.name] : [],
-			),
-		)
-
-		return { type: "Error" }
-	}
-
-	return caseType
-}
-
-// NOTE: The bare form (`#Add({ … })`) resolves the way Method lookup
-// resolves its Namespace — every Choice in Type scope is scanned for the
-// Case, and only actual ambiguity asks for the prefix. Shadowed Type names
-// are skipped, mirroring `getAllNamespacesInScope`.
-function findCaseTypesInScope(
-	name: string,
-	scope: enricher.Scope,
-): Array<common.CaseType> {
-	let seenTypeNames = new Set<string>()
-	let cases = new Map<string, common.CaseType>()
-	let searchScope: enricher.Scope | null = scope
-
-	while (searchScope !== null) {
-		for (let [typeName, type] of Object.entries(searchScope.types)) {
-			if (seenTypeNames.has(typeName)) {
-				continue
-			}
-
-			seenTypeNames.add(typeName)
-
-			let members =
-				type.type === "UnionType" ? flattenUnionMembers(type) : [type]
-
-			for (let member of members) {
-				if (member.type === "Case" && member.name === name) {
-					cases.set(`${member.choice}#${member.name}`, member)
-				}
-			}
-		}
-
-		searchScope = searchScope.parent
-	}
-
-	return [...cases.values()]
-}
-
-export function resolveBareCaseReference(
-	caseName: parser.IdentifierNode,
-	scope: enricher.Scope,
-): common.CaseType | common.ErrorType {
-	let candidates = findCaseTypesInScope(caseName.content, scope)
-
-	if (candidates.length === 1) {
-		return candidates[0]
-	}
-
-	if (candidates.length === 0) {
-		reportError(
-			`No Choice in scope declares a Case '#${caseName.content}'`,
-			caseName.position,
-			{
-				code: "unknown-case",
-				labels: [primary(caseName.position, "no such Case")],
-			},
-		)
-	} else {
-		reportAmbiguousCase(
-			caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in scope",
-		)
-	}
-
-	return { type: "Error" }
-}
-
-// NOTE: Contextual resolution for the bare form — the expected Type of the
-// position (a Declaration's annotation, an Assignment's target, the declared
-// return Type at a `<-`) is consulted before the scope scan, exactly like a
-// Matcher consults the scrutinee. `null` means the context does not pin the
-// Case down, and the scan decides.
-function resolveCaseInExpectedType(
-	caseName: parser.IdentifierNode,
-	expectedType: common.Type,
-): common.CaseType | common.ErrorType | null {
-	let members =
-		expectedType.type === "UnionType"
-			? flattenUnionMembers(expectedType)
-			: [expectedType]
-
-	let candidates = members.filter(
-		(member): member is common.CaseType =>
-			member.type === "Case" && member.name === caseName.content,
-	)
-
-	if (candidates.length === 0) {
-		return null
-	}
-
-	if (candidates.length > 1) {
-		reportAmbiguousCase(
-			caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in the expected Type",
-		)
-
-		return { type: "Error" }
-	}
-
-	return candidates[0]
-}
-
-export function resolveCaseValueType(
-	node: parser.CaseValueNode,
-	scope: enricher.Scope,
-	expectedType: common.Type | null = null,
-): common.CaseType | common.ErrorType {
-	if (node.choice === null) {
-		if (expectedType !== null) {
-			let contextual = resolveCaseInExpectedType(
-				node.caseName,
-				expectedType,
-			)
-
-			if (contextual !== null) {
-				return contextual
-			}
-		}
-
-		return resolveBareCaseReference(node.caseName, scope)
-	}
-
-	return resolveCaseReference(node.choice, node.caseName, scope)
-}
-
-// NOTE: A bare Case Matcher (`case #Add`) resolves against the matched
-// value's own Union — the Case's name never has to be in scope by itself.
-// Ambiguity (two Choices in one Union sharing a Case name) asks for the
-// prefixed form instead of guessing.
-export function resolveCaseMatcherType(
-	node: parser.CaseMatcherNode,
-	valueType: common.Type,
-	scope: enricher.Scope,
-): common.Type {
-	if (node.choice !== null) {
-		return resolveCaseReference(node.choice, node.caseName, scope)
-	}
-
-	if (valueType.type === "Error") {
-		return { type: "Error" }
-	}
-
-	let members =
-		valueType.type === "UnionType"
-			? flattenUnionMembers(valueType)
-			: [valueType]
-
-	let candidates = members.filter(
-		(member): member is common.CaseType =>
-			member.type === "Case" && member.name === node.caseName.content,
-	)
-
-	if (candidates.length === 1) {
-		return candidates[0]
-	}
-
-	if (candidates.length === 0) {
-		reportError(
-			`The matched value has no Case '#${node.caseName.content}'`,
-			node.position,
-			{
-				code: "unknown-case",
-				labels: [primary(node.position, "no such Case in this Union")],
-			},
-		)
-	} else {
-		reportAmbiguousCase(
-			node.caseName,
-			candidates.map((candidate) => candidate.choice),
-			"in the matched Union",
-		)
-	}
-
-	return { type: "Error" }
 }
 
 // NOTE: Each Case becomes a nominal Record Type, and the Choice's name is
@@ -1513,26 +249,32 @@ export function resolveChoiceDeclarationStatementType(
 	return { type: "UnionType", name: node.name.content, types: caseTypes }
 }
 
-export function resolveRecordValueType(
-	node: parser.RecordValueNode,
-	scope: enricher.Scope,
+// NOTE: The Type of a Record Literal, computed from its members' already
+// enriched Types. A valid Record annotation wins; anything else reports and
+// falls back to the members' structural Type. `annotationPosition` is only read
+// when there is an annotation to point the Diagnostic at.
+export function recordValueTypeOf(
+	resolvedAnnotation: common.Type | null,
+	memberTypes: Record<string, common.Type>,
+	annotationPosition: common.Position | null,
 ): common.RecordType {
-	if (node.type !== null) {
-		const resolvedType = resolveType(node.type, scope)
-
-		if (resolvedType.type === "Record") {
-			return resolvedType
+	if (resolvedAnnotation !== null) {
+		if (resolvedAnnotation.type === "Record") {
+			return resolvedAnnotation
 		}
 
-		if (resolvedType.type !== "Error") {
+		if (
+			resolvedAnnotation.type !== "Error" &&
+			annotationPosition !== null
+		) {
 			reportError(
 				"A Record Literal must be annotated with a Record Type",
-				node.type.position,
+				annotationPosition,
 				{
 					code: "record-annotation-not-record",
 					labels: [
 						primary(
-							node.type.position,
+							annotationPosition,
 							"this is not a Record Type",
 						),
 					],
@@ -1543,111 +285,71 @@ export function resolveRecordValueType(
 
 	// NOTE: Missing or invalid Type Annotations fall back to the
 	// structural Type of the Record Literal itself.
-	let members: Record<string, common.Type> = {}
-
-	for (let [memberKey, memberValue] of Object.entries(node.members)) {
-		members[memberKey] = resolveType(memberValue.value, scope)
-	}
-
 	return {
 		type: "Record",
-		members,
+		members: memberTypes,
 	}
 }
 
-export function resolveFunctionValueType(
-	node: parser.FunctionValueNode,
-	scope: enricher.Scope,
-	expectedType: common.Type | null = null,
-): common.FunctionType {
-	return resolveFunctionDefinitionType(node.value, scope, expectedType)
-}
-
-// NOTE: The Enricher builds a Function literal's typed Nodes in a separate
-// pass from the one that matched it against a signature, so the Types its
-// omitted annotations resolved to have to be read back rather than worked out
-// again — there is no expected Type left to work them out from.
-//
-// A literal that is not an Argument was never matched against anything, so
-// nothing recorded it. Its annotations can only have come from its own body,
-// and this is the first and last chance to work them out.
-export function contextualFunctionTypeOf(
-	node: parser.FunctionDefinitionNode,
-	scope: enricher.Scope,
-): common.FunctionType | undefined {
-	let recorded = contextualFunctionTypes.get(node)
-
-	if (recorded !== undefined) {
-		return recorded
+// NOTE: The item Type of a List Literal from its elements' already enriched
+// Types. An empty List has an Unknown item Type; otherwise the item Type is the
+// Union of the distinct element Types, in first-seen order.
+export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
+	if (valueTypes.length === 0) {
+		return { type: "Unknown" }
 	}
 
-	if (!needsContext(node)) {
-		return undefined
-	}
+	let itemTypes = [valueTypes[0]]
 
-	return resolveFunctionDefinitionType(node, scope)
-}
-
-export function resolveListValueType(
-	node: parser.ListValueNode,
-	scope: enricher.Scope,
-): common.ListType {
-	if (node.values.length === 0) {
-		return {
-			type: "List",
-			itemType: { type: "Unknown" },
-		}
-	} else {
-		let itemTypes = [resolveType(node.values[0], scope)]
-
-		for (let expression of node.values.slice(1)) {
-			let expressionType = resolveType(expression, scope)
-
-			if (
-				!itemTypes.some((existing) =>
-					isDeepStrictEqual(existing, expressionType),
-				)
-			) {
-				itemTypes.push(expressionType)
-			}
-		}
-
-		return {
-			type: "List",
-			itemType: buildUnion(itemTypes),
+	for (let valueType of valueTypes.slice(1)) {
+		if (
+			!itemTypes.some((existing) =>
+				isDeepStrictEqual(existing, valueType),
+			)
+		) {
+			itemTypes.push(valueType)
 		}
 	}
+
+	return buildUnion(itemTypes)
 }
 
-export function resolveLookupType(
-	node: parser.LookupNode,
-	scope: enricher.Scope,
+// NOTE: The result Type of a Lookup, computed from its base's already enriched
+// Type. The member and base Positions are all it needs to point the Diagnostics.
+export function lookupTypeOf(
+	baseType: common.Type,
+	memberName: string,
+	positions: { member: common.Position; base: common.Position },
 ): common.Type {
-	let baseType = resolveType(node.base, scope)
-
 	if (baseType.type === "Error") {
 		return baseType
 	}
 
 	if (baseType.type === "Namespace") {
-		if (Object.hasOwn(baseType.properties, node.member.content)) {
-			return baseType.properties[node.member.content]
-		} else if (Object.hasOwn(baseType.methods, node.member.content)) {
-			return baseType.methods[node.member.content]
+		if (Object.hasOwn(baseType.properties, memberName)) {
+			return baseType.properties[memberName]
+		} else if (Object.hasOwn(baseType.methods, memberName)) {
+			return baseType.methods[memberName]
 		} else {
-			reportUnknownMember(node, `Namespace '${baseType.name}'`, [
-				...Object.keys(baseType.properties),
-				...Object.keys(baseType.methods),
-			])
+			reportUnknownMember(
+				memberName,
+				positions.member,
+				`Namespace '${baseType.name}'`,
+				[
+					...Object.keys(baseType.properties),
+					...Object.keys(baseType.methods),
+				],
+			)
 
 			return { type: "Error" }
 		}
 	} else if (baseType.type === "Record") {
-		if (Object.hasOwn(baseType.members, node.member.content)) {
-			return baseType.members[node.member.content]
+		if (Object.hasOwn(baseType.members, memberName)) {
+			return baseType.members[memberName]
 		} else {
 			reportUnknownMember(
-				node,
+				memberName,
+				positions.member,
 				describeType(baseType),
 				Object.keys(baseType.members),
 			)
@@ -1657,11 +359,12 @@ export function resolveLookupType(
 	} else if (baseType.type === "Case") {
 		// NOTE: A Case *is* a Record with a nominal identity — its payload
 		// members are read exactly like a Record's.
-		if (Object.hasOwn(baseType.members, node.member.content)) {
-			return baseType.members[node.member.content]
+		if (Object.hasOwn(baseType.members, memberName)) {
+			return baseType.members[memberName]
 		} else {
 			reportUnknownMember(
-				node,
+				memberName,
+				positions.member,
 				`Case '${baseType.choice}#${baseType.name}'`,
 				Object.keys(baseType.members),
 			)
@@ -1669,20 +372,16 @@ export function resolveLookupType(
 			return { type: "Error" }
 		}
 	} else {
-		reportError(
-			"This value has no members to look up",
-			node.base.position,
-			{
-				code: "type-without-members",
-				labels: [
-					primary(
-						node.base.position,
-						`this is ${withArticle(describeType(baseType))}`,
-					),
-				],
-				notes: ["Only Records, Cases and Namespaces have members."],
-			},
-		)
+		reportError("This value has no members to look up", positions.base, {
+			code: "type-without-members",
+			labels: [
+				primary(
+					positions.base,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+			],
+			notes: ["Only Records, Cases and Namespaces have members."],
+		})
 
 		return { type: "Error" }
 	}
@@ -1815,31 +514,7 @@ export function scopeWithGenerics(
 		}
 	}
 
-	return {
-		parent: scope,
-		members: {},
-		declarations: {},
-		constants: new Set(),
-		types,
-		protocols: {},
-	}
-}
-
-// NOTE: What a contextually typed Function literal resolved to. It is worked
-// out while the invocation's signature is being matched — the only moment the
-// expected Type is known — and read back when the same Node is enriched, which
-// happens separately and without that context. Keyed by the Node, so a
-// re-parse starts empty and nothing has to be invalidated.
-const contextualFunctionTypes = new WeakMap<
-	parser.FunctionDefinitionNode,
-	common.FunctionType
->()
-
-function needsContext(node: parser.FunctionDefinitionNode): boolean {
-	return (
-		node.returnType === null ||
-		node.parameters.some((parameter) => parameter.type === null)
-	)
+	return childScope(scope, { types })
 }
 
 // NOTE: Only a Function literal in Argument position can omit an annotation,
@@ -1857,302 +532,23 @@ export function resolveDeclaredType(
 	return resolveType(node, scope)
 }
 
-export function resolveFunctionDefinitionType(
+// NOTE: A fully annotated Function signature — every Parameter and the return
+// Type are written, so there is no body to walk. A literal that omitted an
+// annotation is resolved contextually on the enrichment side instead, which is
+// the only place a body can be enriched to infer what it leaves out.
+export function resolveFunctionSignatureType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
-	expectedType: common.Type | null = null,
 ): common.FunctionType {
-	if (!needsContext(node)) {
-		let functionScope = scopeWithGenerics(node.generics, scope)
-
-		return {
-			type: "Function",
-			generics: resolveGenericDeclarations(node.generics, scope),
-			parameterTypes: resolveParameterTypes(node, functionScope),
-			returnType: resolveDeclaredType(node.returnType, functionScope),
-			documentation: node.documentation ?? undefined,
-		}
-	}
-
-	// NOTE: The Enricher re-resolves the same Node repeatedly, and only the
-	// pass driven by Argument matching carries the expected Type — every later
-	// pass has to be answered from what that one worked out.
-	let recorded = contextualFunctionTypes.get(node)
-
-	if (expectedType === null && recorded !== undefined) {
-		return recorded
-	}
-
 	let functionScope = scopeWithGenerics(node.generics, scope)
-	let expectedFunction =
-		expectedType !== null && expectedType.type === "Function"
-			? expectedType
-			: null
 
-	let parameterTypes = resolveContextualParameterTypes(
-		node,
-		functionScope,
-		expectedFunction,
-	)
-
-	let resolved: common.FunctionType = {
+	return {
 		type: "Function",
 		generics: resolveGenericDeclarations(node.generics, scope),
-		parameterTypes,
-		returnType: resolveContextualReturnType(
-			node,
-			functionScope,
-			parameterTypes,
-			expectedFunction,
-		),
+		parameterTypes: resolveParameterTypes(node, functionScope),
+		returnType: resolveDeclaredType(node.returnType, functionScope),
 		documentation: node.documentation ?? undefined,
 	}
-
-	contextualFunctionTypes.set(node, resolved)
-
-	return resolved
-}
-
-// NOTE: An unannotated Parameter takes its Type *and* its label from the
-// expected signature, positionally — which is why the Parser records no
-// external name for one. An annotated Parameter is resolved exactly as it
-// always was, so the two forms can be mixed across a Parameter list.
-function resolveContextualParameterTypes(
-	node: parser.FunctionDefinitionNode,
-	scope: enricher.Scope,
-	expectedFunction: common.FunctionType | null,
-): Array<common.Parameter> {
-	return node.parameters.map((parameter, index) => {
-		let documentation = parameterDocumentation(
-			parameter,
-			node.documentation,
-		)
-
-		if (parameter.type !== null) {
-			return {
-				name: parameter.externalName?.content ?? null,
-				type: resolveDeclaredType(parameter.type, scope),
-				documentation,
-			}
-		}
-
-		let expectedParameter = expectedFunction?.parameterTypes[index]
-
-		if (expectedParameter === undefined) {
-			reportError(
-				`The Type of Parameter '${parameterLabel(parameter)}' could not be inferred`,
-				parameter.position,
-				{
-					code: "uninferable-parameter-type",
-					labels: [
-						primary(
-							parameter.position,
-							"this Parameter has no Type",
-						),
-					],
-					notes: [
-						expectedFunction === null
-							? "Only a Function passed as an Argument takes its Types from the surrounding context."
-							: `The expected Function Type takes ${countOf(expectedFunction.parameterTypes.length, "Parameter")}, so there is nothing for Parameter ${index + 1} to infer from.`,
-					],
-					helps: ["Write the Parameter's Type explicitly."],
-				},
-			)
-
-			return { name: null, type: { type: "Error" }, documentation }
-		}
-
-		return {
-			name: expectedParameter.name,
-			type: expectedParameter.type,
-			documentation,
-		}
-	})
-}
-
-// NOTE: Working out what a Function literal returns means enriching its body —
-// the Type of `<- total` can not be known without the Constants the body
-// itself declares. Only the Enricher can do that, and `enrichers` imports this
-// module rather than the other way round, so it installs the implementation
-// here as it loads. Keeping the seam on this side is what avoids an import
-// cycle.
-export type BodyReturnTypeInference = (
-	node: parser.FunctionDefinitionNode,
-	parameterTypes: Array<common.Parameter>,
-	scope: enricher.Scope,
-) => common.Type | null
-
-let inferReturnTypeFromBody: BodyReturnTypeInference | null = null
-
-export function registerBodyReturnTypeInference(
-	inference: BodyReturnTypeInference,
-): void {
-	inferReturnTypeFromBody = inference
-}
-
-function resolveContextualReturnType(
-	node: parser.FunctionDefinitionNode,
-	scope: enricher.Scope,
-	parameterTypes: Array<common.Parameter>,
-	expectedFunction: common.FunctionType | null,
-): common.Type {
-	if (node.returnType !== null) {
-		return resolveType(node.returnType, scope)
-	}
-
-	// NOTE: A Parameter that could not be inferred has already been reported,
-	// and its Error Type poisons whatever the body returns — a second
-	// Diagnostic here would only restate the first in vaguer terms.
-	if (parameterTypes.some((parameter) => parameter.type.type === "Error")) {
-		return { type: "Error" }
-	}
-
-	// NOTE: With no expected signature the body is the only thing that could
-	// say what this Function returns, and reading a Type off a body that
-	// nothing else constrains is exactly the inference that is hard to follow
-	// across a whole Program. A literal in Argument position is the one place
-	// the Type is still written down — just elsewhere — so it is the one place
-	// an omitted `-> Type` is allowed.
-	if (expectedFunction === null) {
-		reportError(
-			"This Function must write its return Type",
-			node.parameterListPosition,
-			{
-				code: "missing-return-type",
-				labels: [
-					primary(node.parameterListPosition, "no '-> Type' here"),
-				],
-				notes: [
-					"Only a Function passed as an Argument takes its Types from the surrounding context.",
-				],
-			},
-		)
-
-		return { type: "Error" }
-	}
-
-	// NOTE: An expected return Type that is still an unbound Generic says
-	// nothing — in `map`'s `(_ item: ItemType) -> Result` nothing binds
-	// `Result` but this literal's own body, so the body is what it is read off.
-	if (containsGenericUse(expectedFunction.returnType)) {
-		let inferred = inferReturnTypeFromBody?.(node, parameterTypes, scope)
-
-		if (inferred !== null && inferred !== undefined) {
-			return inferred
-		}
-
-		let position = functionLiteralPosition(node)
-		let message = "The return Type could not be inferred from the body"
-		let helps = ["Give the Function an explicit '-> Type'."]
-
-		if (position === null) {
-			reportError(message, null, {
-				code: "uninferable-return-type",
-				labels: [],
-				helps,
-			})
-		} else {
-			reportError(message, position, {
-				code: "uninferable-return-type",
-				labels: [
-					primary(position, "the body's Type is not determined here"),
-				],
-				helps,
-			})
-		}
-
-		return { type: "Error" }
-	}
-
-	return expectedFunction.returnType
-}
-
-function parameterLabel(parameter: parser.ParameterNode): string {
-	return (
-		parameter.internalName?.content ??
-		parameter.externalName?.content ??
-		"_"
-	)
-}
-
-function functionLiteralPosition(
-	node: parser.FunctionDefinitionNode,
-): common.Position | null {
-	return node.parameters[0]?.position ?? null
-}
-
-function containsGenericUse(type: common.Type): boolean {
-	switch (type.type) {
-		case "GenericUse":
-			return true
-		case "UnionType":
-			return type.types.some(containsGenericUse)
-		case "List":
-			return containsGenericUse(type.itemType)
-		case "Function":
-			return (
-				type.parameterTypes.some((parameter) =>
-					containsGenericUse(parameter.type),
-				) || containsGenericUse(type.returnType)
-			)
-		case "Record":
-			return Object.values(type.members).some(containsGenericUse)
-		default:
-			return false
-	}
-}
-
-export function resolveNamespaceDefinitionStatementType(
-	node: parser.NamespaceDefinitionStatementNode,
-	scope: enricher.Scope,
-): common.NamespaceType {
-	// NOTE: Namespace Generics are visible in the target Type and in every
-	// Method signature — `namespace Boxes<infer Item> for List<Item>`.
-	let genericScope = scopeWithGenerics(node.generics, scope)
-
-	let resultType: common.NamespaceType = {
-		type: "Namespace",
-		targetType:
-			node.targetType === null
-				? null
-				: resolveType(node.targetType, genericScope),
-		name: node.name.content,
-		generics: resolveGenericDeclarations(node.generics, scope),
-		properties: {},
-		methods: {},
-		conformsTo: node.conformsTo.map((identifier) => identifier.content),
-	}
-
-	let properties: Record<string, common.Type> = {}
-	let methods: Record<string, common.MethodType> = {}
-
-	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		properties[memberKey] = resolveType(memberValue.value, scope)
-	}
-
-	for (let [methodName, methodValue] of Object.entries(node.methods)) {
-		// NOTE: The Namespace is only injected as a member for
-		// self-reference — injecting it as a type would shadow a
-		// same-named Type Alias (`namespace Event for Event`).
-		methods[methodName] = resolveMethodType(
-			methodValue,
-			{
-				parent: genericScope,
-				members: { [node.name.content]: resultType },
-				declarations: { [node.name.content]: node.name.position },
-				constants: new Set([node.name.content]),
-				types: {},
-				protocols: {},
-			},
-			resultType.targetType,
-			resultType.generics,
-		)
-	}
-
-	resultType.properties = properties
-	resultType.methods = methods
-
-	return resultType
 }
 
 export function resolveProtocolDeclarationStatementType(
@@ -2163,14 +559,7 @@ export function resolveProtocolDeclarationStatementType(
 	// the signatures it is an ordinary GenericUse, substituted wherever the
 	// Protocol is used against a concrete Type.
 	let selfType: common.GenericUse = { type: "GenericUse", name: "Self" }
-	let signatureScope: enricher.Scope = {
-		parent: scope,
-		members: {},
-		declarations: {},
-		constants: new Set(),
-		types: { Self: selfType },
-		protocols: {},
-	}
+	let signatureScope = childScope(scope, { types: { Self: selfType } })
 
 	let methods: Record<string, common.MethodType> = {}
 
@@ -2828,13 +1217,6 @@ export function resolveGenericTypeDeclarationType(
 	return { type: "Error" }
 }
 
-export function resolveMatchType(
-	node: parser.MatchNode,
-	scope: enricher.Scope,
-): common.Type {
-	return resolveType(node.returnType, scope)
-}
-
 /***********/
 /* Helpers */
 /***********/
@@ -2863,80 +1245,23 @@ export function reportReservedTypeName(position: common.Position | null): void {
 	})
 }
 
-// NOTE: The qualified spelling is shown rather than described — "prefix it
-// with its Choice's name" leaves the reader to work out what that looks like,
-// and the whole point of the Diagnostic is that they can not tell the two
-// Choices apart.
-function reportAmbiguousCase(
-	caseName: parser.IdentifierNode,
-	choiceNames: Array<string>,
-	where: string,
-): void {
-	reportError(
-		`Case '#${caseName.content}' is declared by more than one Choice`,
-		caseName.position,
-		{
-			code: "ambiguous-case",
-			labels: [
-				primary(
-					caseName.position,
-					`${countOf(choiceNames.length, "Choice")} ${where} declare${choiceNames.length === 1 ? "s" : ""} it`,
-				),
-			],
-			notes: choiceNames.map(
-				(choiceName) =>
-					`'${choiceName}' declares '#${caseName.content}'.`,
-			),
-			helps: [
-				`Write '${choiceNames[0]}#${caseName.content}' to pick one.`,
-			],
-		},
-	)
-}
-
-function reportUnknownCase(
-	caseName: parser.IdentifierNode,
-	choiceDescription: string,
-	declaredCaseNames: Array<string>,
-): void {
-	let suggestion = closestMatch(caseName.content, declaredCaseNames)
-
-	reportError(
-		`${choiceDescription} has no Case '#${caseName.content}'`,
-		caseName.position,
-		{
-			code: "unknown-case",
-			labels: [primary(caseName.position, "no such Case")],
-			notes:
-				declaredCaseNames.length === 0
-					? []
-					: [
-							`${choiceDescription} declares ${declaredCaseNames
-								.map((name) => `'#${name}'`)
-								.join(", ")}.`,
-						],
-			helps:
-				suggestion === null ? [] : [`Did you mean '#${suggestion}'?`],
-		},
-	)
-}
-
 // NOTE: The members the base actually has are listed rather than left for the
 // reader to go and look up — a Lookup fails most often because the member is
 // spelled differently, not because it is absent.
 function reportUnknownMember(
-	node: parser.LookupNode,
+	memberName: string,
+	memberPosition: common.Position,
 	baseDescription: string,
 	memberNames: Array<string>,
 ): void {
-	let suggestion = closestMatch(node.member.content, memberNames)
+	let suggestion = closestMatch(memberName, memberNames)
 
 	reportError(
-		`${baseDescription} has no member '${node.member.content}'`,
-		node.member.position,
+		`${baseDescription} has no member '${memberName}'`,
+		memberPosition,
 		{
 			code: "unknown-member",
-			labels: [primary(node.member.position, "no such member")],
+			labels: [primary(memberPosition, "no such member")],
 			notes:
 				memberNames.length === 0
 					? [`${baseDescription} has no members.`]
@@ -2971,7 +1296,7 @@ function namesInScope(
 // NOTE: A near miss is a Help rather than part of the message — it is a
 // suggestion, and a message that states one as fact reads as though the
 // Compiler knows something it does not.
-function suggestionHelps(
+export function suggestionHelps(
 	name: string,
 	scope: enricher.Scope,
 	kind: "members" | "types" | "protocols",
@@ -3075,17 +1400,6 @@ export function getAllNamespacesInScope(
 	}
 
 	return namespaces
-}
-
-export function resolveMethodLookupBaseNamespaces(
-	node: parser.MethodInvocationNode,
-	scope: enricher.Scope,
-): Map<string, common.NamespaceType> {
-	return resolveMethodLookupNamespacesForReceiverType(
-		resolveType(node.base, scope),
-		node.namespaceSpecifier,
-		scope,
-	)
 }
 
 export function resolveMethodLookupNamespacesForReceiverType(
@@ -3219,7 +1533,7 @@ function resolveParameterTypes(
 	}))
 }
 
-function parameterDocumentation(
+export function parameterDocumentation(
 	parameter: parser.ParameterNode,
 	documentation: common.Documentation | null,
 ): string | undefined {
