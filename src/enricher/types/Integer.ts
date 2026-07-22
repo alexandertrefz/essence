@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
@@ -251,10 +252,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Integer" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -268,10 +266,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Rational" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -544,14 +539,10 @@ export const namespace: common.NamespaceType = {
 					type: { type: "Integer" },
 				},
 			],
-			returnType: {
+			returnType: optionalOf({
 				type: "UnionType",
-				types: [
-					{ type: "Integer" },
-					{ type: "Algebraic" },
-					{ type: "Nothing" },
-				],
-			},
+				types: [{ type: "Integer" }, { type: "Algebraic" }],
+			}),
 			documentation: {
 				description:
 					"The exact square root. A perfect square gives a Integer; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.",
@@ -705,10 +696,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the divisor",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Integer" }),
 			documentation: {
 				description:
 					"The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainderOf(dividingBy 3)` is `2`.",
@@ -732,14 +720,10 @@ export const namespace: common.NamespaceType = {
 					documentation: "the exponent",
 				},
 			],
-			returnType: {
+			returnType: optionalOf({
 				type: "UnionType",
-				types: [
-					{ type: "Integer" },
-					{ type: "Rational" },
-					{ type: "Nothing" },
-				],
-			},
+				types: [{ type: "Integer" }, { type: "Rational" }],
+			}),
 			documentation: {
 				description:
 					"Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.",
@@ -769,10 +753,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the highest allowed value",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Integer" }),
 			documentation: {
 				description:
 					"The Integer, pulled into the given bounds — the lower bound when below it, the upper when above it, itself otherwise.",
@@ -793,10 +774,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the text to read",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Integer" }),
 			documentation: {
 				description:
 					"Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.",

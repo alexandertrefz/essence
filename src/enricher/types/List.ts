@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { GenericListType, ListType } from "../../interfaces/common/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
@@ -18,10 +19,7 @@ const typeResolvedWithGenericUse: ListType = {
 // at the foot of this file.
 const itemType: common.Type = { type: "GenericUse", name: "ItemType" }
 
-const itemOrNothing: common.Type = {
-	type: "UnionType",
-	types: [itemType, { type: "Nothing" }],
-}
+const itemOrNothing: common.Type = optionalOf(itemType)
 
 const predicate: common.Type = {
 	type: "Function",
@@ -246,13 +244,7 @@ const namespaceDefinition: common.NamespaceType = {
 					type: typeResolvedWithGenericUse,
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [
-					{ type: "GenericUse", name: "ItemType" },
-					{ type: "Nothing" },
-				],
-			},
+			returnType: optionalOf({ type: "GenericUse", name: "ItemType" }),
 			documentation: {
 				description: "The last item of the List.",
 				parameters: {},
@@ -631,10 +623,7 @@ const namespaceDefinition: common.NamespaceType = {
 				{ name: null, type: typeResolvedWithGenericUse },
 				{ name: null, type: itemType },
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Integer" }),
 			documentation: {
 				description:
 					"The position of the first item equal to the given one.",
@@ -835,10 +824,7 @@ const namespaceDefinition: common.NamespaceType = {
 				{ name: null, type: typeResolvedWithGenericUse },
 				{ name: null, type: itemType },
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Integer" }),
 			documentation: {
 				description:
 					"The position of the last item equal to the given one.",
@@ -967,13 +953,10 @@ const namespaceDefinition: common.NamespaceType = {
 					documentation: "how many items each group holds",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [
-					{ type: "List", itemType: typeResolvedWithGenericUse },
-					{ type: "Nothing" },
-				],
-			},
+			returnType: optionalOf({
+				type: "List",
+				itemType: typeResolvedWithGenericUse,
+			}),
 			documentation: {
 				description:
 					"Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.",

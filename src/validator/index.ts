@@ -713,6 +713,12 @@ function describeType(type: common.Type): string {
 				return type.name
 			}
 
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(describeType)
+					.join(", ")}>`
+			}
+
 			return type.types.map(describeType).join(" | ")
 		case "Case":
 			return `${type.choice}#${type.name}`

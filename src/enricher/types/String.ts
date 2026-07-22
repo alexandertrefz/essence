@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
@@ -11,14 +12,8 @@ export const type: common.StringType = { type: "String" }
 const stringType: common.Type = { type: "String" }
 const booleanType: common.Type = { type: "Boolean" }
 const integerType: common.Type = { type: "Integer" }
-const stringOrNothing: common.Type = {
-	type: "UnionType",
-	types: [stringType, { type: "Nothing" }],
-}
-const integerOrNothing: common.Type = {
-	type: "UnionType",
-	types: [integerType, { type: "Nothing" }],
-}
+const stringOrNothing: common.Type = optionalOf(stringType)
+const integerOrNothing: common.Type = optionalOf(integerType)
 
 function param(
 	type: common.Type,

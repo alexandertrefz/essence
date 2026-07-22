@@ -37,6 +37,20 @@ describe("Validator", () => {
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
 
+		it("should treat a nested Optional and its flattened spelling as interchangeable", () => {
+			// NOTE: `Optional<Integer | Rational>` nests its payload as one
+			// member; the flat spelling lists all three. Assignability must
+			// accept both directions — the two describe the same values.
+			expect(
+				diagnosticsFor(`implementation {
+					constant nested: Optional<Integer | Rational> = 1
+					constant flat: Integer | Rational | Nothing = nested
+					constant back: Optional<Integer | Rational> = flat
+					__print(back)
+				}`),
+			).toEqual([])
+		})
+
 		it("should report Variable Declarations with mismatched Types", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				variable a: String = true

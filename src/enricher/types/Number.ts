@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
@@ -47,8 +48,12 @@ function orderingMethods(
 	return methods
 }
 
+// NOTE: The `name` is display-only — Hovers, Inlay Hints and Diagnostics
+// print this Union as `Number` instead of spelling out all four members.
+// Assignability ignores Union names entirely.
 export const type: common.UnionType = {
 	type: "UnionType",
+	name: "Number",
 	types: [
 		{ type: "Integer" },
 		{ type: "Rational" },
@@ -322,10 +327,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -338,10 +340,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -360,10 +359,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 			],
 			documentation: {
@@ -462,10 +458,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Integer" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Integer" }),
 				},
 				{
 					generics: [],
@@ -480,10 +473,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -506,14 +496,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
+					returnType: optionalOf({
 						type: "UnionType",
-						types: [
-							{ type: "Integer" },
-							{ type: "Rational" },
-							{ type: "Nothing" },
-						],
-					},
+						types: [{ type: "Integer" }, { type: "Rational" }],
+					}),
 				},
 			],
 		},
@@ -603,10 +589,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Integer" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Integer" }),
 				},
 				{
 					generics: [],
@@ -621,10 +604,7 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -647,14 +627,10 @@ export const namespace: common.NamespaceType = {
 							},
 						},
 					],
-					returnType: {
+					returnType: optionalOf({
 						type: "UnionType",
-						types: [
-							{ type: "Integer" },
-							{ type: "Rational" },
-							{ type: "Nothing" },
-						],
-					},
+						types: [{ type: "Integer" }, { type: "Rational" }],
+					}),
 				},
 			],
 		},
