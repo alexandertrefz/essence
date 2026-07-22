@@ -46,7 +46,7 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"Variable 'undeclaredVariable' is not declared.",
+				"'undeclaredVariable' is not declared",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
@@ -58,7 +58,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'UndeclaredType' is not declared.",
+				"Type 'UndeclaredType' is not declared",
 			)
 		})
 
@@ -185,7 +185,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"This Record has no member 'age'.",
+				"{ name: String } has no member 'age'",
 			)
 		})
 
@@ -213,7 +213,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Variable 'undeclaredVariable' is not declared.",
+				"'undeclaredVariable' is not declared",
 			)
 		})
 
@@ -363,7 +363,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe("Variable 'b' is not declared.")
+			expect(diagnostics[0].message).toBe("'b' is not declared")
 		})
 
 		it("should leave Namespaces referencing later Variables to in-order enrichment", () => {
@@ -379,7 +379,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Variable 'fallbackName' is not declared.",
+				"'fallbackName' is not declared",
 			)
 		})
 
@@ -1084,7 +1084,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Undeclared' is not declared.",
+				"Protocol 'Undeclared' is not declared",
 			)
 		})
 
@@ -1358,7 +1358,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Undeclared' is not declared.",
+				"Protocol 'Undeclared' is not declared",
 			)
 		})
 

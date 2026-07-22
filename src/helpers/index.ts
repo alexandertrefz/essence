@@ -43,7 +43,12 @@ export function closestMatch(
 
 	let threshold = Math.max(2, Math.floor(input.length / 3))
 
-	return best.distance <= threshold ? best.name : null
+	// NOTE: A candidate must also share more with the input than it differs
+	// from it. Without that, every short name is within the threshold of
+	// every other short name, and `point.z` gets told it meant `point.x`.
+	return best.distance <= threshold && best.distance < input.length
+		? best.name
+		: null
 }
 
 // NOTE: A compact, one-line description of a Type for Diagnostics — the
