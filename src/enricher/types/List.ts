@@ -1,5 +1,6 @@
 import type { GenericListType, ListType } from "../../interfaces/common/index"
 import type { common } from "../../interfaces/index"
+import { type as orderingType } from "./Ordering"
 
 export const type: GenericListType = {
 	type: "GenericList",
@@ -11,10 +12,24 @@ const typeResolvedWithGenericUse: ListType = {
 	itemType: { type: "GenericUse", name: "ItemType" },
 }
 
-// TODO: Add a slice method
-// TODO: Add get methods for the generic case and filtered case
-// TODO: Add a map method
-// TODO: Add a reduce method
+// NOTE: The item Type on its own, and the two shapes that recur across the
+// higher-order Methods: a value that may be absent, and a check over one item.
+// `ItemType` is the Namespace Generic, merged into every signature by the loop
+// at the foot of this file.
+const itemType: common.Type = { type: "GenericUse", name: "ItemType" }
+
+const itemOrNothing: common.Type = {
+	type: "UnionType",
+	types: [itemType, { type: "Nothing" }],
+}
+
+const predicate: common.Type = {
+	type: "Function",
+	generics: [],
+	parameterTypes: [{ name: null, type: itemType }],
+	returnType: { type: "Boolean" },
+}
+
 const namespaceDefinition: common.NamespaceType = {
 	type: "Namespace",
 	name: "List",
@@ -136,20 +151,39 @@ const namespaceDefinition: common.NamespaceType = {
 			returnType: { type: "Boolean" },
 		},
 		firstItem: {
-			type: "SimpleMethod",
-			generics: [],
-			parameterTypes: [
+			type: "OverloadedMethod",
+			overloads: [
 				{
-					name: null,
-					type: typeResolvedWithGenericUse,
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: typeResolvedWithGenericUse,
+						},
+					],
+					returnType: itemOrNothing,
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: typeResolvedWithGenericUse,
+						},
+						{
+							name: "where",
+							type: predicate,
+						},
+					],
+					returnType: itemOrNothing,
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [
-					{ type: "GenericUse", name: "ItemType" },
-					{ type: "Nothing" },
-				],
+			documentation: {
+				description:
+					"The first item, or the first item the given check accepts.",
+				parameters: {},
+				returns: "the matching item, or `Nothing` when there is none.",
+				position: null,
 			},
 		},
 		lastItem: {
@@ -370,6 +404,293 @@ const namespaceDefinition: common.NamespaceType = {
 					returnType: typeResolvedWithGenericUse,
 				},
 			],
+		},
+
+		// NOTE: `map` and `reduce` are the first builtins to carry a
+		// Method-level Generic. `Result` must be `infer: true`, or it never
+		// enters `bindableNames` and inference silently leaves it unbound. It
+		// is bound from the callback: for `map` from the callback's return
+		// Type, for `reduce` from the `startingWith` value before the callback
+		// is even checked. The merge loop below prepends `ItemType`, so each
+		// ends up generic in `[ItemType, Result]`.
+		map: {
+			type: "SimpleMethod",
+			generics: [{ name: "Result", defaultType: null, infer: true }],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: null,
+					type: {
+						type: "Function",
+						generics: [],
+						parameterTypes: [{ name: null, type: itemType }],
+						returnType: { type: "GenericUse", name: "Result" },
+					},
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: { type: "GenericUse", name: "Result" },
+			},
+			documentation: {
+				description:
+					"A new List with the given transform applied to every item.",
+				parameters: {},
+				returns: "the List of transformed items.",
+				position: null,
+			},
+		},
+		reduce: {
+			type: "SimpleMethod",
+			generics: [{ name: "Result", defaultType: null, infer: true }],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: "startingWith",
+					type: { type: "GenericUse", name: "Result" },
+				},
+				{
+					name: null,
+					type: {
+						type: "Function",
+						generics: [],
+						parameterTypes: [
+							{
+								name: null,
+								type: { type: "GenericUse", name: "Result" },
+							},
+							{ name: null, type: itemType },
+						],
+						returnType: { type: "GenericUse", name: "Result" },
+					},
+				},
+			],
+			returnType: { type: "GenericUse", name: "Result" },
+			documentation: {
+				description:
+					"Combines every item into a single value, starting from the given one.",
+				parameters: {
+					startingWith: "the value the first combination builds on.",
+				},
+				returns: "the combined value.",
+				position: null,
+			},
+		},
+
+		// NOTE: The complement of `removeEvery(where:)` — the filter. Only the
+		// `where` form, since keeping just the items equal to a given value is
+		// what `contains` already answers.
+		keepEvery: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: "where", type: predicate },
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List of just the items the given check accepts.",
+				parameters: {},
+				returns: "the List of accepted items.",
+				position: null,
+			},
+		},
+
+		itemAt: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: null, type: { type: "Integer" } },
+			],
+			returnType: itemOrNothing,
+			documentation: {
+				description:
+					"The item at the given position, counting from zero.",
+				parameters: {},
+				returns:
+					"the item, or `Nothing` when the position is outside the List.",
+				position: null,
+			},
+		},
+		firstIndexOf: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: null, type: itemType },
+			],
+			returnType: {
+				type: "UnionType",
+				types: [{ type: "Integer" }, { type: "Nothing" }],
+			},
+			documentation: {
+				description:
+					"The position of the first item equal to the given one.",
+				parameters: {},
+				returns:
+					"the zero-based position, or `Nothing` when the item is absent.",
+				position: null,
+			},
+		},
+		slice: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: "from", type: { type: "Integer" } },
+				{ name: "to", type: { type: "Integer" } },
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List of the items from one position up to, but not including, another.",
+				parameters: {
+					from: "the first position to include, counting from zero.",
+					to: "the position to stop before.",
+				},
+				returns: "the List of items in that range.",
+				position: null,
+			},
+		},
+		reversed: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [{ name: null, type: typeResolvedWithGenericUse }],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description: "A new List with the items in the opposite order.",
+				parameters: {},
+				returns: "the reversed List.",
+				position: null,
+			},
+		},
+		sortedBy: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: null,
+					type: {
+						type: "Function",
+						generics: [],
+						parameterTypes: [
+							{ name: null, type: itemType },
+							{ name: null, type: itemType },
+						],
+						returnType: orderingType,
+					},
+				},
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List ordered by the given comparison, applied to each pair of items.",
+				parameters: {},
+				returns: "the ordered List.",
+				position: null,
+			},
+		},
+
+		// NOTE: `anyItem`/`everyItem` read as sentences — "any item matches …",
+		// "every item matches …" — the existential and universal checks over a
+		// predicate. The no-argument existential is `hasItems`.
+		anyItem: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: "matches", type: predicate },
+			],
+			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the given check accepts at least one item.",
+				parameters: {},
+				returns: "`true` when some item is accepted.",
+				position: null,
+			},
+		},
+		everyItem: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: "matches", type: predicate },
+			],
+			returnType: { type: "Boolean" },
+			documentation: {
+				description: "Whether the given check accepts every item.",
+				parameters: {},
+				returns:
+					"`true` when all items are accepted, including the empty List.",
+				position: null,
+			},
+		},
+		countOf: {
+			type: "OverloadedMethod",
+			overloads: [
+				{
+					generics: [],
+					parameterTypes: [
+						{ name: null, type: typeResolvedWithGenericUse },
+						{ name: null, type: itemType },
+					],
+					returnType: { type: "Integer" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{ name: null, type: typeResolvedWithGenericUse },
+						{ name: "where", type: predicate },
+					],
+					returnType: { type: "Integer" },
+				},
+			],
+			documentation: {
+				description:
+					"How many items equal the given one, or are accepted by the given check.",
+				parameters: {},
+				returns: "the count.",
+				position: null,
+			},
+		},
+		insertAt: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: null, type: { type: "Integer" } },
+				{ name: "with", type: itemType },
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List with the given item inserted before the given position.",
+				parameters: {},
+				returns: "the List with the item inserted.",
+				position: null,
+			},
+		},
+		replaceAt: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: null, type: { type: "Integer" } },
+				{ name: "with", type: itemType },
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List with the item at the given position replaced.",
+				parameters: {},
+				returns:
+					"the List with the item replaced, or unchanged when the position is outside it.",
+				position: null,
+			},
 		},
 	},
 }
