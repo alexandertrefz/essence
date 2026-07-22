@@ -352,6 +352,14 @@ export const namespace: common.NamespaceType = {
 
 		lowestNumber: {
 			type: "OverloadedStaticMethod",
+			documentation: {
+				description:
+					"The lower of two Numbers, or the lowest in a List of them.",
+				parameters: {},
+				returns:
+					"the lowest Number — `Nothing` for the empty List, which has none.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -485,6 +493,14 @@ export const namespace: common.NamespaceType = {
 		},
 		greatestNumber: {
 			type: "OverloadedStaticMethod",
+			documentation: {
+				description:
+					"The greater of two Numbers, or the greatest in a List of them.",
+				parameters: {},
+				returns:
+					"the greatest Number — `Nothing` for the empty List, which has none.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],

@@ -235,6 +235,13 @@ export const namespace: common.NamespaceType = {
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether this String has at least one character — the opposite of `isEmpty`.",
+				parameters: {},
+				returns: "`true` when the String is not empty.",
+				position: null,
+			},
 		},
 		is: {
 			type: "SimpleMethod",
@@ -247,9 +254,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to compare against",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the String has exactly the same characters as another.",
+				parameters: {},
+				returns: "`true` when the Strings are equal.",
+				position: null,
+			},
 		},
 		isNot: {
 			type: "SimpleMethod",
@@ -262,9 +277,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to compare against",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the String differs from another in any character.",
+				parameters: {},
+				returns: "`true` when the Strings are not equal.",
+				position: null,
+			},
 		},
 		prepend: {
 			type: "SimpleMethod",
@@ -277,9 +300,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to add to the front",
 				},
 			],
 			returnType: { type: "String" },
+			documentation: {
+				description:
+					"Joins another String onto the front of this one.\n\nNeither String is changed — the joined result is returned.",
+				parameters: {},
+				returns: "the two Strings joined together",
+				position: null,
+			},
 		},
 		append: {
 			type: "SimpleMethod",
@@ -315,11 +346,19 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the separator to split at",
 				},
 			],
 			returnType: {
 				type: "List",
 				itemType: { type: "String" },
+			},
+			documentation: {
+				description:
+					"Splits the String at every occurrence of the given separator. `joinWith` on the resulting List is the return trip.",
+				parameters: {},
+				returns: "the List of pieces, without the separator.",
+				position: null,
 			},
 		},
 		contains: {
@@ -333,9 +372,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to look for",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the given String occurs anywhere in this one.",
+				parameters: {},
+				returns: "`true` when it occurs.",
+				position: null,
+			},
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
@@ -348,9 +395,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "String" },
+					documentation: "the String to look for",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the given String occurs nowhere in this one.",
+				parameters: {},
+				returns: "`true` when it does not occur.",
+				position: null,
+			},
 		},
 		...additionalMethods,
 		toString: {
