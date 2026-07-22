@@ -1,4 +1,4 @@
-import { reportError } from "../../diagnostics/index"
+import { primary, reportError } from "../../diagnostics/index"
 import { type common, lexer } from "../../interfaces/index"
 import { Lexer } from "../../lexer/index"
 import { parseDocumentation } from "../documentation"
@@ -8,19 +8,32 @@ type Token = lexer.Token
 
 export class ParseError extends Error {
 	position: common.Position | null
+	// NOTE: What belongs under the arrow at `position` — "expected ':'" —
+	// as opposed to `message`, which is the whole sentence. The renderer puts
+	// them in different places, so they are kept apart here.
+	label: string | null
 
-	constructor(message: string, position: common.Position | null = null) {
+	constructor(
+		message: string,
+		position: common.Position | null = null,
+		label: string | null = null,
+	) {
 		super(message)
 		this.name = "ParseError"
 		this.position = position
+		this.label = label
 	}
 }
 
 // NOTE: All parse failures are routed through this single helper. The
 // statement loops catch the resulting ParseError, report it as a Diagnostic
 // and resynchronise.
-export function fail(message: string, position?: common.Position): never {
-	throw new ParseError(message, position ?? null)
+export function fail(
+	message: string,
+	position?: common.Position,
+	label?: string,
+): never {
+	throw new ParseError(message, position ?? null, label ?? null)
 }
 
 // NOTE: The written form of every fixed-content Token type, used to phrase
@@ -148,15 +161,13 @@ export class TokenStream {
 			}
 		} catch {
 			let cursor = sourceLexer.save()
+			let position = { start: cursor, end: cursor }
 
-			reportError(
-				"String Literal is never closed.",
-				{
-					start: cursor,
-					end: cursor,
-				},
-				{ code: "unclosed-string" },
-			)
+			reportError("This String Literal is never closed", position, {
+				code: "unclosed-string",
+				labels: [primary(position, "the input ends here")],
+				helps: ["Add the missing '\"'."],
+			})
 
 			this.hadLexerError = true
 		}
@@ -242,6 +253,7 @@ export class TokenStream {
 			fail(
 				`Expected ${describeTokenType(tokenType)} but found end of input.`,
 				this.endPosition(),
+				`expected ${describeTokenType(tokenType)}`,
 			)
 		}
 
@@ -249,6 +261,7 @@ export class TokenStream {
 			fail(
 				`Expected ${describeTokenType(tokenType)} but found ${describeToken(token)}.`,
 				token.position,
+				`expected ${describeTokenType(tokenType)}`,
 			)
 		}
 

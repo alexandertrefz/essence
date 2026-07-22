@@ -104,6 +104,32 @@ Error: Match Expressions require a Union Type
 "
 `;
 
+exports[`Diagnostic Showcase Syntax.es should render the same report every time 1`] = `
+"[syntax-error]
+Error: Expected '=' but found '42'.
+    ╭─┤ Syntax.es:14:18 │
+    │
+ 14 │     constant answer 42
+    │                     ─┐  
+    │                      ╰── expected '='
+────╯
+
+[unclosed-block]
+Error: This block is never closed
+    ╭─┤ Syntax.es:19:10 │
+    │
+ 18 │     function greet(_ name: String) -> String {
+    │                                              ▲  
+    │                                              ╰── opened here
+ 19 │        <- name
+    │               │ 
+    │               ╰─ the input ends here
+    │ 
+    │ Help: Add the missing '}'.
+────╯
+"
+`;
+
 exports[`Diagnostic Showcase Types.es should render the same report every time 1`] = `
 "[assignment-type-mismatch]
 Error: This value does not fit Variable 'count'
