@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { closestMatch, parseArguments, UsageError } from "../cli/args"
+import { parseArguments, UsageError } from "../cli/args"
 import { commands, findCommand, globalOptions } from "../cli/commands"
 import { colorChoiceFor } from "../cli/context"
 import { renderCommandHelp, renderOverview, wrap } from "../cli/help"
@@ -28,6 +28,7 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../cli/theme"
+import { closestMatch } from "../helpers/index"
 
 const buildCommand = findCommand("build") as NonNullable<
 	ReturnType<typeof findCommand>

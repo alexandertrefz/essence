@@ -1,5 +1,6 @@
 import { parseArgs, type ParseArgsConfig } from "node:util"
 
+import { closestMatch } from "../helpers/index"
 import {
 	type CommandSpec,
 	commands,
@@ -53,52 +54,6 @@ export type Invocation = {
 	options: OptionValues
 	files: Array<string>
 	programArguments: Array<string>
-}
-
-function editDistance(left: string, right: string): number {
-	let previous = Array.from({ length: right.length + 1 }, (_, i) => i)
-
-	for (let i = 1; i <= left.length; i++) {
-		let current = [i]
-
-		for (let j = 1; j <= right.length; j++) {
-			let substitution =
-				previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
-
-			current.push(
-				Math.min(previous[j] + 1, current[j - 1] + 1, substitution),
-			)
-		}
-
-		previous = current
-	}
-
-	return previous[right.length]
-}
-
-// NOTE: A suggestion is only offered when it is close enough to be plausible —
-// proposing an unrelated flag is worse than proposing nothing.
-export function closestMatch(
-	input: string,
-	candidates: Array<string>,
-): string | null {
-	let best: { name: string; distance: number } | null = null
-
-	for (let candidate of candidates) {
-		let distance = editDistance(input, candidate)
-
-		if (best === null || distance < best.distance) {
-			best = { name: candidate, distance }
-		}
-	}
-
-	if (best === null) {
-		return null
-	}
-
-	let threshold = Math.max(2, Math.floor(input.length / 3))
-
-	return best.distance <= threshold ? best.name : null
 }
 
 function toParseArgsOptions(

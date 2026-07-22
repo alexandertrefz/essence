@@ -1,9 +1,51 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`Diagnostic Showcase should render the same report every time 1`] = `
+exports[`Diagnostic Showcase Dispatch.es should render the same report every time 1`] = `
+"[unknown-method]
+Error: No Method named 'lenght' for this value
+    ╭─┤ Dispatch.es:13:31 │
+    │
+ 13 │     constant length = "essence"::lenght()
+    │                       ────┬────  ───┬──  
+    │                           ╰─────────│──── this is a String
+    │                                     │    
+    │                                     ╰──── no Method of this name
+    │ 
+    │ Help: Did you mean 'length'?
+    │ 
+    │ Note: Searched Namespaces 'String', 'Optional'.
+────╯
+
+[no-matching-overload]
+Error: No overload of 'prepend' accepts these Arguments
+    ╭─┤ Dispatch.es:16:19 │
+    │
+ 16 │     constant piece = "essence"::prepend()
+    │                      ──────────┬─────────  
+    │                                ╰─────────── this call passes 0 Arguments
+    │ 
+    │ Note: 'String::prepend' takes 1 Argument: Parameter 1 is String.
+────╯
+
+[unknown-method]
+Error: No Method named 'describe' for this value
+    ╭─┤ Dispatch.es:19:32 │
+    │
+ 19 │     constant nowhere = { x = 1 }::describe()
+    │                        ────┬────  ────┬───  
+    │                            ╰──────────│───── this is a { x: Integer }
+    │                                       │     
+    │                                       ╰───── no Method of this name
+    │ 
+    │ Note: Searched Namespaces 'Optional', 'Record'.
+────╯
+"
+`;
+
+exports[`Diagnostic Showcase Types.es should render the same report every time 1`] = `
 "[assignment-type-mismatch]
 Error: This value does not fit Variable 'count'
-    ╭─┤ Showcase.es:15:10 │
+    ╭─┤ Types.es:15:10 │
     │
  13 │     variable count = 0
     │              ──┬──  
@@ -16,7 +58,7 @@ Error: This value does not fit Variable 'count'
 
 [assignment-type-mismatch]
 Error: This value does not fit the declared Type of Constant 'label'
-    ╭─┤ Showcase.es:19:27 │
+    ╭─┤ Types.es:19:27 │
     │
  19 │     constant label: String = 42
     │                              ─┐  
@@ -27,7 +69,7 @@ Error: This value does not fit the declared Type of Constant 'label'
 
 [argument-count-mismatch]
 Error: This call passes the wrong number of Arguments
-    ╭─┤ Showcase.es:26:22 │
+    ╭─┤ Types.es:26:22 │
     │
  26 │     constant greeting = greet("World")
     │                         ───────┬──────  
@@ -38,7 +80,7 @@ Error: This call passes the wrong number of Arguments
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 1
-    ╭─┤ Showcase.es:27:25 │
+    ╭─┤ Types.es:27:25 │
     │
  27 │     constant shout = greet(1, times "twice")
     │                            ▲  
@@ -49,7 +91,7 @@ Error: This Argument does not fit Parameter 1
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'times'
-    ╭─┤ Showcase.es:27:34 │
+    ╭─┤ Types.es:27:34 │
     │
  27 │     constant shout = greet(1, times "twice")
     │                                     ───┬───  

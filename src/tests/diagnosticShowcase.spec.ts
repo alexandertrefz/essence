@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import { containsErrors } from "../diagnostics/index"
@@ -9,19 +9,18 @@ import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 
-// NOTE: `testFiles/diagnostics/Showcase.es` is deliberately broken — it is
-// the one place where the Compiler's error output can be read end to end.
+// NOTE: The files in `testFiles/diagnostics/` are deliberately broken — they
+// are the one place where the Compiler's error output can be read end to end.
 // Snapshotting it here is what keeps it that way: a Diagnostic that loses its
 // labels, its notes or its code shows up as a snapshot diff rather than as
 // output nobody looked at.
 
-const SHOWCASE = path.join(
+const SHOWCASE_DIRECTORY = path.join(
 	import.meta.dir,
 	"..",
 	"..",
 	"testFiles",
 	"diagnostics",
-	"Showcase.es",
 )
 
 function analyse(source: string): Array<common.Diagnostic> {
@@ -43,29 +42,47 @@ function analyse(source: string): Array<common.Diagnostic> {
 	return [...diagnostics, ...validate(enriched)]
 }
 
+// NOTE: One file per Compiler stage — the Enricher never runs when the Parser
+// reported errors, and the Validator never runs when the Enricher did, so a
+// single file could only ever showcase the earliest stage that fails in it.
+let showcaseFiles = readdirSync(SHOWCASE_DIRECTORY)
+	.filter((fileName) => fileName.endsWith(".es"))
+	.sort()
+
 describe("Diagnostic Showcase", () => {
-	let source = readFileSync(SHOWCASE, "utf8")
-	let diagnostics = analyse(source)
-
-	it("should stay broken", () => {
-		// NOTE: The file exists to produce Diagnostics. A clean run means the
-		// showcase quietly stopped showcasing anything.
-		expect(containsErrors(diagnostics)).toBe(true)
+	it("should have showcase files", () => {
+		expect(showcaseFiles.length).toBeGreaterThan(0)
 	})
 
-	it("should give every Diagnostic a code and a labelled span", () => {
-		for (let diagnostic of diagnostics) {
-			expect(diagnostic.code).toBeString()
-			expect(diagnostic.position).not.toBeNull()
-			expect(diagnostic.labels?.length ?? 0).toBeGreaterThan(0)
-		}
-	})
+	for (let fileName of showcaseFiles) {
+		describe(fileName, () => {
+			let source = readFileSync(
+				path.join(SHOWCASE_DIRECTORY, fileName),
+				"utf8",
+			)
+			let diagnostics = analyse(source)
 
-	it("should render the same report every time", () => {
-		expect(
-			renderDiagnostics(diagnostics, source, "Showcase.es", {
-				color: false,
-			}),
-		).toMatchSnapshot()
-	})
+			it("should stay broken", () => {
+				// NOTE: The file exists to produce Diagnostics. A clean run
+				// means the showcase quietly stopped showcasing anything.
+				expect(containsErrors(diagnostics)).toBe(true)
+			})
+
+			it("should give every Diagnostic a code and a labelled span", () => {
+				for (let diagnostic of diagnostics) {
+					expect(diagnostic.code).toBeString()
+					expect(diagnostic.position).not.toBeNull()
+					expect(diagnostic.labels?.length ?? 0).toBeGreaterThan(0)
+				}
+			})
+
+			it("should render the same report every time", () => {
+				expect(
+					renderDiagnostics(diagnostics, source, fileName, {
+						color: false,
+					}),
+				).toMatchSnapshot()
+			})
+		})
+	}
 })
