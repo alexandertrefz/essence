@@ -848,3 +848,50 @@ describe("identifierPattern", () => {
 		})
 	})
 })
+
+describe("Rename through where clauses", () => {
+	let conditionalSource = [
+		"implementation {",
+		"\tnamespace Box<infer Item> for { value: Item }",
+		"\t\tis Comparable where Item is Comparable",
+		"\t{",
+		"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
+		"\t\t\t<- @.value::compareTo(other.value)",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should rename a Namespace Generic from its declaration through the where clause", () => {
+		expect(rename(conditionalSource, { line: 2, column: 23 }, "Element")).toBe(
+			conditionalSource.replaceAll("Item", "Element"),
+		)
+	})
+
+	it("should rename a Namespace Generic from its where-clause mention", () => {
+		expect(rename(conditionalSource, { line: 3, column: 24 }, "Element")).toBe(
+			conditionalSource.replaceAll("Item", "Element"),
+		)
+	})
+
+	it("should rename a Protocol through clause and condition mentions", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"\tnamespace Boxy<infer Item> for { value: Item }",
+			"\t\tis Sizable where Item is Sizable",
+			"\t{",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.value::size()",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 6, column: 7 }, "Measurable")).toBe(
+			source.replaceAll("Sizable", "Measurable"),
+		)
+	})
+})

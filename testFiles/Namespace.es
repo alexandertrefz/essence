@@ -55,7 +55,8 @@ implementation {
 
 	§ § Namespaces for Lists & Generics
 
-	§ `map` and `reduce` are builtins now — see List.es and Inference.es. A
-	§ List-of-Number `sum` still wants a Namespace targeting `List<Number>`,
-	§ which conditional conformance will make expressible.
+	§ `map` and `reduce` are builtins now — see List.es and Inference.es.
+	§ Conditional conformance has shipped — `is Comparable where Item is
+	§ Comparable` — see ConditionalConformance.es for Namespaces that lean
+	§ on their Item's Protocols.
 }

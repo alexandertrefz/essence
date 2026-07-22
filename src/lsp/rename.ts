@@ -1037,10 +1037,22 @@ function walkNamespaceDefinition(
 ) {
 	declareInScope(scope, "values", node.name, "namespace", context)
 
-	// NOTE: Only the clause Protocol is referenced here — walking the `where`
-	// conditions (their Generic and Protocol) is Commit 3's tooling work.
+	// NOTE: The Namespace's own Type Parameters are in scope for the `where`
+	// conditions (and for the target Type and Methods below), so the Generic
+	// scope is built first — a `where Item is Comparable` condition then binds
+	// `Item` to the Generic's declaration, and renaming either end moves both.
+	let genericScope = scopeWithGenerics(node.generics, scope, context)
+
+	// NOTE: A clause's Protocol resolves in the outer Scope, its `where`
+	// conditions' LHS Generic through the Namespace's own Type Parameters, and
+	// each condition's RHS Protocol in the outer Scope again.
 	for (let clause of node.conformsTo) {
 		reference(scope, "types", clause.protocol, context)
+
+		for (let condition of clause.conditions) {
+			reference(genericScope, "types", condition.generic, context)
+			reference(scope, "types", condition.protocol, context)
+		}
 	}
 
 	// NOTE: Property and Method names are declared as Namespace member
@@ -1102,8 +1114,6 @@ function walkNamespaceDefinition(
 			"write",
 		)
 	}
-
-	let genericScope = scopeWithGenerics(node.generics, scope, context)
 
 	if (node.targetType !== null) {
 		walkTypeDeclaration(node.targetType, genericScope, context)
