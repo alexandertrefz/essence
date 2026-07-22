@@ -1488,6 +1488,34 @@ describe("Enricher", () => {
 
 					constant smallerInteger: Integer = smaller(5, 3)
 					constant smallerRational: Rational = smaller(1/2, 1/3)
+					constant smallerString: String = smaller("a", "b")
+				}`),
+			).toEqual([])
+		})
+
+		it("should sort a List of Strings, now that String is Comparable", () => {
+			// NOTE: `sortedBy` needs no Protocol bound — the comparator does —
+			// but the annotation only holds if `compareTo` resolves on a
+			// String, which it does now that String conforms to Comparable.
+			expect(
+				diagnosticsFor(`implementation {
+					constant ordered: List<String> = ["b", "a"]::sortedBy(
+						(first, second) { <- first::compareTo(second) },
+					)
+				}`),
+			).toEqual([])
+		})
+
+		it("should type the everyday String Methods", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant count: Integer = "hi"::length()
+					constant chars: List<String> = "hi"::characters()
+					constant char: String | Nothing = "hi"::characterAt(0)
+					constant loud: String = "hi"::uppercased()::trimmed()
+					constant begins: Boolean = "hi"::startsWith("h")
+					constant at: Integer | Nothing = "hello"::firstIndexOf("l")
+					constant padded: String = "7"::paddedAtStart(to 3, with "0")
 				}`),
 			).toEqual([])
 		})
