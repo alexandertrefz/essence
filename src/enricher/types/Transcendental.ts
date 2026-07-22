@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 
 export const type: common.TranscendentalType = { type: "Transcendental" }
@@ -269,13 +270,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Integer" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [
-							{ type: "Transcendental" },
-							{ type: "Nothing" },
-						],
-					},
+					returnType: optionalOf({ type: "Transcendental" }),
 				},
 				{
 					generics: [],
@@ -289,13 +284,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Rational" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [
-							{ type: "Transcendental" },
-							{ type: "Nothing" },
-						],
-					},
+					returnType: optionalOf({ type: "Transcendental" }),
 				},
 				{
 					generics: [],
@@ -309,10 +298,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Transcendental" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 					documentation: {
 						description:
 							"Divides by another Transcendental. Proportional values give an exact Rational — TAU divided by PI is exactly 2. Anything else is not representable yet and gives Nothing.",

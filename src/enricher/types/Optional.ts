@@ -1,22 +1,33 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 
-// NOTE: The covering Namespace for `ItemType | Nothing` — the Union every
+// NOTE: The global spelling of fallibility — `Optional<Integer>` is a Generic
+// Type Alias for `Integer | Nothing`, usable in any Type position. Applying
+// it stamps the applied spelling onto the resulting Union as its display
+// name, so annotations read back exactly as written.
+export const type: common.GenericAliasType = {
+	type: "GenericAlias",
+	name: "Optional",
+	generics: [{ name: "ItemType", defaultType: null, infer: false }],
+	aliasedType: optionalOf({ type: "GenericUse", name: "ItemType" }),
+}
+
+// NOTE: The covering Namespace for `Optional<ItemType>` — the Union every
 // fallible Method returns. It carries the one Method whose meaning needs both
 // members at once: `otherwise`, which collapses the Union back to a bare
 // value. Matching binds `ItemType` to the receiver's non-Nothing member
 // (concrete Union members are tried ahead of binding ones), so the fallback
-// and the result are typed by that member alone. A receiver whose Union holds
-// several members besides `Nothing` does not resolve here — the first member
-// binds `ItemType` and the second no longer fits it — which keeps `otherwise`
-// on the single-payload shape it is meant for.
+// and the result are typed by that member alone. A compound payload works
+// when it is one nested member — `Optional<Integer | Rational>` binds
+// `ItemType` to `Integer | Rational` in one piece, which is how the stdlib
+// spells such results. A *flat* `Integer | Rational | Nothing` receiver does
+// not resolve here — the first member binds `ItemType` and the second no
+// longer fits it.
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Optional",
 	generics: [{ name: "ItemType", defaultType: null, infer: true }],
-	targetType: {
-		type: "UnionType",
-		types: [{ type: "GenericUse", name: "ItemType" }, { type: "Nothing" }],
-	},
+	targetType: optionalOf({ type: "GenericUse", name: "ItemType" }),
 	properties: {},
 	methods: {
 		otherwise: {
@@ -25,13 +36,7 @@ export const namespace: common.NamespaceType = {
 			parameterTypes: [
 				{
 					name: null,
-					type: {
-						type: "UnionType",
-						types: [
-							{ type: "GenericUse", name: "ItemType" },
-							{ type: "Nothing" },
-						],
-					},
+					type: optionalOf({ type: "GenericUse", name: "ItemType" }),
 				},
 				{
 					name: null,

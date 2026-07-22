@@ -178,6 +178,96 @@ describe("Inlay Hints", () => {
 				hintsOf(source).filter((hint) => hint.label === " -> String"),
 			).toHaveLength(1)
 		})
+
+		it("should keep `Number` by name in a return Type inferred from branches", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Picker for Number {",
+				"\t\tpick<infer Target>(",
+				"\t\t\t_ transform: (_ value: Number) -> Target,",
+				"\t\t) -> Target {",
+				"\t\t\t<- transform(1)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant value: Number = 1",
+				"\tconstant picked = value::pick((item) {",
+				"\t\tif item::isGreaterThan(0) { <- item }",
+				"",
+				"\t\t<- nothing",
+				"\t})",
+				"}",
+			].join("\n")
+
+			let labels = hintsOf(source).map((hint) => hint.label)
+
+			expect(labels).toContain(" -> Number | Nothing")
+			expect(labels).toContain(": Number | Nothing")
+		})
+	})
+
+	describe("Optional", () => {
+		it("should substitute the applied spelling along with the members", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Firsts<infer Item> for List<Item> {",
+				"\t\tmaybeFirst() -> Optional<Item> {",
+				"\t\t\t<- nothing",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant found = [1]::maybeFirst()",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toContain(
+				": Optional<Integer>",
+			)
+		})
+
+		it("should describe builtin fallible Methods as `Optional`", () => {
+			let source = [
+				"implementation {",
+				"\tconstant half = 1110::divideBy(2)",
+				"\tconstant first = [1, 2, 3]::firstItem()",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Optional<Rational>",
+				": Optional<Integer>",
+			])
+		})
+
+		it("should resolve `otherwise` on an `Optional`-annotated value", () => {
+			let source = [
+				"implementation {",
+				"\tconstant maybe: Optional<Integer> = nothing",
+				"\tconstant certain = maybe::otherwise(0)",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toContain(
+				": Integer",
+			)
+		})
+
+		it("should keep a compound payload whole — and `otherwise` collapses it", () => {
+			// NOTE: The stdlib spells mixed fallible results as one nested
+			// payload (`Optional<Integer | Rational>`), which is what lets
+			// `otherwise` bind the payload in one piece.
+			let source = [
+				"implementation {",
+				"\tconstant power = 2::toThePowerOf(-2)",
+				"\tconstant sure = power::otherwise(0)",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Optional<Integer | Rational>",
+				": Integer | Rational",
+			])
+		})
 	})
 
 	it("should restrict Hints to the requested line range", () => {

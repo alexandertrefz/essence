@@ -1,3 +1,4 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
@@ -26,10 +27,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the denominator",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Rational" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Rational" }),
 			documentation: {
 				description:
 					"Builds the Rational one Integer over another — the way to write a ratio of computed values, where the literal form `3/4` is not available.",
@@ -250,10 +248,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Rational" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -267,10 +262,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Integer" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Rational" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Rational" }),
 				},
 				{
 					generics: [],
@@ -543,14 +535,10 @@ export const namespace: common.NamespaceType = {
 					type: { type: "Rational" },
 				},
 			],
-			returnType: {
+			returnType: optionalOf({
 				type: "UnionType",
-				types: [
-					{ type: "Rational" },
-					{ type: "Algebraic" },
-					{ type: "Nothing" },
-				],
-			},
+				types: [{ type: "Rational" }, { type: "Algebraic" }],
+			}),
 			documentation: {
 				description:
 					"The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.",
@@ -644,10 +632,7 @@ export const namespace: common.NamespaceType = {
 					type: { type: "Rational" },
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Rational" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Rational" }),
 			documentation: {
 				description:
 					"The Rational flipped upside down — the numerator and denominator exchanged.",
@@ -766,10 +751,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the exponent",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Rational" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Rational" }),
 			documentation: {
 				description:
 					"Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.",
@@ -790,10 +772,7 @@ export const namespace: common.NamespaceType = {
 					documentation: "the text to read",
 				},
 			],
-			returnType: {
-				type: "UnionType",
-				types: [{ type: "Rational" }, { type: "Nothing" }],
-			},
+			returnType: optionalOf({ type: "Rational" }),
 			documentation: {
 				description:
 					"Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.",

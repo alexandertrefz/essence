@@ -58,7 +58,7 @@ describe("Hover", () => {
 		expect(hover(source, { line: 2, column: 15 })).toBe("Integer")
 	})
 
-	it("should describe Union Types", () => {
+	it("should describe an aliased Union Type by its Alias's name", () => {
 		let source = [
 			"implementation {",
 			"\ttype Value = Integer | String",
@@ -67,9 +67,74 @@ describe("Hover", () => {
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 4, column: 10 })).toBe(
+		expect(hover(source, { line: 4, column: 10 })).toBe("something: Value")
+	})
+
+	it("should describe an anonymous Union Type member by member", () => {
+		let source = [
+			"implementation {",
+			"\tconstant something: Integer | String = 42",
+			"\t__print(something)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 10 })).toBe(
 			"something: Integer | String",
 		)
+	})
+
+	it("should keep `Number` by name inside a Union Type", () => {
+		let source = [
+			"implementation {",
+			"\tconstant something: Number | Nothing = 42",
+			"\t__print(something)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 10 })).toBe(
+			"something: Number | Nothing",
+		)
+	})
+
+	it("should describe the builtin `Optional` as applied", () => {
+		let source = [
+			"implementation {",
+			"\tconstant something: Optional<Integer> = nothing",
+			"\t__print(something)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 10 })).toBe(
+			"something: Optional<Integer>",
+		)
+	})
+
+	it("should describe a userland Generic Alias as applied", () => {
+		let source = [
+			"implementation {",
+			"\ttype Fallible<Value> = Value | String",
+			"\tconstant something: Fallible<Integer> = 42",
+			"\t__print(something)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 10 })).toBe(
+			"something: Fallible<Integer>",
+		)
+	})
+
+	it("should keep an untouched `Number` by name when a wildcard narrows", () => {
+		let source = [
+			"implementation {",
+			"\tconstant value: Number | Nothing = 42",
+			"\t__print(match value -> Number {",
+			"\t\tcase Nothing { <- 0 }",
+			"\t\tcase _ { <- @ }",
+			"\t})",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 5, column: 15 })).toBe("@: Number")
 	})
 
 	it("should describe Method invocations", () => {
