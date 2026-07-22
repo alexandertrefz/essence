@@ -161,7 +161,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation = CalculatorOperation#Modulo({ left = 1 })
 				}`),
-			).toContain("Type 'CalculatorOperation' has no Case '#Modulo'.")
+			).toContain("'CalculatorOperation' has no Case '#Modulo'")
 		})
 
 		it("reports a bare Case Matcher the matched Union does not declare", () => {
@@ -174,7 +174,7 @@ describe("Choices", () => {
 						case _ { <- nothing }
 					}
 				}`),
-			).toContain("The matched value's Type has no Case '#Modulo'.")
+			).toContain("The matched value has no Case '#Modulo'")
 		})
 
 		it("asks for the prefixed form when two Choices share a Case name", () => {
@@ -190,9 +190,7 @@ describe("Choices", () => {
 						case _ { <- nothing }
 					}
 				}`),
-			).toContain(
-				"Case '#Go' is ambiguous — 2 Choices in the matched Union declare it. Prefix it with its Choice's name.",
-			)
+			).toContain("Case '#Go' is declared by more than one Choice")
 		})
 
 		it("reports unknown payload members on Lookup", () => {
@@ -288,9 +286,7 @@ describe("Choices", () => {
 						case #ClearAll { <- nothing }
 					}
 				}`),
-			).toContain(
-				"Match Expression does not handle Type 'CalculatorOperation#Negate'.",
-			)
+			).toContain("This Match Expression does not handle every Case")
 		})
 
 		it("treats a Union containing a Choice as the Union of its Cases", () => {
@@ -323,9 +319,7 @@ describe("Choices", () => {
 
 			expect(
 				diagnostics.map((diagnostic) => diagnostic.message),
-			).toContain(
-				"Type 'B#Wait' is not a member of the matched Union — this case can never match.",
-			)
+			).toContain("This Case can never match")
 		})
 
 		it("requires a payload for payload-carrying Cases", () => {
@@ -372,7 +366,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation = #Modulo({ left = 1 })
 				}`),
-			).toContain("No Choice in scope declares a Case '#Modulo'.")
+			).toContain("No Choice in scope declares a Case '#Modulo'")
 		})
 
 		it("asks for the prefix when two Choices in scope share the Case name", () => {
@@ -383,9 +377,7 @@ describe("Choices", () => {
 
 					constant command = #Go({ speed = 1 })
 				}`),
-			).toContain(
-				"Case '#Go' is ambiguous — it is declared by the Choices 'A', 'B'. Prefix it with its Choice's name.",
-			)
+			).toContain("Case '#Go' is declared by more than one Choice")
 		})
 
 		it("resolves bare Ordering Cases", () => {
@@ -454,9 +446,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${sharedCaseChoices}
 					constant command: A | B = #Go({ speed = 1 })
 				}`),
-			).toContain(
-				"Case '#Go' is ambiguous — 2 Choices in the expected Type declare it. Prefix it with its Choice's name.",
-			)
+			).toContain("Case '#Go' is declared by more than one Choice")
 		})
 
 		it("falls back to the scope scan when the expected Type has no such Case", () => {
@@ -470,7 +460,7 @@ describe("Choices", () => {
 				"This value does not fit the declared Type of Constant 'command'",
 			)
 			expect(messages).not.toContain(
-				"No Choice in scope declares a Case '#Go'.",
+				"No Choice in scope declares a Case '#Go'",
 			)
 		})
 	})

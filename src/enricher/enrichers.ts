@@ -702,6 +702,7 @@ export function enrichMatch(
 				memberLiterals,
 				guard,
 				matcher,
+				matcherPosition: handler.matcher.position,
 			}
 		}),
 		position: node.position,

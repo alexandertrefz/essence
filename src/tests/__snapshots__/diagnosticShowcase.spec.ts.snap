@@ -64,6 +64,46 @@ Error: { x: Integer, y: Integer } has no member 'z'
 "
 `;
 
+exports[`Diagnostic Showcase Match.es should render the same report every time 1`] = `
+"[missing-case]
+Error: This Match Expression does not handle every Case
+    ╭─┤ Match.es:21:20 │
+    │
+ 21 │     constant action = match signal -> String {
+    │                             ───┬──  
+    │                                ╰──── this is a Signal
+    │ 
+    │ Help: Add 'case Signal#Amber', 'case Signal#Green', or a 'case _' that covers the rest.
+    │ 
+    │ Note: Unhandled: 'Signal#Amber', 'Signal#Green'.
+────╯
+
+[unreachable-case]
+Warning: This Case can never match
+    ╭─┤ Match.es:31:8 │
+    │
+ 28 │     constant described = match other -> String {
+    │                                ──┬──  
+    │                                  ╰──── this is an Integer | Nothing
+    │ 
+ 31 │        case String { <- "never" }
+    │             ───┬──  
+    │                ╰──── String is not a member of the matched Union
+────╯
+
+[match-on-non-union]
+Error: Match Expressions require a Union Type
+    ╭─┤ Match.es:35:24 │
+    │
+ 35 │     constant only = match "essence" -> String {
+    │                           ────┬────  
+    │                               ╰────── this is a String
+    │ 
+    │ Note: Matching a Type with only one possible shape has only one outcome.
+────╯
+"
+`;
+
 exports[`Diagnostic Showcase Types.es should render the same report every time 1`] = `
 "[assignment-type-mismatch]
 Error: This value does not fit Variable 'count'
