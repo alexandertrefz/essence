@@ -21,6 +21,7 @@ import {
 	namespace as numberNamespace,
 	type as numberType,
 } from "./types/Number"
+import { namespace as optionalNamespace } from "./types/Optional"
 import {
 	namespace as orderingNamespace,
 	type as orderingType,
@@ -69,6 +70,7 @@ export const builtinMembers: Record<string, common.Type> = {
 	Transcendental: transcendentalNamespace,
 	Number: numberNamespace,
 	Nothing: nothingNamespace,
+	Optional: optionalNamespace,
 	Ordering: orderingNamespace,
 	Record: recordNamespace,
 	List: listNamespace,

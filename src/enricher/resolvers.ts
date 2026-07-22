@@ -2426,6 +2426,14 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
+	// NOTE: An unbounded Type Parameter has no Methods — it resolves only
+	// through a Protocol bound, handled above. Without this cut, a Namespace
+	// whose target Union carries a bindable Generic member (`Optional`) would
+	// bind the bare Parameter and offer its Methods on every `T`.
+	if (baseType.type === "GenericUse") {
+		return matchingNamespaces
+	}
+
 	let namespaces = getAllNamespacesInScope(scope, namespaceSpecifier)
 
 	// NOTE: Generic Namespaces match their target Type by binding the

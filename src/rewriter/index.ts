@@ -28,6 +28,7 @@ export function rewrite(program: common.typedSimple.Program): string {
 			internalImport([importNamespaceSpecifier("Number")], "Number"),
 			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
 			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
+			internalImport([importNamespaceSpecifier("Optional")], "Optional"),
 			internalImport([importNamespaceSpecifier("Ordering")], "Ordering"),
 			internalImport([importNamespaceSpecifier("Record")], "Record"),
 			internalImport([importNamespaceSpecifier("List")], "List"),
