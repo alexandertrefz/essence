@@ -378,6 +378,34 @@ export function divideByTranscendental(
 	return createRational(ratio.numerator, ratio.denominator)
 }
 
+// NOTE: Negation flips both components and keeps the π coefficient non-zero,
+// so the result stays a Transcendental without consulting the
+// `createTranscendental` gateway.
+export function negated(
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	return {
+		[typeKeySymbol]: "Transcendental",
+		rationalPartNumerator: -transcendental.rationalPartNumerator,
+		rationalPartDenominator: transcendental.rationalPartDenominator,
+		piCoefficientNumerator: -transcendental.piCoefficientNumerator,
+		piCoefficientDenominator: transcendental.piCoefficientDenominator,
+	}
+}
+
+export function absolute(
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	// NOTE: The sign against zero is decidable — `a + b·π` can not equal a
+	// rational, so the enclosure loop always separates.
+	const sign = signRelativeTo(transcendental, {
+		[typeKeySymbol]: "Integer",
+		value: 0n,
+	})
+
+	return sign < 0n ? negated(transcendental) : transcendental
+}
+
 // #endregion
 
 // #region Printing

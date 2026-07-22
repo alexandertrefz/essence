@@ -335,6 +335,174 @@ export function isGreaterThanOrEqualTo__overload$2(
 
 // #endregion
 
+// NOTE: The reduced form with the sign on the numerator — the shape the
+// accessors and the rounding family read. Operations on the underlying
+// Fraction class do not promise either normalization.
+function reducedParts(rational: RationalType): {
+	numerator: bigint
+	denominator: bigint
+} {
+	let clonedRational = rational.rational.clone()
+	clonedRational.reduce()
+
+	let numerator = clonedRational.numerator
+	let denominator = clonedRational.denominator
+
+	if (denominator < 0n) {
+		numerator = -numerator
+		denominator = -denominator
+	}
+
+	return { numerator, denominator }
+}
+
+// #region Everyday methods
+
+export function numerator(rational: RationalType): IntegerType {
+	return {
+		[typeKeySymbol]: "Integer",
+		value: reducedParts(rational).numerator,
+	}
+}
+
+export function denominator(rational: RationalType): IntegerType {
+	return {
+		[typeKeySymbol]: "Integer",
+		value: reducedParts(rational).denominator,
+	}
+}
+
+export function absolute(rational: RationalType): RationalType {
+	let parts = reducedParts(rational)
+
+	return createRational(
+		parts.numerator < 0n ? -parts.numerator : parts.numerator,
+		parts.denominator,
+	)
+}
+
+export function negated(rational: RationalType): RationalType {
+	let parts = reducedParts(rational)
+
+	return createRational(-parts.numerator, parts.denominator)
+}
+
+export function reciprocal(rational: RationalType): RationalType | NothingType {
+	let parts = reducedParts(rational)
+
+	if (parts.numerator === 0n) {
+		return createNothing()
+	}
+
+	return createRational(parts.denominator, parts.numerator)
+}
+
+export function isWholeNumber(rational: RationalType): BooleanType {
+	return createBoolean(reducedParts(rational).denominator === 1n)
+}
+
+export function rounded(rational: RationalType): IntegerType {
+	let parts = reducedParts(rational)
+	let truncatedQuotient = parts.numerator / parts.denominator
+	let remainder = parts.numerator % parts.denominator
+	let remainderMagnitude = remainder < 0n ? -remainder : remainder
+
+	// NOTE: Halves round away from zero.
+	if (remainderMagnitude * 2n >= parts.denominator) {
+		truncatedQuotient += parts.numerator < 0n ? -1n : 1n
+	}
+
+	return { [typeKeySymbol]: "Integer", value: truncatedQuotient }
+}
+
+export function roundedDown(rational: RationalType): IntegerType {
+	let parts = reducedParts(rational)
+	let quotient = parts.numerator / parts.denominator
+
+	if (parts.numerator % parts.denominator !== 0n && parts.numerator < 0n) {
+		quotient -= 1n
+	}
+
+	return { [typeKeySymbol]: "Integer", value: quotient }
+}
+
+export function roundedUp(rational: RationalType): IntegerType {
+	let parts = reducedParts(rational)
+	let quotient = parts.numerator / parts.denominator
+
+	if (parts.numerator % parts.denominator !== 0n && parts.numerator > 0n) {
+		quotient += 1n
+	}
+
+	return { [typeKeySymbol]: "Integer", value: quotient }
+}
+
+export function truncated(rational: RationalType): IntegerType {
+	let parts = reducedParts(rational)
+
+	return {
+		[typeKeySymbol]: "Integer",
+		value: parts.numerator / parts.denominator,
+	}
+}
+
+export function toThePowerOf(
+	rational: RationalType,
+	exponent: IntegerType,
+): RationalType | NothingType {
+	let parts = reducedParts(rational)
+
+	if (exponent.value >= 0n) {
+		return createRational(
+			parts.numerator ** exponent.value,
+			parts.denominator ** exponent.value,
+		)
+	}
+
+	if (parts.numerator === 0n) {
+		return createNothing()
+	}
+
+	return createRational(
+		parts.denominator ** -exponent.value,
+		parts.numerator ** -exponent.value,
+	)
+}
+
+export function parse(text: StringType): RationalType | NothingType {
+	let fractionForm = /^(-?[0-9]+)\/([0-9]+)$/.exec(text.value)
+
+	if (fractionForm !== null) {
+		let parsedDenominator = BigInt(fractionForm[2])
+
+		if (parsedDenominator === 0n) {
+			return createNothing()
+		}
+
+		return createRational(BigInt(fractionForm[1]), parsedDenominator)
+	}
+
+	let decimalForm = /^(-?)([0-9]+)\.([0-9]+)$/.exec(text.value)
+
+	if (decimalForm !== null) {
+		let scale = 10n ** BigInt(decimalForm[3].length)
+		let magnitude = BigInt(decimalForm[2]) * scale + BigInt(decimalForm[3])
+
+		return createRational(
+			decimalForm[1] === "-" ? -magnitude : magnitude,
+			scale,
+		)
+	}
+
+	if (/^-?[0-9]+$/.test(text.value)) {
+		return createRational(BigInt(text.value), 1n)
+	}
+
+	return createNothing()
+}
+
+// #endregion
+
 function formatAsRational(rational: Fraction): string {
 	let clonedRational = rational.clone()
 	clonedRational.reduce()
