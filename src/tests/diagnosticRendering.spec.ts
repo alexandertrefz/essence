@@ -177,8 +177,47 @@ describe("diagnostic rendering", () => {
 
 			[internal-error]
 			Error: Missing declaration.
+
+			─── 2 errors
 			`,
 		)
+	})
+
+	test("summarises the counts below the reports", () => {
+		let output = renderDiagnostics(
+			[
+				diagnostic("error", "First.", null),
+				diagnostic("warning", "Second.", null),
+				diagnostic("warning", "Third.", null),
+			],
+			"constant x = 10\n",
+			"Test.es",
+			{ color: false },
+		)
+
+		expect(output).toEndWith("─── 1 error, 2 warnings\n")
+	})
+
+	test("renders no summary when there is nothing to summarise", () => {
+		expect(
+			renderDiagnostics([], "constant x = 10\n", "Test.es", {
+				color: false,
+			}),
+		).toBe("")
+	})
+
+	test("colors the summary counts by severity", () => {
+		let output = renderDiagnostics(
+			[
+				diagnostic("error", "First.", null),
+				diagnostic("warning", "Second.", null),
+			],
+			"constant x = 10\n",
+			"Test.es",
+		)
+
+		expect(output).toContain("\x1b[31m1 error\x1b[0m")
+		expect(output).toContain("\x1b[33m1 warning\x1b[0m")
 	})
 
 	test("clamps out-of-range positions instead of crashing", () => {

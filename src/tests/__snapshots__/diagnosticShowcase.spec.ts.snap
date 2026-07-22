@@ -61,6 +61,8 @@ Error: { x: Integer, y: Integer } has no member 'z'
     │ 
     │ Note: { x: Integer, y: Integer } has 'x', 'y'.
 ────╯
+
+─── 5 errors
 "
 `;
 
@@ -101,6 +103,8 @@ Error: Match Expressions require a Union Type
     │ 
     │ Note: Matching a Type with only one possible shape has only one outcome.
 ────╯
+
+─── 2 errors, 1 warning
 "
 `;
 
@@ -127,6 +131,8 @@ Error: This block is never closed
     │ 
     │ Help: Add the missing '}'.
 ────╯
+
+─── 2 errors
 "
 `;
 
@@ -187,5 +193,7 @@ Error: This Argument does not fit Parameter 'times'
     │ 
     │ Note: Parameter 'times' is Integer.
 ────╯
+
+─── 5 errors
 "
 `;

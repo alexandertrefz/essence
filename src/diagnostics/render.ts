@@ -4,9 +4,11 @@ import {
 	ColorGenerator,
 	Config,
 	Label,
+	paint,
 	Report,
 	Source,
 } from "../ariadne/index"
+import { countOf } from "../helpers/index"
 import type { common } from "../interfaces/index"
 
 export interface RenderOptions {
@@ -128,9 +130,41 @@ export function renderDiagnostics(
 	// NOTE: A blank line between reports. Each report already ends in a rule
 	// that closes it off, but run together they read as one wall — the gap is
 	// what lets the eye find where the next problem starts.
-	return diagnostics
+	let reports = diagnostics
 		.map((diagnostic) =>
 			renderDiagnostic(diagnostic, source, fileName, options),
 		)
 		.join("\n")
+
+	return `${reports}${renderSummary(diagnostics, options)}`
+}
+
+// NOTE: The tally goes underneath rather than on top. Above the reports it
+// would be read before it means anything; below, it answers the question the
+// reader actually has once they have scrolled — whether that was all of it.
+// Nothing is rendered when there is nothing to count.
+function renderSummary(
+	diagnostics: Array<common.Diagnostic>,
+	options: RenderOptions,
+): string {
+	if (diagnostics.length === 0) {
+		return ""
+	}
+
+	let config = new Config({ color: options.color ?? true })
+	let errors = diagnostics.filter(
+		(diagnostic) => diagnostic.severity === "error",
+	).length
+	let warnings = diagnostics.length - errors
+	let counts: Array<string> = []
+
+	if (errors > 0) {
+		counts.push(paint(countOf(errors, "error"), config.errorColor()))
+	}
+
+	if (warnings > 0) {
+		counts.push(paint(countOf(warnings, "warning"), config.warningColor()))
+	}
+
+	return `\n${paint("───", config.marginColor())} ${counts.join(", ")}\n`
 }
