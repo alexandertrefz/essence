@@ -310,8 +310,8 @@ function rewriteCaseValue(
 // decouples the Protocol's method names from the Namespace's layout.
 function rewriteConformanceValue(
 	node: common.typedSimple.ConformanceValueNode,
-): estree.ObjectExpression {
-	return {
+): estree.ObjectExpression | estree.CallExpression {
+	let methodMap: estree.ObjectExpression = {
 		type: "ObjectExpression",
 		properties: Object.entries(node.methodMap).map(
 			([protocolMethodName, namespaceMethodName]): estree.Property => ({
@@ -333,6 +333,36 @@ function rewriteConformanceValue(
 				computed: false,
 			}),
 		),
+	}
+
+	// NOTE: An unconditional conformance is exactly the plain method-map object
+	// literal — kept byte-identical so its emit snapshots do not churn. A
+	// conditional one wraps it in `$type.boundConformance(<map>, [<witnesses>])`,
+	// which curries each `where` condition's witness onto every Method so the
+	// bounded runtime helpers receive them as hidden trailing Arguments.
+	if (node.conditions.length === 0) {
+		return methodMap
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "MemberExpression",
+			optional: false,
+			object: { type: "Identifier", name: "$type" },
+			property: { type: "Identifier", name: "boundConformance" },
+			computed: false,
+		},
+		arguments: [
+			methodMap,
+			{
+				type: "ArrayExpression",
+				elements: node.conditions.map((condition) =>
+					rewriteExpression(condition),
+				),
+			},
+		],
 	}
 }
 

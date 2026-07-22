@@ -34,7 +34,15 @@ const namespaceDefinition: common.NamespaceType = {
 	name: "List",
 	generics: [{ name: "ItemType", defaultType: null, infer: true }],
 	targetType: typeResolvedWithGenericUse,
-	conformsTo: ["Equatable", "Printable"],
+	conformsTo: ["Equatable", "Printable", "Comparable"],
+	// NOTE: List's Comparable conformance is conditional — a List is orderable
+	// exactly when its items are. `compareTo` carries the same bound as its own
+	// Method Generic, so a use site solving `List<ItemType> is Comparable`
+	// recursively solves `ItemType is Comparable` and hands the item ordering
+	// in as the hidden conformance Argument.
+	conformanceConditions: {
+		Comparable: [{ generic: "ItemType", protocol: "Comparable" }],
+	},
 	properties: {},
 	methods: {
 		// NOTE: `is`/`isNot` (Equatable) and `toString` (Printable) are derived
@@ -684,6 +692,39 @@ const namespaceDefinition: common.NamespaceType = {
 				position: null,
 			},
 		},
+		// NOTE: The witness behind List's conditional Comparable conformance —
+		// lexicographic ordering, available whenever the items are `Comparable`.
+		// Self-contained (its own bounded `ItemType`), so the foot loop leaves
+		// it alone; routing it through `conformedMethods` would drop the bound,
+		// so it is hand written like `sorted`.
+		compareTo: {
+			type: "SimpleMethod",
+			generics: [
+				{
+					name: "ItemType",
+					defaultType: null,
+					infer: true,
+					constraint: "Comparable",
+				},
+			],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: null,
+					type: typeResolvedWithGenericUse,
+					documentation: "the List to compare with",
+				},
+			],
+			returnType: orderingType,
+			documentation: {
+				description:
+					"Orders the List against another one lexicographically — the first differing pair of items decides, and on an equal prefix the shorter List comes first. Available whenever the items conform to `Comparable`.",
+				parameters: {},
+				returns:
+					"`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
+				position: null,
+			},
+		},
 
 		// NOTE: `anyItem`/`everyItem` read as sentences — "any item matches …",
 		// "every item matches …" — the existential and universal checks over a
@@ -995,7 +1036,12 @@ const namespaceDefinition: common.NamespaceType = {
 // receiver, an Integer-only result), so they have no `ItemType` to infer and
 // merging it in would only ever leave it unbound. `sorted` declares its own
 // `ItemType`, bounded by `Comparable`.
-const methodsWithoutItemType = new Set(["joinWith", "of", "sorted"])
+const methodsWithoutItemType = new Set([
+	"joinWith",
+	"of",
+	"sorted",
+	"compareTo",
+])
 
 for (let [methodName, method] of Object.entries(namespaceDefinition.methods)) {
 	if (methodsWithoutItemType.has(methodName)) {

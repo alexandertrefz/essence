@@ -1441,6 +1441,68 @@ describe("Parser", () => {
 					expect(input).toMatchSnapshot()
 				})
 			})
+
+			describe("Where Clauses", () => {
+				it("should parse a single where condition", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace List<infer Item> for List<Item> is Comparable where Item is Comparable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should parse several where conditions", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace Pair<infer Key, infer Value> for { key: Key, value: Value } is Comparable where Key is Comparable, Value is Comparable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should end the where list at a comma followed by is", () => {
+					let program: parser.Program = parse(
+						"implementation { namespace Box<infer Item> for List<Item> is Comparable where Item is Comparable, is Printable {} }",
+					)
+
+					let namespace = program.implementation
+						.nodes[0] as parser.NamespaceDefinitionStatementNode
+
+					// NOTE: The comma before `is Printable` ends the `where`
+					// list — Printable is a second clause, not a condition.
+					expect(namespace.conformsTo.length).toBe(2)
+					expect(namespace.conformsTo[0].protocol.content).toBe(
+						"Comparable",
+					)
+					expect(namespace.conformsTo[0].conditions.length).toBe(1)
+					expect(
+						namespace.conformsTo[0].conditions[0].generic.content,
+					).toBe("Item")
+					expect(namespace.conformsTo[1].protocol.content).toBe(
+						"Printable",
+					)
+					expect(namespace.conformsTo[1].conditions.length).toBe(0)
+				})
+
+				it("should parse two conditional clauses", () => {
+					let input: parser.Program = parse(
+						"implementation { namespace Pair<infer Item> for { first: Item, second: Item } is Equatable where Item is Equatable, is Comparable where Item is Comparable {} }",
+					)
+
+					expect(input).toMatchSnapshot()
+				})
+
+				it("should end the where conditions at the opening brace", () => {
+					let program: parser.Program = parse(
+						"implementation { namespace Box<infer Item> for List<Item> is Comparable where Item is Comparable {} }",
+					)
+
+					let namespace = program.implementation
+						.nodes[0] as parser.NamespaceDefinitionStatementNode
+
+					expect(namespace.conformsTo.length).toBe(1)
+					expect(namespace.conformsTo[0].conditions.length).toBe(1)
+				})
+			})
 		})
 
 		describe("TypeAliasStatements", () => {

@@ -217,6 +217,35 @@ describe("Parser Recovery", () => {
 		)
 	})
 
+	it("should ask for a condition after where", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				namespace Box<infer Item> for List<Item> is Comparable where {}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"Expected an Identifier but found '{'.",
+		)
+	})
+
+	it("should ask for is in a where condition", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				namespace Box<infer Item> for List<Item> is Comparable where Item Comparable {}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"A 'where' condition reads 'Generic is Protocol'",
+		)
+		expect(diagnostics[0].labels[0]?.message).toBe("expected 'is' here")
+	})
+
 	it("should recover from a broken Generic list", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {

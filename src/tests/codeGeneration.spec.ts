@@ -595,6 +595,63 @@ describe("Code Generation", () => {
 
 			expect(code).toContain("inner(item, Item__conformance)")
 		})
+
+		it("should keep a flat witness a plain object literal", () => {
+			const code = generate(`implementation {
+				constant ordered: List<Integer> = [3, 1, 2]::sorted()
+			}`)
+
+			// NOTE: An unconditional witness stays exactly the method-map object
+			// literal — no `boundConformance` wrapper, so its emit is unchanged.
+			expect(code).toContain("compareTo: Integer.compareTo")
+			expect(code).not.toContain("boundConformance")
+		})
+
+		it("should wrap a nested witness in boundConformance", () => {
+			const code = generate(`implementation {
+				constant ordered = [[1, 2], [3]]::sorted()
+			}`)
+
+			// NOTE: `List<List<Integer>>` sorts through List's own `compareTo`,
+			// curried with the inner Integer ordering — the conditional witness.
+			expect(code).toContain("$type.boundConformance(")
+			expect(code).toContain("compareTo: List.compareTo")
+			expect(code).toContain("compareTo: Integer.compareTo")
+		})
+
+		it("should order multiple retrofitted bounds by Namespace Generic declaration", () => {
+			const code = generate(`implementation {
+				namespace Pair<infer Key, infer Value> for { key: Key, value: Value }
+					is Comparable where Key is Comparable, Value is Comparable
+				{
+					compareTo(_ other: { key: Key, value: Value }) -> Ordering {
+						constant keyOrder = @.key::compareTo(other.key)
+						constant valueOrder = @.value::compareTo(other.value)
+						<- match keyOrder -> Ordering {
+							case #Equal { <- valueOrder }
+							case _ { <- keyOrder }
+						}
+					}
+				}
+
+				constant a = { key = 1, value = "x" }
+				constant b = { key = 1, value = "y" }
+				__print(a::compareTo(b))
+			}`)
+
+			// NOTE: R7 — the hidden conformance Parameters follow the Namespace's
+			// Generic declaration order (Key, then Value), and the call site's
+			// witnesses appear in that same order so they line up.
+			expect(code).toContain(
+				"compareTo(_self, other, Key__conformance, Value__conformance)",
+			)
+			expect(code).toContain(
+				"Key__conformance.compareTo(_self.key, other.key)",
+			)
+			expect(code).toContain(
+				"Value__conformance.compareTo(_self.value, other.value)",
+			)
+		})
 	})
 
 	describe("Union Method Dispatch", () => {

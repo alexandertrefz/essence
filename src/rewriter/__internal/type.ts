@@ -32,6 +32,28 @@ export function dispatchMethod(
 	throw new Error("No dispatch case matched the receiver.")
 }
 
+// NOTE: The runtime half of a conditional conformance — each fulfilling Method
+// is curried with the `where` conditions' own witnesses, which the bounded
+// helper (`List.compareTo`) receives as its hidden trailing conformance
+// Arguments. The unconditional case never reaches here: the Rewriter emits its
+// method map as a plain object literal instead.
+export function boundConformance(
+	// NOTE: The fulfilling Methods carry concrete runtime signatures
+	// (`List.compareTo` takes its own conformance Argument), so the map is
+	// typed loosely here — the curried witnesses restore the exact shape the
+	// bounded helper expects.
+	methods: Record<string, (...args: Array<any>) => unknown>,
+	conditions: Array<unknown>,
+): Record<string, (...args: Array<any>) => unknown> {
+	let bound: Record<string, (...args: Array<any>) => unknown> = {}
+
+	for (let [name, method] of Object.entries(methods)) {
+		bound[name] = (...args: Array<unknown>) => method(...args, ...conditions)
+	}
+
+	return bound
+}
+
 // NOTE: The runtime shape of a constructed Choice Case — the payload's
 // members with the Case's tag (`"CalculatorOperation#Add"`) on the hidden
 // Type key. Unit Cases simply carry no further members.

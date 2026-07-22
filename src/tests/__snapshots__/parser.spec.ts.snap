@@ -18320,16 +18320,30 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       {
         "conformsTo": [
           {
-            "content": "Equatable",
-            "nodeType": "Identifier",
+            "conditions": [],
+            "nodeType": "ConformanceClause",
             "position": {
               "end": {
                 "column": 69,
                 "line": 1,
               },
               "start": {
-                "column": 60,
+                "column": 57,
                 "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Equatable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 69,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 60,
+                  "line": 1,
+                },
               },
             },
           },
@@ -18425,30 +18439,58 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       {
         "conformsTo": [
           {
-            "content": "Equatable",
-            "nodeType": "Identifier",
+            "conditions": [],
+            "nodeType": "ConformanceClause",
             "position": {
               "end": {
                 "column": 69,
                 "line": 1,
               },
               "start": {
-                "column": 60,
+                "column": 57,
                 "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Equatable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 69,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 60,
+                  "line": 1,
+                },
               },
             },
           },
           {
-            "content": "Printable",
-            "nodeType": "Identifier",
+            "conditions": [],
+            "nodeType": "ConformanceClause",
             "position": {
               "end": {
                 "column": 83,
                 "line": 1,
               },
               "start": {
-                "column": 74,
+                "column": 71,
                 "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Printable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 83,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 74,
+                  "line": 1,
+                },
               },
             },
           },
@@ -18544,16 +18586,30 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       {
         "conformsTo": [
           {
-            "content": "Equatable",
-            "nodeType": "Identifier",
+            "conditions": [],
+            "nodeType": "ConformanceClause",
             "position": {
               "end": {
                 "column": 44,
                 "line": 1,
               },
               "start": {
-                "column": 35,
+                "column": 32,
                 "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Equatable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 44,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 35,
+                  "line": 1,
+                },
               },
             },
           },
@@ -18856,6 +18912,913 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
     "end": {
       "column": 8,
       "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse a single where condition 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "conditions": [
+              {
+                "generic": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 84,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 80,
+                      "line": 1,
+                    },
+                  },
+                },
+                "nodeType": "WhereCondition",
+                "position": {
+                  "end": {
+                    "column": 98,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 80,
+                    "line": 1,
+                  },
+                },
+                "protocol": {
+                  "content": "Comparable",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 98,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 88,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            ],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 98,
+                "line": 1,
+              },
+              "start": {
+                "column": 60,
+                "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Comparable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 73,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 63,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [
+          {
+            "constraint": null,
+            "defaultType": null,
+            "inferred": true,
+            "name": {
+              "content": "Item",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 43,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 39,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "GenericDeclarationNode",
+            "position": {
+              "end": {
+                "column": 43,
+                "line": 1,
+              },
+              "start": {
+                "column": 33,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "methods": {},
+        "name": {
+          "content": "List",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 32,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 101,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "baseType": {
+            "nodeType": "IdentifierTypeDeclaration",
+            "position": {
+              "end": {
+                "column": 53,
+                "line": 1,
+              },
+              "start": {
+                "column": 49,
+                "line": 1,
+              },
+            },
+            "type": {
+              "content": "List",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 53,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 49,
+                  "line": 1,
+                },
+              },
+            },
+          },
+          "generics": [
+            {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 58,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 54,
+                  "line": 1,
+                },
+              },
+              "type": {
+                "content": "Item",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 58,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 54,
+                    "line": 1,
+                  },
+                },
+              },
+            },
+          ],
+          "nodeType": "GenericTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 59,
+              "line": 1,
+            },
+            "start": {
+              "column": 53,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 103,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 103,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse several where conditions 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "conditions": [
+              {
+                "generic": {
+                  "content": "Key",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 111,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 108,
+                      "line": 1,
+                    },
+                  },
+                },
+                "nodeType": "WhereCondition",
+                "position": {
+                  "end": {
+                    "column": 125,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 108,
+                    "line": 1,
+                  },
+                },
+                "protocol": {
+                  "content": "Comparable",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 125,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 115,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+              {
+                "generic": {
+                  "content": "Value",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 132,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 127,
+                      "line": 1,
+                    },
+                  },
+                },
+                "nodeType": "WhereCondition",
+                "position": {
+                  "end": {
+                    "column": 146,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 127,
+                    "line": 1,
+                  },
+                },
+                "protocol": {
+                  "content": "Comparable",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 146,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 136,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            ],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 146,
+                "line": 1,
+              },
+              "start": {
+                "column": 88,
+                "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Comparable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 101,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 91,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [
+          {
+            "constraint": null,
+            "defaultType": null,
+            "inferred": true,
+            "name": {
+              "content": "Key",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 42,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 39,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "GenericDeclarationNode",
+            "position": {
+              "end": {
+                "column": 42,
+                "line": 1,
+              },
+              "start": {
+                "column": 33,
+                "line": 1,
+              },
+            },
+          },
+          {
+            "constraint": null,
+            "defaultType": null,
+            "inferred": true,
+            "name": {
+              "content": "Value",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 55,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 50,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "GenericDeclarationNode",
+            "position": {
+              "end": {
+                "column": 55,
+                "line": 1,
+              },
+              "start": {
+                "column": 44,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "methods": {},
+        "name": {
+          "content": "Pair",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 32,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 149,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "members": {
+            "key": {
+              "name": {
+                "content": "key",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 66,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 63,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 71,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 68,
+                    "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "Key",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 71,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 68,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            },
+            "value": {
+              "name": {
+                "content": "value",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 78,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 73,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 85,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 80,
+                    "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "Value",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 85,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 80,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 87,
+              "line": 1,
+            },
+            "start": {
+              "column": 61,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 151,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 151,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse two conditional clauses 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "conformsTo": [
+          {
+            "conditions": [
+              {
+                "generic": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 102,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 98,
+                      "line": 1,
+                    },
+                  },
+                },
+                "nodeType": "WhereCondition",
+                "position": {
+                  "end": {
+                    "column": 115,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 98,
+                    "line": 1,
+                  },
+                },
+                "protocol": {
+                  "content": "Equatable",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 115,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 106,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            ],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 115,
+                "line": 1,
+              },
+              "start": {
+                "column": 79,
+                "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Equatable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 91,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 82,
+                  "line": 1,
+                },
+              },
+            },
+          },
+          {
+            "conditions": [
+              {
+                "generic": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 141,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 137,
+                      "line": 1,
+                    },
+                  },
+                },
+                "nodeType": "WhereCondition",
+                "position": {
+                  "end": {
+                    "column": 155,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 137,
+                    "line": 1,
+                  },
+                },
+                "protocol": {
+                  "content": "Comparable",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 155,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 145,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            ],
+            "nodeType": "ConformanceClause",
+            "position": {
+              "end": {
+                "column": 155,
+                "line": 1,
+              },
+              "start": {
+                "column": 117,
+                "line": 1,
+              },
+            },
+            "protocol": {
+              "content": "Comparable",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 130,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 120,
+                  "line": 1,
+                },
+              },
+            },
+          },
+        ],
+        "documentation": null,
+        "generics": [
+          {
+            "constraint": null,
+            "defaultType": null,
+            "inferred": true,
+            "name": {
+              "content": "Item",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 43,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 39,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "GenericDeclarationNode",
+            "position": {
+              "end": {
+                "column": 43,
+                "line": 1,
+              },
+              "start": {
+                "column": 33,
+                "line": 1,
+              },
+            },
+          },
+        ],
+        "methods": {},
+        "name": {
+          "content": "Pair",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 32,
+              "line": 1,
+            },
+            "start": {
+              "column": 28,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "NamespaceDefinitionStatement",
+        "position": {
+          "end": {
+            "column": 158,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "properties": {},
+        "targetType": {
+          "members": {
+            "first": {
+              "name": {
+                "content": "first",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 56,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 51,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 62,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 58,
+                    "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 62,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 58,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            },
+            "second": {
+              "name": {
+                "content": "second",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 70,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 64,
+                    "line": 1,
+                  },
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 76,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 72,
+                    "line": 1,
+                  },
+                },
+                "type": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 76,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 72,
+                      "line": 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "nodeType": "RecordTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 78,
+              "line": 1,
+            },
+            "start": {
+              "column": 49,
+              "line": 1,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 160,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 160,
+      "line": 1,
     },
     "start": {
       "column": 1,

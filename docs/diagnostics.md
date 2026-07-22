@@ -295,7 +295,31 @@ value yet — call it directly.
 
 ### `protocol-bound-namespace-generic`
 
-A Namespace's Type Parameters can not carry Protocol bounds yet.
+A Namespace's Type Parameters can not carry Protocol bounds directly — a
+conditional conformance (`is Comparable where Item is Comparable`) carries the
+bound instead.
+
+### `unknown-where-generic`
+
+A `where` condition's left-hand side does not name one of the Namespace's own
+Type Parameters — only a declared Generic can be bound by a condition.
+
+### `conflicting-where-condition`
+
+A `where` clause binds the same Type Parameter twice, or a single Method would
+have to satisfy two conformance clauses whose conditions disagree.
+
+### `unwitnessable-where-condition`
+
+A `where` condition binds a Type Parameter that never appears in the
+Namespace's target Type — unification can never bind it at a use site, so no
+caller could ever supply the conformance it demands.
+
+### `unsatisfied-conformance-condition`
+
+A conditional conformance was selected at a use site, but one of its `where`
+conditions is not met — the Type binding a bounded Type Parameter does not
+itself conform to the Protocol the condition requires.
 
 ## Inference
 
