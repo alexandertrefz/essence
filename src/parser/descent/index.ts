@@ -1678,13 +1678,22 @@ class DescentParser {
 			// label does not cascade into a parse failure for the whole
 			// literal.
 			if (allowsInferredTypes && !annotationFollows()) {
+				let labelPosition = {
+					start: name.position.start,
+					end: internalName.position.end,
+				}
+
 				reportError(
-					"A Parameter without a Type takes its label from the expected Function Type — write only its name.",
+					"A Parameter without a Type can not carry a label",
+					labelPosition,
 					{
-						start: name.position.start,
-						end: internalName.position.end,
+						code: "redundant-parameter-label",
+						labels: [primary(labelPosition, "two names, no Type")],
+						notes: [
+							"Such a Parameter takes its label from the expected Function Type.",
+						],
+						helps: [`Write only '${internalName.content}'.`],
 					},
-					{ code: "redundant-parameter-label" },
 				)
 
 				return generators.parameter(

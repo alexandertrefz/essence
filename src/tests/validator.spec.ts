@@ -75,7 +75,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Top level returns are not permitted.",
+				"There is nothing here to return from",
 			)
 		})
 
@@ -88,7 +88,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type of returned expression doesn't match the declared return type.",
+				"This value does not fit the declared return Type",
 			)
 		})
 
@@ -101,7 +101,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"If Conditions have to be Booleans.",
+				"An If Condition has to be a Boolean",
 			)
 		})
 
@@ -116,7 +116,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"If Conditions have to be Booleans.",
+				"An If Condition has to be a Boolean",
 			)
 		})
 
@@ -255,7 +255,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Not all code paths return a value.",
+				"Not every path through this Function returns",
 			)
 		})
 
@@ -275,7 +275,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Not all code paths return a value.",
+				"Not every path through this Function returns",
 			)
 		})
 
@@ -323,7 +323,7 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"A Rational can not have a denominator of zero.",
+				"A Rational can not have a denominator of zero",
 			)
 		})
 
@@ -353,7 +353,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type of returned expression doesn't match the declared return type.",
+				"This value does not fit the declared return Type",
 			)
 		})
 
@@ -405,7 +405,7 @@ describe("Validator", () => {
 		`
 
 		const boundValueMessage =
-			"A Function with Protocol-bound Type Parameters can not be used as a value (yet) — call it directly."
+			"A Function with Protocol-bound Type Parameters can not be used as a value"
 
 		it("should allow calling a bounded Function directly", () => {
 			expect(

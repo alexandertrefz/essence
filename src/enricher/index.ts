@@ -1,4 +1,4 @@
-import { collectDiagnostics, reportError } from "../diagnostics/index"
+import { collectDiagnostics, primary, reportError } from "../diagnostics/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import { enrichNode } from "./enrichers"
@@ -186,7 +186,15 @@ const enrichImplementation = (
 						error instanceof Error ? error.message : String(error)
 					}`,
 					node.position,
-					{ code: "internal-error" },
+					{
+						code: "internal-error",
+						labels: [
+							primary(node.position, "the Compiler threw here"),
+						],
+						notes: [
+							"This is a bug in the Compiler, not in the Program.",
+						],
+					},
 				)
 
 				return []

@@ -1351,7 +1351,7 @@ describe("Parser", () => {
 					expect(
 						diagnostics.map((diagnostic) => diagnostic.message),
 					).toEqual([
-						"A Parameter without a Type takes its label from the expected Function Type — write only its name.",
+						"A Parameter without a Type can not carry a label",
 					])
 				})
 
