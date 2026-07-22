@@ -4,6 +4,8 @@ import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as integer from "../rewriter/__internal/Integer"
+import { anyIs, anyIsNot } from "../rewriter/__internal/internalHelpers"
+import * as list from "../rewriter/__internal/List"
 import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
 import * as ordering from "../rewriter/__internal/Ordering"
@@ -265,6 +267,60 @@ describe("Irrationals", () => {
 					value: [],
 				}),
 			).toEqual(createNothing())
+		})
+	})
+
+	describe("Structural equality", () => {
+		// NOTE: `anyIs` is what every List operation compares with. It branched
+		// on the type tag for the other kinds and fell through to `false` for
+		// Algebraic and Transcendental, so a List could not find a value it
+		// held.
+		it("finds an Algebraic in a List", () => {
+			const rootTwo = radical(2n)
+
+			expect(anyIs(rootTwo, radical(2n))).toBeTrue()
+			expect(anyIs(rootTwo, radical(3n))).toBeFalse()
+			expect(anyIsNot(rootTwo, radical(2n))).toBeFalse()
+
+			expect(
+				list.contains(list.createList([rootTwo]), radical(2n)).value,
+			).toBeTrue()
+			expect(
+				list.doesNotContain(list.createList([rootTwo]), radical(3n))
+					.value,
+			).toBeTrue()
+		})
+
+		it("finds a Transcendental in a List", () => {
+			expect(anyIs(number.PI, number.PI)).toBeTrue()
+			expect(anyIs(number.PI, number.TAU)).toBeFalse()
+
+			expect(
+				list.contains(list.createList([number.PI]), number.PI).value,
+			).toBeTrue()
+		})
+
+		it("collapses duplicate irrationals", () => {
+			expect(
+				list.removeDuplicates(
+					list.createList([radical(2n), radical(2n), radical(3n)]),
+				),
+			).toEqual(list.createList([radical(2n), radical(3n)]))
+
+			expect(
+				list.removeDuplicates(
+					list.createList([number.PI, number.TAU, number.PI]),
+				),
+			).toEqual(list.createList([number.PI, number.TAU]))
+		})
+
+		it("keeps kinds apart", () => {
+			// NOTE: An Algebraic is irrational by construction and a
+			// Transcendental is provably not algebraic, so no cross-kind pair
+			// is ever equal — the same rule `Number::is` states.
+			expect(anyIs(radical(2n), number.PI)).toBeFalse()
+			expect(anyIs(number.PI, radical(2n))).toBeFalse()
+			expect(anyIs(radical(2n), integer.createInteger(2n))).toBeFalse()
 		})
 	})
 

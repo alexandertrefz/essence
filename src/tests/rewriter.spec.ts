@@ -4970,17 +4970,19 @@ describe("Rewriter", () => {
 			describe("removeLast", () => {
 				it("removed the lastItem item from the list", () => {
 					expect(
-						list.removeLast(list.createList([integerOne()])),
+						list.removeLast__overload$1(
+							list.createList([integerOne()]),
+						),
 					).toEqual(listEmpty())
 
 					expect(
-						list.removeLast(
+						list.removeLast__overload$1(
 							list.createList([integerOne(), integerTwo()]),
 						),
 					).toEqual(list.createList([integerOne()]))
 
 					expect(
-						list.removeLast(
+						list.removeLast__overload$1(
 							list.createList([
 								integerOne(),
 								integerTwo(),
@@ -4990,7 +4992,7 @@ describe("Rewriter", () => {
 					).toEqual(list.createList([integerOne(), integerTwo()]))
 
 					expect(
-						list.removeLast(
+						list.removeLast__overload$1(
 							list.createList([
 								integerOne(),
 								integerTwo(),
@@ -5008,7 +5010,57 @@ describe("Rewriter", () => {
 				})
 
 				it("returns an empty list if the list is empty", () => {
-					expect(list.removeLast(listEmpty())).toEqual(listEmpty())
+					expect(list.removeLast__overload$1(listEmpty())).toEqual(
+						listEmpty(),
+					)
+				})
+
+				it("removes the given amount of items from the end", () => {
+					const threeItems = () =>
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						])
+
+					expect(
+						list.removeLast__overload$2(threeItems(), integerOne()),
+					).toEqual(list.createList([integerOne(), integerTwo()]))
+
+					expect(
+						list.removeLast__overload$2(threeItems(), integerTwo()),
+					).toEqual(list.createList([integerOne()]))
+				})
+
+				it("keeps every item when the amount is below one", () => {
+					expect(
+						list.removeLast__overload$2(
+							list.createList([integerOne(), integerTwo()]),
+							integerZero(),
+						),
+					).toEqual(list.createList([integerOne(), integerTwo()]))
+				})
+
+				it("returns an empty list when the amount reaches the length", () => {
+					expect(
+						list.removeLast__overload$2(
+							list.createList([integerOne(), integerTwo()]),
+							integerTwo(),
+						),
+					).toEqual(listEmpty())
+
+					// NOTE: Far beyond a 32 bit index — the guard has to read
+					// the bigint, not the narrowed Number.
+					expect(
+						list.removeLast__overload$2(
+							list.createList([integerOne(), integerTwo()]),
+							integer.createInteger(2n ** 40n),
+						),
+					).toEqual(listEmpty())
+
+					expect(
+						list.removeLast__overload$2(listEmpty(), integerOne()),
+					).toEqual(listEmpty())
 				})
 			})
 
