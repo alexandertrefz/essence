@@ -1,4 +1,12 @@
-import { type Cache, Config, Label, Report, Source } from "../ariadne/index"
+import {
+	type Cache,
+	type Color,
+	ColorGenerator,
+	Config,
+	Label,
+	Report,
+	Source,
+} from "../ariadne/index"
 import type { common } from "../interfaces/index"
 
 export interface RenderOptions {
@@ -22,6 +30,18 @@ function toOffset(source: Source, cursor: common.Cursor): number {
 	return Math.min(offset, source.text.length)
 }
 
+// NOTE: A Position that points past the end of the source — or backwards,
+// after clamping — must still render. Ariadne's `Label` throws on an inverted
+// span, so the clamping happens here rather than there.
+function toSpan(
+	source: Source,
+	position: common.Position,
+): { start: number; end: number } {
+	let start = toOffset(source, position.start)
+
+	return { start, end: Math.max(toOffset(source, position.end), start) }
+}
+
 function namedCache(source: Source, fileName: string): Cache<unknown> {
 	return {
 		fetch: () => source,
@@ -35,26 +55,66 @@ export function renderDiagnostic(
 	fileName: string,
 	options: RenderOptions = {},
 ): string {
+	let color = options.color ?? true
+	let config = new Config({ color, indexType: "utf16" })
+	let severityColor =
+		diagnostic.severity === "error"
+			? config.errorColor()
+			: config.warningColor()
+	// NOTE: Secondary Labels each get their own generated color so that a
+	// report with several of them stays readable — the arrows are what tie a
+	// message to its span, and identically colored arrows that cross are not
+	// followable.
+	let secondaryColors = new ColorGenerator()
 	let labels: Array<Label> = []
 	let primaryOffset = 0
 
 	if (diagnostic.position !== null) {
-		let start = toOffset(source, diagnostic.position.start)
-		let end = Math.max(toOffset(source, diagnostic.position.end), start)
+		primaryOffset = toSpan(source, diagnostic.position).start
+	}
 
-		labels.push(new Label({ start, end }))
-		primaryOffset = start
+	if (diagnostic.labels !== undefined && diagnostic.labels.length > 0) {
+		for (let label of diagnostic.labels) {
+			let isPrimary = (label.kind ?? "primary") === "primary"
+			let labelColor: Color | null = null
+
+			if (color) {
+				labelColor = isPrimary ? severityColor : secondaryColors.next()
+			}
+
+			labels.push(
+				new Label(toSpan(source, label.position), {
+					message: label.message,
+					color: labelColor ?? undefined,
+					// NOTE: Left at 0 unless a Diagnostic asks otherwise —
+					// Labels are grouped into one source excerpt only while
+					// their order agrees with their line order, and an order
+					// taken from the array index tears a two-line report into
+					// two separate excerpts.
+					order: label.order ?? 0,
+					// NOTE: The primary Label wins when spans overlap — the
+					// mistake is what the reader came for, not the
+					// declaration it is measured against.
+					priority: isPrimary ? 1 : 0,
+				}),
+			)
+		}
+	} else if (diagnostic.position !== null) {
+		// NOTE: A Diagnostic that carries no Labels still gets its Position
+		// underlined, bare, the way every Diagnostic was rendered before
+		// Labels existed.
+		labels.push(new Label(toSpan(source, diagnostic.position)))
 	}
 
 	let report = new Report({
 		kind: diagnostic.severity,
 		span: { start: primaryOffset, end: primaryOffset },
+		code: diagnostic.code,
 		message: diagnostic.message,
 		labels,
-		config: new Config({
-			color: options.color ?? true,
-			indexType: "utf16",
-		}),
+		notes: diagnostic.notes,
+		helps: diagnostic.helps,
+		config,
 	})
 
 	return report.render(namedCache(source, fileName))
@@ -68,9 +128,12 @@ export function renderDiagnostics(
 ): string {
 	let source = new Source(sourceText)
 
+	// NOTE: A blank line between reports. Each report already ends in a rule
+	// that closes it off, but run together they read as one wall — the gap is
+	// what lets the eye find where the next problem starts.
 	return diagnostics
 		.map((diagnostic) =>
 			renderDiagnostic(diagnostic, source, fileName, options),
 		)
-		.join("")
+		.join("\n")
 }
