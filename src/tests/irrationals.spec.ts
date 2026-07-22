@@ -418,13 +418,11 @@ describe("Irrationals", () => {
 				})
 			}`)
 
-			expect(diagnostics).toHaveLength(2)
-			expect(diagnostics[0].message).toBe(
-				"Match Expression does not handle Type 'Algebraic'.",
-			)
-			expect(diagnostics[1].message).toBe(
-				"Match Expression does not handle Type 'Transcendental'.",
-			)
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("missing-case")
+			expect(diagnostics[0].notes).toEqual([
+				"Unhandled: 'Algebraic', 'Transcendental'.",
+			])
 		})
 
 		it("types PI as Transcendental", () => {

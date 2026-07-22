@@ -347,6 +347,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		// Nothing` — is discharged by Handlers for its *members* rather than
 		// demanding one Handler for the nested Union as a whole.
 		let memberTypes = flattenUnionMembers(node.value.type)
+		let unhandledTypes: Array<common.Type> = []
 
 		for (let memberType of memberTypes) {
 			// NOTE: A Handler with a literal Matcher or a Guard covers only
@@ -363,14 +364,36 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			)
 
 			if (!isHandled) {
-				reportError(
-					`Match Expression does not handle Type '${describeType(
-						memberType,
-					)}'.`,
-					node.position,
-					{ code: "missing-case" },
-				)
+				unhandledTypes.push(memberType)
 			}
+		}
+
+		// NOTE: One Diagnostic for the whole Match rather than one per
+		// unhandled member — they all have the same cause and the same fix,
+		// and a Union of six unhandled members would otherwise bury the rest
+		// of the output.
+		if (unhandledTypes.length > 0) {
+			let descriptions = unhandledTypes.map(describeType)
+
+			reportError(
+				`This Match Expression does not handle every Case`,
+				node.position,
+				{
+					code: "missing-case",
+					labels: [
+						primary(
+							node.value.position,
+							`this is ${withArticle(describeType(node.value.type))}`,
+						),
+					],
+					notes: [
+						`Unhandled: ${descriptions.map((description) => `'${description}'`).join(", ")}.`,
+					],
+					helps: [
+						`Add ${descriptions.map((description) => `'case ${description}'`).join(", ")}, or a 'case _' that covers the rest.`,
+					],
+				},
+			)
 		}
 
 		for (let handler of node.handlers) {
@@ -380,21 +403,45 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 
 			if (!isReachable) {
 				// NOTE: Tagged `unnecessary` so that clients grey the case out
-				// instead of underlining it — it is dead, not wrong.
+				// instead of underlining it — it is dead, not wrong. The
+				// Position is the Matcher's, so only the dead Handler is
+				// greyed out rather than the whole Match.
 				reportWarning(
-					`Type '${describeType(
-						handler.matcher,
-					)}' is not a member of the matched Union — this case can never match.`,
-					node.position,
-					{ code: "unreachable-case", tags: ["unnecessary"] },
+					`This Case can never match`,
+					handler.matcherPosition,
+					{
+						code: "unreachable-case",
+						tags: ["unnecessary"],
+						labels: [
+							primary(
+								handler.matcherPosition,
+								`${describeType(handler.matcher)} is not a member of the matched Union`,
+							),
+							secondary(
+								node.value.position,
+								`this is ${withArticle(describeType(node.value.type))}`,
+							),
+						],
+					},
 				)
 			}
 		}
 	} else if (node.value.type.type !== "Error") {
 		reportError(
-			"You can only use Match-Expressions on Union Types.",
+			"Match Expressions require a Union Type",
 			node.value.position,
-			{ code: "match-on-non-union" },
+			{
+				code: "match-on-non-union",
+				labels: [
+					primary(
+						node.value.position,
+						`this is ${withArticle(describeType(node.value.type))}`,
+					),
+				],
+				notes: [
+					"Matching a Type with only one possible shape has only one outcome.",
+				],
+			},
 		)
 	}
 

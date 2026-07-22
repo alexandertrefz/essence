@@ -130,9 +130,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"You can only use Match-Expressions on Union Types.",
-			)
+			expect(diagnostics[0].code).toBe("match-on-non-union")
 		})
 
 		it("should accept exhaustive Match Expressions", () => {
@@ -164,9 +162,8 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
-			expect(diagnostics[0].message).toBe(
-				"Match Expression does not handle Type 'Rational'.",
-			)
+			expect(diagnostics[0].code).toBe("missing-case")
+			expect(diagnostics[0].notes).toEqual(["Unhandled: 'Rational'."])
 		})
 
 		it("should warn about unreachable Match cases", () => {
@@ -191,8 +188,9 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].message).toBe(
-				"Type 'String' is not a member of the matched Union — this case can never match.",
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].labels?.[0].message).toBe(
+				"String is not a member of the matched Union",
 			)
 		})
 
