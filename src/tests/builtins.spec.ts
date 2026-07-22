@@ -88,4 +88,35 @@ describe("Builtins", () => {
 			})
 		}
 	})
+
+	// NOTE: "Every stdlib Method is documented" is a completion gate, not an
+	// aspiration — Hover and Signature Help surface these descriptions, so an
+	// undocumented Method ships a blank tooltip. The backfill of 2026-07-22
+	// took coverage to 100%; this keeps it there.
+	describe("every declared Method carries documentation", () => {
+		for (let namespace of builtinNamespaces) {
+			it(`documents ${namespace.name}`, () => {
+				let undocumented: Array<string> = []
+
+				for (let [name, method] of Object.entries(namespace.methods)) {
+					let documentation = (
+						method as unknown as {
+							documentation?: { description?: string }
+						}
+					).documentation
+
+					if (
+						documentation === undefined ||
+						documentation === null ||
+						typeof documentation.description !== "string" ||
+						documentation.description.length === 0
+					) {
+						undocumented.push(`${namespace.name}::${name}`)
+					}
+				}
+
+				expect(undocumented).toEqual([])
+			})
+		}
+	})
 })
