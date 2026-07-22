@@ -91,6 +91,73 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
+	// NOTE: A contextually typed Function literal shows neither its Parameter
+	// Types nor its return Type anywhere in the source — they come from the
+	// signature it is passed to — which is exactly what a Hint is for.
+	describe("Contextual Function literals", () => {
+		it("should annotate an inferred Parameter and return Type", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (item) { <- true })",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source)).toEqual([
+				{
+					position: { line: 2, column: 15 },
+					label: ": List<Integer>",
+					kind: "type",
+				},
+				{
+					position: { line: 2, column: 46 },
+					label: ": Integer",
+					kind: "type",
+				},
+				{
+					position: { line: 2, column: 47 },
+					label: " -> Boolean",
+					kind: "type",
+				},
+			])
+		})
+
+		it("should annotate the underscore spelling too", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (_ item) { <- true })",
+				"}",
+			].join("\n")
+
+			expect(
+				hintsOf(source).filter((hint) => hint.label === ": Integer"),
+			).toHaveLength(1)
+		})
+
+		it("should not annotate what the source already writes", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept: List<Integer> = [1]::removeEvery(",
+				"\t\twhere (_ item: Integer) -> Boolean { <- true },",
+				"\t)",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source)).toEqual([])
+		})
+
+		it("should annotate a return Type inferred from the body", () => {
+			let source = [
+				"implementation {",
+				"\tconstant describe = (_ value: Integer) { <- value::toString() }",
+				"}",
+			].join("\n")
+
+			expect(
+				hintsOf(source).filter((hint) => hint.label === " -> String"),
+			).toHaveLength(1)
+		})
+	})
+
 	it("should restrict Hints to the requested line range", () => {
 		let source = [
 			"implementation {",

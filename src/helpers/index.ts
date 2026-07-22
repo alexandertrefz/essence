@@ -614,9 +614,12 @@ function matchTypes(
 // in the Enricher can report Diagnostics, so `getType` is only invoked for
 // Arguments whose label already matched, exactly like the previous inline
 // checks did.
+// `expectedType` is the parameter's Type with whatever has been inferred so
+// far substituted in. A Function literal that omitted its annotations reads
+// them off it; every other Argument ignores it entirely.
 export type MatchableArgument = {
 	name: string | null
-	getType: () => common.Type
+	getType: (expectedType: common.Type) => common.Type
 }
 
 export type ArgumentMatchResult =
@@ -656,9 +659,26 @@ export function matchArguments(
 		let parameter = parameters[i]
 		let argument = matchableArguments[i]
 
+		// NOTE: Arguments bind left to right, so by the time a callback is
+		// reached the Generics its Parameters mention have usually been bound
+		// by earlier Arguments — substituting them is what turns `map`'s
+		// declared `(_ item: ItemType) -> Result` into the `(_ item: Integer)
+		// -> Result` the literal is actually resolved against.
+		let expectedType =
+			inferenceContext === null
+				? parameter.type
+				: applyGenericBindings(
+						parameter.type,
+						inferenceContext.bindings,
+					)
+
 		if (
 			parameter.name !== argument.name ||
-			!matchTypes(parameter.type, argument.getType(), inferenceContext)
+			!matchTypes(
+				parameter.type,
+				argument.getType(expectedType),
+				inferenceContext,
+			)
 		) {
 			if (!options.collectAllMismatches) {
 				return {

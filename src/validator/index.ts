@@ -383,12 +383,18 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	}
 
 	for (let handler of node.handlers) {
+		// NOTE: Synthetic — a Match handler is validated as if it were a
+		// Function body so that its `<-` Statements are checked against the
+		// Match's Type. It has no Parameter list of its own, so nothing here
+		// is ever inferred or hinted.
 		let handlerContext: common.typed.FunctionDefinitionNode = {
 			nodeType: "FunctionDefinition",
 			generics: [],
 			parameters: [],
 			body: handler.body,
 			returnType: node.type,
+			inferredReturnType: null,
+			parameterListPosition: node.position,
 		}
 
 		for (let bodyNode of handler.body) {

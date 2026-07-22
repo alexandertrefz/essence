@@ -1,4 +1,4 @@
-import { reportError } from "../diagnostics/index"
+import { collectDiagnostics, reportError } from "../diagnostics/index"
 import { flattenUnionMembers, matchesType } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import {
@@ -9,6 +9,9 @@ import {
 	resolveChoiceDeclarationStatementType,
 	resolveCombinationType,
 	resolveFunctionInvocation,
+	contextualFunctionTypeOf,
+	registerBodyReturnTypeInference,
+	resolveDeclaredType,
 	resolveFunctionValueType,
 	resolveListValueType,
 	resolveMethodInvocation,
@@ -246,7 +249,7 @@ export function enrichMethodFunctionDefinition(
 
 	// NOTE: Resolved before the body so that `<-` Expressions can consult it
 	// — a bare Case resolves against the declared return Type first.
-	let returnType = resolveType(method.value.returnType, newScope)
+	let returnType = resolveDeclaredType(method.value.returnType, newScope)
 	newScope.expectedReturnType = returnType
 
 	return {
@@ -259,6 +262,10 @@ export function enrichMethodFunctionDefinition(
 		),
 		body: method.value.body.map((node) => enrichNode(node, newScope)),
 		returnType,
+		// NOTE: A Method always writes its annotations — the Parser only
+		// allows omitting them for a literal in expression position.
+		inferredReturnType: null,
+		parameterListPosition: method.value.parameterListPosition,
 	}
 }
 
@@ -304,21 +311,38 @@ export function enrichFunctionDefinition(
 		protocols: {},
 	}
 
+	// NOTE: A literal that omitted its annotations was already resolved
+	// against the expected signature while the invocation was matched; this
+	// pass reads that back rather than re-deriving it, because here the
+	// expected Type is gone.
+	let contextualType = contextualFunctionTypeOf(node, scope)
+
 	// NOTE: Resolved before the body so that `<-` Expressions can consult it
 	// — a bare Case resolves against the declared return Type first.
-	let returnType = resolveType(node.returnType, newScope)
+	let returnType =
+		contextualType?.returnType ??
+		(node.returnType === null
+			? { type: "Error" as const }
+			: resolveType(node.returnType, newScope))
+
 	newScope.expectedReturnType = returnType
 
 	return {
 		nodeType: "FunctionDefinition",
-		parameters: node.parameters.map((parameter) =>
-			enrichParameter(parameter, newScope),
+		parameters: node.parameters.map((parameter, index) =>
+			enrichParameter(
+				parameter,
+				newScope,
+				contextualType?.parameterTypes[index],
+			),
 		),
 		generics: node.generics.map((generic) =>
 			enrichGenericDeclarationNode(generic, scope),
 		),
 		body: node.body.map((node) => enrichNode(node, newScope)),
 		returnType,
+		inferredReturnType: node.returnType === null ? returnType : null,
+		parameterListPosition: node.parameterListPosition,
 	}
 }
 
@@ -1229,8 +1253,15 @@ function enrichMethods(
 function enrichParameter(
 	node: parser.ParameterNode,
 	scope: enricher.Scope,
+	// NOTE: Set for an unannotated Parameter, whose Type and label both came
+	// from the expected signature rather than from anything written here.
+	contextualParameter?: common.Parameter,
 ): common.typed.ParameterNode {
-	let type = resolveType(node.type, scope)
+	let type =
+		contextualParameter?.type ??
+		(node.type === null
+			? { type: "Error" as const }
+			: resolveType(node.type, scope))
 
 	// NOTE: `_: Type` binds no name, so there is nothing to declare — leaving
 	// it out of Scope is what makes the Parameter unreferenceable rather than
@@ -1248,6 +1279,7 @@ function enrichParameter(
 			? enrichIdentifier(node.internalName, scope)
 			: null,
 		position: node.position,
+		inferredType: node.type === null ? type : null,
 	}
 }
 
@@ -1262,4 +1294,111 @@ function enrichMember(
 		type: resolveType(node, scope),
 	}
 }
+// #endregion
+
+// #region Body Return Type Inference
+
+// NOTE: Every `<-` the body reaches, ignoring those belonging to a nested
+// Function literal — those return out of their own literal, not this one.
+function collectReturnedTypes(
+	nodes: Array<common.typed.ImplementationNode>,
+	types: Array<common.Type>,
+): void {
+	for (let node of nodes) {
+		switch (node.nodeType) {
+			case "ReturnStatement":
+				types.push(node.expression.type)
+				break
+			case "IfElseStatement":
+				collectReturnedTypes(node.trueBody, types)
+				collectReturnedTypes(node.falseBody, types)
+				break
+			case "IfStatement":
+				collectReturnedTypes(node.body, types)
+				break
+			default:
+				break
+		}
+	}
+}
+
+// NOTE: One `<-` gives its Type outright; several give the Union of the
+// distinct ones, which is what a Function returning either a value or
+// `nothing` needs.
+function unionOfTypes(types: Array<common.Type>): common.Type | null {
+	let distinct: Array<common.Type> = []
+
+	for (let type of types) {
+		let members =
+			type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+
+		for (let member of members) {
+			if (!distinct.some((existing) => matchesType(existing, member))) {
+				distinct.push(member)
+			}
+		}
+	}
+
+	if (distinct.length === 0) {
+		return null
+	}
+
+	if (distinct.length === 1) {
+		return distinct[0]
+	}
+
+	return { type: "UnionType", types: distinct }
+}
+
+// NOTE: Installed into the Resolver, which needs a body enriched to know what
+// the literal returns but can not import this module. The body is enriched
+// twice as a result — once here to find the Type, once for real once it is
+// known — so this pass's Diagnostics are collected and dropped rather than
+// reported. `collectDiagnostics` exists for exactly this.
+registerBodyReturnTypeInference((node, parameterTypes, scope) => {
+	let { result } = collectDiagnostics(() => {
+		let inferenceScope: enricher.Scope = {
+			parent: scope,
+			members: {},
+			constants: new Set<string>(),
+			types: {},
+			protocols: {},
+		}
+
+		node.parameters.forEach((parameter, index) => {
+			let type = parameterTypes[index]?.type ?? { type: "Error" as const }
+
+			if (parameter.internalName !== null) {
+				declareVariableInScope(
+					parameter.internalName,
+					type,
+					inferenceScope,
+					true,
+				)
+			}
+		})
+
+		// NOTE: No `expectedReturnType` is seeded — there is none yet, which
+		// is the whole reason this runs. A bare Case in return position has
+		// nothing to resolve against and stays unresolved, so a literal
+		// returning one still has to write its `-> Type`.
+		let types: Array<common.Type> = []
+
+		collectReturnedTypes(
+			node.body.map((bodyNode) => enrichNode(bodyNode, inferenceScope)),
+			types,
+		)
+
+		// NOTE: A body that returns nothing at all is left to the Validator,
+		// which reports the missing return against the Function itself.
+		if (types.some((type) => type.type === "Error")) {
+			return null
+		}
+
+		return unionOfTypes(types)
+	})
+
+	return result
+})
+
 // #endregion

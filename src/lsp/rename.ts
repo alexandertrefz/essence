@@ -1135,11 +1135,17 @@ function walkNamespaceDefinition(
 	}
 }
 
+// NOTE: Null for an annotation a contextually typed Function literal omitted —
+// there is no Type written down, so there is no name in it to rename.
 function walkTypeDeclaration(
-	node: parser.TypeDeclarationNode,
+	node: parser.TypeDeclarationNode | null,
 	scope: Scope,
 	context: WalkContext,
 ) {
+	if (node === null) {
+		return
+	}
+
 	switch (node.nodeType) {
 		case "IdentifierTypeDeclaration":
 			reference(scope, "types", node.type, context)

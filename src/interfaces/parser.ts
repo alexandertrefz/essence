@@ -501,24 +501,39 @@ export interface GenericTypeDeclarationNode {
 	position: Position
 }
 
+// NOTE: `returnType` is null for a Function literal in Argument position that
+// omitted its `-> Type` — the Type comes from the expected signature, or from
+// the body when the expected signature leaves it Generic. Only
+// `parseFunctionLiteral` reached from expression position can produce a null;
+// every Declaration still parses its annotation.
 export interface FunctionDefinitionNode {
 	nodeType: "FunctionDefinition"
 	parameters: Array<ParameterNode>
 	generics: Array<GenericDeclarationNode>
-	returnType: TypeDeclarationNode
+	returnType: TypeDeclarationNode | null
 	body: Array<ImplementationNode>
 	documentation: Documentation | null
+	// NOTE: Where an omitted `-> Type` would have been written — the end of
+	// the Parameter list. Carried so that an Inlay Hint for an inferred return
+	// Type has somewhere to sit.
+	parameterListPosition: Position
 }
 
 // NOTE: `internalName` is null for `_: Type`, which binds no name at all —
 // the Parameter is positional and unreferenceable. That is what Function Types
 // (where a name could never be referred to) and deliberately ignored
 // Parameters need. `_ name: Type` still binds `name`, it only drops the label.
+//
+// `type` is null for an unannotated Parameter of a contextually typed Function
+// literal. Such a Parameter takes both its Type *and* its label from the
+// expected signature, which is why `externalName` is null alongside it — in
+// `(item) { … }` there is no label to read off the source, and writing one
+// would have nothing to agree with.
 export interface ParameterNode {
 	nodeType: "Parameter"
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode | null
-	type: TypeDeclarationNode
+	type: TypeDeclarationNode | null
 	position: Position
 	documentation: Documentation | null
 }
