@@ -57,9 +57,7 @@ describe("LSP", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Constant 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
 		it("should not run the Validator when the Enricher reported errors", () => {

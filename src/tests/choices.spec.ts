@@ -215,13 +215,17 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation: CalculatorOperation = { left = 1, right = 1 }
 				}`),
-			).toContain("Wrong Assignment Value Type for Constant 'operation'.")
+			).toContain(
+				"This value does not fit the declared Type of Constant 'operation'",
+			)
 
 			expect(
 				messagesOf(`implementation { ${calculatorChoice}
 					constant record: { left: Integer, right: Integer } = CalculatorOperation#Add({ left = 1, right = 1 })
 				}`),
-			).toContain("Wrong Assignment Value Type for Constant 'record'.")
+			).toContain(
+				"This value does not fit the declared Type of Constant 'record'",
+			)
 		})
 
 		it("keeps Cases of different Choices apart", () => {
@@ -232,7 +236,9 @@ describe("Choices", () => {
 
 					constant command: A = B#Go({ speed = 1 })
 				}`),
-			).toContain("Wrong Assignment Value Type for Constant 'command'.")
+			).toContain(
+				"This value does not fit the declared Type of Constant 'command'",
+			)
 		})
 
 		it("rejects an empty Choice", () => {
@@ -461,7 +467,7 @@ describe("Choices", () => {
 			}`)
 
 			expect(messages).toContain(
-				"Wrong Assignment Value Type for Constant 'command'.",
+				"This value does not fit the declared Type of Constant 'command'",
 			)
 			expect(messages).not.toContain(
 				"No Choice in scope declares a Case '#Go'.",
