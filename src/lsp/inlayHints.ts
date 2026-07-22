@@ -56,7 +56,11 @@ function visitNode(
 			// NOTE: `declaredType` is set exactly when the source spelled the
 			// Type out — annotating an annotated declaration would be noise.
 			// A failed inference is left alone rather than shown as `Error`.
-			if (node.declaredType === null && node.type.type !== "Error") {
+			if (
+				node.declaredType === null &&
+				node.type.type !== "Error" &&
+				!writesItsOwnType(node.value)
+			) {
 				hints.push({
 					position: node.name.position.end,
 					label: `: ${printType(node.type)}`,
@@ -160,6 +164,24 @@ function visitNode(
 		case "NothingValue":
 			return
 	}
+}
+
+// NOTE: A Function literal that annotates itself in full already shows its
+// whole Type at the declaration — repeating that Type beside the name says
+// nothing the line does not already say, and says it at the width of a
+// signature. A literal that left an annotation out is the opposite case: the
+// hint beside the name is then the only place the Type appears, so it stays.
+function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
+	if (value.nodeType !== "FunctionValue") {
+		return false
+	}
+
+	return (
+		value.value.inferredReturnType === null &&
+		value.value.parameters.every(
+			(parameter) => parameter.inferredType === null,
+		)
+	)
 }
 
 // NOTE: `inferredType` and `inferredReturnType` are set exactly when the

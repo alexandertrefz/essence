@@ -48,20 +48,20 @@ implementation {
 	§ The same call with a body returning a Boolean binds `Target` to Boolean.
 	__print(numbers::transformFirst((item) { <- item::isGreaterThan(0) }, fallback false))
 
-	§ A literal that is not an Argument has no expected signature at all, but
-	§ its Parameters are written — so only the return Type has to be inferred.
-	constant halve = (_ value: Integer) { <- value::divideBy(2) }
-
-	__print(halve(9))
-
 	§ Several `<-` Statements give the Union of what they return.
-	constant doubleIfPositive = (_ value: Integer) {
-		if value::isGreaterThan(0) { <- value::multiplyWith(2) }
+	__print(numbers::transformFirst((item) {
+		if item::isGreaterThan(0) { <- item::multiplyWith(2) }
 
 		<- nothing
+	}, fallback nothing))
+
+	§ A literal that is not an Argument has no expected signature anywhere, so
+	§ it writes its annotations in full — inferring a whole signature from a
+	§ body is what makes a Program hard to follow.
+	constant halve = (_ value: Integer) -> Rational | Nothing {
+		<- value::divideBy(2)
 	}
 
-	__print(doubleIfPositive(5))
-	__print(doubleIfPositive(0))
+	__print(halve(9))
 
 }

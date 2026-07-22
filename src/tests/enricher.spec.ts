@@ -613,24 +613,18 @@ describe("Enricher", () => {
 				])
 			})
 
-			it("infers the return Type from the body with no context at all", () => {
+			it("reports an omitted return Type outside Argument position", () => {
+				// NOTE: The body could answer this one — every Parameter is
+				// written — but a Type read off a body that nothing else
+				// constrains is what makes a Program hard to follow. Only an
+				// Argument, whose Type is written down elsewhere, may omit it.
 				expect(
-					typeOfFirstConstant(`implementation {
+					diagnosticsFor(`implementation {
 						constant describe = (_ value: Integer) { <- value::toString() }
-					}`),
-				).toEqual({
-					type: "Function",
-					generics: [],
-					parameterTypes: [
-						{
-							name: null,
-							type: { type: "Integer" },
-							documentation: undefined,
-						},
-					],
-					returnType: { type: "String" },
-					documentation: undefined,
-				})
+					}`).map((diagnostic) => diagnostic.message),
+				).toEqual([
+					"A Function that is not passed as an Argument must write its return Type — only an Argument takes its Types from the surrounding context.",
+				])
 			})
 
 			it("reports more Parameters than the expected signature takes", () => {
@@ -673,29 +667,25 @@ describe("Enricher", () => {
 			it("unions the Types of several returns", () => {
 				expect(
 					typeOfFirstConstant(`implementation {
-						constant maybeDouble = (_ value: Integer) {
+						namespace Mapper<infer Item> for List<Item> {
+							transformFirst<infer Target>(
+								_ transform: (_ item: Item) -> Target,
+							) -> Target {
+								<- transform(1)
+							}
+						}
+
+						constant maybeDouble = [1]::transformFirst((value) {
 							if value::isGreaterThan(0) {
 								<- value::multiplyWith(2)
 							}
 
 							<- nothing
-						}
+						})
 					}`),
 				).toEqual({
-					type: "Function",
-					generics: [],
-					parameterTypes: [
-						{
-							name: null,
-							type: { type: "Integer" },
-							documentation: undefined,
-						},
-					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Integer" }, { type: "Nothing" }],
-					},
-					documentation: undefined,
+					type: "UnionType",
+					types: [{ type: "Integer" }, { type: "Nothing" }],
 				})
 			})
 
