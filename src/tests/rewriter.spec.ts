@@ -5679,6 +5679,34 @@ describe("Rewriter", () => {
 					string.createString("1/2"),
 				)
 			})
+
+			it("orders with the isLessThan family, reading compareTo", () => {
+				// NOTE: 1/2 < 1, so the strict pair splits and the
+				// or-equal-to pair follows the strict one.
+				expect(
+					number.isLessThan(rationalOneHalf(), integerOne()).value,
+				).toBe(true)
+				expect(
+					number.isGreaterThan(rationalOneHalf(), integerOne()).value,
+				).toBe(false)
+				expect(
+					number.isLessThanOrEqualTo(rationalOneHalf(), integerOne())
+						.value,
+				).toBe(true)
+
+				// NOTE: 1 == 1/1, so only the or-equal-to members hold.
+				expect(
+					number.isLessThan(integerOne(), rationalOne()).value,
+				).toBe(false)
+				expect(
+					number.isLessThanOrEqualTo(integerOne(), rationalOne())
+						.value,
+				).toBe(true)
+				expect(
+					number.isGreaterThanOrEqualTo(integerOne(), rationalOne())
+						.value,
+				).toBe(true)
+			})
 		})
 
 		describe("Union Method dispatch", () => {

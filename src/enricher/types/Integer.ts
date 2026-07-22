@@ -91,6 +91,50 @@ export const namespace: common.NamespaceType = {
 						position: null,
 					},
 				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Algebraic" },
+							documentation: "the Algebraic to add",
+						},
+					],
+					returnType: { type: "Algebraic" },
+					documentation: {
+						description:
+							"Adds an Algebraic to an Integer. Shifting the rational part of `a + b·√d` leaves the radical untouched, so the sum is exact.",
+						parameters: {},
+						returns: null,
+						position: null,
+					},
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Integer" },
+						},
+						{
+							name: null,
+							type: { type: "Transcendental" },
+							documentation: "the Transcendental to add",
+						},
+					],
+					returnType: { type: "Transcendental" },
+					documentation: {
+						description:
+							"Adds a Transcendental to an Integer. Shifting the rational part of `a + b·π` leaves the π term untouched, so the sum is exact.",
+						parameters: {},
+						returns: null,
+						position: null,
+					},
+				},
 			],
 			documentation: {
 				description: "Adds a number to this Integer.",
