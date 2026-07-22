@@ -160,6 +160,196 @@ export const namespace: common.NamespaceType = {
 		} as common.MethodType,
 		...orderingMethods(type),
 
+		sum: {
+			type: "OverloadedStaticMethod",
+			overloads: [
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Integer" },
+							},
+						},
+					],
+					returnType: { type: "Integer" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Rational" },
+							},
+						},
+					],
+					returnType: { type: "Rational" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: {
+									type: "UnionType",
+									types: [
+										{ type: "Integer" },
+										{ type: "Rational" },
+									],
+								},
+							},
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "Rational" }],
+					},
+				},
+			],
+			documentation: {
+				description:
+					"Adds up every Number in the List. The empty List sums to zero.",
+				parameters: {},
+				returns: "the exact total.",
+				position: null,
+			},
+		},
+
+		product: {
+			type: "OverloadedStaticMethod",
+			overloads: [
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Integer" },
+							},
+						},
+					],
+					returnType: { type: "Integer" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Rational" },
+							},
+						},
+					],
+					returnType: { type: "Rational" },
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: {
+									type: "UnionType",
+									types: [
+										{ type: "Integer" },
+										{ type: "Rational" },
+									],
+								},
+							},
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "Rational" }],
+					},
+				},
+			],
+			documentation: {
+				description:
+					"Multiplies every Number in the List together. The empty List multiplies to one.",
+				parameters: {},
+				returns: "the exact product.",
+				position: null,
+			},
+		},
+
+		average: {
+			type: "OverloadedStaticMethod",
+			overloads: [
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Integer" },
+							},
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Rational" }, { type: "Nothing" }],
+					},
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: { type: "Rational" },
+							},
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Rational" }, { type: "Nothing" }],
+					},
+				},
+				{
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: {
+								type: "List",
+								itemType: {
+									type: "UnionType",
+									types: [
+										{ type: "Integer" },
+										{ type: "Rational" },
+									],
+								},
+							},
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Rational" }, { type: "Nothing" }],
+					},
+				},
+			],
+			documentation: {
+				description:
+					"The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational.",
+				parameters: {},
+				returns:
+					"the mean, or `Nothing` for the empty List — no Numbers have no mean.",
+				position: null,
+			},
+		},
+
 		lowestNumber: {
 			type: "OverloadedStaticMethod",
 			overloads: [

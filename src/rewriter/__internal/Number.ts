@@ -4,6 +4,7 @@ import type { AlgebraicType } from "./Algebraic"
 import {
 	compareTo as compareAlgebraicTo,
 	is as algebraicIs,
+	reduced,
 	toString as algebraicToString,
 } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
@@ -366,6 +367,155 @@ export function greatestNumber__overload$7(
 		return createInteger(greatestNumber.value)
 	}
 }
+
+// #endregion
+
+// #region Aggregates
+
+// NOTE: The exact running total as a bigint rational — the one shape every
+// mix of Integers and Rationals folds into without loss.
+function addToRunningTotal(
+	total: { numerator: bigint; denominator: bigint },
+	number: IntegerType | RationalType,
+): { numerator: bigint; denominator: bigint } {
+	if (number[typeKeySymbol] === "Integer") {
+		return {
+			numerator: total.numerator + number.value * total.denominator,
+			denominator: total.denominator,
+		}
+	}
+
+	return {
+		numerator:
+			total.numerator * number.rational.denominator +
+			number.rational.numerator * total.denominator,
+		denominator: total.denominator * number.rational.denominator,
+	}
+}
+
+function multiplyIntoRunningProduct(
+	product: { numerator: bigint; denominator: bigint },
+	number: IntegerType | RationalType,
+): { numerator: bigint; denominator: bigint } {
+	if (number[typeKeySymbol] === "Integer") {
+		return {
+			numerator: product.numerator * number.value,
+			denominator: product.denominator,
+		}
+	}
+
+	return {
+		numerator: product.numerator * number.rational.numerator,
+		denominator: product.denominator * number.rational.denominator,
+	}
+}
+
+export function sum__overload$1(integers: ListType<IntegerType>): IntegerType {
+	let total = 0n
+
+	for (let integer of integers.value) {
+		total += integer.value
+	}
+
+	return createInteger(total)
+}
+
+export function sum__overload$2(
+	rationals: ListType<RationalType>,
+): RationalType {
+	let total = { numerator: 0n, denominator: 1n }
+
+	for (let rational of rationals.value) {
+		total = addToRunningTotal(total, rational)
+	}
+
+	return createRational(total.numerator, total.denominator)
+}
+
+export function sum__overload$3(
+	numbers: ListType<IntegerType | RationalType>,
+): IntegerType | RationalType {
+	let total = { numerator: 0n, denominator: 1n }
+
+	for (let number of numbers.value) {
+		total = addToRunningTotal(total, number)
+	}
+
+	// NOTE: A mixed List may still add up to a whole number — surface it as
+	// one, like `lowestNumber` surfaces whichever member won.
+	const reducedTotal = reduced(total.numerator, total.denominator)
+
+	if (reducedTotal.denominator === 1n) {
+		return createInteger(reducedTotal.numerator)
+	}
+
+	return createRational(reducedTotal.numerator, reducedTotal.denominator)
+}
+
+export function product__overload$1(
+	integers: ListType<IntegerType>,
+): IntegerType {
+	let product = 1n
+
+	for (let integer of integers.value) {
+		product *= integer.value
+	}
+
+	return createInteger(product)
+}
+
+export function product__overload$2(
+	rationals: ListType<RationalType>,
+): RationalType {
+	let product = { numerator: 1n, denominator: 1n }
+
+	for (let rational of rationals.value) {
+		product = multiplyIntoRunningProduct(product, rational)
+	}
+
+	return createRational(product.numerator, product.denominator)
+}
+
+export function product__overload$3(
+	numbers: ListType<IntegerType | RationalType>,
+): IntegerType | RationalType {
+	let product = { numerator: 1n, denominator: 1n }
+
+	for (let number of numbers.value) {
+		product = multiplyIntoRunningProduct(product, number)
+	}
+
+	const reducedProduct = reduced(product.numerator, product.denominator)
+
+	if (reducedProduct.denominator === 1n) {
+		return createInteger(reducedProduct.numerator)
+	}
+
+	return createRational(reducedProduct.numerator, reducedProduct.denominator)
+}
+
+function averageOf(
+	numbers: ListType<IntegerType | RationalType>,
+): RationalType | NothingType {
+	if (numbers.value.length === 0) {
+		return createNothing()
+	}
+
+	let total = { numerator: 0n, denominator: 1n }
+
+	for (let number of numbers.value) {
+		total = addToRunningTotal(total, number)
+	}
+
+	return createRational(
+		total.numerator,
+		total.denominator * BigInt(numbers.value.length),
+	)
+}
+
+export const average__overload$1 = averageOf
+export const average__overload$2 = averageOf
+export const average__overload$3 = averageOf
 
 // #endregion
 
