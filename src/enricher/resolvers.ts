@@ -1178,9 +1178,13 @@ export function resolveCaseReference(
 
 	if (choiceType === null) {
 		reportError(
-			`Type '${choice.content}' is not declared.`,
+			`Type '${choice.content}' is not declared`,
 			choice.position,
-			{ code: "unknown-type" },
+			{
+				code: "unknown-type",
+				labels: [primary(choice.position, "no such Type")],
+				helps: suggestionHelps(choice.content, scope, "types"),
+			},
 		)
 
 		return { type: "Error" }
@@ -1544,11 +1548,10 @@ export function resolveLookupType(
 		} else if (Object.hasOwn(baseType.methods, node.member.content)) {
 			return baseType.methods[node.member.content]
 		} else {
-			reportError(
-				`Namespace '${baseType.name}' has no member '${node.member.content}'.`,
-				node.member.position,
-				{ code: "unknown-member" },
-			)
+			reportUnknownMember(node, `Namespace '${baseType.name}'`, [
+				...Object.keys(baseType.properties),
+				...Object.keys(baseType.methods),
+			])
 
 			return { type: "Error" }
 		}
@@ -1556,10 +1559,10 @@ export function resolveLookupType(
 		if (Object.hasOwn(baseType.members, node.member.content)) {
 			return baseType.members[node.member.content]
 		} else {
-			reportError(
-				`This Record has no member '${node.member.content}'.`,
-				node.member.position,
-				{ code: "unknown-member" },
+			reportUnknownMember(
+				node,
+				describeType(baseType),
+				Object.keys(baseType.members),
 			)
 
 			return { type: "Error" }
@@ -1570,10 +1573,10 @@ export function resolveLookupType(
 		if (Object.hasOwn(baseType.members, node.member.content)) {
 			return baseType.members[node.member.content]
 		} else {
-			reportError(
-				`Case '${baseType.choice}#${baseType.name}' has no member '${node.member.content}'.`,
-				node.member.position,
-				{ code: "unknown-member" },
+			reportUnknownMember(
+				node,
+				`Case '${baseType.choice}#${baseType.name}'`,
+				Object.keys(baseType.members),
 			)
 
 			return { type: "Error" }
@@ -1604,8 +1607,12 @@ export function resolveIdentifierType(
 				{ code: "protocol-as-value" },
 			)
 		} else {
-			reportError(`Variable '${name}' is not declared.`, node.position, {
+			reportError(`'${name}' is not declared`, node.position, {
 				code: "unknown-name",
+				labels: [
+					primary(node.position, "no such Variable or Constant"),
+				],
+				helps: suggestionHelps(name, scope, "members"),
 			})
 		}
 
@@ -1658,9 +1665,22 @@ export function resolveGenericDeclarations(
 			findProtocolInScope(generic.constraint.content, scope) === null
 		) {
 			reportError(
-				`Protocol '${generic.constraint.content}' is not declared.`,
+				`Protocol '${generic.constraint.content}' is not declared`,
 				generic.constraint.position,
-				{ code: "unknown-protocol" },
+				{
+					code: "unknown-protocol",
+					labels: [
+						primary(
+							generic.constraint.position,
+							"no such Protocol",
+						),
+					],
+					helps: suggestionHelps(
+						generic.constraint.content,
+						scope,
+						"protocols",
+					),
+				},
 			)
 		}
 
@@ -2263,9 +2283,17 @@ export function checkProtocolConformance(
 
 		if (protocol === null) {
 			reportError(
-				`Protocol '${identifier.content}' is not declared.`,
+				`Protocol '${identifier.content}' is not declared`,
 				identifier.position,
-				{ code: "unknown-protocol" },
+				{
+					code: "unknown-protocol",
+					labels: [primary(identifier.position, "no such Protocol")],
+					helps: suggestionHelps(
+						identifier.content,
+						scope,
+						"protocols",
+					),
+				},
 			)
 
 			continue
@@ -2438,8 +2466,10 @@ export function resolveIdentifierTypeDeclarationType(
 				{ code: "protocol-as-type" },
 			)
 		} else {
-			reportError(`Type '${name}' is not declared.`, node.position, {
+			reportError(`Type '${name}' is not declared`, node.position, {
 				code: "unknown-type",
+				labels: [primary(node.position, "no such Type")],
+				helps: suggestionHelps(name, scope, "types"),
 			})
 		}
 
@@ -2500,9 +2530,13 @@ export function resolveGenericTypeDeclarationType(
 
 		if (result === null) {
 			reportError(
-				`Type '${name}' is not declared.`,
+				`Type '${name}' is not declared`,
 				node.baseType.position,
-				{ code: "unknown-type" },
+				{
+					code: "unknown-type",
+					labels: [primary(node.baseType.position, "no such Type")],
+					helps: suggestionHelps(name, scope, "types"),
+				},
 			)
 
 			return { type: "Error" }
@@ -2567,6 +2601,68 @@ export function resolveMatchType(
 /***********/
 /* Helpers */
 /***********/
+
+// NOTE: The members the base actually has are listed rather than left for the
+// reader to go and look up — a Lookup fails most often because the member is
+// spelled differently, not because it is absent.
+function reportUnknownMember(
+	node: parser.LookupNode,
+	baseDescription: string,
+	memberNames: Array<string>,
+): void {
+	let suggestion = closestMatch(node.member.content, memberNames)
+
+	reportError(
+		`${baseDescription} has no member '${node.member.content}'`,
+		node.member.position,
+		{
+			code: "unknown-member",
+			labels: [primary(node.member.position, "no such member")],
+			notes:
+				memberNames.length === 0
+					? [`${baseDescription} has no members.`]
+					: [
+							`${baseDescription} has ${memberNames
+								.map((memberName) => `'${memberName}'`)
+								.join(", ")}.`,
+						],
+			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+		},
+	)
+}
+
+// NOTE: Every name of one kind that is visible from `scope`, innermost first
+// — what a "did you mean" is drawn from, so that a suggestion is always a
+// name the reader could actually have written here.
+function namesInScope(
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): Array<string> {
+	let names: Array<string> = []
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		names.push(...Object.keys(searchScope[kind]))
+		searchScope = searchScope.parent
+	}
+
+	return names
+}
+
+// NOTE: A near miss is a Help rather than part of the message — it is a
+// suggestion, and a message that states one as fact reads as though the
+// Compiler knows something it does not.
+function suggestionHelps(
+	name: string,
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): Array<string> {
+	let suggestion = closestMatch(name, namesInScope(scope, kind))
+
+	return suggestion === null || suggestion === name
+		? []
+		: [`Did you mean '${suggestion}'?`]
+}
 
 export function findVariableInScope(
 	name: string,
