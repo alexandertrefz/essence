@@ -677,6 +677,32 @@ export function reciprocalOf(
 	)
 }
 
+// NOTE: Negation flips both components and touches neither invariant — the
+// radicand stays squarefree and the coefficient stays non-zero, so the result
+// is an Algebraic without consulting the `createAlgebraic` gateway.
+export function negated(algebraic: AlgebraicType): AlgebraicType {
+	return {
+		[typeKeySymbol]: "Algebraic",
+		rationalPartNumerator: -algebraic.rationalPartNumerator,
+		rationalPartDenominator: algebraic.rationalPartDenominator,
+		radicalCoefficientNumerator: -algebraic.radicalCoefficientNumerator,
+		radicalCoefficientDenominator: algebraic.radicalCoefficientDenominator,
+		radicand: algebraic.radicand,
+	}
+}
+
+export function absolute(algebraic: AlgebraicType): AlgebraicType {
+	// NOTE: The sign is exactly decidable, and never zero — an Algebraic is
+	// irrational by construction.
+	const sign = signOfLinearRadical(
+		rationalPartOf(algebraic),
+		radicalCoefficientOf(algebraic),
+		algebraic.radicand,
+	)
+
+	return sign < 0n ? negated(algebraic) : algebraic
+}
+
 // #endregion
 
 // #region Printing
