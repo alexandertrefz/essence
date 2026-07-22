@@ -5,9 +5,11 @@ import type { common, parser } from "../interfaces/index"
 export function program(
 	implementation: parser.ImplementationSectionNode,
 	position: common.Position,
+	kind: parser.Program["kind"] = "implementation",
 ): parser.Program {
 	return {
 		nodeType: "Program",
+		kind,
 		implementation,
 		position,
 	}
@@ -395,6 +397,34 @@ export function namespaceDefinitionStatement(
 					methods: curr.methods,
 					documentation: curr.documentation,
 				}
+			} else if (curr.nodeType === "SimpleMethodSignatureNode") {
+				prev[curr.name.content] = {
+					nodeType: "SimpleMethodSignature",
+					name: curr.name,
+					signature: curr.signature,
+				}
+			} else if (curr.nodeType === "StaticMethodSignatureNode") {
+				prev[curr.name.content] = {
+					nodeType: "StaticMethodSignature",
+					name: curr.name,
+					signature: curr.signature,
+				}
+			} else if (curr.nodeType === "OverloadedMethodSignaturesNode") {
+				prev[curr.name.content] = {
+					nodeType: "OverloadedMethodSignatures",
+					name: curr.name,
+					methods: curr.methods,
+					documentation: curr.documentation,
+				}
+			} else if (
+				curr.nodeType === "OverloadedStaticMethodSignaturesNode"
+			) {
+				prev[curr.name.content] = {
+					nodeType: "OverloadedStaticMethodSignatures",
+					name: curr.name,
+					methods: curr.methods,
+					documentation: curr.documentation,
+				}
 			}
 		}
 
@@ -443,6 +473,23 @@ export function protocolMethodSignature(
 ): parser.ProtocolMethodSignatureNode {
 	return {
 		nodeType: "ProtocolMethodSignature",
+		parameters,
+		returnType,
+		position,
+		documentation,
+	}
+}
+
+export function nativeMethodSignature(
+	generics: Array<parser.GenericDeclarationNode>,
+	parameters: Array<parser.ParameterNode>,
+	returnType: parser.TypeDeclarationNode,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.NativeMethodSignatureNode {
+	return {
+		nodeType: "NativeMethodSignature",
+		generics,
 		parameters,
 		returnType,
 		position,
@@ -790,12 +837,40 @@ type OverloadedStaticMethodNode = {
 	documentation: common.Documentation | null
 }
 
+// NOTE: The `declarations { … }` counterparts — a body-less native signature in
+// place of the block, and overload entries that may mix the two forms.
+type SimpleMethodSignatureNode = {
+	nodeType: "SimpleMethodSignatureNode"
+	name: parser.IdentifierNode
+	signature: parser.NativeMethodSignatureNode
+}
+
+type StaticMethodSignatureNode = {
+	nodeType: "StaticMethodSignatureNode"
+	name: parser.IdentifierNode
+	signature: parser.NativeMethodSignatureNode
+}
+
+type OverloadedMethodSignaturesNode = {
+	nodeType: "OverloadedMethodSignaturesNode"
+	name: parser.IdentifierNode
+	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>
+	documentation: common.Documentation | null
+}
+
+type OverloadedStaticMethodSignaturesNode = {
+	nodeType: "OverloadedStaticMethodSignaturesNode"
+	name: parser.IdentifierNode
+	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>
+	documentation: common.Documentation | null
+}
+
 type NamespaceProperty = {
 	nodeType: "NamespacePropertyNode"
 	name: parser.IdentifierNode
 	documentation: common.Documentation | null
 	type: parser.TypeDeclarationNode | null
-	value: parser.ExpressionNode
+	value: parser.ExpressionNode | null
 }
 
 type NamespaceProperties = Record<string, parser.NamespacePropertyNode>
@@ -805,5 +880,9 @@ type NamespaceMethod =
 	| StaticMethodNode
 	| OverloadedMethodNode
 	| OverloadedStaticMethodNode
+	| SimpleMethodSignatureNode
+	| StaticMethodSignatureNode
+	| OverloadedMethodSignaturesNode
+	| OverloadedStaticMethodSignaturesNode
 
 // #endregion

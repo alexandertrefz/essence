@@ -49,6 +49,12 @@ A Parameter of a Function that takes its Types from the surrounding context
 was given both an external and an internal name. Such a Parameter takes its
 label from the expected Function Type; write only its name.
 
+### `declarations-outside-stdlib`
+
+A file opened with `declarations { … }`, the standard library's private
+Program form for body-less native Method signatures. Only the standard library
+may open one — write `implementation { … }` instead.
+
 ## Names
 
 ### `duplicate-variable`

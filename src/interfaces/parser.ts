@@ -2,6 +2,11 @@ import type { Documentation, Position } from "./common/index"
 
 export type Program = {
 	nodeType: "Program"
+	// NOTE: `declarations { … }` is the standard library's opt-in program form —
+	// its Namespace bodies may hold body-less native Method signatures and
+	// value-less static Properties. Every user Program is `implementation { … }`
+	// and can never declare a native.
+	kind: "implementation" | "declarations"
 	implementation: ImplementationSectionNode
 	position: Position
 }
@@ -297,16 +302,69 @@ export interface OverloadedStaticMethod {
 	documentation: Documentation | null
 }
 
+// NOTE: A body-less native Method signature — the `declarations { … }` form of
+// a Method. It carries the same shape as a bodied Method minus the block: an
+// optional Generic list, a Parameter list and a return Type. Only the standard
+// library's Namespace bodies produce these; a user Program never can.
+export interface NativeMethodSignatureNode {
+	nodeType: "NativeMethodSignature"
+	generics: Array<GenericDeclarationNode>
+	parameters: Array<ParameterNode>
+	returnType: TypeDeclarationNode
+	position: Position
+	documentation: Documentation | null
+}
+
+export interface SimpleMethodSignature {
+	nodeType: "SimpleMethodSignature"
+	name: IdentifierNode
+	signature: NativeMethodSignatureNode
+}
+
+export interface StaticMethodSignature {
+	nodeType: "StaticMethodSignature"
+	name: IdentifierNode
+	signature: NativeMethodSignatureNode
+}
+
+// NOTE: An `overload` block in a `declarations { … }` Program may MIX bodied
+// and body-less entries — one overload implemented in Essence, another bound to
+// the runtime by name. Each entry is therefore either a Function literal or a
+// native signature.
+export interface OverloadedMethodSignatures {
+	nodeType: "OverloadedMethodSignatures"
+	name: IdentifierNode
+	methods: Array<FunctionValueNode | NativeMethodSignatureNode>
+	documentation: Documentation | null
+}
+
+export interface OverloadedStaticMethodSignatures {
+	nodeType: "OverloadedStaticMethodSignatures"
+	name: IdentifierNode
+	methods: Array<FunctionValueNode | NativeMethodSignatureNode>
+	documentation: Documentation | null
+}
+
 export type NamespaceMethods = Record<
 	string,
-	SimpleMethod | StaticMethod | OverloadedMethod | OverloadedStaticMethod
+	| SimpleMethod
+	| StaticMethod
+	| OverloadedMethod
+	| OverloadedStaticMethod
+	| SimpleMethodSignature
+	| StaticMethodSignature
+	| OverloadedMethodSignatures
+	| OverloadedStaticMethodSignatures
 >
 
+// NOTE: `value` is null only for a native static Property in a
+// `declarations { … }` Program — `static PI: Transcendental` with no `=`. Every
+// static Property in a user Program still parses its `= value`.
 export interface NamespacePropertyNode {
 	name: IdentifierNode
 	documentation: Documentation | null
 	type: TypeDeclarationNode | null
-	value: ExpressionNode
+	value: ExpressionNode | null
 }
 
 export interface NamespaceDefinitionStatementNode {
