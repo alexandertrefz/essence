@@ -192,7 +192,9 @@ function namespaceMembers(
 			kind: "property",
 			range: unionOfPositions(
 				property.name.position,
-				property.value.position,
+				// NOTE: A native static Property has no value to span to — its
+				// range is then just its name.
+				property.value?.position ?? property.name.position,
 			),
 			selectionRange: property.name.position,
 			children: [],
@@ -202,13 +204,20 @@ function namespaceMembers(
 	for (let member of Object.values(node.methods)) {
 		let methods =
 			member.nodeType === "OverloadedMethod" ||
-			member.nodeType === "OverloadedStaticMethod"
+			member.nodeType === "OverloadedStaticMethod" ||
+			member.nodeType === "OverloadedMethodSignatures" ||
+			member.nodeType === "OverloadedStaticMethodSignatures"
 				? member.methods
-				: [member.method]
+				: member.nodeType === "SimpleMethodSignature" ||
+					  member.nodeType === "StaticMethodSignature"
+					? [member.signature]
+					: [member.method]
 
 		let isStatic =
 			member.nodeType === "StaticMethod" ||
-			member.nodeType === "OverloadedStaticMethod"
+			member.nodeType === "OverloadedStaticMethod" ||
+			member.nodeType === "StaticMethodSignature" ||
+			member.nodeType === "OverloadedStaticMethodSignatures"
 
 		// NOTE: The Method wrappers carry no Position of their own — the
 		// range is the span from the name to the end of the last overload.

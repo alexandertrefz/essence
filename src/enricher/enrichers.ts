@@ -1000,6 +1000,15 @@ export function enrichNamespaceDefinitionStatement(
 		let result: Record<string, common.typed.NamespaceProperty> = {}
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
+			// NOTE: A value-less native static Property only ever appears in a
+			// `declarations { … }` Program, which the Enricher does not process
+			// yet — Commit 3 wires it.
+			if (propertyValue.value === null) {
+				throw new Error(
+					"Native static Property reached the Enricher before it was wired",
+				)
+			}
+
 			let type: common.Type
 			let value: common.typed.ExpressionNode = enrichExpression(
 				propertyValue.value,
@@ -1621,7 +1630,7 @@ function enrichMethods(
 					injected,
 				),
 			}
-		} else {
+		} else if (memberValue.nodeType === "OverloadedStaticMethod") {
 			result[memberKey] = {
 				nodeType: "OverloadedStaticMethod",
 				name,
@@ -1632,6 +1641,13 @@ function enrichMethods(
 					injected,
 				),
 			}
+		} else {
+			// NOTE: The body-less native Method forms only ever appear in a
+			// `declarations { … }` Program, which the Enricher does not process
+			// yet — Commit 3 wires them.
+			throw new Error(
+				`Native Method signature '${memberValue.nodeType}' reached the Enricher before it was wired`,
+			)
 		}
 	}
 
@@ -3335,6 +3351,15 @@ export function resolveNamespaceDefinitionStatementType(
 	let methods: Record<string, common.MethodType> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
+		// NOTE: A value-less native static Property only ever appears in a
+		// `declarations { … }` Program, which the Enricher does not process yet —
+		// Commit 3 wires it.
+		if (memberValue.value === null) {
+			throw new Error(
+				"Native static Property reached the Enricher before it was wired",
+			)
+		}
+
 		// NOTE: A property's Type is its value's, read off the enriched
 		// Expression — the same walk the Node build uses, so the two agree.
 		// Enriching an Expression declares nothing, so this is safe under the
