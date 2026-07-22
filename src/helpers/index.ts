@@ -535,11 +535,29 @@ export type ConformanceCheckResult =
 	| { kind: "conforms"; methodMap: ConformanceMethodMap }
 	| { kind: "missing"; methodName: string }
 	| { kind: "mismatched"; methodName: string }
+	// NOTE: The fulfilling Method matches the Protocol's signature, but carries
+	// a Protocol bound of its own (`<infer Item is Comparable>`) that the
+	// conformance has not been told to assume. The conformance is sound only
+	// *conditionally* — under a `where` clause supplying that bound — so it can
+	// not be granted unconditionally. This is what keeps a generic Namespace's
+	// blanket conformance honest: `List is Comparable` needs `where Item is
+	// Comparable`, and until it says so, this reports which bound is missing.
+	| {
+			kind: "needs-condition"
+			methodName: string
+			genericName: string
+			protocolName: string
+	  }
 
+// NOTE: `assumptions` maps a Generic name to the Protocol the conformance is
+// allowed to assume it satisfies (from a `where` clause). A fulfilling Method
+// whose own Generic carries a bound absent from this map can not fulfill
+// unconditionally — see the `needs-condition` result.
 export function computeConformanceMethodMap(
 	protocol: common.ProtocolType,
 	namespace: common.NamespaceType,
 	target: common.Type,
+	assumptions: ReadonlyMap<string, string> = new Map(),
 ): ConformanceCheckResult {
 	let methodMap: ConformanceMethodMap = {}
 	let selfBindings: GenericBindings = new Map([["Self", target]])
@@ -562,35 +580,47 @@ export function computeConformanceMethodMap(
 			substituted.type === "SimpleMethod" ||
 			substituted.type === "StaticMethod"
 		) {
-			let fulfillingName = findFulfillingMethodName(
+			let fulfilling = findFulfillingMethod(
 				methodName,
 				substituted,
 				substituted.type === "StaticMethod",
 				implementation,
 			)
 
-			if (fulfillingName === null) {
+			if (fulfilling === null) {
 				return { kind: "mismatched", methodName }
 			}
 
-			methodMap[methodName] = fulfillingName
+			let bound = firstUnassumedBound(fulfilling.method, assumptions)
+
+			if (bound !== null) {
+				return { kind: "needs-condition", methodName, ...bound }
+			}
+
+			methodMap[methodName] = fulfilling.name
 		} else {
 			let requiresStatic = substituted.type === "OverloadedStaticMethod"
 
 			for (let [index, overload] of substituted.overloads.entries()) {
-				let fulfillingName = findFulfillingMethodName(
+				let fulfilling = findFulfillingMethod(
 					methodName,
 					overload,
 					requiresStatic,
 					implementation,
 				)
 
-				if (fulfillingName === null) {
+				if (fulfilling === null) {
 					return { kind: "mismatched", methodName }
 				}
 
+				let bound = firstUnassumedBound(fulfilling.method, assumptions)
+
+				if (bound !== null) {
+					return { kind: "needs-condition", methodName, ...bound }
+				}
+
 				methodMap[resolveOverloadedMethodName(methodName, index)] =
-					fulfillingName
+					fulfilling.name
 			}
 		}
 	}
@@ -598,16 +628,38 @@ export function computeConformanceMethodMap(
 	return { kind: "conforms", methodMap }
 }
 
+// NOTE: The first bound the fulfilling Method carries that the conformance was
+// not told to assume — `null` when every bound is covered (or there are none).
+function firstUnassumedBound(
+	method: common.BaseFunction,
+	assumptions: ReadonlyMap<string, string>,
+): { genericName: string; protocolName: string } | null {
+	for (let generic of method.generics) {
+		if (
+			generic.constraint != null &&
+			assumptions.get(generic.name) !== generic.constraint
+		) {
+			return {
+				genericName: generic.name,
+				protocolName: generic.constraint,
+			}
+		}
+	}
+
+	return null
+}
+
 // NOTE: A Simple requirement is fulfilled by a Simple Method or by the first
 // matching overload of an Overloaded one — mirroring how invocations resolve
 // their overload. Staticness must agree; the emitted name of the fulfilling
-// Method (with its own overload suffix) is returned.
-function findFulfillingMethodName(
+// Method (with its own overload suffix) and the Method itself are returned, the
+// latter so its own Protocol bounds can be inspected.
+function findFulfillingMethod(
 	methodName: string,
 	requirement: common.BaseFunction,
 	requiresStatic: boolean,
 	implementation: common.MethodType,
-): string | null {
+): { name: string; method: common.BaseFunction } | null {
 	if (
 		implementation.type === "SimpleMethod" ||
 		implementation.type === "StaticMethod"
@@ -617,7 +669,7 @@ function findFulfillingMethodName(
 		}
 
 		return signatureMatches(requirement, implementation, null)
-			? methodName
+			? { name: methodName, method: implementation }
 			: null
 	}
 
@@ -627,7 +679,10 @@ function findFulfillingMethodName(
 
 	for (let [index, overload] of implementation.overloads.entries()) {
 		if (signatureMatches(requirement, overload, null)) {
-			return resolveOverloadedMethodName(methodName, index)
+			return {
+				name: resolveOverloadedMethodName(methodName, index),
+				method: overload,
+			}
 		}
 	}
 

@@ -1415,7 +1415,7 @@ describe("Parser", () => {
 
 				it("should parse a Namespace with multiple Conformance Clauses", () => {
 					let input: parser.Program = parse(
-						"implementation { namespace IntegerEquatable for Integer is Equatable, Printable {} }",
+						"implementation { namespace IntegerEquatable for Integer is Equatable, is Printable {} }",
 					)
 
 					expect(input).toMatchSnapshot()

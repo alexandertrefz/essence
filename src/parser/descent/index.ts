@@ -530,21 +530,7 @@ class DescentParser {
 			targetType = this.parseType()
 		}
 
-		// NOTE: `is` is contextual, not a keyword — `::is()` Method calls rely
-		// on it lexing as an ordinary Identifier.
-		let conformsTo: Array<parser.IdentifierNode> = []
-		let peeked = this.tokens.peek()
-		if (peeked?.type === TokenType.Identifier && peeked.value === "is") {
-			this.tokens.next()
-
-			conformsTo.push(this.parseIdentifier())
-
-			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-				this.tokens.next()
-
-				conformsTo.push(this.parseIdentifier())
-			}
-		}
+		let conformsTo = this.parseConformanceClauses()
 
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
@@ -563,6 +549,40 @@ class DescentParser {
 			},
 			this.tokens.documentationAbove(keyword.position.start.line),
 		)
+	}
+
+	// NOTE: `is` is contextual, not a keyword — `::is()` Method calls rely on
+	// it lexing as an ordinary Identifier. Each conformance carries its own
+	// `is` (`is Equatable, is Printable`); the comma separates clauses, so a
+	// bare Protocol name after a comma is a mistake with a tailored Diagnostic.
+	protected parseConformanceClauses(): Array<parser.IdentifierNode> {
+		let conformsTo: Array<parser.IdentifierNode> = []
+
+		let peeked = this.tokens.peek()
+		if (!(peeked?.type === TokenType.Identifier && peeked.value === "is")) {
+			return conformsTo
+		}
+
+		this.tokens.next()
+		conformsTo.push(this.parseIdentifier())
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			this.tokens.next()
+
+			let next = this.tokens.peek()
+			if (!(next?.type === TokenType.Identifier && next.value === "is")) {
+				fail(
+					"Each conformance needs its own 'is' — write 'is Equatable, is Printable'",
+					next?.position,
+					"expected 'is' before this Protocol",
+				)
+			}
+
+			this.tokens.next()
+			conformsTo.push(this.parseIdentifier())
+		}
+
+		return conformsTo
 	}
 
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {
