@@ -73,12 +73,27 @@ const statementStartTokenTypes = [
 	TokenType.KeywordChoice,
 ]
 
+export type ParserOptions = {
+	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
+	// standard library sets it, every user file leaves it off so that a
+	// `declarations` block there is diagnosed rather than parsed.
+	allowDeclarationsHeader?: boolean
+}
+
 class DescentParser {
 	protected tokens: TokenStream
 	protected suppressDiagnostics: boolean
+	protected allowDeclarationsHeader: boolean
+	// NOTE: Parser state set from the header — `declarations` unlocks the
+	// body-less native Method signatures and value-less static Properties that
+	// `parseNamespaceBodyNode` produces. In `implementation` mode those branches
+	// are simply never reached, so the absence of a body stays a parse error
+	// exactly as before.
+	protected mode: parser.Program["kind"] = "implementation"
 
-	constructor(source: string) {
+	constructor(source: string, options: ParserOptions = {}) {
 		this.tokens = new TokenStream(source)
+		this.allowDeclarationsHeader = options.allowDeclarationsHeader ?? false
 
 		// NOTE: A Lexer error truncates the Token stream, so every
 		// end-of-input error after it would only be a cascade of the already
@@ -104,6 +119,8 @@ class DescentParser {
 				position,
 			)
 		}
+
+		this.mode = header.kind
 
 		let nodes = this.parseStatementList(() =>
 			this.parseImplementationNode(),
@@ -137,18 +154,64 @@ class DescentParser {
 			end: closingPosition.end,
 		})
 
-		return generators.program(implementation, implementation.position)
+		return generators.program(
+			implementation,
+			implementation.position,
+			header.kind,
+		)
 	}
 
 	protected parseProgramHeader(): {
 		keyword: Token
 		leftBrace: Token
+		kind: parser.Program["kind"]
 	} | null {
+		// NOTE: A bare Identifier can never begin a Program today, so
+		// `declarations {` is unambiguous — no Lexer keyword is needed. Only the
+		// standard library is allowed to open one; anywhere else it is a tailored
+		// Diagnostic, after which the block is parsed as an implementation
+		// section so its contents still produce Diagnostics.
+		let token = this.tokens.peek()
+
+		if (
+			token?.type === TokenType.Identifier &&
+			token.value === "declarations" &&
+			this.tokens.peek(1)?.type === TokenType.SymbolLeftBrace
+		) {
+			let keyword = this.tokens.next()
+			let leftBrace = this.tokens.next()
+
+			if (!this.allowDeclarationsHeader) {
+				if (!this.suppressDiagnostics) {
+					reportError(
+						"Only the standard library may open a 'declarations' block",
+						keyword.position,
+						{
+							code: "declarations-outside-stdlib",
+							labels: [
+								primary(
+									keyword.position,
+									"'declarations' is not allowed here",
+								),
+							],
+							helps: [
+								"Open the Program with 'implementation { … }' instead.",
+							],
+						},
+					)
+				}
+
+				return { keyword, leftBrace, kind: "implementation" }
+			}
+
+			return { keyword, leftBrace, kind: "declarations" }
+		}
+
 		try {
 			let keyword = this.tokens.expect(TokenType.KeywordImplementation)
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
-			return { keyword, leftBrace }
+			return { keyword, leftBrace, kind: "implementation" }
 		} catch (error) {
 			this.reportParseError(error)
 
@@ -700,6 +763,26 @@ class DescentParser {
 
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
+			if (this.mode === "declarations") {
+				// NOTE: An overload block may MIX bodied and body-less entries in
+				// declarations mode — each is a Function literal or a native
+				// signature, whichever the entry's own body decides.
+				let methods = this.parseStatementList(() =>
+					this.parseMethodBodyOrSignature(),
+				)
+
+				this.parseClosingBrace(leftBrace.position)
+
+				return {
+					nodeType: isStatic
+						? "OverloadedStaticMethodSignaturesNode"
+						: "OverloadedMethodSignaturesNode",
+					name,
+					methods,
+					documentation,
+				}
+			}
+
 			let methods = this.parseStatementList(() =>
 				this.parseOptionallyGenericFunctionLiteral(),
 			)
@@ -735,6 +818,24 @@ class DescentParser {
 				this.tokens.peek()?.type === TokenType.SymbolLeftParen ||
 				this.tokens.peek()?.type === TokenType.SymbolLeftAngle
 			) {
+				if (this.mode === "declarations") {
+					let result = this.parseMethodBodyOrSignature()
+
+					if (result.nodeType === "NativeMethodSignature") {
+						return {
+							nodeType: "StaticMethodSignatureNode",
+							name,
+							signature: result,
+						}
+					}
+
+					return {
+						nodeType: "StaticMethodNode",
+						name,
+						method: result,
+					}
+				}
+
 				return {
 					nodeType: "StaticMethodNode",
 					name,
@@ -743,6 +844,22 @@ class DescentParser {
 			}
 
 			let type = this.parseOptionalDeclarationType()
+
+			// NOTE: A native static Property — `static PI: Transcendental` with
+			// no `=` — is legal only in declarations mode. Everywhere else the
+			// missing `=` stays a parse error, produced by the `expect` below.
+			if (
+				this.mode === "declarations" &&
+				this.tokens.peek()?.type !== TokenType.SymbolEqual
+			) {
+				return {
+					nodeType: "NamespacePropertyNode",
+					name,
+					documentation,
+					type,
+					value: null,
+				}
+			}
 
 			this.tokens.expect(TokenType.SymbolEqual)
 
@@ -759,11 +876,82 @@ class DescentParser {
 
 		let name = this.parseIdentifier()
 
+		if (this.mode === "declarations") {
+			let result = this.parseMethodBodyOrSignature()
+
+			if (result.nodeType === "NativeMethodSignature") {
+				return {
+					nodeType: "SimpleMethodSignatureNode",
+					name,
+					signature: result,
+				}
+			}
+
+			return {
+				nodeType: "SimpleMethodNode",
+				name,
+				method: result,
+			}
+		}
+
 		return {
 			nodeType: "SimpleMethodNode",
 			name,
 			method: this.parseOptionallyGenericFunctionLiteral(),
 		}
+	}
+
+	// NOTE: The `declarations`-mode Method form — an optional Generic list, a
+	// Parameter list and a return Type, then either a block (a bodied Method,
+	// implemented in Essence) or nothing (a body-less native signature bound to
+	// the runtime by name). The bodied branch reproduces exactly what
+	// `parseOptionallyGenericFunctionLiteral` builds, so a bodied Method in a
+	// declarations Program parses identically to one anywhere else.
+	protected parseMethodBodyOrSignature():
+		| parser.FunctionValueNode
+		| parser.NativeMethodSignatureNode {
+		let documentation = this.documentationHere()
+		let generics = this.parseOptionalGenericList()
+		let parameterList = this.parseParameterList()
+		let returnType = this.parseReturnType()
+
+		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
+			let block = this.parseBlock()
+
+			let definition =
+				generics.length > 0
+					? generators.genericFunctionDefinition(
+							generics,
+							parameterList.parameters,
+							returnType,
+							block.body,
+							parameterList.position,
+							documentation,
+						)
+					: generators.functionDefinition(
+							parameterList.parameters,
+							returnType,
+							block.body,
+							parameterList.position,
+							documentation,
+						)
+
+			return generators.functionValueNode(definition, {
+				start: parameterList.position.start,
+				end: block.position.end,
+			})
+		}
+
+		return generators.nativeMethodSignature(
+			generics,
+			parameterList.parameters,
+			returnType,
+			{
+				start: parameterList.position.start,
+				end: returnType.position.end,
+			},
+			documentation,
+		)
 	}
 
 	protected parseProtocolDeclarationStatement(): parser.ProtocolDeclarationStatementNode {
@@ -2238,14 +2426,17 @@ export type ParseResult = {
 // parser recovers and always produces a Program (broken Statements are
 // dropped). `parseWithDiagnostics` is the full form the compiler driver
 // uses; `parse` is the convenience form for callers that only need the AST.
-export function parseWithDiagnostics(chunk: string): ParseResult {
+export function parseWithDiagnostics(
+	chunk: string,
+	options?: ParserOptions,
+): ParseResult {
 	let { result, diagnostics } = collectDiagnostics(() =>
-		new DescentParser(chunk).parseProgram(),
+		new DescentParser(chunk, options).parseProgram(),
 	)
 
 	return { program: result, diagnostics }
 }
 
-export function parse(chunk: string): parser.Program {
-	return parseWithDiagnostics(chunk).program
+export function parse(chunk: string, options?: ParserOptions): parser.Program {
+	return parseWithDiagnostics(chunk, options).program
 }

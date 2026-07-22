@@ -55,15 +55,37 @@ function collectFromNode(
 			addRange(ranges, node.position)
 
 			for (let property of Object.values(node.properties)) {
-				collectFromNode(property.value, ranges)
+				// NOTE: A native static Property has no value to fold.
+				if (property.value !== null) {
+					collectFromNode(property.value, ranges)
+				}
 			}
 
 			for (let member of Object.values(node.methods)) {
-				let methods =
+				// NOTE: Only bodied Methods have a block to fold — the body-less
+				// native signatures (declarations mode) have none, so they are
+				// skipped.
+				let methods: Array<parser.FunctionValueNode> = []
+
+				if (
+					member.nodeType === "SimpleMethod" ||
+					member.nodeType === "StaticMethod"
+				) {
+					methods = [member.method]
+				} else if (
 					member.nodeType === "OverloadedMethod" ||
 					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
+				) {
+					methods = member.methods
+				} else if (
+					member.nodeType === "OverloadedMethodSignatures" ||
+					member.nodeType === "OverloadedStaticMethodSignatures"
+				) {
+					methods = member.methods.filter(
+						(entry): entry is parser.FunctionValueNode =>
+							entry.nodeType === "FunctionValue",
+					)
+				}
 
 				for (let method of methods) {
 					addRange(ranges, method.position)

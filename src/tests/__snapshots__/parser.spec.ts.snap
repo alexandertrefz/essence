@@ -64,6 +64,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -142,6 +143,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -238,6 +240,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -334,6 +337,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -408,6 +412,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation with
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -501,6 +506,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -642,6 +648,7 @@ exports[`Parser Expressions MethodInvocations should parse chained MethodInvocat
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -720,6 +727,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -811,6 +819,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -902,6 +911,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -993,6 +1003,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1084,6 +1095,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1162,6 +1174,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1258,6 +1271,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1354,6 +1368,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1468,6 +1483,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1582,6 +1598,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1723,6 +1740,7 @@ exports[`Parser Expressions FunctionInvocations should parse Lookup FunctionInvo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1848,6 +1866,7 @@ exports[`Parser Expressions FunctionInvocations should parse multiple FunctionIn
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -1920,6 +1939,7 @@ exports[`Parser Expressions Lookups should parse simple Lookup 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2019,6 +2039,7 @@ exports[`Parser Expressions Lookups should parse complex Lookup 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2064,6 +2085,7 @@ exports[`Parser Expressions Identifiers should parse Identifiers 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2109,6 +2131,7 @@ exports[`Parser Expressions Identifiers should parse 'with' as Identifier 1`] = 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2154,6 +2177,7 @@ exports[`Parser Expressions Identifiers should parse 'static' as Identifier 1`] 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2199,6 +2223,7 @@ exports[`Parser Expressions Identifiers should parse 'case' as Identifier 1`] = 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2243,6 +2268,7 @@ exports[`Parser Expressions Self should parse @ 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2315,6 +2341,7 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2419,6 +2446,7 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2523,6 +2551,7 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2657,6 +2686,7 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2745,6 +2775,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -2931,6 +2962,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -3117,6 +3149,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -3290,6 +3323,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -3545,6 +3579,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -3664,6 +3699,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -3881,6 +3917,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4098,6 +4135,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4302,6 +4340,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4588,6 +4627,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4665,6 +4705,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4742,6 +4783,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4849,6 +4891,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -4956,6 +4999,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5065,6 +5109,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5174,6 +5219,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5277,6 +5323,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5380,6 +5427,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5513,6 +5561,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5646,6 +5695,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5807,6 +5857,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5851,6 +5902,7 @@ exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5896,6 +5948,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'true' Boolean
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5941,6 +5994,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'false' Boolea
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -5986,6 +6040,7 @@ exports[`Parser Expressions Literals StringLiterals should parse empty StringLit
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6031,6 +6086,7 @@ exports[`Parser Expressions Literals StringLiterals should parse filled StringLi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6076,6 +6132,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6121,6 +6178,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6166,6 +6224,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6211,6 +6270,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6256,6 +6316,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6301,6 +6362,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6347,6 +6409,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6393,6 +6456,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6439,6 +6503,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative nume
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6485,6 +6550,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative deno
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6531,6 +6597,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse fully negativ
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6576,6 +6643,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an empty List 1`]
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6636,6 +6704,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with a si
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6724,6 +6793,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with mult
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -6943,6 +7013,7 @@ exports[`Parser Expressions Match should parse match expression with function in
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7001,6 +7072,7 @@ exports[`Parser Statements ReturnStatements should parse ReturnStatements 1`] = 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7060,6 +7132,7 @@ exports[`Parser Statements IfStatements should parse IfStatements 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7120,6 +7193,7 @@ exports[`Parser Statements IfStatements should parse IfElseStatements 1`] = `
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7209,6 +7283,7 @@ exports[`Parser Statements IfStatements should parse IfElse-If-Statements 1`] = 
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7299,6 +7374,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-Statements 1`
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7418,6 +7494,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-If-Statements
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7492,6 +7569,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7592,6 +7670,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7680,6 +7759,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -7843,6 +7923,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8111,6 +8192,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8185,6 +8267,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8285,6 +8368,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8373,6 +8457,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8536,6 +8621,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8804,6 +8890,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8878,6 +8965,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -8952,6 +9040,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9026,6 +9115,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9098,6 +9188,7 @@ exports[`Parser Statements VariableAssignmentStatements should parse VariableAss
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9162,6 +9253,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9259,6 +9351,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9388,6 +9481,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -9625,6 +9719,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -10034,6 +10129,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -10429,6 +10525,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -10979,6 +11076,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -11249,6 +11347,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -11339,6 +11438,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -11462,6 +11562,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -11617,6 +11718,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -11880,6 +11982,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -12315,6 +12418,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -12736,6 +12840,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -13312,6 +13417,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -13608,6 +13714,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -13871,6 +13978,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -14306,6 +14414,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -14727,6 +14836,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -15303,6 +15413,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -15599,6 +15710,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -15895,6 +16007,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -15955,6 +16068,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -16075,6 +16189,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -16368,6 +16483,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -16488,6 +16604,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -16809,6 +16926,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -17031,6 +17149,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -17179,6 +17298,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -17405,6 +17525,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -17727,6 +17848,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18041,6 +18163,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18298,6 +18421,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18417,6 +18541,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18564,6 +18689,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18657,6 +18783,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -18907,6 +19034,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -19141,6 +19269,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -19478,6 +19607,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -19814,6 +19944,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -19901,6 +20032,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -19975,6 +20107,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20093,6 +20226,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20284,6 +20418,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20386,6 +20521,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20586,6 +20722,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20786,6 +20923,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -20973,6 +21111,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
@@ -21284,6 +21423,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {

@@ -68,15 +68,36 @@ function collectFromNode(
 			return
 		case "NamespaceDefinitionStatement": {
 			for (let property of Object.values(node.properties)) {
-				descend(property.value, cursor, chain)
+				// NOTE: A native static Property has no value to descend into.
+				if (property.value !== null) {
+					descend(property.value, cursor, chain)
+				}
 			}
 
 			for (let member of Object.values(node.methods)) {
-				let methods =
+				// NOTE: Only bodied Methods have a block to select within — the
+				// body-less native signatures (declarations mode) are skipped.
+				let methods: Array<parser.FunctionValueNode> = []
+
+				if (
+					member.nodeType === "SimpleMethod" ||
+					member.nodeType === "StaticMethod"
+				) {
+					methods = [member.method]
+				} else if (
 					member.nodeType === "OverloadedMethod" ||
 					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
+				) {
+					methods = member.methods
+				} else if (
+					member.nodeType === "OverloadedMethodSignatures" ||
+					member.nodeType === "OverloadedStaticMethodSignatures"
+				) {
+					methods = member.methods.filter(
+						(entry): entry is parser.FunctionValueNode =>
+							entry.nodeType === "FunctionValue",
+					)
+				}
 
 				for (let method of methods) {
 					if (contains(method.position, cursor)) {

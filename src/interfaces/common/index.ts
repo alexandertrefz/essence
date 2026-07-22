@@ -101,6 +101,7 @@ export type DiagnosticCode =
 	| "unclosed-string"
 	| "unclosed-block"
 	| "redundant-parameter-label"
+	| "declarations-outside-stdlib"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

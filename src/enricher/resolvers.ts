@@ -2309,15 +2309,25 @@ export function parameterDocumentation(
 }
 
 export function resolveMethodType(
-	node:
-		| parser.SimpleMethod
-		| parser.StaticMethod
-		| parser.OverloadedMethod
-		| parser.OverloadedStaticMethod,
+	node: parser.NamespaceMethods[string],
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 	namespaceGenerics: Array<common.GenericDeclaration> = [],
 ): common.MethodType {
+	// NOTE: The body-less native Method forms only ever appear in a
+	// `declarations { … }` Program, which the Enricher does not process yet —
+	// Commit 3 wires them. Reaching one here is therefore an internal error.
+	if (
+		node.nodeType === "SimpleMethodSignature" ||
+		node.nodeType === "StaticMethodSignature" ||
+		node.nodeType === "OverloadedMethodSignatures" ||
+		node.nodeType === "OverloadedStaticMethodSignatures"
+	) {
+		throw new Error(
+			`Native Method signature '${node.nodeType}' reached the Enricher before it was wired`,
+		)
+	}
+
 	if (node.nodeType === "SimpleMethod") {
 		if (selfType === null) {
 			reportError(

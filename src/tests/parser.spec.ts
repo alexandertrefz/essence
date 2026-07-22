@@ -1765,4 +1765,237 @@ describe("Parser", () => {
 			})
 		})
 	})
+
+	describe("Declarations Programs", () => {
+		// NOTE: `declarations { … }` is the standard library's opt-in Program
+		// form — only reachable when the caller passes `allowDeclarationsHeader`.
+		function declarationsNamespace(
+			source: string,
+		): parser.NamespaceDefinitionStatementNode {
+			let program = parse(source, { allowDeclarationsHeader: true })
+			let node = program.implementation.nodes[0]
+
+			if (node.nodeType !== "NamespaceDefinitionStatement") {
+				throw new Error(
+					"expected a NamespaceDefinitionStatement as the first node",
+				)
+			}
+
+			return node
+		}
+
+		it("should parse a declarations header round-trip", () => {
+			let program = parse(
+				`declarations {
+					namespace Number {
+						static PI: Transcendental
+					}
+				}`,
+				{ allowDeclarationsHeader: true },
+			)
+
+			expect(program.kind).toBe("declarations")
+			expect(program.implementation.nodes).toHaveLength(1)
+			expect(program.implementation.nodes[0].nodeType).toBe(
+				"NamespaceDefinitionStatement",
+			)
+		})
+
+		it("should parse a body-less simple Method signature with generics and documentation", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Container for List {
+						§§ Wraps a value.
+						§§ @param value the value to wrap
+						§§ @returns the wrapped value
+						wrap <Item>(value: Item) -> Item
+					}
+				}`,
+			)
+
+			let method = namespace.methods["wrap"]
+
+			expect(method.nodeType).toBe("SimpleMethodSignature")
+
+			if (method.nodeType === "SimpleMethodSignature") {
+				expect(method.signature.nodeType).toBe("NativeMethodSignature")
+				expect(method.signature.generics).toHaveLength(1)
+				expect(method.signature.generics[0].name.content).toBe("Item")
+				expect(method.signature.parameters).toHaveLength(1)
+				expect(
+					method.signature.parameters[0].internalName?.content,
+				).toBe("value")
+
+				let documentation = method.signature.documentation
+
+				expect(documentation?.description).toBe("Wraps a value.")
+				expect(documentation?.parameters).toEqual({
+					value: "the value to wrap",
+				})
+				expect(documentation?.returns).toBe("the wrapped value")
+			}
+		})
+
+		it("should parse a body-less static Method signature", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Number {
+						static parse(_ text: String) -> Number
+					}
+				}`,
+			)
+
+			let method = namespace.methods["parse"]
+
+			expect(method.nodeType).toBe("StaticMethodSignature")
+
+			if (method.nodeType === "StaticMethodSignature") {
+				expect(method.signature.nodeType).toBe("NativeMethodSignature")
+				expect(method.signature.returnType.nodeType).toBe(
+					"IdentifierTypeDeclaration",
+				)
+			}
+		})
+
+		it("should parse a fully body-less overload block", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Number for Number {
+						overload add {
+							(_ other: Number) -> Number
+							(_ other: Integer) -> Number
+						}
+					}
+				}`,
+			)
+
+			let method = namespace.methods["add"]
+
+			expect(method.nodeType).toBe("OverloadedMethodSignatures")
+
+			if (method.nodeType === "OverloadedMethodSignatures") {
+				expect(method.methods).toHaveLength(2)
+				expect(method.methods[0].nodeType).toBe("NativeMethodSignature")
+				expect(method.methods[1].nodeType).toBe("NativeMethodSignature")
+			}
+		})
+
+		it("should parse an overload block that mixes a body-less and a bodied entry", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Number for Number {
+						overload combine {
+							(_ other: Number) -> Number
+							(_ other: Integer) -> Number {
+								<- other
+							}
+						}
+					}
+				}`,
+			)
+
+			let method = namespace.methods["combine"]
+
+			expect(method.nodeType).toBe("OverloadedMethodSignatures")
+
+			if (method.nodeType === "OverloadedMethodSignatures") {
+				expect(method.methods).toHaveLength(2)
+				expect(method.methods[0].nodeType).toBe("NativeMethodSignature")
+				expect(method.methods[1].nodeType).toBe("FunctionValue")
+			}
+		})
+
+		it("should parse a body-less static overload block", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Number {
+						overload static of {
+							(_ value: Integer) -> Number
+							(_ value: String) -> Number
+						}
+					}
+				}`,
+			)
+
+			let method = namespace.methods["of"]
+
+			expect(method.nodeType).toBe("OverloadedStaticMethodSignatures")
+
+			if (method.nodeType === "OverloadedStaticMethodSignatures") {
+				expect(method.methods).toHaveLength(2)
+				expect(method.methods[0].nodeType).toBe("NativeMethodSignature")
+			}
+		})
+
+		it("should parse a native static Property without a value", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Number {
+						static PI: Transcendental
+					}
+				}`,
+			)
+
+			let property = namespace.properties["PI"]
+
+			expect(property.value).toBeNull()
+			expect(property.type?.nodeType).toBe("IdentifierTypeDeclaration")
+		})
+
+		it("should still parse a bodied Method in declarations mode", () => {
+			let namespace = declarationsNamespace(
+				`declarations {
+					namespace Math for Number {
+						double(value: Number) -> Number {
+							<- value
+						}
+					}
+				}`,
+			)
+
+			let method = namespace.methods["double"]
+
+			expect(method.nodeType).toBe("SimpleMethod")
+
+			if (method.nodeType === "SimpleMethod") {
+				expect(method.method.nodeType).toBe("FunctionValue")
+				expect(method.method.value.body).toHaveLength(1)
+			}
+		})
+
+		it("should reject a declarations block outside the standard library", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`declarations {
+					constant x = 1
+				}`,
+			)
+
+			let diagnostic = diagnostics.find(
+				(candidate) => candidate.code === "declarations-outside-stdlib",
+			)
+
+			expect(diagnostic).toBeDefined()
+			expect(diagnostic?.labels[0]?.kind).toBe("primary")
+
+			// NOTE: Recovery parses the block as an implementation section so
+			// the contents still yield an AST and downstream Diagnostics.
+			expect(program.kind).toBe("implementation")
+			expect(program.implementation.nodes).toHaveLength(1)
+			expect(program.implementation.nodes[0].nodeType).toBe(
+				"ConstantDeclarationStatement",
+			)
+		})
+
+		it("should reject a body-less Method in implementation mode", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					namespace Number for Number {
+						double(value: Number) -> Number
+					}
+				}`,
+			)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+	})
 })
