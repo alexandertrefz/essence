@@ -17,4 +17,12 @@ implementation {
 
 	§ no-namespace-for-value.
 	constant nowhere = { x = 1 }::describe()
+
+	§ unknown-name — the closest name in Scope is offered.
+	constant name = "essence"
+	constant shout = nmae
+
+	§ unknown-member — the members the Record does have are listed.
+	constant point = { x = 1, y = 2 }
+	constant depth = point.z
 }

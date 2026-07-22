@@ -153,7 +153,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant operation = Missing#Add({ left = 1 })
 				}`),
-			).toContain("Type 'Missing' is not declared.")
+			).toContain("Type 'Missing' is not declared")
 		})
 
 		it("reports an unknown Case", () => {
@@ -206,7 +206,7 @@ describe("Choices", () => {
 					}
 				}`),
 			).toContain(
-				"Case 'CalculatorOperation#Add' has no member 'missing'.",
+				"Case 'CalculatorOperation#Add' has no member 'missing'",
 			)
 		})
 
@@ -495,7 +495,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant smaller = Ordering.less
 				}`),
-			).toContain("Namespace 'Ordering' has no member 'less'.")
+			).toContain("Namespace 'Ordering' has no member 'less'")
 		})
 
 		it("no longer declares the Cases as standalone Types", () => {
@@ -503,7 +503,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant smaller: Less = Ordering#Less
 				}`),
-			).toContain("Type 'Less' is not declared.")
+			).toContain("Type 'Less' is not declared")
 		})
 	})
 

@@ -39,6 +39,28 @@ Error: No Method named 'describe' for this value
     │ 
     │ Note: Searched Namespaces 'Optional', 'Record'.
 ────╯
+
+[unknown-name]
+Error: 'nmae' is not declared
+    ╭─┤ Dispatch.es:23:19 │
+    │
+ 23 │     constant shout = nmae
+    │                      ──┬─  
+    │                        ╰─── no such Variable or Constant
+    │ 
+    │ Help: Did you mean 'name'?
+────╯
+
+[unknown-member]
+Error: { x: Integer, y: Integer } has no member 'z'
+    ╭─┤ Dispatch.es:27:25 │
+    │
+ 27 │     constant depth = point.z
+    │                            ▲  
+    │                            ╰── no such member
+    │ 
+    │ Note: { x: Integer, y: Integer } has 'x', 'y'.
+────╯
 "
 `;
 

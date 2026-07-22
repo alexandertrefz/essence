@@ -33,7 +33,7 @@ describe("LSP", () => {
 
 			expect(diagnostics[1].severity).toBe("error")
 			expect(diagnostics[1].message).toBe(
-				"Variable 'undeclaredVariable' is not declared.",
+				"'undeclaredVariable' is not declared",
 			)
 		})
 
@@ -45,7 +45,7 @@ describe("LSP", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"Variable 'undeclaredVariable' is not declared.",
+				"'undeclaredVariable' is not declared",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
@@ -68,7 +68,7 @@ describe("LSP", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Variable 'undeclaredVariable' is not declared.",
+				"'undeclaredVariable' is not declared",
 			)
 		})
 	})
