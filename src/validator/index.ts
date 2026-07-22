@@ -39,7 +39,15 @@ export const validate = (
 						error instanceof Error ? error.message : String(error)
 					}`,
 					node.position,
-					{ code: "internal-error" },
+					{
+						code: "internal-error",
+						labels: [
+							primary(node.position, "the Compiler threw here"),
+						],
+						notes: [
+							"This is a bug in the Compiler, not in the Program.",
+						],
+					},
 				)
 			}
 		}
@@ -140,9 +148,21 @@ function validateExpression(
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 	if (isBoundFunctionType(node.type)) {
 		reportError(
-			"A Function with Protocol-bound Type Parameters can not be used as a value (yet) — call it directly.",
+			"A Function with Protocol-bound Type Parameters can not be used as a value",
 			node.position,
-			{ code: "protocol-bound-function-value" },
+			{
+				code: "protocol-bound-function-value",
+				labels: [
+					primary(
+						node.position,
+						"this Function is stored, not called",
+					),
+				],
+				notes: [
+					"A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.",
+				],
+				helps: ["Call it directly instead of passing it around."],
+			},
 		)
 	}
 }
@@ -185,9 +205,17 @@ function validateNativeFunctionInvocation(
 		)
 	} else if (functionType.type !== "Error") {
 		reportError(
-			`'${node.name.content}' is not a native function.`,
+			`'${node.name.content}' is not a native Function`,
 			node.name.position,
-			{ code: "unknown-native-function" },
+			{
+				code: "unknown-native-function",
+				labels: [
+					primary(
+						node.name.position,
+						"the Compiler provides no such native Function",
+					),
+				],
+			},
 		)
 	}
 
@@ -225,8 +253,14 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedStaticMethod"
 	) {
 		if (functionType.type !== "Error") {
-			reportError("This expression is not a Function.", node.position, {
+			reportError("This Expression is not a Function", node.position, {
 				code: "not-a-function",
+				labels: [
+					primary(
+						node.position,
+						`this is ${withArticle(describeType(functionType))}`,
+					),
+				],
 			})
 		}
 
@@ -277,9 +311,21 @@ function validateFunctionInvocation(
 
 			if (!overloadMatched) {
 				reportError(
-					"Passed arguments do not match any overload.",
+					"No overload accepts these Arguments",
 					node.position,
-					{ code: "no-matching-overload" },
+					{
+						code: "no-matching-overload",
+						labels: [
+							primary(
+								node.position,
+								`this call passes ${countOf(node.arguments.length, "Argument")}`,
+							),
+						],
+						notes: functionType.overloads.map(
+							(overload) =>
+								`One overload ${describeSignature(overload.parameterTypes)}.`,
+						),
+					},
 				)
 			} else {
 				node.overloadedMethodIndex = index
@@ -494,22 +540,43 @@ function validateCaseValue(
 	if (Object.keys(node.type.members).length === 0) {
 		if (node.value !== null) {
 			reportError(
-				`Case '#${node.type.name}' does not carry a payload.`,
+				`Case '#${node.type.name}' does not carry a payload`,
 				node.value.position,
-				{ code: "unexpected-payload" },
+				{
+					code: "unexpected-payload",
+					labels: [primary(node.value.position, "nothing goes here")],
+					helps: [`Write '#${node.type.name}' on its own.`],
+				},
 			)
 		}
 	} else if (node.value === null) {
 		reportError(
-			`Case '#${node.type.name}' requires a payload of Type '${describeType(payloadType)}'.`,
+			`Case '#${node.type.name}' requires a payload`,
 			node.position,
-			{ code: "missing-payload" },
+			{
+				code: "missing-payload",
+				labels: [primary(node.position, "no payload was given")],
+				notes: [
+					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
+				],
+			},
 		)
 	} else if (!matchesType(payloadType, node.value.type)) {
 		reportError(
-			`The payload does not match Case '#${node.type.name}' — expected '${describeType(payloadType)}'.`,
+			`This payload does not fit Case '#${node.type.name}'`,
 			node.value.position,
-			{ code: "payload-type-mismatch" },
+			{
+				code: "payload-type-mismatch",
+				labels: [
+					primary(
+						node.value.position,
+						`this is ${withArticle(describeType(node.value.type))}`,
+					),
+				],
+				notes: [
+					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
+				],
+			},
 		)
 	}
 
@@ -529,9 +596,12 @@ function validateRationalValue(
 ): common.typed.RationalValueNode {
 	if (BigInt(node.denominator) === 0n) {
 		reportError(
-			"A Rational can not have a denominator of zero.",
+			"A Rational can not have a denominator of zero",
 			node.position,
-			{ code: "zero-denominator" },
+			{
+				code: "zero-denominator",
+				labels: [primary(node.position, "this divides by zero")],
+			},
 		)
 	}
 
@@ -714,9 +784,20 @@ function validateIfElseStatementNode(
 		node.condition.type.type !== "Error"
 	) {
 		reportError(
-			"If Conditions have to be Booleans.",
+			"An If Condition has to be a Boolean",
 			node.condition.position,
-			{ code: "condition-not-boolean" },
+			{
+				code: "condition-not-boolean",
+				labels: [
+					primary(
+						node.condition.position,
+						`this is ${withArticle(describeType(node.condition.type))}`,
+					),
+				],
+				notes: [
+					"Essence has no truthiness — only a Boolean can be a Condition.",
+				],
+			},
 		)
 	}
 
@@ -741,9 +822,20 @@ function validateIfStatement(
 		node.condition.type.type !== "Error"
 	) {
 		reportError(
-			"If Conditions have to be Booleans.",
+			"An If Condition has to be a Boolean",
 			node.condition.position,
-			{ code: "condition-not-boolean" },
+			{
+				code: "condition-not-boolean",
+				labels: [
+					primary(
+						node.condition.position,
+						`this is ${withArticle(describeType(node.condition.type))}`,
+					),
+				],
+				notes: [
+					"Essence has no truthiness — only a Boolean can be a Condition.",
+				],
+			},
 		)
 	}
 
@@ -761,16 +853,32 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		reportError("Top level returns are not permitted.", node.position, {
+		reportError("There is nothing here to return from", node.position, {
 			code: "top-level-return",
+			labels: [primary(node.position, "this is outside any Function")],
 		})
 	} else if (
 		!matchesType(currentFunctionContext.returnType, node.expression.type)
 	) {
 		reportError(
-			"Type of returned expression doesn't match the declared return type.",
+			"This value does not fit the declared return Type",
 			node.expression.position,
-			{ code: "return-type-mismatch" },
+			{
+				code: "return-type-mismatch",
+				// NOTE: The declared return Type has no Position of its own —
+				// only the Parameter list does, which is where an omitted
+				// `-> Type` would have gone — so it is stated as a note
+				// rather than pointed at.
+				labels: [
+					primary(
+						node.expression.position,
+						`this is ${withArticle(describeType(node.expression.type))}`,
+					),
+				],
+				notes: [
+					`The Function returns ${describeType(currentFunctionContext.returnType)}.`,
+				],
+			},
 		)
 	}
 
@@ -828,8 +936,12 @@ function validateDefiniteReturn(
 	}
 
 	if (!bodyDefinitelyReturns(definition.body)) {
-		reportError("Not all code paths return a value.", position, {
+		reportError("Not every path through this Function returns", position, {
 			code: "missing-return",
+			labels: [primary(position, "this path falls off the end")],
+			notes: [
+				`The declared return Type is ${describeType(returnType)}, so every path must yield one.`,
+			],
 		})
 	}
 }

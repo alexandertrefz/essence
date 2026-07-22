@@ -244,7 +244,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					choice Empty { }
 				}`),
-			).toContain("A Choice must declare at least one Case.")
+			).toContain("A Choice must declare at least one Case")
 		})
 
 		it("rejects duplicate Cases", () => {
@@ -252,7 +252,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					choice Duplicated { Go, Go }
 				}`),
-			).toContain("Case '#Go' is declared more than once.")
+			).toContain("Case '#Go' is declared more than once")
 		})
 
 		it("hoists Choices so use may precede declaration", () => {
@@ -327,9 +327,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation = CalculatorOperation#Add
 				}`),
-			).toContain(
-				"Case '#Add' requires a payload of Type '{ left: Integer, right: Integer }'.",
-			)
+			).toContain("Case '#Add' requires a payload")
 		})
 
 		it("rejects a payload on a unit Case", () => {
@@ -337,7 +335,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation = CalculatorOperation#ClearAll({ left = 1 })
 				}`),
-			).toContain("Case '#ClearAll' does not carry a payload.")
+			).toContain("Case '#ClearAll' does not carry a payload")
 		})
 
 		it("rejects a payload of the wrong shape", () => {
@@ -345,9 +343,7 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation = CalculatorOperation#Add({ left = 1 })
 				}`),
-			).toContain(
-				"The payload does not match Case '#Add' — expected '{ left: Integer, right: Integer }'.",
-			)
+			).toContain("This payload does not fit Case '#Add'")
 		})
 	})
 
