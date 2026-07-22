@@ -69,12 +69,80 @@ export type Diagnostic = {
 	tags?: Array<DiagnosticTag>
 }
 
+// NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
+// every one of these — a code with no entry there is a code nobody can look
+// up. Spellings are stable API: reword a message freely, but renaming a code
+// breaks the Quick Fixes and the suppressions that are keyed off it.
 export type DiagnosticCode =
+	// Syntax — the Lexer and the Parser.
+	| "syntax-error"
+	| "unexpected-token"
+	| "unclosed-string"
+	| "unclosed-block"
+	| "redundant-parameter-label"
+	// Names — declared twice, never declared, or not what the position wants.
+	| "duplicate-variable"
+	| "duplicate-type"
+	| "duplicate-protocol"
+	| "duplicate-case"
+	| "reserved-type-name"
+	| "unknown-name"
+	| "unknown-type"
+	| "unknown-protocol"
+	| "unknown-native-function"
+	| "unknown-member"
+	| "type-without-members"
+	// Types — a value that does not fit where it was put.
+	| "assignment-type-mismatch"
+	| "argument-type-mismatch"
+	| "argument-count-mismatch"
+	| "return-type-mismatch"
+	| "condition-not-boolean"
+	| "constant-reassignment"
+	| "missing-return"
+	| "top-level-return"
+	| "not-a-function"
+	| "record-annotation-not-record"
+	| "uncombinable-types"
+	| "partial-type-mismatch"
+	| "wrong-type-argument-count"
+	| "type-not-generic"
+	| "zero-denominator"
+	// Dispatch — which Method, in which Namespace, with which overload.
+	| "no-matching-overload"
+	| "ambiguous-namespace"
+	| "unknown-method"
+	| "no-namespace-for-value"
+	| "undispatchable-method"
+	| "untyped-namespace-method"
+	// Choices and their Cases.
+	| "empty-choice"
+	| "unknown-case"
+	| "ambiguous-case"
+	| "missing-payload"
+	| "unexpected-payload"
+	| "payload-type-mismatch"
+	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"
-	| "missing-return"
-	| "constant-reassignment"
-	| "unknown-name"
+	| "match-on-non-union"
+	// Protocols and conformance.
+	| "protocol-as-value"
+	| "protocol-as-type"
+	| "unsatisfied-bound"
+	| "ambiguous-conformance"
+	| "nonconforming-namespace"
+	| "conformance-needs-target-type"
+	| "generic-namespace-conformance"
+	| "protocol-bound-function-value"
+	| "protocol-bound-namespace-generic"
+	// Inference — what the Compiler could not work out on its own.
+	| "uninferable-type-parameter"
+	| "uninferable-parameter-type"
+	| "uninferable-return-type"
+	| "missing-return-type"
+	// Everything else.
+	| "at-outside-method"
 	| "internal-error"
 
 export type UnknownType = {

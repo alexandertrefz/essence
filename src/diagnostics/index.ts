@@ -43,8 +43,11 @@ export function report(diagnostic: common.Diagnostic): void {
 	}
 }
 
+// NOTE: `code` is required, not optional. It is what `docs/diagnostics.md`
+// is indexed by and what a Quick Fix keys off, and a required field is the
+// only thing that keeps the next Diagnostic anyone adds from skipping it.
 type DiagnosticDetails = {
-	code?: common.DiagnosticCode
+	code: common.DiagnosticCode
 	labels?: Array<common.DiagnosticLabel>
 	notes?: Array<string>
 	helps?: Array<string>
@@ -53,16 +56,16 @@ type DiagnosticDetails = {
 
 export function reportError(
 	message: string,
-	position: common.Position | null = null,
-	details: DiagnosticDetails = {},
+	position: common.Position | null,
+	details: DiagnosticDetails,
 ): void {
 	report({ severity: "error", message, position, ...details })
 }
 
 export function reportWarning(
 	message: string,
-	position: common.Position | null = null,
-	details: DiagnosticDetails = {},
+	position: common.Position | null,
+	details: DiagnosticDetails,
 ): void {
 	report({ severity: "warning", message, position, ...details })
 }
