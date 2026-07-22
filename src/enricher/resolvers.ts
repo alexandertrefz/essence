@@ -1621,15 +1621,25 @@ function resolveContextualReturnType(
 		return { type: "Error" }
 	}
 
+	// NOTE: With no expected signature the body is the only thing that could
+	// say what this Function returns, and reading a Type off a body that
+	// nothing else constrains is exactly the inference that is hard to follow
+	// across a whole Program. A literal in Argument position is the one place
+	// the Type is still written down — just elsewhere — so it is the one place
+	// an omitted `-> Type` is allowed.
+	if (expectedFunction === null) {
+		reportError(
+			"A Function that is not passed as an Argument must write its return Type — only an Argument takes its Types from the surrounding context.",
+			node.parameterListPosition,
+		)
+
+		return { type: "Error" }
+	}
+
 	// NOTE: An expected return Type that is still an unbound Generic says
 	// nothing — in `map`'s `(_ item: ItemType) -> Result` nothing binds
-	// `Result` but this literal's own body. The body is also the answer when
-	// there is no expected signature at all, which is how an otherwise
-	// annotated literal may leave its `-> Type` off.
-	if (
-		expectedFunction === null ||
-		containsGenericUse(expectedFunction.returnType)
-	) {
+	// `Result` but this literal's own body, so the body is what it is read off.
+	if (containsGenericUse(expectedFunction.returnType)) {
 		let inferred = inferReturnTypeFromBody?.(node, parameterTypes, scope)
 
 		if (inferred !== null && inferred !== undefined) {
