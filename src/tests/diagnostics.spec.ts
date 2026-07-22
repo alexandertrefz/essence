@@ -4,6 +4,8 @@ import {
 	collectDiagnostics,
 	containsErrors,
 	report,
+	placelessDiagnostic,
+	primary,
 	reportError,
 	reportWarning,
 } from "../diagnostics/index"
@@ -22,9 +24,13 @@ const otherPosition: common.Position = {
 describe("Diagnostics", () => {
 	it("should collect reported Diagnostics", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position, { code: "internal-error" })
+			reportError("Some Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 			reportWarning("Some Warning.", otherPosition, {
 				code: "internal-error",
+				labels: [primary(otherPosition, "here")],
 			})
 		})
 
@@ -34,12 +40,18 @@ describe("Diagnostics", () => {
 				message: "Some Error.",
 				position,
 				code: "internal-error",
+				labels: [primary(position, "here")],
+				notes: [],
+				helps: [],
 			},
 			{
 				severity: "warning",
 				message: "Some Warning.",
 				position: otherPosition,
 				code: "internal-error",
+				labels: [primary(otherPosition, "here")],
+				notes: [],
+				helps: [],
 			},
 		])
 	})
@@ -52,8 +64,14 @@ describe("Diagnostics", () => {
 
 	it("should deduplicate identical Diagnostics", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position, { code: "internal-error" })
-			reportError("Some Error.", position, { code: "internal-error" })
+			reportError("Some Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
+			reportError("Some Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 		})
 
 		expect(diagnostics).toHaveLength(1)
@@ -61,9 +79,13 @@ describe("Diagnostics", () => {
 
 	it("should not deduplicate Diagnostics with differing positions", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position, { code: "internal-error" })
+			reportError("Some Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 			reportError("Some Error.", otherPosition, {
 				code: "internal-error",
+				labels: [primary(otherPosition, "here")],
 			})
 		})
 
@@ -72,8 +94,14 @@ describe("Diagnostics", () => {
 
 	it("should not deduplicate Diagnostics with differing severities", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Message.", position, { code: "internal-error" })
-			reportWarning("Some Message.", position, { code: "internal-error" })
+			reportError("Some Message.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
+			reportWarning("Some Message.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 		})
 
 		expect(diagnostics).toHaveLength(2)
@@ -83,11 +111,15 @@ describe("Diagnostics", () => {
 		let innerDiagnostics: Array<common.Diagnostic> = []
 
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Outer Error.", position, { code: "internal-error" })
+			reportError("Outer Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 
 			innerDiagnostics = collectDiagnostics(() => {
 				reportError("Inner Error.", otherPosition, {
 					code: "internal-error",
+					labels: [primary(otherPosition, "here")],
 				})
 			}).diagnostics
 		})
@@ -102,6 +134,7 @@ describe("Diagnostics", () => {
 			let inner = collectDiagnostics(() => {
 				reportError("Inner Error.", position, {
 					code: "internal-error",
+					labels: [primary(position, "here")],
 				})
 			})
 
@@ -122,7 +155,10 @@ describe("Diagnostics", () => {
 				})
 			} catch {}
 
-			reportError("Outer Error.", position, { code: "internal-error" })
+			reportError("Outer Error.", position, {
+				code: "internal-error",
+				labels: [primary(position, "here")],
+			})
 		})
 
 		expect(diagnostics).toHaveLength(1)
@@ -133,8 +169,8 @@ describe("Diagnostics", () => {
 		it("should detect errors", () => {
 			expect(
 				containsErrors([
-					{ severity: "warning", message: "", position: null },
-					{ severity: "error", message: "", position: null },
+					placelessDiagnostic("warning", "", "internal-error"),
+					placelessDiagnostic("error", "", "internal-error"),
 				]),
 			).toBe(true)
 		})
@@ -142,7 +178,7 @@ describe("Diagnostics", () => {
 		it("should not report warnings as errors", () => {
 			expect(
 				containsErrors([
-					{ severity: "warning", message: "", position: null },
+					placelessDiagnostic("warning", "", "internal-error"),
 				]),
 			).toBe(false)
 			expect(containsErrors([])).toBe(false)

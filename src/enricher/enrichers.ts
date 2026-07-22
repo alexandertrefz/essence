@@ -1170,24 +1170,22 @@ function reportDuplicateDeclaration(
 	code: common.DiagnosticCode,
 	kind: string,
 ): void {
-	let position = typeof identifier === "string" ? null : identifier.position
+	let message = `${kind} '${name}' is already declared`
 
-	reportError(`${kind} '${name}' is already declared`, position, {
+	if (typeof identifier === "string") {
+		reportError(message, null, { code, labels: [] })
+
+		return
+	}
+
+	reportError(message, identifier.position, {
 		code,
-		labels:
-			position === null
+		labels: [
+			primary(identifier.position, "declared a second time here"),
+			...(firstDeclarationPosition === null
 				? []
-				: [
-						primary(position, "declared a second time here"),
-						...(firstDeclarationPosition === null
-							? []
-							: [
-									secondary(
-										firstDeclarationPosition,
-										"first declared here",
-									),
-								]),
-					],
+				: [secondary(firstDeclarationPosition, "first declared here")]),
+		],
 	})
 }
 

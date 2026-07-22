@@ -2042,24 +2042,24 @@ function resolveContextualReturnType(
 		}
 
 		let position = functionLiteralPosition(node)
+		let message = "The return Type could not be inferred from the body"
+		let helps = ["Give the Function an explicit '-> Type'."]
 
-		reportError(
-			"The return Type could not be inferred from the body",
-			position,
-			{
+		if (position === null) {
+			reportError(message, null, {
 				code: "uninferable-return-type",
-				labels:
-					position === null
-						? []
-						: [
-								primary(
-									position,
-									"the body's Type is not determined here",
-								),
-							],
-				helps: ["Give the Function an explicit '-> Type'."],
-			},
-		)
+				labels: [],
+				helps,
+			})
+		} else {
+			reportError(message, position, {
+				code: "uninferable-return-type",
+				labels: [
+					primary(position, "the body's Type is not determined here"),
+				],
+				helps,
+			})
+		}
 
 		return { type: "Error" }
 	}
@@ -2842,13 +2842,24 @@ export function resolveMatchType(
 // NOTE: `Self` is what a Protocol calls its conforming Type; the two other
 // places that reject the name report it identically, so they share this.
 export function reportReservedTypeName(position: common.Position | null): void {
+	let notes = [
+		"'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.",
+	]
+
+	if (position === null) {
+		reportError("'Self' is a reserved Type name", null, {
+			code: "reserved-type-name",
+			labels: [],
+			notes,
+		})
+
+		return
+	}
+
 	reportError("'Self' is a reserved Type name", position, {
 		code: "reserved-type-name",
-		labels:
-			position === null ? [] : [primary(position, "this name is taken")],
-		notes: [
-			"'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.",
-		],
+		labels: [primary(position, "this name is taken")],
+		notes,
 	})
 }
 
@@ -3304,25 +3315,31 @@ export function resolveMethodType(
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
 		if (selfType === null) {
-			reportError(
-				"A Namespace without a target Type can only hold static Methods",
-				node.methods[0]?.position ?? null,
-				{
+			let message =
+				"A Namespace without a target Type can only hold static Methods"
+			let helps = [
+				"Give the Namespace a target Type with 'for …', or make the Methods static.",
+			]
+			let firstMethod = node.methods[0]
+
+			if (firstMethod === undefined) {
+				reportError(message, null, {
 					code: "untyped-namespace-method",
-					labels:
-						node.methods[0] === undefined
-							? []
-							: [
-									primary(
-										node.methods[0].position,
-										"these overloads are not static",
-									),
-								],
-					helps: [
-						"Give the Namespace a target Type with 'for …', or make the Methods static.",
+					labels: [],
+					helps,
+				})
+			} else {
+				reportError(message, firstMethod.position, {
+					code: "untyped-namespace-method",
+					labels: [
+						primary(
+							firstMethod.position,
+							"these overloads are not static",
+						),
 					],
-				},
-			)
+					helps,
+				})
+			}
 
 			selfType = { type: "Error" }
 		}

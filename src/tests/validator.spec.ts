@@ -189,7 +189,7 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("warning")
 			expect(diagnostics[0].code).toBe("unreachable-case")
-			expect(diagnostics[0].labels?.[0].message).toBe(
+			expect(diagnostics[0].labels[0]?.message).toBe(
 				"String is not a member of the matched Union",
 			)
 		})

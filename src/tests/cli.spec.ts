@@ -29,6 +29,7 @@ import {
 	visibleLength,
 } from "../cli/theme"
 import { closestMatch } from "../helpers/index"
+import { testDiagnostic } from "./diagnosticFactory"
 
 const buildCommand = findCommand("build") as NonNullable<
 	ReturnType<typeof findCommand>
@@ -455,9 +456,9 @@ describe("CLI", () => {
 
 		it("counts Diagnostics by severity", () => {
 			let counts = countDiagnostics([
-				{ severity: "error", message: "a", position: null },
-				{ severity: "warning", message: "b", position: null },
-				{ severity: "error", message: "c", position: null },
+				testDiagnostic({ severity: "error", message: "a" }),
+				testDiagnostic({ severity: "warning", message: "b" }),
+				testDiagnostic({ severity: "error", message: "c" }),
 			])
 
 			expect(counts).toEqual({ errors: 2, warnings: 1 })
@@ -566,7 +567,7 @@ describe("CLI", () => {
 					outcome({
 						ok: false,
 						diagnostics: [
-							{
+							testDiagnostic({
 								severity: "error",
 								message: "Broken.",
 								code: "unknown-name",
@@ -574,7 +575,7 @@ describe("CLI", () => {
 									start: { line: 3, column: 5 },
 									end: { line: 3, column: 9 },
 								},
-							},
+							}),
 						],
 					}),
 				],
@@ -602,11 +603,10 @@ describe("CLI", () => {
 					outcome({
 						ok: false,
 						diagnostics: [
-							{
+							testDiagnostic({
 								severity: "error",
 								message: "No idea.",
-								position: null,
-							},
+							}),
 						],
 					}),
 				],
@@ -614,7 +614,7 @@ describe("CLI", () => {
 			)
 
 			expect(report.files[0].diagnostics[0].line).toBe(null)
-			expect(report.files[0].diagnostics[0].code).toBe(null)
+			expect(report.files[0].diagnostics[0].code).toBe("internal-error")
 		})
 
 		it("keeps stage timings", () => {

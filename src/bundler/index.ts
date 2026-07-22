@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
+import { placelessDiagnostic } from "../diagnostics/index"
 import type { common } from "../interfaces/index"
 
 // NOTE: The Rewriter emits a module whose imports of the Essence runtime are
@@ -65,11 +66,9 @@ export async function bundle(
 				path: file.path,
 				contents: file.contents,
 			})),
-			diagnostics: result.warnings.map((warning) => ({
-				severity: "warning" as const,
-				message: warning.text,
-				position: null,
-			})),
+			diagnostics: result.warnings.map((warning) =>
+				placelessDiagnostic("warning", warning.text, "bundler-warning"),
+			),
 		}
 	} catch (error) {
 		// NOTE: The Rewriter only ever produces JavaScript it built itself, so
@@ -86,23 +85,23 @@ function bundleErrorsToDiagnostics(error: unknown): Array<common.Diagnostic> {
 	let errors = (error as { errors?: Array<{ text: string }> }).errors
 
 	if (Array.isArray(errors) && errors.length > 0) {
-		return errors.map((entry) => ({
-			severity: "error" as const,
-			message: `Could not bundle the generated JavaScript: ${entry.text}`,
-			position: null,
-			code: "internal-error" as const,
-		}))
+		return errors.map((entry) =>
+			placelessDiagnostic(
+				"error",
+				`Could not bundle the generated JavaScript: ${entry.text}`,
+				"bundle-failed",
+			),
+		)
 	}
 
 	return [
-		{
-			severity: "error",
-			message: `Could not bundle the generated JavaScript: ${
+		placelessDiagnostic(
+			"error",
+			`Could not bundle the generated JavaScript: ${
 				error instanceof Error ? error.message : String(error)
 			}`,
-			position: null,
-			code: "internal-error",
-		},
+			"bundle-failed",
+		),
 	]
 }
 
