@@ -149,10 +149,14 @@ export class TokenStream {
 		} catch {
 			let cursor = sourceLexer.save()
 
-			reportError("String Literal is never closed.", {
-				start: cursor,
-				end: cursor,
-			})
+			reportError(
+				"String Literal is never closed.",
+				{
+					start: cursor,
+					end: cursor,
+				},
+				{ code: "unclosed-string" },
+			)
 
 			this.hadLexerError = true
 		}

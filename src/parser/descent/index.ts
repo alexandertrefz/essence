@@ -108,7 +108,9 @@ class DescentParser {
 		if (!this.tokens.isAtEnd() && !this.suppressDiagnostics) {
 			let token = this.peekOrFail()
 
-			reportError(`Unexpected ${describeToken(token)}.`, token.position)
+			reportError(`Unexpected ${describeToken(token)}.`, token.position, {
+				code: "unexpected-token",
+			})
 		}
 
 		let implementation = generators.implementationSection(nodes, {
@@ -143,7 +145,7 @@ class DescentParser {
 		}
 
 		if (!this.suppressDiagnostics) {
-			reportError(error.message, error.position)
+			reportError(error.message, error.position, { code: "syntax-error" })
 		}
 	}
 
@@ -250,6 +252,7 @@ class DescentParser {
 			reportError(
 				"Expected '}' but found end of input.",
 				this.tokens.endPosition(),
+				{ code: "unclosed-block" },
 			)
 
 			this.suppressDiagnostics = true
@@ -1641,6 +1644,7 @@ class DescentParser {
 						start: name.position.start,
 						end: internalName.position.end,
 					},
+					{ code: "redundant-parameter-label" },
 				)
 
 				return generators.parameter(

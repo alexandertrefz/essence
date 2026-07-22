@@ -30,6 +30,7 @@ describe("Parser Recovery", () => {
 					start: { line: 1, column: 29 },
 					end: { line: 1, column: 30 },
 				},
+				code: "syntax-error",
 			},
 		])
 	})

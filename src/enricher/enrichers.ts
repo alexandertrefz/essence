@@ -400,6 +400,7 @@ export function enrichRecordValue(
 			reportError(
 				"Type Annotations for Records must be Record Types.",
 				node.type.position,
+				{ code: "record-annotation-not-record" },
 			)
 		}
 	}
@@ -802,6 +803,7 @@ export function enrichVariableAssignmentStatement(
 		reportError(
 			`Constant '${node.name.content}' can not be reassigned.`,
 			node.name.position,
+			{ code: "constant-reassignment" },
 		)
 	}
 
@@ -876,6 +878,7 @@ export function enrichNamespaceDefinitionStatement(
 			reportError(
 				"Namespace Type Parameters can not have Protocol bounds (yet).",
 				generic.constraint.position,
+				{ code: "protocol-bound-namespace-generic" },
 			)
 		}
 	}
@@ -1128,6 +1131,7 @@ function declareVariableInScope(
 		reportError(
 			`Variable '${variableName}' is already declared.`,
 			typeof identifier === "string" ? null : identifier.position,
+			{ code: "duplicate-variable" },
 		)
 	}
 
@@ -1185,11 +1189,13 @@ function declareTypeInScope(
 		reportError(
 			"'Self' is a reserved Type name.",
 			typeof identifier === "string" ? null : identifier.position,
+			{ code: "reserved-type-name" },
 		)
 	} else if (scope.types[variableName] != null) {
 		reportError(
 			`Type '${variableName}' is already declared.`,
 			typeof identifier === "string" ? null : identifier.position,
+			{ code: "duplicate-type" },
 		)
 	}
 
@@ -1207,6 +1213,7 @@ function declareProtocolInScope(
 		reportError(
 			`Protocol '${identifier.content}' is already declared.`,
 			identifier.position,
+			{ code: "duplicate-protocol" },
 		)
 	}
 

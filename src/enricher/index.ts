@@ -186,6 +186,7 @@ const enrichImplementation = (
 						error instanceof Error ? error.message : String(error)
 					}`,
 					node.position,
+					{ code: "internal-error" },
 				)
 
 				return []
