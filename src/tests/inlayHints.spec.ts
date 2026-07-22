@@ -36,6 +36,18 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
+	it("should not annotate a Function literal that annotates itself", () => {
+		// NOTE: The literal already spells the whole signature out on the same
+		// line — repeating it beside the name is noise the width of a Type.
+		let source = [
+			"implementation {",
+			"\tconstant halve = (_ value: Integer) -> Integer { <- value }",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([])
+	})
+
 	it("should annotate an inferred Record Type", () => {
 		let source = [
 			"implementation {",
@@ -148,7 +160,17 @@ describe("Inlay Hints", () => {
 		it("should annotate a return Type inferred from the body", () => {
 			let source = [
 				"implementation {",
-				"\tconstant describe = (_ value: Integer) { <- value::toString() }",
+				"\tnamespace Mapper<infer Item> for List<Item> {",
+				"\t\ttransformFirst<infer Target>(",
+				"\t\t\t_ transform: (_ item: Item) -> Target,",
+				"\t\t) -> Target {",
+				"\t\t\t<- transform(1)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant described = [1]::transformFirst((value) {",
+				"\t\t<- value::toString()",
+				"\t})",
 				"}",
 			].join("\n")
 
