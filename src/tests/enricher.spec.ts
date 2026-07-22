@@ -4,6 +4,7 @@ import { enrich } from "../enricher/index"
 import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
+import { namespace as listNamespace } from "../enricher/types/List"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import { namespace as numberNamespace } from "../enricher/types/Number"
 import { namespace as orderingNamespace } from "../enricher/types/Ordering"
@@ -25,6 +26,53 @@ function enrichSource(source: string): {
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
+}
+
+// NOTE: Walks the typed Program collecting every resolved Conformance —
+// wherever a bounded Type Parameter was satisfied, an Invocation carries the
+// `{ genericName, protocolName, source }` shape. Used to assert which Namespace
+// a bound resolved to at a call site.
+function collectConformances(value: unknown): Array<common.Conformance> {
+	let found: Array<common.Conformance> = []
+	let seen = new WeakSet<object>()
+
+	let visit = (node: unknown) => {
+		if (Array.isArray(node)) {
+			for (let element of node) {
+				visit(element)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		if (seen.has(node)) {
+			return
+		}
+
+		seen.add(node)
+
+		let record = node as Record<string, unknown>
+
+		if (
+			"genericName" in record &&
+			"protocolName" in record &&
+			"source" in record
+		) {
+			found.push(record as unknown as common.Conformance)
+		}
+
+		for (let key of Object.keys(record)) {
+			visit(record[key])
+		}
+	}
+
+	visit(value)
+
+	return found
 }
 
 describe("Enricher", () => {
@@ -1093,22 +1141,98 @@ describe("Enricher", () => {
 			)
 		})
 
-		it("should reject a Conformance Clause on a generic Namespace", () => {
-			let diagnostics = diagnosticsFor(`implementation {
-				protocol Showable {
-					toString() -> String
+		it("should accept a Conformance Clause on a generic Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					protocol Showable {
+						toString() -> String
+					}
+
+					namespace ListShowable<infer Item> for List<Item> is Showable {
+						toString() -> String {
+							<- "list"
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should resolve a generic Namespace's conformance at a bounded call site", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::is(b)
 				}
 
-				namespace ListShowable<infer Item> for List<Item> is Showable {
-					toString() -> String {
-						<- "list"
+				constant result: Boolean = areEqual([1, 2], [3, 4])
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let namespaceSources = collectConformances(program).filter(
+				(conformance) =>
+					conformance.protocolName === "Equatable" &&
+					conformance.source.kind === "namespace",
+			)
+
+			expect(namespaceSources.length).toBeGreaterThan(0)
+			expect(
+				namespaceSources.every(
+					(conformance) =>
+						conformance.source.kind === "namespace" &&
+						conformance.source.name === "List",
+				),
+			).toBe(true)
+		})
+
+		it("should prefer a concrete Namespace over the generic blanket", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				namespace IntegerListEquatable for List<Integer> is Equatable {
+					is(_ other: List<Integer>) -> Boolean { <- true }
+					isNot(_ other: List<Integer>) -> Boolean { <- false }
+				}
+
+				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::is(b)
+				}
+
+				constant result: Boolean = areEqual([1, 2], [3, 4])
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let namespaceSources = collectConformances(program).filter(
+				(conformance) =>
+					conformance.protocolName === "Equatable" &&
+					conformance.source.kind === "namespace",
+			)
+
+			expect(namespaceSources.length).toBeGreaterThan(0)
+			expect(
+				namespaceSources.every(
+					(conformance) =>
+						conformance.source.kind === "namespace" &&
+						conformance.source.name === "IntegerListEquatable",
+				),
+			).toBe(true)
+		})
+
+		it("should report a Method that needs a condition", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Orderable {
+					compareTo(_ other: Self) -> Ordering
+				}
+
+				namespace ListOrderable<infer Item> for List<Item> is Orderable {
+					compareTo <infer Item is Comparable>(_ other: List<Item>) -> Ordering {
+						<- Ordering#Equal
 					}
 				}
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"A generic Namespace can not declare Protocol conformance",
+			expect(diagnostics[0].code).toBe("nonconforming-namespace")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"Method 'compareTo' needs 'Item is Comparable'",
 			)
 		})
 
@@ -1392,6 +1516,7 @@ describe("Enricher", () => {
 				recordNamespace,
 				nothingNamespace,
 				orderingNamespace,
+				listNamespace,
 			]
 
 			for (const namespace of namespaces) {

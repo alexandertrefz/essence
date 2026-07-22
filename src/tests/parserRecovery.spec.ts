@@ -198,6 +198,25 @@ describe("Parser Recovery", () => {
 		}
 	})
 
+	it("should ask for 'is' before each conformance", () => {
+		let { diagnostics } = parseWithDiagnostics(
+			`implementation {
+				namespace IntegerEquatable for Integer is Equatable, Printable {}
+			}`,
+		)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].severity).toBe("error")
+		expect(diagnostics[0].message).toBe(
+			"Each conformance needs its own 'is' — write 'is Equatable, is Printable'",
+		)
+		expect(diagnostics[0].labels).toHaveLength(1)
+		expect(diagnostics[0].labels[0]?.kind).toBe("primary")
+		expect(diagnostics[0].labels[0]?.message).toBe(
+			"expected 'is' before this Protocol",
+		)
+	})
+
 	it("should recover from a broken Generic list", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {

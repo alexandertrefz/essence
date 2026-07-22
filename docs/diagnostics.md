@@ -281,15 +281,12 @@ More than one Namespace in scope makes the Type conform to the Protocol.
 ### `nonconforming-namespace`
 
 A Namespace declares conformance to a Protocol but does not satisfy it — a
-Method is missing, or its signature does not match the Protocol's.
+Method is missing, its signature does not match the Protocol's, or a fulfilling
+Method carries a Protocol bound of its own that the conformance can not assume.
 
 ### `conformance-needs-target-type`
 
 Only a Namespace with a target Type (`for …`) can conform to a Protocol.
-
-### `generic-namespace-conformance`
-
-A generic Namespace can not declare Protocol conformance yet.
 
 ### `protocol-bound-function-value`
 

@@ -2,6 +2,7 @@ import { optionalOf } from "../../helpers/index"
 import type { GenericListType, ListType } from "../../interfaces/common/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
+import { conformedMethods, Equatable, Printable } from "./Protocols"
 
 export const type: GenericListType = {
 	type: "GenericList",
@@ -33,74 +34,39 @@ const namespaceDefinition: common.NamespaceType = {
 	name: "List",
 	generics: [{ name: "ItemType", defaultType: null, infer: true }],
 	targetType: typeResolvedWithGenericUse,
+	conformsTo: ["Equatable", "Printable"],
 	properties: {},
 	methods: {
-		is: {
-			type: "SimpleMethod",
-			generics: [],
-			parameterTypes: [
-				{
-					name: null,
-					type: typeResolvedWithGenericUse,
-				},
-				{
-					name: null,
-					type: typeResolvedWithGenericUse,
-					documentation: "the List to compare against",
-				},
-			],
-			returnType: { type: "Boolean" },
-			documentation: {
+		// NOTE: `is`/`isNot` (Equatable) and `toString` (Printable) are derived
+		// from the Protocols themselves, so their signatures can never drift
+		// from the requirements the List Namespace conforms to. The List
+		// specific tooltips are passed as overrides, keeping the Hover and
+		// Completion texts exactly as hand written. `ItemType` is merged into
+		// each by the foot loop, so direct calls still infer the item Type.
+		...conformedMethods(Equatable, typeResolvedWithGenericUse, {
+			is: {
 				description:
 					"Checks whether the Lists are structurally equal — the same items, in the same order.",
 				parameters: {},
 				returns: "`true` when the Lists are equal.",
 				position: null,
 			},
-		},
-		isNot: {
-			type: "SimpleMethod",
-			generics: [],
-			parameterTypes: [
-				{
-					name: null,
-					type: typeResolvedWithGenericUse,
-				},
-				{
-					name: null,
-					type: typeResolvedWithGenericUse,
-					documentation: "the List to compare against",
-				},
-			],
-			returnType: { type: "Boolean" },
-			documentation: {
+			isNot: {
 				description:
 					"Checks whether the Lists differ — in any item or in their order.",
 				parameters: {},
 				returns: "`true` when the Lists are not equal.",
 				position: null,
 			},
-		},
-		// NOTE: The List Namespace is generic, and generic Namespaces can not
-		// declare Protocol conformance (yet) — `toString` still exists for
-		// direct calls; List conformance ships with conditional conformance.
-		toString: {
-			type: "SimpleMethod",
-			generics: [],
-			parameterTypes: [
-				{
-					name: null,
-					type: typeResolvedWithGenericUse,
-				},
-			],
-			returnType: { type: "String" },
-			documentation: {
+		}),
+		...conformedMethods(Printable, typeResolvedWithGenericUse, {
+			toString: {
 				description: "Represents the List and its items as a String.",
 				parameters: {},
 				returns: "the String representation of the List.",
 				position: null,
 			},
-		} as common.MethodType,
+		}),
 		length: {
 			type: "SimpleMethod",
 			generics: [],
