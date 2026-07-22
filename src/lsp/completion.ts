@@ -27,7 +27,7 @@ import {
 //   space by what precedes the identifier being typed.
 //
 // Member and Method completion resolve the receiver's Type with a "probe":
-// the document text up to the trigger is re-parsed with `.__lspProbe`
+// the document text up to the trigger is re-parsed with `.lspProbeMember`
 // appended (and enough closing brackets to balance it back into a valid
 // Program) — the enriched Program's Lookup node for that synthetic member
 // carries the receiver's Type in `base.type`, at the Scope the cursor is

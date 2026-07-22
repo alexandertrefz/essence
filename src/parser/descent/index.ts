@@ -1,6 +1,6 @@
-// NOTE: Hand-written recursive descent parser — the default parser of the
-// compiler, re-exported through src/parser. It reuses the node generators,
-// keeping its ASTs identical to the ones the nearley parser produced.
+// NOTE: Hand-written recursive descent parser — the compiler's parser,
+// re-exported through src/parser. It builds its ASTs through the shared
+// node generators in ../nodeGenerators.
 import { collectDiagnostics, reportError } from "../../diagnostics/index"
 import { type common, lexer, type parser } from "../../interfaces/index"
 import * as generators from "../nodeGenerators"

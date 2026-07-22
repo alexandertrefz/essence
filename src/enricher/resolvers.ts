@@ -1425,8 +1425,9 @@ export function resolveGenericDeclarations(
 }
 
 // NOTE: Declared Generics are registered as GenericUses so that Parameter
-// and Return Types can reference them. Binding them to concrete Types
-// happens once Generic Inference is implemented.
+// and Return Types can reference them. They stay opaque within the
+// declaration; binding them to concrete Types happens at each use site,
+// where Generic Inference substitutes the Arguments' Types.
 export function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	scope: enricher.Scope,
