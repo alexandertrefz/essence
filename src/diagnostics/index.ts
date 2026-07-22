@@ -8,8 +8,10 @@ import type { common } from "../interfaces/index"
 // per nesting level.
 let activeDiagnostics: Array<common.Diagnostic> = []
 
-// NOTE: The Enricher resolves some Nodes more than once; deduplication keeps
-// those repeated resolutions from reporting the same Diagnostic twice.
+// NOTE: A few Nodes are still typed more than once within one enrichment — a
+// Function definition's signature is resolved both for its own Type and while
+// its typed body is built. Deduplication keeps those repeated resolutions from
+// reporting the same Diagnostic twice.
 function isDuplicate(diagnostic: common.Diagnostic): boolean {
 	return activeDiagnostics.some(
 		(existingDiagnostic) =>
