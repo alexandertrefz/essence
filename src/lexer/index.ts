@@ -17,22 +17,28 @@ type LexingResult = {
 }
 
 const createIsHelper = (tester: string | Array<string>) => {
-	return (input: string): boolean => {
-		if (typeof tester === "string") {
-			return tester === input
-		} else {
-			return !!~tester.indexOf(input)
-		}
+	if (typeof tester === "string") {
+		return (input: string): boolean => tester === input
 	}
+
+	// NOTE: The candidate set is fixed at construction, so membership is a
+	// Set lookup rather than a scan of the Array on every character lexed.
+	let candidates = new Set(tester)
+
+	return (input: string): boolean => candidates.has(input)
 }
 
 const orHelper = (
 	funcs: Array<(input: string) => boolean>,
 	input: string,
 ): boolean => {
-	return funcs
-		.map((func) => func(input))
-		.reduce((prev, curr) => prev || curr, false)
+	for (let func of funcs) {
+		if (func(input)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 const linebreak = "\n"
