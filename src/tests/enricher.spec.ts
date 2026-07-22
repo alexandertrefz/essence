@@ -93,9 +93,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Could not find a method named 'undeclaredMethod' in the Namespaces matching this value.",
-			)
+			expect(diagnostics[0].code).toBe("unknown-method")
 		})
 
 		it("should report Method Invocations whose arguments match no overload", () => {
@@ -104,9 +102,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Passed arguments do not match any overload.",
-			)
+			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
 		it("should accept Method Invocations with matching argument labels", () => {
@@ -123,9 +119,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Passed arguments do not match any overload.",
-			)
+			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
 		it("should report Combinations of non-Record Types", () => {
@@ -202,13 +196,11 @@ describe("Enricher", () => {
 				constant c = "value"::undeclaredMethod()
 			}`)
 
-			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
-				[
-					"Variable 'undeclaredVariable' is not declared.",
-					"Type 'UndeclaredType' is not declared.",
-					"Could not find a method named 'undeclaredMethod' in the Namespaces matching this value.",
-				],
-			)
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+				"unknown-type",
+				"unknown-method",
+			])
 		})
 
 		it("should not report follow-up errors on Error Types", () => {
@@ -550,9 +542,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Passed arguments do not match any overload.",
-			)
+			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
 		// NOTE: A Function literal in Argument position may leave its
@@ -601,9 +591,7 @@ describe("Enricher", () => {
 							where (item) { <- item::isGreaterThan(2) },
 						)
 					}`).map((diagnostic) => diagnostic.message),
-				).toContain(
-					"Could not find a method named 'isGreaterThan' in the Namespaces matching this value.",
-				)
+				).toContain("No Method named 'isGreaterThan' for this value")
 			})
 
 			it("reports a literal with nothing to infer from", () => {
@@ -736,9 +724,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Passed arguments do not match any overload.",
-			)
+			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
 		it("should report Type Parameters that can not be inferred", () => {
@@ -1242,9 +1228,7 @@ describe("Enricher", () => {
 
 			expect(
 				diagnostics.some(
-					(diagnostic) =>
-						diagnostic.message ===
-						"Passed arguments do not match any overload.",
+					(diagnostic) => diagnostic.code === "no-matching-overload",
 				),
 			).toBe(true)
 		})
@@ -1257,9 +1241,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics.length).toBeGreaterThan(0)
-			expect(diagnostics[0].message).toBe(
-				"Could not find a Namespace for this value (method 'toString').",
-			)
+			expect(diagnostics[0].code).toBe("no-namespace-for-value")
 		})
 
 		it("should report a binding without a conforming Namespace", () => {
@@ -1342,11 +1324,8 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(
-				diagnostics[0].message.startsWith(
-					"Multiple Namespaces conform to Protocol 'Showable' for Type 'Record', please disambiguate.",
-				),
-			).toBe(true)
+			expect(diagnostics[0].code).toBe("ambiguous-conformance")
+			expect(diagnostics[0].message).toContain("Showable")
 		})
 
 		it("should prefer the exact target over a covering Union target", () => {
@@ -1776,7 +1755,7 @@ describe("Enricher", () => {
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"Could not find a method named 'multiplyWith' for Type 'Boolean', a member of this value's Union Type.",
+						"No Method named 'multiplyWith' for Boolean",
 				),
 			).toBe(true)
 		})
@@ -1803,7 +1782,7 @@ describe("Enricher", () => {
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"Passed arguments do not match any overload for Type 'Boolean', a member of this value's Union Type.",
+						"No overload of 'tag' accepts these Arguments for Boolean",
 				),
 			).toBe(true)
 		})
@@ -1833,10 +1812,10 @@ describe("Enricher", () => {
 			}`)
 
 			expect(
-				diagnostics.some((diagnostic) =>
-					diagnostic.message.startsWith(
-						"Passed arguments matched more than 1 Namespace for Type 'Integer', a member of this value's Union Type",
-					),
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.message ===
+						"'tag' is provided by more than one Namespace for Integer",
 				),
 			).toBe(true)
 		})
