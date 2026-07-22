@@ -7,6 +7,7 @@ import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
+import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -478,4 +479,132 @@ export function replaceAt<ItemType extends AnyType>(
 	copiedList[getInt32(index)] = item
 
 	return createList(copiedList)
+}
+
+export function lastIndexOf<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+): IntegerType | NothingType {
+	for (let index = originalList.value.length - 1; index >= 0; index--) {
+		if (anyIs(originalList.value[index], item)) {
+			return createInteger(BigInt(index))
+		}
+	}
+
+	return createNothing()
+}
+
+export function joinWith(
+	originalList: ListType<StringType>,
+	separator: StringType,
+): StringType {
+	return createString(
+		originalList.value.map((item) => item.value).join(separator.value),
+	)
+}
+
+export function flattened<ItemType extends AnyType>(
+	originalList: ListType<ListType<ItemType>>,
+): ListType<ItemType> {
+	return createList(
+		originalList.value.flatMap((innerList) => innerList.value),
+	)
+}
+
+export function partitioned<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	matchesFunction: (item: ItemType) => BooleanType,
+): RecordType {
+	let matching: Array<ItemType> = []
+	let rest: Array<ItemType> = []
+
+	for (let item of originalList.value) {
+		if (matchesFunction(item).value) {
+			matching.push(item)
+		} else {
+			rest.push(item)
+		}
+	}
+
+	return {
+		[typeKeySymbol]: "Record",
+		matching: createList(matching),
+		rest: createList(rest),
+	}
+}
+
+export function pairedWith<ItemType extends AnyType, Other extends AnyType>(
+	originalList: ListType<ItemType>,
+	otherList: ListType<Other>,
+): ListType<RecordType> {
+	let pairCount = Math.min(originalList.value.length, otherList.value.length)
+	let pairs: Array<RecordType> = []
+
+	for (let index = 0; index < pairCount; index++) {
+		pairs.push({
+			[typeKeySymbol]: "Record",
+			first: originalList.value[index],
+			second: otherList.value[index],
+		})
+	}
+
+	return createList(pairs)
+}
+
+export function splitInto<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	groupSize: IntegerType,
+): ListType<ListType<ItemType>> | NothingType {
+	if (groupSize.value < 1n) {
+		return createNothing()
+	}
+
+	let size = Number(groupSize.value)
+	let groups: Array<ListType<ItemType>> = []
+
+	for (let start = 0; start < originalList.value.length; start += size) {
+		groups.push(createList(originalList.value.slice(start, start + size)))
+	}
+
+	return createList(groups)
+}
+
+export function repeating<ItemType extends AnyType>(
+	item: ItemType,
+	times: IntegerType,
+): ListType<ItemType> {
+	if (times.value <= 0n) {
+		// NOTE: Zero or fewer copies is the empty List, the way `replaceAt`
+		// treats an impossible position as a no-op.
+		return createList([])
+	}
+
+	return createList(Array.from({ length: Number(times.value) }, () => item))
+}
+
+export function of(
+	firstInteger: IntegerType,
+	lastInteger: IntegerType,
+): ListType<IntegerType> {
+	let integers: Array<IntegerType> = []
+
+	if (firstInteger.value <= lastInteger.value) {
+		for (
+			let value = firstInteger.value;
+			value <= lastInteger.value;
+			value++
+		) {
+			integers.push(createInteger(value))
+		}
+	} else {
+		for (
+			let value = firstInteger.value;
+			value >= lastInteger.value;
+			value--
+		) {
+			integers.push(createInteger(value))
+		}
+	}
+
+	return createList(integers)
 }
