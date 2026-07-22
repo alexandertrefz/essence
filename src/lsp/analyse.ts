@@ -1,4 +1,4 @@
-import { containsErrors } from "../diagnostics/index"
+import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
@@ -27,13 +27,13 @@ export function analyse(source: string): Array<common.Diagnostic> {
 		// NOTE: A compiler bug must never take down the Language Server, so
 		// any unexpected throw is surfaced as a single Diagnostic instead.
 		return [
-			{
-				severity: "error",
-				message: `Internal Compiler Error: ${
+			placelessDiagnostic(
+				"error",
+				`Internal Compiler Error: ${
 					error instanceof Error ? error.message : String(error)
 				}`,
-				position: null,
-			},
+				"internal-error",
+			),
 		]
 	}
 }

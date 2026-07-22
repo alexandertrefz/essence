@@ -4,6 +4,7 @@ import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
 import { analyse } from "../lsp/analyse"
 import { toLspDiagnostic, toLspRange } from "../lsp/conversion"
+import { testDiagnostic } from "./diagnosticFactory"
 
 describe("LSP", () => {
 	describe("analyse", () => {
@@ -98,14 +99,14 @@ describe("LSP", () => {
 		it("should map error Diagnostics", () => {
 			expect(
 				toLspDiagnostic(
-					{
+					testDiagnostic({
 						severity: "error",
 						message: "Some Error.",
 						position: {
 							start: { line: 1, column: 1 },
 							end: { line: 1, column: 10 },
 						},
-					},
+					}),
 					"file:///Test.es",
 				),
 			).toEqual({
@@ -116,16 +117,18 @@ describe("LSP", () => {
 				severity: DiagnosticSeverity.Error,
 				message: "Some Error.",
 				source: "essence",
+				code: "internal-error",
+				tags: undefined,
 			})
 		})
 
 		it("should map warning Diagnostics", () => {
 			let diagnostic = toLspDiagnostic(
-				{
+				testDiagnostic({
 					severity: "warning",
 					message: "Some Warning.",
 					position: null,
-				},
+				}),
 				"file:///Test.es",
 			)
 
@@ -138,13 +141,13 @@ describe("LSP", () => {
 
 		it("should carry the code and map tags", () => {
 			let diagnostic = toLspDiagnostic(
-				{
+				testDiagnostic({
 					severity: "warning",
 					message: "Dead code.",
 					position: null,
 					code: "unreachable-case",
 					tags: ["unnecessary"],
-				},
+				}),
 				"file:///Test.es",
 			)
 
@@ -152,17 +155,16 @@ describe("LSP", () => {
 			expect(diagnostic.tags).toEqual([DiagnosticTag.Unnecessary])
 		})
 
-		it("should leave code and tags unset when there are none", () => {
+		it("should leave tags and related information unset when there are none", () => {
 			let diagnostic = toLspDiagnostic(
-				{
+				testDiagnostic({
 					severity: "error",
 					message: "Some Error.",
 					position: null,
-				},
+				}),
 				"file:///Test.es",
 			)
 
-			expect(diagnostic.code).toBeUndefined()
 			expect(diagnostic.tags).toBeUndefined()
 			expect(diagnostic.relatedInformation).toBeUndefined()
 		})
@@ -173,7 +175,7 @@ describe("LSP", () => {
 				end: { line: 1, column: 2 },
 			}
 			let diagnostic = toLspDiagnostic(
-				{
+				testDiagnostic({
 					severity: "error",
 					message: "This value does not fit Variable 'x'",
 					position,
@@ -187,7 +189,7 @@ describe("LSP", () => {
 					],
 					notes: ["'x' is declared as Integer."],
 					helps: ["Convert it first."],
-				},
+				}),
 				"file:///Test.es",
 			)
 
@@ -210,7 +212,7 @@ describe("LSP", () => {
 				end: { line: 1, column: 15 },
 			}
 			let diagnostic = toLspDiagnostic(
-				{
+				testDiagnostic({
 					severity: "error",
 					message: "This value does not fit Variable 'count'",
 					position: valuePosition,
@@ -227,7 +229,7 @@ describe("LSP", () => {
 							kind: "secondary",
 						},
 					],
-				},
+				}),
 				"file:///Test.es",
 			)
 

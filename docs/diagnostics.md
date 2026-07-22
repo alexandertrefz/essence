@@ -321,6 +321,33 @@ explicit `-> Type`.
 
 A Function that is not passed as an Argument must write its return Type.
 
+## The Compiler as a program
+
+These are not about a Program at all — they are about the run. They carry no
+source location, because there is none to carry.
+
+### `file-not-found`
+
+The named source file does not exist.
+
+### `not-a-file`
+
+A directory was passed where a source file was expected. Pass the files inside
+it, for example `src/*.es`.
+
+### `unreadable-file`
+
+The file exists but could not be read — most often a permissions problem.
+
+### `bundle-failed`
+
+The generated JavaScript could not be bundled. Always a Compiler bug — the
+Rewriter only ever emits JavaScript it built itself.
+
+### `bundler-warning`
+
+A warning from the JavaScript bundler, passed through unchanged.
+
 ## Everything else
 
 ### `at-outside-method`

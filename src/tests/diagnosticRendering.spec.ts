@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { Source } from "../ariadne/index"
+import { primary } from "../diagnostics/index"
 import { renderDiagnostic, renderDiagnostics } from "../diagnostics/render"
 import type { common } from "../interfaces/index"
+import { testDiagnostic } from "./diagnosticFactory"
 
 function removeTrailing(text: string): string {
 	let lines = text.split("\n")
@@ -36,22 +38,38 @@ function expectOutput(actual: string, expected: string): void {
 	expect(removeTrailing(actual)).toBe(dedent(expected))
 }
 
+// NOTE: A positioned Diagnostic always carries at least one Label — the type
+// makes it so — and the Label's message is what the arrow says. These tests
+// are about the layout around it, so they all use the same short one.
 function diagnostic(
 	severity: common.DiagnosticSeverity,
 	message: string,
 	position: common.Position | null,
+	code: common.DiagnosticCode = "internal-error",
 ): common.Diagnostic {
-	return { severity, message, position }
+	return testDiagnostic({
+		severity,
+		message,
+		position,
+		code,
+		labels:
+			position === null ? [] : [primary(position, "the offending span")],
+	})
 }
 
 describe("diagnostic rendering", () => {
 	test("renders an error with a position as an annotated report", () => {
 		let sourceText = "constant x = 10\nx = 20\n"
 		let output = renderDiagnostic(
-			diagnostic("error", "Cannot reassign Constant 'x'.", {
-				start: { line: 2, column: 1 },
-				end: { line: 2, column: 2 },
-			}),
+			diagnostic(
+				"error",
+				"Cannot reassign Constant 'x'.",
+				{
+					start: { line: 2, column: 1 },
+					end: { line: 2, column: 2 },
+				},
+				"constant-reassignment",
+			),
 			new Source(sourceText),
 			"Test.es",
 			{ color: false },
@@ -60,11 +78,13 @@ describe("diagnostic rendering", () => {
 		expectOutput(
 			output,
 			`
+			[constant-reassignment]
 			Error: Cannot reassign Constant 'x'.
 			   ╭─┤ Test.es:2:1 │
 			   │
 			 2 │ x = 20
-			   │ ─
+			   │ ▲
+			   │ ╰── the offending span
 			───╯
 			`,
 		)
@@ -73,10 +93,15 @@ describe("diagnostic rendering", () => {
 	test("renders a warning with a Warning header", () => {
 		let sourceText = "constant x = 10\n"
 		let output = renderDiagnostic(
-			diagnostic("warning", "Unreachable Match Case.", {
-				start: { line: 1, column: 10 },
-				end: { line: 1, column: 16 },
-			}),
+			diagnostic(
+				"warning",
+				"Unreachable Match Case.",
+				{
+					start: { line: 1, column: 10 },
+					end: { line: 1, column: 16 },
+				},
+				"unreachable-case",
+			),
 			new Source(sourceText),
 			"Test.es",
 			{ color: false },
@@ -85,11 +110,13 @@ describe("diagnostic rendering", () => {
 		expectOutput(
 			output,
 			`
+			[unreachable-case]
 			Warning: Unreachable Match Case.
 			   ╭─┤ Test.es:1:10 │
 			   │
 			 1 │ constant x = 10
-			   │          ──────
+			   │          ───┬──
+			   │             ╰──── the offending span
 			───╯
 			`,
 		)
@@ -107,17 +134,28 @@ describe("diagnostic rendering", () => {
 			{ color: false },
 		)
 
-		expectOutput(output, "Error: Internal Compiler Error: something broke.")
+		expectOutput(
+			output,
+			`
+			[internal-error]
+			Error: Internal Compiler Error: something broke.
+			`,
+		)
 	})
 
 	test("renders multiple diagnostics against a shared source", () => {
 		let sourceText = "constant x = 10\nx = 20\n"
 		let output = renderDiagnostics(
 			[
-				diagnostic("error", "Cannot reassign Constant 'x'.", {
-					start: { line: 2, column: 1 },
-					end: { line: 2, column: 2 },
-				}),
+				diagnostic(
+					"error",
+					"Cannot reassign Constant 'x'.",
+					{
+						start: { line: 2, column: 1 },
+						end: { line: 2, column: 2 },
+					},
+					"constant-reassignment",
+				),
 				diagnostic("error", "Missing declaration.", null),
 			],
 			sourceText,
@@ -128,13 +166,16 @@ describe("diagnostic rendering", () => {
 		expectOutput(
 			output,
 			`
+			[constant-reassignment]
 			Error: Cannot reassign Constant 'x'.
 			   ╭─┤ Test.es:2:1 │
 			   │
 			 2 │ x = 20
-			   │ ─
+			   │ ▲
+			   │ ╰── the offending span
 			───╯
 
+			[internal-error]
 			Error: Missing declaration.
 			`,
 		)
@@ -156,7 +197,7 @@ describe("diagnostic rendering", () => {
 
 	test("renders a code in the header", () => {
 		let output = renderDiagnostic(
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "Match Expression does not handle every Case",
 				position: {
@@ -164,7 +205,7 @@ describe("diagnostic rendering", () => {
 					end: { line: 1, column: 9 },
 				},
 				code: "missing-case",
-			},
+			}),
 			new Source("constant x = 10\n"),
 			"Test.es",
 			{ color: false },
@@ -177,9 +218,10 @@ describe("diagnostic rendering", () => {
 
 	test("renders a primary Label's message beside its span", () => {
 		let output = renderDiagnostic(
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "This value does not fit Variable 'x'",
+				code: "assignment-type-mismatch",
 				position: {
 					start: { line: 2, column: 5 },
 					end: { line: 2, column: 11 },
@@ -194,7 +236,7 @@ describe("diagnostic rendering", () => {
 						kind: "primary",
 					},
 				],
-			},
+			}),
 			new Source('variable x = 10\nx = "ten"\n'),
 			"Test.es",
 			{ color: false },
@@ -203,6 +245,7 @@ describe("diagnostic rendering", () => {
 		expectOutput(
 			output,
 			`
+			[assignment-type-mismatch]
 			Error: This value does not fit Variable 'x'
 			   ╭─┤ Test.es:2:5 │
 			   │
@@ -216,7 +259,7 @@ describe("diagnostic rendering", () => {
 
 	test("renders a secondary Label pointing at the declaration", () => {
 		let output = renderDiagnostic(
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "This value does not fit Variable 'x'",
 				position: {
@@ -241,7 +284,7 @@ describe("diagnostic rendering", () => {
 						kind: "secondary",
 					},
 				],
-			},
+			}),
 			new Source('variable x = 10\nx = "ten"\n'),
 			"Test.es",
 			{ color: false },
@@ -255,7 +298,7 @@ describe("diagnostic rendering", () => {
 
 	test("renders notes and helps below the source", () => {
 		let output = renderDiagnostic(
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "Case '#Green' is ambiguous",
 				position: {
@@ -264,7 +307,7 @@ describe("diagnostic rendering", () => {
 				},
 				notes: ["'Colour' declares it.", "'Traffic' declares it too."],
 				helps: ["Write 'Colour.Green' instead."],
-			},
+			}),
 			new Source("constant x = 10\n"),
 			"Test.es",
 			{ color: false },
@@ -277,7 +320,7 @@ describe("diagnostic rendering", () => {
 
 	test("colors primary and secondary Labels differently", () => {
 		let output = renderDiagnostic(
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "This value does not fit Variable 'x'",
 				position: {
@@ -302,7 +345,7 @@ describe("diagnostic rendering", () => {
 						kind: "secondary",
 					},
 				],
-			},
+			}),
 			new Source('variable x = 10\nx = "ten"\n'),
 			"Test.es",
 		)
@@ -325,14 +368,21 @@ describe("diagnostic rendering", () => {
 
 	test("colored output styles the severity header", () => {
 		let output = renderDiagnostic(
-			diagnostic("error", "Cannot reassign Constant 'x'.", {
-				start: { line: 2, column: 1 },
-				end: { line: 2, column: 2 },
-			}),
+			diagnostic(
+				"error",
+				"Cannot reassign Constant 'x'.",
+				{
+					start: { line: 2, column: 1 },
+					end: { line: 2, column: 2 },
+				},
+				"constant-reassignment",
+			),
 			new Source("constant x = 10\nx = 20\n"),
 			"Test.es",
 		)
 
-		expect(output).toContain("\x1b[31mError\x1b[0m")
+		expect(output).toContain(
+			"\x1b[38;5;115m[constant-reassignment]\x1b[0m\n\x1b[31mError\x1b[0m",
+		)
 	})
 })

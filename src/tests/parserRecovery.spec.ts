@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { parseWithDiagnostics } from "../parser/index"
+import { testDiagnostic } from "./diagnosticFactory"
 
 describe("Parser Recovery", () => {
 	it("should report zero diagnostics for a valid program", () => {
@@ -23,7 +24,7 @@ describe("Parser Recovery", () => {
 		)
 
 		expect(diagnostics).toEqual([
-			{
+			testDiagnostic({
 				severity: "error",
 				message: "Expected '=' but found '1'.",
 				position: {
@@ -41,7 +42,7 @@ describe("Parser Recovery", () => {
 						kind: "primary",
 					},
 				],
-			},
+			}),
 		])
 	})
 
