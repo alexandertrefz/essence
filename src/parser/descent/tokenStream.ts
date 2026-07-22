@@ -6,7 +6,14 @@ import { parseDocumentation } from "../documentation"
 const TokenType = lexer.TokenType
 type Token = lexer.Token
 
-export class ParseError extends Error {
+// NOTE: Deliberately not an `Error` subclass. Speculative parsing throws and
+// catches this on every backtrack, and capturing a stack trace per throw is
+// the single most expensive thing the parser does. Nothing outside the parser
+// ever sees a ParseError — it is caught by `backtrack` or by the Statement
+// loops, which read only `message`, `position` and `label`.
+export class ParseError {
+	name = "ParseError"
+	message: string
 	position: common.Position | null
 	// NOTE: What belongs under the arrow at `position` — "expected ':'" —
 	// as opposed to `message`, which is the whole sentence. The renderer puts
@@ -18,8 +25,7 @@ export class ParseError extends Error {
 		position: common.Position | null = null,
 		label: string | null = null,
 	) {
-		super(message)
-		this.name = "ParseError"
+		this.message = message
 		this.position = position
 		this.label = label
 	}
