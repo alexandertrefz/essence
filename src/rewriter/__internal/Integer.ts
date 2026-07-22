@@ -244,6 +244,100 @@ export function isGreaterThanOrEqualTo__overload$2(
 
 // #endregion
 
+// #region Everyday methods
+
+export function absolute(integer: IntegerType): IntegerType {
+	return createInteger(integer.value < 0n ? -integer.value : integer.value)
+}
+
+export function negated(integer: IntegerType): IntegerType {
+	return createInteger(-integer.value)
+}
+
+export function isEven(integer: IntegerType): BooleanType {
+	return createBoolean(integer.value % 2n === 0n)
+}
+
+export function isOdd(integer: IntegerType): BooleanType {
+	return createBoolean(integer.value % 2n !== 0n)
+}
+
+export function isPositive(integer: IntegerType): BooleanType {
+	return createBoolean(integer.value > 0n)
+}
+
+export function isNegative(integer: IntegerType): BooleanType {
+	return createBoolean(integer.value < 0n)
+}
+
+export function isZero(integer: IntegerType): BooleanType {
+	return createBoolean(integer.value === 0n)
+}
+
+export function remainderOf(
+	integer: IntegerType,
+	divisor: IntegerType,
+): IntegerType | NothingType {
+	if (divisor.value === 0n) {
+		return createNothing()
+	}
+
+	// NOTE: Euclidean remainder — the result is always in
+	// `0 ≤ r < |divisor|`, whatever the signs of the operands.
+	let remainder = integer.value % divisor.value
+
+	if (remainder < 0n) {
+		remainder += divisor.value < 0n ? -divisor.value : divisor.value
+	}
+
+	return createInteger(remainder)
+}
+
+export function toThePowerOf(
+	base: IntegerType,
+	exponent: IntegerType,
+): IntegerType | RationalType | NothingType {
+	if (exponent.value >= 0n) {
+		return createInteger(base.value ** exponent.value)
+	}
+
+	if (base.value === 0n) {
+		return createNothing()
+	}
+
+	return createRational(1n, base.value ** -exponent.value)
+}
+
+export function clampedBetween(
+	integer: IntegerType,
+	lowerBound: IntegerType,
+	upperBound: IntegerType,
+): IntegerType | NothingType {
+	if (lowerBound.value > upperBound.value) {
+		return createNothing()
+	}
+
+	if (integer.value < lowerBound.value) {
+		return lowerBound
+	}
+
+	if (integer.value > upperBound.value) {
+		return upperBound
+	}
+
+	return integer
+}
+
+export function parse(text: StringType): IntegerType | NothingType {
+	if (!/^-?[0-9]+$/.test(text.value)) {
+		return createNothing()
+	}
+
+	return createInteger(BigInt(text.value))
+}
+
+// #endregion
+
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())

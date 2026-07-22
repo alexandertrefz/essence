@@ -55,9 +55,17 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "Algebraic" },
+					documentation: "the Algebraic to compare with",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the Algebraics are different numbers — exactly, no approximation is consulted.",
+				parameters: {},
+				returns: "`true` when the numbers differ.",
+				position: null,
+			},
 		},
 
 		compareTo: {
@@ -87,6 +95,13 @@ export const namespace: common.NamespaceType = {
 
 		add: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Adds a number to this Algebraic, exactly. Two Algebraics over the same radical stay in the slice; the radical parts may also cancel, leaving a Rational.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -142,6 +157,13 @@ export const namespace: common.NamespaceType = {
 
 		subtract: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Subtracts a number from this Algebraic, exactly. Subtracting an equal radical part leaves a Rational.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -190,6 +212,13 @@ export const namespace: common.NamespaceType = {
 
 		multiplyWith: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Multiplies this Algebraic with a number, exactly. A radical times itself turns rational — `√2 · √2` is `2` — and multiplying by zero collapses to zero.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -251,6 +280,13 @@ export const namespace: common.NamespaceType = {
 
 		divideBy: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational gives `Nothing` only for zero.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -301,6 +337,44 @@ export const namespace: common.NamespaceType = {
 					returnType: rationalOrAlgebraicOrNothing,
 				},
 			],
+		},
+
+		absolute: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Algebraic" },
+				},
+			],
+			returnType: { type: "Algebraic" },
+			documentation: {
+				description:
+					"The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
+		},
+
+		negated: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Algebraic" },
+				},
+			],
+			returnType: { type: "Algebraic" },
+			documentation: {
+				description:
+					"The Algebraic with its sign flipped. Negating an irrational leaves it irrational, so the result is again an Algebraic.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 		},
 
 		toString: {

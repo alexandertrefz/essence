@@ -40,6 +40,13 @@ export function or(
 	return createBoolean(originalBoolean.value || other.value)
 }
 
+export function exclusiveOr(
+	originalBoolean: BooleanType,
+	other: BooleanType,
+): BooleanType {
+	return createBoolean(originalBoolean.value !== other.value)
+}
+
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(boolean: BooleanType): StringType {
 	return createString(boolean.value.toString())

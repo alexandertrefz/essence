@@ -52,13 +52,28 @@ export const namespace: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "Transcendental" },
+					documentation: "the Transcendental to compare with",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the Transcendentals have different canonical forms — within the current grammar, different numbers.",
+				parameters: {},
+				returns: "`true` when the canonical forms differ.",
+				position: null,
+			},
 		},
 
 		add: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Adds a number to this Transcendental, exactly. Two Transcendentals may cancel their π terms, leaving a Rational.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -120,6 +135,13 @@ export const namespace: common.NamespaceType = {
 
 		subtract: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Subtracts a number from this Transcendental, exactly. Subtracting an equal π term leaves a Rational.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -174,6 +196,13 @@ export const namespace: common.NamespaceType = {
 
 		multiplyWith: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Multiplies this Transcendental with an Integer or Rational, exactly — multiplying by zero collapses to zero. Two Transcendentals can not be multiplied: `π·π` would leave the linear-in-π grammar.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -220,6 +249,13 @@ export const namespace: common.NamespaceType = {
 
 		divideBy: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational gives `Nothing` only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `TAU::divideBy(PI)` is `2` — and gives `Nothing` otherwise.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -286,6 +322,44 @@ export const namespace: common.NamespaceType = {
 					},
 				},
 			],
+		},
+
+		absolute: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Transcendental" },
+				},
+			],
+			returnType: { type: "Transcendental" },
+			documentation: {
+				description:
+					"The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
+		},
+
+		negated: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "Transcendental" },
+				},
+			],
+			returnType: { type: "Transcendental" },
+			documentation: {
+				description:
+					"The Transcendental with its sign flipped. The π term keeps its non-zero coefficient, so the result is again a Transcendental.",
+				parameters: {},
+				returns: null,
+				position: null,
+			},
 		},
 
 		toString: {
