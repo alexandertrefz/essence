@@ -59,6 +59,37 @@ describe("ariadne report rendering", () => {
 		expectOutput(message, "Error: can't compare apples with oranges")
 	})
 
+	test("one message with a code", () => {
+		let message = new Report({
+			kind: "error",
+			span: { start: 0, end: 0 },
+			code: "E03",
+			message: "can't compare apples with oranges",
+			config: noColor(),
+		}).render(Source.from(""))
+
+		expectOutput(
+			message,
+			`
+			[E03]
+			Error: can't compare apples with oranges
+			`,
+		)
+	})
+
+	test("a code is painted like a Note, on a line of its own", () => {
+		let message = new Report({
+			kind: "error",
+			span: { start: 0, end: 0 },
+			code: "E03",
+			message: "can't compare apples with oranges",
+		}).render(Source.from(""))
+
+		expect(message).toContain(
+			"\x1b[38;5;115m[E03]\x1b[0m\n\x1b[31mError\x1b[0m:",
+		)
+	})
+
 	test("two labels without messages", () => {
 		let source = "apple == orange;"
 		let message = new Report({

@@ -292,6 +292,16 @@ export function writeReport<Id>(report: Report<Id>, cache: Cache<Id>): string {
 	// --- Header ---
 
 	let kindColor = reportKindColor(report.kind, config)
+
+	// NOTE: The code gets a line of its own above the header, in the same
+	// color as `Note` and `Help`, rather than sharing the kind's line and
+	// color as upstream does. It is a lookup key rather than part of the
+	// sentence, and on the header line it competes with the word that says
+	// whether this is an error at all.
+	if (report.code !== null) {
+		w.writeLine(paint(`[${report.code}]`, config.noteColor()))
+	}
+
 	w.writeLine(
 		`${paint(reportKindName(report.kind), kindColor)}: ${report.message ?? ""}`,
 	)
