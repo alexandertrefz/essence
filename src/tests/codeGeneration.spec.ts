@@ -387,6 +387,24 @@ describe("Code Generation", () => {
 		})
 	})
 
+	describe("String Methods", () => {
+		// NOTE: String gained Comparable, so a List of Strings sorts with a
+		// real comparator — this pins that `compareTo` resolves on the String
+		// receiver and the whole pipeline emits.
+		it("sorts a List of Strings through String.compareTo", () => {
+			let generated = generate(`
+				implementation {
+					__print(["b", "a"]::sortedBy(
+						(first, second) { <- first::compareTo(second) },
+					))
+				}
+			`)
+
+			expect(generated).toContain("List.sortedBy(")
+			expect(generated).toContain("String.compareTo(")
+		})
+	})
+
 	describe("Higher-order List Methods", () => {
 		// NOTE: `map`/`reduce` are the first builtins with a Method-level
 		// Generic and the first to take a contextually typed callback all the

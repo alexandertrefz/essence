@@ -749,6 +749,26 @@ describe("Rewriter", () => {
 					)
 				})
 
+				it("splits an empty splitter by code point, keeping astral characters whole", () => {
+					// NOTE: `String.split("")` would tear the emoji into two
+					// lone surrogates; splitting by code point keeps it whole,
+					// so this matches `characters()` exactly.
+					let emoji = string.createString("a\u{1F600}b")
+
+					expect(
+						string.splitOn(emoji, string.createString("")),
+					).toEqual(
+						list.createList([
+							string.createString("a"),
+							string.createString("\u{1F600}"),
+							string.createString("b"),
+						]),
+					)
+					expect(
+						string.splitOn(emoji, string.createString("")),
+					).toEqual(string.characters(emoji))
+				})
+
 				it("splits correctly using a substring", () => {
 					expect(
 						string.splitOn(
@@ -760,6 +780,21 @@ describe("Rewriter", () => {
 							string.createString("1"),
 							string.createString("2"),
 							string.createString("3"),
+						]),
+					)
+				})
+
+				it("splits on an astral separator", () => {
+					expect(
+						string.splitOn(
+							string.createString("a\u{1F600}b\u{1F600}c"),
+							string.createString("\u{1F600}"),
+						),
+					).toEqual(
+						list.createList([
+							string.createString("a"),
+							string.createString("b"),
+							string.createString("c"),
 						]),
 					)
 				})
@@ -903,6 +938,263 @@ describe("Rewriter", () => {
 							string.createString("d"),
 						),
 					).toEqual(booleanTrue())
+				})
+			})
+
+			describe("length and characters", () => {
+				it("counts and splits by code point", () => {
+					expect(string.length(string.createString("abc"))).toEqual(
+						integer.createInteger(3n),
+					)
+					// NOTE: The emoji is one code point, not two code units.
+					expect(
+						string.length(string.createString("a\u{1F600}b")),
+					).toEqual(integer.createInteger(3n))
+					expect(
+						string.characters(string.createString("a\u{1F600}")),
+					).toEqual(
+						list.createList([
+							string.createString("a"),
+							string.createString("\u{1F600}"),
+						]),
+					)
+				})
+			})
+
+			describe("characterAt", () => {
+				it("returns the code point at the position", () => {
+					expect(
+						string.characterAt(
+							string.createString("a\u{1F600}b"),
+							integerOne(),
+						),
+					).toEqual(string.createString("\u{1F600}"))
+				})
+
+				it("returns nothing outside the String", () => {
+					expect(
+						string.characterAt(
+							string.createString("a"),
+							integerTwo(),
+						),
+					).toEqual(nothing())
+					expect(
+						string.characterAt(
+							string.createString("a"),
+							integer.createInteger(-1n),
+						),
+					).toEqual(nothing())
+				})
+			})
+
+			describe("casing and trimming", () => {
+				it("upper- and lower-cases", () => {
+					expect(
+						string.uppercased(string.createString("aB")),
+					).toEqual(string.createString("AB"))
+					expect(
+						string.lowercased(string.createString("aB")),
+					).toEqual(string.createString("ab"))
+				})
+
+				it("trims from either or both ends", () => {
+					expect(
+						string.trimmed(string.createString("  hi  ")),
+					).toEqual(string.createString("hi"))
+					expect(
+						string.trimmedAtStart(string.createString("  hi  ")),
+					).toEqual(string.createString("hi  "))
+					expect(
+						string.trimmedAtEnd(string.createString("  hi  ")),
+					).toEqual(string.createString("  hi"))
+				})
+			})
+
+			describe("prefixes and suffixes", () => {
+				it("answers starts/ends and their negations", () => {
+					const hello = string.createString("hello")
+
+					expect(
+						string.startsWith(hello, string.createString("he")),
+					).toEqual(booleanTrue())
+					expect(
+						string.doesNotStartWith(
+							hello,
+							string.createString("he"),
+						),
+					).toEqual(booleanFalse())
+					expect(
+						string.endsWith(hello, string.createString("lo")),
+					).toEqual(booleanTrue())
+					expect(
+						string.doesNotEndWith(hello, string.createString("x")),
+					).toEqual(booleanTrue())
+				})
+			})
+
+			describe("replaceEvery", () => {
+				it("replaces every occurrence", () => {
+					expect(
+						string.replaceEvery(
+							string.createString("a-a-a"),
+							string.createString("a"),
+							string.createString("b"),
+						),
+					).toEqual(string.createString("b-b-b"))
+				})
+			})
+
+			describe("repeated", () => {
+				it("joins the String to itself", () => {
+					expect(
+						string.repeated(
+							string.createString("ab"),
+							integerTwo(),
+						),
+					).toEqual(string.createString("abab"))
+				})
+
+				it("is empty for a count below one", () => {
+					expect(
+						string.repeated(
+							string.createString("ab"),
+							integerZero(),
+						),
+					).toEqual(stringEmpty())
+					expect(
+						string.repeated(
+							string.createString("ab"),
+							integer.createInteger(-3n),
+						),
+					).toEqual(stringEmpty())
+				})
+			})
+
+			describe("reversed", () => {
+				it("reverses by code point, keeping astral characters whole", () => {
+					expect(
+						string.reversed(string.createString("a\u{1F600}b")),
+					).toEqual(string.createString("b\u{1F600}a"))
+				})
+			})
+
+			describe("slice", () => {
+				const abcde = () => string.createString("abcde")
+
+				it("returns the half-open range", () => {
+					expect(
+						string.slice(
+							abcde(),
+							integerOne(),
+							integer.createInteger(3n),
+						),
+					).toEqual(string.createString("bc"))
+				})
+
+				it("clamps each end", () => {
+					expect(
+						string.slice(
+							abcde(),
+							integer.createInteger(-2n),
+							integer.createInteger(99n),
+						),
+					).toEqual(abcde())
+				})
+
+				it("is empty when the range is empty or reversed", () => {
+					expect(
+						string.slice(
+							abcde(),
+							integer.createInteger(3n),
+							integerOne(),
+						),
+					).toEqual(stringEmpty())
+				})
+			})
+
+			describe("firstIndexOf", () => {
+				it("gives the code-point position of the first occurrence", () => {
+					expect(
+						string.firstIndexOf(
+							string.createString("a\u{1F600}bc"),
+							string.createString("b"),
+						),
+					).toEqual(integerTwo())
+				})
+
+				it("gives nothing when absent", () => {
+					expect(
+						string.firstIndexOf(
+							string.createString("abc"),
+							string.createString("z"),
+						),
+					).toEqual(nothing())
+				})
+			})
+
+			describe("padding", () => {
+				it("pads at the start and end up to a length in code points", () => {
+					expect(
+						string.paddedAtStart(
+							string.createString("7"),
+							integer.createInteger(3n),
+							string.createString("0"),
+						),
+					).toEqual(string.createString("007"))
+					expect(
+						string.paddedAtEnd(
+							string.createString("7"),
+							integer.createInteger(3n),
+							string.createString("."),
+						),
+					).toEqual(string.createString("7.."))
+				})
+
+				it("leaves a long-enough String unchanged, and an empty pad has no effect", () => {
+					expect(
+						string.paddedAtStart(
+							string.createString("hello"),
+							integerTwo(),
+							string.createString("0"),
+						),
+					).toEqual(string.createString("hello"))
+					expect(
+						string.paddedAtStart(
+							string.createString("hi"),
+							integerHundred(),
+							stringEmpty(),
+						),
+					).toEqual(string.createString("hi"))
+				})
+			})
+
+			describe("compareTo", () => {
+				it("orders lexicographically by code point", () => {
+					expect(
+						string.compareTo(
+							string.createString("apple"),
+							string.createString("banana"),
+						),
+					).toBe(ordering.less)
+					expect(
+						string.compareTo(
+							string.createString("banana"),
+							string.createString("apple"),
+						),
+					).toBe(ordering.greater)
+					expect(
+						string.compareTo(
+							string.createString("apple"),
+							string.createString("apple"),
+						),
+					).toBe(ordering.equal)
+					// NOTE: A prefix orders before the longer String.
+					expect(
+						string.compareTo(
+							string.createString("app"),
+							string.createString("apple"),
+						),
+					).toBe(ordering.less)
 				})
 			})
 		})

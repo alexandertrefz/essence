@@ -7,7 +7,7 @@ implementation {
 	§ Next 2 lines are equivalent.
 	__print(Integer.subtract(1234, 234))
 	__print(1234::subtract(234))
-	
+
 	§ Next 2 lines are equivalent.
 	__print(Integer.divideBy(20000, 2))
 	__print(20000::divideBy(2))
