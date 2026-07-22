@@ -329,11 +329,27 @@ export function variableAssignmentStatement(
 	return { nodeType: "VariableAssignmentStatement", name, value, position }
 }
 
+export function conformanceClause(
+	protocol: parser.IdentifierNode,
+	conditions: Array<parser.WhereConditionNode>,
+	position: common.Position,
+): parser.ConformanceClauseNode {
+	return { nodeType: "ConformanceClause", protocol, conditions, position }
+}
+
+export function whereCondition(
+	generic: parser.IdentifierNode,
+	protocol: parser.IdentifierNode,
+	position: common.Position,
+): parser.WhereConditionNode {
+	return { nodeType: "WhereCondition", generic, protocol, position }
+}
+
 export function namespaceDefinitionStatement(
 	name: parser.IdentifierNode,
 	generics: Array<parser.GenericDeclarationNode>,
 	targetType: parser.TypeDeclarationNode | null,
-	conformsTo: Array<parser.IdentifierNode>,
+	conformsTo: Array<parser.ConformanceClauseNode>,
 	body: Array<NamespaceProperty | NamespaceMethod>,
 	position: common.Position,
 	documentation: common.Documentation | null = null,

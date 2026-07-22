@@ -156,6 +156,10 @@ export type DiagnosticCode =
 	| "conformance-needs-target-type"
 	| "protocol-bound-function-value"
 	| "protocol-bound-namespace-generic"
+	| "unknown-where-generic"
+	| "conflicting-where-condition"
+	| "unwitnessable-where-condition"
+	| "unsatisfied-conformance-condition"
 	// Inference — what the Compiler could not work out on its own.
 	| "uninferable-type-parameter"
 	| "uninferable-parameter-type"
@@ -317,6 +321,14 @@ export type NamespaceType = {
 	// its `is` clause. Optional so the hand written builtin Namespaces stay
 	// valid until they conform.
 	conformsTo?: Array<string>
+	// NOTE: The `where` conditions of each conditional conformance, keyed by
+	// Protocol name — `{ Comparable: [{ generic: "ItemType", protocol:
+	// "Comparable" }] }`. Absent for an unconditional conformance. A sibling
+	// of `conformsTo` so the builtin tables' plain `conformsTo` stays valid.
+	conformanceConditions?: Record<
+		string,
+		Array<{ generic: string; protocol: string }>
+	>
 }
 
 // NOTE: Deliberately NOT part of `Type` — a Protocol is not a Type. It is
@@ -384,7 +396,16 @@ export type GenericAliasType = {
 // Methods into a conformance value at the call site; a `parameter` source
 // forwards the enclosing bounded Function's own conformance parameter.
 export type ConformanceSource =
-	| { kind: "namespace"; name: string; methodMap: Record<string, string> }
+	| {
+			kind: "namespace"
+			name: string
+			methodMap: Record<string, string>
+			// NOTE: The recursively solved conformances for this Namespace's
+			// own `where` conditions, ordered by its Generic declaration order
+			// so they line up with the fulfilling Methods' hidden trailing
+			// conformance Parameters. Empty for an unconditional conformance.
+			conditions: Array<Conformance>
+	  }
 	| { kind: "parameter"; name: string }
 
 export type Conformance = {

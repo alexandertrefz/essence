@@ -12,7 +12,7 @@ import * as optional from "../rewriter/__internal/Optional"
 import * as rational from "../rewriter/__internal/Rational"
 import * as string from "../rewriter/__internal/String"
 import * as transcendental from "../rewriter/__internal/Transcendental"
-import { typeKeySymbol } from "../rewriter/__internal/type"
+import { boundConformance, typeKeySymbol } from "../rewriter/__internal/type"
 import { validate } from "../validator/index"
 
 const int = (value: bigint) => integer.createInteger(value)
@@ -410,6 +410,83 @@ describe("Stdlib", () => {
 					compareTo: integer.compareTo,
 				}),
 			).toEqual(ints(1n, 2n, 3n))
+		})
+
+		it("compares Lists lexicographically", () => {
+			let integerConformance = { compareTo: integer.compareTo }
+
+			expect(
+				list.compareTo(ints(1n, 2n), ints(1n, 3n), integerConformance)[
+					typeKeySymbol
+				],
+			).toBe("Ordering#Less")
+
+			expect(
+				list.compareTo(ints(2n), ints(1n, 9n), integerConformance)[
+					typeKeySymbol
+				],
+			).toBe("Ordering#Greater")
+
+			expect(
+				list.compareTo(ints(1n, 2n), ints(1n, 2n), integerConformance)[
+					typeKeySymbol
+				],
+			).toBe("Ordering#Equal")
+		})
+
+		it("orders a shorter List before a longer one that shares its prefix", () => {
+			expect(
+				list.compareTo(ints(1n), ints(1n, 2n), {
+					compareTo: integer.compareTo,
+				})[typeKeySymbol],
+			).toBe("Ordering#Less")
+		})
+
+		it("sorts nested Lists through a bound conformance", () => {
+			// NOTE: The witness the codegen builds for `List<List<Integer>>` —
+			// `boundConformance` curries the inner Integer ordering onto
+			// `List.compareTo`, exactly what `$type.boundConformance(...)` emits.
+			let nested = boundConformance({ compareTo: list.compareTo }, [
+				{ compareTo: integer.compareTo },
+			])
+
+			expect(
+				list.sorted(
+					list.createList([ints(3n), ints(1n, 2n)]),
+					nested as unknown as Parameters<typeof list.sorted>[1],
+				),
+			).toEqual(list.createList([ints(1n, 2n), ints(3n)]))
+		})
+
+		it("sorts three-level nested Lists", () => {
+			let integerConformance = { compareTo: integer.compareTo }
+			let listOfIntegers = boundConformance(
+				{ compareTo: list.compareTo },
+				[integerConformance],
+			)
+			let listOfListOfIntegers = boundConformance(
+				{ compareTo: list.compareTo },
+				[listOfIntegers],
+			)
+			let listOfListOfListOfIntegers = boundConformance(
+				{ compareTo: list.compareTo },
+				[listOfListOfIntegers],
+			)
+
+			// NOTE: a and b are List<List<List<Integer>>>. Their first (only)
+			// items order Greater vs Less at the innermost pair (2 vs 1), so a
+			// sorts after b.
+			let a = list.createList([list.createList([ints(2n)])])
+			let b = list.createList([list.createList([ints(1n), ints(9n)])])
+
+			expect(
+				list.sorted(
+					list.createList([a, b]),
+					listOfListOfListOfIntegers as unknown as Parameters<
+						typeof list.sorted
+					>[1],
+				),
+			).toEqual(list.createList([b, a]))
 		})
 	})
 

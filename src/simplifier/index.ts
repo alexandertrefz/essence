@@ -231,20 +231,32 @@ function simplifyConformanceArguments(
 	return conformances.map((conformance) => ({
 		nodeType: "Argument",
 		name: null,
-		value:
-			conformance.source.kind === "parameter"
-				? {
-						nodeType: "Identifier",
-						name: conformance.source.name,
-						type: { type: "Unknown" },
-					}
-				: {
-						nodeType: "ConformanceValue",
-						namespaceName: conformance.source.name,
-						methodMap: conformance.source.methodMap,
-						type: { type: "Unknown" },
-					},
+		value: conformanceExpression(conformance),
 	}))
+}
+
+// NOTE: One conformance witness — a forwarded parameter stays an Identifier; a
+// resolved Namespace becomes a ConformanceValue whose own `where` conditions
+// are witnessed recursively, in the order the Enricher fixed to match the
+// fulfilling Methods' hidden conformance Parameters.
+function conformanceExpression(
+	conformance: common.Conformance,
+): common.typedSimple.ExpressionNode {
+	if (conformance.source.kind === "parameter") {
+		return {
+			nodeType: "Identifier",
+			name: conformance.source.name,
+			type: { type: "Unknown" },
+		}
+	}
+
+	return {
+		nodeType: "ConformanceValue",
+		namespaceName: conformance.source.name,
+		methodMap: conformance.source.methodMap,
+		conditions: conformance.source.conditions.map(conformanceExpression),
+		type: { type: "Unknown" },
+	}
 }
 
 function simplifyCombination(

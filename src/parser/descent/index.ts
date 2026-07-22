@@ -555,16 +555,16 @@ class DescentParser {
 	// it lexing as an ordinary Identifier. Each conformance carries its own
 	// `is` (`is Equatable, is Printable`); the comma separates clauses, so a
 	// bare Protocol name after a comma is a mistake with a tailored Diagnostic.
-	protected parseConformanceClauses(): Array<parser.IdentifierNode> {
-		let conformsTo: Array<parser.IdentifierNode> = []
+	protected parseConformanceClauses(): Array<parser.ConformanceClauseNode> {
+		let clauses: Array<parser.ConformanceClauseNode> = []
 
 		let peeked = this.tokens.peek()
 		if (!(peeked?.type === TokenType.Identifier && peeked.value === "is")) {
-			return conformsTo
+			return clauses
 		}
 
-		this.tokens.next()
-		conformsTo.push(this.parseIdentifier())
+		let isToken = this.tokens.next()
+		clauses.push(this.parseConformanceClause(isToken))
 
 		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
 			this.tokens.next()
@@ -578,11 +578,100 @@ class DescentParser {
 				)
 			}
 
-			this.tokens.next()
-			conformsTo.push(this.parseIdentifier())
+			let clauseIsToken = this.tokens.next()
+			clauses.push(this.parseConformanceClause(clauseIsToken))
 		}
 
-		return conformsTo
+		return clauses
+	}
+
+	protected parseConformanceClause(
+		isToken: Token,
+	): parser.ConformanceClauseNode {
+		let protocol = this.parseIdentifier()
+		let conditions = this.parseOptionalWhereClause()
+
+		let end =
+			conditions.length > 0
+				? conditions[conditions.length - 1].position.end
+				: protocol.position.end
+
+		return generators.conformanceClause(protocol, conditions, {
+			start: isToken.position.start,
+			end,
+		})
+	}
+
+	// NOTE: `where Generic is Protocol (, Generic is Protocol)*`, contextual
+	// `where` (no lexer change — modelled on `parseOptionalGuard`). Written for
+	// reuse: it takes no Namespace-specific input, so a future function-generics
+	// `where` calls it verbatim.
+	protected parseOptionalWhereClause(): Array<parser.WhereConditionNode> {
+		let token = this.tokens.peek()
+
+		if (!(token?.type === TokenType.Identifier && token.value === "where")) {
+			return []
+		}
+
+		this.tokens.next()
+
+		let conditions: Array<parser.WhereConditionNode> = [
+			this.parseWhereCondition(),
+		]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			// NOTE: Comma disambiguation — a comma followed by `is` ends the
+			// condition list, because that comma separates conformance clauses
+			// (`is A where Item is X, is B`), not conditions. It is left
+			// unconsumed for `parseConformanceClauses` to pick up.
+			let afterComma = this.tokens.peek(1)
+
+			if (
+				afterComma?.type === TokenType.Identifier &&
+				afterComma.value === "is"
+			) {
+				break
+			}
+
+			this.tokens.next()
+			conditions.push(this.parseWhereCondition())
+		}
+
+		return conditions
+	}
+
+	protected parseWhereCondition(): parser.WhereConditionNode {
+		let generic = this.parseIdentifier()
+
+		// NOTE: `is`/`where` name real Identifiers, but a `where` condition
+		// whose LHS is literally one of them is almost certainly a dropped
+		// name rather than a Type Parameter called `is` — diagnosed here.
+		if (generic.content === "is" || generic.content === "where") {
+			fail(
+				`'${generic.content}' can not name a Type Parameter in a 'where' condition`,
+				generic.position,
+				"expected a Type Parameter name here",
+			)
+		}
+
+		let isToken = this.tokens.peek()
+
+		if (!(isToken?.type === TokenType.Identifier && isToken.value === "is")) {
+			fail(
+				"A 'where' condition reads 'Generic is Protocol'",
+				isToken?.position,
+				"expected 'is' here",
+			)
+		}
+
+		this.tokens.next()
+
+		let protocol = this.parseIdentifier()
+
+		return generators.whereCondition(generic, protocol, {
+			start: generic.position.start,
+			end: protocol.position.end,
+		})
 	}
 
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {

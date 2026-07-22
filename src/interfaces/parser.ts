@@ -314,11 +314,30 @@ export interface NamespaceDefinitionStatementNode {
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	targetType: TypeDeclarationNode | null
-	conformsTo: Array<IdentifierNode>
+	conformsTo: Array<ConformanceClauseNode>
 	properties: Record<string, NamespacePropertyNode>
 	methods: NamespaceMethods
 	position: Position
 	documentation: Documentation | null
+}
+
+// NOTE: One `is Protocol where …` clause of a Namespace conformance list.
+// The `where` conditions are empty for an unconditional conformance.
+export interface ConformanceClauseNode {
+	nodeType: "ConformanceClause"
+	protocol: IdentifierNode
+	conditions: Array<WhereConditionNode>
+	position: Position
+}
+
+// NOTE: One `Generic is Protocol` condition of a `where` clause — the LHS
+// names one of the Namespace's own Type Parameters, the RHS the Protocol it
+// must satisfy for the conformance to hold.
+export interface WhereConditionNode {
+	nodeType: "WhereCondition"
+	generic: IdentifierNode
+	protocol: IdentifierNode
+	position: Position
 }
 
 export interface ProtocolMethodSignatureNode {

@@ -6,12 +6,14 @@ import {
 	buildUnion,
 	computeConformanceMethodMap,
 	closestMatch,
+	conformanceKey,
 	countOf,
 	createInferenceContext,
 	describeType,
 	type GenericBindings,
 	matchesType,
 	matchesTypeWithBindings,
+	typeMentionsGeneric,
 	withArticle,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
@@ -668,6 +670,360 @@ function specializeNamespace(
 	}
 }
 
+// NOTE: The outcome of solving one (binding, Protocol) conformance. A success
+// carries the witness source (recursively including its own `where`
+// conditions); a failure carries the because-chain, outermost first, or an
+// empty chain when the failure was already reported (ambiguity, a
+// nonconforming Namespace) and must stay silent.
+export type ConformanceSolveResult =
+	| { ok: true; source: common.ConformanceSource }
+	| { ok: false; chain: Array<string> }
+
+type ScopeConformanceState = {
+	memo: Map<string, ConformanceSolveResult>
+	inProgress: Set<string>
+}
+
+// NOTE: Memoised per exact Scope, not per root Scope (R3): `where` conditions
+// are solved against whatever Namespaces are visible, and
+// `getAllNamespacesInScope` walks the parent chain — a function-local
+// Namespace is visible only in its own subtree, so two Scopes can legitimately
+// solve the same (Type, Protocol) differently. The Scope is constant down one
+// recursion tree, so the `inProgress` set still guards cycles within it.
+let conformanceStates = new WeakMap<enricher.Scope, ScopeConformanceState>()
+
+function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
+	let state = conformanceStates.get(scope)
+
+	if (state === undefined) {
+		state = { memo: new Map(), inProgress: new Set() }
+		conformanceStates.set(scope, state)
+	}
+
+	return state
+}
+
+// NOTE: Solves whether `binding` conforms to `protocolName` in `scope`,
+// producing the witness the codegen needs. A GenericUse forwards the enclosing
+// bounded Function's own conformance parameter; a concrete Type selects the one
+// conforming Namespace and recursively solves that Namespace's `where`
+// conditions. Cycle-guarded and memoised per Scope.
+export function solveConformance(
+	binding: common.Type,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): ConformanceSolveResult {
+	if (binding.type === "GenericUse") {
+		if (binding.constraint === protocolName) {
+			return {
+				ok: true,
+				source: {
+					kind: "parameter",
+					name: `${binding.name}__conformance`,
+				},
+			}
+		}
+
+		return {
+			ok: false,
+			chain: [
+				`Type Parameter '${binding.name}' does not conform to '${protocolName}'.`,
+			],
+		}
+	}
+
+	// NOTE: An Error binding was already diagnosed — stay silent.
+	if (binding.type === "Error") {
+		return { ok: false, chain: [] }
+	}
+
+	let protocol = findProtocolInScope(protocolName, scope)
+
+	// NOTE: An unknown Protocol was already diagnosed at the declaration.
+	if (protocol === null) {
+		return { ok: false, chain: [] }
+	}
+
+	let key = conformanceKey(protocolName, binding)
+	let state = conformanceStateFor(scope)
+
+	let cached = state.memo.get(key)
+	if (cached !== undefined) {
+		return cached
+	}
+
+	if (state.inProgress.has(key)) {
+		return {
+			ok: false,
+			chain: [
+				`${describeType(binding)} conforming to '${protocolName}' depends on itself.`,
+			],
+		}
+	}
+
+	state.inProgress.add(key)
+
+	try {
+		let result = solveNamespaceConformance(
+			binding,
+			protocol,
+			protocolName,
+			scope,
+			position,
+		)
+
+		// NOTE: Only successes are memoised — a failure reached through a cycle
+		// is tainted by whatever else was in progress, so caching it could
+		// poison an independent later query for the same key.
+		if (result.ok) {
+			state.memo.set(key, result)
+		}
+
+		return result
+	} finally {
+		state.inProgress.delete(key)
+	}
+}
+
+function solveNamespaceConformance(
+	binding: common.Type,
+	protocol: common.ProtocolType,
+	protocolName: string,
+	scope: enricher.Scope,
+	position: common.Position,
+): ConformanceSolveResult {
+	let candidates: Array<{
+		name: string
+		type: common.NamespaceType
+		isGeneric: boolean
+		// NOTE: The Namespace's own `where` conditions for this Protocol, and
+		// the bindings that map each condition's Generic to a concrete Type, so
+		// the conditions can be solved recursively. Ordered by the Namespace's
+		// Generic declaration order to line the witnesses up with the hidden
+		// conformance Parameters.
+		conditions: Array<{ generic: string; protocol: string }>
+		conditionBindings: GenericBindings
+	}> = []
+
+	for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
+		if (
+			namespace.conformsTo === undefined ||
+			!namespace.conformsTo.includes(protocolName) ||
+			namespace.targetType === null
+		) {
+			continue
+		}
+
+		let orderedConditions = orderConditions(
+			namespace.conformanceConditions?.[protocolName] ?? [],
+			namespace.generics,
+		)
+
+		if (namespace.generics.length === 0) {
+			if (matchesType(namespace.targetType, binding)) {
+				candidates.push({
+					name,
+					type: namespace,
+					isGeneric: false,
+					conditions: orderedConditions,
+					conditionBindings: new Map(),
+				})
+			}
+
+			continue
+		}
+
+		// NOTE: A generic Namespace (`List<Item>`) conforms to the binding
+		// when its target Type unifies with it — `List<Item>` binds `Item`
+		// to `Integer` against a `List<Integer>` receiver. The Namespace is
+		// then specialized against those bindings, so its target Type and
+		// Method signatures read concretely from here on. The builtin table
+		// singleton is never mutated — `specializeNamespace` builds fresh
+		// objects.
+		let context = createInferenceContext(namespace.generics)
+
+		if (matchesTypeWithBindings(namespace.targetType, binding, context)) {
+			candidates.push({
+				name,
+				type: specializeNamespace(namespace, context.bindings),
+				isGeneric: true,
+				conditions: orderedConditions,
+				conditionBindings: context.bindings,
+			})
+		}
+	}
+
+	// NOTE: A concrete Namespace always beats a generic one's blanket
+	// conformance — a hand-written `for List<Integer> is Equatable` wins
+	// over `List<Item> is Equatable`. This runs before the assignability
+	// filter below: a specialized generic target (`List<Integer>`) is
+	// structurally identical to a concrete one, so without this they would
+	// tie and spuriously read as ambiguous.
+	if (candidates.some((candidate) => !candidate.isGeneric)) {
+		candidates = candidates.filter((candidate) => !candidate.isGeneric)
+	}
+
+	// NOTE: Specificity by assignability — a candidate whose target Type
+	// is assignable to another candidate's (but not the other way around)
+	// is the more specific one and wins. This is what lets a Namespace for
+	// a concrete Record shape beat the builtin Record Namespace's blanket
+	// conformance, and an exact target beat a covering Union.
+	let isStrictlyMoreSpecific = (a: common.Type, b: common.Type): boolean =>
+		matchesType(b, a) && !matchesType(a, b)
+
+	let mostSpecificCandidates = candidates.filter(
+		(candidate) =>
+			!candidates.some(
+				(other) =>
+					other !== candidate &&
+					other.type.targetType !== null &&
+					candidate.type.targetType !== null &&
+					isStrictlyMoreSpecific(
+						other.type.targetType,
+						candidate.type.targetType,
+					),
+			),
+	)
+
+	if (mostSpecificCandidates.length > 0) {
+		candidates = mostSpecificCandidates
+	}
+
+	if (candidates.length === 0) {
+		return {
+			ok: false,
+			chain: [
+				`${describeType(binding)} does not conform to '${protocolName}'.`,
+			],
+		}
+	}
+
+	if (candidates.length > 1) {
+		reportError(
+			`More than one Namespace makes ${describeType(binding)} conform to '${protocolName}'`,
+			position,
+			{
+				code: "ambiguous-conformance",
+				labels: [
+					primary(position, "the conformance can not be chosen here"),
+				],
+				notes: candidates.map(
+					(candidate) =>
+						`'${candidate.name}' conforms to '${protocolName}'.`,
+				),
+			},
+		)
+
+		return { ok: false, chain: [] }
+	}
+
+	let candidate = candidates[0]
+
+	// NOTE: The candidate conforms only under its own `where` conditions — feed
+	// them in as assumptions so a fulfilling Method carrying that same bound
+	// (List's `compareTo`) is accepted here, then verify the assumptions hold
+	// by solving the conditions recursively below.
+	let assumptions = new Map(
+		candidate.conditions.map((condition) => [
+			condition.generic,
+			condition.protocol,
+		]),
+	)
+
+	let result = computeConformanceMethodMap(
+		protocol,
+		candidate.type,
+		binding,
+		assumptions,
+	)
+
+	if (result.kind !== "conforms") {
+		// NOTE: Reachable when the Namespace covers the binding through a wider
+		// target Type (a Union) but a `Self` position makes the signatures
+		// incompatible for this narrower binding, or a fulfilling Method still
+		// carries an unassumed bound. Reported here; the caller stays silent.
+		let label =
+			result.kind === "needs-condition"
+				? `Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`
+				: `this needs ${describeType(binding)} to conform`
+
+		reportError(
+			`Namespace '${candidate.name}' does not conform to '${protocolName}'`,
+			position,
+			{
+				code: "nonconforming-namespace",
+				labels: [primary(position, label)],
+			},
+		)
+
+		return { ok: false, chain: [] }
+	}
+
+	// NOTE: Recursively solve the chosen Namespace's own `where` conditions —
+	// their bindings come from the unification above. A failure bubbles up as
+	// a because-chain with this level prepended.
+	let conditions: Array<common.Conformance> = []
+
+	for (let condition of candidate.conditions) {
+		let conditionBinding = candidate.conditionBindings.get(condition.generic)
+
+		if (conditionBinding === undefined) {
+			continue
+		}
+
+		let solved = solveConformance(
+			conditionBinding,
+			condition.protocol,
+			scope,
+			position,
+		)
+
+		if (!solved.ok) {
+			return {
+				ok: false,
+				chain:
+					solved.chain.length === 0
+						? []
+						: [
+								`${describeType(binding)} does not conform to '${protocolName}'.`,
+								...solved.chain,
+							],
+			}
+		}
+
+		conditions.push({
+			genericName: condition.generic,
+			protocolName: condition.protocol,
+			source: solved.source,
+		})
+	}
+
+	return {
+		ok: true,
+		source: {
+			kind: "namespace",
+			name: candidate.name,
+			methodMap: result.methodMap,
+			conditions,
+		},
+	}
+}
+
+// NOTE: Orders a Protocol's `where` conditions by the Namespace's Generic
+// declaration order — the invariant that lines each witness up with its hidden
+// conformance Parameter, which the simplifier emits in that same order.
+function orderConditions(
+	conditions: Array<{ generic: string; protocol: string }>,
+	generics: Array<common.GenericDeclaration>,
+): Array<{ generic: string; protocol: string }> {
+	let order = generics.map((generic) => generic.name)
+
+	return [...conditions].sort(
+		(a, b) => order.indexOf(a.generic) - order.indexOf(b.generic),
+	)
+}
+
 export function resolveConformances(
 	generics: Array<common.GenericDeclaration>,
 	bindings: GenericBindings,
@@ -693,13 +1049,14 @@ export function resolveConformances(
 			continue
 		}
 
-		let protocol = findProtocolInScope(generic.constraint, scope)
-
 		// NOTE: An unknown Protocol was already diagnosed at the declaration.
-		if (protocol === null) {
+		if (findProtocolInScope(generic.constraint, scope) === null) {
 			continue
 		}
 
+		// NOTE: A GenericUse binding keeps its own tailored Diagnostic — the
+		// bound was carried by an unbounded Type Parameter, which is a distinct
+		// mistake from a Type that simply has no conforming Namespace.
 		if (binding.type === "GenericUse") {
 			if (binding.constraint === generic.constraint) {
 				conformances.push({
@@ -735,88 +1092,34 @@ export function resolveConformances(
 			continue
 		}
 
-		let candidates: Array<{
-			name: string
-			type: common.NamespaceType
-			isGeneric: boolean
-		}> = []
-
-		for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
-			if (
-				namespace.conformsTo === undefined ||
-				!namespace.conformsTo.includes(generic.constraint) ||
-				namespace.targetType === null
-			) {
-				continue
-			}
-
-			if (namespace.generics.length === 0) {
-				if (matchesType(namespace.targetType, binding)) {
-					candidates.push({ name, type: namespace, isGeneric: false })
-				}
-
-				continue
-			}
-
-			// NOTE: A generic Namespace (`List<Item>`) conforms to the binding
-			// when its target Type unifies with it — `List<Item>` binds `Item`
-			// to `Integer` against a `List<Integer>` receiver. The Namespace is
-			// then specialized against those bindings, so its target Type and
-			// Method signatures read concretely from here on. The builtin table
-			// singleton is never mutated — `specializeNamespace` builds fresh
-			// objects.
-			let context = createInferenceContext(namespace.generics)
-
-			if (
-				matchesTypeWithBindings(namespace.targetType, binding, context)
-			) {
-				candidates.push({
-					name,
-					type: specializeNamespace(namespace, context.bindings),
-					isGeneric: true,
-				})
-			}
-		}
-
-		// NOTE: A concrete Namespace always beats a generic one's blanket
-		// conformance — a hand-written `for List<Integer> is Equatable` wins
-		// over `List<Item> is Equatable`. This runs before the assignability
-		// filter below: a specialized generic target (`List<Integer>`) is
-		// structurally identical to a concrete one, so without this they would
-		// tie and spuriously read as ambiguous.
-		if (candidates.some((candidate) => !candidate.isGeneric)) {
-			candidates = candidates.filter((candidate) => !candidate.isGeneric)
-		}
-
-		// NOTE: Specificity by assignability — a candidate whose target Type
-		// is assignable to another candidate's (but not the other way around)
-		// is the more specific one and wins. This is what lets a Namespace for
-		// a concrete Record shape beat the builtin Record Namespace's blanket
-		// conformance, and an exact target beat a covering Union.
-		let isStrictlyMoreSpecific = (
-			a: common.Type,
-			b: common.Type,
-		): boolean => matchesType(b, a) && !matchesType(a, b)
-
-		let mostSpecificCandidates = candidates.filter(
-			(candidate) =>
-				!candidates.some(
-					(other) =>
-						other !== candidate &&
-						other.type.targetType !== null &&
-						candidate.type.targetType !== null &&
-						isStrictlyMoreSpecific(
-							other.type.targetType,
-							candidate.type.targetType,
-						),
-				),
+		let result = solveConformance(
+			binding,
+			generic.constraint,
+			scope,
+			position,
 		)
 
-		if (mostSpecificCandidates.length > 0) {
-			candidates = mostSpecificCandidates
+		if (result.ok) {
+			conformances.push({
+				genericName: generic.name,
+				protocolName: generic.constraint,
+				source: result.source,
+			})
+
+			continue
 		}
 
-		if (candidates.length === 0) {
+		// NOTE: An empty chain means the failure (ambiguity, a nonconforming
+		// Namespace) was already reported — stay silent.
+		if (result.chain.length === 0) {
+			continue
+		}
+
+		// NOTE: A single-level chain is the plain "no Namespace conforms" case
+		// and keeps the `unsatisfied-bound` Diagnostic. A multi-level chain is
+		// a conditional conformance whose `where` condition failed — its
+		// because-chain becomes the notes of `unsatisfied-conformance-condition`.
+		if (result.chain.length === 1) {
 			reportError(
 				`${describeType(binding)} does not conform to '${generic.constraint}'`,
 				position,
@@ -836,76 +1139,38 @@ export function resolveConformances(
 					],
 				},
 			)
-
-			continue
-		}
-
-		if (candidates.length > 1) {
+		} else {
 			reportError(
-				`More than one Namespace makes ${describeType(binding)} conform to '${generic.constraint}'`,
+				`${describeType(binding)} does not conform to '${generic.constraint}'`,
 				position,
 				{
-					code: "ambiguous-conformance",
+					code: "unsatisfied-conformance-condition",
 					labels: [
 						primary(
 							position,
-							"the conformance can not be chosen here",
+							`this binds a Type Parameter bound to '${generic.constraint}'`,
 						),
 					],
-					notes: candidates.map(
-						(candidate) =>
-							`'${candidate.name}' conforms to '${generic.constraint}'.`,
-					),
+					notes: result.chain,
+					helps: [
+						`Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`,
+					],
 				},
 			)
-
-			continue
 		}
-
-		let candidate = candidates[0]
-		let result = computeConformanceMethodMap(
-			protocol,
-			candidate.type,
-			binding,
-		)
-
-		if (result.kind !== "conforms") {
-			// NOTE: `needs-condition` is reachable when a generic Namespace's
-			// blanket conformance is fulfilled by a Method carrying its own
-			// Protocol bound — the conformance holds only under a `where` clause
-			// supplying it, which this commit has no syntax for yet. The other
-			// failures are reachable when the Namespace covers the binding
-			// through a wider target Type (a Union) but a `Self` position makes
-			// the signatures incompatible for this narrower binding.
-			let label =
-				result.kind === "needs-condition"
-					? `Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`
-					: `this needs ${describeType(binding)} to conform`
-
-			reportError(
-				`Namespace '${candidate.name}' does not conform to '${generic.constraint}'`,
-				position,
-				{
-					code: "nonconforming-namespace",
-					labels: [primary(position, label)],
-				},
-			)
-
-			continue
-		}
-
-		conformances.push({
-			genericName: generic.name,
-			protocolName: generic.constraint,
-			source: {
-				kind: "namespace",
-				name: candidate.name,
-				methodMap: result.methodMap,
-			},
-		})
 	}
 
 	return conformances
+}
+
+// NOTE: The result of checking one conformance clause that holds — its
+// Protocol, the validated `where` conditions, and the map from each Protocol
+// Method to the fulfilling Namespace Method. Handed back to the Enricher so it
+// can thread each conditional clause's bounds into the fulfilling Methods.
+export type CheckedConformance = {
+	protocolName: string
+	conditions: Array<{ generic: string; protocol: string }>
+	methodMap: Record<string, string>
 }
 
 // NOTE: Called from the Enricher, never from speculative hoisting — a
@@ -915,8 +1180,14 @@ export function checkProtocolConformance(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
 	scope: enricher.Scope,
-): void {
-	for (let identifier of node.conformsTo) {
+): Array<CheckedConformance> {
+	let checked: Array<CheckedConformance> = []
+	let declaredGenerics = new Set(
+		node.generics.map((generic) => generic.name.content),
+	)
+
+	for (let clause of node.conformsTo) {
+		let identifier = clause.protocol
 		let protocol = findProtocolInScope(identifier.content, scope)
 
 		if (protocol === null) {
@@ -958,10 +1229,140 @@ export function checkProtocolConformance(
 			continue
 		}
 
+		// NOTE: Validate each `where` condition before it becomes an
+		// assumption — the LHS has to name one of this Namespace's own Type
+		// Parameters, the RHS a real Protocol, and no Generic may be bound
+		// twice in one clause.
+		let conditions: Array<{ generic: string; protocol: string }> = []
+		let assumptions = new Map<string, string>()
+		let boundGenerics = new Map<string, string>()
+
+		for (let condition of clause.conditions) {
+			if (!declaredGenerics.has(condition.generic.content)) {
+				reportError(
+					`'${condition.generic.content}' is not a Type Parameter of this Namespace`,
+					condition.generic.position,
+					{
+						code: "unknown-where-generic",
+						labels: [
+							primary(
+								condition.generic.position,
+								"no such Type Parameter",
+							),
+						],
+						helps: [
+							`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
+						],
+					},
+				)
+
+				continue
+			}
+
+			// NOTE: A condition is proven at the use site by unifying the
+			// target Type against the receiver — a Generic the target never
+			// mentions can never be bound there, so its witness could never
+			// be produced and the hidden conformance Parameter would arrive
+			// as `undefined` at runtime.
+			if (
+				!typeMentionsGeneric(
+					namespaceType.targetType,
+					condition.generic.content,
+				)
+			) {
+				reportError(
+					`'${condition.generic.content}' does not appear in this Namespace's target Type`,
+					condition.generic.position,
+					{
+						code: "unwitnessable-where-condition",
+						labels: [
+							primary(
+								condition.generic.position,
+								"not part of the target Type",
+							),
+						],
+						notes: [
+							"A condition is proven by the target Type at each use site — a Type Parameter the target never mentions has nothing to prove it with.",
+						],
+						helps: [
+							`Mention '${condition.generic.content}' in the target Type, or drop the condition.`,
+						],
+					},
+				)
+
+				continue
+			}
+
+			let conditionProtocol = findProtocolInScope(
+				condition.protocol.content,
+				scope,
+			)
+
+			if (conditionProtocol === null) {
+				reportError(
+					`Protocol '${condition.protocol.content}' is not declared`,
+					condition.protocol.position,
+					{
+						code: "unknown-protocol",
+						labels: [
+							primary(
+								condition.protocol.position,
+								"no such Protocol",
+							),
+						],
+						helps: suggestionHelps(
+							condition.protocol.content,
+							scope,
+							"protocols",
+						),
+					},
+				)
+
+				continue
+			}
+
+			let existing = boundGenerics.get(condition.generic.content)
+
+			if (existing !== undefined) {
+				reportError(
+					`'${condition.generic.content}' is bound twice in this conformance`,
+					condition.generic.position,
+					{
+						code: "conflicting-where-condition",
+						labels: [
+							primary(
+								condition.generic.position,
+								`already bound to '${existing}'`,
+							),
+						],
+						notes: [
+							`'${condition.generic.content}' is already required to conform to '${existing}'.`,
+						],
+					},
+				)
+
+				continue
+			}
+
+			boundGenerics.set(
+				condition.generic.content,
+				condition.protocol.content,
+			)
+			assumptions.set(
+				condition.generic.content,
+				condition.protocol.content,
+			)
+			conditions.push({
+				generic: condition.generic.content,
+				protocol: condition.protocol.content,
+			})
+		}
+
 		let result = computeConformanceMethodMap(
 			protocol,
 			namespaceType,
 			namespaceType.targetType,
+			assumptions,
 		)
 
 		if (result.kind === "needs-condition") {
@@ -975,6 +1376,9 @@ export function checkProtocolConformance(
 							identifier.position,
 							`Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`,
 						),
+					],
+					helps: [
+						`Add 'where ${result.genericName} is ${result.protocolName}' to this conformance.`,
 					],
 				},
 			)
@@ -1006,8 +1410,16 @@ export function checkProtocolConformance(
 					],
 				},
 			)
+		} else {
+			checked.push({
+				protocolName: protocol.name,
+				conditions,
+				methodMap: result.methodMap,
+			})
 		}
 	}
+
+	return checked
 }
 
 export function resolveTypeAliasStatementType(
