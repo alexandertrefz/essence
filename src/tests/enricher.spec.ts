@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { enrich } from "../enricher/index"
+import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
@@ -10,6 +11,7 @@ import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
+import { namespace as transcendentalNamespace } from "../enricher/types/Transcendental"
 import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import { parse } from "../parser/index"
@@ -1507,6 +1509,64 @@ describe("Enricher", () => {
 					constant same: Boolean = 5::compareTo(7)::is(Ordering#Less)
 				}`),
 			).toEqual([])
+		})
+
+		// NOTE: The ordering family lives only on the covering Number
+		// Namespace, so a mixed-kind comparison resolves through it — the
+		// member Namespaces declare no cross-kind `isLessThan` of their own.
+		it("should compare across Number kinds through the Number Namespace", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant belowPi: Boolean = 3::isLessThan(Number.PI)
+					constant orderedPis: Boolean = Number.PI::isGreaterThan(Number.TAU)
+					constant rootVsHalf = match 2::squareRoot() -> Boolean {
+						case Algebraic { <- @::isLessThanOrEqualTo(3/2) }
+						case Integer   { <- false }
+						case Nothing   { <- false }
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should span the numeric tower for Integer::add", () => {
+			// NOTE: The Transcendental annotation only type-checks if
+			// `1::add(π)` resolves to the new overload. The match narrows √2
+			// to an Algebraic and adds an Integer to it — the other new
+			// overload — with `toString` keeping the handler's return a String
+			// so the test turns on resolution, not on the result Type.
+			expect(
+				diagnosticsFor(`implementation {
+					constant withPi: Transcendental = 1::add(Number.PI)
+					constant withRoot: String = match 2::squareRoot() -> String {
+						case Algebraic { <- 1::add(@)::toString() }
+						case Integer   { <- @::toString() }
+						case Nothing   { <- "none" }
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Cross-kind comparison lives only on Number. Integer and
+		// Rational keep the same-kind `isLessThan` they always had, but it was
+		// deliberately not widened to the irrationals, and the irrationals
+		// declare no comparison of their own — deciding a Transcendental
+		// ordering in general is undecidable, so the claim is made once by
+		// Number. This guards against a well-meaning re-addition to a member.
+		it("keeps cross-kind comparison off the member Namespaces", () => {
+			// NOTE: The argument Types Integer::isLessThan accepts — no
+			// Algebraic or Transcendental among them.
+			let integerLessThan = integerNamespace.methods
+				.isLessThan as common.OverloadedMethodType
+			let acceptedKinds = integerLessThan.overloads.map(
+				(overload) => overload.parameterTypes[1].type.type,
+			)
+
+			expect(acceptedKinds).not.toContain("Algebraic")
+			expect(acceptedKinds).not.toContain("Transcendental")
+
+			expect(algebraicNamespace.methods.isLessThan).toBeUndefined()
+			expect(transcendentalNamespace.methods.isLessThan).toBeUndefined()
+			expect(numberNamespace.methods.isLessThan).toBeDefined()
 		})
 
 		it("should not allow redeclaring a builtin Protocol", () => {

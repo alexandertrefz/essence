@@ -43,6 +43,29 @@ implementation {
 	§ Comparing π against 22/7 is exact and total — the classic bound.
 	__print(Number.PI::compareTo(22/7)::toString())
 
+	§ The whole tower is comparable through Number, across any two kinds.
+	§ An Integer against π, a Rational against π, two Transcendentals.
+	__print(3::isLessThan(Number.PI))              § true  (3 < π)
+	__print(4::isLessThan(Number.PI))              § false (4 > π)
+	constant piBound = 22/7
+	__print(piBound::isGreaterThan(Number.PI))     § true  (22/7 > π)
+	__print(Number.PI::isLessThan(Number.TAU))     § true  (π < 2·π)
+	__print(Number.TAU::isGreaterThanOrEqualTo(Number.PI))
+
+	§ An Integer now adds across the whole tower, staying exact.
+	__print(1::add(Number.PI))                     § 1 + π
+
+	§ An Integer against √2, through Number — √2 ≈ 1.414.
+	__print(match 2::squareRoot() -> String {
+		case Algebraic {
+			<- "1 < √2: "::append(1::isLessThan(@)::toString())
+				::append(", 2 > √2: ")::append(2::isGreaterThan(@)::toString())
+				::append(", 1 + √2 = ")::append(1::add(@)::toString())
+		}
+		case Integer { <- "collapsed" }
+		case Nothing { <- "none" }
+	})
+
 	§ `Irrational` names exactly the Union of the two new Types.
 	constant someIrrational: Irrational = Number.PI
 
