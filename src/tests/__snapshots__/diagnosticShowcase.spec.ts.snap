@@ -1,5 +1,46 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`Diagnostic Showcase Conformance.es should render the same report every time 1`] = `
+"[unknown-where-generic]
+Error: 'Other' is not a Type Parameter of this Namespace
+    ╭─┤ Conformance.es:15:23 │
+    │
+ 15 │        is Comparable where Other is Comparable
+    │                            ──┬──  
+    │                              ╰──── no such Type Parameter
+    │ 
+    │ Help: Declare it in the Namespace's Generic list: '<infer Other>'.
+────╯
+
+[conflicting-where-condition]
+Error: 'Item' is bound twice in this conformance
+    ╭─┤ Conformance.es:24:43 │
+    │
+ 24 │        is Comparable where Item is Comparable, Item is Equatable
+    │                                                ──┬─  
+    │                                                  ╰─── already bound to 'Comparable'
+    │ 
+    │ Note: 'Item' is already required to conform to 'Comparable'.
+────╯
+
+[unsatisfied-conformance-condition]
+Error: List<Boolean> does not conform to 'Comparable'
+    ╭─┤ Conformance.es:34:21 │
+    │
+ 34 │     constant ordered = [[true], [false]]::sorted()
+    │                        ─────────────┬─────────────  
+    │                                     ╰─────────────── this binds a Type Parameter bound to 'Comparable'
+    │ 
+    │ Help: Declare a Namespace 'for List<Boolean> is Comparable'.
+    │ 
+    │ Note 1: List<Boolean> does not conform to 'Comparable'.
+    │ Note 2: Boolean does not conform to 'Comparable'.
+────╯
+
+─── 3 errors
+"
+`;
+
 exports[`Diagnostic Showcase Dispatch.es should render the same report every time 1`] = `
 "[unknown-method]
 Error: No Method named 'lenght' for this value

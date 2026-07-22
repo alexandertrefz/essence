@@ -472,5 +472,29 @@ describe("Validator", () => {
 				),
 			).toBe(true)
 		})
+
+		it("should reject a retrofitted conditional Method as a stored value", () => {
+			// NOTE: A conditional conformance retrofits the `where` bound onto
+			// its fulfilling Method's Namespace Generic — so the Method carries
+			// hidden conformance Parameters and can no more be a value than any
+			// other bounded Function.
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Wrapper<infer Item> for { value: Item }
+					is Comparable where Item is Comparable
+				{
+					compareTo(_ other: { value: Item }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+
+				constant reference = Wrapper.compareTo
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) => diagnostic.message === boundValueMessage,
+				),
+			).toBe(true)
+		})
 	})
 })

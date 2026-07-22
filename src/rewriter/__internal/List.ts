@@ -6,7 +6,7 @@ import { createInteger } from "./Integer"
 import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
-import type { OrderingType } from "./Ordering"
+import { equal, greater, less, type OrderingType } from "./Ordering"
 import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 import { createString } from "./String"
@@ -401,6 +401,41 @@ export function sorted<ItemType extends AnyType>(
 	},
 ): ListType<ItemType> {
 	return sortedBy(originalList, conformance.compareTo)
+}
+
+// NOTE: Lexicographic comparison — the item `compareTo` arrives as the hidden
+// conformance Argument (curried by `boundConformance` for a nested List). The
+// first pair that is not `Equal` decides; on an equal prefix the shorter List
+// is `Less`, and two equal-length Lists compare `Equal`.
+export function compareTo<ItemType extends AnyType>(
+	first: ListType<ItemType>,
+	second: ListType<ItemType>,
+	conformance: {
+		compareTo: (first: ItemType, second: ItemType) => OrderingType
+	},
+): OrderingType {
+	let shared = Math.min(first.value.length, second.value.length)
+
+	for (let index = 0; index < shared; index++) {
+		let ordering = conformance.compareTo(
+			first.value[index],
+			second.value[index],
+		)
+
+		if (ordering[typeKeySymbol] !== "Ordering#Equal") {
+			return ordering
+		}
+	}
+
+	if (first.value.length < second.value.length) {
+		return less
+	}
+
+	if (first.value.length > second.value.length) {
+		return greater
+	}
+
+	return equal
 }
 
 export function anyItem<ItemType extends AnyType>(

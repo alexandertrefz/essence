@@ -1037,8 +1037,10 @@ function walkNamespaceDefinition(
 ) {
 	declareInScope(scope, "values", node.name, "namespace", context)
 
-	for (let identifier of node.conformsTo) {
-		reference(scope, "types", identifier, context)
+	// NOTE: Only the clause Protocol is referenced here — walking the `where`
+	// conditions (their Generic and Protocol) is Commit 3's tooling work.
+	for (let clause of node.conformsTo) {
+		reference(scope, "types", clause.protocol, context)
 	}
 
 	// NOTE: Property and Method names are declared as Namespace member

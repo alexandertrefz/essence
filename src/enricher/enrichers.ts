@@ -289,9 +289,17 @@ export function enrichMethodFunctionDefinition(
 	// Types seed the typed Node so the annotations are resolved once — the
 	// caller resolves the signature anyway, for the FunctionValue's own Type.
 	signature: common.FunctionType,
+	// NOTE: Constrained Namespace Generics threaded in for a conditional
+	// conformance's fulfilling Method — bounded GenericUses in the body scope
+	// (so it can call the Protocol's Methods on `Item` values), and leading the
+	// typed Generics so their hidden conformance Parameters are emitted first.
+	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
 ): common.typed.FunctionDefinitionNode {
-	// NOTE: The Method's own Generics are registered as GenericUses so that
-	// Parameter and Return Types as well as the body can reference them.
+	// NOTE: `scope` and `selfType` already carry the injected bounds when this
+	// is a fulfilling Method (the caller resolved the signature under them too),
+	// so the body reads them consistently.
+	// The Method's own Generics are registered as GenericUses so that Parameter
+	// and Return Types as well as the body can reference them.
 	let newScope = scopeWithGenerics(method.value.generics, scope)
 
 	if (selfType !== null) {
@@ -305,9 +313,12 @@ export function enrichMethodFunctionDefinition(
 
 	return {
 		nodeType: "FunctionDefinition",
-		generics: method.value.generics.map((generic) =>
-			enrichGenericDeclarationNode(generic, scope),
-		),
+		generics: [
+			...injectedGenerics,
+			...method.value.generics.map((generic) =>
+				enrichGenericDeclarationNode(generic, scope),
+			),
+		],
 		parameters: method.value.parameters.map((parameter, index) =>
 			enrichParameter(
 				parameter,
@@ -385,23 +396,65 @@ export function enrichFunctionDefinition(
 	}
 }
 
+// NOTE: A Scope in which the injected Namespace Generics are their bounded
+// GenericUses, so a fulfilling Method's signature and body resolve `Item` with
+// its `where` bound — and the corresponding constraint-carrying selfType, so a
+// Protocol-Method call on `@`'s members resolves through that bound too.
+function withInjectedBounds(
+	scope: enricher.Scope,
+	selfType: common.Type | null,
+	injectedGenerics: Array<common.typed.GenericDeclarationNode>,
+): { scope: enricher.Scope; selfType: common.Type | null } {
+	if (injectedGenerics.length === 0) {
+		return { scope, selfType }
+	}
+
+	let boundedUses = injectedGenerics.map(
+		(generic): common.GenericUse => ({
+			type: "GenericUse",
+			name: generic.name,
+			...(generic.constraint !== null
+				? { constraint: generic.constraint }
+				: {}),
+		}),
+	)
+
+	let boundedScope = childScope(scope, {
+		types: Object.fromEntries(boundedUses.map((use) => [use.name, use])),
+	})
+
+	let bindings = new Map(boundedUses.map((use) => [use.name, use]))
+
+	return {
+		scope: boundedScope,
+		selfType:
+			selfType === null
+				? null
+				: applyGenericBindings(selfType, bindings),
+	}
+}
+
 export function enrichMethodFunctionValue(
 	node: parser.SimpleMethod | parser.StaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
+	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
 ): common.typed.FunctionValueNode {
+	let bounded = withInjectedBounds(scope, selfType, injectedGenerics)
+
 	// NOTE: The signature is resolved once and seeds the body enrichment, so the
 	// Method's annotations are walked once rather than once here and once again
 	// inside the definition.
-	let type = resolveFunctionValueType(node.method, scope)
+	let type = resolveFunctionValueType(node.method, bounded.scope)
 
 	return {
 		nodeType: "FunctionValue",
 		value: enrichMethodFunctionDefinition(
 			node.method,
-			scope,
-			selfType,
+			bounded.scope,
+			bounded.selfType,
 			type,
+			injectedGenerics,
 		),
 		position: node.method.position,
 		type,
@@ -412,19 +465,23 @@ export function enrichMethodsFunctionValue(
 	node: parser.OverloadedMethod | parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
+	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
 ): Array<common.typed.FunctionValueNode> {
 	let results: Array<common.typed.FunctionValueNode> = []
 
+	let bounded = withInjectedBounds(scope, selfType, injectedGenerics)
+
 	for (let method of Object.values(node.methods)) {
-		let type = resolveFunctionValueType(method, scope)
+		let type = resolveFunctionValueType(method, bounded.scope)
 
 		results.push({
 			nodeType: "FunctionValue",
 			value: enrichMethodFunctionDefinition(
 				method,
-				scope,
-				selfType,
+				bounded.scope,
+				bounded.selfType,
 				type,
+				injectedGenerics,
 			),
 			position: method.position,
 			type,
@@ -983,11 +1040,12 @@ export function enrichNamespaceDefinitionStatement(
 		declareVariableInScope(node.name, type, scope, true)
 	}
 
-	checkProtocolConformance(node, type, scope)
+	let checkedConformances = checkProtocolConformance(node, type, scope)
 
-	// NOTE: Method definitions only carry their own Generics, so a
-	// Namespace-level bound has no way to thread its conformance parameter
-	// into the Methods — rejected until conditional conformance lands.
+	// NOTE: A bound on a Namespace's own Type Parameter is still rejected — a
+	// conditional conformance (`is Comparable where Item is Comparable`) is
+	// where a Namespace-level bound belongs, so its conformance parameter can
+	// be threaded into exactly the fulfilling Methods rather than all of them.
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
 			reportError(
@@ -998,13 +1056,118 @@ export function enrichNamespaceDefinitionStatement(
 					labels: [
 						primary(
 							generic.constraint.position,
-							"this bound is not supported yet",
+							"this bound is not supported here",
 						),
 					],
 					helps: [
-						"Put the bound on the Method's own Type Parameters instead.",
+						`Bound it per conformance: 'is ${generic.constraint.content} where ${generic.name.content} is ${generic.constraint.content}'.`,
 					],
 				},
+			)
+		}
+	}
+
+	// NOTE: Which Namespace Generic each fulfilling Method must treat as bound,
+	// gathered from every conditional conformance clause. A Method fulfilling
+	// two clauses that bound the same Generic to different Protocols is a
+	// conflict — one hidden conformance Parameter can not be two things.
+	let methodBounds = new Map<string, Map<string, string>>()
+
+	for (let conformance of checkedConformances) {
+		if (conformance.conditions.length === 0) {
+			continue
+		}
+
+		// NOTE: The map's VALUES are the fulfilling Methods' emitted names; an
+		// overloaded fulfiller carries a `__overload$N` suffix, stripped here
+		// to recover the Namespace Method's own name.
+		let fulfillingMethods = new Set(
+			Object.values(conformance.methodMap).map((emittedName) =>
+				emittedName.replace(/__overload\$\d+$/, ""),
+			),
+		)
+
+		for (let methodName of fulfillingMethods) {
+			let bounds = methodBounds.get(methodName)
+
+			if (bounds === undefined) {
+				bounds = new Map()
+				methodBounds.set(methodName, bounds)
+			}
+
+			for (let condition of conformance.conditions) {
+				let existing = bounds.get(condition.generic)
+
+				if (existing !== undefined && existing !== condition.protocol) {
+					let clause = node.conformsTo.find(
+						(candidate) =>
+							candidate.protocol.content ===
+							conformance.protocolName,
+					)
+
+					reportError(
+						`Method '${methodName}' can not satisfy conflicting conformance conditions`,
+						clause?.position ?? node.name.position,
+						{
+							code: "conflicting-where-condition",
+							labels: [
+								primary(
+									clause?.position ?? node.name.position,
+									`Method '${methodName}' would need both '${condition.generic} is ${existing}' and '${condition.generic} is ${condition.protocol}'`,
+								),
+							],
+						},
+					)
+
+					continue
+				}
+
+				bounds.set(condition.generic, condition.protocol)
+			}
+		}
+	}
+
+	// NOTE: The constrained Namespace Generics to weave into each fulfilling
+	// Method, as typed Generic Declarations. They lead the Method's own
+	// Generics so `simplifyFunctionDefinition` emits their hidden conformance
+	// Parameters first, in Namespace declaration order.
+	let injectedGenerics = new Map<
+		string,
+		Array<common.typed.GenericDeclarationNode>
+	>()
+
+	for (let [methodName, bounds] of methodBounds) {
+		let injected: Array<common.typed.GenericDeclarationNode> = []
+
+		for (let generic of node.generics) {
+			let constraint = bounds.get(generic.name.content)
+
+			if (constraint === undefined) {
+				continue
+			}
+
+			injected.push({
+				nodeType: "GenericDeclaration",
+				name: generic.name.content,
+				inferred: generic.inferred,
+				defaultType: generic.defaultType
+					? resolveType(generic.defaultType, scope)
+					: null,
+				constraint,
+				position: generic.position,
+			})
+		}
+
+		if (injected.length > 0) {
+			injectedGenerics.set(methodName, injected)
+
+			// NOTE: Retrofit the same bound onto the Namespace-Generic entries
+			// of the Method's resolved Type, on fresh Generic objects so the
+			// shared unbounded Namespace Generics (and every other Method) stay
+			// untouched. Idempotent: re-running sets the same constraint.
+			type.methods[methodName] = retrofitNamespaceBounds(
+				type.methods[methodName],
+				bounds,
 			)
 		}
 	}
@@ -1016,9 +1179,13 @@ export function enrichNamespaceDefinitionStatement(
 	return {
 		nodeType: "NamespaceDefinitionStatement",
 		targetType: type.targetType,
-		conformsTo: node.conformsTo.map((identifier) => ({
-			name: identifier.content,
-			position: identifier.position,
+		conformsTo: node.conformsTo.map((clause) => ({
+			name: clause.protocol.content,
+			position: clause.protocol.position,
+			conditions: clause.conditions.map((condition) => ({
+				generic: condition.generic.content,
+				protocol: condition.protocol.content,
+			})),
 		})),
 		name: enrichIdentifier(node.name, scope),
 		properties: enrichProperties(node.properties, scope),
@@ -1027,10 +1194,42 @@ export function enrichNamespaceDefinitionStatement(
 			methodScope,
 			type.targetType,
 			type.methods,
+			injectedGenerics,
 		),
 		position: node.position,
 		type,
 		documentation: node.documentation,
+	}
+}
+
+// NOTE: Returns a copy of a Method Type with the given bounds set on its
+// Namespace-Generic entries — fresh Generic objects, so the shared unbounded
+// Namespace Generics are never mutated.
+function retrofitNamespaceBounds(
+	method: common.MethodType,
+	bounds: Map<string, string>,
+): common.MethodType {
+	let apply = (
+		generics: Array<common.GenericDeclaration>,
+	): Array<common.GenericDeclaration> =>
+		generics.map((generic) => {
+			let constraint = bounds.get(generic.name)
+
+			return constraint === undefined
+				? generic
+				: { ...generic, constraint }
+		})
+
+	if (method.type === "SimpleMethod" || method.type === "StaticMethod") {
+		return { ...method, generics: apply(method.generics) }
+	}
+
+	return {
+		...method,
+		overloads: method.overloads.map((overload) => ({
+			...overload,
+			generics: apply(overload.generics),
+		})),
 	}
 }
 
@@ -1364,6 +1563,12 @@ function enrichMethods(
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 	methodTypes: Record<string, common.MethodType>,
+	// NOTE: The constrained Namespace Generics to weave into each conditional
+	// conformance's fulfilling Methods — empty for every other Method.
+	injectedGenerics: Map<
+		string,
+		Array<common.typed.GenericDeclarationNode>
+	> = new Map(),
 ): common.typed.Methods {
 	let result: common.typed.Methods = {}
 
@@ -1378,17 +1583,29 @@ function enrichMethods(
 			type: methodTypes[memberKey] ?? { type: "Unknown" },
 		}
 
+		let injected = injectedGenerics.get(memberKey) ?? []
+
 		if (memberValue.nodeType === "SimpleMethod") {
 			result[memberKey] = {
 				nodeType: "SimpleMethod",
 				name,
-				method: enrichMethodFunctionValue(memberValue, scope, selfType),
+				method: enrichMethodFunctionValue(
+					memberValue,
+					scope,
+					selfType,
+					injected,
+				),
 			}
 		} else if (memberValue.nodeType === "StaticMethod") {
 			result[memberKey] = {
 				nodeType: "StaticMethod",
 				name,
-				method: enrichMethodFunctionValue(memberValue, scope, selfType),
+				method: enrichMethodFunctionValue(
+					memberValue,
+					scope,
+					selfType,
+					injected,
+				),
 			}
 		} else if (memberValue.nodeType === "OverloadedMethod") {
 			result[memberKey] = {
@@ -1398,6 +1615,7 @@ function enrichMethods(
 					memberValue,
 					scope,
 					selfType,
+					injected,
 				),
 			}
 		} else {
@@ -1408,6 +1626,7 @@ function enrichMethods(
 					memberValue,
 					scope,
 					selfType,
+					injected,
 				),
 			}
 		}
@@ -3080,6 +3299,21 @@ export function resolveNamespaceDefinitionStatementType(
 	// Method signature — `namespace Boxes<infer Item> for List<Item>`.
 	let genericScope = scopeWithGenerics(node.generics, scope)
 
+	let conformanceConditions: Record<
+		string,
+		Array<{ generic: string; protocol: string }>
+	> = {}
+
+	for (let clause of node.conformsTo) {
+		if (clause.conditions.length > 0) {
+			conformanceConditions[clause.protocol.content] =
+				clause.conditions.map((condition) => ({
+					generic: condition.generic.content,
+					protocol: condition.protocol.content,
+				}))
+		}
+	}
+
 	let resultType: common.NamespaceType = {
 		type: "Namespace",
 		targetType:
@@ -3090,7 +3324,8 @@ export function resolveNamespaceDefinitionStatementType(
 		generics: resolveGenericDeclarations(node.generics, scope),
 		properties: {},
 		methods: {},
-		conformsTo: node.conformsTo.map((identifier) => identifier.content),
+		conformsTo: node.conformsTo.map((clause) => clause.protocol.content),
+		conformanceConditions,
 	}
 
 	let properties: Record<string, common.Type> = {}

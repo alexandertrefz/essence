@@ -61,6 +61,10 @@ export interface ConformanceValueNode {
 	nodeType: "ConformanceValue"
 	namespaceName: string
 	methodMap: Record<string, string>
+	// NOTE: The witness values for this Namespace's own `where` conditions, in
+	// Generic declaration order. Empty for an unconditional conformance, which
+	// the Rewriter emits as a plain method-map object literal.
+	conditions: Array<ExpressionNode>
 	type: Type
 }
 

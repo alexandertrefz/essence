@@ -531,6 +531,64 @@ function signatureMatches(
 // by one overload of an Overloaded Namespace Method).
 export type ConformanceMethodMap = Record<string, string>
 
+// NOTE: A deterministic key for a (Protocol, Type) pair, used to memoise and
+// cycle-guard conformance solving. The Type is serialised with object keys
+// sorted, so two structurally identical Types always produce the same key
+// regardless of the order their properties were built in. The NUL separator
+// keeps the Protocol name from colliding with the serialised Type.
+export function conformanceKey(
+	protocolName: string,
+	type: common.Type,
+): string {
+	return `${protocolName}\u0000${stableSerialize(type)}`
+}
+
+function stableSerialize(value: unknown): string {
+	if (value === null || typeof value !== "object") {
+		return JSON.stringify(value) ?? "null"
+	}
+
+	if (Array.isArray(value)) {
+		return `[${value.map(stableSerialize).join(",")}]`
+	}
+
+	let entries = Object.entries(value as Record<string, unknown>)
+		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+		.map(([key, val]) => `${JSON.stringify(key)}:${stableSerialize(val)}`)
+
+	return `{${entries.join(",")}}`
+}
+
+// NOTE: Whether a Type mentions a Generic anywhere in its tree. Types are
+// plain data, so a structural walk covers every shape — including ones added
+// later — without enumerating them. Used to reject `where` conditions on a
+// Type Parameter the target Type never carries: unification could never bind
+// such a Generic, so no use site could ever produce its witness.
+export function typeMentionsGeneric(
+	type: common.Type,
+	genericName: string,
+): boolean {
+	let walk = (value: unknown): boolean => {
+		if (value === null || typeof value !== "object") {
+			return false
+		}
+
+		if (Array.isArray(value)) {
+			return value.some(walk)
+		}
+
+		let record = value as Record<string, unknown>
+
+		if (record.type === "GenericUse" && record.name === genericName) {
+			return true
+		}
+
+		return Object.values(record).some(walk)
+	}
+
+	return walk(type)
+}
+
 export type ConformanceCheckResult =
 	| { kind: "conforms"; methodMap: ConformanceMethodMap }
 	| { kind: "missing"; methodName: string }

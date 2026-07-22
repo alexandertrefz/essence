@@ -1276,6 +1276,199 @@ describe("Enricher", () => {
 		})
 	})
 
+	describe("Conditional Conformance", () => {
+		it("should accept a conditional clause whose body uses the bound", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Wrapper<infer Item> for { value: Item }
+						is Comparable where Item is Comparable
+					{
+						compareTo(_ other: { value: Item }) -> Ordering {
+							<- @.value::compareTo(other.value)
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should help toward a where clause on a needs-condition Method", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Orderable {
+					compareTo(_ other: Self) -> Ordering
+				}
+
+				namespace ListOrderable<infer Item> for List<Item> is Orderable {
+					compareTo <infer Item is Comparable>(_ other: List<Item>) -> Ordering {
+						<- Ordering#Equal
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("nonconforming-namespace")
+			expect(diagnostics[0].helps).toContain(
+				"Add 'where Item is Comparable' to this conformance.",
+			)
+		})
+
+		it("should reject a where condition naming an unknown Generic", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Wrapper<infer Item> for { value: Item }
+					is Comparable where Other is Comparable
+				{
+					compareTo(_ other: { value: Item }) -> Ordering {
+						<- Ordering#Equal
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-where-generic")
+			expect(diagnostics[0].message).toBe(
+				"'Other' is not a Type Parameter of this Namespace",
+			)
+		})
+
+		it("should reject a where condition on a Generic the target Type never mentions", () => {
+			// NOTE: Regression — a phantom Generic's condition can never be
+			// witnessed at a use site, so before this Diagnostic the hidden
+			// conformance Parameter arrived as `undefined` and crashed.
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Weird<infer Ghost, infer Item> for { value: Item }
+					is Comparable where Ghost is Comparable, Item is Comparable
+				{
+					compareTo(_ other: { value: Item }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unwitnessable-where-condition")
+			expect(diagnostics[0].message).toBe(
+				"'Ghost' does not appear in this Namespace's target Type",
+			)
+		})
+
+		it("should reject a Generic bound twice in one clause", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Wrapper<infer Item> for { value: Item }
+					is Comparable where Item is Comparable, Item is Equatable
+				{
+					compareTo(_ other: { value: Item }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+			}`)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.code === "conflicting-where-condition",
+				),
+			).toBe(true)
+		})
+
+		it("should solve a conditional conformance at a use site", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant ordered: List<Integer> = [3, 1, 2]::sorted()
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let comparable = collectConformances(program).filter(
+				(conformance) => conformance.protocolName === "Comparable",
+			)
+
+			expect(comparable.length).toBeGreaterThan(0)
+			expect(
+				comparable.some(
+					(conformance) =>
+						conformance.source.kind === "namespace" &&
+						conformance.source.name === "Integer",
+				),
+			).toBe(true)
+		})
+
+		it("should nest witness conditions ordered by the candidate's Generics", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant ordered = [[1, 2], [3]]::sorted()
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let outer = collectConformances(program).find(
+				(conformance) =>
+					conformance.protocolName === "Comparable" &&
+					conformance.source.kind === "namespace" &&
+					conformance.source.name === "List",
+			)
+
+			expect(outer).toBeDefined()
+
+			if (outer !== undefined && outer.source.kind === "namespace") {
+				expect(outer.source.conditions).toHaveLength(1)
+				expect(outer.source.conditions[0].source.kind).toBe("namespace")
+
+				if (outer.source.conditions[0].source.kind === "namespace") {
+					expect(outer.source.conditions[0].source.name).toBe(
+						"Integer",
+					)
+				}
+			}
+		})
+
+		it("should report a two-level because-chain for a nested failure", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant ordered = [[true], [false]]::sorted()
+			}`)
+
+			let failure = diagnostics.find(
+				(diagnostic) =>
+					diagnostic.code === "unsatisfied-conformance-condition",
+			)
+
+			expect(failure).toBeDefined()
+			expect(failure!.notes.length).toBeGreaterThanOrEqual(2)
+			expect(failure!.notes[0]).toContain("does not conform")
+			expect(
+				failure!.notes.some((note) =>
+					note.includes("Boolean does not conform"),
+				),
+			).toBe(true)
+		})
+
+		it("should demand a witness for a direct compareTo call", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant order = [1, 2]::compareTo([1, 3])
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let comparable = collectConformances(program).filter(
+				(conformance) => conformance.protocolName === "Comparable",
+			)
+
+			expect(comparable.length).toBeGreaterThan(0)
+		})
+
+		it("should reject a List of a non-Comparable Type", () => {
+			// NOTE: Boolean conforms only to Equatable and Printable — sorting a
+			// List of them has no item ordering to lean on. (Transcendental,
+			// which the plan first named here, in fact conforms to Comparable
+			// through the covering `Number` Namespace, so it is not a negative.)
+			let diagnostics = diagnosticsFor(`implementation {
+				constant sorted = [true, false]::sorted()
+			}`)
+
+			expect(
+				diagnostics.some((diagnostic) =>
+					diagnostic.message.includes("does not conform"),
+				),
+			).toBe(true)
+		})
+	})
+
 	describe("Protocol Bounds", () => {
 		const printableSetup = `
 			protocol Showable {
@@ -1529,10 +1722,25 @@ describe("Enricher", () => {
 
 						expect(protocol).toBeDefined()
 
+						// NOTE: A conditional conformance (List's Comparable)
+						// only holds under the `where` conditions it declares —
+						// supply them as assumptions, exactly as the Enricher's
+						// declaration-side check does.
+						const assumptions = new Map(
+							(
+								namespace.conformanceConditions?.[protocolName] ??
+								[]
+							).map((condition) => [
+								condition.generic,
+								condition.protocol,
+							]),
+						)
+
 						const result = computeConformanceMethodMap(
 							protocol,
 							namespace,
 							namespace.targetType!,
+							assumptions,
 						)
 
 						expect(result.kind).toBe("conforms")
