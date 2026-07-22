@@ -3,6 +3,11 @@ import type * as common from "./common/index"
 export type Scope = {
 	parent: Scope | null
 	members: Record<string, common.Type>
+	// NOTE: Where each name in `members` was declared, so that a Diagnostic
+	// about a use can point back at the declaration it is judged against.
+	// Names declared by the Compiler itself — the builtin Namespaces, `@` —
+	// have no Essence source to point at and are absent here.
+	declarations: Record<string, common.Position>
 	// NOTE: Names in `members` that are not reassignable — Constants,
 	// Functions, Namespaces, Parameters and `@`.
 	constants: Set<string>

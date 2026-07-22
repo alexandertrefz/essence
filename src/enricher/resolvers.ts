@@ -1446,6 +1446,7 @@ export function scopeWithGenerics(
 	return {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types,
 		protocols: {},
@@ -1729,6 +1730,7 @@ export function resolveNamespaceDefinitionStatementType(
 			{
 				parent: genericScope,
 				members: { [node.name.content]: resultType },
+				declarations: { [node.name.content]: node.name.position },
 				constants: new Set([node.name.content]),
 				types: {},
 				protocols: {},
@@ -1755,6 +1757,7 @@ export function resolveProtocolDeclarationStatementType(
 	let signatureScope: enricher.Scope = {
 		parent: scope,
 		members: {},
+		declarations: {},
 		constants: new Set(),
 		types: { Self: selfType },
 		protocols: {},
