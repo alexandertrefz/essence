@@ -26,6 +26,7 @@ import { Config, Label, Report } from "./ariadne"
 let report = new Report({
 	kind: "error",
 	span: { start: 0, end: 0 },
+	code: "E03",
 	message: "can't compare apples with oranges",
 	labels: [
 		new Label({ start: 0, end: 5 }, { message: "This is an apple" }),
@@ -36,6 +37,9 @@ let report = new Report({
 
 console.log(report.render("apple == orange;"))
 ```
+
+A `code` is optional; when given it is printed on its own line above the
+header, in the same color as `Note` and `Help`.
 
 `Report.render` accepts a plain string, a `Source`, or — for reports whose
 labels point into multiple sources — a `Cache` (see `sources()`). Labels can
@@ -53,6 +57,8 @@ for everything that can be tuned.
   `concolor`/stream-detection integration are not ported. Terminal color
   support detection is the caller's responsibility (`color: false` disables
   styling, `stripAnsi: true` additionally strips codes embedded in messages).
+- A `Report`'s `code` sits on its own line above the header, in the note
+  color, rather than sharing the header line and the kind's color.
 - Character display widths use a compact approximation of the Unicode
   East-Asian-width tables rather than the full `unicode-width` data.
 
