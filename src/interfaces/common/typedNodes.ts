@@ -385,6 +385,10 @@ export interface ParameterNode {
 	externalName: IdentifierNode | null
 	internalName: IdentifierNode | null
 	position: Position
+	// NOTE: Set only when the Parameter wrote no `: Type` and took one from
+	// the expected signature. Null means the Type is written in the source,
+	// where showing it again would be noise.
+	inferredType: Type | null
 }
 
 export interface GenericDeclarationNode {
@@ -402,6 +406,12 @@ export interface FunctionDefinitionNode {
 	parameters: Array<ParameterNode>
 	body: Array<ImplementationNode>
 	returnType: Type
+	// NOTE: Set only when no `-> Type` was written, mirroring a Parameter's
+	// `inferredType`. `returnType` is the Type either way; this says whether
+	// the source shows it.
+	inferredReturnType: Type | null
+	// NOTE: Where an omitted `-> Type` would have gone, for the Inlay Hint.
+	parameterListPosition: Position
 }
 
 export interface ArgumentNode {

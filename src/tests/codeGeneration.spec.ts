@@ -387,6 +387,46 @@ describe("Code Generation", () => {
 		})
 	})
 
+	describe("Contextual Function literals", () => {
+		// NOTE: The whole point is that the inferred Parameter Type reaches
+		// the body's Scope. `isGreaterThan` is overloaded, so the emitted
+		// `__overload$1` is only chosen if `item` really resolved to an
+		// Integer — a weaker assertion would pass even if the body had been
+		// typed as an Error.
+		it("types the body from the inferred Parameter", () => {
+			let generated = generate(`
+				implementation {
+					__print([1, 2, 3]::removeEvery(
+						where (item) { <- item::isGreaterThan(2) },
+					))
+				}
+			`)
+
+			expect(generated).toContain("removeEvery__overload$2")
+			expect(generated).toContain("isGreaterThan__overload$1")
+		})
+
+		it("emits the same JavaScript however the literal was written", () => {
+			let annotated = generate(`
+				implementation {
+					__print([1, 2, 3]::removeEvery(
+						where (_ item: Integer) -> Boolean { <- item::isGreaterThan(2) },
+					))
+				}
+			`)
+
+			let inferred = generate(`
+				implementation {
+					__print([1, 2, 3]::removeEvery(
+						where (item) { <- item::isGreaterThan(2) },
+					))
+				}
+			`)
+
+			expect(inferred).toBe(annotated)
+		})
+	})
+
 	describe("Protocols", () => {
 		it("should erase Protocol declarations from the emitted JavaScript", () => {
 			const code = generate(`implementation {

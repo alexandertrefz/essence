@@ -500,6 +500,179 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: A Function literal in Argument position may leave its
+		// annotations out and take them from the parameter it is being passed
+		// to. An unannotated Parameter takes its label from there too, which
+		// is why `(item)` and `(_ item)` mean the same thing here and neither
+		// spelling has to know that `removeEvery`'s callback is labelless.
+		describe("Contextual Function literals", () => {
+			it("infers a Parameter Type from the expected signature", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant kept = [1, 2, 3]::removeEvery(
+							where (item) { <- item::isGreaterThan(2) },
+						)
+					}`),
+				).toEqual({ type: "List", itemType: { type: "Integer" } })
+			})
+
+			it("reads the same written either way", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant kept = [1, 2, 3]::removeEvery(
+							where (_ item) { <- item::isGreaterThan(2) },
+						)
+					}`),
+				).toEqual({ type: "List", itemType: { type: "Integer" } })
+			})
+
+			it("still accepts a written return Type", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant kept = [1, 2, 3]::removeEvery(
+							where (item) -> Boolean { <- item::isGreaterThan(2) },
+						)
+					}`),
+				).toEqual({ type: "List", itemType: { type: "Integer" } })
+			})
+
+			it("types the body with the inferred Parameter", () => {
+				// NOTE: `isGreaterThan` only resolves if `item` is an Integer,
+				// so this fails outright rather than subtly if the inferred
+				// Type never reaches the body's Scope.
+				expect(
+					diagnosticsFor(`implementation {
+						constant kept = ["a"]::removeEvery(
+							where (item) { <- item::isGreaterThan(2) },
+						)
+					}`).map((diagnostic) => diagnostic.message),
+				).toContain(
+					"Could not find a method named 'isGreaterThan' in the Namespaces matching this value.",
+				)
+			})
+
+			it("reports a literal with nothing to infer from", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant standalone = (x) { <- x }
+				}`)
+
+				// NOTE: One Diagnostic, not two — the return Type could not be
+				// inferred either, but only because the Parameter it depends
+				// on could not be, which is what the reported message says.
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.message),
+				).toEqual([
+					"Could not infer the Type of Parameter 'x' — only a Function passed as an Argument takes its Types from the surrounding context.",
+				])
+			})
+
+			it("infers the return Type from the body with no context at all", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant describe = (_ value: Integer) { <- value::toString() }
+					}`),
+				).toEqual({
+					type: "Function",
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Integer" },
+							documentation: undefined,
+						},
+					],
+					returnType: { type: "String" },
+					documentation: undefined,
+				})
+			})
+
+			it("reports more Parameters than the expected signature takes", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant kept = [1, 2]::removeEvery(
+							where (a, b) { <- true },
+						)
+					}`).map((diagnostic) => diagnostic.message),
+				).toContain(
+					"The expected Function Type takes 1 Parameter, so there is nothing for Parameter 2 to infer from.",
+				)
+			})
+
+			it("binds a Generic from an inferred return Type", () => {
+				// NOTE: The hard case, and the one `map` needs. `Item` is
+				// bound by the receiver, which types the Parameter; nothing
+				// binds `Target` but this literal's own body, so the body is
+				// what `Target` is read off — String here, which then decides
+				// the Type of the whole invocation.
+				expect(
+					typeOfFirstConstant(`implementation {
+						namespace Mapper<infer Item> for List<Item> {
+							transformFirst<infer Target>(
+								_ transform: (_ item: Item) -> Target,
+								fallback fallbackValue: Target,
+							) -> Target {
+								<- fallbackValue
+							}
+						}
+
+						constant first = [1]::transformFirst(
+							(item) { <- item::toString() },
+							fallback "none",
+						)
+					}`),
+				).toEqual({ type: "String" })
+			})
+
+			it("unions the Types of several returns", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant maybeDouble = (_ value: Integer) {
+							if value::isGreaterThan(0) {
+								<- value::multiplyWith(2)
+							}
+
+							<- nothing
+						}
+					}`),
+				).toEqual({
+					type: "Function",
+					generics: [],
+					parameterTypes: [
+						{
+							name: null,
+							type: { type: "Integer" },
+							documentation: undefined,
+						},
+					],
+					returnType: {
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "Nothing" }],
+					},
+					documentation: undefined,
+				})
+			})
+
+			it("infers the Parameter while the return Type is written", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						namespace Mapper<infer Item> for List<Item> {
+							transformFirst<infer Target>(
+								_ transform: (_ item: Item) -> Target,
+								fallback fallbackValue: Target,
+							) -> Target {
+								<- fallbackValue
+							}
+						}
+
+						constant first = [1]::transformFirst(
+							(item) -> String { <- item::toString() },
+							fallback "none",
+						)
+					}`),
+				).toEqual({ type: "String" })
+			})
+		})
+
 		it("should infer Generic Functions from their Arguments", () => {
 			expect(
 				typeOfFirstConstant(`implementation {

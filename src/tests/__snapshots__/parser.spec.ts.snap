@@ -2693,6 +2693,16 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 20,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
           "parameters": [],
           "returnType": {
             "nodeType": "IdentifierTypeDeclaration",
@@ -2799,6 +2809,16 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 32,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -2975,6 +2995,16 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 23,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -3151,6 +3181,16 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -3314,6 +3354,16 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 59,
+              "line": 2,
+            },
+            "start": {
+              "column": 7,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -3562,6 +3612,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 29,
+              "line": 1,
+            },
+            "start": {
+              "column": 27,
+              "line": 1,
+            },
+          },
           "parameters": [],
           "returnType": {
             "nodeType": "IdentifierTypeDeclaration",
@@ -3699,6 +3759,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 44,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -3906,6 +3976,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 35,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -4113,6 +4193,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
             },
           ],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 37,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -4307,6 +4397,16 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
             },
           ],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 74,
+              "line": 2,
+            },
+            "start": {
+              "column": 16,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -9358,6 +9458,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -9585,6 +9695,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -9747,6 +9867,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 40,
+                    "line": 7,
+                  },
+                  "start": {
+                    "column": 23,
+                    "line": 7,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -9976,6 +10106,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -10121,6 +10261,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -10351,6 +10501,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -10496,6 +10656,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -10641,6 +10811,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 12,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 12,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -10869,6 +11049,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 5,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -11497,6 +11687,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -11750,6 +11950,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -11912,6 +12122,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 40,
+                    "line": 7,
+                  },
+                  "start": {
+                    "column": 23,
+                    "line": 7,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -12167,6 +12387,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -12312,6 +12542,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -12568,6 +12808,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -12713,6 +12963,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -12858,6 +13118,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 12,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 12,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -13112,6 +13382,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 39,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 22,
+                    "line": 5,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -13398,6 +13678,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 32,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 15,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -13651,6 +13941,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 32,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 15,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -13813,6 +14113,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 33,
+                    "line": 7,
+                  },
+                  "start": {
+                    "column": 16,
+                    "line": 7,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -14068,6 +14378,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -14213,6 +14533,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -14469,6 +14799,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 27,
+                      "line": 4,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 4,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -14614,6 +14954,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 8,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 8,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -14759,6 +15109,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                   "documentation": null,
                   "generics": [],
                   "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 32,
+                      "line": 12,
+                    },
+                    "start": {
+                      "column": 10,
+                      "line": 12,
+                    },
+                  },
                   "parameters": [
                     {
                       "documentation": null,
@@ -15013,6 +15373,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 32,
+                    "line": 5,
+                  },
+                  "start": {
+                    "column": 15,
+                    "line": 5,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -15299,6 +15669,16 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 32,
+                    "line": 9,
+                  },
+                  "start": {
+                    "column": 15,
+                    "line": 9,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -16813,6 +17193,1125 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
 }
 `;
 
+exports[`Parser Statements ProtocolDeclarationStatements Contextual Function literals should parse a Function literal without annotations 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "kept",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 21,
+              "line": 2,
+            },
+            "start": {
+              "column": 17,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 66,
+            "line": 2,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arguments": [
+            {
+              "name": {
+                "content": "where",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 46,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "Argument",
+              "value": {
+                "nodeType": "FunctionValue",
+                "position": {
+                  "end": {
+                    "column": 65,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 47,
+                    "line": 2,
+                  },
+                },
+                "value": {
+                  "body": [
+                    {
+                      "expression": {
+                        "nodeType": "BooleanValue",
+                        "position": {
+                          "end": {
+                            "column": 63,
+                            "line": 2,
+                          },
+                          "start": {
+                            "column": 59,
+                            "line": 2,
+                          },
+                        },
+                        "value": true,
+                      },
+                      "nodeType": "ReturnStatement",
+                      "position": {
+                        "end": {
+                          "column": 63,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 56,
+                          "line": 2,
+                        },
+                      },
+                    },
+                  ],
+                  "documentation": null,
+                  "generics": [],
+                  "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 53,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 47,
+                      "line": 2,
+                    },
+                  },
+                  "parameters": [
+                    {
+                      "documentation": null,
+                      "externalName": null,
+                      "internalName": {
+                        "content": "item",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 52,
+                            "line": 2,
+                          },
+                          "start": {
+                            "column": 48,
+                            "line": 2,
+                          },
+                        },
+                      },
+                      "nodeType": "Parameter",
+                      "position": {
+                        "end": {
+                          "column": 52,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 48,
+                          "line": 2,
+                        },
+                      },
+                      "type": null,
+                    },
+                  ],
+                  "returnType": null,
+                },
+              },
+            },
+          ],
+          "base": {
+            "nodeType": "ListValue",
+            "position": {
+              "end": {
+                "column": 27,
+                "line": 2,
+              },
+              "start": {
+                "column": 24,
+                "line": 2,
+              },
+            },
+            "values": [
+              {
+                "nodeType": "IntegerValue",
+                "position": {
+                  "end": {
+                    "column": 26,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 25,
+                    "line": 2,
+                  },
+                },
+                "value": "1",
+              },
+            ],
+          },
+          "member": {
+            "content": "removeEvery",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 40,
+                "line": 2,
+              },
+              "start": {
+                "column": 29,
+                "line": 2,
+              },
+            },
+          },
+          "namespaceSpecifier": null,
+          "nodeType": "MethodInvocation",
+          "position": {
+            "end": {
+              "column": 66,
+              "line": 2,
+            },
+            "start": {
+              "column": 24,
+              "line": 2,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 3,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 3,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Contextual Function literals should parse the underscore spellings 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "name": {
+          "content": "a",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 18,
+              "line": 2,
+            },
+            "start": {
+              "column": 17,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 44,
+            "line": 2,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "type": null,
+        "value": {
+          "arguments": [
+            {
+              "name": null,
+              "nodeType": "Argument",
+              "value": {
+                "nodeType": "FunctionValue",
+                "position": {
+                  "end": {
+                    "column": 43,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 23,
+                    "line": 2,
+                  },
+                },
+                "value": {
+                  "body": [
+                    {
+                      "expression": {
+                        "nodeType": "BooleanValue",
+                        "position": {
+                          "end": {
+                            "column": 41,
+                            "line": 2,
+                          },
+                          "start": {
+                            "column": 37,
+                            "line": 2,
+                          },
+                        },
+                        "value": true,
+                      },
+                      "nodeType": "ReturnStatement",
+                      "position": {
+                        "end": {
+                          "column": 41,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 34,
+                          "line": 2,
+                        },
+                      },
+                    },
+                  ],
+                  "documentation": null,
+                  "generics": [],
+                  "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 31,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 23,
+                      "line": 2,
+                    },
+                  },
+                  "parameters": [
+                    {
+                      "documentation": null,
+                      "externalName": null,
+                      "internalName": {
+                        "content": "item",
+                        "nodeType": "Identifier",
+                        "position": {
+                          "end": {
+                            "column": 30,
+                            "line": 2,
+                          },
+                          "start": {
+                            "column": 26,
+                            "line": 2,
+                          },
+                        },
+                      },
+                      "nodeType": "Parameter",
+                      "position": {
+                        "end": {
+                          "column": 30,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 24,
+                          "line": 2,
+                        },
+                      },
+                      "type": null,
+                    },
+                  ],
+                  "returnType": null,
+                },
+              },
+            },
+          ],
+          "name": {
+            "content": "f",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 22,
+                "line": 2,
+              },
+              "start": {
+                "column": 21,
+                "line": 2,
+              },
+            },
+          },
+          "nodeType": "FunctionInvocation",
+          "position": {
+            "end": {
+              "column": 44,
+              "line": 2,
+            },
+            "start": {
+              "column": 21,
+              "line": 2,
+            },
+          },
+        },
+      },
+      {
+        "documentation": null,
+        "name": {
+          "content": "b",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 18,
+              "line": 3,
+            },
+            "start": {
+              "column": 17,
+              "line": 3,
+            },
+          },
+        },
+        "nodeType": "ConstantDeclarationStatement",
+        "position": {
+          "end": {
+            "column": 39,
+            "line": 3,
+          },
+          "start": {
+            "column": 8,
+            "line": 3,
+          },
+        },
+        "type": null,
+        "value": {
+          "arguments": [
+            {
+              "name": null,
+              "nodeType": "Argument",
+              "value": {
+                "nodeType": "FunctionValue",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 23,
+                    "line": 3,
+                  },
+                },
+                "value": {
+                  "body": [
+                    {
+                      "expression": {
+                        "nodeType": "BooleanValue",
+                        "position": {
+                          "end": {
+                            "column": 36,
+                            "line": 3,
+                          },
+                          "start": {
+                            "column": 32,
+                            "line": 3,
+                          },
+                        },
+                        "value": true,
+                      },
+                      "nodeType": "ReturnStatement",
+                      "position": {
+                        "end": {
+                          "column": 36,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 29,
+                          "line": 3,
+                        },
+                      },
+                    },
+                  ],
+                  "documentation": null,
+                  "generics": [],
+                  "nodeType": "FunctionDefinition",
+                  "parameterListPosition": {
+                    "end": {
+                      "column": 26,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 23,
+                      "line": 3,
+                    },
+                  },
+                  "parameters": [
+                    {
+                      "documentation": null,
+                      "externalName": null,
+                      "internalName": null,
+                      "nodeType": "Parameter",
+                      "position": {
+                        "end": {
+                          "column": 25,
+                          "line": 3,
+                        },
+                        "start": {
+                          "column": 24,
+                          "line": 3,
+                        },
+                      },
+                      "type": null,
+                    },
+                  ],
+                  "returnType": null,
+                },
+              },
+            },
+          ],
+          "name": {
+            "content": "f",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 22,
+                "line": 3,
+              },
+              "start": {
+                "column": 21,
+                "line": 3,
+              },
+            },
+          },
+          "nodeType": "FunctionInvocation",
+          "position": {
+            "end": {
+              "column": 39,
+              "line": 3,
+            },
+            "start": {
+              "column": 21,
+              "line": 3,
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 4,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 4,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic on a Function 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "smallest",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 17,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "FunctionStatement",
+        "position": {
+          "end": {
+            "column": 9,
+            "line": 4,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "value": {
+          "body": [
+            {
+              "expression": {
+                "nodeType": "NothingValue",
+                "position": {
+                  "end": {
+                    "column": 19,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 12,
+                    "line": 3,
+                  },
+                },
+              },
+              "nodeType": "ReturnStatement",
+              "position": {
+                "end": {
+                  "column": 19,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
+            },
+          ],
+          "documentation": null,
+          "generics": [
+            {
+              "constraint": {
+                "content": "Comparable",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 41,
+                    "line": 2,
+                  },
+                },
+              },
+              "defaultType": null,
+              "inferred": true,
+              "name": {
+                "content": "Item",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 37,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "GenericDeclarationNode",
+              "position": {
+                "end": {
+                  "column": 51,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 27,
+                  "line": 2,
+                },
+              },
+            },
+          ],
+          "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 72,
+              "line": 2,
+            },
+            "start": {
+              "column": 52,
+              "line": 2,
+            },
+          },
+          "parameters": [
+            {
+              "documentation": null,
+              "externalName": null,
+              "internalName": {
+                "content": "list",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 59,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 55,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "Parameter",
+              "position": {
+                "end": {
+                  "column": 71,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 53,
+                  "line": 2,
+                },
+              },
+              "type": {
+                "baseType": {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 65,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 61,
+                      "line": 2,
+                    },
+                  },
+                  "type": {
+                    "content": "List",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 65,
+                        "line": 2,
+                      },
+                      "start": {
+                        "column": 61,
+                        "line": 2,
+                      },
+                    },
+                  },
+                },
+                "generics": [
+                  {
+                    "nodeType": "IdentifierTypeDeclaration",
+                    "position": {
+                      "end": {
+                        "column": 70,
+                        "line": 2,
+                      },
+                      "start": {
+                        "column": 66,
+                        "line": 2,
+                      },
+                    },
+                    "type": {
+                      "content": "Item",
+                      "nodeType": "Identifier",
+                      "position": {
+                        "end": {
+                          "column": 70,
+                          "line": 2,
+                        },
+                        "start": {
+                          "column": 66,
+                          "line": 2,
+                        },
+                      },
+                    },
+                  },
+                ],
+                "nodeType": "GenericTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 71,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 65,
+                    "line": 2,
+                  },
+                },
+              },
+            },
+          ],
+          "returnType": {
+            "nodeType": "UnionTypeDeclaration",
+            "position": {
+              "end": {
+                "column": 90,
+                "line": 2,
+              },
+              "start": {
+                "column": 76,
+                "line": 2,
+              },
+            },
+            "types": [
+              {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 80,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 76,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 80,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 76,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+              {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 90,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 83,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Nothing",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 90,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 83,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic with a default Type 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "name": {
+          "content": "describe",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 25,
+              "line": 2,
+            },
+            "start": {
+              "column": 17,
+              "line": 2,
+            },
+          },
+        },
+        "nodeType": "FunctionStatement",
+        "position": {
+          "end": {
+            "column": 9,
+            "line": 4,
+          },
+          "start": {
+            "column": 8,
+            "line": 2,
+          },
+        },
+        "value": {
+          "body": [
+            {
+              "expression": {
+                "nodeType": "StringValue",
+                "position": {
+                  "end": {
+                    "column": 14,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 12,
+                    "line": 3,
+                  },
+                },
+                "value": "",
+              },
+              "nodeType": "ReturnStatement",
+              "position": {
+                "end": {
+                  "column": 14,
+                  "line": 3,
+                },
+                "start": {
+                  "column": 9,
+                  "line": 3,
+                },
+              },
+            },
+          ],
+          "documentation": null,
+          "generics": [
+            {
+              "constraint": {
+                "content": "Printable",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 51,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 42,
+                    "line": 2,
+                  },
+                },
+              },
+              "defaultType": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 60,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 54,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "String",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 60,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 54,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+              "inferred": true,
+              "name": {
+                "content": "Value",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "GenericDeclarationNode",
+              "position": {
+                "end": {
+                  "column": 60,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 27,
+                  "line": 2,
+                },
+              },
+            },
+          ],
+          "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 77,
+              "line": 2,
+            },
+            "start": {
+              "column": 61,
+              "line": 2,
+            },
+          },
+          "parameters": [
+            {
+              "documentation": null,
+              "externalName": null,
+              "internalName": {
+                "content": "value",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 69,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 64,
+                    "line": 2,
+                  },
+                },
+              },
+              "nodeType": "Parameter",
+              "position": {
+                "end": {
+                  "column": 76,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 62,
+                  "line": 2,
+                },
+              },
+              "type": {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 76,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 71,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Value",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 76,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 71,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+          "returnType": {
+            "nodeType": "IdentifierTypeDeclaration",
+            "position": {
+              "end": {
+                "column": 87,
+                "line": 2,
+              },
+              "start": {
+                "column": 81,
+                "line": 2,
+              },
+            },
+            "type": {
+              "content": "String",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 87,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 81,
+                  "line": 2,
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 8,
+        "line": 5,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 8,
+      "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with a Conformance Clause 1`] = `
 {
   "implementation": {
@@ -17172,6 +18671,16 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
                 "documentation": null,
                 "generics": [],
                 "nodeType": "FunctionDefinition",
+                "parameterListPosition": {
+                  "end": {
+                    "column": 29,
+                    "line": 3,
+                  },
+                  "start": {
+                    "column": 11,
+                    "line": 3,
+                  },
+                },
                 "parameters": [
                   {
                     "documentation": null,
@@ -17862,6 +19371,16 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 34,
+              "line": 1,
+            },
+            "start": {
+              "column": 32,
+              "line": 1,
+            },
+          },
           "parameters": [],
           "returnType": {
             "nodeType": "IdentifierTypeDeclaration",
@@ -17982,6 +19501,16 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 46,
+              "line": 2,
+            },
+            "start": {
+              "column": 21,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -18172,6 +19701,16 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 37,
+              "line": 2,
+            },
+            "start": {
+              "column": 21,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -18362,6 +19901,16 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 39,
+              "line": 2,
+            },
+            "start": {
+              "column": 21,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -18539,6 +20088,16 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
           "documentation": null,
           "generics": [],
           "nodeType": "FunctionDefinition",
+          "parameterListPosition": {
+            "end": {
+              "column": 73,
+              "line": 2,
+            },
+            "start": {
+              "column": 21,
+              "line": 2,
+            },
+          },
           "parameters": [
             {
               "documentation": null,
@@ -18766,557 +20325,6 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
   "position": {
     "end": {
       "column": 7,
-      "line": 5,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic on a Function 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "name": {
-          "content": "smallest",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 25,
-              "line": 2,
-            },
-            "start": {
-              "column": 17,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "FunctionStatement",
-        "position": {
-          "end": {
-            "column": 9,
-            "line": 4,
-          },
-          "start": {
-            "column": 8,
-            "line": 2,
-          },
-        },
-        "value": {
-          "body": [
-            {
-              "expression": {
-                "nodeType": "NothingValue",
-                "position": {
-                  "end": {
-                    "column": 19,
-                    "line": 3,
-                  },
-                  "start": {
-                    "column": 12,
-                    "line": 3,
-                  },
-                },
-              },
-              "nodeType": "ReturnStatement",
-              "position": {
-                "end": {
-                  "column": 19,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 9,
-                  "line": 3,
-                },
-              },
-            },
-          ],
-          "documentation": null,
-          "generics": [
-            {
-              "constraint": {
-                "content": "Comparable",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 51,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 41,
-                    "line": 2,
-                  },
-                },
-              },
-              "defaultType": null,
-              "inferred": true,
-              "name": {
-                "content": "Item",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 37,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 33,
-                    "line": 2,
-                  },
-                },
-              },
-              "nodeType": "GenericDeclarationNode",
-              "position": {
-                "end": {
-                  "column": 51,
-                  "line": 2,
-                },
-                "start": {
-                  "column": 27,
-                  "line": 2,
-                },
-              },
-            },
-          ],
-          "nodeType": "FunctionDefinition",
-          "parameters": [
-            {
-              "documentation": null,
-              "externalName": null,
-              "internalName": {
-                "content": "list",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 59,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 55,
-                    "line": 2,
-                  },
-                },
-              },
-              "nodeType": "Parameter",
-              "position": {
-                "end": {
-                  "column": 71,
-                  "line": 2,
-                },
-                "start": {
-                  "column": 53,
-                  "line": 2,
-                },
-              },
-              "type": {
-                "baseType": {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 65,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 61,
-                      "line": 2,
-                    },
-                  },
-                  "type": {
-                    "content": "List",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 65,
-                        "line": 2,
-                      },
-                      "start": {
-                        "column": 61,
-                        "line": 2,
-                      },
-                    },
-                  },
-                },
-                "generics": [
-                  {
-                    "nodeType": "IdentifierTypeDeclaration",
-                    "position": {
-                      "end": {
-                        "column": 70,
-                        "line": 2,
-                      },
-                      "start": {
-                        "column": 66,
-                        "line": 2,
-                      },
-                    },
-                    "type": {
-                      "content": "Item",
-                      "nodeType": "Identifier",
-                      "position": {
-                        "end": {
-                          "column": 70,
-                          "line": 2,
-                        },
-                        "start": {
-                          "column": 66,
-                          "line": 2,
-                        },
-                      },
-                    },
-                  },
-                ],
-                "nodeType": "GenericTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 71,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 65,
-                    "line": 2,
-                  },
-                },
-              },
-            },
-          ],
-          "returnType": {
-            "nodeType": "UnionTypeDeclaration",
-            "position": {
-              "end": {
-                "column": 90,
-                "line": 2,
-              },
-              "start": {
-                "column": 76,
-                "line": 2,
-              },
-            },
-            "types": [
-              {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 80,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 76,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "Item",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 80,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 76,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-              {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 90,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 83,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "Nothing",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 90,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 83,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 8,
-        "line": 5,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 8,
-      "line": 5,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic with a default Type 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "name": {
-          "content": "describe",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 25,
-              "line": 2,
-            },
-            "start": {
-              "column": 17,
-              "line": 2,
-            },
-          },
-        },
-        "nodeType": "FunctionStatement",
-        "position": {
-          "end": {
-            "column": 9,
-            "line": 4,
-          },
-          "start": {
-            "column": 8,
-            "line": 2,
-          },
-        },
-        "value": {
-          "body": [
-            {
-              "expression": {
-                "nodeType": "StringValue",
-                "position": {
-                  "end": {
-                    "column": 14,
-                    "line": 3,
-                  },
-                  "start": {
-                    "column": 12,
-                    "line": 3,
-                  },
-                },
-                "value": "",
-              },
-              "nodeType": "ReturnStatement",
-              "position": {
-                "end": {
-                  "column": 14,
-                  "line": 3,
-                },
-                "start": {
-                  "column": 9,
-                  "line": 3,
-                },
-              },
-            },
-          ],
-          "documentation": null,
-          "generics": [
-            {
-              "constraint": {
-                "content": "Printable",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 51,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 42,
-                    "line": 2,
-                  },
-                },
-              },
-              "defaultType": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 60,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 54,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "String",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 60,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 54,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-              "inferred": true,
-              "name": {
-                "content": "Value",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 38,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 33,
-                    "line": 2,
-                  },
-                },
-              },
-              "nodeType": "GenericDeclarationNode",
-              "position": {
-                "end": {
-                  "column": 60,
-                  "line": 2,
-                },
-                "start": {
-                  "column": 27,
-                  "line": 2,
-                },
-              },
-            },
-          ],
-          "nodeType": "FunctionDefinition",
-          "parameters": [
-            {
-              "documentation": null,
-              "externalName": null,
-              "internalName": {
-                "content": "value",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 69,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 64,
-                    "line": 2,
-                  },
-                },
-              },
-              "nodeType": "Parameter",
-              "position": {
-                "end": {
-                  "column": 76,
-                  "line": 2,
-                },
-                "start": {
-                  "column": 62,
-                  "line": 2,
-                },
-              },
-              "type": {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 76,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 71,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "Value",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 76,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 71,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-            },
-          ],
-          "returnType": {
-            "nodeType": "IdentifierTypeDeclaration",
-            "position": {
-              "end": {
-                "column": 87,
-                "line": 2,
-              },
-              "start": {
-                "column": 81,
-                "line": 2,
-              },
-            },
-            "type": {
-              "content": "String",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 87,
-                  "line": 2,
-                },
-                "start": {
-                  "column": 81,
-                  "line": 2,
-                },
-              },
-            },
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 8,
-        "line": 5,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 8,
       "line": 5,
     },
     "start": {
