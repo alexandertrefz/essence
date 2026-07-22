@@ -1935,7 +1935,47 @@ export function getAllNamespacesInScope(
 		return cached.namespaces
 	}
 
-	let variableNames: Set<string> = new Set()
+	// NOTE: What a Scope can see is what its parent can see, amended by its
+	// own members: a member that is a Namespace adds one, and a member that
+	// is anything else shadows one away. Asking the parent — whose answer is
+	// itself memoised — costs a walk of this Scope's own members instead of
+	// every member of every Scope above it.
+	let parentNamespaces =
+		scope.parent === null
+			? EMPTY_NAMESPACES
+			: getAllNamespacesInScope(scope.parent, null)
+
+	let amends = false
+
+	for (let key in scope.members) {
+		if (
+			scope.members[key]!.type === "Namespace" ||
+			parentNamespaces.has(key)
+		) {
+			amends = true
+
+			break
+		}
+	}
+
+	// NOTE: Most Scopes declare no Namespace and shadow none, so they share
+	// their parent's answer *by identity* — which is what lets everything
+	// derived from it, the candidate index below above all, be computed once
+	// for a whole subtree instead of once per Scope.
+	let result = amends ? new Map(parentNamespaces) : parentNamespaces
+
+	if (amends) {
+		for (let key in scope.members) {
+			let value = scope.members[key]!
+
+			if (value.type === "Namespace") {
+				result.set(key, value)
+			} else {
+				result.delete(key)
+			}
+		}
+	}
+
 	let versions: Array<{ scope: enricher.Scope; version: number }> = []
 
 	while (searchScope !== null) {
@@ -1944,26 +1984,17 @@ export function getAllNamespacesInScope(
 			version: scopeVersions.get(searchScope) ?? 0,
 		})
 
-		for (let key in searchScope.members) {
-			// NOTE: Since we are resolving bottom up, we need to exclude any shadowed variables
-			if (!variableNames.has(key)) {
-				variableNames.add(key)
-
-				let value = searchScope.members[key]!
-
-				if (value.type === "Namespace") {
-					namespaces.set(key, value)
-				}
-			}
-		}
-
 		searchScope = searchScope.parent
 	}
 
-	namespacesInScopeCache.set(scope, { versions, namespaces })
+	namespacesInScopeCache.set(scope, { versions, namespaces: result })
 
-	return namespaces
+	return result
 }
+
+// NOTE: The answer for a rootless Scope — shared so that it, too, is one
+// identity rather than one per Scope.
+const EMPTY_NAMESPACES: Map<string, common.NamespaceType> = new Map()
 
 export function resolveMethodLookupNamespacesForReceiverType(
 	baseType: common.Type,
