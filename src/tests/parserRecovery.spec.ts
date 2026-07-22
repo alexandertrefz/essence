@@ -31,6 +31,16 @@ describe("Parser Recovery", () => {
 					end: { line: 1, column: 30 },
 				},
 				code: "syntax-error",
+				labels: [
+					{
+						position: {
+							start: { line: 1, column: 29 },
+							end: { line: 1, column: 30 },
+						},
+						message: "expected '='",
+						kind: "primary",
+					},
+				],
 			},
 		])
 	})
@@ -130,9 +140,7 @@ describe("Parser Recovery", () => {
 		)
 
 		expect(diagnostics).toHaveLength(1)
-		expect(diagnostics[0].message).toBe(
-			"Expected '}' but found end of input.",
-		)
+		expect(diagnostics[0].code).toBe("unclosed-block")
 
 		let nodes = program.implementation.nodes
 
@@ -147,7 +155,7 @@ describe("Parser Recovery", () => {
 
 		expect(diagnostics).toHaveLength(1)
 		expect(diagnostics[0].severity).toBe("error")
-		expect(diagnostics[0].message).toBe("String Literal is never closed.")
+		expect(diagnostics[0].code).toBe("unclosed-string")
 		expect(diagnostics[0].position).not.toBeNull()
 	})
 
