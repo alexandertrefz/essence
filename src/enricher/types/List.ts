@@ -48,9 +48,17 @@ const namespaceDefinition: common.NamespaceType = {
 				{
 					name: null,
 					type: typeResolvedWithGenericUse,
+					documentation: "the List to compare against",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the Lists are structurally equal — the same items, in the same order.",
+				parameters: {},
+				returns: "`true` when the Lists are equal.",
+				position: null,
+			},
 		},
 		isNot: {
 			type: "SimpleMethod",
@@ -63,9 +71,17 @@ const namespaceDefinition: common.NamespaceType = {
 				{
 					name: null,
 					type: typeResolvedWithGenericUse,
+					documentation: "the List to compare against",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Checks whether the Lists differ — in any item or in their order.",
+				parameters: {},
+				returns: "`true` when the Lists are not equal.",
+				position: null,
+			},
 		},
 		// NOTE: The List Namespace is generic, and generic Namespaces can not
 		// declare Protocol conformance (yet) — `toString` still exists for
@@ -97,6 +113,12 @@ const namespaceDefinition: common.NamespaceType = {
 				},
 			],
 			returnType: { type: "Integer" },
+			documentation: {
+				description: "How many items the List has.",
+				parameters: {},
+				returns: "the number of items.",
+				position: null,
+			},
 		},
 		hasItems: {
 			type: "SimpleMethod",
@@ -108,6 +130,13 @@ const namespaceDefinition: common.NamespaceType = {
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether the List has at least one item — the opposite of `isEmpty`.",
+				parameters: {},
+				returns: "`true` when the List is not empty.",
+				position: null,
+			},
 		},
 		isEmpty: {
 			type: "SimpleMethod",
@@ -119,6 +148,12 @@ const namespaceDefinition: common.NamespaceType = {
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description: "Whether the List has no items at all.",
+				parameters: {},
+				returns: "`true` for the empty List.",
+				position: null,
+			},
 		},
 		contains: {
 			type: "SimpleMethod",
@@ -131,9 +166,17 @@ const namespaceDefinition: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "GenericUse", name: "ItemType" },
+					documentation: "the item to look for",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether an item equal to the given one is in the List.",
+				parameters: {},
+				returns: "`true` when the item occurs.",
+				position: null,
+			},
 		},
 		doesNotContain: {
 			type: "SimpleMethod",
@@ -146,9 +189,17 @@ const namespaceDefinition: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "GenericUse", name: "ItemType" },
+					documentation: "the item to look for",
 				},
 			],
 			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether no item equal to the given one is in the List.",
+				parameters: {},
+				returns: "`true` when the item does not occur.",
+				position: null,
+			},
 		},
 		firstItem: {
 			type: "OverloadedMethod",
@@ -202,9 +253,23 @@ const namespaceDefinition: common.NamespaceType = {
 					{ type: "Nothing" },
 				],
 			},
+			documentation: {
+				description: "The last item of the List.",
+				parameters: {},
+				returns: "the item, or `Nothing` for the empty List.",
+				position: null,
+			},
 		},
 		removeFirst: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"A new List without the first item, or without the given number of leading items.",
+				parameters: {},
+				returns:
+					"the shortened List — empty when more items were removed than it had.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -245,12 +310,28 @@ const namespaceDefinition: common.NamespaceType = {
 				{
 					name: null,
 					type: { type: "Integer" },
+					documentation: "the position of the item to remove",
 				},
 			],
 			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List without the item at the given position, counting from zero.",
+				parameters: {},
+				returns:
+					"the List without that item, or unchanged when the position is outside it.",
+				position: null,
+			},
 		},
 		removeEvery: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"A new List without every item equal to the given one, or without every item the given check accepts.",
+				parameters: {},
+				returns: "the List of remaining items.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -299,6 +380,14 @@ const namespaceDefinition: common.NamespaceType = {
 		},
 		removeLast: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"A new List without the last item, or without the given number of trailing items.",
+				parameters: {},
+				returns:
+					"the shortened List — empty when more items were removed than it had.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -338,9 +427,23 @@ const namespaceDefinition: common.NamespaceType = {
 				},
 			],
 			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A new List keeping only the first occurrence of each item, in the original order.",
+				parameters: {},
+				returns: "the List without duplicates.",
+				position: null,
+			},
 		},
 		prepend: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"A new List with the given item — or the contents of the given List — added at the front.",
+				parameters: {},
+				returns: "the extended List.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -374,6 +477,13 @@ const namespaceDefinition: common.NamespaceType = {
 		},
 		append: {
 			type: "OverloadedMethod",
+			documentation: {
+				description:
+					"A new List with the given item — or the contents of the given List — added at the end.",
+				parameters: {},
+				returns: "the extended List.",
+				position: null,
+			},
 			overloads: [
 				{
 					generics: [],
@@ -692,14 +802,230 @@ const namespaceDefinition: common.NamespaceType = {
 				position: null,
 			},
 		},
+		lastIndexOf: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: null, type: itemType },
+			],
+			returnType: {
+				type: "UnionType",
+				types: [{ type: "Integer" }, { type: "Nothing" }],
+			},
+			documentation: {
+				description:
+					"The position of the last item equal to the given one.",
+				parameters: {},
+				returns:
+					"the zero-based position, or `Nothing` when the item is absent.",
+				position: null,
+			},
+		},
+
+		// NOTE: `joinWith` is the return trip of `String::splitOn` — it only
+		// exists on a List of Strings, so its receiver Type is written out
+		// rather than generic, and the foot loop below leaves it alone.
+		joinWith: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: { type: "List", itemType: { type: "String" } },
+				},
+				{
+					name: null,
+					type: { type: "String" },
+					documentation: "the separator to place between the items",
+				},
+			],
+			returnType: { type: "String" },
+			documentation: {
+				description:
+					"Joins the Strings into one, with the given separator between them — the return trip of `String::splitOn`.",
+				parameters: {},
+				returns: "the joined String.",
+				position: null,
+			},
+		},
+
+		flattened: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: typeResolvedWithGenericUse,
+					},
+				},
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"Flattens a List of Lists by one level — every inner List's items, in order, in a single List.",
+				parameters: {},
+				returns: "the flattened List.",
+				position: null,
+			},
+		},
+
+		partitioned: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{ name: "where", type: predicate },
+			],
+			returnType: {
+				type: "Record",
+				members: {
+					matching: typeResolvedWithGenericUse,
+					rest: typeResolvedWithGenericUse,
+				},
+			},
+			documentation: {
+				description:
+					"Splits the List in two by the given check — the accepted items and the rest, each in their original order.",
+				parameters: {},
+				returns:
+					"a Record with the accepted items under `matching` and the others under `rest`.",
+				position: null,
+			},
+		},
+
+		pairedWith: {
+			type: "SimpleMethod",
+			generics: [{ name: "Other", defaultType: null, infer: true }],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: null,
+					type: {
+						type: "List",
+						itemType: { type: "GenericUse", name: "Other" },
+					},
+					documentation: "the List to pair the items with",
+				},
+			],
+			returnType: {
+				type: "List",
+				itemType: {
+					type: "Record",
+					members: {
+						first: itemType,
+						second: { type: "GenericUse", name: "Other" },
+					},
+				},
+			},
+			documentation: {
+				description:
+					"Pairs the items of the two Lists position by position. The pairing stops with the shorter List.",
+				parameters: {},
+				returns:
+					"a List of Records, each holding one item of this List under `first` and its counterpart under `second`.",
+				position: null,
+			},
+		},
+
+		splitInto: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type: typeResolvedWithGenericUse },
+				{
+					name: "groupsOf",
+					type: { type: "Integer" },
+					documentation: "how many items each group holds",
+				},
+			],
+			returnType: {
+				type: "UnionType",
+				types: [
+					{ type: "List", itemType: typeResolvedWithGenericUse },
+					{ type: "Nothing" },
+				],
+			},
+			documentation: {
+				description:
+					"Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.",
+				parameters: {},
+				returns:
+					"the List of groups, or `Nothing` when the group size is below one.",
+				position: null,
+			},
+		},
+
+		repeating: {
+			type: "StaticMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: null,
+					type: itemType,
+					documentation: "the item to repeat",
+				},
+				{
+					name: "times",
+					type: { type: "Integer" },
+					documentation: "how many copies the List holds",
+				},
+			],
+			returnType: typeResolvedWithGenericUse,
+			documentation: {
+				description:
+					"A List holding the given item the given number of times. Zero or fewer times gives the empty List.",
+				parameters: {},
+				returns: "the List of repeated items.",
+				position: null,
+			},
+		},
+
+		// NOTE: The loop-fuel constructor — Essence has no Range Type by
+		// design, so counting loops write `List.of(integersFrom 1, through
+		// 10)::map(...)`. Fixed to Integers, so the foot loop leaves it alone.
+		of: {
+			type: "StaticMethod",
+			generics: [],
+			parameterTypes: [
+				{
+					name: "integersFrom",
+					type: { type: "Integer" },
+					documentation: "the first Integer of the List",
+				},
+				{
+					name: "through",
+					type: { type: "Integer" },
+					documentation: "the last Integer of the List, included",
+				},
+			],
+			returnType: { type: "List", itemType: { type: "Integer" } },
+			documentation: {
+				description:
+					"The Integers from one value through another, both included — counting down when the first is the greater.",
+				parameters: {},
+				returns: "the List of Integers.",
+				position: null,
+			},
+		},
 	},
 }
 
 // NOTE: The Namespace-level `ItemType` Generic is merged into every Method
 // signature, so that each signature is self-contained for inference — a
 // Method looked up as a value re-infers `ItemType` from its receiver
-// argument.
-for (let method of Object.values(namespaceDefinition.methods)) {
+// argument. `joinWith` and `of` fix their Types outright (a String-only
+// receiver, an Integer-only result), so they have no `ItemType` to infer and
+// merging it in would only ever leave it unbound.
+const methodsWithoutItemType = new Set(["joinWith", "of"])
+
+for (let [methodName, method] of Object.entries(namespaceDefinition.methods)) {
+	if (methodsWithoutItemType.has(methodName)) {
+		continue
+	}
+
 	if (method.type === "SimpleMethod" || method.type === "StaticMethod") {
 		method.generics = [...namespaceDefinition.generics, ...method.generics]
 	} else {
