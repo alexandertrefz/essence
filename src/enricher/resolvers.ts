@@ -1996,6 +1996,165 @@ export function getAllNamespacesInScope(
 // identity rather than one per Scope.
 const EMPTY_NAMESPACES: Map<string, common.NamespaceType> = new Map()
 
+// NOTE: Method resolution asks "which of the visible Namespaces target this
+// receiver?" once per invocation, and answered it by matching the receiver
+// against every Namespace in Scope — linear in the size of the program, on
+// every Method call in the program. `matchTypes` can only ever say yes to a
+// pair whose Types have the same kind, plus three blanket cases (a Union
+// target tries its members, an Unknown target accepts anything, a bindable
+// Generic target binds anything), so bucketing the Namespaces by the kind
+// they target lets a receiver skip every bucket that could not match it.
+type IndexedNamespace = {
+	order: number
+	name: string
+	namespace: common.NamespaceType
+}
+
+type NamespaceIndex = {
+	// NOTE: Targets that can match a receiver of any kind, so every lookup
+	// pays for them.
+	always: Array<IndexedNamespace>
+	byKind: Map<common.Type["type"], Array<IndexedNamespace>>
+	// NOTE: A Record target matches only a receiver carrying every one of its
+	// members, so it is filed under whichever of its member names is rarest
+	// among the Record targets — the name that rules out the most Namespaces
+	// for the fewest lookups.
+	recordsByMember: Map<string, Array<IndexedNamespace>>
+	// NOTE: `for {}` targets every Record, so no member name can file them.
+	recordsWithoutMembers: Array<IndexedNamespace>
+}
+
+let namespaceIndexes = new WeakMap<
+	Map<string, common.NamespaceType>,
+	NamespaceIndex
+>()
+
+function pushInto<Key>(
+	map: Map<Key, Array<IndexedNamespace>>,
+	key: Key,
+	entry: IndexedNamespace,
+): void {
+	let bucket = map.get(key)
+
+	if (bucket === undefined) {
+		map.set(key, [entry])
+	} else {
+		bucket.push(entry)
+	}
+}
+
+function buildNamespaceIndex(
+	namespaces: Map<string, common.NamespaceType>,
+): NamespaceIndex {
+	let index: NamespaceIndex = {
+		always: [],
+		byKind: new Map(),
+		recordsByMember: new Map(),
+		recordsWithoutMembers: [],
+	}
+
+	let entries: Array<IndexedNamespace> = []
+	let memberCounts: Map<string, number> = new Map()
+	let order = 0
+
+	for (let [name, namespace] of namespaces) {
+		let entry = { order: order++, name, namespace }
+
+		entries.push(entry)
+
+		if (namespace.targetType?.type === "Record") {
+			for (let memberName in namespace.targetType.members) {
+				memberCounts.set(
+					memberName,
+					(memberCounts.get(memberName) ?? 0) + 1,
+				)
+			}
+		}
+	}
+
+	for (let entry of entries) {
+		let targetType = entry.namespace.targetType
+
+		// NOTE: A Namespace with no target Type is a Namespace of Static
+		// Methods — never a Method receiver, so it is indexed nowhere.
+		if (targetType === null || targetType === undefined) {
+			continue
+		}
+
+		if (
+			targetType.type === "UnionType" ||
+			targetType.type === "Unknown" ||
+			targetType.type === "GenericUse"
+		) {
+			index.always.push(entry)
+		} else if (
+			targetType.type === "List" ||
+			targetType.type === "GenericList"
+		) {
+			// NOTE: The two List spellings match each other, so they share a
+			// bucket rather than being told apart here.
+			pushInto(index.byKind, "List", entry)
+		} else if (targetType.type === "Record") {
+			let rarest: string | null = null
+			let rarestCount = Infinity
+
+			for (let memberName in targetType.members) {
+				let count = memberCounts.get(memberName) ?? 0
+
+				if (count < rarestCount) {
+					rarest = memberName
+					rarestCount = count
+				}
+			}
+
+			if (rarest === null) {
+				index.recordsWithoutMembers.push(entry)
+			} else {
+				pushInto(index.recordsByMember, rarest, entry)
+			}
+		} else {
+			pushInto(index.byKind, targetType.type, entry)
+		}
+	}
+
+	return index
+}
+
+// NOTE: The Namespaces worth matching against `baseType`, in the order they
+// are visible in — a superset of those that can match, never a subset, so the
+// matching below decides exactly what it decided when it saw all of them.
+function namespaceCandidatesFor(
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+): Array<IndexedNamespace> {
+	let index = namespaceIndexes.get(namespaces)
+
+	if (index === undefined) {
+		index = buildNamespaceIndex(namespaces)
+		namespaceIndexes.set(namespaces, index)
+	}
+
+	let candidates = index.always
+
+	if (baseType.type === "Record") {
+		candidates = candidates.concat(index.recordsWithoutMembers)
+
+		for (let memberName in baseType.members) {
+			let bucket = index.recordsByMember.get(memberName)
+
+			if (bucket !== undefined) {
+				candidates = candidates.concat(bucket)
+			}
+		}
+	} else if (baseType.type === "List" || baseType.type === "GenericList") {
+		candidates = candidates.concat(index.byKind.get("List") ?? [])
+	} else {
+		candidates = candidates.concat(index.byKind.get(baseType.type) ?? [])
+	}
+
+	return candidates.sort((lhs, rhs) => lhs.order - rhs.order)
+}
+
 export function resolveMethodLookupNamespacesForReceiverType(
 	baseType: common.Type,
 	namespaceSpecifier: parser.MethodInvocationNode["namespaceSpecifier"],
@@ -2058,7 +2217,10 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	// Namespace's Generics against the receiver — the bindings are only used
 	// for the selection here, Method resolution re-binds them from the
 	// receiver Argument.
-	for (let [name, namespace] of namespaces) {
+	for (let { name, namespace } of namespaceCandidatesFor(
+		namespaces,
+		baseType,
+	)) {
 		if (namespace.targetType) {
 			if (namespace.targetType.type === "UnionType") {
 				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
