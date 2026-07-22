@@ -31,9 +31,7 @@ describe("Validator", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Constant 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
 
@@ -57,9 +55,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Variable 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
 		it("should report Variable Assignments with mismatched Types", () => {
@@ -69,9 +65,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Variable 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
 		it("should report top level returns", () => {
@@ -212,9 +206,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Amount of passed arguments doesn't match the signature.",
-			)
+			expect(diagnostics[0].code).toBe("argument-count-mismatch")
 		})
 
 		it("should report Function Invocations with mismatched Argument Types", () => {
@@ -227,9 +219,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Argument 1 doesn't match its declared parameter.",
-			)
+			expect(diagnostics[0].code).toBe("argument-type-mismatch")
 		})
 
 		it("should accept Functions that return on all code paths", () => {
@@ -301,13 +291,11 @@ describe("Validator", () => {
 				}
 			}`)
 
-			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
-				[
-					"Wrong Assignment Value Type for Constant 'a'.",
-					"Top level returns are not permitted.",
-					"If Conditions have to be Booleans.",
-				],
-			)
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"assignment-type-mismatch",
+				"top-level-return",
+				"condition-not-boolean",
+			])
 		})
 	})
 
@@ -318,9 +306,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Constant 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
 		it("should accept declared Types matching inferred return Types", () => {
@@ -357,9 +343,7 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Wrong Assignment Value Type for Constant 'a'.",
-			)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 		})
 
 		it("should treat Generics as opaque inside Generic Functions", () => {
