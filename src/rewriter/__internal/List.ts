@@ -391,6 +391,18 @@ export function sortedBy<ItemType extends AnyType>(
 	return createList(sorted)
 }
 
+// NOTE: The bounded twin of `sortedBy` — `ItemType is Comparable` makes the
+// Enricher hand the conforming Namespace's method map in as a hidden trailing
+// Argument, and its `compareTo` is the whole comparison.
+export function sorted<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	conformance: {
+		compareTo: (first: ItemType, second: ItemType) => OrderingType
+	},
+): ListType<ItemType> {
+	return sortedBy(originalList, conformance.compareTo)
+}
+
 export function anyItem<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	matchesFunction: (item: ItemType) => BooleanType,
