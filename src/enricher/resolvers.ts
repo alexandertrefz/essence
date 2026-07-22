@@ -1205,10 +1205,12 @@ export function resolveCaseReference(
 	)
 
 	if (caseType === undefined) {
-		reportError(
-			`Type '${choice.content}' has no Case '#${caseName.content}'.`,
-			caseName.position,
-			{ code: "unknown-case" },
+		reportUnknownCase(
+			caseName,
+			`'${choice.content}'`,
+			members.flatMap((member) =>
+				member.type === "Case" ? [member.name] : [],
+			),
 		)
 
 		return { type: "Error" }
@@ -1265,17 +1267,18 @@ export function resolveBareCaseReference(
 
 	if (candidates.length === 0) {
 		reportError(
-			`No Choice in scope declares a Case '#${caseName.content}'.`,
+			`No Choice in scope declares a Case '#${caseName.content}'`,
 			caseName.position,
-			{ code: "unknown-case" },
+			{
+				code: "unknown-case",
+				labels: [primary(caseName.position, "no such Case")],
+			},
 		)
 	} else {
-		reportError(
-			`Case '#${caseName.content}' is ambiguous — it is declared by the Choices ${candidates
-				.map((candidate) => `'${candidate.choice}'`)
-				.join(", ")}. Prefix it with its Choice's name.`,
-			caseName.position,
-			{ code: "ambiguous-case" },
+		reportAmbiguousCase(
+			caseName,
+			candidates.map((candidate) => candidate.choice),
+			"in scope",
 		)
 	}
 
@@ -1306,10 +1309,10 @@ function resolveCaseInExpectedType(
 	}
 
 	if (candidates.length > 1) {
-		reportError(
-			`Case '#${caseName.content}' is ambiguous — ${candidates.length} Choices in the expected Type declare it. Prefix it with its Choice's name.`,
-			caseName.position,
-			{ code: "ambiguous-case" },
+		reportAmbiguousCase(
+			caseName,
+			candidates.map((candidate) => candidate.choice),
+			"in the expected Type",
 		)
 
 		return { type: "Error" }
@@ -1374,15 +1377,18 @@ export function resolveCaseMatcherType(
 
 	if (candidates.length === 0) {
 		reportError(
-			`The matched value's Type has no Case '#${node.caseName.content}'.`,
+			`The matched value has no Case '#${node.caseName.content}'`,
 			node.position,
-			{ code: "unknown-case" },
+			{
+				code: "unknown-case",
+				labels: [primary(node.position, "no such Case in this Union")],
+			},
 		)
 	} else {
-		reportError(
-			`Case '#${node.caseName.content}' is ambiguous — ${candidates.length} Choices in the matched Union declare it. Prefix it with its Choice's name.`,
-			node.position,
-			{ code: "ambiguous-case" },
+		reportAmbiguousCase(
+			node.caseName,
+			candidates.map((candidate) => candidate.choice),
+			"in the matched Union",
 		)
 	}
 
@@ -2601,6 +2607,64 @@ export function resolveMatchType(
 /***********/
 /* Helpers */
 /***********/
+
+// NOTE: The qualified spelling is shown rather than described — "prefix it
+// with its Choice's name" leaves the reader to work out what that looks like,
+// and the whole point of the Diagnostic is that they can not tell the two
+// Choices apart.
+function reportAmbiguousCase(
+	caseName: parser.IdentifierNode,
+	choiceNames: Array<string>,
+	where: string,
+): void {
+	reportError(
+		`Case '#${caseName.content}' is declared by more than one Choice`,
+		caseName.position,
+		{
+			code: "ambiguous-case",
+			labels: [
+				primary(
+					caseName.position,
+					`${countOf(choiceNames.length, "Choice")} ${where} declare${choiceNames.length === 1 ? "s" : ""} it`,
+				),
+			],
+			notes: choiceNames.map(
+				(choiceName) =>
+					`'${choiceName}' declares '#${caseName.content}'.`,
+			),
+			helps: [
+				`Write '${choiceNames[0]}#${caseName.content}' to pick one.`,
+			],
+		},
+	)
+}
+
+function reportUnknownCase(
+	caseName: parser.IdentifierNode,
+	choiceDescription: string,
+	declaredCaseNames: Array<string>,
+): void {
+	let suggestion = closestMatch(caseName.content, declaredCaseNames)
+
+	reportError(
+		`${choiceDescription} has no Case '#${caseName.content}'`,
+		caseName.position,
+		{
+			code: "unknown-case",
+			labels: [primary(caseName.position, "no such Case")],
+			notes:
+				declaredCaseNames.length === 0
+					? []
+					: [
+							`${choiceDescription} declares ${declaredCaseNames
+								.map((name) => `'#${name}'`)
+								.join(", ")}.`,
+						],
+			helps:
+				suggestion === null ? [] : [`Did you mean '#${suggestion}'?`],
+		},
+	)
+}
 
 // NOTE: The members the base actually has are listed rather than left for the
 // reader to go and look up — a Lookup fails most often because the member is

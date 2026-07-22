@@ -211,6 +211,11 @@ export interface MatchNode {
 	value: ExpressionNode
 	handlers: Array<{
 		matcher: Type
+		// NOTE: Where the Matcher was written — `case Nothing`, not the whole
+		// Handler and not the whole Match. What a Diagnostic about one
+		// Handler underlines, and what an editor greys out when the Handler
+		// turns out to be dead.
+		matcherPosition: Position
 		literal: ExpressionNode | null
 		memberLiterals: Record<string, ExpressionNode> | null
 		guard: ExpressionNode | null
