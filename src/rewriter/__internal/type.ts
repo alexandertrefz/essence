@@ -63,7 +63,6 @@ export type AnyType =
 	| NothingType
 	| OrderingType
 
-// TODO: Handle Record Types
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
 	if (type.type === "Nothing") {
 		return value[typeKeySymbol] === "Nothing"
@@ -90,6 +89,22 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 			([name, memberType]) =>
 				name in value && isValueOfType(value[name], memberType),
 		)
+	} else if (type.type === "List" || type.type === "GenericList") {
+		if (value[typeKeySymbol] !== "List") {
+			return false
+		}
+
+		// NOTE: Item Types erase at runtime — narrowing a List means looking
+		// at the items it happens to hold. Every item has to fit, so the
+		// empty List fits any List matcher, the same way an empty literal is
+		// assignable to any List.
+		if (type.type === "List" && type.itemType.type !== "Unknown") {
+			return (value as ListType<AnyType>).value.every((item) =>
+				isValueOfType(item, type.itemType),
+			)
+		}
+
+		return true
 	} else if (type.type === "Case") {
 		// NOTE: Nominal — only the tag decides, the payload's structure never
 		// does. A structurally identical plain Record is not this Case.
