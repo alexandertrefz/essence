@@ -46,6 +46,9 @@ export interface ReportOptions<Id = unknown> {
 	kind: ReportKind
 	// The primary location at which the problem should be reported.
 	span: Span<Id>
+	// A stable identifier for this kind of report, shown before the kind name
+	// as `[code] Error: ...`.
+	code?: string
 	message?: string
 	labels?: Array<Label<Id>>
 	notes?: Array<string>
@@ -57,6 +60,7 @@ export interface ReportOptions<Id = unknown> {
 export class Report<Id = unknown> {
 	readonly kind: ReportKind
 	readonly span: Span<Id>
+	readonly code: string | null
 	readonly message: string | null
 	readonly labels: Array<Label<Id>>
 	readonly notes: Array<string>
@@ -66,6 +70,7 @@ export class Report<Id = unknown> {
 	constructor(options: ReportOptions<Id>) {
 		this.kind = options.kind
 		this.span = options.span
+		this.code = options.code ?? null
 		this.message = options.message ?? null
 		this.labels = options.labels ?? []
 		this.notes = options.notes ?? []
