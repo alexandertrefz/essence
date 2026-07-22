@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import {
 	applyGenericBindings,
+	buildUnion,
 	computeConformanceMethodMap,
 	createInferenceContext,
 	first,
@@ -9,6 +10,7 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	optionalOf,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
@@ -1862,6 +1864,131 @@ describe("Helpers", () => {
 					combine__overload$2: "combine__overload$1",
 				},
 			})
+		})
+	})
+
+	describe("buildUnion", () => {
+		const integer: Type = { type: "Integer" }
+		const rational: Type = { type: "Rational" }
+		const nothing: Type = { type: "Nothing" }
+
+		it("should hoist Nothing and nest the payload", () => {
+			expect(buildUnion([integer, rational, nothing])).toEqual({
+				type: "UnionType",
+				types: [
+					{ type: "UnionType", types: [integer, rational] },
+					nothing,
+				],
+			})
+		})
+
+		it("should leave a single payload beside Nothing flat", () => {
+			expect(buildUnion([integer, nothing])).toEqual({
+				type: "UnionType",
+				types: [integer, nothing],
+			})
+		})
+
+		it("should collapse a subsumed member into its named superset", () => {
+			const number: UnionType = {
+				type: "UnionType",
+				name: "Number",
+				types: [integer, rational],
+			}
+
+			expect(buildUnion([integer, number, nothing])).toEqual({
+				type: "UnionType",
+				types: [number, nothing],
+			})
+		})
+
+		it("should keep a lone applied Optional as written", () => {
+			const optionalRational = optionalOf(rational)
+
+			expect(buildUnion([optionalRational, nothing])).toBe(
+				optionalRational,
+			)
+		})
+
+		it("should decompose an applied Optional that merges with other members", () => {
+			expect(buildUnion([optionalOf(rational), integer])).toEqual({
+				type: "UnionType",
+				types: [
+					{ type: "UnionType", types: [rational, integer] },
+					nothing,
+				],
+			})
+		})
+
+		it("should collapse to Nothing when nothing else remains", () => {
+			expect(buildUnion([nothing, nothing])).toEqual(nothing)
+		})
+	})
+
+	describe("matchesTypeWithBindings remainder fallback", () => {
+		const integer: Type = { type: "Integer" }
+		const rational: Type = { type: "Rational" }
+		const nothing: Type = { type: "Nothing" }
+
+		it("should bind the Generic to the leftovers once concrete members claimed theirs", () => {
+			const maybeInt: UnionType = {
+				type: "UnionType",
+				name: "MaybeInt",
+				types: [integer, nothing],
+			}
+			const expected: UnionType = {
+				type: "UnionType",
+				types: [{ type: "GenericUse", name: "ItemType" }, nothing],
+			}
+			const context = createInferenceContext([
+				{ name: "ItemType", infer: true, defaultType: null },
+			])
+
+			expect(
+				matchesTypeWithBindings(
+					expected,
+					{ type: "UnionType", types: [maybeInt, rational] },
+					context,
+				),
+			).toBe(true)
+
+			// NOTE: MaybeInt's buried Nothing goes to the concrete member;
+			// the Generic binds the payload that is left.
+			expect(context.bindings.get("ItemType")).toEqual({
+				type: "UnionType",
+				types: [integer, rational],
+			})
+		})
+
+		it("should not rebind a Generic that is already bound", () => {
+			const expected: UnionType = {
+				type: "UnionType",
+				types: [{ type: "GenericUse", name: "ItemType" }, nothing],
+			}
+			const context = createInferenceContext([
+				{ name: "ItemType", infer: true, defaultType: null },
+			])
+			context.bindings.set("ItemType", integer)
+
+			expect(
+				matchesTypeWithBindings(
+					expected,
+					{
+						type: "UnionType",
+						types: [
+							{
+								type: "UnionType",
+								name: "MaybeRational",
+								types: [rational, nothing],
+							},
+							integer,
+						],
+					},
+					context,
+				),
+			).toBe(false)
+
+			expect(context.bindings.get("ItemType")).toEqual(integer)
 		})
 	})
 })

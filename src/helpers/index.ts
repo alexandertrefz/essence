@@ -250,6 +250,69 @@ function matchGenericUse(
 	return false
 }
 
+// NOTE: The failure fallback of Union-against-Union matching with an
+// inference context — it only ever turns a rejection into an acceptance, so
+// every match that succeeded before still succeeds unchanged. When the
+// whole-member pass fails and the expected Union carries exactly one
+// still-unbound `infer` Generic, the actual Union is flattened, the concrete
+// expected members claim the members they accept, and the Generic binds the
+// Union of the leftovers. This is what resolves `otherwise` on a receiver
+// like `MaybeInt | Rational` (with `type MaybeInt = Integer | Nothing`):
+// `Nothing` claims MaybeInt's buried `Nothing`, and `ItemType` binds
+// `Integer | Rational`. The whole-member pass keeps first claim, so an
+// Optional-shaped receiver still binds its payload in one piece and this
+// path never runs for it.
+function matchUnionRemainder(
+	lhs: common.UnionType,
+	rhs: common.UnionType,
+	context: GenericInferenceContext | null,
+	snapshot: GenericBindings | null,
+): boolean {
+	if (context === null || snapshot === null) {
+		return false
+	}
+
+	// NOTE: The failed whole-member pass may have bound Generics on its way
+	// down — those bindings are rolled back before the remainder is collected.
+	context.bindings.clear()
+
+	for (let [name, binding] of snapshot) {
+		context.bindings.set(name, binding)
+	}
+
+	let unboundGenericMembers = lhs.types.filter(
+		(member): member is common.GenericUse =>
+			member.type === "GenericUse" &&
+			context.bindableNames.has(member.name) &&
+			!context.bindings.has(member.name),
+	)
+
+	if (unboundGenericMembers.length !== 1) {
+		return false
+	}
+
+	let genericMember = unboundGenericMembers[0]
+	let concreteMembers = lhs.types.filter((member) => member !== genericMember)
+
+	let leftovers: Array<common.Type> = []
+
+	for (let actualMember of flattenUnionMembers(rhs)) {
+		let claimed = concreteMembers.some((concreteMember) =>
+			matchTypes(concreteMember, actualMember, context),
+		)
+
+		if (!claimed) {
+			leftovers.push(actualMember)
+		}
+	}
+
+	if (leftovers.length > 0) {
+		context.bindings.set(genericMember.name, buildUnion(leftovers))
+	}
+
+	return true
+}
+
 // NOTE: Members that would bind a still-unbound Generic are tried last, so
 // that a Union member with a concrete counterpart does not get eaten by a
 // greedy first-occurrence binding (`Nothing` must match the `Nothing` member
@@ -492,6 +555,113 @@ export function optionalOf(itemType: common.Type): common.UnionType {
 	}
 }
 
+// NOTE: Builds a Union in its canonical, Optional-shaped form: `Nothing` is
+// hoisted to a single top-level member and every other member becomes the
+// payload — one member, or one anonymous nested Union of them. So
+// `Integer | Rational | Nothing` is built as `(Integer | Rational) | Nothing`,
+// which is what lets `otherwise` (and any Generic bound over `T | Nothing`)
+// bind the payload in one piece — while an anonymous nested payload still
+// prints member by member, exactly as written.
+//
+// Members that subsume one another collapse (`Integer` alongside `Number`
+// becomes just `Number`); named Unions (`Number`, a Choice, a named Alias)
+// stay whole; an applied `Optional<X>` member surrenders its payload and its
+// `Nothing` only when it has to merge with other members — on its own it is
+// returned as written.
+export function buildUnion(members: Array<common.Type>): common.Type {
+	// NOTE: Subsumption runs before decomposition, so `Optional<Rational>`
+	// next to a plain `nothing` collapses to just `Optional<Rational>` and
+	// keeps its spelling instead of being taken apart.
+	let distinct: Array<common.Type> = []
+
+	for (let member of members) {
+		if (distinct.some((existing) => matchesType(existing, member))) {
+			continue
+		}
+
+		distinct = distinct.filter((existing) => !matchesType(member, existing))
+		distinct.push(member)
+	}
+
+	if (distinct.length === 1) {
+		return distinct[0]
+	}
+
+	let hasNothing = false
+	let payloadMembers: Array<common.Type> = []
+
+	let collect = (member: common.Type) => {
+		if (member.type === "Nothing") {
+			hasNothing = true
+			return
+		}
+
+		if (member.type === "UnionType") {
+			if (member.name === undefined && member.alias === undefined) {
+				for (let nestedMember of member.types) {
+					collect(nestedMember)
+				}
+
+				return
+			}
+
+			// NOTE: An aliased Union that carries a `Nothing` (`Optional<X>`)
+			// gives it up to the top level here — buried inside a payload
+			// member it would be invisible to `otherwise`. Named Unions keep
+			// their members regardless: their name is their spelling.
+			if (
+				member.alias !== undefined &&
+				flattenUnionMembers(member).some(
+					(nestedMember) => nestedMember.type === "Nothing",
+				)
+			) {
+				for (let nestedMember of member.types) {
+					collect(nestedMember)
+				}
+
+				return
+			}
+		}
+
+		payloadMembers.push(member)
+	}
+
+	for (let member of distinct) {
+		collect(member)
+	}
+
+	// NOTE: Decomposition can surface duplicates — `Optional<Integer>` next
+	// to a plain `Integer` — so the payload subsumes once more.
+	let payload: Array<common.Type> = []
+
+	for (let member of payloadMembers) {
+		if (payload.some((existing) => matchesType(existing, member))) {
+			continue
+		}
+
+		payload = payload.filter((existing) => !matchesType(member, existing))
+		payload.push(member)
+	}
+
+	if (payload.length === 0) {
+		return { type: "Nothing" }
+	}
+
+	let payloadType: common.Type =
+		payload.length === 1
+			? payload[0]
+			: { type: "UnionType", types: payload }
+
+	if (!hasNothing) {
+		return payloadType
+	}
+
+	return {
+		type: "UnionType",
+		types: [payloadType, { type: "Nothing" }],
+	}
+}
+
 // NOTE: The inference-aware form of `matchesType` — the first occurrence of
 // a bindable Generic (in `context.bindableNames`) binds the Type on the
 // other side, every later occurrence checks with the normal assignability
@@ -615,6 +785,9 @@ function matchTypes(
 			// it is a nested actual member decomposed against the whole
 			// expected Union, which makes the nested and the flattened
 			// spelling of the same Union interchangeable.
+			let snapshot = context === null ? null : new Map(context.bindings)
+			let matchedWholeMembers = true
+
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
 
@@ -630,11 +803,16 @@ function matchTypes(
 				}
 
 				if (!foundMatch) {
-					return false
+					matchedWholeMembers = false
+					break
 				}
 			}
 
-			return true
+			if (matchedWholeMembers) {
+				return true
+			}
+
+			return matchUnionRemainder(lhs, rhs, context, snapshot)
 		} else {
 			for (let type of lhsMembers) {
 				if (matchTypes(type, rhs, context)) {

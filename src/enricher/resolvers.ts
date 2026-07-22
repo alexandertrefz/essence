@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util"
 import { reportError } from "../diagnostics/index"
 import {
 	applyGenericBindings,
+	buildUnion,
 	computeConformanceMethodMap,
 	createInferenceContext,
 	flattenUnionMembers,
@@ -673,10 +674,7 @@ ${resolvedMethods
 
 	return {
 		namespace: placeholderNamespace(),
-		type:
-			returnTypes.length === 1
-				? returnTypes[0]
-				: { type: "UnionType", types: returnTypes },
+		type: buildUnion(returnTypes),
 		overloadedMethodIndex: null,
 		conformances: [],
 		dispatch: sortedCases,
@@ -1269,28 +1267,23 @@ export function resolveListValueType(
 			itemType: { type: "Unknown" },
 		}
 	} else {
-		let itemType = resolveType(node.values[0], scope)
-		let isUnion = false
+		let itemTypes = [resolveType(node.values[0], scope)]
 
-		for (let expression of node.values) {
+		for (let expression of node.values.slice(1)) {
 			let expressionType = resolveType(expression, scope)
-			if (!isDeepStrictEqual(itemType, expressionType)) {
-				if (!isUnion) {
-					isUnion = true
 
-					itemType = {
-						type: "UnionType",
-						types: [itemType, expressionType],
-					}
-				} else {
-					;(itemType as common.UnionType).types.push(expressionType)
-				}
+			if (
+				!itemTypes.some((existing) =>
+					isDeepStrictEqual(existing, expressionType),
+				)
+			) {
+				itemTypes.push(expressionType)
 			}
 		}
 
 		return {
 			type: "List",
-			itemType,
+			itemType: buildUnion(itemTypes),
 		}
 	}
 }
@@ -2224,17 +2217,20 @@ export function resolveIdentifierTypeDeclarationType(
 	return result
 }
 
+// NOTE: Built canonical — `Integer | Rational | Nothing` becomes
+// `(Integer | Rational) | Nothing`, still printing exactly as written. See
+// `buildUnion`.
 export function resolveUnionTypeDeclarationType(
 	node: parser.UnionTypeDeclarationNode,
 	scope: enricher.Scope,
-): common.UnionType {
+): common.Type {
 	let resolvedTypes = []
 
 	for (let type of node.types) {
 		resolvedTypes.push(resolveType(type, scope))
 	}
 
-	return { type: "UnionType", types: resolvedTypes }
+	return buildUnion(resolvedTypes)
 }
 
 export function resolveRecordTypeDeclarationType(

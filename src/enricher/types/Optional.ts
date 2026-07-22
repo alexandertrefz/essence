@@ -15,14 +15,13 @@ export const type: common.GenericAliasType = {
 // NOTE: The covering Namespace for `Optional<ItemType>` — the Union every
 // fallible Method returns. It carries the one Method whose meaning needs both
 // members at once: `otherwise`, which collapses the Union back to a bare
-// value. Matching binds `ItemType` to the receiver's non-Nothing member
-// (concrete Union members are tried ahead of binding ones), so the fallback
-// and the result are typed by that member alone. A compound payload works
-// when it is one nested member — `Optional<Integer | Rational>` binds
-// `ItemType` to `Integer | Rational` in one piece, which is how the stdlib
-// spells such results. A *flat* `Integer | Rational | Nothing` receiver does
-// not resolve here — the first member binds `ItemType` and the second no
-// longer fits it.
+// value. Matching binds `ItemType` to the receiver's non-Nothing payload: an
+// Optional-shaped receiver binds it in one piece (Unions are built that way
+// — see `buildUnion`), and a receiver whose `Nothing` hides inside a named
+// member (`MaybeInt | Rational`) resolves through the Union matcher's
+// remainder fallback, which lets `Nothing` claim its own and binds
+// `ItemType` to whatever is left. Either way the fallback Argument and the
+// result are typed by the payload alone.
 export const namespace: common.NamespaceType = {
 	type: "Namespace",
 	name: "Optional",

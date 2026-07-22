@@ -1,5 +1,6 @@
 import { collectDiagnostics, reportError } from "../diagnostics/index"
 import {
+	buildUnion,
 	flattenUnionMembers,
 	matchesType,
 	unionMembersKeepingNames,
@@ -590,7 +591,7 @@ function resolveWildcardMatcherType(
 		return remainingTypes[0]
 	}
 
-	return { type: "UnionType", types: remainingTypes }
+	return buildUnion(remainingTypes)
 }
 
 export function enrichMatch(
@@ -1381,7 +1382,7 @@ function unionOfTypes(types: Array<common.Type>): common.Type | null {
 		return distinct[0]
 	}
 
-	return { type: "UnionType", types: distinct }
+	return buildUnion(distinct)
 }
 
 // NOTE: Installed into the Resolver, which needs a body enriched to know what
