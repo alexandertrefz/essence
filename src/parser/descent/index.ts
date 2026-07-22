@@ -1,7 +1,12 @@
 // NOTE: Hand-written recursive descent parser — the compiler's parser,
 // re-exported through src/parser. It builds its ASTs through the shared
 // node generators in ../nodeGenerators.
-import { collectDiagnostics, reportError } from "../../diagnostics/index"
+import {
+	collectDiagnostics,
+	primary,
+	reportError,
+	secondary,
+} from "../../diagnostics/index"
 import { type common, lexer, type parser } from "../../interfaces/index"
 import * as generators from "../nodeGenerators"
 import {
@@ -84,9 +89,9 @@ class DescentParser {
 	// #region Program & Sections
 
 	parseProgram(): parser.Program {
-		let keyword = this.parseProgramHeader()
+		let header = this.parseProgramHeader()
 
-		if (keyword === null) {
+		if (header === null) {
 			// NOTE: Without the `implementation {` header nothing can be
 			// parsed — an empty Program is returned alongside the Diagnostic.
 			let position = {
@@ -103,31 +108,47 @@ class DescentParser {
 		let nodes = this.parseStatementList(() =>
 			this.parseImplementationNode(),
 		)
-		let closingPosition = this.parseClosingBrace()
+		let closingPosition = this.parseClosingBrace(header.leftBrace.position)
 
 		if (!this.tokens.isAtEnd() && !this.suppressDiagnostics) {
 			let token = this.peekOrFail()
 
-			reportError(`Unexpected ${describeToken(token)}.`, token.position, {
-				code: "unexpected-token",
-			})
+			reportError(
+				`Unexpected ${describeToken(token)} after the end of the Program`,
+				token.position,
+				{
+					code: "unexpected-token",
+					labels: [
+						primary(token.position, "nothing may follow here"),
+						secondary(
+							closingPosition,
+							"the implementation block ends here",
+						),
+					],
+					notes: [
+						"A Program is one 'implementation { … }' block and nothing else.",
+					],
+				},
+			)
 		}
 
 		let implementation = generators.implementationSection(nodes, {
-			start: keyword.position.start,
+			start: header.keyword.position.start,
 			end: closingPosition.end,
 		})
 
 		return generators.program(implementation, implementation.position)
 	}
 
-	protected parseProgramHeader(): Token | null {
+	protected parseProgramHeader(): {
+		keyword: Token
+		leftBrace: Token
+	} | null {
 		try {
 			let keyword = this.tokens.expect(TokenType.KeywordImplementation)
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
-			this.tokens.expect(TokenType.SymbolLeftBrace)
-
-			return keyword
+			return { keyword, leftBrace }
 		} catch (error) {
 			this.reportParseError(error)
 
@@ -145,7 +166,13 @@ class DescentParser {
 		}
 
 		if (!this.suppressDiagnostics) {
-			reportError(error.message, error.position, { code: "syntax-error" })
+			reportError(error.message, error.position, {
+				code: "syntax-error",
+				labels:
+					error.position === null || error.label === null
+						? []
+						: [primary(error.position, error.label)],
+			})
 		}
 	}
 
@@ -237,7 +264,13 @@ class DescentParser {
 		)
 	}
 
-	protected parseClosingBrace(): common.Position {
+	// NOTE: `openingPosition` is where the `{` this closes was written. The
+	// end of the input is where a missing `}` is *noticed*; the `{` is where
+	// the mistake is, and pointing at both is the difference between "there
+	// is a brace missing somewhere" and "this block was never closed".
+	protected parseClosingBrace(
+		openingPosition: common.Position | null = null,
+	): common.Position {
 		let token = this.tokens.peek()
 
 		if (token !== undefined && token.type === TokenType.SymbolRightBrace) {
@@ -249,11 +282,18 @@ class DescentParser {
 		// NOTE: Only the innermost torn-open block reports — a missing `}`
 		// necessarily tears open every enclosing block as well.
 		if (!this.suppressDiagnostics) {
-			reportError(
-				"Expected '}' but found end of input.",
-				this.tokens.endPosition(),
-				{ code: "unclosed-block" },
-			)
+			let endPosition = this.tokens.endPosition()
+
+			reportError("This block is never closed", endPosition, {
+				code: "unclosed-block",
+				labels: [
+					primary(endPosition, "the input ends here"),
+					...(openingPosition === null
+						? []
+						: [secondary(openingPosition, "opened here")]),
+				],
+				helps: ["Add the missing '}'."],
+			})
 
 			this.suppressDiagnostics = true
 		}
@@ -495,10 +535,10 @@ class DescentParser {
 			}
 		}
 
-		this.tokens.expect(TokenType.SymbolLeftBrace)
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
-		let closingPosition = this.parseClosingBrace()
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
 		return generators.namespaceDefinitionStatement(
 			name,
@@ -538,13 +578,13 @@ class DescentParser {
 
 			let name = this.parseIdentifier()
 
-			this.tokens.expect(TokenType.SymbolLeftBrace)
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			let methods = this.parseStatementList(() =>
 				this.parseOptionallyGenericFunctionLiteral(),
 			)
 
-			this.parseClosingBrace()
+			this.parseClosingBrace(leftBrace.position)
 
 			if (isStatic) {
 				return {
@@ -610,10 +650,10 @@ class DescentParser {
 		let keyword = this.tokens.expect(TokenType.KeywordProtocol)
 		let name = this.parseIdentifier()
 
-		this.tokens.expect(TokenType.SymbolLeftBrace)
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let body = this.parseStatementList(() => this.parseProtocolBodyNode())
-		let closingPosition = this.parseClosingBrace()
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
 		return generators.protocolDeclarationStatement(
 			name,
@@ -650,13 +690,13 @@ class DescentParser {
 
 			let name = this.parseIdentifier()
 
-			this.tokens.expect(TokenType.SymbolLeftBrace)
+			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			let signatures = this.parseStatementList(() =>
 				this.parseProtocolMethodSignature(),
 			)
 
-			this.parseClosingBrace()
+			this.parseClosingBrace(leftBrace.position)
 
 			if (isStatic) {
 				return {
@@ -933,7 +973,7 @@ class DescentParser {
 		let value = this.parseExpression()
 		let returnType = this.parseReturnType()
 
-		this.tokens.expect(TokenType.SymbolLeftBrace)
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let handlers = this.parseStatementList(() => {
 			this.tokens.expect(TokenType.KeywordCase)
@@ -945,7 +985,7 @@ class DescentParser {
 			return { matcher, guard, body: block.body }
 		})
 
-		let closingPosition = this.parseClosingBrace()
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
 		return generators.match(value, returnType, handlers, {
 			start: keyword.position.start,
@@ -2001,7 +2041,7 @@ class DescentParser {
 		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 		let body = this.parseStatementList(() => this.parseImplementationNode())
-		let closingPosition = this.parseClosingBrace()
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
 		return {
 			body,
