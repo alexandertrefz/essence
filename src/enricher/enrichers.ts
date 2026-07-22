@@ -1,4 +1,9 @@
-import { collectDiagnostics, reportError } from "../diagnostics/index"
+import {
+	collectDiagnostics,
+	primary,
+	reportError,
+	secondary,
+} from "../diagnostics/index"
 import {
 	buildUnion,
 	flattenUnionMembers,
@@ -8,6 +13,7 @@ import {
 import type { common, enricher, parser } from "../interfaces/index"
 import {
 	checkProtocolConformance,
+	reportReservedTypeName,
 	findTypeInScope,
 	resolveCaseMatcherType,
 	resolveCaseValueType,
@@ -398,9 +404,17 @@ export function enrichRecordValue(
 			declaredType = resolvedType
 		} else if (resolvedType.type !== "Error") {
 			reportError(
-				"Type Annotations for Records must be Record Types.",
+				"A Record Literal must be annotated with a Record Type",
 				node.type.position,
-				{ code: "record-annotation-not-record" },
+				{
+					code: "record-annotation-not-record",
+					labels: [
+						primary(
+							node.type.position,
+							"this is not a Record Type",
+						),
+					],
+				},
 			)
 		}
 	}
@@ -802,9 +816,25 @@ export function enrichVariableAssignmentStatement(
 
 	if (declaringScope?.constants.has(node.name.content)) {
 		reportError(
-			`Constant '${node.name.content}' can not be reassigned.`,
+			`'${node.name.content}' can not be reassigned`,
 			node.name.position,
-			{ code: "constant-reassignment" },
+			{
+				code: "constant-reassignment",
+				labels: [
+					primary(node.name.position, "assigned to here"),
+					...(declarationPosition === null
+						? []
+						: [
+								secondary(
+									declarationPosition,
+									"declared as a Constant here",
+								),
+							]),
+				],
+				helps: [
+					"Declare it with 'variable' instead of 'constant' if it needs to change.",
+				],
+			},
 		)
 	}
 
@@ -877,9 +907,20 @@ export function enrichNamespaceDefinitionStatement(
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
 			reportError(
-				"Namespace Type Parameters can not have Protocol bounds (yet).",
+				"A Namespace's Type Parameters can not carry Protocol bounds",
 				generic.constraint.position,
-				{ code: "protocol-bound-namespace-generic" },
+				{
+					code: "protocol-bound-namespace-generic",
+					labels: [
+						primary(
+							generic.constraint.position,
+							"this bound is not supported yet",
+						),
+					],
+					helps: [
+						"Put the bound on the Method's own Type Parameters instead.",
+					],
+				},
 			)
 		}
 	}
@@ -1119,6 +1160,37 @@ export function enrichFunctionStatement(
 
 // #region Helpers
 
+// NOTE: A name declared by the Compiler rather than in Essence — `@`, the
+// builtins — is passed as a bare string and has no Position to point at. The
+// Diagnostic is still worth reporting; it just has nothing to underline.
+function reportDuplicateDeclaration(
+	identifier: parser.IdentifierNode | string,
+	name: string,
+	firstDeclarationPosition: common.Position | null,
+	code: common.DiagnosticCode,
+	kind: string,
+): void {
+	let position = typeof identifier === "string" ? null : identifier.position
+
+	reportError(`${kind} '${name}' is already declared`, position, {
+		code,
+		labels:
+			position === null
+				? []
+				: [
+						primary(position, "declared a second time here"),
+						...(firstDeclarationPosition === null
+							? []
+							: [
+									secondary(
+										firstDeclarationPosition,
+										"first declared here",
+									),
+								]),
+					],
+	})
+}
+
 function declareVariableInScope(
 	identifier: parser.IdentifierNode | string,
 	type: common.Type,
@@ -1129,10 +1201,12 @@ function declareVariableInScope(
 		typeof identifier === "string" ? identifier : identifier.content
 
 	if (scope.members[variableName] != null) {
-		reportError(
-			`Variable '${variableName}' is already declared.`,
-			typeof identifier === "string" ? null : identifier.position,
-			{ code: "duplicate-variable" },
+		reportDuplicateDeclaration(
+			identifier,
+			variableName,
+			scope.declarations[variableName] ?? null,
+			"duplicate-variable",
+			"Variable",
 		)
 	}
 
@@ -1187,16 +1261,16 @@ function declareTypeInScope(
 		typeof identifier === "string" ? identifier : identifier.content
 
 	if (variableName === "Self") {
-		reportError(
-			"'Self' is a reserved Type name.",
+		reportReservedTypeName(
 			typeof identifier === "string" ? null : identifier.position,
-			{ code: "reserved-type-name" },
 		)
 	} else if (scope.types[variableName] != null) {
-		reportError(
-			`Type '${variableName}' is already declared.`,
-			typeof identifier === "string" ? null : identifier.position,
-			{ code: "duplicate-type" },
+		reportDuplicateDeclaration(
+			identifier,
+			variableName,
+			null,
+			"duplicate-type",
+			"Type",
 		)
 	}
 
@@ -1211,10 +1285,12 @@ function declareProtocolInScope(
 	scope: enricher.Scope,
 ): enricher.Scope {
 	if (scope.protocols[identifier.content] != null) {
-		reportError(
-			`Protocol '${identifier.content}' is already declared.`,
-			identifier.position,
-			{ code: "duplicate-protocol" },
+		reportDuplicateDeclaration(
+			identifier,
+			identifier.content,
+			null,
+			"duplicate-protocol",
+			"Protocol",
 		)
 	}
 

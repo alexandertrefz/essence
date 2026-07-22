@@ -183,9 +183,20 @@ function reportUnboundGenerics(
 	position: common.Position,
 ): void {
 	for (let name of unboundGenerics) {
-		reportError(`Could not infer Type Parameter '${name}'.`, position, {
-			code: "uninferable-type-parameter",
-		})
+		reportError(
+			`Type Parameter '${name}' could not be inferred`,
+			position,
+			{
+				code: "uninferable-type-parameter",
+				labels: [
+					primary(
+						position,
+						"nothing here determines what it binds to",
+					),
+				],
+				helps: ["Write the Type Argument explicitly."],
+			},
+		)
 	}
 }
 
@@ -206,9 +217,17 @@ export function resolveNativeFunctionInvocationType(
 
 	if (type.type !== "Error") {
 		reportError(
-			`'${node.name.content}' is not a native function.`,
+			`'${node.name.content}' is not a native Function`,
 			node.name.position,
-			{ code: "unknown-native-function" },
+			{
+				code: "unknown-native-function",
+				labels: [
+					primary(
+						node.name.position,
+						"the Compiler provides no such native Function",
+					),
+				],
+			},
 		)
 	}
 
@@ -1033,19 +1052,31 @@ export function resolveFunctionInvocation(
 			}
 		}
 
-		reportError(
-			"Passed arguments do not match any overload.",
-			node.position,
-			{ code: "no-matching-overload" },
-		)
+		reportError("No overload accepts these Arguments", node.position, {
+			code: "no-matching-overload",
+			labels: [
+				primary(
+					node.position,
+					`this call passes ${countOf(node.arguments.length, "Argument")}`,
+				),
+			],
+		})
 
 		return { type: { type: "Error" }, conformances: [] }
 	} else {
 		if (type.type !== "Error") {
 			reportError(
-				"This expression is not a Function.",
+				"This Expression is not a Function",
 				node.name.position,
-				{ code: "not-a-function" },
+				{
+					code: "not-a-function",
+					labels: [
+						primary(
+							node.name.position,
+							`this is ${withArticle(describeType(type))}`,
+						),
+					],
+				},
 			)
 		}
 
@@ -1129,9 +1160,18 @@ export function resolveCombinationType(
 
 	if (lhsType.type !== "Record") {
 		reportError(
-			`You can not combine ${describeTypesForCombination(lhsType)}.`,
+			`${describeTypesForCombination(lhsType)} can not be combined`,
 			node.lhs.position,
-			{ code: "uncombinable-types" },
+			{
+				code: "uncombinable-types",
+				labels: [
+					primary(
+						node.lhs.position,
+						`this is ${withArticle(describeType(lhsType))}`,
+					),
+				],
+				notes: ["Only Records and Namespaces can be combined."],
+			},
 		)
 
 		return { type: "Error" }
@@ -1139,9 +1179,18 @@ export function resolveCombinationType(
 
 	if (rhsType.type !== "Record") {
 		reportError(
-			`You can not combine ${describeTypesForCombination(rhsType)}.`,
+			`${describeTypesForCombination(rhsType)} can not be combined`,
 			node.rhs.position,
-			{ code: "uncombinable-types" },
+			{
+				code: "uncombinable-types",
+				labels: [
+					primary(
+						node.rhs.position,
+						`this is ${withArticle(describeType(rhsType))}`,
+					),
+				],
+				notes: ["Only Records and Namespaces can be combined."],
+			},
 		)
 
 		return { type: "Error" }
@@ -1156,9 +1205,24 @@ export function resolveCombinationType(
 			return lhsType
 		} else {
 			reportError(
-				"The right hand side Type must be a Partial of the left hand side Type.",
+				"This is not a Partial of the value it updates",
 				node.rhs.position,
-				{ code: "partial-type-mismatch" },
+				{
+					code: "partial-type-mismatch",
+					labels: [
+						primary(
+							node.rhs.position,
+							`this is ${withArticle(describeType(rhsType))}`,
+						),
+						secondary(
+							node.lhs.position,
+							`this is ${withArticle(describeType(lhsType))}`,
+						),
+					],
+					notes: [
+						"An update may only set members the original already has, with the Types it declared for them.",
+					],
+				},
 			)
 
 			return lhsType
@@ -1403,8 +1467,9 @@ export function resolveChoiceDeclarationStatementType(
 	scope: enricher.Scope,
 ): common.UnionType {
 	if (node.cases.length === 0) {
-		reportError("A Choice must declare at least one Case.", node.position, {
+		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
+			labels: [primary(node.position, "this Choice declares none")],
 		})
 	}
 
@@ -1417,9 +1482,17 @@ export function resolveChoiceDeclarationStatementType(
 			)
 		) {
 			reportError(
-				`Case '#${choiceCase.name.content}' is declared more than once.`,
+				`Case '#${choiceCase.name.content}' is declared more than once`,
 				choiceCase.name.position,
-				{ code: "duplicate-case" },
+				{
+					code: "duplicate-case",
+					labels: [
+						primary(
+							choiceCase.name.position,
+							"declared a second time here",
+						),
+					],
+				},
 			)
 
 			continue
@@ -1453,9 +1526,17 @@ export function resolveRecordValueType(
 
 		if (resolvedType.type !== "Error") {
 			reportError(
-				"Type Annotations for Records must be Record Types.",
+				"A Record Literal must be annotated with a Record Type",
 				node.type.position,
-				{ code: "record-annotation-not-record" },
+				{
+					code: "record-annotation-not-record",
+					labels: [
+						primary(
+							node.type.position,
+							"this is not a Record Type",
+						),
+					],
+				},
 			)
 		}
 	}
@@ -1589,9 +1670,18 @@ export function resolveLookupType(
 		}
 	} else {
 		reportError(
-			"Only Records, Cases and Namespaces have members.",
+			"This value has no members to look up",
 			node.base.position,
-			{ code: "type-without-members" },
+			{
+				code: "type-without-members",
+				labels: [
+					primary(
+						node.base.position,
+						`this is ${withArticle(describeType(baseType))}`,
+					),
+				],
+				notes: ["Only Records, Cases and Namespaces have members."],
+			},
 		)
 
 		return { type: "Error" }
@@ -1608,9 +1698,15 @@ export function resolveIdentifierType(
 	if (result === null) {
 		if (findProtocolInScope(name, scope) !== null) {
 			reportError(
-				`Protocol '${name}' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is ${name}>') and Namespace conformance clauses ('is ${name}').`,
+				`Protocol '${name}' can not be used as a value`,
 				node.position,
-				{ code: "protocol-as-value" },
+				{
+					code: "protocol-as-value",
+					labels: [primary(node.position, "this names a Protocol")],
+					notes: [
+						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
+					],
+				},
 			)
 		} else {
 			reportError(`'${name}' is not declared`, node.position, {
@@ -1635,11 +1731,15 @@ export function resolveSelfType(
 	let result = findVariableInScope("@", scope)
 
 	if (result === null) {
-		reportError(
-			"@-Expressions can not be used outside of Methods and Match Expressions.",
-			node.position,
-			{ code: "at-outside-method" },
-		)
+		reportError("There is no '@' here to refer to", node.position, {
+			code: "at-outside-method",
+			labels: [
+				primary(node.position, "this is outside any Method or Handler"),
+			],
+			notes: [
+				"'@' is the receiver of a Method or the value a Match Handler matched.",
+			],
+		})
 
 		return { type: "Error" }
 	} else {
@@ -1655,11 +1755,7 @@ export function resolveGenericDeclarations(
 		let defaultType = null
 
 		if (generic.name.content === "Self") {
-			reportError(
-				"'Self' is a reserved Type name.",
-				generic.name.position,
-				{ code: "reserved-type-name" },
-			)
+			reportReservedTypeName(generic.name.position)
 		}
 
 		if (generic.defaultType) {
@@ -1844,11 +1940,23 @@ function resolveContextualParameterTypes(
 
 		if (expectedParameter === undefined) {
 			reportError(
-				expectedFunction === null
-					? `Could not infer the Type of Parameter '${parameterLabel(parameter)}' — only a Function passed as an Argument takes its Types from the surrounding context.`
-					: `The expected Function Type takes ${expectedFunction.parameterTypes.length === 1 ? "1 Parameter" : `${expectedFunction.parameterTypes.length} Parameters`}, so there is nothing for Parameter ${index + 1} to infer from.`,
+				`The Type of Parameter '${parameterLabel(parameter)}' could not be inferred`,
 				parameter.position,
-				{ code: "uninferable-parameter-type" },
+				{
+					code: "uninferable-parameter-type",
+					labels: [
+						primary(
+							parameter.position,
+							"this Parameter has no Type",
+						),
+					],
+					notes: [
+						expectedFunction === null
+							? "Only a Function passed as an Argument takes its Types from the surrounding context."
+							: `The expected Function Type takes ${countOf(expectedFunction.parameterTypes.length, "Parameter")}, so there is nothing for Parameter ${index + 1} to infer from.`,
+					],
+					helps: ["Write the Parameter's Type explicitly."],
+				},
 			)
 
 			return { name: null, type: { type: "Error" }, documentation }
@@ -1907,9 +2015,17 @@ function resolveContextualReturnType(
 	// an omitted `-> Type` is allowed.
 	if (expectedFunction === null) {
 		reportError(
-			"A Function that is not passed as an Argument must write its return Type — only an Argument takes its Types from the surrounding context.",
+			"This Function must write its return Type",
 			node.parameterListPosition,
-			{ code: "missing-return-type" },
+			{
+				code: "missing-return-type",
+				labels: [
+					primary(node.parameterListPosition, "no '-> Type' here"),
+				],
+				notes: [
+					"Only a Function passed as an Argument takes its Types from the surrounding context.",
+				],
+			},
 		)
 
 		return { type: "Error" }
@@ -1925,10 +2041,24 @@ function resolveContextualReturnType(
 			return inferred
 		}
 
+		let position = functionLiteralPosition(node)
+
 		reportError(
-			"Could not infer the return Type from the body — give the Function an explicit `-> Type`.",
-			functionLiteralPosition(node),
-			{ code: "uninferable-return-type" },
+			"The return Type could not be inferred from the body",
+			position,
+			{
+				code: "uninferable-return-type",
+				labels:
+					position === null
+						? []
+						: [
+								primary(
+									position,
+									"the body's Type is not determined here",
+								),
+							],
+				helps: ["Give the Function an explicit '-> Type'."],
+			},
 		)
 
 		return { type: "Error" }
@@ -2164,9 +2294,23 @@ export function resolveConformances(
 				})
 			} else {
 				reportError(
-					`Type Parameter '${binding.name}' does not conform to Protocol '${generic.constraint}' — it carries no such bound.`,
+					`Type Parameter '${binding.name}' does not conform to '${generic.constraint}'`,
 					position,
-					{ code: "unsatisfied-bound" },
+					{
+						code: "unsatisfied-bound",
+						labels: [
+							primary(
+								position,
+								"bound here to an unbounded Type Parameter",
+							),
+						],
+						notes: [
+							`'${binding.name}' carries no '${generic.constraint}' bound of its own, so it can not satisfy one.`,
+						],
+						helps: [
+							`Declare it as '<infer ${binding.name} is ${generic.constraint}>'.`,
+						],
+					},
 				)
 			}
 
@@ -2220,9 +2364,23 @@ export function resolveConformances(
 
 		if (candidates.length === 0) {
 			reportError(
-				`Type '${describeType(binding)}' does not conform to Protocol '${generic.constraint}': no conforming Namespace is in scope.`,
+				`${describeType(binding)} does not conform to '${generic.constraint}'`,
 				position,
-				{ code: "unsatisfied-bound" },
+				{
+					code: "unsatisfied-bound",
+					labels: [
+						primary(
+							position,
+							`this binds a Type Parameter bound to '${generic.constraint}'`,
+						),
+					],
+					notes: [
+						`No Namespace in scope makes ${describeType(binding)} conform to '${generic.constraint}'.`,
+					],
+					helps: [
+						`Declare a Namespace 'for ${describeType(binding)} is ${generic.constraint}'.`,
+					],
+				},
 			)
 
 			continue
@@ -2230,13 +2388,21 @@ export function resolveConformances(
 
 		if (candidates.length > 1) {
 			reportError(
-				`Multiple Namespaces conform to Protocol '${generic.constraint}' for Type '${describeType(binding)}', please disambiguate.
-
-The matching Namespaces are:
-${candidates.map((candidate) => `    - ${candidate.name}`).join("\n")}
-`,
+				`More than one Namespace makes ${describeType(binding)} conform to '${generic.constraint}'`,
 				position,
-				{ code: "ambiguous-conformance" },
+				{
+					code: "ambiguous-conformance",
+					labels: [
+						primary(
+							position,
+							"the conformance can not be chosen here",
+						),
+					],
+					notes: candidates.map(
+						(candidate) =>
+							`'${candidate.name}' conforms to '${generic.constraint}'.`,
+					),
+				},
 			)
 
 			continue
@@ -2254,9 +2420,17 @@ ${candidates.map((candidate) => `    - ${candidate.name}`).join("\n")}
 			// wider target Type (a Union) but a `Self` position makes the
 			// signatures incompatible for this narrower binding.
 			reportError(
-				`Namespace '${candidate.name}' does not conform to Protocol '${generic.constraint}' for Type '${describeType(binding)}'.`,
+				`Namespace '${candidate.name}' does not conform to '${generic.constraint}'`,
 				position,
-				{ code: "nonconforming-namespace" },
+				{
+					code: "nonconforming-namespace",
+					labels: [
+						primary(
+							position,
+							`this needs ${describeType(binding)} to conform`,
+						),
+					],
+				},
 			)
 
 			continue
@@ -2307,9 +2481,20 @@ export function checkProtocolConformance(
 
 		if (namespaceType.targetType === null) {
 			reportError(
-				"Only Namespaces with a target Type ('for …') can conform to a Protocol.",
+				"Only a Namespace with a target Type can conform to a Protocol",
 				identifier.position,
-				{ code: "conformance-needs-target-type" },
+				{
+					code: "conformance-needs-target-type",
+					labels: [
+						primary(
+							identifier.position,
+							"this Namespace has no 'for …'",
+						),
+					],
+					notes: [
+						"A conformance says what a Type can do, so there has to be a Type.",
+					],
+				},
 			)
 
 			continue
@@ -2317,9 +2502,17 @@ export function checkProtocolConformance(
 
 		if (namespaceType.generics.length > 0) {
 			reportError(
-				"Generic Namespaces can not declare Protocol conformance (yet).",
+				"A generic Namespace can not declare Protocol conformance",
 				identifier.position,
-				{ code: "generic-namespace-conformance" },
+				{
+					code: "generic-namespace-conformance",
+					labels: [
+						primary(
+							identifier.position,
+							"this conformance is not supported yet",
+						),
+					],
+				},
 			)
 
 			continue
@@ -2333,15 +2526,31 @@ export function checkProtocolConformance(
 
 		if (result.kind === "missing") {
 			reportError(
-				`Namespace '${namespaceType.name}' does not conform to Protocol '${protocol.name}': it is missing Method '${result.methodName}'.`,
+				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
 				identifier.position,
-				{ code: "nonconforming-namespace" },
+				{
+					code: "nonconforming-namespace",
+					labels: [
+						primary(
+							identifier.position,
+							`Method '${result.methodName}' is missing`,
+						),
+					],
+				},
 			)
 		} else if (result.kind === "mismatched") {
 			reportError(
-				`Namespace '${namespaceType.name}' does not conform to Protocol '${protocol.name}': Method '${result.methodName}' does not match the Protocol's signature.`,
+				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
 				identifier.position,
-				{ code: "nonconforming-namespace" },
+				{
+					code: "nonconforming-namespace",
+					labels: [
+						primary(
+							identifier.position,
+							`Method '${result.methodName}' does not match the Protocol's signature`,
+						),
+					],
+				},
 			)
 		}
 	}
@@ -2355,9 +2564,7 @@ export function resolveTypeAliasStatementType(
 	// speculatively and would otherwise register the reserved name without
 	// ever reaching the declaration check.
 	if (node.name.content === "Self") {
-		reportError("'Self' is a reserved Type name.", node.name.position, {
-			code: "reserved-type-name",
-		})
+		reportReservedTypeName(node.name.position)
 	}
 
 	if (node.generics.length === 0) {
@@ -2410,9 +2617,20 @@ function applyGenericAlias(
 		typeArguments.length < requiredCount
 	) {
 		reportError(
-			`Wrong number of Type Arguments for Type '${aliasType.name}'.`,
+			`Type '${aliasType.name}' was given the wrong number of Type Arguments`,
 			position,
-			{ code: "wrong-type-argument-count" },
+			{
+				code: "wrong-type-argument-count",
+				labels: [
+					primary(
+						position,
+						`${countOf(typeArguments.length, "Type Argument")} given`,
+					),
+				],
+				notes: [
+					`'${aliasType.name}' takes ${countOf(aliasType.generics.length, "Type Parameter")}.`,
+				],
+			},
 		)
 	}
 
@@ -2467,9 +2685,15 @@ export function resolveIdentifierTypeDeclarationType(
 	if (result === null) {
 		if (findProtocolInScope(name, scope) !== null) {
 			reportError(
-				`Protocol '${name}' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is ${name}>') and Namespace conformance clauses ('is ${name}').`,
+				`Protocol '${name}' can not be used as a Type`,
 				node.position,
-				{ code: "protocol-as-type" },
+				{
+					code: "protocol-as-type",
+					labels: [primary(node.position, "this names a Protocol")],
+					notes: [
+						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
+					],
+				},
 			)
 		} else {
 			reportError(`Type '${name}' is not declared`, node.position, {
@@ -2561,11 +2785,15 @@ export function resolveGenericTypeDeclarationType(
 	// that inferred and declared List Types share a single representation.
 	if (baseType.type === "GenericList") {
 		if (node.generics.length !== 1) {
-			reportError(
-				"List requires exactly 1 Type Argument.",
-				node.position,
-				{ code: "wrong-type-argument-count" },
-			)
+			reportError("List takes exactly 1 Type Argument", node.position, {
+				code: "wrong-type-argument-count",
+				labels: [
+					primary(
+						node.position,
+						`${countOf(node.generics.length, "Type Argument")} given`,
+					),
+				],
+			})
 
 			return {
 				type: "List",
@@ -2590,8 +2818,11 @@ export function resolveGenericTypeDeclarationType(
 		)
 	}
 
-	reportError("This Type is not generic.", node.position, {
+	reportError("This Type takes no Type Arguments", node.position, {
 		code: "type-not-generic",
+		labels: [
+			primary(node.position, "the Type Arguments have nowhere to go"),
+		],
 	})
 
 	return { type: "Error" }
@@ -2607,6 +2838,19 @@ export function resolveMatchType(
 /***********/
 /* Helpers */
 /***********/
+
+// NOTE: `Self` is what a Protocol calls its conforming Type; the two other
+// places that reject the name report it identically, so they share this.
+export function reportReservedTypeName(position: common.Position | null): void {
+	reportError("'Self' is a reserved Type name", position, {
+		code: "reserved-type-name",
+		labels:
+			position === null ? [] : [primary(position, "this name is taken")],
+		notes: [
+			"'Self' is what a Protocol calls the Type conforming to it, so no declaration may take it.",
+		],
+	})
+}
 
 // NOTE: The qualified spelling is shown rather than described — "prefix it
 // with its Choice's name" leaves the reader to work out what that looks like,
@@ -2996,9 +3240,20 @@ export function resolveMethodType(
 	if (node.nodeType === "SimpleMethod") {
 		if (selfType === null) {
 			reportError(
-				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+				"A Namespace without a target Type can only hold static Methods",
 				node.method.position,
-				{ code: "untyped-namespace-method" },
+				{
+					code: "untyped-namespace-method",
+					labels: [
+						primary(
+							node.method.position,
+							"this Method is not static",
+						),
+					],
+					helps: [
+						"Give the Namespace a target Type with 'for …', or make the Method static.",
+					],
+				},
 			)
 
 			selfType = { type: "Error" }
@@ -3050,9 +3305,23 @@ export function resolveMethodType(
 	} else if (node.nodeType === "OverloadedMethod") {
 		if (selfType === null) {
 			reportError(
-				"Using Non-Static Methods in Untyped Namespaces is not supported.",
+				"A Namespace without a target Type can only hold static Methods",
 				node.methods[0]?.position ?? null,
-				{ code: "untyped-namespace-method" },
+				{
+					code: "untyped-namespace-method",
+					labels:
+						node.methods[0] === undefined
+							? []
+							: [
+									primary(
+										node.methods[0].position,
+										"these overloads are not static",
+									),
+								],
+					helps: [
+						"Give the Namespace a target Type with 'for …', or make the Methods static.",
+					],
+				},
 			)
 
 			selfType = { type: "Error" }

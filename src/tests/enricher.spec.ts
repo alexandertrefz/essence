@@ -70,7 +70,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Variable 'a' is already declared.",
+				"Variable 'a' is already declared",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
@@ -83,7 +83,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Name' is already declared.",
+				"Type 'Name' is already declared",
 			)
 		})
 
@@ -128,7 +128,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe("You can not combine Strings.")
+			expect(diagnostics[0].message).toBe("Strings can not be combined")
 		})
 
 		it("should report Combinations whose right hand side is not a Partial", () => {
@@ -140,7 +140,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"The right hand side Type must be a Partial of the left hand side Type.",
+				"This is not a Partial of the value it updates",
 			)
 		})
 
@@ -151,7 +151,7 @@ describe("Enricher", () => {
 
 			expect(
 				diagnostics.map((diagnostic) => diagnostic.message),
-			).toContain("Type Annotations for Records must be Record Types.")
+			).toContain("A Record Literal must be annotated with a Record Type")
 		})
 
 		it("should report @-Expressions outside of Methods", () => {
@@ -161,7 +161,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"@-Expressions can not be used outside of Methods and Match Expressions.",
+				"There is no '@' here to refer to",
 			)
 		})
 
@@ -173,7 +173,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Only Records, Cases and Namespaces have members.",
+				"This value has no members to look up",
 			)
 		})
 
@@ -245,9 +245,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Constant 'a' can not be reassigned.",
-			)
+			expect(diagnostics[0].message).toBe("'a' can not be reassigned")
 			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
 
@@ -262,7 +260,7 @@ describe("Enricher", () => {
 
 			expect(
 				diagnostics.map((diagnostic) => diagnostic.message),
-			).toContain("Constant 'getName' can not be reassigned.")
+			).toContain("'getName' can not be reassigned")
 		})
 
 		it("should report reassigned Parameters", () => {
@@ -274,9 +272,7 @@ describe("Enricher", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].message).toBe(
-				"Constant 'name' can not be reassigned.",
-			)
+			expect(diagnostics[0].message).toBe("'name' can not be reassigned")
 		})
 
 		it("should allow reassigning outer Variables from inner scopes", () => {
@@ -391,7 +387,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Name' is already declared.",
+				"Type 'Name' is already declared",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
@@ -604,9 +600,7 @@ describe("Enricher", () => {
 				// on could not be, which is what the reported message says.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.message),
-				).toEqual([
-					"Could not infer the Type of Parameter 'x' — only a Function passed as an Argument takes its Types from the surrounding context.",
-				])
+				).toEqual(["The Type of Parameter 'x' could not be inferred"])
 			})
 
 			it("reports an omitted return Type outside Argument position", () => {
@@ -618,9 +612,7 @@ describe("Enricher", () => {
 					diagnosticsFor(`implementation {
 						constant describe = (_ value: Integer) { <- value::toString() }
 					}`).map((diagnostic) => diagnostic.message),
-				).toEqual([
-					"A Function that is not passed as an Argument must write its return Type — only an Argument takes its Types from the surrounding context.",
-				])
+				).toEqual(["This Function must write its return Type"])
 			})
 
 			it("reports more Parameters than the expected signature takes", () => {
@@ -630,9 +622,7 @@ describe("Enricher", () => {
 							where (a, b) { <- true },
 						)
 					}`).map((diagnostic) => diagnostic.message),
-				).toContain(
-					"The expected Function Type takes 1 Parameter, so there is nothing for Parameter 2 to infer from.",
-				)
+				).toContain("The Type of Parameter 'b' could not be inferred")
 			})
 
 			it("binds a Generic from an inferred return Type", () => {
@@ -738,7 +728,7 @@ describe("Enricher", () => {
 
 			expect(
 				diagnostics.map((diagnostic) => diagnostic.message),
-			).toContain("Could not infer Type Parameter 'T'.")
+			).toContain("Type Parameter 'T' could not be inferred")
 		})
 
 		it("should apply defaults for unbound plain Generics", () => {
@@ -799,7 +789,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Wrong number of Type Arguments for Type 'Maybe'.",
+				"Type 'Maybe' was given the wrong number of Type Arguments",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(4)
 		})
@@ -813,7 +803,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Wrong number of Type Arguments for Type 'Maybe'.",
+				"Type 'Maybe' was given the wrong number of Type Arguments",
 			)
 		})
 
@@ -878,7 +868,7 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Showable' is already declared.",
+				"Protocol 'Showable' is already declared",
 			)
 		})
 
@@ -893,7 +883,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
+				"Protocol 'Showable' can not be used as a Type",
 			)
 		})
 
@@ -908,7 +898,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
+				"Protocol 'Showable' can not be used as a Type",
 			)
 		})
 
@@ -931,7 +921,7 @@ describe("Enricher", () => {
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"Protocol 'Showable' can not be used as a Type. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
+						"Protocol 'Showable' can not be used as a Type",
 				),
 			).toBe(true)
 		})
@@ -947,7 +937,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Showable' can not be used as a value. Protocols are only usable as Generic bounds ('<infer T is Showable>') and Namespace conformance clauses ('is Showable').",
+				"Protocol 'Showable' can not be used as a value",
 			)
 		})
 
@@ -960,7 +950,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"'Self' is a reserved Type name.",
+				"'Self' is a reserved Type name",
 			)
 		})
 
@@ -971,7 +961,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"'Self' is a reserved Type name.",
+				"'Self' is a reserved Type name",
 			)
 		})
 	})
@@ -1050,7 +1040,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace 'VectorMatchable' does not conform to Protocol 'Matchable': it is missing Method 'is'.",
+				"Namespace 'VectorMatchable' does not conform to 'Matchable'",
 			)
 		})
 
@@ -1071,7 +1061,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace 'VectorShowable' does not conform to Protocol 'Showable': Method 'toString' does not match the Protocol's signature.",
+				"Namespace 'VectorShowable' does not conform to 'Showable'",
 			)
 		})
 
@@ -1099,7 +1089,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Only Namespaces with a target Type ('for …') can conform to a Protocol.",
+				"Only a Namespace with a target Type can conform to a Protocol",
 			)
 		})
 
@@ -1118,7 +1108,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Generic Namespaces can not declare Protocol conformance (yet).",
+				"A generic Namespace can not declare Protocol conformance",
 			)
 		})
 
@@ -1157,7 +1147,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace 'VectorCreatable' does not conform to Protocol 'Creatable': Method 'create' does not match the Protocol's signature.",
+				"Namespace 'VectorCreatable' does not conform to 'Creatable'",
 			)
 		})
 	})
@@ -1259,7 +1249,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Boolean' does not conform to Protocol 'Showable': no conforming Namespace is in scope.",
+				"Boolean does not conform to 'Showable'",
 			)
 		})
 
@@ -1302,7 +1292,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type Parameter 'Item' does not conform to Protocol 'Showable' — it carries no such bound.",
+				"Type Parameter 'Item' does not conform to 'Showable'",
 			)
 		})
 
@@ -1377,7 +1367,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Namespace Type Parameters can not have Protocol bounds (yet).",
+				"A Namespace's Type Parameters can not carry Protocol bounds",
 			)
 		})
 	})
@@ -1634,7 +1624,7 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Protocol 'Printable' is already declared.",
+				"Protocol 'Printable' is already declared",
 			)
 		})
 	})
