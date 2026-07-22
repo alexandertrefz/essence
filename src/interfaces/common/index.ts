@@ -39,6 +39,8 @@ export type DiagnosticTag = "unnecessary" | "deprecated"
 // was never closed — and is what turns a claim into an explanation.
 export type DiagnosticLabel = {
 	position: Position
+	// NOTE: Required. A Label with no message is the bare underline this whole
+	// shape exists to replace.
 	message: string
 	kind?: "primary" | "secondary"
 	// NOTE: Lower orders render first. Only worth setting when two Labels
@@ -46,6 +48,14 @@ export type DiagnosticLabel = {
 	order?: number
 }
 
+// NOTE: The required fields are the point of this type. `code`, `notes` and
+// `helps` are not optional, and a positioned Diagnostic must carry at least
+// one Label — the type system, rather than discipline, is what keeps the next
+// Diagnostic anyone adds from being a bare sentence over an unannotated
+// excerpt. An empty `notes` or `helps` array is a deliberate "there is
+// nothing more to say"; a missing one is an oversight, and the two must not
+// look alike at a call site. Widening any of this back is how the output
+// quietly rots.
 export type Diagnostic = {
 	severity: DiagnosticSeverity
 	// NOTE: A short claim about what is wrong. The Types, the spans and the
@@ -53,21 +63,32 @@ export type Diagnostic = {
 	// carries them itself renders as one long line above an unannotated
 	// source excerpt, which is the shape this exists to avoid.
 	message: string
-	// NOTE: THE place the Diagnostic is about — what the Language Server
-	// underlines and what deduplication keys off. The primary Label repeats
-	// it with an explanation attached.
-	position: Position | null
-	labels?: Array<DiagnosticLabel>
-	// NOTE: Context — why the rule exists, what the alternatives were.
-	notes?: Array<string>
-	// NOTE: Action — what to write instead.
-	helps?: Array<string>
 	// NOTE: A stable identifier for the kind of Diagnostic, independent of
 	// the message wording — what a Language Server client keys Quick Fixes
-	// off, and what lets a message be reworded without breaking them.
-	code?: DiagnosticCode
+	// off, and what lets a message be reworded without breaking them. Every
+	// one of them is documented in `docs/diagnostics.md`.
+	code: DiagnosticCode
+	// NOTE: Context — why the rule exists, what the alternatives were.
+	notes: Array<string>
+	// NOTE: Action — what to write instead.
+	helps: Array<string>
+	// NOTE: Situational metadata. Optional because its absence is
+	// unambiguous — unlike a missing Label, it costs the reader nothing.
 	tags?: Array<DiagnosticTag>
-}
+} & (
+	| {
+			// NOTE: THE place the Diagnostic is about — what the Language
+			// Server underlines and what deduplication keys off. The primary
+			// Label repeats it with an explanation attached.
+			position: Position
+			labels: [DiagnosticLabel, ...Array<DiagnosticLabel>]
+	  }
+	// NOTE: Only a placeless Diagnostic may have no Labels — an Internal
+	// Compiler Error with no Node to blame, or a duplicate declaration of a
+	// name the Compiler itself declared. The union is what makes that the
+	// sole exemption.
+	| { position: null; labels: [] }
+)
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look
@@ -141,6 +162,12 @@ export type DiagnosticCode =
 	| "uninferable-parameter-type"
 	| "uninferable-return-type"
 	| "missing-return-type"
+	// The Compiler as a program — reading files, bundling the output.
+	| "file-not-found"
+	| "not-a-file"
+	| "unreadable-file"
+	| "bundle-failed"
+	| "bundler-warning"
 	// Everything else.
 	| "at-outside-method"
 	| "internal-error"

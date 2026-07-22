@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises"
 import { gzipSync } from "node:zlib"
 
 import { bundle, writeOutputs } from "../bundler/index"
-import { containsErrors } from "../diagnostics/index"
+import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
@@ -102,38 +102,37 @@ function readError(error: unknown, fileName: string): common.Diagnostic {
 	let code = (error as NodeJS.ErrnoException).code
 
 	if (code === "ENOENT") {
-		return {
-			severity: "error",
-			message: `No such file: ${fileName}`,
-			position: null,
-		}
+		return placelessDiagnostic(
+			"error",
+			`No such file: ${fileName}`,
+			"file-not-found",
+		)
 	}
 
 	if (code === "EISDIR") {
-		return {
-			severity: "error",
-			message:
-				`${fileName} is a directory. Pass the source files inside it ` +
+		return placelessDiagnostic(
+			"error",
+			`${fileName} is a directory. Pass the source files inside it ` +
 				`instead, for example ${fileName}/*.es`,
-			position: null,
-		}
+			"not-a-file",
+		)
 	}
 
 	if (code === "EACCES") {
-		return {
-			severity: "error",
-			message: `Not allowed to read ${fileName}`,
-			position: null,
-		}
+		return placelessDiagnostic(
+			"error",
+			`Not allowed to read ${fileName}`,
+			"unreadable-file",
+		)
 	}
 
-	return {
-		severity: "error",
-		message: `Could not read ${fileName}: ${
+	return placelessDiagnostic(
+		"error",
+		`Could not read ${fileName}: ${
 			error instanceof Error ? error.message : String(error)
 		}`,
-		position: null,
-	}
+		"unreadable-file",
+	)
 }
 
 export async function compileFile(
@@ -250,14 +249,15 @@ export async function compileFile(
 		// NOTE: A throw that reaches here is a Compiler bug rather than a
 		// problem with the source. It is reported as a Diagnostic so that a
 		// batch compile keeps going, and the stack is kept for --verbose.
-		diagnostics.push({
-			severity: "error",
-			message: `Internal Compiler error: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-			position: null,
-			code: "internal-error",
-		})
+		diagnostics.push(
+			placelessDiagnostic(
+				"error",
+				`Internal Compiler error: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+				"internal-error",
+			),
+		)
 
 		return finish(false, null, {
 			stack: error instanceof Error ? (error.stack ?? null) : null,

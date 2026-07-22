@@ -43,31 +43,99 @@ export function report(diagnostic: common.Diagnostic): void {
 	}
 }
 
-// NOTE: `code` is required, not optional. It is what `docs/diagnostics.md`
-// is indexed by and what a Quick Fix keys off, and a required field is the
-// only thing that keeps the next Diagnostic anyone adds from skipping it.
+// NOTE: `code` and `labels` are required; `notes` and `helps` default to
+// empty, because writing `notes: []` at a site that has nothing to add is
+// noise while omitting a Label never is — see the invariant on
+// `common.Diagnostic`.
 type DiagnosticDetails = {
 	code: common.DiagnosticCode
-	labels?: Array<common.DiagnosticLabel>
 	notes?: Array<string>
 	helps?: Array<string>
 	tags?: Array<common.DiagnosticTag>
 }
 
+// NOTE: The overloads are what carry the invariant down to the call sites: a
+// Diagnostic with a Position must name at least one Label, a placeless one
+// must name none. A site holding a `Position | null` matches neither and has
+// to branch — which is the point, because the two cases genuinely produce
+// different reports.
+type LocatedDetails = DiagnosticDetails & {
+	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
+}
+
+type PlacelessDetails = DiagnosticDetails & { labels: [] }
+
+function buildDiagnostic(
+	severity: common.DiagnosticSeverity,
+	message: string,
+	position: common.Position | null,
+	details: LocatedDetails | PlacelessDetails,
+): common.Diagnostic {
+	let base = { severity, message, notes: [], helps: [], ...details }
+
+	return position === null
+		? { ...base, position, labels: [] }
+		: {
+				...base,
+				position,
+				labels: details.labels as LocatedDetails["labels"],
+			}
+}
+
+export function reportError(
+	message: string,
+	position: common.Position,
+	details: LocatedDetails,
+): void
+export function reportError(
+	message: string,
+	position: null,
+	details: PlacelessDetails,
+): void
 export function reportError(
 	message: string,
 	position: common.Position | null,
-	details: DiagnosticDetails,
+	details: LocatedDetails | PlacelessDetails,
 ): void {
-	report({ severity: "error", message, position, ...details })
+	report(buildDiagnostic("error", message, position, details))
 }
 
 export function reportWarning(
 	message: string,
+	position: common.Position,
+	details: LocatedDetails,
+): void
+export function reportWarning(
+	message: string,
+	position: null,
+	details: PlacelessDetails,
+): void
+export function reportWarning(
+	message: string,
 	position: common.Position | null,
-	details: DiagnosticDetails,
+	details: LocatedDetails | PlacelessDetails,
 ): void {
-	report({ severity: "warning", message, position, ...details })
+	report(buildDiagnostic("warning", message, position, details))
+}
+
+// NOTE: For the Diagnostics that are about the Compiler run rather than about
+// a Program — a file that could not be read, a bundle that failed. They have
+// no source to point into, which is exactly the placeless half of the
+// `Diagnostic` union.
+export function placelessDiagnostic(
+	severity: common.DiagnosticSeverity,
+	message: string,
+	code: common.DiagnosticCode,
+): common.Diagnostic {
+	return {
+		severity,
+		message,
+		position: null,
+		labels: [],
+		notes: [],
+		helps: [],
+		code,
+	}
 }
 
 export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {

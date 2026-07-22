@@ -165,15 +165,26 @@ class DescentParser {
 			throw error
 		}
 
-		if (!this.suppressDiagnostics) {
-			reportError(error.message, error.position, {
-				code: "syntax-error",
-				labels:
-					error.position === null || error.label === null
-						? []
-						: [primary(error.position, error.label)],
-			})
+		if (this.suppressDiagnostics) {
+			return
 		}
+
+		if (error.position === null) {
+			reportError(error.message, null, {
+				code: "syntax-error",
+				labels: [],
+			})
+
+			return
+		}
+
+		reportError(error.message, error.position, {
+			code: "syntax-error",
+			labels:
+				error.label === null
+					? [primary(error.position, "here")]
+					: [primary(error.position, error.label)],
+		})
 	}
 
 	// NOTE: Parses list elements until the closing `}` (or the end of the

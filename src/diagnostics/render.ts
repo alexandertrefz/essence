@@ -73,37 +73,34 @@ export function renderDiagnostic(
 		primaryOffset = toSpan(source, diagnostic.position).start
 	}
 
-	if (diagnostic.labels !== undefined && diagnostic.labels.length > 0) {
-		for (let label of diagnostic.labels) {
-			let isPrimary = (label.kind ?? "primary") === "primary"
-			let labelColor: Color | null = null
+	// NOTE: No fallback for a Diagnostic with a Position and no Labels — the
+	// `Diagnostic` type makes that combination unrepresentable, which is what
+	// keeps a bare underline with no explanation from ever being rendered
+	// again.
+	for (let label of diagnostic.labels) {
+		let isPrimary = (label.kind ?? "primary") === "primary"
+		let labelColor: Color | null = null
 
-			if (color) {
-				labelColor = isPrimary ? severityColor : secondaryColors.next()
-			}
-
-			labels.push(
-				new Label(toSpan(source, label.position), {
-					message: label.message,
-					color: labelColor ?? undefined,
-					// NOTE: Left at 0 unless a Diagnostic asks otherwise —
-					// Labels are grouped into one source excerpt only while
-					// their order agrees with their line order, and an order
-					// taken from the array index tears a two-line report into
-					// two separate excerpts.
-					order: label.order ?? 0,
-					// NOTE: The primary Label wins when spans overlap — the
-					// mistake is what the reader came for, not the
-					// declaration it is measured against.
-					priority: isPrimary ? 1 : 0,
-				}),
-			)
+		if (color) {
+			labelColor = isPrimary ? severityColor : secondaryColors.next()
 		}
-	} else if (diagnostic.position !== null) {
-		// NOTE: A Diagnostic that carries no Labels still gets its Position
-		// underlined, bare, the way every Diagnostic was rendered before
-		// Labels existed.
-		labels.push(new Label(toSpan(source, diagnostic.position)))
+
+		labels.push(
+			new Label(toSpan(source, label.position), {
+				message: label.message,
+				color: labelColor ?? undefined,
+				// NOTE: Left at 0 unless a Diagnostic asks otherwise — Labels
+				// are grouped into one source excerpt only while their order
+				// agrees with their line order, and an order taken from the
+				// array index tears a two-line report into two separate
+				// excerpts.
+				order: label.order ?? 0,
+				// NOTE: The primary Label wins when spans overlap — the
+				// mistake is what the reader came for, not the declaration it
+				// is measured against.
+				priority: isPrimary ? 1 : 0,
+			}),
+		)
 	}
 
 	let report = new Report({

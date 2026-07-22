@@ -1,6 +1,7 @@
 import { availableParallelism } from "node:os"
 import { Worker } from "node:worker_threads"
 
+import { placelessDiagnostic } from "../diagnostics/index"
 import {
 	type CompileOutcome,
 	type CompileRequest,
@@ -89,14 +90,13 @@ function workerFailure(
 		ok: false,
 		sourceText: "",
 		diagnostics: [
-			{
-				severity: "error",
-				message: `Internal Compiler error: ${
+			placelessDiagnostic(
+				"error",
+				`Internal Compiler error: ${
 					error instanceof Error ? error.message : String(error)
 				}`,
-				position: null,
-				code: "internal-error",
-			},
+				"internal-error",
+			),
 		],
 		timings: [],
 		duration: 0,
