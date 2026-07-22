@@ -97,14 +97,17 @@ describe("LSP", () => {
 	describe("toLspDiagnostic", () => {
 		it("should map error Diagnostics", () => {
 			expect(
-				toLspDiagnostic({
-					severity: "error",
-					message: "Some Error.",
-					position: {
-						start: { line: 1, column: 1 },
-						end: { line: 1, column: 10 },
+				toLspDiagnostic(
+					{
+						severity: "error",
+						message: "Some Error.",
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 1, column: 10 },
+						},
 					},
-				}),
+					"file:///Test.es",
+				),
 			).toEqual({
 				range: {
 					start: { line: 0, character: 0 },
@@ -117,11 +120,14 @@ describe("LSP", () => {
 		})
 
 		it("should map warning Diagnostics", () => {
-			let diagnostic = toLspDiagnostic({
-				severity: "warning",
-				message: "Some Warning.",
-				position: null,
-			})
+			let diagnostic = toLspDiagnostic(
+				{
+					severity: "warning",
+					message: "Some Warning.",
+					position: null,
+				},
+				"file:///Test.es",
+			)
 
 			expect(diagnostic.severity).toBe(DiagnosticSeverity.Warning)
 			expect(diagnostic.range).toEqual({
@@ -131,27 +137,112 @@ describe("LSP", () => {
 		})
 
 		it("should carry the code and map tags", () => {
-			let diagnostic = toLspDiagnostic({
-				severity: "warning",
-				message: "Dead code.",
-				position: null,
-				code: "unreachable-case",
-				tags: ["unnecessary"],
-			})
+			let diagnostic = toLspDiagnostic(
+				{
+					severity: "warning",
+					message: "Dead code.",
+					position: null,
+					code: "unreachable-case",
+					tags: ["unnecessary"],
+				},
+				"file:///Test.es",
+			)
 
 			expect(diagnostic.code).toBe("unreachable-case")
 			expect(diagnostic.tags).toEqual([DiagnosticTag.Unnecessary])
 		})
 
 		it("should leave code and tags unset when there are none", () => {
-			let diagnostic = toLspDiagnostic({
-				severity: "error",
-				message: "Some Error.",
-				position: null,
-			})
+			let diagnostic = toLspDiagnostic(
+				{
+					severity: "error",
+					message: "Some Error.",
+					position: null,
+				},
+				"file:///Test.es",
+			)
 
 			expect(diagnostic.code).toBeUndefined()
 			expect(diagnostic.tags).toBeUndefined()
+			expect(diagnostic.relatedInformation).toBeUndefined()
+		})
+
+		it("should fold the primary Label, Notes and Helps into the message", () => {
+			let position = {
+				start: { line: 1, column: 1 },
+				end: { line: 1, column: 2 },
+			}
+			let diagnostic = toLspDiagnostic(
+				{
+					severity: "error",
+					message: "This value does not fit Variable 'x'",
+					position,
+					code: "assignment-type-mismatch",
+					labels: [
+						{
+							position,
+							message: "this is a String",
+							kind: "primary",
+						},
+					],
+					notes: ["'x' is declared as Integer."],
+					helps: ["Convert it first."],
+				},
+				"file:///Test.es",
+			)
+
+			expect(diagnostic.message).toBe(
+				[
+					"This value does not fit Variable 'x': this is a String",
+					"Note: 'x' is declared as Integer.",
+					"Help: Convert it first.",
+				].join("\n"),
+			)
+		})
+
+		it("should map secondary Labels to related information", () => {
+			let valuePosition = {
+				start: { line: 3, column: 9 },
+				end: { line: 3, column: 14 },
+			}
+			let declarationPosition = {
+				start: { line: 1, column: 10 },
+				end: { line: 1, column: 15 },
+			}
+			let diagnostic = toLspDiagnostic(
+				{
+					severity: "error",
+					message: "This value does not fit Variable 'count'",
+					position: valuePosition,
+					code: "assignment-type-mismatch",
+					labels: [
+						{
+							position: valuePosition,
+							message: "this is a String",
+							kind: "primary",
+						},
+						{
+							position: declarationPosition,
+							message: "declared as Integer here",
+							kind: "secondary",
+						},
+					],
+				},
+				"file:///Test.es",
+			)
+
+			expect(diagnostic.relatedInformation).toEqual([
+				{
+					location: {
+						uri: "file:///Test.es",
+						range: {
+							start: { line: 0, character: 9 },
+							end: { line: 0, character: 14 },
+						},
+					},
+					message: "declared as Integer here",
+				},
+			])
 		})
 	})
 
