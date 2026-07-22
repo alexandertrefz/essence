@@ -802,6 +802,42 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	}
 }
 
+// NOTE: The deduped member list for a Union built from several candidate
+// Types. Anonymous (unnamed, unaliased) nested Unions are exploded so their
+// members merge in; a named nested Union (`Number`, a Choice, a named Alias)
+// stays whole so the result prints by name. A member already subsumed by one
+// present is dropped, and a member that subsumes present ones evicts them — so
+// `Integer` and `Number` collapse to `Number` rather than sitting side by
+// side. The caller decides how to finish: an empty list, a lone member, or
+// `buildUnion` over the rest.
+export function mergeUnionMembers(
+	types: Array<common.Type>,
+): Array<common.Type> {
+	let distinct: Array<common.Type> = []
+
+	for (let type of types) {
+		let members =
+			type.type === "UnionType" &&
+			type.name === undefined &&
+			type.alias === undefined
+				? unionMembersKeepingNames(type)
+				: [type]
+
+		for (let member of members) {
+			if (distinct.some((existing) => matchesType(existing, member))) {
+				continue
+			}
+
+			distinct = distinct.filter(
+				(existing) => !matchesType(member, existing),
+			)
+			distinct.push(member)
+		}
+	}
+
+	return distinct
+}
+
 // NOTE: The inference-aware form of `matchesType` — the first occurrence of
 // a bindable Generic (in `context.bindableNames`) binds the Type on the
 // other side, every later occurrence checks with the normal assignability

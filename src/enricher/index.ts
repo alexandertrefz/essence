@@ -1,12 +1,15 @@
 import { collectDiagnostics, primary, reportError } from "../diagnostics/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
-import { enrichNode } from "./enrichers"
+import {
+	enrichNode,
+	type HoistedTypes,
+	resolveNamespaceDefinitionStatementType,
+} from "./enrichers"
 import {
 	resolveChoiceDeclarationStatementType,
-	resolveNamespaceDefinitionStatementType,
+	resolveFunctionSignatureType,
 	resolveProtocolDeclarationStatementType,
-	resolveType,
 	resolveTypeAliasStatementType,
 } from "./resolvers"
 
@@ -80,8 +83,8 @@ function isHoistable(
 function hoistDeclarations(
 	nodes: Array<parser.ImplementationNode>,
 	scope: enricher.Scope,
-): Set<parser.ImplementationNode> {
-	let hoistedNodes = new Set<parser.ImplementationNode>()
+): HoistedTypes {
+	let hoistedTypes: HoistedTypes = new Map()
 	let pendingNodes = nodes.filter(isHoistable)
 
 	while (pendingNodes.length > 0) {
@@ -106,7 +109,10 @@ function hoistDeclarations(
 								scope,
 							)
 						} else if (node.nodeType === "FunctionStatement") {
-							return resolveType(node.value, scope)
+							return resolveFunctionSignatureType(
+								node.value,
+								scope,
+							)
 						} else if (
 							node.nodeType === "ProtocolDeclarationStatement"
 						) {
@@ -148,7 +154,7 @@ function hoistDeclarations(
 					scope.constants.add(node.name.content)
 				}
 
-				hoistedNodes.add(node)
+				hoistedTypes.set(node, speculation.result)
 			} else {
 				remainingNodes.push(node)
 			}
@@ -161,14 +167,14 @@ function hoistDeclarations(
 		pendingNodes = remainingNodes
 	}
 
-	return hoistedNodes
+	return hoistedTypes
 }
 
 const enrichImplementation = (
 	implementation: parser.ImplementationSectionNode,
 	scope: enricher.Scope,
 ): common.typed.ImplementationSectionNode => {
-	let hoistedNodes = hoistDeclarations(implementation.nodes, scope)
+	let hoistedTypes = hoistDeclarations(implementation.nodes, scope)
 
 	return {
 		nodeType: "ImplementationSection",
@@ -179,7 +185,7 @@ const enrichImplementation = (
 			// broken statement can not take down the enrichment of the
 			// remaining Program.
 			try {
-				return [enrichNode(node, scope, hoistedNodes)]
+				return [enrichNode(node, scope, hoistedTypes)]
 			} catch (error) {
 				reportError(
 					`Internal Compiler Error: ${
