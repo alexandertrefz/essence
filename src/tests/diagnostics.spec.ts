@@ -22,16 +22,24 @@ const otherPosition: common.Position = {
 describe("Diagnostics", () => {
 	it("should collect reported Diagnostics", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position)
-			reportWarning("Some Warning.", otherPosition)
+			reportError("Some Error.", position, { code: "internal-error" })
+			reportWarning("Some Warning.", otherPosition, {
+				code: "internal-error",
+			})
 		})
 
 		expect(diagnostics).toEqual([
-			{ severity: "error", message: "Some Error.", position },
+			{
+				severity: "error",
+				message: "Some Error.",
+				position,
+				code: "internal-error",
+			},
 			{
 				severity: "warning",
 				message: "Some Warning.",
 				position: otherPosition,
+				code: "internal-error",
 			},
 		])
 	})
@@ -44,8 +52,8 @@ describe("Diagnostics", () => {
 
 	it("should deduplicate identical Diagnostics", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position)
-			reportError("Some Error.", position)
+			reportError("Some Error.", position, { code: "internal-error" })
+			reportError("Some Error.", position, { code: "internal-error" })
 		})
 
 		expect(diagnostics).toHaveLength(1)
@@ -53,8 +61,10 @@ describe("Diagnostics", () => {
 
 	it("should not deduplicate Diagnostics with differing positions", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Error.", position)
-			reportError("Some Error.", otherPosition)
+			reportError("Some Error.", position, { code: "internal-error" })
+			reportError("Some Error.", otherPosition, {
+				code: "internal-error",
+			})
 		})
 
 		expect(diagnostics).toHaveLength(2)
@@ -62,8 +72,8 @@ describe("Diagnostics", () => {
 
 	it("should not deduplicate Diagnostics with differing severities", () => {
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Some Message.", position)
-			reportWarning("Some Message.", position)
+			reportError("Some Message.", position, { code: "internal-error" })
+			reportWarning("Some Message.", position, { code: "internal-error" })
 		})
 
 		expect(diagnostics).toHaveLength(2)
@@ -73,10 +83,12 @@ describe("Diagnostics", () => {
 		let innerDiagnostics: Array<common.Diagnostic> = []
 
 		let { diagnostics } = collectDiagnostics(() => {
-			reportError("Outer Error.", position)
+			reportError("Outer Error.", position, { code: "internal-error" })
 
 			innerDiagnostics = collectDiagnostics(() => {
-				reportError("Inner Error.", otherPosition)
+				reportError("Inner Error.", otherPosition, {
+					code: "internal-error",
+				})
 			}).diagnostics
 		})
 
@@ -88,7 +100,9 @@ describe("Diagnostics", () => {
 	it("should allow committing Diagnostics of nested collections", () => {
 		let { diagnostics } = collectDiagnostics(() => {
 			let inner = collectDiagnostics(() => {
-				reportError("Inner Error.", position)
+				reportError("Inner Error.", position, {
+					code: "internal-error",
+				})
 			})
 
 			for (let diagnostic of inner.diagnostics) {
@@ -108,7 +122,7 @@ describe("Diagnostics", () => {
 				})
 			} catch {}
 
-			reportError("Outer Error.", position)
+			reportError("Outer Error.", position, { code: "internal-error" })
 		})
 
 		expect(diagnostics).toHaveLength(1)

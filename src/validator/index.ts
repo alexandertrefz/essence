@@ -32,6 +32,7 @@ export const validate = (
 						error instanceof Error ? error.message : String(error)
 					}`,
 					node.position,
+					{ code: "internal-error" },
 				)
 			}
 		}
@@ -134,6 +135,7 @@ function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 		reportError(
 			"A Function with Protocol-bound Type Parameters can not be used as a value (yet) — call it directly.",
 			node.position,
+			{ code: "protocol-bound-function-value" },
 		)
 	}
 }
@@ -178,6 +180,7 @@ function validateNativeFunctionInvocation(
 		reportError(
 			`'${node.name.content}' is not a native function.`,
 			node.name.position,
+			{ code: "unknown-native-function" },
 		)
 	}
 
@@ -215,7 +218,9 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedStaticMethod"
 	) {
 		if (functionType.type !== "Error") {
-			reportError("This expression is not a Function.", node.position)
+			reportError("This expression is not a Function.", node.position, {
+				code: "not-a-function",
+			})
 		}
 
 		return node
@@ -267,6 +272,7 @@ function validateFunctionInvocation(
 				reportError(
 					"Passed arguments do not match any overload.",
 					node.position,
+					{ code: "no-matching-overload" },
 				)
 			} else {
 				node.overloadedMethodIndex = index
@@ -285,6 +291,7 @@ function validateFunctionInvocation(
 				reportError(
 					"Amount of passed arguments doesn't match the signature.",
 					node.position,
+					{ code: "argument-count-mismatch" },
 				)
 
 				return node
@@ -295,6 +302,7 @@ function validateFunctionInvocation(
 					reportError(
 						`Argument ${i + 1} doesn't match its declared parameter.`,
 						node.arguments[i].value.position,
+						{ code: "argument-type-mismatch" },
 					)
 				}
 			}
@@ -379,6 +387,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		reportError(
 			"You can only use Match-Expressions on Union Types.",
 			node.value.position,
+			{ code: "match-on-non-union" },
 		)
 	}
 
@@ -433,17 +442,20 @@ function validateCaseValue(
 			reportError(
 				`Case '#${node.type.name}' does not carry a payload.`,
 				node.value.position,
+				{ code: "unexpected-payload" },
 			)
 		}
 	} else if (node.value === null) {
 		reportError(
 			`Case '#${node.type.name}' requires a payload of Type '${describeType(payloadType)}'.`,
 			node.position,
+			{ code: "missing-payload" },
 		)
 	} else if (!matchesType(payloadType, node.value.type)) {
 		reportError(
 			`The payload does not match Case '#${node.type.name}' — expected '${describeType(payloadType)}'.`,
 			node.value.position,
+			{ code: "payload-type-mismatch" },
 		)
 	}
 
@@ -465,6 +477,7 @@ function validateRationalValue(
 		reportError(
 			"A Rational can not have a denominator of zero.",
 			node.position,
+			{ code: "zero-denominator" },
 		)
 	}
 
@@ -511,6 +524,7 @@ function validateConstantDeclarationStatement(
 			reportError(
 				`Wrong Assignment Value Type for Constant '${node.name.content}'.`,
 				node.value.position,
+				{ code: "assignment-type-mismatch" },
 			)
 		}
 	}
@@ -529,6 +543,7 @@ function validateVariableDeclarationStatement(
 			reportError(
 				`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
 				node.value.position,
+				{ code: "assignment-type-mismatch" },
 			)
 		}
 	}
@@ -546,6 +561,7 @@ function validateVariableAssignmentStatement(
 		reportError(
 			`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
 			node.value.position,
+			{ code: "assignment-type-mismatch" },
 		)
 	}
 
@@ -593,6 +609,7 @@ function validateIfElseStatementNode(
 		reportError(
 			"If Conditions have to be Booleans.",
 			node.condition.position,
+			{ code: "condition-not-boolean" },
 		)
 	}
 
@@ -619,6 +636,7 @@ function validateIfStatement(
 		reportError(
 			"If Conditions have to be Booleans.",
 			node.condition.position,
+			{ code: "condition-not-boolean" },
 		)
 	}
 
@@ -636,13 +654,16 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		reportError("Top level returns are not permitted.", node.position)
+		reportError("Top level returns are not permitted.", node.position, {
+			code: "top-level-return",
+		})
 	} else if (
 		!matchesType(currentFunctionContext.returnType, node.expression.type)
 	) {
 		reportError(
 			"Type of returned expression doesn't match the declared return type.",
 			node.expression.position,
+			{ code: "return-type-mismatch" },
 		)
 	}
 
@@ -779,6 +800,7 @@ function validateSimpleFunctionInvocation(
 		reportError(
 			"Amount of passed arguments doesn't match the signature.",
 			position,
+			{ code: "argument-count-mismatch" },
 		)
 
 		return
@@ -789,6 +811,7 @@ function validateSimpleFunctionInvocation(
 			reportError(
 				`Argument ${i + 1} doesn't match its declared parameter.`,
 				argumentNodes[i].value.position,
+				{ code: "argument-type-mismatch" },
 			)
 		}
 	}
