@@ -252,6 +252,67 @@ describe("Inlay Hints", () => {
 			)
 		})
 
+		it("should resolve `otherwise` on a flat spelled-out Union", () => {
+			// NOTE: Unions are built canonical — `Integer | Rational | Nothing`
+			// carries its payload as one nested member, so `otherwise` binds
+			// it in one piece even when the source spells the Union out flat.
+			let source = [
+				"implementation {",
+				"\tconstant flat: Integer | Rational | Nothing = 1",
+				"\tconstant sure = flat::otherwise(0)",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Integer | Rational",
+			])
+		})
+
+		it("should resolve `otherwise` when Nothing hides inside a named member", () => {
+			// NOTE: `MaybeInt` keeps its name — and its buried `Nothing` — as
+			// a member of the wider Union. The remainder fallback lets the
+			// expected `Nothing` claim it, so `otherwise` still resolves and
+			// types the payload as `Integer | Rational`.
+			let source = [
+				"implementation {",
+				"\ttype MaybeInt = Integer | Nothing",
+				"\tconstant mixed: MaybeInt | Rational = 1",
+				"\tconstant sure = mixed::otherwise(0)",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Integer | Rational",
+			])
+		})
+
+		it("should resolve `otherwise` on a Union inferred from mixed branches", () => {
+			// NOTE: One branch returns `Optional<Rational>`, the other a bare
+			// Integer — the inferred Union hoists the Optional's `Nothing` to
+			// the top level, so the result stays fallible-shaped.
+			let source = [
+				"implementation {",
+				"\tnamespace Picker for Integer {",
+				"\t\tpick<infer Target>(_ transform: (_ value: Integer) -> Target) -> Target {",
+				"\t\t\t<- transform(1)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant merged = 1::pick((value) {",
+				"\t\tif value::isGreaterThan(0) { <- value::divideBy(2) }",
+				"",
+				"\t\t<- value",
+				"\t})",
+				"\tconstant sure = merged::otherwise(0)",
+				"}",
+			].join("\n")
+
+			let labels = hintsOf(source).map((hint) => hint.label)
+
+			expect(labels).toContain(": Rational | Integer | Nothing")
+			expect(labels).toContain(": Rational | Integer")
+		})
+
 		it("should keep a compound payload whole — and `otherwise` collapses it", () => {
 			// NOTE: The stdlib spells mixed fallible results as one nested
 			// payload (`Optional<Integer | Rational>`), which is what lets

@@ -83,6 +83,36 @@ describe("Hover", () => {
 		)
 	})
 
+	it("should print a flat fallible Union exactly as written", () => {
+		// NOTE: `Integer | Rational | Nothing` is built canonical — payload
+		// nested beside `Nothing` — but the nesting is anonymous, so the
+		// Hover still spells the members out just as the source does.
+		let source = [
+			"implementation {",
+			"\tconstant something: Integer | Rational | Nothing = 42",
+			"\t__print(something)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 10 })).toBe(
+			"something: Integer | Rational | Nothing",
+		)
+	})
+
+	it("should keep a named Alias by name inside a wider Union", () => {
+		let source = [
+			"implementation {",
+			"\ttype MaybeInt = Integer | Nothing",
+			"\tconstant mixed: MaybeInt | Rational = 1",
+			"\t__print(mixed)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 4, column: 10 })).toBe(
+			"mixed: MaybeInt | Rational",
+		)
+	})
+
 	it("should keep `Number` by name inside a Union Type", () => {
 		let source = [
 			"implementation {",
