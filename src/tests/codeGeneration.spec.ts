@@ -387,6 +387,37 @@ describe("Code Generation", () => {
 		})
 	})
 
+	describe("Higher-order List Methods", () => {
+		// NOTE: `map`/`reduce` are the first builtins with a Method-level
+		// Generic and the first to take a contextually typed callback all the
+		// way through codegen. This pins the emitted call and that the callback
+		// became a plain JS closure.
+		it("emits map with an inferred callback", () => {
+			let generated = generate(`
+				implementation {
+					__print([1, 2]::map((n) { <- n::toString() }))
+				}
+			`)
+
+			expect(generated).toContain("List.map(")
+			expect(generated).toContain("Integer.toString(")
+		})
+
+		it("emits reduce with its starting value and callback", () => {
+			let generated = generate(`
+				implementation {
+					__print([1, 2]::reduce(
+						startingWith 0,
+						(total, n) { <- total::add(n) },
+					))
+				}
+			`)
+
+			expect(generated).toContain("List.reduce(")
+			expect(generated).toContain("Integer.add__overload$1(")
+		})
+	})
+
 	describe("Contextual Function literals", () => {
 		// NOTE: The whole point is that the inferred Parameter Type reaches
 		// the body's Scope. `isGreaterThan` is overloaded, so the emitted

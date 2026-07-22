@@ -53,19 +53,7 @@ implementation {
 
 	§ § Namespaces for Lists & Generics
 
-	§ namespace ListMap<Item> for List<Item> {
-	§ 	map<ReturnType>(_ mappingFunction: (_ item: Item) -> ReturnType) -> List<ReturnType>
-	§ }
-
-	§ __print([0, 1, 2]::map((item: Number) -> String { <- item::add(1)::toString() }))
-
-	§ namespace ListSum for List<Number> {
-	§ 	sum() -> Item {
-	§ 		§ @::reduce(startingWith: 0, (a: Number, b: Number) -> Number { <- a::add(b) })
-	§ 		<- 0
-	§ 	}
-	§ }
-
-	§ __print([1, 2, 3, 4]::sum())
-	§ __print([1, 2/1, 3, 4/1, 0, 0/1]::sum())
+	§ `map` and `reduce` are builtins now — see List.es and Inference.es. A
+	§ List-of-Number `sum` still wants a Namespace targeting `List<Number>`,
+	§ which conditional conformance will make expressible.
 }

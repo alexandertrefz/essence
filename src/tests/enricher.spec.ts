@@ -431,6 +431,51 @@ describe("Enricher", () => {
 			})
 		})
 
+		it("should infer map's result Type from the callback's return", () => {
+			// NOTE: `Result` occurs only in the callback's return position and
+			// in `map`'s own return — the case 0.5b unblocked. The callback is
+			// contextually typed, so `n` needs no annotation.
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant texts = [1, 2]::map((n) { <- n::toString() })
+				}`),
+			).toEqual({ type: "List", itemType: { type: "String" } })
+		})
+
+		it("should infer reduce's result Type from the starting value", () => {
+			// NOTE: `Result` binds from `startingWith` before the callback is
+			// checked, so both `total` and `n` are contextually typed.
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant total = [1, 2, 3]::reduce(
+						startingWith 0,
+						(total, n) { <- total::add(n) },
+					)
+				}`),
+			).toEqual({ type: "Integer" })
+		})
+
+		it("should carry the item Type into map's callback body", () => {
+			// NOTE: `isGreaterThan` only resolves if `n` typed as Integer, so
+			// a broken item-Type substitution fails outright here.
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant flags = [1, 2]::map((n) { <- n::isGreaterThan(1) })
+				}`),
+			).toEqual({ type: "List", itemType: { type: "Boolean" } })
+		})
+
+		it("should find an item with the firstItem check overload", () => {
+			expect(
+				typeOfFirstConstant(`implementation {
+					constant found = [1, 2]::firstItem(where (n) { <- n::isGreaterThan(1) })
+				}`),
+			).toEqual({
+				type: "UnionType",
+				types: [{ type: "Integer" }, { type: "Nothing" }],
+			})
+		})
+
 		it("should substitute the receiver's item Type into List returns", () => {
 			expect(
 				typeOfFirstConstant(`implementation {

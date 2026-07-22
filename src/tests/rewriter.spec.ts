@@ -4531,17 +4531,19 @@ describe("Rewriter", () => {
 			describe("firstItem", () => {
 				it("returns the firstItem item of the list if it is not empty", () => {
 					expect(
-						list.firstItem(list.createList([integerTwo()])),
+						list.firstItem__overload$1(
+							list.createList([integerTwo()]),
+						),
 					).toEqual(integerTwo())
 
 					expect(
-						list.firstItem(
+						list.firstItem__overload$1(
 							list.createList([integerTwo(), integerOne()]),
 						),
 					).toEqual(integerTwo())
 
 					expect(
-						list.firstItem(
+						list.firstItem__overload$1(
 							list.createList([
 								integerTwo(),
 								integerOne(),
@@ -4551,12 +4553,16 @@ describe("Rewriter", () => {
 					).toEqual(integerTwo())
 
 					expect(
-						list.firstItem(list.createList([integerHundred()])),
+						list.firstItem__overload$1(
+							list.createList([integerHundred()]),
+						),
 					).toEqual(integerHundred())
 				})
 
 				it("returns nothing if the list is empty", () => {
-					expect(list.firstItem(listEmpty())).toEqual(nothing())
+					expect(list.firstItem__overload$1(listEmpty())).toEqual(
+						nothing(),
+					)
 				})
 			})
 
@@ -5303,6 +5309,385 @@ describe("Rewriter", () => {
 							integerHundred(),
 						]),
 					)
+				})
+			})
+
+			describe("firstItem", () => {
+				it("finds the first item the check accepts", () => {
+					const greaterThanOne = (item: integer.IntegerType) =>
+						boolean.createBoolean(item.value > 1n)
+
+					expect(
+						list.firstItem__overload$2(
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+							greaterThanOne,
+						),
+					).toEqual(integerTwo())
+				})
+
+				it("returns nothing when nothing is accepted", () => {
+					const never = () => booleanFalse()
+
+					expect(
+						list.firstItem__overload$2(
+							list.createList([integerOne(), integerTwo()]),
+							never,
+						),
+					).toEqual(nothing())
+					expect(
+						list.firstItem__overload$2(listEmpty(), never),
+					).toEqual(nothing())
+				})
+			})
+
+			describe("map", () => {
+				it("applies the transform to every item", () => {
+					expect(
+						list.map(
+							list.createList([integerOne(), integerTwo()]),
+							(item: integer.IntegerType) =>
+								integer.toString(item),
+						),
+					).toEqual(
+						list.createList([
+							string.createString("1"),
+							string.createString("2"),
+						]),
+					)
+				})
+
+				it("maps the empty list to the empty list", () => {
+					expect(list.map(listEmpty(), () => integerOne())).toEqual(
+						listEmpty(),
+					)
+				})
+			})
+
+			describe("reduce", () => {
+				it("combines every item onto the starting value", () => {
+					expect(
+						list.reduce(
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+							integerZero(),
+							(
+								accumulator: integer.IntegerType,
+								item: integer.IntegerType,
+							) =>
+								integer.createInteger(
+									accumulator.value + item.value,
+								),
+						),
+					).toEqual(integer.createInteger(103n))
+				})
+
+				it("returns the starting value for the empty list", () => {
+					expect(
+						list.reduce(
+							listEmpty(),
+							integerZero(),
+							(accumulator: integer.IntegerType) => accumulator,
+						),
+					).toEqual(integerZero())
+				})
+			})
+
+			describe("keepEvery", () => {
+				it("keeps just the accepted items", () => {
+					const greaterThanOne = (item: integer.IntegerType) =>
+						boolean.createBoolean(item.value > 1n)
+
+					expect(
+						list.keepEvery(
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+							greaterThanOne,
+						),
+					).toEqual(list.createList([integerTwo(), integerHundred()]))
+				})
+			})
+
+			describe("itemAt", () => {
+				it("returns the item at a position inside the list", () => {
+					expect(
+						list.itemAt(
+							list.createList([integerOne(), integerTwo()]),
+							integerOne(),
+						),
+					).toEqual(integerTwo())
+				})
+
+				it("returns nothing for a position outside the list", () => {
+					expect(
+						list.itemAt(
+							list.createList([integerOne()]),
+							integerTwo(),
+						),
+					).toEqual(nothing())
+					expect(
+						list.itemAt(
+							list.createList([integerOne()]),
+							integer.createInteger(-1n),
+						),
+					).toEqual(nothing())
+				})
+			})
+
+			describe("firstIndexOf", () => {
+				it("gives the position of the first equal item", () => {
+					expect(
+						list.firstIndexOf(
+							list.createList([
+								integerTwo(),
+								integerOne(),
+								integerOne(),
+							]),
+							integerOne(),
+						),
+					).toEqual(integerOne())
+				})
+
+				it("gives nothing when the item is absent", () => {
+					expect(
+						list.firstIndexOf(
+							list.createList([integerOne()]),
+							integerTwo(),
+						),
+					).toEqual(nothing())
+				})
+			})
+
+			describe("slice", () => {
+				const abcd = () =>
+					list.createList([
+						integerZero(),
+						integerOne(),
+						integerTwo(),
+						integerHundred(),
+					])
+
+				it("returns the half-open range", () => {
+					// NOTE: [1, 3) — positions 1 and 2, stopping before 3.
+					expect(
+						list.slice(
+							abcd(),
+							integerOne(),
+							integer.createInteger(3n),
+						),
+					).toEqual(list.createList([integerOne(), integerTwo()]))
+				})
+
+				it("clamps each end to the list", () => {
+					expect(
+						list.slice(
+							abcd(),
+							integer.createInteger(-5n),
+							integer.createInteger(99n),
+						),
+					).toEqual(abcd())
+				})
+
+				it("returns empty when the range is empty or reversed", () => {
+					expect(
+						list.slice(abcd(), integerTwo(), integerOne()),
+					).toEqual(listEmpty())
+				})
+
+				it("clamps a position past a 32 bit index instead of wrapping", () => {
+					expect(
+						list.slice(
+							abcd(),
+							integerZero(),
+							integer.createInteger(2n ** 40n),
+						),
+					).toEqual(abcd())
+				})
+			})
+
+			describe("reversed", () => {
+				it("reverses without mutating the original", () => {
+					const original = list.createList([
+						integerOne(),
+						integerTwo(),
+						integerHundred(),
+					])
+
+					expect(list.reversed(original)).toEqual(
+						list.createList([
+							integerHundred(),
+							integerTwo(),
+							integerOne(),
+						]),
+					)
+					expect(original).toEqual(
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
+					)
+				})
+			})
+
+			describe("sortedBy", () => {
+				it("orders by the comparison and is stable", () => {
+					const ascending = (
+						first: integer.IntegerType,
+						second: integer.IntegerType,
+					) => integer.compareTo(first, second)
+
+					expect(
+						list.sortedBy(
+							list.createList([
+								integerTwo(),
+								integerHundred(),
+								integerOne(),
+							]),
+							ascending,
+						),
+					).toEqual(
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
+					)
+				})
+			})
+
+			describe("anyItem and everyItem", () => {
+				const greaterThanOne = (item: integer.IntegerType) =>
+					boolean.createBoolean(item.value > 1n)
+
+				it("anyItem is true when some item is accepted", () => {
+					expect(
+						list.anyItem(
+							list.createList([integerOne(), integerTwo()]),
+							greaterThanOne,
+						),
+					).toEqual(booleanTrue())
+					expect(
+						list.anyItem(
+							list.createList([integerOne()]),
+							greaterThanOne,
+						),
+					).toEqual(booleanFalse())
+				})
+
+				it("everyItem is true only when all are — vacuously for empty", () => {
+					expect(
+						list.everyItem(
+							list.createList([integerTwo(), integerHundred()]),
+							greaterThanOne,
+						),
+					).toEqual(booleanTrue())
+					expect(
+						list.everyItem(
+							list.createList([integerOne(), integerTwo()]),
+							greaterThanOne,
+						),
+					).toEqual(booleanFalse())
+					expect(list.everyItem(listEmpty(), greaterThanOne)).toEqual(
+						booleanTrue(),
+					)
+				})
+			})
+
+			describe("countOf", () => {
+				it("counts equal items", () => {
+					expect(
+						list.countOf__overload$1(
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerOne(),
+							]),
+							integerOne(),
+						),
+					).toEqual(integerTwo())
+				})
+
+				it("counts accepted items", () => {
+					const greaterThanOne = (item: integer.IntegerType) =>
+						boolean.createBoolean(item.value > 1n)
+
+					expect(
+						list.countOf__overload$2(
+							list.createList([
+								integerOne(),
+								integerTwo(),
+								integerHundred(),
+							]),
+							greaterThanOne,
+						),
+					).toEqual(integerTwo())
+				})
+			})
+
+			describe("insertAt", () => {
+				it("inserts before the position", () => {
+					expect(
+						list.insertAt(
+							list.createList([integerOne(), integerHundred()]),
+							integerOne(),
+							integerTwo(),
+						),
+					).toEqual(
+						list.createList([
+							integerOne(),
+							integerTwo(),
+							integerHundred(),
+						]),
+					)
+				})
+
+				it("clamps so it always inserts — before the start or past the end", () => {
+					expect(
+						list.insertAt(
+							list.createList([integerOne()]),
+							integer.createInteger(-5n),
+							integerZero(),
+						),
+					).toEqual(list.createList([integerZero(), integerOne()]))
+					expect(
+						list.insertAt(
+							list.createList([integerOne()]),
+							integer.createInteger(99n),
+							integerTwo(),
+						),
+					).toEqual(list.createList([integerOne(), integerTwo()]))
+				})
+			})
+
+			describe("replaceAt", () => {
+				it("replaces the item at the position", () => {
+					expect(
+						list.replaceAt(
+							list.createList([integerOne(), integerTwo()]),
+							integerZero(),
+							integerHundred(),
+						),
+					).toEqual(list.createList([integerHundred(), integerTwo()]))
+				})
+
+				it("leaves the list unchanged for a position outside it", () => {
+					expect(
+						list.replaceAt(
+							list.createList([integerOne()]),
+							integerTwo(),
+							integerHundred(),
+						),
+					).toEqual(list.createList([integerOne()]))
 				})
 			})
 		})
