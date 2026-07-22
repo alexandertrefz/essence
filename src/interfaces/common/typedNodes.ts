@@ -261,6 +261,11 @@ export interface VariableAssignmentStatementNode {
 	nodeType: "VariableAssignmentStatement"
 	name: IdentifierNode
 	value: ExpressionNode
+	// NOTE: Where the assigned Variable was declared, carried over from the
+	// Scope the Enricher resolved the name in — the Validator, which is what
+	// rejects a mismatched value, no longer has that Scope. Null when the
+	// Variable is a builtin or was never declared at all.
+	declarationPosition: Position | null
 	position: Position
 }
 
