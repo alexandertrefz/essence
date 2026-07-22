@@ -160,6 +160,32 @@ export const namespace: common.NamespaceType = {
 		} as common.MethodType,
 		...orderingMethods(type),
 
+		isBetween: {
+			type: "SimpleMethod",
+			generics: [],
+			parameterTypes: [
+				{ name: null, type },
+				{
+					name: null,
+					type,
+					documentation: "the lower bound, included",
+				},
+				{
+					name: "and",
+					type,
+					documentation: "the upper bound, included",
+				},
+			],
+			returnType: { type: "Boolean" },
+			documentation: {
+				description:
+					"Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.PI::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.",
+				parameters: {},
+				returns: "`true` when the Number is within the bounds.",
+				position: null,
+			},
+		},
+
 		sum: {
 			type: "OverloadedStaticMethod",
 			overloads: [
