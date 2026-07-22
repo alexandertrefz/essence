@@ -1,42 +1,30 @@
 implementation {
 
-	§ Next 2 lines are equivalent.
-	__print(Integer.add(66, 34))
-	__print(66::add(34))
+	§ Every builtin Method has two spellings — through its Namespace, or with
+	§ `::` on the value itself. Both lines make the same call.
+	__print(Integer.add(66, 34))                      § 100
+	__print(66::add(34))                              § 100
 
-	§ Next 2 lines are equivalent.
-	__print(Integer.subtract(1234, 234))
-	__print(1234::subtract(234))
+	§ The everyday arithmetic, in Method form.
+	__print(1234::subtract(234))                      § 1000
+	__print(100::multiplyWith(1000))                  § 100000
 
-	§ Next 2 lines are equivalent.
-	__print(Integer.divideBy(20000, 2))
-	__print(20000::divideBy(2))
-
-	§ Next 2 lines are equivalent.
-	__print(Integer.multiplyWith(100, 1000))
-	__print(100::multiplyWith(1000))
-
-	§ You can chain and nest these calls as well, of course. Since dividing
-	§ might not produce a value, you match on its result before chaining onward.
+	§ Division leaves the Integers behind — the result is a Rational — and
+	§ dividing by zero answers Nothing, so the result wants a match before
+	§ chaining onward.
 	constant half = match 1110::divideBy(2) -> Rational {
-		case Rational {
-			<- @
-		}
-
-		case Nothing {
-			<- 1/1
-		}
+		case Rational { <- @ }
+		case Nothing  { <- 1/1 }
 	}
 
-	__print(100::add(11)::multiplyWith(5)::subtract(1)::divideBy(half))
+	__print(half)                                     § 555/1
+	__print(100::add(11)::multiplyWith(5)::subtract(1)::divideBy(half))  § 554/555
 
-	§ And you can use numbers of any size, even exceeding the limits of IEEE 754.
-	__print(9_007_199_254_740_991::multiplyWith(500))
+	§ Integers are arbitrarily large — IEEE 754 puts no ceiling here.
+	__print(9_007_199_254_740_991::multiplyWith(500)) § 4503599627370495500
 
-	§ When Integers are not enough, you can use Rationals.
-	__print(Rational.divideBy(1/2, 1/6))
-	__print(1/2::divideBy(1/6))
-
-	__print(1/2::multiplyWith(2)::divideBy(6))
+	§ Rationals stay exact through every step.
+	__print(1/2::divideBy(1/6))                       § 3/1
+	__print(1/2::multiplyWith(2)::divideBy(6))        § 1/6
 
 }
