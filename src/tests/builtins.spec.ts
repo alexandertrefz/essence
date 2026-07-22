@@ -16,7 +16,7 @@ import * as string from "../rewriter/__internal/String"
 import * as transcendental from "../rewriter/__internal/Transcendental"
 
 // NOTE: The Rewriter imports one runtime module per builtin Namespace, under
-// the Namespace's own name (`src/rewriter/index.ts:17-33`), so the mapping is
+// the Namespace's own name (`src/rewriter/index.ts:17-34`), so the mapping is
 // the identity — and this table is the only place it is written twice.
 const runtimeModules: Record<string, Record<string, unknown>> = {
 	String: string,
