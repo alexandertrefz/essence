@@ -1,5 +1,9 @@
 import { collectDiagnostics, reportError } from "../diagnostics/index"
-import { flattenUnionMembers, matchesType } from "../helpers/index"
+import {
+	flattenUnionMembers,
+	matchesType,
+	unionMembersKeepingNames,
+} from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 import {
 	checkProtocolConformance,
@@ -555,12 +559,28 @@ function resolveWildcardMatcherType(
 		return isHandled(valueType) ? { type: "Unknown" } : valueType
 	}
 
-	// NOTE: Flattened for the same reason the Validator's exhaustiveness
-	// check flattens — a nested Union member (`Number`, a Choice) is handled
-	// member by member.
-	let remainingTypes = flattenUnionMembers(valueType).filter(
-		(memberType) => !isHandled(memberType),
-	)
+	// NOTE: Handling is checked member by member for the same reason the
+	// Validator's exhaustiveness check flattens — but a named nested Union
+	// (`Number`, a Choice) whose members are all still unhandled stays whole,
+	// so `@` Hovers print its name. Once a Handler has taken some of its
+	// members, only the remaining ones survive, and those are necessarily
+	// spelled out.
+	let remainingTypes: Array<common.Type> = []
+
+	for (let memberType of unionMembersKeepingNames(valueType)) {
+		if (memberType.type === "UnionType") {
+			let flattened = flattenUnionMembers(memberType)
+			let remaining = flattened.filter((member) => !isHandled(member))
+
+			if (remaining.length === flattened.length) {
+				remainingTypes.push(memberType)
+			} else {
+				remainingTypes.push(...remaining)
+			}
+		} else if (!isHandled(memberType)) {
+			remainingTypes.push(memberType)
+		}
+	}
 
 	if (remainingTypes.length === 0) {
 		return { type: "Unknown" }
@@ -1330,13 +1350,26 @@ function unionOfTypes(types: Array<common.Type>): common.Type | null {
 	let distinct: Array<common.Type> = []
 
 	for (let type of types) {
+		// NOTE: Named nested Unions (`Number`, a Choice, a named Alias) stay
+		// whole so the inferred Type prints by name; a member that subsumes
+		// existing ones replaces them, so `Integer` and `Number` merge into
+		// `Number` rather than sitting side by side.
 		let members =
-			type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+			type.type === "UnionType" &&
+			type.name === undefined &&
+			type.alias === undefined
+				? unionMembersKeepingNames(type)
+				: [type]
 
 		for (let member of members) {
-			if (!distinct.some((existing) => matchesType(existing, member))) {
-				distinct.push(member)
+			if (distinct.some((existing) => matchesType(existing, member))) {
+				continue
 			}
+
+			distinct = distinct.filter(
+				(existing) => !matchesType(member, existing),
+			)
+			distinct.push(member)
 		}
 	}
 

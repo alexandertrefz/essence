@@ -21,7 +21,10 @@ import {
 	namespace as numberNamespace,
 	type as numberType,
 } from "./types/Number"
-import { namespace as optionalNamespace } from "./types/Optional"
+import {
+	namespace as optionalNamespace,
+	type as optionalType,
+} from "./types/Optional"
 import {
 	namespace as orderingNamespace,
 	type as orderingType,
@@ -88,6 +91,7 @@ export const builtinTypes: Record<string, common.Type> = {
 	Record: recordType,
 	Number: numberType,
 	List: listType,
+	Optional: optionalType,
 	Ordering: orderingType,
 }
 

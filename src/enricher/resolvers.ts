@@ -11,6 +11,7 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	unionMembersKeepingNames,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
 
@@ -647,21 +648,26 @@ ${resolvedMethods
 	let returnTypes: Array<common.Type> = []
 
 	for (let returnType of caseReturnTypes) {
-		let flattened =
-			returnType.type === "UnionType"
-				? flattenUnionMembers(returnType)
+		// NOTE: Named nested Unions (`Ordering`, `Number`) stay whole so the
+		// invocation's Type prints by name; a member subsumed by an existing
+		// one (or subsuming existing ones) collapses so `Number` and `Integer`
+		// merge into `Number` rather than sitting side by side.
+		let members =
+			returnType.type === "UnionType" &&
+			returnType.name === undefined &&
+			returnType.alias === undefined
+				? unionMembersKeepingNames(returnType)
 				: [returnType]
 
-		for (let member of flattened) {
-			if (
-				!returnTypes.some(
-					(existing) =>
-						matchesType(existing, member) &&
-						matchesType(member, existing),
-				)
-			) {
-				returnTypes.push(member)
+		for (let member of members) {
+			if (returnTypes.some((existing) => matchesType(existing, member))) {
+				continue
 			}
+
+			returnTypes = returnTypes.filter(
+				(existing) => !matchesType(member, existing),
+			)
+			returnTypes.push(member)
 		}
 	}
 
@@ -1841,6 +1847,12 @@ function describeTypeForDiagnostic(type: common.Type): string {
 				return type.name
 			}
 
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(describeTypeForDiagnostic)
+					.join(", ")}>`
+			}
+
 			return type.types
 				.map((memberType) => describeTypeForDiagnostic(memberType))
 				.join(" | ")
@@ -2088,7 +2100,22 @@ export function resolveTypeAliasStatementType(
 	}
 
 	if (node.generics.length === 0) {
-		return resolveType(node.type, scope)
+		let resolvedType = resolveType(node.type, scope)
+
+		// NOTE: An anonymous Union takes the Alias's name, so Hovers and
+		// Diagnostics print `Coordinate` rather than spelling the members out.
+		// A copy, not a mutation — the resolved Type may be a shared Scope
+		// object. An already named or aliased Union (a Choice, `Number`,
+		// `Optional<Integer>`, another Alias) keeps its original spelling.
+		if (
+			resolvedType.type === "UnionType" &&
+			resolvedType.name === undefined &&
+			resolvedType.alias === undefined
+		) {
+			return { ...resolvedType, name: node.name.content }
+		}
+
+		return resolvedType
 	}
 
 	// NOTE: Generic Type Aliases keep their body unapplied — the Generics
@@ -2139,7 +2166,33 @@ function applyGenericAlias(
 		bindings.set(generic.name, argument)
 	}
 
-	return applyGenericBindings(aliasType.aliasedType, bindings)
+	let appliedType = applyGenericBindings(aliasType.aliasedType, bindings)
+
+	// NOTE: An applied alias whose body is an anonymous Union carries the
+	// applied spelling as its display alias, so `Optional<Integer>` prints as
+	// written rather than as `Integer | Nothing`. The Type Arguments are kept
+	// as Types — a later substitution rewrites them alongside the members, so
+	// the spelling never goes stale. Display-only, like every Union name. A
+	// body that is already named or aliased keeps its own spelling, the way
+	// `type Sure = Number` keeps printing `Number`.
+	if (
+		appliedType.type === "UnionType" &&
+		appliedType.name === undefined &&
+		appliedType.alias === undefined
+	) {
+		return {
+			...appliedType,
+			alias: {
+				name: aliasType.name,
+				typeArguments: generics.map(
+					(generic) =>
+						bindings.get(generic.name) ?? { type: "Error" },
+				),
+			},
+		}
+	}
+
+	return appliedType
 }
 
 export function resolveIdentifierTypeDeclarationType(

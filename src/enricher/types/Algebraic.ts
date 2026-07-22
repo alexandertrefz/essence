@@ -1,12 +1,13 @@
+import { optionalOf } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
 export const type: common.AlgebraicType = { type: "Algebraic" }
 
-const rationalOrAlgebraicOrNothing: common.Type = {
+const rationalOrAlgebraicOrNothing: common.Type = optionalOf({
 	type: "UnionType",
-	types: [{ type: "Rational" }, { type: "Algebraic" }, { type: "Nothing" }],
-}
+	types: [{ type: "Rational" }, { type: "Algebraic" }],
+})
 
 // NOTE: A real algebraic irrational — for now the quadratic slice
 // `a + b·√d`. Every guarantee is exact: equality and ordering are decided
@@ -300,10 +301,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Integer" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Algebraic" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Algebraic" }),
 				},
 				{
 					generics: [],
@@ -317,10 +315,7 @@ export const namespace: common.NamespaceType = {
 							type: { type: "Rational" },
 						},
 					],
-					returnType: {
-						type: "UnionType",
-						types: [{ type: "Algebraic" }, { type: "Nothing" }],
-					},
+					returnType: optionalOf({ type: "Algebraic" }),
 				},
 				{
 					generics: [],

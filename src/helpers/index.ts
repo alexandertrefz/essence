@@ -106,38 +106,84 @@ export function applyGenericBindings(
 	switch (type.type) {
 		case "GenericUse":
 			return bindings.get(type.name) ?? type
-		case "List":
-			return {
-				type: "List",
-				itemType: applyGenericBindings(type.itemType, bindings),
+		case "List": {
+			let itemType = applyGenericBindings(type.itemType, bindings)
+
+			return itemType === type.itemType
+				? type
+				: { type: "List", itemType }
+		}
+		case "UnionType": {
+			let types = type.types.map((memberType) =>
+				applyGenericBindings(memberType, bindings),
+			)
+			let aliasArguments = type.alias?.typeArguments.map((typeArgument) =>
+				applyGenericBindings(typeArgument, bindings),
+			)
+
+			if (
+				types.every(
+					(memberType, index) => memberType === type.types[index],
+				) &&
+				(aliasArguments === undefined ||
+					aliasArguments.every(
+						(typeArgument, index) =>
+							typeArgument === type.alias?.typeArguments[index],
+					))
+			) {
+				return type
 			}
-		case "UnionType":
-			return {
-				type: "UnionType",
-				types: type.types.map((memberType) =>
-					applyGenericBindings(memberType, bindings),
-				),
+
+			// NOTE: A plain `name` cannot follow a substitution — it might
+			// spell out the very Type Parameters being replaced — so it is
+			// dropped rather than kept stale. Parameter-free named Unions
+			// (`Number`, a Choice) come back untouched member by member and
+			// survive through the identity check above. An `alias` carries
+			// its Type Arguments as Types, so it substitutes right along and
+			// `Optional<ItemType>` heals into `Optional<Integer>`.
+			let substituted: common.UnionType = { type: "UnionType", types }
+
+			if (type.alias !== undefined && aliasArguments !== undefined) {
+				substituted.alias = {
+					name: type.alias.name,
+					typeArguments: aliasArguments,
+				}
 			}
-		case "Record":
-			return {
-				type: "Record",
-				members: Object.fromEntries(
-					Object.entries(type.members).map(([name, memberType]) => [
-						name,
-						applyGenericBindings(memberType, bindings),
-					]),
-				),
+
+			return substituted
+		}
+		case "Record": {
+			let entries = Object.entries(type.members).map(
+				([name, memberType]) =>
+					[name, applyGenericBindings(memberType, bindings)] as const,
+			)
+
+			if (
+				entries.every(
+					([name, memberType]) => memberType === type.members[name],
+				)
+			) {
+				return type
 			}
-		case "Case":
-			return {
-				...type,
-				members: Object.fromEntries(
-					Object.entries(type.members).map(([name, memberType]) => [
-						name,
-						applyGenericBindings(memberType, bindings),
-					]),
-				),
+
+			return { type: "Record", members: Object.fromEntries(entries) }
+		}
+		case "Case": {
+			let entries = Object.entries(type.members).map(
+				([name, memberType]) =>
+					[name, applyGenericBindings(memberType, bindings)] as const,
+			)
+
+			if (
+				entries.every(
+					([name, memberType]) => memberType === type.members[name],
+				)
+			) {
+				return type
 			}
+
+			return { ...type, members: Object.fromEntries(entries) }
+		}
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
@@ -403,8 +449,47 @@ export function flattenUnionMembers(
 	return members
 }
 
+// NOTE: Like `flattenUnionMembers`, except a *named* nested Union (a Choice,
+// `Number`, a named Type Alias, or an applied `Optional<X>`) stays whole.
+// Union-building code uses this so Hovers and Diagnostics keep the name
+// instead of spelling out every member — purely a display concern, since
+// assignability ignores Union names and recurses into nested Unions either
+// way.
+export function unionMembersKeepingNames(
+	type: common.UnionType,
+): Array<common.Type> {
+	let members: Array<common.Type> = []
+
+	for (let member of type.types) {
+		if (
+			member.type === "UnionType" &&
+			member.name === undefined &&
+			member.alias === undefined
+		) {
+			members.push(...unionMembersKeepingNames(member))
+		} else {
+			members.push(member)
+		}
+	}
+
+	return members
+}
+
 export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
+}
+
+// NOTE: The Union `itemType | Nothing`, carrying the applied `Optional<...>`
+// spelling for display. The stdlib writes its fallible signatures with this,
+// so Hovers and Diagnostics print the global alias — and a compound payload
+// stays one nested member (`Optional<Integer | Rational>`), which is what
+// lets `otherwise` bind it in one piece.
+export function optionalOf(itemType: common.Type): common.UnionType {
+	return {
+		type: "UnionType",
+		types: [itemType, { type: "Nothing" }],
+		alias: { name: "Optional", typeArguments: [itemType] },
+	}
 }
 
 // NOTE: The inference-aware form of `matchesType` — the first occurrence of
@@ -524,7 +609,12 @@ function matchTypes(
 			// NOTE: An actual Union is assignable when every one of its
 			// members is accepted by some member of the expected Union — the
 			// actual Type must not be able to hold any value the expected
-			// Type can not hold.
+			// Type can not hold. A whole member is tried first, so a binding
+			// Generic binds a nested Union (`Optional<Integer | Rational>`'s
+			// payload) in one piece; only when no single expected member takes
+			// it is a nested actual member decomposed against the whole
+			// expected Union, which makes the nested and the flattened
+			// spelling of the same Union interchangeable.
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
 
@@ -533,6 +623,10 @@ function matchTypes(
 						foundMatch = true
 						break
 					}
+				}
+
+				if (!foundMatch && rhsType.type === "UnionType") {
+					foundMatch = matchTypes(lhs, rhsType, context)
 				}
 
 				if (!foundMatch) {

@@ -427,6 +427,10 @@ describe("Enricher", () => {
 				}`),
 			).toEqual({
 				type: "UnionType",
+				alias: {
+					name: "Optional",
+					typeArguments: [{ type: "Integer" }],
+				},
 				types: [{ type: "Integer" }, { type: "Nothing" }],
 			})
 		})
@@ -472,6 +476,10 @@ describe("Enricher", () => {
 				}`),
 			).toEqual({
 				type: "UnionType",
+				alias: {
+					name: "Optional",
+					typeArguments: [{ type: "Integer" }],
+				},
 				types: [{ type: "Integer" }, { type: "Nothing" }],
 			})
 		})
@@ -773,8 +781,14 @@ describe("Enricher", () => {
 			expect(constant.nodeType).toBe("ConstantDeclarationStatement")
 
 			if (constant.nodeType === "ConstantDeclarationStatement") {
+				// NOTE: The applied spelling sticks around as the Union's
+				// display alias — assignability ignores it.
 				expect(constant.declaredType).toEqual({
 					type: "UnionType",
+					alias: {
+						name: "Maybe",
+						typeArguments: [{ type: "Rational" }],
+					},
 					types: [{ type: "Rational" }, { type: "Nothing" }],
 				})
 			}

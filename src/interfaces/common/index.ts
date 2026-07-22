@@ -212,13 +212,23 @@ export type ProtocolType = {
 	documentation?: Documentation
 }
 
-// NOTE: `name` is set on the Union a `choice` declaration creates (and on the
-// builtin `Ordering`) — assignability ignores it entirely, it only gives
-// Diagnostics and Hovers a readable name for the Union of a Choice's Cases.
+// NOTE: `name` is set on the Union a `choice` declaration creates (and on
+// builtins like `Ordering` and `Number`, and non-generic Type Aliases) —
+// assignability ignores it entirely, it only gives Diagnostics and Hovers a
+// readable name for the Union.
+// `alias` is its parameterized sibling, set on the Union an applied Generic
+// Alias produces (`Optional<Integer>`). Its Type Arguments are real Types, so
+// generic substitution rewrites them alongside the members and the applied
+// spelling stays accurate — a plain string name would go stale instead.
+// Equally ignored by assignability.
 export type UnionType = {
 	type: "UnionType"
 	types: Array<Type | GenericUse>
 	name?: string
+	alias?: {
+		name: string
+		typeArguments: Array<Type | GenericUse>
+	}
 }
 
 export type GenericName = string

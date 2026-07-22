@@ -7,9 +7,16 @@ export function printType(type: common.Type): string {
 	switch (type.type) {
 		case "UnionType":
 			// NOTE: A Choice's Union prints as the Choice's name — spelling
-			// out every Case would drown the Hover.
+			// out every Case would drown the Hover. An applied Generic Alias
+			// prints as applied: `Optional<Integer>`.
 			if (type.name !== undefined) {
 				return type.name
+			}
+
+			if (type.alias !== undefined) {
+				return `${type.alias.name}<${type.alias.typeArguments
+					.map(printType)
+					.join(", ")}>`
 			}
 
 			return type.types.map(printType).join(" | ")
