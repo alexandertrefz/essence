@@ -1,5 +1,6 @@
 import type { BooleanType } from "./Boolean"
 import { createBoolean, negate } from "./Boolean"
+import { getStringRepresentation } from "./functions"
 import { anyIs } from "./internalHelpers"
 import type { ListType } from "./List"
 import { createList } from "./List"
@@ -17,6 +18,11 @@ export function createRecord(record: Record<string, AnyType>): RecordType {
 	return { [typeKeySymbol]: "Record", ...record }
 }
 
+// NOTE: `keys` is declared on the Namespace; `entries` and `values` are
+// runtime-only for now — their honest return Types need an `Anything` Type
+// (a Record's values have no common Type), which arrives with the JSON
+// design. They stay implemented and tested so the Dictionary work can pick
+// them up.
 export function entries(recordInstance: RecordType): ListType<RecordType> {
 	return createList(
 		Object.entries(recordInstance).map(([key, value]) => {
@@ -75,8 +81,6 @@ export function isNot(
 }
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
-export function toString(recordInstance: RecordType) {
-	// TODO
-	console.log("toString", recordInstance)
-	return createString("Record")
+export function toString(recordInstance: RecordType): StringType {
+	return createString(getStringRepresentation(recordInstance))
 }

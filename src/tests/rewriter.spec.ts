@@ -357,13 +357,37 @@ describe("Rewriter", () => {
 					).toBeFalse()
 				})
 
-				it("returns false for unimplemented checks", () => {
+				it("narrows Lists by the items they hold", () => {
+					// NOTE: Item Types erase at runtime, so the empty List
+					// fits any List matcher — the same way an empty literal
+					// is assignable to any List.
 					expect(
 						isValueOfType(listEmpty(), {
 							type: "List",
 							itemType: {
 								type: "Nothing",
 							},
+						}),
+					).toBeTrue()
+
+					expect(
+						isValueOfType(list.createList([integerOne()]), {
+							type: "List",
+							itemType: { type: "Integer" },
+						}),
+					).toBeTrue()
+
+					expect(
+						isValueOfType(list.createList([integerOne()]), {
+							type: "List",
+							itemType: { type: "String" },
+						}),
+					).toBeFalse()
+
+					expect(
+						isValueOfType(integerOne(), {
+							type: "List",
+							itemType: { type: "Integer" },
 						}),
 					).toBeFalse()
 				})
@@ -6228,8 +6252,17 @@ describe("Rewriter", () => {
 			describe("toString", () => {
 				it("prints correctly", () => {
 					expect(record.toString(recordEmpty())).toEqual(
-						string.createString("Record"),
+						string.createString("{}"),
 					)
+
+					expect(
+						record.toString(
+							record.createRecord({
+								a: integerOne(),
+								b: string.createString("text"),
+							}),
+						),
+					).toEqual(string.createString('{ a = 1, b = "text" }'))
 				})
 			})
 		})
