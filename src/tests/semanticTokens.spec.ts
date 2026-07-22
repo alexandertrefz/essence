@@ -170,3 +170,26 @@ describe("Semantic Tokens", () => {
 		})
 	})
 })
+
+describe("Semantic Tokens in where clauses", () => {
+	it("should classify where-clause mentions as Generics and Protocols", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"\tnamespace Boxy<infer Item> for { value: Item }",
+			"\t\tis Sizable where Item is Sizable",
+			"\t{",
+			"\t\tsize() -> Integer {",
+			"\t\t\t<- @.value::size()",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 6, 6)?.type).toBe("type")
+		expect(tokenAt(source, 6, 20)?.type).toBe("typeParameter")
+		expect(tokenAt(source, 6, 28)?.type).toBe("type")
+	})
+})

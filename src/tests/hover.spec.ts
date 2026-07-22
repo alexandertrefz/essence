@@ -346,3 +346,35 @@ describe("Hover", () => {
 		expect(hover(source, { line: 1, column: 1 })).toBeNull()
 	})
 })
+
+describe("Hover of conformance clauses", () => {
+	it("should describe a Namespace with its conformance clauses", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Box<infer Item> for { value: Item }",
+			"\t\tis Comparable where Item is Comparable",
+			"\t{",
+			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 13 })).toBe(
+			"namespace Box<infer Item> for { value: Item } is Comparable where Item is Comparable",
+		)
+	})
+
+	it("should show a Method's Protocol bound", () => {
+		let source = [
+			"implementation {",
+			"\t[3, 1]::sorted()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 11 })).toBe(
+			"sorted<ItemType is Comparable>() -> List<ItemType>",
+		)
+	})
+})
