@@ -8,7 +8,6 @@ implementation {
 	}
 
 	variable list: List<Rational> = []
-	variable approximateTau = list::append(710/113)::firstItem()
 
 	list = list::append(1/1)
 	list = list::append(contentsOf [2/1])
@@ -47,8 +46,13 @@ implementation {
 	__print(numbers::slice(from 1, to 3))    § [1, 2]
 	__print(numbers::countOf(1))             § 2
 
+	§ Membership tests.
+	__print(numbers::contains(4))            § true
+	__print(numbers::doesNotContain(9))      § true
+
 	§ Structural edits, each returning a new List.
 	__print(numbers::reversed())             § [4, 1, 2, 1, 3]
+	__print(numbers::removeAt(2))            § [3, 1, 1, 4]
 	__print(numbers::insertAt(2, with 99))   § [3, 1, 99, 2, 1, 4]
 	__print(numbers::replaceAt(0, with 99))  § [99, 1, 2, 1, 4]
 	__print(numbers::sortedBy((a, b) { <- a::compareTo(b) }))  § [1, 1, 2, 3, 4]

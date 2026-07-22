@@ -1,8 +1,27 @@
 implementation {
-	type Node<NodeType> = { left: NodeType, right: NodeType }
-	type Tree<ValueType> = Node<Tree<ValueType>> | ValueType
 
-	variable integerTreeOne: Tree<Integer> = { left = 1, right = 2 }
-	variable integerTreeTwo: Tree<Integer> = { left = { left = 1, right = 2 }, right = { left = 3, right = 4 } }
-	variable integerTreeThree: Tree<Integer> = { left = { left = 1, right = 2 }, right = 3 }
+	§ Recursive Type declarations are not part of the language yet — a Type
+	§ may not name itself, directly or through another declaration. Once it
+	§ can, this file becomes the Tree it sketches:
+
+	§ choice Tree<Value> {
+	§ 	Node { left: Tree<Value>, right: Tree<Value> },
+	§ 	Leaf { value: Value },
+	§ }
+
+	§ function sumOf(_ tree: Tree<Integer>) -> Integer {
+	§ 	<- match tree -> Integer {
+	§ 		case #Leaf { <- @.value }
+	§ 		case #Node { <- sumOf(@.left)::add(sumOf(@.right)) }
+	§ 	}
+	§ }
+
+	§ __print(sumOf(#Node({
+	§ 	left = #Leaf({ value = 1 }),
+	§ 	right = #Node({
+	§ 		left = #Leaf({ value = 2 }),
+	§ 		right = #Leaf({ value = 3 }),
+	§ 	}),
+	§ })))                                  § 6
+
 }
