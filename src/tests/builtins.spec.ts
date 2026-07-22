@@ -8,6 +8,7 @@ import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
 import * as nothing from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
+import * as optional from "../rewriter/__internal/Optional"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
@@ -26,6 +27,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Transcendental: transcendental,
 	Number: number,
 	Nothing: nothing,
+	Optional: optional,
 	Ordering: ordering,
 	Record: record,
 	List: list,
