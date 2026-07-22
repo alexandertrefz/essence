@@ -1,7 +1,9 @@
 import {
 	collectDiagnostics,
+	primary,
 	reportError,
 	reportWarning,
+	secondary,
 } from "../diagnostics/index"
 import {
 	createInferenceContext,
@@ -9,6 +11,7 @@ import {
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	withArticle,
 } from "../helpers/index"
 import type { common } from "../interfaces/index"
 
@@ -288,10 +291,10 @@ function validateFunctionInvocation(
 			)
 
 			if (matchResult.type === "ArityMismatch") {
-				reportError(
-					"Amount of passed arguments doesn't match the signature.",
+				reportArityMismatch(
+					functionType.parameterTypes,
+					node.arguments.length,
 					node.position,
-					{ code: "argument-count-mismatch" },
 				)
 
 				return node
@@ -299,10 +302,10 @@ function validateFunctionInvocation(
 
 			if (matchResult.type === "ArgumentMismatch") {
 				for (let i of matchResult.mismatchedArgumentIndices) {
-					reportError(
-						`Argument ${i + 1} doesn't match its declared parameter.`,
-						node.arguments[i].value.position,
-						{ code: "argument-type-mismatch" },
+					reportArgumentMismatch(
+						functionType.parameterTypes[i],
+						i,
+						node.arguments[i],
 					)
 				}
 			}
@@ -521,10 +524,11 @@ function validateConstantDeclarationStatement(
 ): common.typed.ConstantDeclarationStatementNode {
 	if (node.declaredType !== null) {
 		if (!matchesType(node.declaredType, node.value.type)) {
-			reportError(
-				`Wrong Assignment Value Type for Constant '${node.name.content}'.`,
-				node.value.position,
-				{ code: "assignment-type-mismatch" },
+			reportDeclarationMismatch(
+				"Constant",
+				node.name.content,
+				node.declaredType,
+				node.value,
 			)
 		}
 	}
@@ -540,10 +544,11 @@ function validateVariableDeclarationStatement(
 ): common.typed.VariableDeclarationStatementNode {
 	if (node.declaredType !== null) {
 		if (!matchesType(node.declaredType, node.value.type)) {
-			reportError(
-				`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
-				node.value.position,
-				{ code: "assignment-type-mismatch" },
+			reportDeclarationMismatch(
+				"Variable",
+				node.name.content,
+				node.declaredType,
+				node.value,
 			)
 		}
 	}
@@ -554,14 +559,65 @@ function validateVariableDeclarationStatement(
 	return node
 }
 
+// NOTE: A Declaration's Type Annotation carries no Position of its own, so
+// the Type it demands is stated as a note rather than pointed at. The value
+// is what gets the arrow — it is the part that can be changed.
+function reportDeclarationMismatch(
+	kind: "Constant" | "Variable",
+	name: string,
+	declaredType: common.Type,
+	value: common.typed.ExpressionNode,
+): void {
+	reportError(
+		`This value does not fit the declared Type of ${kind} '${name}'`,
+		value.position,
+		{
+			code: "assignment-type-mismatch",
+			labels: [
+				primary(
+					value.position,
+					`this is ${withArticle(describeType(value.type))}`,
+				),
+			],
+			notes: [`'${name}' is declared as ${describeType(declaredType)}.`],
+		},
+	)
+}
+
 function validateVariableAssignmentStatement(
 	node: common.typed.VariableAssignmentStatementNode,
 ): common.typed.VariableAssignmentStatementNode {
 	if (!matchesType(node.name.type, node.value.type)) {
+		let declaredType = describeType(node.name.type)
+
 		reportError(
-			`Wrong Assignment Value Type for Variable '${node.name.content}'.`,
+			`This value does not fit Variable '${node.name.content}'`,
 			node.value.position,
-			{ code: "assignment-type-mismatch" },
+			{
+				code: "assignment-type-mismatch",
+				labels: [
+					primary(
+						node.value.position,
+						`this is ${withArticle(describeType(node.value.type))}`,
+					),
+					// NOTE: Null for a builtin, which was declared in
+					// TypeScript and has no Essence source to point at.
+					...(node.declarationPosition === null
+						? []
+						: [
+								secondary(
+									node.declarationPosition,
+									`declared as ${declaredType} here`,
+								),
+							]),
+				],
+				notes:
+					node.declarationPosition === null
+						? [
+								`'${node.name.content}' is declared as ${declaredType}.`,
+							]
+						: [],
+			},
 		)
 	}
 
@@ -778,6 +834,75 @@ function matchableArgumentsFromTypedNodes(
 	}))
 }
 
+// NOTE: A Parameter is identified by its label where it has one, and by its
+// place in the signature where it does not — `_ value: Integer` is written
+// without a label on purpose, and inventing one for the Diagnostic would name
+// something the reader can not find in the source.
+function describeParameter(
+	parameter: common.Parameter | undefined,
+	index: number,
+): string {
+	return parameter?.name != null
+		? `Parameter '${parameter.name}'`
+		: `Parameter ${index + 1}`
+}
+
+function describeSignature(parameterTypes: Array<common.Parameter>): string {
+	if (parameterTypes.length === 0) {
+		return "takes no Arguments"
+	}
+
+	return `takes ${parameterTypes.length === 1 ? "1 Argument" : `${parameterTypes.length} Arguments`}: ${parameterTypes
+		.map(
+			(parameter, index) =>
+				`${describeParameter(parameter, index)} is ${describeType(parameter.type)}`,
+		)
+		.join(", ")}`
+}
+
+function reportArityMismatch(
+	parameterTypes: Array<common.Parameter>,
+	argumentCount: number,
+	position: common.Position,
+): void {
+	reportError("This call passes the wrong number of Arguments", position, {
+		code: "argument-count-mismatch",
+		labels: [
+			primary(
+				position,
+				`passes ${argumentCount === 1 ? "1 Argument" : `${argumentCount} Arguments`}`,
+			),
+		],
+		notes: [`The signature ${describeSignature(parameterTypes)}.`],
+	})
+}
+
+function reportArgumentMismatch(
+	parameter: common.Parameter | undefined,
+	index: number,
+	argumentNode: common.typed.ArgumentNode,
+): void {
+	let name = describeParameter(parameter, index)
+
+	reportError(
+		`This Argument does not fit ${name}`,
+		argumentNode.value.position,
+		{
+			code: "argument-type-mismatch",
+			labels: [
+				primary(
+					argumentNode.value.position,
+					`this is ${withArticle(describeType(argumentNode.value.type))}`,
+				),
+			],
+			notes:
+				parameter === undefined
+					? []
+					: [`${name} is ${describeType(parameter.type)}.`],
+		},
+	)
+}
+
 function validateSimpleFunctionInvocation(
 	functionType: common.FunctionType | common.StaticMethodType,
 	argumentNodes: Array<common.typed.ArgumentNode>,
@@ -797,10 +922,10 @@ function validateSimpleFunctionInvocation(
 	)
 
 	if (matchResult.type === "ArityMismatch") {
-		reportError(
-			"Amount of passed arguments doesn't match the signature.",
+		reportArityMismatch(
+			functionType.parameterTypes,
+			argumentNodes.length,
 			position,
-			{ code: "argument-count-mismatch" },
 		)
 
 		return
@@ -808,10 +933,10 @@ function validateSimpleFunctionInvocation(
 
 	if (matchResult.type === "ArgumentMismatch") {
 		for (let i of matchResult.mismatchedArgumentIndices) {
-			reportError(
-				`Argument ${i + 1} doesn't match its declared parameter.`,
-				argumentNodes[i].value.position,
-				{ code: "argument-type-mismatch" },
+			reportArgumentMismatch(
+				functionType.parameterTypes[i],
+				i,
+				argumentNodes[i],
 			)
 		}
 	}

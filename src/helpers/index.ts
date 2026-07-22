@@ -1,5 +1,14 @@
 import type { common, lexer } from "../interfaces/index"
 
+// NOTE: For Diagnostics — "this is an Integer", not "this is a Integer".
+// Type names are the only thing this is ever applied to, and they are always
+// spelled out, so the vowel rule needs no exceptions.
+export function withArticle(description: string): string {
+	return /^[AEIOU]/i.test(description)
+		? `an ${description}`
+		: `a ${description}`
+}
+
 export function stripPositionFromArray(
 	tokens: Array<lexer.Token | undefined>,
 ): Array<lexer.SimpleToken | undefined> {

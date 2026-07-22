@@ -1,0 +1,61 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Diagnostic Showcase should render the same report every time 1`] = `
+"[assignment-type-mismatch]
+Error: This value does not fit Variable 'count'
+    ╭─┤ Showcase.es:15:10 │
+    │
+ 13 │     variable count = 0
+    │              ──┬──  
+    │                ╰──── declared as Integer here
+    │ 
+ 15 │     count = "ten"
+    │             ──┬──  
+    │               ╰──── this is a String
+────╯
+
+[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'label'
+    ╭─┤ Showcase.es:19:27 │
+    │
+ 19 │     constant label: String = 42
+    │                              ─┐  
+    │                               ╰── this is an Integer
+    │ 
+    │ Note: 'label' is declared as String.
+────╯
+
+[argument-count-mismatch]
+Error: This call passes the wrong number of Arguments
+    ╭─┤ Showcase.es:26:22 │
+    │
+ 26 │     constant greeting = greet("World")
+    │                         ───────┬──────  
+    │                                ╰──────── passes 1 Argument
+    │ 
+    │ Note: The signature takes 2 Arguments: Parameter 1 is String, Parameter 'times' is Integer.
+────╯
+
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 1
+    ╭─┤ Showcase.es:27:25 │
+    │
+ 27 │     constant shout = greet(1, times "twice")
+    │                            ▲  
+    │                            ╰── this is an Integer
+    │ 
+    │ Note: Parameter 1 is String.
+────╯
+
+[argument-type-mismatch]
+Error: This Argument does not fit Parameter 'times'
+    ╭─┤ Showcase.es:27:34 │
+    │
+ 27 │     constant shout = greet(1, times "twice")
+    │                                     ───┬───  
+    │                                        ╰───── this is a String
+    │ 
+    │ Note: Parameter 'times' is Integer.
+────╯
+"
+`;
