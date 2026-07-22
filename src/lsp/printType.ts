@@ -50,6 +50,35 @@ export function printType(type: common.Type): string {
 	}
 }
 
+// NOTE: A Namespace's conformance list, rendered the way it is declared —
+// ` is Equatable, is Printable, is Comparable where ItemType is Comparable`.
+// The first clause follows the `for Target` half with just a space (as in the
+// declaration itself); the later clauses are comma-separated. An unconditional
+// clause drops its `where`; a conditional one spells every
+// `Generic is Protocol` condition.
+export function printConformanceClauses(
+	conformsTo: Array<{
+		name: string
+		conditions: Array<{ generic: string; protocol: string }>
+	}>,
+): string {
+	return conformsTo
+		.map((clause, index) => {
+			let where =
+				clause.conditions.length === 0
+					? ""
+					: ` where ${clause.conditions
+							.map(
+								(condition) =>
+									`${condition.generic} is ${condition.protocol}`,
+							)
+							.join(", ")}`
+
+			return `${index === 0 ? " " : ", "}is ${clause.name}${where}`
+		})
+		.join("")
+}
+
 // NOTE: A Case with its payload shape spelled out — for Hovers where the
 // Case itself is the subject rather than a mention. `printType` deliberately
 // stays terse (`CalculatorOperation#Add`); this is the descriptive form.
@@ -145,7 +174,15 @@ export function describeSignature(
 		functionType.generics.length === 0
 			? ""
 			: `<${functionType.generics
-					.map((generic) => generic.name)
+					.map((generic) =>
+						// NOTE: A Protocol-bounded Type Parameter reads back as it
+						// is written — `ItemType is Comparable` — so a Hover or
+						// Signature Help over `sorted` shows the bound its ordering
+						// depends on rather than a bare `ItemType`.
+						generic.constraint == null
+							? generic.name
+							: `${generic.name} is ${generic.constraint}`,
+					)
 					.join(", ")}>`
 
 	let label = `${name}${generics}(`

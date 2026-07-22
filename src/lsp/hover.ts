@@ -3,6 +3,7 @@ import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
 import {
 	printCaseWithPayload,
+	printConformanceClauses,
 	printSignature,
 	printType,
 	signaturesOf,
@@ -171,14 +172,47 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitFunctionDefinition(node.value, state)
 			return
 		case "NamespaceDefinitionStatement":
-			consider(
-				state,
-				node.position,
-				node.type,
-				node.name.content,
-				node.documentation,
-			)
-			visitIdentifier(node.name, state, undefined, node.documentation)
+			// NOTE: A Namespace that declares conformance reads back as its
+			// whole declaration head — `namespace List<infer Item> for
+			// List<Item>, is Equatable, is Comparable where Item is Comparable`
+			// — spelled by hand like a Protocol or Choice so the clauses show.
+			// One without clauses keeps the plain name-and-Type Hover.
+			if (node.conformsTo.length > 0) {
+				let generics =
+					node.type.generics.length === 0
+						? ""
+						: `<${node.type.generics
+								.map(printGenericDeclaration)
+								.join(", ")}>`
+
+				let target =
+					node.targetType === null
+						? ""
+						: ` for ${printType(node.targetType)}`
+
+				let content = `namespace ${node.name.content}${generics}${target}${printConformanceClauses(
+					node.conformsTo,
+				)}`
+
+				for (let position of [node.position, node.name.position]) {
+					if (wins(state, position)) {
+						state.best = {
+							position,
+							content,
+							documentation: renderDocumentation(node.documentation),
+						}
+					}
+				}
+			} else {
+				consider(
+					state,
+					node.position,
+					node.type,
+					node.name.content,
+					node.documentation,
+				)
+				visitIdentifier(node.name, state, undefined, node.documentation)
+			}
 
 			for (let property of Object.values(node.properties)) {
 				visitIdentifier(
@@ -427,6 +461,17 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			consider(state, node.position, node.type, null)
 			return
 	}
+}
+
+// NOTE: A Namespace's own Type Parameter, rendered as declared — `infer Item`,
+// or `Item is Comparable` where it carries a bound. Used only for the
+// declaration-head Hover; call sites render Generics through `printType`.
+function printGenericDeclaration(generic: common.GenericDeclaration): string {
+	let inferKeyword = generic.infer ? "infer " : ""
+	let constraint =
+		generic.constraint == null ? "" : ` is ${generic.constraint}`
+
+	return `${inferKeyword}${generic.name}${constraint}`
 }
 
 function visitIdentifier(
