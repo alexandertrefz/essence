@@ -268,6 +268,68 @@ describe("Irrationals", () => {
 				}),
 			).toEqual(createNothing())
 		})
+
+		// NOTE: The `isLessThan` family is thin wrappers over `compareTo`, and
+		// the whole reason Phase 1 was cheap is that `compareTo` was already
+		// total and exact across all sixteen cells. These two properties pin
+		// that the wrappers really do agree with it — checked over every
+		// ordered pair of one value per kind, including √2 and π.
+		describe("the ordering family agrees with compareTo", () => {
+			// NOTE: One representative per kind. √2 < 3/2 < 2 < π, so the set
+			// also exercises every strict outcome, not just the reflexive one.
+			let values: Array<[string, never]> = [
+				["1", integer.createInteger(1n) as never],
+				["3/2", rational.createRational(3n, 2n) as never],
+				["2", integer.createInteger(2n) as never],
+				["√2", radical(2n) as never],
+				["π", number.PI as never],
+			]
+
+			for (let [aName, a] of values) {
+				for (let [bName, b] of values) {
+					it(`${aName} against ${bName}`, () => {
+						let order = ordering.toString(
+							number.compareTo(a, b),
+						).value
+
+						expect(number.isLessThan(a, b).value).toBe(
+							order === "Less",
+						)
+						expect(number.isLessThanOrEqualTo(a, b).value).toBe(
+							order !== "Greater",
+						)
+						expect(number.isGreaterThan(a, b).value).toBe(
+							order === "Greater",
+						)
+						expect(number.isGreaterThanOrEqualTo(a, b).value).toBe(
+							order !== "Less",
+						)
+					})
+				}
+			}
+		})
+
+		it("orders the family symmetrically", () => {
+			// NOTE: `a < b` must agree with `b > a` for every pair, the
+			// property a broken cross-kind cell would break first.
+			let values = [
+				integer.createInteger(1n) as never,
+				rational.createRational(3n, 2n) as never,
+				radical(2n) as never,
+				number.PI as never,
+			]
+
+			for (let a of values) {
+				for (let b of values) {
+					expect(number.isLessThan(a, b).value).toBe(
+						number.isGreaterThan(b, a).value,
+					)
+					expect(number.isLessThanOrEqualTo(a, b).value).toBe(
+						number.isGreaterThanOrEqualTo(b, a).value,
+					)
+				}
+			}
+		})
 	})
 
 	describe("Structural equality", () => {

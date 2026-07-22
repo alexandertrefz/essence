@@ -15,7 +15,7 @@ import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
-import { equal, greater, less } from "./Ordering"
+import { equal, greater, less, is as orderingIs } from "./Ordering"
 import type { RationalType } from "./Rational"
 import {
 	createRational,
@@ -522,6 +522,40 @@ export function compareTo(number: NumberType, other: NumberType): OrderingType {
 	} else {
 		return greater
 	}
+}
+
+// #endregion
+
+// #region Comparisons
+
+// NOTE: The Union-level ordering — one signature over every pair, reading the
+// covering `compareTo`, which hand-writes all sixteen cells. This is where a
+// Transcendental is compared against another Transcendental; the member
+// Namespaces leave that cell out.
+
+export function isLessThan(number: NumberType, other: NumberType): BooleanType {
+	return createBoolean(orderingIs(compareTo(number, other), less).value)
+}
+
+export function isLessThanOrEqualTo(
+	number: NumberType,
+	other: NumberType,
+): BooleanType {
+	return createBoolean(!orderingIs(compareTo(number, other), greater).value)
+}
+
+export function isGreaterThan(
+	number: NumberType,
+	other: NumberType,
+): BooleanType {
+	return createBoolean(orderingIs(compareTo(number, other), greater).value)
+}
+
+export function isGreaterThanOrEqualTo(
+	number: NumberType,
+	other: NumberType,
+): BooleanType {
+	return createBoolean(!orderingIs(compareTo(number, other), less).value)
 }
 
 // #endregion
