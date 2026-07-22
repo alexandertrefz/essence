@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
 import { describe, expect, it } from "bun:test"
 
 import { containsErrors } from "../diagnostics/index"
@@ -22,6 +26,34 @@ function generate(source: string): string {
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
 	return rewrite(optimise(simplify(enriched.program)))
+}
+
+// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// its top-level `__print` calls run. The emitted imports are absolute paths
+// into this repo's runtime, so the module resolves from anywhere; `console.log`
+// is captured to collect the output, then restored.
+async function run(source: string): Promise<Array<string>> {
+	let js = generate(source)
+	let directory = mkdtempSync(join(tmpdir(), "essence-e2e-"))
+	let file = join(directory, "program.ts")
+
+	writeFileSync(file, js)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((arg) => String(arg)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+		rmSync(directory, { recursive: true, force: true })
+	}
+
+	return output
 }
 
 // NOTE: The counterpart for cases that are supposed to be rejected — returns
@@ -639,6 +671,26 @@ describe("Code Generation", () => {
 
 			expect(code).toContain("IntegerTag.tag")
 			expect(code).toContain("BooleanTag.tag")
+		})
+	})
+
+	describe("Conditional Conformance", () => {
+		it("runs List's is and toString through bounded generic Functions", async () => {
+			let output = await run(`implementation {
+				function stringify <infer Value is Printable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+
+				function same <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::is(b)
+				}
+
+				__print(stringify([1, 2, 3]))
+				__print(same([1, 2], [1, 2])::toString())
+				__print(same([1, 2], [3, 4])::toString())
+			}`)
+
+			expect(output).toEqual(['"[ 1, 2, 3 ]"', '"true"', '"false"'])
 		})
 	})
 })

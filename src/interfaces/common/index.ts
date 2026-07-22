@@ -154,7 +154,6 @@ export type DiagnosticCode =
 	| "ambiguous-conformance"
 	| "nonconforming-namespace"
 	| "conformance-needs-target-type"
-	| "generic-namespace-conformance"
 	| "protocol-bound-function-value"
 	| "protocol-bound-namespace-generic"
 	// Inference — what the Compiler could not work out on its own.

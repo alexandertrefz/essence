@@ -18443,11 +18443,11 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
             "nodeType": "Identifier",
             "position": {
               "end": {
-                "column": 80,
+                "column": 83,
                 "line": 1,
               },
               "start": {
-                "column": 71,
+                "column": 74,
                 "line": 1,
               },
             },
@@ -18473,7 +18473,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
         "nodeType": "NamespaceDefinitionStatement",
         "position": {
           "end": {
-            "column": 83,
+            "column": 86,
             "line": 1,
           },
           "start": {
@@ -18513,7 +18513,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
     ],
     "position": {
       "end": {
-        "column": 85,
+        "column": 88,
         "line": 1,
       },
       "start": {
@@ -18525,7 +18525,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 85,
+      "column": 88,
       "line": 1,
     },
     "start": {

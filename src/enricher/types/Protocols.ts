@@ -1,3 +1,4 @@
+import { applyGenericBindings, type GenericBindings } from "../../helpers/index"
 import type { common } from "../../interfaces/index"
 import { type as orderingType } from "./Ordering"
 
@@ -80,6 +81,38 @@ export const Printable: common.ProtocolType = {
 		returns: null,
 		position: null,
 	},
+}
+
+// NOTE: A conforming Namespace's copy of a Protocol's Methods, instantiated
+// for its target Type — every `Self` in the Protocol signatures is replaced
+// with `selfType` (`List<ItemType>` for the List Namespace). A builtin that
+// conforms structurally derives its Method entries from here instead of hand
+// writing them, so the signatures can never drift from the Protocol's. Per
+// Method documentation overrides let a Namespace phrase the tooltip in its own
+// terms ("the Lists are equal") while keeping the Protocol's shape.
+export function conformedMethods(
+	protocol: common.ProtocolType,
+	selfType: common.Type,
+	docOverrides: Record<string, common.Documentation> = {},
+): Record<string, common.MethodType> {
+	let selfBindings: GenericBindings = new Map([["Self", selfType]])
+	let methods: Record<string, common.MethodType> = {}
+
+	for (let [name, method] of Object.entries(protocol.methods)) {
+		let instantiated = applyGenericBindings(
+			method,
+			selfBindings,
+		) as common.MethodType
+
+		let override = docOverrides[name]
+
+		methods[name] =
+			override === undefined
+				? instantiated
+				: { ...instantiated, documentation: override }
+	}
+
+	return methods
 }
 
 export const Comparable: common.ProtocolType = {

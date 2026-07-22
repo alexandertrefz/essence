@@ -639,6 +639,35 @@ function resolveProtocolMethodType(
 // Namespace in scope — the exact-target ones win over covering ones, and
 // anything else is a Diagnostic. Failures report and yield no source; the
 // Diagnostic gates codegen, so a missing source never reaches the Rewriter.
+// NOTE: A generic Namespace specialized against the bindings that unified its
+// target Type with a receiver — its target Type and every Method signature are
+// rewritten through those bindings so it reads as a concrete Namespace from the
+// selection point on. Fresh objects throughout: the builtin table singletons
+// must never be mutated.
+function specializeNamespace(
+	namespace: common.NamespaceType,
+	bindings: GenericBindings,
+): common.NamespaceType {
+	let methods: Record<string, common.MethodType> = {}
+
+	for (let [name, method] of Object.entries(namespace.methods)) {
+		methods[name] = applyGenericBindings(
+			method,
+			bindings,
+		) as common.MethodType
+	}
+
+	return {
+		...namespace,
+		targetType:
+			namespace.targetType === null
+				? null
+				: applyGenericBindings(namespace.targetType, bindings),
+		methods,
+		generics: [],
+	}
+}
+
 export function resolveConformances(
 	generics: Array<common.GenericDeclaration>,
 	bindings: GenericBindings,
@@ -706,21 +735,57 @@ export function resolveConformances(
 			continue
 		}
 
-		let candidates: Array<{ name: string; type: common.NamespaceType }> = []
+		let candidates: Array<{
+			name: string
+			type: common.NamespaceType
+			isGeneric: boolean
+		}> = []
 
 		for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
 			if (
 				namespace.conformsTo === undefined ||
 				!namespace.conformsTo.includes(generic.constraint) ||
-				namespace.targetType === null ||
-				namespace.generics.length > 0
+				namespace.targetType === null
 			) {
 				continue
 			}
 
-			if (matchesType(namespace.targetType, binding)) {
-				candidates.push({ name, type: namespace })
+			if (namespace.generics.length === 0) {
+				if (matchesType(namespace.targetType, binding)) {
+					candidates.push({ name, type: namespace, isGeneric: false })
+				}
+
+				continue
 			}
+
+			// NOTE: A generic Namespace (`List<Item>`) conforms to the binding
+			// when its target Type unifies with it — `List<Item>` binds `Item`
+			// to `Integer` against a `List<Integer>` receiver. The Namespace is
+			// then specialized against those bindings, so its target Type and
+			// Method signatures read concretely from here on. The builtin table
+			// singleton is never mutated — `specializeNamespace` builds fresh
+			// objects.
+			let context = createInferenceContext(namespace.generics)
+
+			if (
+				matchesTypeWithBindings(namespace.targetType, binding, context)
+			) {
+				candidates.push({
+					name,
+					type: specializeNamespace(namespace, context.bindings),
+					isGeneric: true,
+				})
+			}
+		}
+
+		// NOTE: A concrete Namespace always beats a generic one's blanket
+		// conformance — a hand-written `for List<Integer> is Equatable` wins
+		// over `List<Item> is Equatable`. This runs before the assignability
+		// filter below: a specialized generic target (`List<Integer>`) is
+		// structurally identical to a concrete one, so without this they would
+		// tie and spuriously read as ambiguous.
+		if (candidates.some((candidate) => !candidate.isGeneric)) {
+			candidates = candidates.filter((candidate) => !candidate.isGeneric)
 		}
 
 		// NOTE: Specificity by assignability — a candidate whose target Type
@@ -805,20 +870,24 @@ export function resolveConformances(
 		)
 
 		if (result.kind !== "conforms") {
-			// NOTE: Reachable when the Namespace covers the binding through a
-			// wider target Type (a Union) but a `Self` position makes the
-			// signatures incompatible for this narrower binding.
+			// NOTE: `needs-condition` is reachable when a generic Namespace's
+			// blanket conformance is fulfilled by a Method carrying its own
+			// Protocol bound — the conformance holds only under a `where` clause
+			// supplying it, which this commit has no syntax for yet. The other
+			// failures are reachable when the Namespace covers the binding
+			// through a wider target Type (a Union) but a `Self` position makes
+			// the signatures incompatible for this narrower binding.
+			let label =
+				result.kind === "needs-condition"
+					? `Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`
+					: `this needs ${describeType(binding)} to conform`
+
 			reportError(
 				`Namespace '${candidate.name}' does not conform to '${generic.constraint}'`,
 				position,
 				{
 					code: "nonconforming-namespace",
-					labels: [
-						primary(
-							position,
-							`this needs ${describeType(binding)} to conform`,
-						),
-					],
+					labels: [primary(position, label)],
 				},
 			)
 
@@ -889,31 +958,27 @@ export function checkProtocolConformance(
 			continue
 		}
 
-		if (namespaceType.generics.length > 0) {
-			reportError(
-				"A generic Namespace can not declare Protocol conformance",
-				identifier.position,
-				{
-					code: "generic-namespace-conformance",
-					labels: [
-						primary(
-							identifier.position,
-							"this conformance is not supported yet",
-						),
-					],
-				},
-			)
-
-			continue
-		}
-
 		let result = computeConformanceMethodMap(
 			protocol,
 			namespaceType,
 			namespaceType.targetType,
 		)
 
-		if (result.kind === "missing") {
+		if (result.kind === "needs-condition") {
+			reportError(
+				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
+				identifier.position,
+				{
+					code: "nonconforming-namespace",
+					labels: [
+						primary(
+							identifier.position,
+							`Method '${result.methodName}' needs '${result.genericName} is ${result.protocolName}'`,
+						),
+					],
+				},
+			)
+		} else if (result.kind === "missing") {
 			reportError(
 				`Namespace '${namespaceType.name}' does not conform to '${protocol.name}'`,
 				identifier.position,
