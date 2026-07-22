@@ -1,5 +1,6 @@
 import type { Fraction } from "bigint-fraction"
 
+import { is as algebraicIs } from "./Algebraic"
 import { is as boolIs } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { is as integerIs } from "./Integer"
@@ -8,6 +9,7 @@ import { is as rationalIs } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
+import { is as transcendentalIs } from "./Transcendental"
 import type { AnyType } from "./type"
 import { typeKeySymbol } from "./type"
 
@@ -55,6 +57,16 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		b[typeKeySymbol] === "Rational"
 	) {
 		return rationalIs(a, b).value
+	} else if (
+		a[typeKeySymbol] === "Algebraic" &&
+		b[typeKeySymbol] === "Algebraic"
+	) {
+		return algebraicIs(a, b).value
+	} else if (
+		a[typeKeySymbol] === "Transcendental" &&
+		b[typeKeySymbol] === "Transcendental"
+	) {
+		return transcendentalIs(a, b).value
 	} else if (
 		a[typeKeySymbol] === "Record" && //
 		b[typeKeySymbol] === "Record"

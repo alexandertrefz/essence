@@ -122,6 +122,11 @@ export function removeFirst__overload$2<ItemType extends AnyType>(
 ): ListType<ItemType> {
 	if (amount.value < 1) {
 		return createList(originalList.value.slice(0))
+	} else if (amount.value >= BigInt(originalList.value.length)) {
+		// NOTE: Dropping at least every item — checked against the bigint
+		// before narrowing, since `getInt32` would wrap an amount this large
+		// into a negative index and slice from the end instead.
+		return createList([])
 	} else {
 		return createList(originalList.value.slice(getInt32(amount)))
 	}
@@ -175,12 +180,32 @@ export function removeEvery__overload$2<ItemType extends AnyType>(
 	return createList(filteredList)
 }
 
-export function removeLast<ItemType extends AnyType>(
+export function removeLast__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListType<ItemType> {
 	return createList(
 		originalList.value.slice(0, originalList.value.length - 1),
 	)
+}
+
+export function removeLast__overload$2<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	amount: IntegerType,
+): ListType<ItemType> {
+	if (amount.value < 1) {
+		return createList(originalList.value.slice(0))
+	} else if (amount.value >= BigInt(originalList.value.length)) {
+		// NOTE: Dropping at least every item — checked against the bigint
+		// before narrowing, since `getInt32` would wrap an amount this large.
+		return createList([])
+	} else {
+		return createList(
+			originalList.value.slice(
+				0,
+				originalList.value.length - getInt32(amount),
+			),
+		)
+	}
 }
 
 export function removeDuplicates<ItemType extends AnyType>(

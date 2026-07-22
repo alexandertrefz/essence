@@ -159,34 +159,6 @@ export const namespace: common.NamespaceType = {
 					],
 					returnType: { type: "Transcendental" },
 				},
-				{
-					generics: [],
-					parameterTypes: [
-						{
-							name: null,
-							type: { type: "Integer" },
-						},
-						{
-							name: null,
-							type: { type: "Algebraic" },
-						},
-					],
-					returnType: { type: "Algebraic" },
-				},
-				{
-					generics: [],
-					parameterTypes: [
-						{
-							name: null,
-							type: { type: "Integer" },
-						},
-						{
-							name: null,
-							type: { type: "Transcendental" },
-						},
-					],
-					returnType: { type: "Transcendental" },
-				},
 			],
 		},
 
