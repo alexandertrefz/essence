@@ -1842,39 +1842,125 @@ export function findProtocolInScope(
 	}
 }
 
+// NOTE: Method resolution asks which Namespaces a Scope can see once per
+// Method invocation, and the answer only changes when a name is declared into
+// one of the Scopes on the chain. Each Scope therefore carries a version that
+// its own declarations bump, and the memoised answer records the versions it
+// was computed from — revalidating costs a walk up the chain comparing
+// numbers, instead of enumerating every member of every Scope.
+let scopeVersions = new WeakMap<enricher.Scope, number>()
+let namespacesInScopeCache = new WeakMap<
+	enricher.Scope,
+	{
+		versions: Array<{ scope: enricher.Scope; version: number }>
+		namespaces: Map<string, common.NamespaceType>
+	}
+>()
+
+// NOTE: Every name ever declared as a Namespace. A declaration only changes
+// what `getAllNamespacesInScope` answers if it declares a Namespace or
+// shadows one — declaring an ordinary Constant leaves every cached answer
+// intact, and Constants are the overwhelming majority of declarations.
+let namespaceNames = new Set<string>()
+
+export function invalidateNamespacesInScope(
+	scope: enricher.Scope,
+	name: string,
+	type: common.Type,
+): void {
+	if (type.type === "Namespace") {
+		namespaceNames.add(name)
+	} else if (!namespaceNames.has(name)) {
+		return
+	}
+
+	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
+}
+
+function namespaceCacheIsCurrent(
+	cached: { versions: Array<{ scope: enricher.Scope; version: number }> },
+	scope: enricher.Scope,
+): boolean {
+	let searchScope: enricher.Scope | null = scope
+	let index = 0
+
+	while (searchScope !== null) {
+		let entry = cached.versions[index]
+
+		if (
+			entry === undefined ||
+			entry.scope !== searchScope ||
+			entry.version !== (scopeVersions.get(searchScope) ?? 0)
+		) {
+			return false
+		}
+
+		searchScope = searchScope.parent
+		index++
+	}
+
+	return index === cached.versions.length
+}
+
 export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
 ): Map<string, common.NamespaceType> {
 	let searchScope: enricher.Scope | null = scope
-	let variableNames: Array<string> = []
 	let namespaces: Map<string, common.NamespaceType> = new Map()
 
-	scopeLoop: while (true) {
-		if (searchScope === null) {
-			break
+	// NOTE: A named lookup only ever wants one Namespace, so it walks the
+	// Scope chain asking for that one name instead of enumerating members.
+	if (identifier) {
+		let name = identifier.content
+
+		while (searchScope !== null) {
+			let value = searchScope.members[name]
+
+			if (value !== undefined && value.type === "Namespace") {
+				namespaces.set(name, value)
+
+				break
+			}
+
+			searchScope = searchScope.parent
 		}
 
-		for (let [key, value] of Object.entries(searchScope.members)) {
-			if (identifier) {
-				if (value.type === "Namespace" && identifier.content === key) {
-					namespaces.set(key, value)
-					break scopeLoop
-				}
-			} else {
-				// NOTE: Since we are resolving bottom up, we need to exclude any shadowed variables
-				if (!variableNames.includes(key)) {
-					variableNames.push(key)
+		return namespaces
+	}
 
-					if (value.type === "Namespace") {
-						namespaces.set(key, value)
-					}
+	let cached = namespacesInScopeCache.get(scope)
+
+	if (cached !== undefined && namespaceCacheIsCurrent(cached, scope)) {
+		return cached.namespaces
+	}
+
+	let variableNames: Set<string> = new Set()
+	let versions: Array<{ scope: enricher.Scope; version: number }> = []
+
+	while (searchScope !== null) {
+		versions.push({
+			scope: searchScope,
+			version: scopeVersions.get(searchScope) ?? 0,
+		})
+
+		for (let key in searchScope.members) {
+			// NOTE: Since we are resolving bottom up, we need to exclude any shadowed variables
+			if (!variableNames.has(key)) {
+				variableNames.add(key)
+
+				let value = searchScope.members[key]!
+
+				if (value.type === "Namespace") {
+					namespaces.set(key, value)
 				}
 			}
 		}
 
 		searchScope = searchScope.parent
 	}
+
+	namespacesInScopeCache.set(scope, { versions, namespaces })
 
 	return namespaces
 }

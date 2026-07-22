@@ -27,6 +27,7 @@ import {
 	reportReservedTypeName,
 	findTypeInScope,
 	combinationTypeOf,
+	invalidateNamespacesInScope,
 	listItemTypeOf,
 	lookupTypeOf,
 	recordValueTypeOf,
@@ -1457,6 +1458,8 @@ function declareVariableInScope(
 	}
 
 	scope.members[variableName] = type
+
+	invalidateNamespacesInScope(scope, variableName, type)
 
 	if (typeof identifier !== "string") {
 		scope.declarations[variableName] = identifier.position
