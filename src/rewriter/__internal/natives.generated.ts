@@ -19,6 +19,7 @@ import type { NumberType } from "./Number"
 import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
+import type { SideType } from "./Side"
 import type { StringType } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
@@ -52,10 +53,8 @@ export type StringNatives = {
 	uppercased: (self: StringType) => StringType
 	// lowercased() -> String
 	lowercased: (self: StringType) => StringType
-	// trimmedAtStart() -> String
-	trimmedAtStart: (self: StringType) => StringType
-	// trimmedAtEnd() -> String
-	trimmedAtEnd: (self: StringType) => StringType
+	// trim(at: Side) -> String
+	trim__overload$2: (self: StringType, at: SideType) => StringType
 	// replaceEvery(_: String, with: String) -> String
 	replaceEvery: (self: StringType, argument1: StringType, argument2: StringType) => StringType
 	// compareTo(_: String) -> Ordering
@@ -272,6 +271,10 @@ export type OrderingNatives = {
 
 }
 
+export type SideNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -329,7 +332,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trimmed" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "repeat" | "reverse" | "slice" | "firstIndex" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "repeat" | "reverse" | "slice" | "firstIndex" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -366,6 +369,10 @@ export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional")
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
 export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "is" | "isNot" | "toString"> = true
+
+declare const SideModule: typeof import("./Side")
+export const $Side: SideNatives = SideModule
+export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "is" | "isNot" | "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

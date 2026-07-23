@@ -18,7 +18,7 @@ implementation {
 	__print(greeting::replaceEvery("o", with "0")) § "Hell0, W0rld"
 	__print(greeting::slice(from 0, to 5)) § "Hello"
 	__print("ab"::repeat(times 3))             § "ababab"
-	__print("  spaced  "::trimmed())       § "spaced"
+	__print("  spaced  "::trim())       § "spaced"
 
 	§ Padding reaches a length, counting characters.
 	__print("7"::paddedAtStart(to 3, with "0"))  § "007"

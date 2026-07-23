@@ -624,6 +624,7 @@ describe("Standard Library Loader", () => {
 			"Nothing",
 			"Optional",
 			"Ordering",
+			"Side",
 			"Record",
 			"List",
 			// NOTE: The one Namespace a List value can reach besides `List`,

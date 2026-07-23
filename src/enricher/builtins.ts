@@ -41,6 +41,7 @@ export const builtinMemberOrder: Array<string> = [
 	"Nothing",
 	"Optional",
 	"Ordering",
+	"Side",
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
@@ -77,6 +78,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Number",
 	"Optional",
 	"Ordering",
+	"Side",
 ]
 
 // NOTE: Accessors rather than consts, because what they answer with is read

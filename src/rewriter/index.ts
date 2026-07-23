@@ -31,6 +31,7 @@ export const runtimeNamespaceNames = [
 	"Nothing",
 	"Optional",
 	"Ordering",
+	"Side",
 	"Record",
 	"List",
 	"NestedList",
@@ -1093,9 +1094,7 @@ function rewriteListValue(
 // member read is unchanged unless the pair is Essence-implemented, which a
 // Record field or a Property never is. A base that is any other Expression
 // (a chained access, a call result) keeps the plain member read.
-function rewriteLookup(
-	node: common.typedSimple.LookupNode,
-): estree.Expression {
+function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 	if (node.base.nodeType === "Identifier") {
 		return namespaceMember(node.base.name, node.member.name)
 	}

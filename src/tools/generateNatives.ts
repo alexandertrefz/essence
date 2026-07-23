@@ -31,6 +31,10 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	LessType: "./Ordering",
 	EqualType: "./Ordering",
 	GreaterType: "./Ordering",
+	SideType: "./Side",
+	StartType: "./Side",
+	EndType: "./Side",
+	BothEndsType: "./Side",
 	RationalType: "./Rational",
 	RecordType: "./Record",
 	StringType: "./String",
@@ -45,16 +49,20 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 // fall through to the structural rendering below.
 const UNION_NAME_ALIASES: Record<string, string> = {
 	Ordering: "OrderingType",
+	Side: "SideType",
 	Number: "NumberType",
 }
 
-// NOTE: The runtime unit types of the builtin `Ordering` Choice — the only
+// NOTE: The runtime unit types of the builtin `Ordering` and `Side` Choices — the only
 // Cases reachable in a signature, and then only inside the `Ordering` Union,
 // which is mapped whole before its Cases are ever visited.
 const CASE_TYPES: Record<string, string> = {
 	"Ordering#Less": "LessType",
 	"Ordering#Equal": "EqualType",
 	"Ordering#Greater": "GreaterType",
+	"Side#Start": "StartType",
+	"Side#End": "EndType",
+	"Side#BothEnds": "BothEndsType",
 }
 
 // NOTE: The mutable state threaded through one render — every runtime type name
@@ -169,7 +177,10 @@ function mapType(
 			}
 
 			let members = entries
-				.map(([name, memberType]) => `${name}: ${mapType(memberType, ctx, where)}`)
+				.map(
+					([name, memberType]) =>
+						`${name}: ${mapType(memberType, ctx, where)}`,
+				)
 				.join("; ")
 
 			return `RecordType & { ${members} }`
@@ -295,7 +306,10 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			}
 
 			return `{ ${entries
-				.map(([name, memberType]) => `${name}: ${describeEssenceType(memberType)}`)
+				.map(
+					([name, memberType]) =>
+						`${name}: ${describeEssenceType(memberType)}`,
+				)
 				.join(", ")} }`
 		}
 		case "UnionType":
@@ -364,11 +378,7 @@ function describeSignature(
 
 // NOTE: One entry of a `*Natives` type — the comment line and the property with
 // its arrow type, both already tab-indented for placement inside the object.
-function nativeEntry(
-	comment: string,
-	key: string,
-	rendered: string,
-): string {
+function nativeEntry(comment: string, key: string, rendered: string): string {
 	return `\t// ${comment}\n\t${key}: ${rendered}`
 }
 
@@ -559,7 +569,9 @@ function renderModuleAssertion(
 	]
 
 	if (forbiddenKeys.length > 0) {
-		let forbidden = forbiddenKeys.map((key) => JSON.stringify(key)).join(" | ")
+		let forbidden = forbiddenKeys
+			.map((key) => JSON.stringify(key))
+			.join(" | ")
 
 		lines.push(
 			`export const $${namespace.name}Absent: AssertNoEssenceExports<${module}, ${forbidden}> = true`,
