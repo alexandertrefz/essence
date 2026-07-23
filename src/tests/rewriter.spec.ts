@@ -499,7 +499,7 @@ describe("Rewriter", () => {
 			// (`src/stdlib/String.es`) and the golden harness covers it —
 			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
 			// `characterAt`, `trimmed`, `startsWith`, `endsWith`, `repeated`,
-			// `reversed`, `slice`, `firstIndexOf`, `paddedAtStart`,
+			// `reverse`, `slice`, `firstIndexOf`, `paddedAtStart`,
 			// `paddedAtEnd` and `toString`, alongside the negations
 			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStartWith`,
 			// `doesNotEndWith`) that moved earlier. What is left below is the
@@ -558,7 +558,7 @@ describe("Rewriter", () => {
 					// This is the ONE place the runtime decides what a
 					// character is — `characters()` IS `splitOn("")` in
 					// Essence, and `length`, `characterAt`, `slice` and
-					// `reversed` are written on top of `characters()`, so
+					// `reverse` are written on top of `characters()`, so
 					// every one of them inherits this behaviour from here.
 					let emoji = string.createString("a\u{1F600}b")
 
@@ -2314,19 +2314,15 @@ describe("Rewriter", () => {
 
 				it("returns false if the lists are not the same length", () => {
 					expect(
-						list.is(
-							listEmpty(),
-							list.createList([integerTwo()]),
-							{ is: integerIs },
-						),
+						list.is(listEmpty(), list.createList([integerTwo()]), {
+							is: integerIs,
+						}),
 					).toEqual(booleanFalse())
 
 					expect(
-						list.is(
-							list.createList([integerTwo()]),
-							listEmpty(),
-							{ is: integerIs },
-						),
+						list.is(list.createList([integerTwo()]), listEmpty(), {
+							is: integerIs,
+						}),
 					).toEqual(booleanFalse())
 
 					expect(
@@ -2384,7 +2380,7 @@ describe("Rewriter", () => {
 			// forms) / removeAt / removeEvery (both forms) / removeLast (both forms)
 			// / removeDuplicates / prepend (both forms) / append(_:) / contains /
 			// anyItem / everyItem / countOf (both forms) / insertAt / replaceAt /
-			// partitioned / sorted / repeating are implemented in Essence now
+			// partition / sorted / repeating are implemented in Essence now
 			// (src/stdlib/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.
@@ -2595,7 +2591,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("reversed", () => {
+			describe("reverse", () => {
 				it("reverses without mutating the original", () => {
 					const original = list.createList([
 						integerOne(),
@@ -2603,7 +2599,7 @@ describe("Rewriter", () => {
 						integerHundred(),
 					])
 
-					expect(list.reversed(original)).toEqual(
+					expect(list.reverse(original)).toEqual(
 						list.createList([
 							integerHundred(),
 							integerTwo(),

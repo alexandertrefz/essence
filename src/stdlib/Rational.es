@@ -42,19 +42,19 @@ declarations {
 		§§ Subtracts a number from this Rational, staying exact for every member of the numeric tower.
 		overload subtract {
 			(_ other: Rational) -> Rational {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Integer) -> Rational {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Algebraic) -> Algebraic {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Transcendental) -> Transcendental {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 		}
 
@@ -125,13 +125,13 @@ declarations {
 
 		§§ The Rational without its sign — its distance from zero.
 		absolute() -> Rational {
-			if @::isLessThan(0/1) { <- @::negated() }
+			if @::isLessThan(0/1) { <- @::negate() }
 			<- @
 		}
 
 		§§ The Rational with its sign flipped.
-		negated() -> Rational {
-			<- Rational.of(@::numerator()::negated(), over @::denominator())::otherwise(@)
+		negate() -> Rational {
+			<- Rational.of(@::numerator()::negate(), over @::denominator())::otherwise(@)
 		}
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.
@@ -147,11 +147,11 @@ declarations {
 		}
 
 		§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
-		rounded() -> Integer
+		round() -> Integer
 
 		§§ The greatest Integer at or below the Rational — the floor.
-		roundedDown() -> Integer {
-			constant truncatedValue = @::truncated()
+		roundDown() -> Integer {
+			constant truncatedValue = @::truncate()
 			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
 				<- truncatedValue::subtract(1)
 			}
@@ -159,8 +159,8 @@ declarations {
 		}
 
 		§§ The lowest Integer at or above the Rational — the ceiling.
-		roundedUp() -> Integer {
-			constant truncatedValue = @::truncated()
+		roundUp() -> Integer {
+			constant truncatedValue = @::truncate()
 			if @::isGreaterThan(0/1)::and(@::isWholeNumber()::negate()) {
 				<- truncatedValue::add(1)
 			}
@@ -168,7 +168,7 @@ declarations {
 		}
 
 		§§ The Integer part of the Rational — the fractional part cut off, rounding towards zero.
-		truncated() -> Integer
+		truncate() -> Integer
 
 		§§ Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.
 		§§

@@ -14,7 +14,7 @@ declarations {
 	§ with a narrower receiver — the Method stays here, on the Namespace that
 	§ targets every List, and the bound is what a use site has to satisfy. One
 	§ Method can not be written that way and is NOT here: `NestedList` below
-	§ holds `flattened`, because no bound can say "the items are themselves
+	§ holds `flatten`, because no bound can say "the items are themselves
 	§ Lists" and still name the inner item Type.
 	§
 	§ The Equatable and Comparable conformances are BOTH conditional — a List is
@@ -306,8 +306,8 @@ declarations {
 
 		§§ A new List with the items in the opposite order.
 		§§
-		§§ @returns the reversed List.
-		reversed() -> List<ItemType>
+		§§ @returns the reverse List.
+		reverse() -> List<ItemType>
 
 		§ The `Comparable` bound works exactly as the `Equatable` one above
 		§ does. It resolves the conforming Namespace at the call site —
@@ -439,7 +439,7 @@ declarations {
 		§§ @returns the joined String, or the empty String for the empty List.
 		joinWith<infer ItemType is Printable>(_ separator: String) -> String
 
-		§ `flattened` would read naturally here too, and it is not here: it is
+		§ `flatten` would read naturally here too, and it is not here: it is
 		§ not available on every List, and every Method of this Namespace is.
 		§ It is declared in `NestedList` below, which says what its receiver has
 		§ to be.
@@ -447,7 +447,7 @@ declarations {
 		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
 		§§
 		§§ @returns a Record with the accepted items under `matching` and the others under `rest`.
-		partitioned(where check: (_: ItemType) -> Boolean) -> { matching: List<ItemType>, rest: List<ItemType> } {
+		partition(where check: (_: ItemType) -> Boolean) -> { matching: List<ItemType>, rest: List<ItemType> } {
 			§ Two passes where the native made one, each keeping the original
 			§ order — which is what the halves are specified to do.
 			<- {
@@ -498,28 +498,28 @@ declarations {
 	§ A List of Lists, and the one Method that only such a List can answer. It
 	§ is a Namespace of its own because a Namespace targets ONE Type and every
 	§ Method in it answers for that Type: `List` targets `List<ItemType>` —
-	§ every List there is — and `flattened` is not available on every List. A
+	§ every List there is — and `flatten` is not available on every List. A
 	§ Namespace targeting `List<List<ItemType>>` says exactly that, and says it
 	§ in the one place the compiler already looks.
 	§
 	§ A bound could not have kept it on `List`, the way `joinWith`'s does: the
 	§ depth is the point. `ItemType` here binds to the INNER List's item Type,
-	§ so `[[1, 2], [3]]::flattened()` is a `List<Integer>` rather than a
+	§ so `[[1, 2], [3]]::flatten()` is a `List<Integer>` rather than a
 	§ `List<List<Integer>>`. Written as a Method of `List` it could only ever
 	§ have named the OUTER item Type, which is the List it is removing, and no
 	§ Protocol bound can name a Type that is not in the signature.
 	§
-	§ `[1, 2]::flattened()` matches no Namespace holding `flattened` and is
+	§ `[1, 2]::flatten()` matches no Namespace holding `flatten` and is
 	§ refused, which is the whole of what "flattening needs something to
 	§ flatten" means.
 	§
 	§ The name reads as what the receiver IS — a Nested List — and it is
-	§ visible: it is what a Hover names, what `::<NestedList>flattened()`
+	§ visible: it is what a Hover names, what `::<NestedList>flatten()`
 	§ disambiguates with, and what a "searched Namespaces" Diagnostic lists.
 	namespace NestedList<infer ItemType> for List<List<ItemType>> {
 		§§ Flattens a List of Lists by one level — every inner List's items, in order, in a single List.
 		§§
-		§§ @returns the flattened List.
-		flattened() -> List<ItemType>
+		§§ @returns the flatten List.
+		flatten() -> List<ItemType>
 	}
 }

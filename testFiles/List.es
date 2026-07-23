@@ -51,7 +51,7 @@ implementation {
 	__print(numbers::doesNotContain(9))      § true
 
 	§ Structural edits, each returning a new List.
-	__print(numbers::reversed())             § [4, 1, 2, 1, 3]
+	__print(numbers::reverse())             § [4, 1, 2, 1, 3]
 	__print(numbers::removeAt(2))            § [3, 1, 1, 4]
 	__print(numbers::insertAt(2, with 99))   § [3, 1, 99, 2, 1, 4]
 	__print(numbers::replaceAt(0, with 99))  § [99, 1, 2, 1, 4]

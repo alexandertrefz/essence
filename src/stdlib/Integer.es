@@ -47,19 +47,19 @@ declarations {
 		§§ Subtracts a number from this Integer, staying exact for every member of the numeric tower.
 		overload subtract {
 			(_ other: Integer) -> Integer {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Rational) -> Rational {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Algebraic) -> Algebraic {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Transcendental) -> Transcendental {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 		}
 
@@ -132,12 +132,12 @@ declarations {
 
 		§§ The Integer without its sign — its distance from zero.
 		absolute() -> Integer {
-			if @::isNegative() { <- @::negated() }
+			if @::isNegative() { <- @::negate() }
 			<- @
 		}
 
 		§§ The Integer with its sign flipped.
-		negated() -> Integer
+		negate() -> Integer
 
 		§§ Whether the Integer is divisible by two. Zero is even.
 		isEven() -> Boolean {

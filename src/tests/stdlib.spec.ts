@@ -85,8 +85,8 @@ describe("Stdlib", () => {
 			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
 			// isNegative/isZero) and clampedBetween are implemented in Essence
 			// now (src/stdlib/Integer.es); the golden harness covers them. Only
-			// negated stays native here.
-			expect(integer.negated(int(5n))).toEqual(int(-5n))
+			// negate stays native here.
+			expect(integer.negate(int(5n))).toEqual(int(-5n))
 		})
 
 		it("parses exactly the shape toString produces", () => {
@@ -107,7 +107,7 @@ describe("Stdlib", () => {
 			expect(rational.denominator(rat(3n, -4n))).toEqual(int(4n))
 		})
 
-		// NOTE: `absolute`, `negated`, `reciprocal` and `isWholeNumber` used to
+		// NOTE: `absolute`, `negate`, `reciprocal` and `isWholeNumber` used to
 		// be tested here against the runtime functions directly. They are
 		// written in Essence now — `src/stdlib/Rational.es` — so there is no
 		// runtime function left to call, and the golden harness
@@ -116,13 +116,13 @@ describe("Stdlib", () => {
 		// everyday Methods above.
 
 		it("rounds to the nearest and towards zero", () => {
-			// NOTE: `roundedDown` and `roundedUp` are written in Essence now;
-			// only `rounded` and `truncated` are still natives to call here.
-			expect(rational.rounded(rat(7n, 2n))).toEqual(int(4n))
-			expect(rational.rounded(rat(-7n, 2n))).toEqual(int(-4n))
-			expect(rational.rounded(rat(1n, 3n))).toEqual(int(0n))
-			expect(rational.truncated(rat(7n, 2n))).toEqual(int(3n))
-			expect(rational.truncated(rat(-7n, 2n))).toEqual(int(-3n))
+			// NOTE: `roundDown` and `roundUp` are written in Essence now;
+			// only `round` and `truncate` are still natives to call here.
+			expect(rational.round(rat(7n, 2n))).toEqual(int(4n))
+			expect(rational.round(rat(-7n, 2n))).toEqual(int(-4n))
+			expect(rational.round(rat(1n, 3n))).toEqual(int(0n))
+			expect(rational.truncate(rat(7n, 2n))).toEqual(int(3n))
+			expect(rational.truncate(rat(-7n, 2n))).toEqual(int(-3n))
 		})
 
 		it("raises to a power, exactly in both directions", () => {
@@ -144,9 +144,9 @@ describe("Stdlib", () => {
 		})
 
 		it("parses fractions, decimals and whole numbers", () => {
-			expect(ratIs(rational.parse(str("3/4")) as never, rat(3n, 4n))).toBe(
-				true,
-			)
+			expect(
+				ratIs(rational.parse(str("3/4")) as never, rat(3n, 4n)),
+			).toBe(true)
 			expect(
 				ratIs(rational.parse(str("-3/4")) as never, rat(-3n, 4n)),
 			).toBe(true)
@@ -166,7 +166,7 @@ describe("Stdlib", () => {
 
 	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
 	// (src/stdlib/Algebraic.es) and Transcendental
-	// (src/stdlib/Transcendental.es), so only `negated` is still native here.
+	// (src/stdlib/Transcendental.es), so only `negate` is still native here.
 	// Their behaviour is covered through the language by
 	// testFiles/Irrational.es and the golden output.
 	describe("Irrational sign Methods", () => {
@@ -177,16 +177,16 @@ describe("Stdlib", () => {
 				2n,
 			) as algebraic.AlgebraicType
 
-			const negatedRoot = algebraic.negated(rootTwo)
+			const negatedRoot = algebraic.negate(rootTwo)
 			expect(negatedRoot.radicalCoefficientNumerator).toBe(-1n)
-			expect(algebraic.negated(negatedRoot)).toEqual(rootTwo)
+			expect(algebraic.negate(negatedRoot)).toEqual(rootTwo)
 		})
 
 		it("negates a Transcendental", () => {
-			const negatedPi = transcendental.negated(number.PI)
+			const negatedPi = transcendental.negate(number.PI)
 
 			expect(negatedPi.piCoefficientNumerator).toBe(-1n)
-			expect(transcendental.negated(negatedPi)).toEqual(number.PI)
+			expect(transcendental.negate(negatedPi)).toEqual(number.PI)
 		})
 	})
 
@@ -297,9 +297,7 @@ describe("Stdlib", () => {
 	describe("List restructuring", () => {
 		it("flattens one level", () => {
 			expect(
-				list.flattened(
-					list.createList([ints(1n, 2n), ints(), ints(3n)]),
-				),
+				list.flatten(list.createList([ints(1n, 2n), ints(), ints(3n)])),
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
@@ -355,7 +353,7 @@ describe("Stdlib", () => {
 			).toEqual(bool(false))
 		})
 
-		// NOTE: `List.partitioned` is implemented in Essence now
+		// NOTE: `List.partition` is implemented in Essence now
 		// (`src/stdlib/List.es`), as `keepEvery` beside `removeEvery(where:)`
 		// — the golden harness covers both halves and the empty List, so the
 		// runtime-direct test that lived here is retired.

@@ -13,6 +13,8 @@ import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import type { TranscendentalType } from "./Transcendental"
@@ -20,8 +22,6 @@ import {
 	add as transcendentalAdd,
 	multiplyWith as transcendentalMultiplyWith,
 } from "./Transcendental"
-import type { OrderingType } from "./Ordering"
-import { equal, greater, less } from "./Ordering"
 import { typeKeySymbol } from "./type"
 
 export type RationalType = { [typeKeySymbol]: "Rational"; rational: Fraction }
@@ -257,7 +257,7 @@ export function denominator(rational: RationalType): IntegerType {
 	}
 }
 
-export function rounded(rational: RationalType): IntegerType {
+export function round(rational: RationalType): IntegerType {
 	let parts = reducedParts(rational)
 	let truncatedQuotient = parts.numerator / parts.denominator
 	let remainder = parts.numerator % parts.denominator
@@ -271,7 +271,7 @@ export function rounded(rational: RationalType): IntegerType {
 	return { [typeKeySymbol]: "Integer", value: truncatedQuotient }
 }
 
-export function truncated(rational: RationalType): IntegerType {
+export function truncate(rational: RationalType): IntegerType {
 	let parts = reducedParts(rational)
 
 	return {

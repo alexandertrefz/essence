@@ -158,7 +158,7 @@ export function slice<ItemType extends AnyType>(
 	return createList(originalList.value.slice(Number(start), Number(end)))
 }
 
-export function reversed<ItemType extends AnyType>(
+export function reverse<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): ListType<ItemType> {
 	return createList(originalList.value.slice(0).reverse())
@@ -260,7 +260,7 @@ export function joinWith<ItemType extends AnyType>(
 	)
 }
 
-export function flattened<ItemType extends AnyType>(
+export function flatten<ItemType extends AnyType>(
 	originalList: ListType<ListType<ItemType>>,
 ): ListType<ItemType> {
 	return createList(

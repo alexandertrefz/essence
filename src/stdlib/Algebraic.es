@@ -42,15 +42,15 @@ declarations {
 		§§ Subtracts a number from this Algebraic, exactly. Subtracting an equal radical part leaves a Rational.
 		overload subtract {
 			(_ other: Integer) -> Algebraic {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Rational) -> Algebraic {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Algebraic) -> Optional<Rational | Algebraic> {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 		}
 
@@ -75,12 +75,12 @@ declarations {
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
 		absolute() -> Algebraic {
-			if @::<Number>isLessThan(0) { <- @::negated() }
+			if @::<Number>isLessThan(0) { <- @::negate() }
 			<- @
 		}
 
 		§§ The Algebraic with its sign flipped. Negating an irrational leaves it irrational, so the result is again an Algebraic.
-		negated() -> Algebraic
+		negate() -> Algebraic
 
 		§§ The exact symbolic form — `√2`, `3·√2` or `1 + √2`.
 		toString() -> String

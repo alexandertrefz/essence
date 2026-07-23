@@ -179,8 +179,8 @@ declarations {
 		}
 
 		§§ The String with its characters in the opposite order.
-		reversed() -> String {
-			<- @::characters()::reversed()::joinWith("")
+		reverse() -> String {
+			<- @::characters()::reverse()::joinWith("")
 		}
 
 		§§ The characters from one position up to, but not including, another.
