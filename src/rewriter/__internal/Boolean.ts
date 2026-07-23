@@ -19,13 +19,6 @@ export function is(
 	return createBoolean(originalBoolean.value === other.value)
 }
 
-export function isNot(
-	originalBoolean: BooleanType,
-	other: BooleanType,
-): BooleanType {
-	return createBoolean(originalBoolean.value !== other.value)
-}
-
 export function and(
 	originalBoolean: BooleanType,
 	other: BooleanType,

@@ -15,7 +15,9 @@ declarations {
 		§§
 		§§ @param other the Boolean to compare against
 		§§ @returns `true` when the two differ.
-		isNot(_ other: Boolean) -> Boolean
+		isNot(_ other: Boolean) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Logical conjunction — `true` only when this Boolean and the given one are both `true`.
 		§§

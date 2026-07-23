@@ -19,6 +19,31 @@ flight — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering` and
 `Record` have moved, the rest have not. Whatever a file here declares is
 subtracted from those tables, so a Namespace moves over one at a time.
 
+A Namespace may be half native and half Essence — `Boolean.isNot` is written
+here, the rest of `Boolean` is still bound to `src/rewriter/__internal/Boolean.ts`
+— and emitted user code can not tell the two apart. `src/rewriter/stdlibPrelude.ts`
+is what makes that true: it simplifies the enriched sources once per process, and
+the Rewriter imports every merged Namespace's runtime module as `$native_<Name>`
+and emits
+
+```js
+const Boolean = { ...$native_Boolean, isNot: function (_self, other) { … } };
+```
+
+so `Boolean.isNot(…)`, a conformance witness's `isNot: Boolean.isNot`, and a
+Union dispatch target all resolve against one object. The Essence half wins where
+the two collide, and `src/tests/builtins.spec.ts` fails on a Method that is
+implemented in BOTH — delete the TypeScript in the same commit that writes the
+Essence.
+
+The spread keeps every export of the runtime module alive, so a const is emitted
+only into Programs that actually name the Namespace, transitively. Two things
+follow for whoever converts the next one: a **bodied static Property is refused**
+— `static PI: Transcendental = …` would be initialised inside the const before
+the const exists, so declare it without a value until the Rewriter emits
+Properties as assignments — and adding a Method that calls into a second merged
+Namespace is fine, the reachability search follows it.
+
 A Type and the Namespace that targets it move TOGETHER: the subtraction is per
 category, so converting `choice Ordering` alone would leave the legacy
 `Ordering` Namespace pointing at the old Type object and say nothing about it.
