@@ -333,15 +333,29 @@ export function reachableEssenceMethods(
 	return reachable
 }
 
-// NOTE: The Essence Methods a typed Method body calls, restricted to the ones a
-// given prelude implements. Reads the same three invocation spellings the
-// Simplifier produces — an instance `MethodInvocation`, a Union
-// `UnionMethodInvocation`, and a static call, which is a `FunctionInvocation`
-// off a Namespace `Lookup`. Over-collecting is safe here as everywhere in the
-// reachability search: an edge to a Method the prelude does not implement is
-// filtered out by `implemented`, and one to a Method it does only emits a const
-// that is read, never one that is missing.
-function essenceMethodReferences(
+// NOTE: The Essence Methods a typed Method body reaches, restricted to the ones
+// a given prelude implements. This MUST recognise every shape `namespaceMember`
+// turns into a bare `$es_…` Identifier, because those are the four emission
+// sites the seed's `referencedNames` will find in the finished tree — if the two
+// disagree, a Method reached only through a shape missing here is named in the
+// emitted body but its const is never pulled in, a `ReferenceError` at run time
+// that compiles green. The shapes, one per `namespaceMember` call site:
+//
+//   MethodInvocation        `@::m(…)`            — base.name, member.name
+//   UnionMethodInvocation    a Union receiver    — each case's namespaceName +
+//                            methodName (the case's conformance Arguments are
+//                            ConformanceValues, reached by the recursion below)
+//   Lookup (Identifier base) a static call OR a bare static reference —
+//                            base.name, member.name
+//   ConformanceValue         a witness `{ m: X.m }` — namespaceName + each
+//                            methodMap value; a conditional one nests more
+//                            ConformanceValues in `conditions`, reached below
+//
+// Over-collecting stays safe, as everywhere in the search: a pair the prelude
+// does not implement is filtered by `implemented` (so a Record field or a
+// static Property read falls out), and one it does only emits a const that is
+// read. Exported for a unit test that feeds it each shape directly.
+export function essenceMethodReferences(
 	root: unknown,
 	implemented: Set<string>,
 ): Set<string> {
@@ -383,18 +397,25 @@ function essenceMethodReferences(
 			>) ?? []) {
 				consider(dispatch["namespaceName"], dispatch["methodName"])
 			}
-		} else if (record["nodeType"] === "FunctionInvocation") {
-			let callee = record["name"] as Record<string, unknown> | undefined
+		} else if (record["nodeType"] === "Lookup") {
+			// NOTE: A `Lookup` off a Namespace Identifier is a static-Method
+			// reference — as a call's callee or a bare value both — and is the
+			// only spelling `rewriteLookup` sends through `namespaceMember`. A
+			// `Lookup` off any other base (a Record field) is filtered by
+			// `implemented`.
+			let base = record["base"] as Record<string, unknown> | undefined
+			let member = record["member"] as Record<string, unknown> | undefined
 
-			if (callee?.["nodeType"] === "Lookup") {
-				let base = callee["base"] as Record<string, unknown> | undefined
-				let member = callee["member"] as
-					| Record<string, unknown>
-					| undefined
+			if (base?.["nodeType"] === "Identifier") {
+				consider(base["name"], member?.["name"])
+			}
+		} else if (record["nodeType"] === "ConformanceValue") {
+			let methodMap = record["methodMap"] as
+				| Record<string, unknown>
+				| undefined
 
-				if (base?.["nodeType"] === "Identifier") {
-					consider(base["name"], member?.["name"])
-				}
+			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
+				consider(record["namespaceName"], namespaceMethodName)
 			}
 		}
 
