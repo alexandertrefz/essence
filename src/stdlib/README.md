@@ -15,6 +15,27 @@ the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
 live in `src/enricher/primitives.ts`, and `__print`, the one native Function
 with no Namespace to live in, in `src/enricher/types/NativeFunctions.ts`.
 
+About half of the declared Method entries are also IMPLEMENTED here, in
+Essence; the rest bind to `src/rewriter/__internal/`. What stays native is a
+deliberate line, not a backlog: the primitives everything else is composed from
+(`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
+`compareTo`), the JavaScript intrinsics Essence has no expression for
+(`String.uppercased`, the trim Methods, `Record`'s reflective Methods,
+`String.compareTo` — there is no way to name a character's code point), and the
+iteration primitives the rest rest on (`List.reduce`, `itemAt`, `slice`,
+`keepEvery`, `append(contentsOf:)`, `static of`, `String.splitOn`).
+
+Two Methods are native for reasons worth reading before assuming otherwise:
+`String.replaceEvery`, because on the EMPTY part `replaceAll` inserts at UTF-16
+code-unit boundaries — between the two surrogate halves of an emoji — a
+position Essence cannot name; and `List.is`, because the pairwise form trips an
+infinite recursion in generic inference (the repro is at the declaration).
+
+**`src/tests/stdlibGolden.spec.ts` is the net.** `testFiles/StdlibExhaustive.es`
+calls every declared Method across its edge cases and its output is diffed
+against a checked-in capture. Never regenerate that capture to make a test
+pass — a changed value means a body is wrong.
+
 ## `declarations { … }`
 
 Each file opens with `declarations { … }` rather than `implementation { … }`.
@@ -58,37 +79,55 @@ inside `src/stdlib` works normally.
 
 ## Native and Essence in one Namespace
 
-A Namespace may be half native and half Essence — `Boolean.isNot` and
-`Number.isBetween` are written here, the rest of both is bound to
-`src/rewriter/__internal/` — and emitted user code can not tell the two apart.
-`src/rewriter/stdlibPrelude.ts` is what makes that true: it simplifies the
-enriched sources once per process, and the Rewriter imports every merged
-Namespace's runtime module as `$native_<Name>` and emits
+Every Namespace here is half native and half Essence — about half of all
+declared Method entries are written in Essence — and emitted user code can not
+tell the two apart. `src/rewriter/stdlibPrelude.ts` simplifies the enriched
+sources once per process, and the Rewriter emits each Essence-implemented
+Method as its OWN top-level const:
 
 ```js
-const Boolean = { ...$native_Boolean, isNot: function (_self, other) { … } };
+import * as Boolean from "…/__internal/Boolean.ts";
+
+const $es_Boolean_isNot = function (_self, other) { … };
 ```
 
-so `Boolean.isNot(…)`, a conformance witness's `isNot: Boolean.isNot`, and a
-Union dispatch target all resolve against one object. The Essence half wins
-where the two collide, and `src/tests/builtins.spec.ts` fails on a Method that
-is implemented in BOTH — delete the TypeScript in the same commit that writes
-the Essence.
+A native stays a member read off the plain import (`Boolean.negate(…)`), which
+esbuild rewrites to a direct symbol reference and can tree-shake; an
+Essence-implemented Method is not a member of anything, so nothing has to
+materialise the module namespace object. `namespaceMember` in
+`src/rewriter/index.ts` picks the spelling, and all four emission sites — a
+plain call, a conformance witness, a Union dispatch target, a static Lookup —
+go through it, so every one works for both kinds.
 
-The spread keeps every export of the runtime module alive, so a const is
-emitted only into Programs that actually name the Namespace, transitively. Two
-things follow for whoever writes the next Essence-bodied Method: a **bodied
-static Property is refused** — `static PI: Transcendental = …` would be
-initialised inside the const before the const exists, so declare it without a
-value until the Rewriter emits Properties as assignments — and calling into a
-second merged Namespace is fine, the reachability search follows it.
+`src/tests/builtins.spec.ts` and the generated contract both fail on a Method
+implemented in BOTH — delete the TypeScript in the same commit that writes the
+Essence.
 
-`Number` is where both of those stopped being hypothetical. Its `PI` and `TAU`
-are value-less native static Properties, so they arrive through the spread like
-any other native and never reach the refusal; and `isBetween`'s body ends in
-`::and(…)`, so a Program that reaches `Number` pulls `Boolean` in behind it and
-gets both consts. A Program that names `Number` at all — `Number.PI` is
-enough — gets the const, because the const is what carries the natives too.
+A const is emitted only into Programs that reach it. The reachability search
+reads each Method's TYPED body, so it follows a Method reached only through
+another Essence Method's body, including through a conformance witness. A
+**bodied static Property is still refused** — its initialiser would run in
+declaration order, and ordering two Properties that name each other is not
+answered yet; declare it without a value, as `Number.PI` and `TAU` are.
+
+### What to weigh before writing the next one
+
+Composition is not free, and two costs are easy to miss because no test fails:
+
+- **A body pulls in everything it transitively reaches.** `Integer.compareTo`
+  once delegated to the covering `Number.compareTo`; that made comparing two
+  Integers drag the Algebraic, Transcendental and Rational machinery — and
+  `bigint-fraction` — into any Program that compared two Integers, nearly
+  doubling `HelloWorld.es`. Same-kind ordering is native again for that reason.
+- **A body can change complexity class.** `String.length` written as
+  `@::characters()::length()` is correct, but builds a List of every character
+  to count them, and pulls `List`'s whole import graph in behind it. It is
+  native again too. `List.anyItem`/`everyItem`/`firstItem(where:)` ARE written
+  on `keepEvery`, which has no early exit, so they lost short-circuiting —
+  measured at ~0 ms to ~180 ms over 2000 calls when the first item decides it.
+
+Prefer a body that reaches only its own Namespace's primitives. `src/tests/bundleSize.spec.ts`
+guards two files, but it is a floor, not a substitute for measuring.
 
 ## Editing hazards
 
@@ -140,12 +179,49 @@ A new Namespace is a new runtime module. The Simplifier emits
 3. a place in `builtinMemberOrder` (`src/enricher/builtins.ts`), and
 4. a row in `builtins.spec.ts`'s `runtimeModules`.
 
-A Namespace declared here but missing any of those either fails
-`builtins.spec.ts` or emits a call to `undefined`.
+`builtins.spec.ts` cross-checks the first, third and fourth against each other
+and against the Namespaces declared here, so a missing registration is a failing
+test rather than a call to `undefined`.
 
-## `List::joinWith`
+## The native contract
 
-Worth knowing because the signature is deliberately wider than a reader might
-expect: joining asks nothing of the items but that each can say what it is, so
-it is `joinWith<infer ItemType is Printable>(_ separator: String) -> String`
-and `[1, 2, 3]::joinWith(", ")` is `"1, 2, 3"`, not a type error.
+`src/rewriter/__internal/natives.generated.ts` is generated from these
+declarations by `bun run generate:natives` and checked in. It spells the calling
+convention every native binding must keep as TypeScript, so `tsc` rejects a
+native whose signature has drifted:
+
+- non-static Method → `fn(receiver, …declaredParameters, …conformanceWitnesses)`
+- static Method → `fn(…declaredParameters, …conformanceWitnesses)`
+- a bounded Method Generic adds a trailing `<Name>__conformance` object of the
+  bound Protocol's Methods
+- an Overload binds to `name__overload$N`, N its position in the Method Type's
+  overloads — **never** its position among the bodied ones
+
+A missing native, a wrong receiver, a wrong arity, a wrong parameter or return
+Type, a misplaced witness, and a runtime export left behind for a Method that
+moved to Essence are all compile errors. `src/tests/natives.spec.ts` fails, without
+ever writing, when the checked-in file drifts from the renderer — regenerate and
+commit it in the same change as the signature. It is in both `.oxlintrc.json` and
+`.oxfmtrc.json` `ignorePatterns`, like the generated parser grammar.
+
+One gap remains: a native that accepts FEWER parameters than declared is not
+caught, because TypeScript treats a shorter function as assignable.
+
+## `List`'s bounded Methods
+
+Three of `List`'s Method Generics carry a Protocol bound, and each bound is a
+statement about what the Method needs rather than a restriction to work around.
+
+`joinWith<infer ItemType is Printable>(_ separator: String) -> String` is
+deliberately wider than a reader might expect: joining asks nothing of the items
+but that each can say what it is, so `[1, 2, 3]::joinWith(", ")` is `"1, 2, 3"`,
+not a type error. `sorted<infer ItemType is Comparable>()` is the same shape for
+ordering.
+
+`is`, `isNot`, `contains`, `doesNotContain`, `firstIndexOf`, `lastIndexOf`,
+`countOf(_ item:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
+`is Equatable`, so equality between items means the item Type's OWN `is` rather
+than a structural comparison the language cannot express. That is a narrowing:
+a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the
+Diagnostic says which bound to add. `List` conforms
+`is Equatable where ItemType is Equatable`, so nested Lists still have a witness.
