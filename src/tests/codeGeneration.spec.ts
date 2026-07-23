@@ -3,13 +3,20 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { describe, expect, it } from "bun:test"
+import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import {
+	loadStdlib,
+	loadStdlibFrom,
+	parseStdlibSource,
+} from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
-import { rewrite } from "../rewriter/index"
+import { reachableMergedNamespaces, rewrite } from "../rewriter/index"
+import { buildStdlibPrelude, stdlibPrelude } from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
@@ -776,6 +783,316 @@ describe("Code Generation", () => {
 			}`)
 
 			expect(output).toEqual(['"[ 1, 2, 3 ]"', '"true"', '"false"'])
+		})
+	})
+
+	// NOTE: A standard library Namespace may be half native and half Essence.
+	// The prelude is what hides that from everything downstream: the runtime
+	// module is imported under `$native_<Name>` and spread into a const that
+	// carries the Namespace's own name, with the Essence-implemented Methods on
+	// top. `Boolean.isNot` is the first Method to have made the trip.
+	describe("Standard Library Prelude", () => {
+		it("merges the Essence-implemented Methods over the runtime module", () => {
+			const code = generate(`implementation {
+				__print(true)
+			}`)
+
+			expect(code).toContain('import * as $native_Boolean from "')
+			expect(code).not.toContain('import * as Boolean from "')
+			expect(code).toContain("const Boolean = {\n\t...$native_Boolean,")
+			expect(code).toContain("isNot: function (_self, other) {")
+
+			// NOTE: Every other Namespace is still wholly native, so it keeps
+			// the plain import and gains no const.
+			expect(code).toContain('import * as String from "')
+			expect(code).not.toContain("const String = {")
+		})
+
+		// NOTE: The const's Method bodies name other Namespaces — `isNot` calls
+		// `Boolean.is` and `Boolean.negate`, both of which arrive through the
+		// spread of the const being defined. That is only safe because the
+		// lookup happens when the Method is CALLED.
+		it("emits a body that reads back through the merged const", () => {
+			const code = generate(`implementation {
+				__print(true)
+			}`)
+
+			expect(code).toContain(
+				"return Boolean.negate(Boolean.is(_self, other));",
+			)
+		})
+
+		// NOTE: The const spreads the runtime module, which keeps every export
+		// that module has alive through the Bundler. A Program that never names
+		// the Namespace must therefore not get one — before this was gated, a
+		// file of nothing but comments compiled to a twelve kilobyte bundle.
+		it("emits no const for a Namespace the Program never names", () => {
+			const code = generate(`implementation {
+				__print("hello")
+			}`)
+
+			expect(code).not.toContain("const Boolean = {")
+			expect(code).not.toContain("$native_Boolean")
+			// NOTE: Left exactly as it was before the prelude existed — an
+			// unreferenced plain import the Bundler shakes away.
+			expect(code).toContain('import * as Boolean from "')
+		})
+
+		// NOTE: The gate runs over the FINISHED tree, after generation, which is
+		// the only place a conformance witness, a `dispatchMethod` target and a
+		// plain call all look alike — they are `Identifier` nodes. A survey of
+		// the source would have to know every one of those shapes.
+		it("finds a Namespace named only through a conformance witness", () => {
+			const code = generate(`implementation {
+				function differ <infer Value is Equatable>(_ a: Value, _ b: Value) -> String {
+					<- a::isNot(b)::toString()
+				}
+
+				constant yes = true
+
+				__print(differ(yes, yes))
+			}`)
+
+			expect(code).toContain("isNot: Boolean.isNot")
+			expect(code).toContain("const Boolean = {")
+		})
+
+		// NOTE: A dotted member name is text, not a reference — a Record with a
+		// member spelled like a merged Namespace must not drag the whole thing
+		// in.
+		it("does not mistake a member name for a reference", () => {
+			const code = generate(`implementation {
+				constant record = { Boolean = "not the Namespace" }
+
+				__print(record.Boolean)
+			}`)
+
+			expect(code).not.toContain("const Boolean = {")
+		})
+
+		it("runs isNot from the merged const", async () => {
+			expect(
+				await run(`implementation {
+					__print(false::isNot(true)::toString())
+					__print(true::isNot(true)::toString())
+					__print(false::isNot(false)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"false"'])
+		})
+
+		// NOTE: The conformance witness reads `Boolean.isNot` off the merged
+		// const rather than off the runtime module, so a Boolean that reaches a
+		// bounded generic has to find the Essence implementation there.
+		it("witnesses Equatable with the merged Method", async () => {
+			const source = `implementation {
+				function differ <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::isNot(b)
+				}
+
+				__print(differ(true, false)::toString())
+				__print(differ(true, true)::toString())
+			}`
+
+			expect(generate(source)).toContain("isNot: Boolean.isNot")
+			expect(await run(source)).toEqual(['"true"', '"false"'])
+		})
+
+		// NOTE: A dispatch case names its target as `<Namespace>.<method>`, which
+		// for Boolean is now a read off the merged const. The natives have to
+		// still be there — they arrive through the spread — or every dispatch to
+		// a Boolean would hand `dispatchMethod` an `undefined` target.
+		//
+		// NOTE: `isNot` itself can not be reached this way: every case of a
+		// dispatch is passed the SAME Arguments, and no single value is both an
+		// Integer and a Boolean. What a Union receiver reaches on the merged
+		// const is therefore a native, which is exactly the half that had to
+		// survive the merge.
+		it("dispatches a Union receiver through the merged const", async () => {
+			const source = `implementation {
+				constant value: Integer | Boolean = true
+
+				__print(value::toString())
+			}`
+
+			expect(generate(source)).toContain("Boolean.toString")
+			expect(await run(source)).toEqual(['"true"'])
+		})
+
+		// NOTE: Simplifying and optimising the standard library for every file
+		// compiled would be paid once per file for an answer that can not
+		// differ — and the Simplifier writes into the Nodes it is handed, so a
+		// second pass over the same tree would mangle the names twice.
+		it("builds the prelude once per process", () => {
+			expect(stdlibPrelude()).toBe(stdlibPrelude())
+		})
+
+		// NOTE: R4 — the standard library's typed Programs are a process-wide
+		// singleton. Building the prelude must leave them exactly as they were,
+		// or the Language Server and the tests would read the Rewriter's
+		// leavings.
+		it("leaves the standard library's typed Programs untouched", () => {
+			let before = JSON.stringify(loadStdlib().typedPrograms)
+
+			buildStdlibPrelude(loadStdlib().typedPrograms)
+
+			expect(JSON.stringify(loadStdlib().typedPrograms)).toBe(before)
+		})
+
+		// NOTE: The `__overload$N` suffix is the Overload's position in the
+		// Method TYPE. A native holds its slot even though the prelude emits
+		// nothing for it, because the runtime export it binds to already answers
+		// to that name — emitting the bodied Overload under the filtered index
+		// would define `combine__overload$1` on top of the spread and clobber
+		// the native.
+		it("numbers a mixed overload block by its position in the Method Type", () => {
+			let stdlib = loadStdlibFrom([
+				parseStdlibSource(
+					"Mixed.es",
+					`declarations {
+	namespace Mixed for Integer {
+		§§ Combines two values.
+		overload combine {
+			(_ other: Integer) -> Integer
+			(_ other: String) -> String {
+				<- other
+			}
+		}
+	}
+}`,
+				),
+			])
+
+			let prelude = buildStdlibPrelude(stdlib.typedPrograms)
+
+			expect(prelude).toHaveLength(1)
+			expect(prelude[0]!.name).toBe("Mixed")
+			expect(Object.keys(prelude[0]!.node.methods)).toEqual([
+				"combine__overload$2",
+			])
+		})
+
+		// NOTE: The search has to run to a FIXED POINT: a Namespace may be
+		// reached only through the BODY of another merged Namespace's Method.
+		// `Boolean` is the only merged one today, so this is driven directly —
+		// and it is the case that will start happening for real as the
+		// conversion goes on.
+		describe("reachability", () => {
+			// NOTE: `Outer.quadruple` calls `Inner.double`, and nothing else
+			// mentions `Inner`. Neither Namespace has a runtime module, which
+			// also exercises the no-spread shape.
+			const pair = `declarations {
+	namespace Inner for Integer {
+		§§ Doubles the value.
+		double() -> Integer {
+			<- @
+		}
+	}
+
+	namespace Outer for Integer {
+		§§ Quadruples the value.
+		quadruple() -> Integer {
+			<- @::double()::double()
+		}
+	}
+}`
+
+			function preludeOf(source: string) {
+				return buildStdlibPrelude(
+					loadStdlibFrom([parseStdlibSource("Pair.es", source)])
+						.typedPrograms,
+				)
+			}
+
+			function callOf(
+				namespaceName: string,
+				methodName: string,
+			): estree.ExpressionStatement {
+				return {
+					type: "ExpressionStatement",
+					expression: {
+						type: "CallExpression",
+						optional: false,
+						callee: {
+							type: "MemberExpression",
+							optional: false,
+							computed: false,
+							object: { type: "Identifier", name: namespaceName },
+							property: { type: "Identifier", name: methodName },
+						},
+						arguments: [],
+					},
+				}
+			}
+
+			it("follows a reference out of a merged Method's body", () => {
+				let reachable = reachableMergedNamespaces(preludeOf(pair), [
+					callOf("Outer", "quadruple"),
+				])
+
+				expect([...reachable.keys()].sort()).toEqual(["Inner", "Outer"])
+			})
+
+			it("keeps a Namespace nothing names out", () => {
+				let reachable = reachableMergedNamespaces(preludeOf(pair), [
+					callOf("Elsewhere", "somewhere"),
+				])
+
+				expect([...reachable.keys()]).toEqual([])
+			})
+
+			it("does not pull a Namespace in through the one it calls", () => {
+				let reachable = reachableMergedNamespaces(preludeOf(pair), [
+					callOf("Inner", "double"),
+				])
+
+				expect([...reachable.keys()]).toEqual(["Inner"])
+			})
+		})
+
+		// NOTE: A bodied static Property would be initialised INSIDE the const's
+		// own object literal — and every Essence literal compiles to a call on a
+		// Namespace, so it would read a binding that does not exist yet. It type
+		// checks and compiles; it crashes at import. Refused where it is written
+		// rather than emitted.
+		it("refuses a bodied static Property", () => {
+			let stdlib = loadStdlibFrom([
+				parseStdlibSource(
+					"Flagged.es",
+					`declarations {
+	namespace Flagged for Boolean {
+		§§ The affirmative.
+		static YES: Boolean = true
+
+		§§ The value itself.
+		itself() -> Boolean {
+			<- @
+		}
+	}
+}`,
+				),
+			])
+
+			expect(() => buildStdlibPrelude(stdlib.typedPrograms)).toThrow(
+				/'Flagged' gives a value to the static Property 'YES'/,
+			)
+		})
+
+		// NOTE: A Namespace whose every member is native has nothing to merge —
+		// it keeps its plain import, and no const is emitted for it.
+		it("skips a Namespace with no Essence-implemented member", () => {
+			let stdlib = loadStdlibFrom([
+				parseStdlibSource(
+					"Natives.es",
+					`declarations {
+	namespace Natives for Integer {
+		§§ Doubles the value.
+		double() -> Integer
+	}
+}`,
+				),
+			])
+
+			expect(buildStdlibPrelude(stdlib.typedPrograms)).toEqual([])
 		})
 	})
 })

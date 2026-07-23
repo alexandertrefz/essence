@@ -4,41 +4,79 @@ import { generate } from "escodegen"
 import type * as estree from "estree"
 
 import type { common } from "../interfaces/index"
+import { type PreludeNamespace, stdlibPrelude } from "./stdlibPrelude"
 
-// NOTE: The Rewriter is pure: a typed simple Program in, JavaScript source
-// text out. Turning that text into a file — bundling the runtime into it,
-// minifying, writing it to disk — is the Bundler's job, which keeps this stage
-// synchronous and testable without touching a file system.
+// NOTE: The builtin Namespaces that have a runtime module in `__internal/`, in
+// the order their imports are emitted. A Namespace the prelude merges is
+// imported under `$native_<Name>` instead and the merged const takes its name —
+// everything downstream reads `Boolean.isNot` either way, so no other part of
+// the Rewriter knows the difference.
+const runtimeNamespaceNames = [
+	"String",
+	"Integer",
+	"Rational",
+	"Algebraic",
+	"Transcendental",
+	"Number",
+	"Boolean",
+	"Nothing",
+	"Optional",
+	"Ordering",
+	"Record",
+	"List",
+]
+
+// NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
+// no bundling, no minifying, nothing written to disk; that is the Bundler's job.
+// It is synchronous and deterministic: the same Program always produces the same
+// text. It does read the file system once, indirectly — the standard library
+// prelude is built from the sources the loader reads at startup — so "pure" here
+// means same input, same output, not "touches nothing".
 export function rewrite(program: common.typedSimple.Program): string {
+	const prelude = stdlibPrelude()
+
+	// NOTE: The user Program is rewritten FIRST, so that which merged Namespaces
+	// it needs can be answered from the finished tree rather than guessed at from
+	// the source. Every reference to a Namespace — a plain `Boolean.isNot(…)`
+	// call, a conformance witness's `isNot: Boolean.isNot`, a `dispatchMethod`
+	// target, an argument to `boundConformance` — is a literal `Identifier` node
+	// by this point, however indirectly it was written. A source-level survey
+	// would have to know about each of those shapes and would silently drop a
+	// Namespace the moment a new one was added.
+	const implementation = rewriteImplementationSection(program.implementation)
+	const merged = reachableMergedNamespaces(prelude, implementation)
+
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
 		sourceType: "module",
 		body: [
-			internalImport([importNamespaceSpecifier("String")], "String"),
-			internalImport([importNamespaceSpecifier("Integer")], "Integer"),
-			internalImport([importNamespaceSpecifier("Rational")], "Rational"),
-			internalImport(
-				[importNamespaceSpecifier("Algebraic")],
-				"Algebraic",
+			...runtimeNamespaceNames.map((name) =>
+				internalImport(
+					[
+						importNamespaceSpecifier(
+							merged.has(name) ? `$native_${name}` : name,
+						),
+					],
+					name,
+				),
 			),
-			internalImport(
-				[importNamespaceSpecifier("Transcendental")],
-				"Transcendental",
-			),
-			internalImport([importNamespaceSpecifier("Number")], "Number"),
-			internalImport([importNamespaceSpecifier("Boolean")], "Boolean"),
-			internalImport([importNamespaceSpecifier("Nothing")], "Nothing"),
-			internalImport([importNamespaceSpecifier("Optional")], "Optional"),
-			internalImport([importNamespaceSpecifier("Ordering")], "Ordering"),
-			internalImport([importNamespaceSpecifier("Record")], "Record"),
-			internalImport([importNamespaceSpecifier("List")], "List"),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			internalImport([importNamespaceSpecifier("$type")], "type"),
 			internalImport(
 				[importNamespaceSpecifier("$helpers")],
 				"internalHelpers",
 			),
-			...rewriteImplementationSection(program.implementation),
+			// NOTE: Imports first — a const spreads the module it was imported
+			// from. Among themselves the consts may sit in any order, because
+			// the only thing a merged const holds is Methods, and a Method body
+			// naming another Namespace reads that name when it is CALLED, long
+			// after every const is initialised. `buildStdlibPrelude` rejects a
+			// bodied Property precisely to keep that true — a Property
+			// initialiser would run HERE, in declaration order.
+			...prelude
+				.filter((namespace) => merged.has(namespace.name))
+				.map((namespace) => merged.get(namespace.name)!),
+			...implementation,
 		],
 	}
 
@@ -147,6 +185,198 @@ function rewriteNamespaceDefinitionStatement(
 			],
 		},
 	}
+}
+
+// NOTE: A merged standard library Namespace — the runtime module spread into an
+// object literal, with everything written in Essence laid over the top:
+//
+//   const Boolean = { ...$native_Boolean, isNot: function (_self, other) { … } }
+//
+// The Essence half WINS where the two collide — the object literal's own key
+// overrides what the spread brought in. That is only a safety net, not a
+// workflow: `builtins.spec` fails a Method that is implemented in BOTH places,
+// so the TypeScript has to be deleted in the same commit that writes the
+// Essence. What the precedence buys is that the failure is a red test rather
+// than a Method that silently kept running its old implementation.
+//
+// NOTE: The member names are taken exactly as the Simplifier produced them, so
+// an Overload lands under `name__overload$N` for N its position in the METHOD
+// TYPE's Overloads — not its position among the bodied ones. A block that binds
+// Overload 1 to the runtime and writes Overload 2 in Essence therefore emits
+// `isNot__overload$2` over a spread that already carries the native's
+// `isNot__overload$1`, and neither shadows the other.
+//
+// NOTE: A Namespace with no runtime module gets no spread. There is nothing to
+// merge with — every member of it is written in Essence — and spreading an
+// identifier that was never imported would emit a ReferenceError.
+function rewriteMergedNamespace(
+	namespace: PreludeNamespace,
+	options: { hasRuntimeModule: boolean },
+): estree.VariableDeclaration {
+	let node = namespace.node
+	let properties: Array<estree.Property | estree.SpreadElement> = []
+
+	if (options.hasRuntimeModule) {
+		properties.push({
+			type: "SpreadElement",
+			argument: {
+				type: "Identifier",
+				name: `$native_${namespace.name}`,
+			},
+		})
+	}
+
+	let property = (
+		name: string,
+		value: estree.Expression,
+	): estree.Property => ({
+		type: "Property",
+		key: { type: "Identifier", name },
+		value,
+		kind: "init",
+		computed: false,
+		method: false,
+		shorthand: false,
+	})
+
+	// NOTE: Only Methods. A merged Namespace can not carry a bodied static
+	// Property — `buildStdlibPrelude` rejects one — because its initialiser
+	// would be evaluated inside this very object literal, before the const it
+	// names exists. See the NOTE there.
+	for (let [name, method] of Object.entries(node.methods)) {
+		properties.push(
+			property(name, rewriteFunctionExpression(method.method.value)),
+		)
+	}
+
+	return {
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: { type: "Identifier", name: namespace.name },
+				init: { type: "ObjectExpression", properties },
+			},
+		],
+	}
+}
+
+// NOTE: Which merged Namespaces the emitted Program actually needs, and the
+// const for each. A merged const spreads its runtime module, which forces the
+// Bundler to materialise the module's namespace object and keep every export it
+// has — tree shaking is defeated for a Namespace the const drags in. Emitting
+// one unconditionally therefore charged every Program about a kilobyte for a
+// Namespace it may never mention, and turned a Program of nothing but comments
+// into a twelve kilobyte bundle. So a const is emitted only where something
+// names it.
+//
+// NOTE: A Namespace left out keeps the plain `import * as <Name>` it always had
+// — nothing references it, the Bundler shakes it away, and the emitted text is
+// what it was before the prelude existed.
+//
+// NOTE: The search runs to a FIXED POINT over the consts themselves, not just
+// over the user Program: `Boolean.isNot`'s body calls `Boolean.negate`, and a
+// Method of one merged Namespace may well call into another. Stopping at the
+// first round would emit a const whose body names one that was never declared.
+//
+// NOTE: Exported for the tests. The fixed point is the part of this that can
+// silently be wrong — a Namespace reached only through another one is exactly
+// what the standard library will produce more of — and it can not be driven
+// through `rewrite` today, because only one Namespace is merged.
+export function reachableMergedNamespaces(
+	prelude: Array<PreludeNamespace>,
+	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
+): Map<string, estree.VariableDeclaration> {
+	let reachable = new Map<string, estree.VariableDeclaration>()
+
+	if (prelude.length === 0) {
+		return reachable
+	}
+
+	let candidates = new Map<string, estree.VariableDeclaration>(
+		prelude.map((namespace) => [
+			namespace.name,
+			rewriteMergedNamespace(namespace, {
+				hasRuntimeModule: runtimeNamespaceNames.includes(
+					namespace.name,
+				),
+			}),
+		]),
+	)
+
+	let pending: Array<string> = []
+
+	let include = (names: Set<string>): void => {
+		for (let name of names) {
+			let declaration = candidates.get(name)
+
+			if (declaration === undefined || reachable.has(name)) {
+				continue
+			}
+
+			reachable.set(name, declaration)
+			pending.push(name)
+		}
+	}
+
+	include(referencedNames(implementation))
+
+	while (pending.length > 0) {
+		include(referencedNames(candidates.get(pending.pop()!)!))
+	}
+
+	return reachable
+}
+
+// NOTE: Every name the given tree READS. A dotted member and an object
+// literal's key are text rather than references — `{ isNot: Boolean.isNot }`
+// names `Boolean` and nothing else — so an emitted Record member that happens
+// to be spelled like a Namespace does not drag it in. Everything else is
+// collected, bindings included: over-collecting only emits a const that is never
+// read, while under-collecting emits a Program that crashes.
+function referencedNames(root: unknown): Set<string> {
+	let names = new Set<string>()
+
+	let visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (let entry of node) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (
+			record["type"] === "Identifier" &&
+			typeof record["name"] === "string"
+		) {
+			names.add(record["name"])
+
+			return
+		}
+
+		for (let [key, value] of Object.entries(record)) {
+			if (
+				record["computed"] === false &&
+				(key === "property" || key === "key")
+			) {
+				continue
+			}
+
+			visit(value)
+		}
+	}
+
+	visit(root)
+
+	return names
 }
 
 function rewriteTypeAliasStatement(
