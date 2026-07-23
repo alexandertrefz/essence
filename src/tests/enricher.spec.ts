@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import {
-	builtinNamespaces,
-	builtinProtocols,
-} from "../enricher/builtins"
+import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
 import { enrich } from "../enricher/index"
 import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
@@ -722,7 +719,7 @@ describe("Enricher", () => {
 
 						constant maybeDouble = [1]::transformFirst((value) {
 							if value::isGreaterThan(0) {
-								<- value::multiplyWith(2)
+								<- value::multiply(with 2)
 							}
 
 							<- nothing
@@ -2150,8 +2147,9 @@ describe("Enricher", () => {
 						// declaration-side check does.
 						const assumptions = new Map(
 							(
-								namespace.conformanceConditions?.[protocolName] ??
-								[]
+								namespace.conformanceConditions?.[
+									protocolName
+								] ?? []
 							).map((condition) => [
 								condition.generic,
 								condition.protocol,
@@ -2239,10 +2237,10 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					constant count: Integer = "hi"::length()
 					constant chars: List<String> = "hi"::characters()
-					constant char: String | Nothing = "hi"::characterAt(0)
+					constant char: String | Nothing = "hi"::character(at 0)
 					constant loud: String = "hi"::uppercased()::trimmed()
-					constant begins: Boolean = "hi"::startsWith("h")
-					constant at: Integer | Nothing = "hello"::firstIndexOf("l")
+					constant begins: Boolean = "hi"::starts(with "h")
+					constant at: Integer | Nothing = "hello"::firstIndex(of "l")
 					constant padded: String = "7"::paddedAtStart(to 3, with "0")
 				}`),
 			).toEqual([])
@@ -2413,7 +2411,7 @@ describe("Enricher", () => {
 		it("should dispatch a Number receiver to every member Namespace", () => {
 			let invocation = lastConstantValue(`implementation {
 				constant number: Number = 5
-				constant doubled = number::multiplyWith(2)
+				constant doubled = number::multiply(with 2)
 			}`)
 
 			expect(invocation.namespace.name).toBe("")
@@ -2457,7 +2455,7 @@ describe("Enricher", () => {
 
 		it("should dispatch across unrelated member Namespaces", () => {
 			let invocation = lastConstantValue(`implementation {
-				constant quotient = 10::divideBy(0)
+				constant quotient = 10::divide(by 0)
 				constant text = quotient::toString()
 			}`)
 
@@ -2497,14 +2495,14 @@ describe("Enricher", () => {
 		it("should reject the call when a member Type lacks the Method", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant value: Integer | Boolean = 5
-				constant bad = value::multiplyWith(2)
+				constant bad = value::multiply(with 2)
 			}`)
 
 			expect(
 				diagnostics.some(
 					(diagnostic) =>
 						diagnostic.message ===
-						"No Method named 'multiplyWith' for Boolean",
+						"No Method named 'multiply' for Boolean",
 				),
 			).toBe(true)
 		})

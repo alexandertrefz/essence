@@ -22,8 +22,8 @@ deliberate line, not a backlog: the primitives everything else is composed from
 `compareTo`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercased`, the trim Methods, `Record`'s reflective Methods,
 `String.compareTo` — there is no way to name a character's code point), and the
-iteration primitives the rest rest on (`List.reduce`, `itemAt`, `slice`,
-`keepEvery`, `append(contentsOf:)`, `static of`, `String.splitOn`).
+iteration primitives the rest rest on (`List.reduce`, `item(at:)`, `slice`,
+`keepEvery`, `append(contentsOf:)`, `static of`, `String.split(on:)`).
 
 Two Methods are native for reasons worth reading before assuming otherwise:
 `String.replaceEvery`, because on the EMPTY part `replaceAll` inserts at UTF-16
@@ -56,9 +56,9 @@ better (`1::add(2)`, not `1::added(2)`).
 **2. A preposition is a label, never fused into the verb.** When an Argument is
 reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,
 *by* a comparison, *at* an index — the preposition is that Argument's label and
-the verb stem stays bare: `text::firstIndex(of: ",")`, `text::split(on: ",")`,
-`text::starts(with: "x")`, `list::sort(by: compare)`, `list::item(at: 0)`,
-`2::raise(to: 10)`, `1::divide(by: 2)`.
+the verb stem stays bare: `text::firstIndex(of ",")`, `text::split(on ",")`,
+`text::starts(with "x")`, `list::sort(by compare)`, `list::item(at 0)`,
+`2::raise(to 10)`, `1::divide(by 2)`.
 
 **3. Direct object positional, everything prepositional labelled.** A verb's
 direct object — what it acts on, with no preposition between — stays positional
@@ -72,7 +72,7 @@ at `index`" — the item is the direct object, the index is reached through *at*
 **4. A variant of one idea is an Overload, not a new name.** One `trim` with an
 `at:` Overload, not `trimmed`/`trimmedAtStart`/`trimmedAtEnd`; one `sort`, not
 `sorted`/`sortedBy`. And a fixed set of modes is a `choice`, never a `String` —
-`trim(at: Side#Start)`, not `trim("start")`.
+`trim(at Side#Start)`, not `trim("start")`.
 
 Three name SHAPES, so rule 1 is not misapplied:
 
@@ -94,7 +94,7 @@ to break:
 - **A predicate Parameter is always labelled `where`** — `keepEvery(where:)`,
   `count(where:)`, `anyItem(where:)`.
 - **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
-  `List.repeat(_, times: 0)` is the empty List, while `clamp` with inverted
+  `List.repeat(_, times 0)` is the empty List, while `clamp` with inverted
   bounds is `Nothing`.
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
@@ -212,8 +212,8 @@ guards two files, but it is a floor, not a substitute for measuring.
 - **Every Method of a Namespace answers for the Namespace's target Type.**
   There is no per-Method receiver, and a Method that only some values of the
   target Type can answer does not belong there. Reach for a **bounded Method
-  Generic** first — `sorted<infer ItemType is Comparable>()` and
-  `joinWith<infer ItemType is Printable>(…)` stay Methods of `List`, which
+  Generic** first — `sort<infer ItemType is Comparable>()` and
+  `join<infer ItemType is Printable>(with:)` stay Methods of `List`, which
   targets every List, and the bound is what a use site has to satisfy. The
   Method Generic shadows the Namespace's `ItemType` outright, and the bound's
   conformance arrives as a hidden trailing Argument, so the runtime
@@ -276,14 +276,14 @@ caught, because TypeScript treats a shorter function as assignable.
 Three of `List`'s Method Generics carry a Protocol bound, and each bound is a
 statement about what the Method needs rather than a restriction to work around.
 
-`joinWith<infer ItemType is Printable>(_ separator: String) -> String` is
+`join<infer ItemType is Printable>(with separator: String) -> String` is
 deliberately wider than a reader might expect: joining asks nothing of the items
-but that each can say what it is, so `[1, 2, 3]::joinWith(", ")` is `"1, 2, 3"`,
-not a type error. `sorted<infer ItemType is Comparable>()` is the same shape for
+but that each can say what it is, so `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`,
+not a type error. `sort<infer ItemType is Comparable>()` is the same shape for
 ordering.
 
-`is`, `isNot`, `contains`, `doesNotContain`, `firstIndexOf`, `lastIndexOf`,
-`countOf(_ item:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
+`is`, `isNot`, `contains`, `doesNotContain`, `firstIndex(of:)`, `lastIndex(of:)`,
+`count(of:)`, `removeEvery(_ item:)` and `removeDuplicates` are bounded
 `is Equatable`, so equality between items means the item Type's OWN `is` rather
 than a structural comparison the language cannot express. That is a narrowing:
 a Method holding an UNBOUNDED `List<ItemType>` can no longer call them, and the

@@ -8,16 +8,16 @@ implementation {
 	__print(greeting::lowercased())        § "hello, world"
 
 	§ Searching and testing.
-	__print(greeting::startsWith("Hello")) § true
-	__print(greeting::doesNotEndWith("!")) § true
-	__print(greeting::firstIndexOf("World")) § 7
+	__print(greeting::starts(with "Hello")) § true
+	__print(greeting::doesNotEnd(with "!")) § true
+	__print(greeting::firstIndex(of "World")) § 7
 	__print(greeting::contains("lo,"))     § true
 
 	§ Producing new Strings.
 	__print(greeting::reverse())          § "dlroW ,olleH"
 	__print(greeting::replaceEvery("o", with "0")) § "Hell0, W0rld"
 	__print(greeting::slice(from 0, to 5)) § "Hello"
-	__print("ab"::repeated(3))             § "ababab"
+	__print("ab"::repeat(times 3))             § "ababab"
 	__print("  spaced  "::trimmed())       § "spaced"
 
 	§ Padding reaches a length, counting characters.
@@ -25,15 +25,15 @@ implementation {
 	__print("7"::paddedAtEnd(to 3, with "."))    § "7.."
 
 	§ Characters, each its own single-character String.
-	__print(greeting::characterAt(1))      § "e"
-	__print(greeting::characterAt(99))     § Nothing
+	__print(greeting::character(at 1))      § "e"
+	__print(greeting::character(at 99))     § Nothing
 	__print(greeting::characters()::length()) § 12
 
 	§ Indices count Unicode code points, so an emoji stays whole.
 	constant emoji = "a😀b"
 	__print(emoji::length())               § 3
-	__print(emoji::characterAt(1))         § "😀"
-	__print(emoji::firstIndexOf("b"))      § 2
+	__print(emoji::character(at 1))         § "😀"
+	__print(emoji::firstIndex(of "b"))      § 2
 	__print(emoji::reverse())             § "b😀a"
 
 	§ String is Comparable now, so a List of Strings sorts with a real

@@ -11,14 +11,14 @@ implementation {
 	__print(match rootTwo -> String {
 		case Algebraic {
 			§ The round-trip is exact: √2 · √2 is exactly 2.
-			__print(@::multiplyWith(@))
+			__print(@::multiply(with @))
 
 			§ Arithmetic stays symbolic.
 			__print(@::add(1))
-			__print(@::multiplyWith(3))
+			__print(@::multiply(with 3))
 
 			§ Dividing by an Irrational can never fail — no Nothing here.
-			__print(1::divideBy(@))
+			__print(1::divide(by @))
 
 			§ Ordering is exact, too: √2 is below 3/2.
 			__print(@::compareTo(3/2)::toString())
@@ -35,10 +35,10 @@ implementation {
 	__print(Number.TAU)
 
 	§ Proportional Transcendentals divide exactly: TAU / π = 2.
-	__print(Number.TAU::divideBy(Number.PI))
+	__print(Number.TAU::divide(by Number.PI))
 
 	§ Numeric equality reaches across representations.
-	__print(Number.PI::multiplyWith(2)::is(Number.TAU))
+	__print(Number.PI::multiply(with 2)::is(Number.TAU))
 
 	§ Comparing π against 22/7 is exact and total — the classic bound.
 	__print(Number.PI::compareTo(22/7)::toString())

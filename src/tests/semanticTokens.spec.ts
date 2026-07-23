@@ -61,7 +61,7 @@ describe("Semantic Tokens", () => {
 			"\t\t}",
 			"\t}",
 			"\tfunction first<T>(_ items: List<T>) -> T {",
-			"\t\t<- items::itemAt(0)",
+			"\t\t<- items::item(at 0)",
 			"\t}",
 			"}",
 		].join("\n")

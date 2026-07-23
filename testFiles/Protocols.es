@@ -10,14 +10,14 @@ implementation {
 
 	namespace RectangleMeasurable for Rectangle is Measurable {
 		area() -> Number {
-			<- @.width::multiplyWith(@.height)
+			<- @.width::multiply(with @.height)
 		}
 	}
 
 	namespace CircleMeasurable for Circle is Measurable {
 		area() -> Number {
 			§ Close enough to π for a demonstration.
-			<- @.radius::multiplyWith(@.radius)::multiplyWith(355/113)
+			<- @.radius::multiply(with @.radius)::multiply(with 355/113)
 		}
 	}
 

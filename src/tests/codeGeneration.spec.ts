@@ -1,8 +1,8 @@
+import { describe, expect, it } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { describe, expect, it } from "bun:test"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"
@@ -189,7 +189,7 @@ describe("Code Generation", () => {
 
 						__print(match value -> Integer {
 							case Nothing { <- 0 }
-							case _       { <- @::multiplyWith(2) }
+							case _       { <- @::multiply(with 2) }
 						})
 					}
 				`),
@@ -289,7 +289,7 @@ describe("Code Generation", () => {
 
 					__print(match value -> Integer {
 						case 0 { <- 0 }
-						case _ { <- @::multiplyWith(2) }
+						case _ { <- @::multiply(with 2) }
 					})
 				}
 			`)
@@ -306,7 +306,7 @@ describe("Code Generation", () => {
 						__print(match value -> Integer {
 							case Nothing { <- 0 }
 							case 0       { <- 0 }
-							case _       { <- @::multiplyWith(2) }
+							case _       { <- @::multiply(with 2) }
 						})
 					}
 				`),
@@ -720,11 +720,11 @@ describe("Code Generation", () => {
 			const code = generate(`implementation {
 				constant number: Number = 5
 
-				__print(number::multiplyWith(2)::toString())
+				__print(number::multiply(with 2)::toString())
 			}`)
 
-			expect(code).toContain("Integer.multiplyWith__overload$")
-			expect(code).toContain("Rational.multiplyWith__overload$")
+			expect(code).toContain("Integer.multiply__overload$")
+			expect(code).toContain("Rational.multiply__overload$")
 		})
 
 		// NOTE: `firstItem()` returns `Item | Nothing`, so `toString` dispatches
@@ -1355,7 +1355,10 @@ describe("Code Generation", () => {
 								name: "record",
 								type: { type: "Record" },
 							},
-							member: { nodeType: "Identifier", name: "instance" },
+							member: {
+								nodeType: "Identifier",
+								name: "instance",
+							},
 						},
 						implemented,
 					)

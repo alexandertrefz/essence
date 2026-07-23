@@ -1,8 +1,8 @@
 declarations {
 
 	§ Indices and character counts are by Unicode code point, not UTF-16 code
-	§ unit — so `characterAt` never returns a lone surrogate, and `length`
-	§ counts what a reader would call characters. `splitOn` matches its
+	§ unit — so `character(at:)` never returns a lone surrogate, and `length`
+	§ counts what a reader would call characters. `split` matches its
 	§ separator on the raw String, which is correct regardless of unit, except
 	§ on the empty separator, which splits into code points rather than code
 	§ units; `characters` IS that case, and every Method below that reads
@@ -59,18 +59,18 @@ declarations {
 		§§ @returns the two Strings joined together
 		append(_ other: String) -> String
 
-		§§ Splits the String at every occurrence of the given separator. `joinWith` on the resulting List is the return trip.
+		§§ Splits the String at every occurrence of the given separator. `join(with:)` on the resulting List is the return trip.
 		§§
 		§§ @param separator the separator to split at
 		§§ @returns the List of pieces, without the separator.
-		splitOn(_ separator: String) -> List<String>
+		split(on separator: String) -> List<String>
 
 		§§ Whether the given String occurs anywhere in this one.
 		§§
 		§§ @param other the String to look for
 		§§ @returns `true` when it occurs.
 		contains(_ other: String) -> Boolean {
-			<- match @::firstIndexOf(other) -> Boolean {
+			<- match @::firstIndex(of other) -> Boolean {
 				case Nothing { <- false }
 				case _ { <- true }
 			}
@@ -95,14 +95,14 @@ declarations {
 		characters() -> List<String> {
 			§ Splitting on the empty separator is defined to split by code
 			§ point, which is exactly what a character is here.
-			<- @::splitOn("")
+			<- @::split(on "")
 		}
 
 		§§ The character at the given position, counting from zero.
 		§§
 		§§ @returns the character, or `Nothing` when the position is outside the String.
-		characterAt(_ index: Integer) -> Optional<String> {
-			<- @::characters()::itemAt(index)
+		character(at index: Integer) -> Optional<String> {
+			<- @::characters()::item(at index)
 		}
 
 		§§ The String with every character in upper case.
@@ -123,7 +123,7 @@ declarations {
 		trimmedAtEnd() -> String
 
 		§§ Whether the String begins with the given one.
-		startsWith(_ prefix: String) -> Boolean {
+		starts(with prefix: String) -> Boolean {
 			§ A prefix longer than the String slices to the whole String, which
 			§ can not equal it — so the too-long case answers `false` without a
 			§ guard of its own.
@@ -131,12 +131,12 @@ declarations {
 		}
 
 		§§ Whether the String does not begin with the given one.
-		doesNotStartWith(_ prefix: String) -> Boolean {
-			<- @::startsWith(prefix)::negate()
+		doesNotStart(with prefix: String) -> Boolean {
+			<- @::starts(with prefix)::negate()
 		}
 
 		§§ Whether the String ends with the given one.
-		endsWith(_ suffix: String) -> Boolean {
+		ends(with suffix: String) -> Boolean {
 			§ A suffix longer than the String makes the start position
 			§ negative, which `slice` clamps to zero — the whole String, which
 			§ can not equal a longer suffix, so that case answers `false` too.
@@ -151,11 +151,11 @@ declarations {
 		}
 
 		§§ Whether the String does not end with the given one.
-		doesNotEndWith(_ suffix: String) -> Boolean {
-			<- @::endsWith(suffix)::negate()
+		doesNotEnd(with suffix: String) -> Boolean {
+			<- @::ends(with suffix)::negate()
 		}
 
-		§ NATIVE on purpose. `@::splitOn(part)::joinWith(replacement)` is the
+		§ NATIVE on purpose. `@::split(on part)::join(with replacement)` is the
 		§ obvious body and it is WRONG: on the empty part the runtime places
 		§ the replacement at every UTF-16 code UNIT boundary — before the
 		§ first character and after the last one included, and between the two
@@ -172,15 +172,15 @@ declarations {
 		§§ The String joined to itself the given number of times.
 		§§
 		§§ @returns the repeated String; the empty String for a count below one.
-		repeated(_ count: Integer) -> String {
+		repeat(times count: Integer) -> String {
 			§ A count below one repeats into the empty List, which joins to the
 			§ empty String.
-			<- List.repeating(@, times count)::joinWith("")
+			<- List.repeat(@, times count)::join(with "")
 		}
 
 		§§ The String with its characters in the opposite order.
 		reverse() -> String {
-			<- @::characters()::reverse()::joinWith("")
+			<- @::characters()::reverse()::join(with "")
 		}
 
 		§§ The characters from one position up to, but not including, another.
@@ -192,19 +192,19 @@ declarations {
 			§ `List.slice` clamps each end to the List and answers the empty
 			§ List for an empty or inverted range, which is exactly what a
 			§ String slice does with its own bounds.
-			<- @::characters()::slice(from from, to to)::joinWith("")
+			<- @::characters()::slice(from from, to to)::join(with "")
 		}
 
 		§§ The position of the first occurrence of the given String.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when it does not occur.
-		firstIndexOf(_ part: String) -> Optional<Integer> {
+		firstIndex(of part: String) -> Optional<Integer> {
 			§ The empty part occurs at the very start of every String, the
 			§ empty String included — and splitting on it would answer the
 			§ length of the first CHARACTER instead, so it is answered here.
 			if part::isEmpty() { <- 0 }
 
-			constant pieces = @::splitOn(part)
+			constant pieces = @::split(on part)
 
 			§ One piece means the separator was never found.
 			if pieces::length()::is(1) { <- nothing }
@@ -235,7 +235,7 @@ declarations {
 			§ times is at least `needed` characters long; slicing to `needed`
 			§ cuts a partial pad off the end, the way the padding is built
 			§ character by character.
-			<- @::prepend(pad::repeated(needed)::slice(from 0, to needed))
+			<- @::prepend(pad::repeat(times needed)::slice(from 0, to needed))
 		}
 
 		§§ The String padded at the end, with the given String, up to the given length.
@@ -252,7 +252,7 @@ declarations {
 
 			constant needed = to::subtract(characterCount)
 
-			<- @::append(pad::repeated(needed)::slice(from 0, to needed))
+			<- @::append(pad::repeat(times needed)::slice(from 0, to needed))
 		}
 
 		§§ Orders the String against another, by character code point.

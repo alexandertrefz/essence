@@ -330,14 +330,14 @@ describe("Validator", () => {
 		it("should type Divisions as Rational | Nothing", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant a: Rational | Nothing = 1::divideBy(2)
-					constant b: Rational | Nothing = 1/2::divideBy(2)
+					constant a: Rational | Nothing = 1::divide(by 2)
+					constant b: Rational | Nothing = 1/2::divide(by 2)
 					constant c: Rational | Nothing = Rational.of(1, over 2)
 				}`),
 			).toEqual([])
 
 			let diagnostics = diagnosticsFor(`implementation {
-				constant a: Rational = 1::divideBy(2)
+				constant a: Rational = 1::divide(by 2)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)

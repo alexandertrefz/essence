@@ -439,7 +439,7 @@ export function add(
 	) as AlgebraicType
 }
 
-export function multiplyWith(
+export function multiply(
 	algebraic: AlgebraicType,
 	other: IntegerType | RationalType,
 ): AlgebraicType | RationalType {
@@ -452,7 +452,7 @@ export function multiplyWith(
 	)
 }
 
-export function divideBy(
+export function divide(
 	algebraic: AlgebraicType,
 	other: IntegerType | RationalType,
 ): AlgebraicType | NothingType {
@@ -577,7 +577,7 @@ export function dividedInto(
 	const reciprocal = reciprocalOf(algebraic)
 
 	if (reciprocal[typeKeySymbol] === "Algebraic") {
-		return multiplyWith(reciprocal, value)
+		return multiply(reciprocal, value)
 	}
 
 	// NOTE: Unreachable — the reciprocal of an irrational is irrational — but
@@ -679,11 +679,11 @@ export function toString(algebraic: AlgebraicType): StringType {
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addAlgebraic
-export const multiplyWith__overload$1 = multiplyWith
-export const multiplyWith__overload$2 = multiplyWith
-export const multiplyWith__overload$3 = multiplyWithAlgebraic
-export const divideBy__overload$1 = divideBy
-export const divideBy__overload$2 = divideBy
-export const divideBy__overload$3 = divideByAlgebraic
+export const multiply__overload$1 = multiply
+export const multiply__overload$2 = multiply
+export const multiply__overload$3 = multiplyWithAlgebraic
+export const divide__overload$1 = divide
+export const divide__overload$2 = divide
+export const divide__overload$3 = divideByAlgebraic
 
 // #endregion

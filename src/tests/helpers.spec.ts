@@ -1441,7 +1441,7 @@ describe("Helpers", () => {
 
 			// NOTE: When a Method forwards to another whose `infer` generic is
 			// spelled the same — every `List` Method binds `ItemType`, so
-			// `firstItem` calling `itemAt` matches the callee's bindable `ItemType`
+			// `firstItem` calling `item` matches the callee's bindable `ItemType`
 			// against the caller's opaque `ItemType` carried by the receiver — the
 			// bindable side must RECORD the binding off the actual Type, not be
 			// waved through by bare name equality with nothing bound. Generic

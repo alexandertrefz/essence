@@ -19,7 +19,7 @@ export function append(
 	return createString(originalString.value + otherString.value)
 }
 
-export function splitOn(
+export function split(
 	originalString: StringType,
 	splitterString: StringType,
 ): ListType<StringType> {
@@ -29,7 +29,7 @@ export function splitOn(
 	// as every UTF-16 code unit, tearing an astral character into two lone
 	// surrogates, so that one case splits by code point instead. This is the
 	// ONLY place the runtime decides what a character is: `characters()` is
-	// written in Essence as `splitOn("")`, and `length`, `characterAt`,
+	// written in Essence as `split("")`, and `length`, `character`,
 	// `slice` and `reverse` are written on top of `characters()`, so an
 	// astral character stays whole for every one of them.
 	let parts =
@@ -60,7 +60,7 @@ export function trimmedAtEnd(originalString: StringType): StringType {
 // reason it can not move into Essence: on the EMPTY part `replaceAll` places
 // the replacement at every code-unit boundary — before the first character and
 // after the last one included, and between the two halves of an astral
-// character. `@::splitOn(part)::joinWith(replacement)` joins code points with
+// character. `@::split(part)::join(replacement)` joins code points with
 // no outer separators, which is a different String, and Essence has no way to
 // name a code unit. It stays native until that case is respecified.
 export function replaceEvery(
@@ -110,7 +110,7 @@ export function compareTo(
 // List of every one of them — turning an O(1) read into an O(n) allocation, and
 // pulling `List` and its whole import graph into any Program that so much as
 // asks whether a String is empty. `characters`, `slice` and `reverse` are
-// still written in Essence on top of `splitOn`.
+// still written in Essence on top of `split`.
 export function length(originalString: StringType): IntegerType {
 	return createInteger(BigInt(Array.from(originalString.value).length))
 }

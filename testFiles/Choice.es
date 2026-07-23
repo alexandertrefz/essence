@@ -26,11 +26,11 @@ implementation {
 		}
 
 		case #Divide {
-			<- @.left::divideBy(@.right)
+			<- @.left::divide(by @.right)
 		}
 
 		case #Multiply {
-			<- @.left::multiplyWith(@.right)
+			<- @.left::multiply(with @.right)
 		}
 
 		case #SquareRoot {

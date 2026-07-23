@@ -249,7 +249,7 @@ export function add(
 	) as TranscendentalType
 }
 
-export function multiplyWith(
+export function multiply(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType,
 ): TranscendentalType | RationalType {
@@ -261,7 +261,7 @@ export function multiplyWith(
 	)
 }
 
-export function divideBy(
+export function divide(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType,
 ): TranscendentalType | NothingType {
@@ -387,10 +387,10 @@ export function toString(transcendental: TranscendentalType): StringType {
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addTranscendental
-export const multiplyWith__overload$1 = multiplyWith
-export const multiplyWith__overload$2 = multiplyWith
-export const divideBy__overload$1 = divideBy
-export const divideBy__overload$2 = divideBy
-export const divideBy__overload$3 = divideByTranscendental
+export const multiply__overload$1 = multiply
+export const multiply__overload$2 = multiply
+export const divide__overload$1 = divide
+export const divide__overload$2 = divide
+export const divide__overload$3 = divideByTranscendental
 
 // #endregion

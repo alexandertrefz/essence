@@ -55,22 +55,22 @@ declarations {
 		}
 
 		§§ Multiplies this Algebraic with a number, exactly. A radical times itself turns rational — `√2 · √2` is `2` — and multiplying by zero collapses to zero.
-		overload multiplyWith {
-			(_ other: Integer) -> Algebraic | Rational
+		overload multiply {
+			(with other: Integer) -> Algebraic | Rational
 
-			(_ other: Rational) -> Algebraic | Rational
+			(with other: Rational) -> Algebraic | Rational
 
 			§§ Multiplies with another Algebraic. Over the same radical the product stays exact — √2·√2 is exactly 2. Products of pure radicals combine across radicals (√2·√3 is √6); anything else gives Nothing.
-			(_ other: Algebraic) -> Optional<Rational | Algebraic>
+			(with other: Algebraic) -> Optional<Rational | Algebraic>
 		}
 
 		§§ Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational gives `Nothing` only for zero.
-		overload divideBy {
-			(_ other: Integer) -> Optional<Algebraic>
+		overload divide {
+			(by other: Integer) -> Optional<Algebraic>
 
-			(_ other: Rational) -> Optional<Algebraic>
+			(by other: Rational) -> Optional<Algebraic>
 
-			(_ other: Algebraic) -> Optional<Rational | Algebraic>
+			(by other: Algebraic) -> Optional<Rational | Algebraic>
 		}
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
