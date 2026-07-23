@@ -608,7 +608,29 @@ function simplifyMethods(
 			memberValue.nodeType === "OverloadedMethod" ||
 			memberValue.nodeType === "OverloadedStaticMethod"
 		) {
+			if (
+				memberValue.overloadIndices.length !==
+				memberValue.methods.length
+			) {
+				throw new Error(
+					`Overloaded Method '${memberKey}' carries ${memberValue.overloadIndices.length} Overload indices for ${memberValue.methods.length} Overloads`,
+				)
+			}
+
 			memberValue.methods.forEach((method, index) => {
+				// NOTE: INVARIANT — the `__overload$N` suffix is derived from
+				// the Overload's position in the Method TYPE's `overloads`
+				// array, NEVER from its position in this Node's `methods`. The
+				// two differ when the Method Type holds Overloads the Node does
+				// not: a `declarations { … }` block may bind some Overloads to
+				// the runtime and write the rest in Essence, and only the
+				// bodied ones are here. A call site resolves its
+				// `overloadedMethodIndex` against the full Type, so emitting
+				// under a filtered index would define a name nobody calls and
+				// clobber the native export that legitimately owns it. The
+				// lengths are checked above rather than falling back to
+				// `index`, which would quietly reinstate exactly that bug.
+				let overloadIndex = memberValue.overloadIndices[index]!
 				let newMethod = simplifyFunctionValue(method)
 
 				if (memberValue.nodeType === "OverloadedMethod") {
@@ -623,10 +645,12 @@ function simplifyMethods(
 					})
 				}
 
-				result[resolveOverloadedMethodName(memberKey, index)] = {
-					method: newMethod,
-					isStatic: memberValue.nodeType === "OverloadedStaticMethod",
-				}
+				result[resolveOverloadedMethodName(memberKey, overloadIndex)] =
+					{
+						method: newMethod,
+						isStatic:
+							memberValue.nodeType === "OverloadedStaticMethod",
+					}
 			})
 		} else {
 			let method = simplifyFunctionValue(memberValue.method)

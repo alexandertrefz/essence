@@ -2350,219 +2350,215 @@ function mergeNamespaceGenerics(
 	return [...used, ...methodGenerics]
 }
 
+// NOTE: One signature of a Namespace Method, in the shape resolution actually
+// reads. A bodied Method and a body-less native signature differ only in
+// whether a block follows — everything the Method's *Type* is made of
+// (Generics, Parameters, return Type, documentation) is written the same way
+// in both — so both are read through this and the resolution below never forks
+// on nativeness.
+type MethodSignatureEntry = {
+	generics: Array<parser.GenericDeclarationNode>
+	parameters: Array<parser.ParameterNode>
+	returnType: parser.TypeDeclarationNode | null
+	documentation: common.Documentation | null
+	position: common.Position
+	native: boolean
+}
+
+function methodSignatureEntry(
+	node: parser.FunctionValueNode | parser.NativeMethodSignatureNode,
+): MethodSignatureEntry {
+	if (node.nodeType === "NativeMethodSignature") {
+		return {
+			generics: node.generics,
+			parameters: node.parameters,
+			returnType: node.returnType,
+			documentation: node.documentation,
+			position: node.position,
+			native: true,
+		}
+	}
+
+	return {
+		generics: node.value.generics,
+		parameters: node.value.parameters,
+		returnType: node.value.returnType,
+		documentation: node.value.documentation,
+		// NOTE: The FunctionValue's Position, not the Definition's — it is what
+		// the bodied path has always pointed its Diagnostics at.
+		position: node.position,
+		native: false,
+	}
+}
+
+// NOTE: A Namespace Method reduced to the four shapes resolution
+// distinguishes, with bodied and native entries already flattened into one
+// list. An Overload block may MIX the two, so the list is per entry and keeps
+// the WRITTEN ORDER — the index of an Overload is load-bearing, it picks the
+// `__overload$N` name the Simplifier emits and the runtime export it binds to.
+type NormalizedMethod = {
+	kind: common.MethodType["type"]
+	// NOTE: Exactly one entry for the two non-overloaded forms.
+	entries: Array<MethodSignatureEntry>
+	// NOTE: The `overload` block's own documentation, which the entries'
+	// individual ones sit under. Always null for a non-overloaded Method.
+	documentation: common.Documentation | null
+}
+
+function normalizeMethod(
+	node: parser.NamespaceMethods[string],
+): NormalizedMethod {
+	switch (node.nodeType) {
+		case "SimpleMethod":
+			return {
+				kind: "SimpleMethod",
+				entries: [methodSignatureEntry(node.method)],
+				documentation: null,
+			}
+		case "StaticMethod":
+			return {
+				kind: "StaticMethod",
+				entries: [methodSignatureEntry(node.method)],
+				documentation: null,
+			}
+		case "SimpleMethodSignature":
+			return {
+				kind: "SimpleMethod",
+				entries: [methodSignatureEntry(node.signature)],
+				documentation: null,
+			}
+		case "StaticMethodSignature":
+			return {
+				kind: "StaticMethod",
+				entries: [methodSignatureEntry(node.signature)],
+				documentation: null,
+			}
+		case "OverloadedMethod":
+		case "OverloadedMethodSignatures":
+			return {
+				kind: "OverloadedMethod",
+				entries: node.methods.map(methodSignatureEntry),
+				documentation: node.documentation,
+			}
+		default:
+			return {
+				kind: "OverloadedStaticMethod",
+				entries: node.methods.map(methodSignatureEntry),
+				documentation: node.documentation,
+			}
+	}
+}
+
+// NOTE: Which entries of a Namespace Method are bound to the runtime rather
+// than implemented in Essence, in written order — one flag for a
+// non-overloaded Method, one per Overload otherwise. The standard library
+// loader records these so that the runtime-export check knows which Methods it
+// must find an implementation for, and which must NOT have one.
+export function nativeMethodEntries(
+	node: parser.NamespaceMethods[string],
+): Array<boolean> {
+	return normalizeMethod(node).entries.map((entry) => entry.native)
+}
+
 export function resolveMethodType(
 	node: parser.NamespaceMethods[string],
 	scope: enricher.Scope,
 	selfType: common.Type | null,
 	namespaceGenerics: Array<common.GenericDeclaration> = [],
 ): common.MethodType {
-	// NOTE: The body-less native Method forms only ever appear in a
-	// `declarations { … }` Program, which the Enricher does not process yet —
-	// Commit 3 wires them. Reaching one here is therefore an internal error.
-	if (
-		node.nodeType === "SimpleMethodSignature" ||
-		node.nodeType === "StaticMethodSignature" ||
-		node.nodeType === "OverloadedMethodSignatures" ||
-		node.nodeType === "OverloadedStaticMethodSignatures"
-	) {
-		throw new Error(
-			`Native Method signature '${node.nodeType}' reached the Enricher before it was wired`,
-		)
-	}
+	let normalized = normalizeMethod(node)
+	let isStatic =
+		normalized.kind === "StaticMethod" ||
+		normalized.kind === "OverloadedStaticMethod"
 
-	if (node.nodeType === "SimpleMethod") {
-		if (selfType === null) {
-			reportError(
-				"A Namespace without a target Type can only hold static Methods",
-				node.method.position,
-				{
-					code: "untyped-namespace-method",
-					labels: [
-						primary(
-							node.method.position,
-							"this Method is not static",
-						),
-					],
-					helps: [
-						"Give the Namespace a target Type with 'for …', or make the Method static.",
-					],
-				},
-			)
+	if (!isStatic && selfType === null) {
+		let message =
+			"A Namespace without a target Type can only hold static Methods"
 
-			selfType = { type: "Error" }
-		}
+		if (normalized.kind === "SimpleMethod") {
+			let position = normalized.entries[0]!.position
 
-		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
-
-		// NOTE: The Generics are resolved BEFORE the signature, as the object
-		// literal this replaced did — both report Diagnostics, and they are
-		// reported in the order the Method reads.
-		let methodGenerics = resolveGenericDeclarations(
-			node.method.value.generics,
-			scope,
-		)
-
-		let signature = {
-			parameterTypes: [
-				{ name: null, type: selfType },
-				...resolveParameterTypes(node.method.value, methodScope),
-			],
-			returnType: resolveDeclaredType(
-				node.method.value.returnType,
-				methodScope,
-			),
-		}
-
-		return {
-			type: "SimpleMethod",
-			generics: mergeNamespaceGenerics(
-				namespaceGenerics,
-				methodGenerics,
-				signature,
-			),
-			...signature,
-			documentation: node.method.value.documentation ?? undefined,
-		}
-	} else if (node.nodeType === "StaticMethod") {
-		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
-
-		// NOTE: Generics before signature, as above.
-		let methodGenerics = resolveGenericDeclarations(
-			node.method.value.generics,
-			scope,
-		)
-
-		let signature = {
-			parameterTypes: resolveParameterTypes(
-				node.method.value,
-				methodScope,
-			),
-			returnType: resolveDeclaredType(
-				node.method.value.returnType,
-				methodScope,
-			),
-		}
-
-		return {
-			type: "StaticMethod",
-			generics: mergeNamespaceGenerics(
-				namespaceGenerics,
-				methodGenerics,
-				signature,
-			),
-			...signature,
-			documentation: node.method.value.documentation ?? undefined,
-		}
-	} else if (node.nodeType === "OverloadedMethod") {
-		if (selfType === null) {
-			let message =
-				"A Namespace without a target Type can only hold static Methods"
+			reportError(message, position, {
+				code: "untyped-namespace-method",
+				labels: [primary(position, "this Method is not static")],
+				helps: [
+					"Give the Namespace a target Type with 'for …', or make the Method static.",
+				],
+			})
+		} else {
 			let helps = [
 				"Give the Namespace a target Type with 'for …', or make the Methods static.",
 			]
-			let firstMethod = node.methods[0]
+			let firstEntry = normalized.entries[0]
 
-			if (firstMethod === undefined) {
+			if (firstEntry === undefined) {
 				reportError(message, null, {
 					code: "untyped-namespace-method",
 					labels: [],
 					helps,
 				})
 			} else {
-				reportError(message, firstMethod.position, {
+				reportError(message, firstEntry.position, {
 					code: "untyped-namespace-method",
 					labels: [
 						primary(
-							firstMethod.position,
+							firstEntry.position,
 							"these overloads are not static",
 						),
 					],
 					helps,
 				})
 			}
-
-			selfType = { type: "Error" }
 		}
 
-		const methodSelfType = selfType
+		selfType = { type: "Error" }
+	}
+
+	// NOTE: The receiver Parameter every non-static signature is prefixed with.
+	// Null exactly when the Method is static, which is when it is not injected.
+	const receiverType: common.Type | null = isStatic ? null : selfType
+
+	// NOTE: Resolved per entry — Overloads differ in what they mention, so each
+	// gets the Namespace Generics its own signature actually uses. The Generics
+	// are resolved BEFORE the signature, as the object literal this replaced
+	// did: both report Diagnostics, and they are reported in the order the
+	// Method reads.
+	let resolveEntry = (entry: MethodSignatureEntry) => {
+		let methodScope = scopeWithGenerics(entry.generics, scope)
+		let entryGenerics = resolveGenericDeclarations(entry.generics, scope)
+
+		let signature = {
+			parameterTypes: [
+				...(receiverType === null
+					? []
+					: [{ name: null, type: receiverType }]),
+				...resolveParameterTypes(entry, methodScope),
+			],
+			returnType: resolveDeclaredType(entry.returnType, methodScope),
+		}
 
 		return {
-			type: "OverloadedMethod",
-			overloads: node.methods.map((method) => {
-				let methodScope = scopeWithGenerics(
-					method.value.generics,
-					scope,
-				)
-
-				// NOTE: Pruned per Overload — Overloads differ in what they
-				// mention, so each gets the Namespace Generics its own
-				// signature actually uses. Generics before signature, so
-				// Diagnostics still come in reading order.
-				let overloadGenerics = resolveGenericDeclarations(
-					method.value.generics,
-					scope,
-				)
-
-				let signature = {
-					parameterTypes: [
-						{ name: null, type: methodSelfType },
-						...resolveParameterTypes(method.value, methodScope),
-					],
-					returnType: resolveDeclaredType(
-						method.value.returnType,
-						methodScope,
-					),
-				}
-
-				return {
-					generics: mergeNamespaceGenerics(
-						namespaceGenerics,
-						overloadGenerics,
-						signature,
-					),
-					...signature,
-					documentation: method.value.documentation ?? undefined,
-				}
-			}),
-			documentation: node.documentation ?? undefined,
+			generics: mergeNamespaceGenerics(
+				namespaceGenerics,
+				entryGenerics,
+				signature,
+			),
+			...signature,
+			documentation: entry.documentation ?? undefined,
 		}
-	} else {
-		return {
-			type: "OverloadedStaticMethod",
-			overloads: node.methods.map((method) => {
-				let methodScope = scopeWithGenerics(
-					method.value.generics,
-					scope,
-				)
+	}
 
-				// NOTE: Pruned per Overload, as above.
-				let overloadGenerics = resolveGenericDeclarations(
-					method.value.generics,
-					scope,
-				)
+	if (normalized.kind === "SimpleMethod") {
+		return { type: "SimpleMethod", ...resolveEntry(normalized.entries[0]!) }
+	}
 
-				let signature = {
-					parameterTypes: resolveParameterTypes(
-						method.value,
-						methodScope,
-					),
-					returnType: resolveDeclaredType(
-						method.value.returnType,
-						methodScope,
-					),
-				}
+	if (normalized.kind === "StaticMethod") {
+		return { type: "StaticMethod", ...resolveEntry(normalized.entries[0]!) }
+	}
 
-				return {
-					generics: mergeNamespaceGenerics(
-						namespaceGenerics,
-						overloadGenerics,
-						signature,
-					),
-					...signature,
-					documentation: method.value.documentation ?? undefined,
-				}
-			}),
-			documentation: node.documentation ?? undefined,
-		}
+	return {
+		type: normalized.kind,
+		overloads: normalized.entries.map(resolveEntry),
+		documentation: normalized.documentation ?? undefined,
 	}
 }
