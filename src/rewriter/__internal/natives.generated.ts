@@ -371,7 +371,7 @@ export const $NothingAbsent: AssertNoEssenceExports<typeof import("./Nothing"), 
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
-export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "otherwise"> = true
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "otherwise" | "hasValue" | "isNothing"> = true
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule

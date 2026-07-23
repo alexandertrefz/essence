@@ -116,10 +116,7 @@ declarations {
 		§§ @param other the String to look for
 		§§ @returns `true` when it occurs.
 		contains(_ other: String) -> Boolean {
-			<- match @::firstIndex(of other) -> Boolean {
-				case Nothing { <- false }
-				case _ { <- true }
-			}
+			<- @::firstIndex(of other)::hasValue()
 		}
 
 		§§ Whether the given String occurs nowhere in this one.

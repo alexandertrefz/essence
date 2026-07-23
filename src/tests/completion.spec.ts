@@ -538,6 +538,8 @@ describe("Completion of a converted standard library Namespace", () => {
 			"exclusiveOr",
 			"toString",
 			"otherwise",
+			"hasValue",
+			"isNothing",
 		])
 	})
 })
