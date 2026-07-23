@@ -1,8 +1,8 @@
+import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
 import {
 	builtinNamespaces,
 	builtinProtocols as builtinProtocolTable,
 } from "../enricher/builtins"
-import { enrich } from "../enricher/index"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -11,7 +11,6 @@ import {
 	matchesTypeWithBindings,
 } from "../helpers/index"
 import type { common } from "../interfaces/index"
-import { parseWithDiagnostics } from "../parser/index"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type
@@ -61,6 +60,7 @@ export function matchingNamespaces(
 	documentText: string,
 	baseType: common.Type,
 	specifierName: string | null,
+	documentPath?: string,
 ): Array<common.NamespaceType> {
 	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves only through its Protocol — mirroring the Enricher's Method
@@ -69,7 +69,7 @@ export function matchingNamespaces(
 		let constraint = baseType.constraint
 		let protocol = [
 			...builtinProtocols(),
-			...collectProtocolTypes(documentText),
+			...collectProtocolTypes(documentText, documentPath),
 		].find((candidate) => candidate.name === constraint)
 
 		if (protocol === undefined) {
@@ -98,9 +98,23 @@ export function matchingNamespaces(
 		]
 	}
 
+	// NOTE: A standard library document declares the very Namespaces the
+	// builtin table already holds — the loader read this file to fill it. The
+	// document's own declaration is the one being edited, so it wins, and the
+	// builtin twin is dropped. Without this every signature is listed TWICE:
+	// Completion happens to dedupe by Method name and hides it, Signature Help
+	// does not, and an Overload set would double entry for entry.
+	let documentNamespaces = collectNamespaceTypes(documentText, documentPath)
+
+	let shadowed = isStdlibDocument(documentPath)
+		? new Set(documentNamespaces.map((namespace) => namespace.name))
+		: new Set<string>()
+
 	let allNamespaces = [
-		...builtinNamespaces(),
-		...collectNamespaceTypes(documentText),
+		...builtinNamespaces().filter(
+			(namespace) => !shadowed.has(namespace.name),
+		),
+		...documentNamespaces,
 	]
 
 	let namespaces =
@@ -194,10 +208,11 @@ function unionReceiverNamespaces(
 // invisible.
 function collectNamespaceTypes(
 	documentText: string,
+	documentPath?: string,
 ): Array<common.NamespaceType> {
 	try {
-		let { program } = parseWithDiagnostics(documentText)
-		let { program: enrichedProgram } = enrich(program)
+		let { program } = parseDocument(documentText, documentPath)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
 		let namespaces: Array<common.NamespaceType> = []
 
 		collectNamespaceTypesInBody(
@@ -231,10 +246,11 @@ function collectNamespaceTypesInBody(
 
 export function collectProtocolTypes(
 	documentText: string,
+	documentPath?: string,
 ): Array<common.ProtocolType> {
 	try {
-		let { program } = parseWithDiagnostics(documentText)
-		let { program: enrichedProgram } = enrich(program)
+		let { program } = parseDocument(documentText, documentPath)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
 		let protocols: Array<common.ProtocolType> = []
 
 		for (let node of enrichedProgram.implementation.nodes) {

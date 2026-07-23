@@ -1,6 +1,5 @@
-import { enrich } from "../enricher/index"
+import { enrichDocument, parseDocument } from "../documents"
 import type { common } from "../interfaces/index"
-import { parseWithDiagnostics } from "../parser/index"
 import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isSmaller } from "./positions"
@@ -52,6 +51,7 @@ export type ParameterInfo = {
 export function findSignatureHelp(
 	documentText: string,
 	cursor: common.Cursor,
+	documentPath?: string,
 ): SignatureHelpInfo | null {
 	let lines = documentText.split("\n")
 	let headText = [
@@ -65,8 +65,8 @@ export function findSignatureHelp(
 	let enrichedProgram: common.typed.Program | null = null
 
 	try {
-		let { program } = parseWithDiagnostics(probeSource)
-		enrichedProgram = enrich(program).program
+		let { program } = parseDocument(probeSource, documentPath)
+		enrichedProgram = enrichDocument(program, documentPath).program
 	} catch {
 		return null
 	}
@@ -126,6 +126,7 @@ export function findSignatureHelp(
 		documentText,
 		invocation.base.type,
 		null,
+		documentPath,
 	)
 
 	let candidates: Array<{

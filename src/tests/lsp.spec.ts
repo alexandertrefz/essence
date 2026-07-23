@@ -1,9 +1,17 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import path from "node:path"
 
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
+import { enrichDocument, parseDocument } from "../documents"
+import { STDLIB_DIRECTORY } from "../enricher/stdlib"
 import { analyse } from "../lsp/analyse"
+import { findCompletions } from "../lsp/completion"
 import { toLspDiagnostic, toLspRange } from "../lsp/conversion"
+import { findHover } from "../lsp/hover"
+import { matchingNamespaces } from "../lsp/namespaces"
+import { findRenameableOccurrence } from "../lsp/rename"
 import { testDiagnostic } from "./diagnosticFactory"
 
 describe("LSP", () => {
@@ -309,5 +317,217 @@ describe("LSP", () => {
 				),
 			).toBe(true)
 		})
+	})
+})
+
+// NOTE: A standard library source is an ordinary `.es` file that two rules do
+// not apply to — it may open with `declarations { … }`, and its declarations
+// are already in the builtin tables because the loader read this very file to
+// put them there. Both are keyed off WHERE the document lives, so the Language
+// Server has to be told. Without it a stdlib file lights up with five errors,
+// one of them a bogus syntax error that wrecks the AST every other feature
+// runs on. String, Integer and Rational are hundreds of hand transcribed
+// Methods each; the editor has to work inside them.
+describe("LSP in a standard library source", () => {
+	const source = [
+		"declarations {",
+		"\t§§ Two truth values.",
+		"\tnamespace Boolean for Boolean is Equatable, is Printable {",
+		"\t\t§§ The opposite truth value.",
+		"\t\tnegate() -> Boolean",
+		"",
+		"\t\t§§ Whether the two are equal.",
+		"\t\tis(_ other: Boolean) -> Boolean",
+		"",
+		"\t\t§§ Whether the two differ.",
+		"\t\tisNot(_ other: Boolean) -> Boolean",
+		"",
+		"\t\t§§ As a String.",
+		"\t\ttoString() -> String",
+		"\t}",
+		"}",
+	].join("\n")
+
+	// NOTE: THE standard library — the one this compiler loads — not any
+	// directory that happens to be spelled `src/stdlib`. Essence is a language;
+	// a user's own project may well have one of those.
+	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
+
+	it("should report no Diagnostics for a document under src/stdlib", () => {
+		expect(analyse(source, stdlibPath)).toEqual([])
+	})
+
+	it("should accept a file:// URI as well as a plain path", () => {
+		expect(analyse(source, `file://${stdlibPath}`)).toEqual([])
+	})
+
+	// NOTE: The permission is the standard library's alone. Lifting it for
+	// every document would retire `declarations-outside-stdlib` by accident —
+	// and a user's own `src/stdlib/Boolean.es` is a plausible thing to write,
+	// so the Editor must not tell them a `declarations` block is fine there
+	// while `esc` rejects it.
+	it("should still reject a 'declarations' header anywhere else", () => {
+		for (let documentPath of [
+			undefined,
+			path.join(STDLIB_DIRECTORY, "../../testFiles/Boolean.es"),
+			"/somewhere/essence/src/stdlib/Boolean.es",
+			"/somewhere/stdlib/Boolean.es",
+		]) {
+			expect(
+				analyse(source, documentPath).map(
+					(diagnostic) => diagnostic.code,
+				),
+			).toContain("declarations-outside-stdlib")
+		}
+	})
+
+	// NOTE: The self-collision. The loader put this file's `Boolean` into the
+	// builtin Scope; enriched against the untouched tables the document
+	// redeclares itself, and every Namespace it declares reports twice over.
+	it("should not report a Namespace as a redeclaration of itself", () => {
+		expect(
+			analyse(source, undefined).map((diagnostic) => diagnostic.code),
+		).toContain("duplicate-variable")
+
+		expect(
+			analyse(source, stdlibPath).map((diagnostic) => diagnostic.code),
+		).not.toContain("duplicate-variable")
+	})
+
+	it("should answer Hover and Completion inside the document", () => {
+		let { program } = parseDocument(source, stdlibPath)
+		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
+
+		expect(
+			findHover(enrichedProgram, { line: 3, column: 12 })?.content,
+		).toBe("namespace Boolean for Boolean is Equatable, is Printable")
+
+		let withPartialType = [
+			"declarations {",
+			"\tnamespace Boxes for List<String> {",
+			"\t\t§§ How many.",
+			"\t\tcount() -> Inte",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(
+			findCompletions(
+				withPartialType,
+				{ line: 4, column: 18 },
+				stdlibPath,
+			).map((entry) => entry.label),
+		).toContain("Integer")
+	})
+
+	// NOTE: A rename inside a standard library source is silently destructive
+	// — the edit reaches this document only, while the name is the binding a
+	// runtime export answers to and a `is …` clause may depend on. Renaming
+	// `exclusiveOr` to `xor` type-checks, emits no Diagnostic and produces a
+	// call to `undefined`; renaming `is` breaks the Equatable conformance and
+	// the loader throws for every Program compiled afterwards.
+	it("should refuse to rename anything in a standard library source", () => {
+		let { program } = parseDocument(source, stdlibPath)
+		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
+
+		// NOTE: Every kind the document holds — the Namespace name (already
+		// protected, since it resolves to a builtin), a conformance Method, a
+		// plain native Method, and a Parameter.
+		for (let cursor of [
+			{ line: 3, column: 12 },
+			{ line: 8, column: 4 },
+			{ line: 14, column: 4 },
+			{ line: 8, column: 9 },
+		]) {
+			expect(
+				findRenameableOccurrence(
+					program,
+					cursor,
+					enrichedProgram,
+					stdlibPath,
+				),
+			).toBeNull()
+		}
+	})
+
+	// NOTE: The guard is keyed off the path and must not touch anything else —
+	// renaming in an ordinary document still works.
+	it("should still rename in an ordinary document", () => {
+		let ordinary = [
+			"implementation {",
+			'\tconstant greeting = "hello"',
+			"\t__print(greeting)",
+			"}",
+		].join("\n")
+
+		let { program } = parseDocument(ordinary)
+		let { program: enrichedProgram } = enrichDocument(program)
+
+		let occurrence = findRenameableOccurrence(
+			program,
+			{ line: 2, column: 12 },
+			enrichedProgram,
+			"/somewhere/essence/testFiles/Greeting.es",
+		)
+
+		expect(occurrence?.name).toBe("greeting")
+		expect(occurrence?.declaration.occurrences).toHaveLength(2)
+	})
+
+	// NOTE: A standard library document declares the very Namespaces the
+	// builtin table holds, so both would match a receiver and every signature
+	// would be listed twice. Completion dedupes by Method name and hides it;
+	// Signature Help does not, and an Overload set would double entry for
+	// entry.
+	it("should not list the document's own Namespace twice", () => {
+		expect(
+			matchingNamespaces(source, { type: "Boolean" }, null, stdlibPath)
+				.map((namespace) => namespace.name)
+				.filter((name) => name === "Boolean"),
+		).toEqual(["Boolean"])
+	})
+
+	// NOTE: A body-less native signature has NO typed Node — the Enricher
+	// drops it, since there is no body to emit — so Hover, which reads the
+	// typed tree, answered every question inside one of these files with the
+	// enclosing Namespace. The standard library is nothing but these
+	// signatures.
+	it("should describe a body-less signature, its Parameters and its annotations", () => {
+		let { program } = parseDocument(source, stdlibPath)
+		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
+
+		let hoverAt = (line: number, column: number) =>
+			findHover(enrichedProgram, { line, column }, program)
+
+		expect(hoverAt(8, 4)?.content).toBe("is(_ Boolean) -> Boolean")
+		expect(hoverAt(8, 4)?.documentation).toBe("Whether the two are equal.")
+		// NOTE: The Parameter's own name, and the annotations either side of it.
+		expect(hoverAt(8, 9)?.content).toBe("other: Boolean")
+		expect(hoverAt(8, 16)?.content).toBe("Boolean")
+		expect(hoverAt(8, 28)?.content).toBe("Boolean")
+		expect(hoverAt(14, 4)?.content).toBe("toString() -> String")
+	})
+
+	// NOTE: The regression that matters as the conversion goes on — every real
+	// standard library source, analysed the way the editor analyses it, is
+	// clean. The loader already throws on a Diagnostic; this says the Language
+	// Server agrees with it, which it did not before.
+	it("should report no Diagnostics for any real standard library source", () => {
+		let directory = path.resolve(import.meta.dirname, "../stdlib")
+
+		let fileNames = readdirSync(directory).filter((fileName) =>
+			fileName.endsWith(".es"),
+		)
+
+		expect(fileNames.length).toBeGreaterThan(0)
+
+		for (let fileName of fileNames) {
+			let filePath = path.resolve(directory, fileName)
+
+			expect([
+				fileName,
+				analyse(readFileSync(filePath, "utf-8"), filePath),
+			]).toEqual([fileName, []])
+		}
 	})
 })

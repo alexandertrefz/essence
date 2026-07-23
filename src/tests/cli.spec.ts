@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 
 import { parseArguments, UsageError } from "../cli/args"
 import { commands, findCommand, globalOptions } from "../cli/commands"
@@ -11,7 +14,7 @@ import {
 	resolveOutputFiles,
 } from "../cli/inputs"
 import { toJSONReport } from "../cli/json"
-import type { CompileOutcome } from "../cli/pipeline"
+import { type CompileOutcome, compileFile } from "../cli/pipeline"
 import { defaultWorkerCount, shouldUseWorkers } from "../cli/pool"
 import {
 	countDiagnostics,
@@ -28,6 +31,7 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../cli/theme"
+import { STDLIB_DIRECTORY } from "../enricher/stdlib"
 import { closestMatch } from "../helpers/index"
 import { testDiagnostic } from "./diagnosticFactory"
 
@@ -628,5 +632,59 @@ describe("CLI", () => {
 			expect(report.files[0].bytes).toBe(2048)
 			expect(report.ok).toBe(true)
 		})
+	})
+})
+
+// NOTE: The CLI and the Language Server have to agree about the file in front
+// of them. `esc check src/stdlib/List.es` used to reject the `declarations { …
+// }` header of the very sources the compiler loads at startup — while the
+// Editor reported the same file clean — so a compiler developer could not
+// check their own transcription. Both now route through `documents.ts`.
+describe("CLI on a standard library source", () => {
+	it("checks a standard library source without Diagnostics", async () => {
+		let fileNames = readdirSync(STDLIB_DIRECTORY).filter((fileName) =>
+			fileName.endsWith(".es"),
+		)
+
+		expect(fileNames.length).toBeGreaterThan(0)
+
+		for (let fileName of fileNames) {
+			let outcome = await compileFile({
+				inputFileName: path.resolve(STDLIB_DIRECTORY, fileName),
+				outputFileName: null,
+				minify: false,
+				sourcemap: false,
+			})
+
+			expect([fileName, outcome.diagnostics]).toEqual([fileName, []])
+			expect([fileName, outcome.ok]).toEqual([fileName, true])
+		}
+	})
+
+	// NOTE: The permission is the standard library's alone — an ordinary file
+	// that opens with `declarations { … }` is still rejected, by the CLI as
+	// much as by the Editor.
+	it("still rejects a 'declarations' header outside the standard library", async () => {
+		let filePath = path.resolve(
+			tmpdir(),
+			`essence-declarations-${process.pid}.es`,
+		)
+
+		writeFileSync(filePath, "declarations {\n\tnamespace Empty {}\n}\n")
+
+		try {
+			let outcome = await compileFile({
+				inputFileName: filePath,
+				outputFileName: null,
+				minify: false,
+				sourcemap: false,
+			})
+
+			expect(
+				outcome.diagnostics.map((diagnostic) => diagnostic.code),
+			).toContain("declarations-outside-stdlib")
+		} finally {
+			rmSync(filePath, { force: true })
+		}
 	})
 })

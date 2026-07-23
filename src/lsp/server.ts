@@ -18,10 +18,9 @@ import {
 	TextDocuments,
 } from "vscode-languageserver/node"
 
-import { enrich } from "../enricher/index"
+import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
 import { loadStdlib } from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
-import { parseWithDiagnostics } from "../parser/index"
 import { analyse } from "./analyse"
 import { type CompletionEntry, findCompletions } from "./completion"
 import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"
@@ -110,16 +109,19 @@ export function startServer() {
 			return null
 		}
 
-		let { program } = parseWithDiagnostics(document.getText())
+		let { program } = parseDocument(document.getText(), uri)
 		let enrichedProgram: common.typed.Program | null = null
 
 		try {
-			enrichedProgram = enrich(program).program
+			enrichedProgram = enrichDocument(program, uri).program
 		} catch {}
 
 		return { program, enrichedProgram }
 	}
 
+	// NOTE: The `uri` is what lets `findRenameableOccurrence` refuse inside a
+	// standard library source — see the NOTE on it, which is where the reason
+	// lives.
 	function renameableOccurrenceAt(uri: string, position: Position) {
 		let parsed = parseAndEnrich(uri)
 
@@ -131,6 +133,7 @@ export function startServer() {
 			parsed.program,
 			toCursor(position),
 			parsed.enrichedProgram,
+			uri,
 		)
 	}
 
@@ -224,7 +227,11 @@ export function startServer() {
 			return null
 		}
 
-		let hover = findHover(parsed.enrichedProgram, toCursor(params.position))
+		let hover = findHover(
+			parsed.enrichedProgram,
+			toCursor(params.position),
+			isStdlibDocument(params.textDocument.uri) ? parsed.program : null,
+		)
 
 		if (hover === null) {
 			return null
@@ -344,7 +351,10 @@ export function startServer() {
 			return null
 		}
 
-		let { program } = parseWithDiagnostics(document.getText())
+		let { program } = parseDocument(
+			document.getText(),
+			params.textDocument.uri,
+		)
 
 		return findDocumentSymbols(program).map(toLspDocumentSymbol)
 	})
@@ -356,7 +366,10 @@ export function startServer() {
 			return null
 		}
 
-		let { program } = parseWithDiagnostics(document.getText())
+		let { program } = parseDocument(
+			document.getText(),
+			params.textDocument.uri,
+		)
 
 		return findFoldingRanges(program).map((range) => ({
 			startLine: range.startLine - 1,
@@ -371,7 +384,10 @@ export function startServer() {
 			return null
 		}
 
-		let { program } = parseWithDiagnostics(document.getText())
+		let { program } = parseDocument(
+			document.getText(),
+			params.textDocument.uri,
+		)
 
 		return params.positions.map((position) => {
 			let chain = findSelectionRanges(program, toCursor(position))
@@ -417,6 +433,7 @@ export function startServer() {
 		let entries = findCompletions(
 			document.getText(),
 			toCursor(params.position),
+			params.textDocument.uri,
 		)
 
 		return entries.map(toLspCompletionItem)
@@ -432,6 +449,7 @@ export function startServer() {
 		let help = findSignatureHelp(
 			document.getText(),
 			toCursor(params.position),
+			params.textDocument.uri,
 		)
 
 		if (help === null) {
@@ -479,8 +497,8 @@ export function startServer() {
 				// is synchronous, which guarantees that here.
 				connection.sendDiagnostics({
 					uri,
-					diagnostics: analyse(document.getText()).map((diagnostic) =>
-						toLspDiagnostic(diagnostic, uri),
+					diagnostics: analyse(document.getText(), uri).map(
+						(diagnostic) => toLspDiagnostic(diagnostic, uri),
 					),
 				})
 			}, analysisDebounceInMilliseconds),

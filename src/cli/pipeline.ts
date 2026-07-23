@@ -3,10 +3,9 @@ import { gzipSync } from "node:zlib"
 
 import { bundle, writeOutputs } from "../bundler/index"
 import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
-import { enrich } from "../enricher/index"
+import { enrichDocument, parseDocument } from "../documents"
 import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
-import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
@@ -174,8 +173,14 @@ export async function compileFile(
 			return finish(false, "read")
 		}
 
+		// NOTE: Routed through the same seam the Language Server uses, so that
+		// `esc check src/stdlib/List.es` and the Editor agree about the file
+		// in front of them. Without it the CLI rejected the `declarations { … }`
+		// header of the very sources it loads at startup — the exact inversion
+		// of the invariant, and a compiler developer could not check their own
+		// transcription.
 		let parsed = await timeline.run("parse", () =>
-			parseWithDiagnostics(sourceText),
+			parseDocument(sourceText, request.inputFileName),
 		)
 
 		diagnostics.push(...parsed.diagnostics)
@@ -185,7 +190,7 @@ export async function compileFile(
 		}
 
 		let enriched = await timeline.run("enrich", () =>
-			enrich(parsed.program),
+			enrichDocument(parsed.program, request.inputFileName),
 		)
 
 		diagnostics.push(...enriched.diagnostics)
