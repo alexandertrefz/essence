@@ -37,56 +37,22 @@ type PrintableConformance<Self extends AnyType> = {
 }
 
 export type StringNatives = {
-	// isEmpty() -> Boolean
-	isEmpty: (self: StringType) => BooleanType
-	// is(_: String) -> Boolean
-	is: (self: StringType, argument1: StringType) => BooleanType
-	// prepend(_: String) -> String
-	prepend: (self: StringType, argument1: StringType) => StringType
 	// append(_: String) -> String
 	append: (self: StringType, argument1: StringType) => StringType
 	// splitOn(_: String) -> List<String>
 	splitOn: (self: StringType, argument1: StringType) => ListType<StringType>
-	// contains(_: String) -> Boolean
-	contains: (self: StringType, argument1: StringType) => BooleanType
-	// length() -> Integer
-	length: (self: StringType) => IntegerType
-	// characters() -> List<String>
-	characters: (self: StringType) => ListType<StringType>
-	// characterAt(_: Integer) -> Optional<String>
-	characterAt: (self: StringType, argument1: IntegerType) => StringType | NothingType
 	// uppercased() -> String
 	uppercased: (self: StringType) => StringType
 	// lowercased() -> String
 	lowercased: (self: StringType) => StringType
-	// trimmed() -> String
-	trimmed: (self: StringType) => StringType
 	// trimmedAtStart() -> String
 	trimmedAtStart: (self: StringType) => StringType
 	// trimmedAtEnd() -> String
 	trimmedAtEnd: (self: StringType) => StringType
-	// startsWith(_: String) -> Boolean
-	startsWith: (self: StringType, argument1: StringType) => BooleanType
-	// endsWith(_: String) -> Boolean
-	endsWith: (self: StringType, argument1: StringType) => BooleanType
 	// replaceEvery(_: String, with: String) -> String
 	replaceEvery: (self: StringType, argument1: StringType, argument2: StringType) => StringType
-	// repeated(_: Integer) -> String
-	repeated: (self: StringType, argument1: IntegerType) => StringType
-	// reversed() -> String
-	reversed: (self: StringType) => StringType
-	// slice(from: Integer, to: Integer) -> String
-	slice: (self: StringType, from: IntegerType, to: IntegerType) => StringType
-	// firstIndexOf(_: String) -> Optional<Integer>
-	firstIndexOf: (self: StringType, argument1: StringType) => IntegerType | NothingType
-	// paddedAtStart(to: Integer, with: String) -> String
-	paddedAtStart: (self: StringType, to: IntegerType, argument2: StringType) => StringType
-	// paddedAtEnd(to: Integer, with: String) -> String
-	paddedAtEnd: (self: StringType, to: IntegerType, argument2: StringType) => StringType
 	// compareTo(_: String) -> Ordering
 	compareTo: (self: StringType, argument1: StringType) => OrderingType
-	// toString() -> String
-	toString: (self: StringType) => StringType
 }
 
 export type BooleanNatives = {
@@ -404,7 +370,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "hasAnyContent" | "isNot" | "doesNotContain" | "doesNotStartWith" | "doesNotEndWith"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "length" | "characters" | "characterAt" | "trimmed" | "startsWith" | "doesNotStartWith" | "endsWith" | "doesNotEndWith" | "repeated" | "reversed" | "slice" | "firstIndexOf" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule

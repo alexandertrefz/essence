@@ -34,6 +34,12 @@ const ratIs = (
 	first.rational.numerator * second.rational.denominator ===
 	second.rational.numerator * first.rational.denominator
 
+// NOTE: `String.toString` is written in Essence now (src/stdlib/String.es) —
+// `<- @`, the identity — so there is no runtime export left to hand `joinWith`
+// as its `Printable` witness. This spells the identity out, which is exactly
+// what the Simplifier now passes.
+const stringToString = (value: string.StringType) => value
+
 function diagnosticsFor(source: string) {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -263,12 +269,12 @@ describe("Stdlib", () => {
 
 			expect(
 				list.joinWith(pieces, str(" + "), {
-					toString: string.toString,
+					toString: stringToString,
 				}).value,
 			).toBe("a + b + c")
 			expect(
 				list.joinWith(list.createList([]), str(","), {
-					toString: string.toString,
+					toString: stringToString,
 				}).value,
 			).toBe("")
 		})
