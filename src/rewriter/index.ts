@@ -4,13 +4,19 @@ import { generate } from "escodegen"
 import type * as estree from "estree"
 
 import type { common } from "../interfaces/index"
-import { type PreludeNamespace, stdlibPrelude } from "./stdlibPrelude"
+import {
+	essenceMethodIdentifier,
+	essenceMethodName,
+	type PreludeNamespace,
+	stdlibPrelude,
+} from "./stdlibPrelude"
 
 // NOTE: The builtin Namespaces that have a runtime module in `__internal/`, in
-// the order their imports are emitted. A Namespace the prelude merges is
-// imported under `$native_<Name>` instead and the merged const takes its name —
-// everything downstream reads `Boolean.isNot` either way, so no other part of
-// the Rewriter knows the difference.
+// the order their imports are emitted. Every one is imported unconditionally,
+// under its own name, and a Namespace no Program references costs nothing —
+// esbuild shakes an unused `import * as <Name>` away entirely. A Method the
+// standard library implements in Essence is NOT a member of one of these; it is
+// its own `$es_<Namespace>_<member>` const, emitted alongside.
 const runtimeNamespaceNames = [
 	"String",
 	"Integer",
@@ -45,21 +51,14 @@ export function rewrite(program: common.typedSimple.Program): string {
 	// would have to know about each of those shapes and would silently drop a
 	// Namespace the moment a new one was added.
 	const implementation = rewriteImplementationSection(program.implementation)
-	const merged = reachableMergedNamespaces(prelude, implementation)
+	const essenceMethods = reachableEssenceMethods(prelude, implementation)
 
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
 		sourceType: "module",
 		body: [
 			...runtimeNamespaceNames.map((name) =>
-				internalImport(
-					[
-						importNamespaceSpecifier(
-							merged.has(name) ? `$native_${name}` : name,
-						),
-					],
-					name,
-				),
+				internalImport([importNamespaceSpecifier(name)], name),
 			),
 			internalImport([importNamespaceSpecifier("$_")], "functions"),
 			internalImport([importNamespaceSpecifier("$type")], "type"),
@@ -67,16 +66,16 @@ export function rewrite(program: common.typedSimple.Program): string {
 				[importNamespaceSpecifier("$helpers")],
 				"internalHelpers",
 			),
-			// NOTE: Imports first — a const spreads the module it was imported
-			// from. Among themselves the consts may sit in any order, because
-			// the only thing a merged const holds is Methods, and a Method body
-			// naming another Namespace reads that name when it is CALLED, long
-			// after every const is initialised. `buildStdlibPrelude` rejects a
-			// bodied Property precisely to keep that true — a Property
-			// initialiser would run HERE, in declaration order.
-			...prelude
-				.filter((namespace) => merged.has(namespace.name))
-				.map((namespace) => merged.get(namespace.name)!),
+			// NOTE: Imports first — an Essence Method's const reads the runtime
+			// modules those imports bind. Among themselves the consts may sit in
+			// any order, because each is a Function expression, whose body runs
+			// only when the Method is CALLED — long after every const is
+			// initialised — so one Essence Method naming another, or naming
+			// itself, resolves at call time regardless of declaration order.
+			// `buildStdlibPrelude` rejects a bodied Property precisely to keep
+			// that true: a Property initialiser would run HERE, in declaration
+			// order.
+			...essenceMethods.values(),
 			...implementation,
 		],
 	}
@@ -188,104 +187,69 @@ function rewriteNamespaceDefinitionStatement(
 	}
 }
 
-// NOTE: A merged standard library Namespace — the runtime module spread into an
-// object literal, with everything written in Essence laid over the top:
+// NOTE: One Essence-implemented standard library Method, emitted as its own
+// top-level const:
 //
-//   const Boolean = { ...$native_Boolean, isNot: function (_self, other) { … } }
+//   const $es_Boolean_isNot = function (_self, other) { … }
 //
-// The Essence half WINS where the two collide — the object literal's own key
-// overrides what the spread brought in. That is only a safety net, not a
-// workflow: `builtins.spec` fails a Method that is implemented in BOTH places,
-// so the TypeScript has to be deleted in the same commit that writes the
-// Essence. What the precedence buys is that the failure is a red test rather
-// than a Method that silently kept running its old implementation.
+// A native of the same Namespace stays a member read off the plain
+// `import * as <Namespace>`, so the two live side by side without either being
+// a member of the other — which is the whole point: nothing has to materialise
+// a module namespace object, so the natives the Program does not use stay
+// shakeable. `builtins.spec` fails a Method implemented in BOTH a runtime export
+// and here, so the TypeScript is deleted in the same commit that writes the
+// Essence.
 //
-// NOTE: The member names are taken exactly as the Simplifier produced them, so
-// an Overload lands under `name__overload$N` for N its position in the METHOD
-// TYPE's Overloads — not its position among the bodied ones. A block that binds
-// Overload 1 to the runtime and writes Overload 2 in Essence therefore emits
-// `isNot__overload$2` over a spread that already carries the native's
-// `isNot__overload$1`, and neither shadows the other.
-//
-// NOTE: A Namespace with no runtime module gets no spread. There is nothing to
-// merge with — every member of it is written in Essence — and spreading an
-// identifier that was never imported would emit a ReferenceError.
-function rewriteMergedNamespace(
-	namespace: PreludeNamespace,
-	options: { hasRuntimeModule: boolean },
+// NOTE: The member name is taken exactly as the Simplifier produced it, so an
+// Overload's const is named for N its position in the METHOD TYPE's Overloads,
+// not among the bodied ones — a block that binds Overload 1 to the runtime and
+// writes Overload 2 in Essence emits `$es_X_m__overload$2`, and the native's
+// `X.m__overload$1` is untouched.
+function rewriteEssenceMethod(
+	namespaceName: string,
+	memberName: string,
+	method: common.typedSimple.Method,
 ): estree.VariableDeclaration {
-	let node = namespace.node
-	let properties: Array<estree.Property | estree.SpreadElement> = []
-
-	if (options.hasRuntimeModule) {
-		properties.push({
-			type: "SpreadElement",
-			argument: {
-				type: "Identifier",
-				name: `$native_${namespace.name}`,
-			},
-		})
-	}
-
-	let property = (
-		name: string,
-		value: estree.Expression,
-	): estree.Property => ({
-		type: "Property",
-		key: { type: "Identifier", name },
-		value,
-		kind: "init",
-		computed: false,
-		method: false,
-		shorthand: false,
-	})
-
-	// NOTE: Only Methods. A merged Namespace can not carry a bodied static
-	// Property — `buildStdlibPrelude` rejects one — because its initialiser
-	// would be evaluated inside this very object literal, before the const it
-	// names exists. See the NOTE there.
-	for (let [name, method] of Object.entries(node.methods)) {
-		properties.push(
-			property(name, rewriteFunctionExpression(method.method.value)),
-		)
-	}
-
 	return {
 		type: "VariableDeclaration",
 		kind: "const",
 		declarations: [
 			{
 				type: "VariableDeclarator",
-				id: { type: "Identifier", name: namespace.name },
-				init: { type: "ObjectExpression", properties },
+				id: {
+					type: "Identifier",
+					name: essenceMethodIdentifier(namespaceName, memberName),
+				},
+				init: rewriteFunctionExpression(method.method.value),
 			},
 		],
 	}
 }
 
-// NOTE: Which merged Namespaces the emitted Program actually needs, and the
-// const for each. A merged const spreads its runtime module, which forces the
-// Bundler to materialise the module's namespace object and keep every export it
-// has — tree shaking is defeated for a Namespace the const drags in. Emitting
-// one unconditionally therefore charged every Program about a kilobyte for a
-// Namespace it may never mention, and turned a Program of nothing but comments
-// into a twelve kilobyte bundle. So a const is emitted only where something
-// names it.
+// NOTE: Which Essence-implemented Methods the emitted Program actually needs,
+// and the const for each. A const is emitted only where something names it:
+// unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
+// unused const still names the runtime Methods its body reaches, and once a
+// module is in the graph its impure top-level initialisers (`Number.PI`,
+// `Number.TAU`) can no longer be dropped — so an unconditional const would
+// charge a Program for a numeric tower it never used. The gate is per-Method,
+// finer than the per-Namespace one it replaced.
 //
-// NOTE: A Namespace left out keeps the plain `import * as <Name>` it always had
-// — nothing references it, the Bundler shakes it away, and the emitted text is
-// what it was before the prelude existed.
+// NOTE: A Method left out costs nothing — nothing references its const and no
+// spread was ever emitted, so the text is exactly what a wholly native standard
+// library would have produced.
 //
 // NOTE: The search runs to a FIXED POINT over the consts themselves, not just
-// over the user Program: `Boolean.isNot`'s body calls `Boolean.negate`, and a
-// Method of one merged Namespace may well call into another. Stopping at the
-// first round would emit a const whose body names one that was never declared.
+// over the user Program: `Boolean.isNot`'s body calls `Boolean.negate` (a
+// native, no const) but could equally call another Essence Method, and a
+// Method's const reached only through another one must still be pulled in.
+// Stopping at the first round would emit a const whose body names one that was
+// never declared.
 //
 // NOTE: Exported for the tests. The fixed point is the part of this that can
-// silently be wrong — a Namespace reached only through another one is exactly
-// what the standard library will produce more of — and it can not be driven
-// through `rewrite` today, because only one Namespace is merged.
-export function reachableMergedNamespaces(
+// silently be wrong — a Method reached only through another one is exactly what
+// the standard library will produce more of as the conversion goes on.
+export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
 ): Map<string, estree.VariableDeclaration> {
@@ -295,39 +259,153 @@ export function reachableMergedNamespaces(
 		return reachable
 	}
 
-	let candidates = new Map<string, estree.VariableDeclaration>(
-		prelude.map((namespace) => [
-			namespace.name,
-			rewriteMergedNamespace(namespace, {
-				hasRuntimeModule: runtimeNamespaceNames.includes(
-					namespace.name,
-				),
-			}),
-		]),
+	// NOTE: The pairs this prelude implements in Essence — an edge is drawn only
+	// to a Method the prelude actually defines a const for.
+	let implemented = new Set(
+		prelude.flatMap((namespace) =>
+			Object.keys(namespace.node.methods).map(
+				(memberName) => `${namespace.name} ${memberName}`,
+			),
+		),
+	)
+
+	// NOTE: Each candidate carries its declaration AND the other Essence Methods
+	// its body calls, read off the TYPED body rather than the emitted const.
+	// That matters: `namespaceMember` decides an emitted call's spelling from the
+	// process-wide prelude, so a const emitted for a DIFFERENT prelude (only the
+	// tests do this) would spell its transitive calls as native member reads and
+	// the fixed point would lose the edge. Reading the typed body keeps the
+	// reachability answer a property of the prelude it was handed.
+	let candidates = new Map<
+		string,
+		{ declaration: estree.VariableDeclaration; references: Set<string> }
+	>(
+		prelude.flatMap((namespace) =>
+			Object.entries(namespace.node.methods).map(
+				([memberName, method]): [
+					string,
+					{
+						declaration: estree.VariableDeclaration
+						references: Set<string>
+					},
+				] => [
+					essenceMethodIdentifier(namespace.name, memberName),
+					{
+						declaration: rewriteEssenceMethod(
+							namespace.name,
+							memberName,
+							method,
+						),
+						references: essenceMethodReferences(
+							method.method.value,
+							implemented,
+						),
+					},
+				],
+			),
+		),
 	)
 
 	let pending: Array<string> = []
 
 	let include = (names: Set<string>): void => {
 		for (let name of names) {
-			let declaration = candidates.get(name)
+			let candidate = candidates.get(name)
 
-			if (declaration === undefined || reachable.has(name)) {
+			if (candidate === undefined || reachable.has(name)) {
 				continue
 			}
 
-			reachable.set(name, declaration)
+			reachable.set(name, candidate.declaration)
 			pending.push(name)
 		}
 	}
 
+	// NOTE: The seed is what the emitted user Program names — a plain call, a
+	// conformance witness and a `dispatchMethod` target are all bare `$es_…`
+	// Identifiers by now, so `referencedNames` finds them all alike.
 	include(referencedNames(implementation))
 
 	while (pending.length > 0) {
-		include(referencedNames(candidates.get(pending.pop()!)!))
+		include(candidates.get(pending.pop()!)!.references)
 	}
 
 	return reachable
+}
+
+// NOTE: The Essence Methods a typed Method body calls, restricted to the ones a
+// given prelude implements. Reads the same three invocation spellings the
+// Simplifier produces — an instance `MethodInvocation`, a Union
+// `UnionMethodInvocation`, and a static call, which is a `FunctionInvocation`
+// off a Namespace `Lookup`. Over-collecting is safe here as everywhere in the
+// reachability search: an edge to a Method the prelude does not implement is
+// filtered out by `implemented`, and one to a Method it does only emits a const
+// that is read, never one that is missing.
+function essenceMethodReferences(
+	root: unknown,
+	implemented: Set<string>,
+): Set<string> {
+	let references = new Set<string>()
+
+	let consider = (namespaceName: unknown, memberName: unknown): void => {
+		if (
+			typeof namespaceName === "string" &&
+			typeof memberName === "string" &&
+			implemented.has(`${namespaceName} ${memberName}`)
+		) {
+			references.add(essenceMethodIdentifier(namespaceName, memberName))
+		}
+	}
+
+	let visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (let entry of node) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (record["nodeType"] === "MethodInvocation") {
+			let base = record["base"] as Record<string, unknown> | undefined
+			let member = record["member"] as Record<string, unknown> | undefined
+
+			consider(base?.["name"], member?.["name"])
+		} else if (record["nodeType"] === "UnionMethodInvocation") {
+			for (let dispatch of (record["cases"] as Array<
+				Record<string, unknown>
+			>) ?? []) {
+				consider(dispatch["namespaceName"], dispatch["methodName"])
+			}
+		} else if (record["nodeType"] === "FunctionInvocation") {
+			let callee = record["name"] as Record<string, unknown> | undefined
+
+			if (callee?.["nodeType"] === "Lookup") {
+				let base = callee["base"] as Record<string, unknown> | undefined
+				let member = callee["member"] as
+					| Record<string, unknown>
+					| undefined
+
+				if (base?.["nodeType"] === "Identifier") {
+					consider(base["name"], member?.["name"])
+				}
+			}
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+
+	return references
 }
 
 // NOTE: Every name the given tree READS. A dotted member and an object
@@ -644,11 +722,12 @@ function rewriteFunctionInvocation(
 }
 
 // NOTE: One reference to a member of a standard library Namespace, in the one
-// place every emission site routes through. Today it is always a member read
-// off the plain `import * as <Namespace>`; the next commit lets it emit a bare
-// Identifier instead for a Method the standard library implements in Essence,
-// so that a native stays tree-shakeable and an Essence-implemented Method needs
-// no materialised module namespace object. The literal constructors
+// place every emission site routes through. A native Method stays a read off
+// the plain `import * as <Namespace>` — which esbuild rewrites to a direct
+// symbol reference and can therefore tree-shake — while an Essence-implemented
+// Method is not a member of anything: it is its own top-level const, reached by
+// a bare `$es_<Namespace>_<member>` Identifier, so nothing has to materialise
+// the module namespace object to get at it. The literal constructors
 // (`String.createString`, `List.createList`, …) do NOT come through here: they
 // name their Namespace directly and are not declared in `src/stdlib`, so they
 // can never be Essence-implemented.
@@ -656,6 +735,12 @@ function namespaceMember(
 	namespaceName: string,
 	memberName: string,
 ): estree.Expression {
+	let essenceName = essenceMethodName(namespaceName, memberName)
+
+	if (essenceName !== null) {
+		return { type: "Identifier", name: essenceName }
+	}
+
 	return {
 		type: "MemberExpression",
 		optional: false,
