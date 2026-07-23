@@ -57,13 +57,14 @@ export function buildStdlibPrelude(
 			// import — so the compiler developer who writes the first one has to
 			// be stopped here.
 			//
-			// NOTE: For whoever converts `Number`, `Transcendental` or any other
-			// Namespace with static Properties: a value-LESS `static PI:
-			// Transcendental` is a native and never reaches this Node, so those
-			// convert as they are. Giving one a value needs the Rewriter to emit
-			// Properties as assignments AFTER every const — `Transcendental.PI =
-			// …` — at which point the ordering between two Properties that name
-			// each other becomes the next thing to answer.
+			// NOTE: `Number.PI` and `Number.TAU` are the proof this refusal is
+			// narrow rather than a wall: a value-LESS `static PI:
+			// Transcendental` is a native, never reaches this Node, and arrives
+			// at a call site through the spread — which is how the numeric tower
+			// converted with its constants intact. Giving one a value needs the
+			// Rewriter to emit Properties as assignments AFTER every const —
+			// `Number.PI = …` — at which point the ordering between two
+			// Properties that name each other becomes the next thing to answer.
 			let bodiedProperties = Object.keys(node.properties)
 
 			if (bodiedProperties.length > 0) {

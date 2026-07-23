@@ -918,6 +918,107 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"'])
 		})
 
+		// NOTE: `Number.isBetween` is the SECOND Method to be written in
+		// Essence, and `Number` the second merged Namespace — which is what
+		// makes the three tests below more than a repeat of the Boolean ones:
+		// the reachability fixed point now has two candidates to get right, and
+		// each has to be emitted exactly when the Program reaches it and not
+		// otherwise.
+		//
+		// NOTE: These five cases are the ones `stdlib.spec.ts` used to assert
+		// against the runtime `isBetween` before it was deleted — both bounds
+		// included, both bounds excluded from outside, and bounds in the wrong
+		// order — now run through the compiled Method instead.
+		it("runs isBetween from the merged const", async () => {
+			expect(
+				await run(`implementation {
+					__print(5::isBetween(1, and 10)::toString())
+					__print(1::isBetween(1, and 10)::toString())
+					__print(10::isBetween(1, and 10)::toString())
+					__print(11::isBetween(1, and 10)::toString())
+					__print(0::isBetween(1, and 10)::toString())
+					__print(5::isBetween(10, and 1)::toString())
+				}`),
+			).toEqual([
+				'"true"',
+				'"true"',
+				'"true"',
+				'"false"',
+				'"false"',
+				'"false"',
+			])
+		})
+
+		// NOTE: The covering order is the whole point of putting `isBetween` on
+		// `Number` rather than on each member — π against an Integer and a
+		// Rational bound is a comparison no member Namespace offers.
+		it("runs isBetween across the whole numeric tower", async () => {
+			expect(
+				await run(`implementation {
+					__print(Number.PI::isBetween(3, and 22/7)::toString())
+					__print(Number.PI::isBetween(22/7, and 4)::toString())
+					__print(3/2::isBetween(1, and 2)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"'])
+		})
+
+		// NOTE: The body calls `Boolean.and`, so reaching `Number` drags
+		// `Boolean` in with it — the reachability search follows a merged
+		// Namespace's own body, which is exactly what the README promises
+		// whoever adds the next cross-Namespace Method.
+		it("emits both merged consts, either one, or neither", () => {
+			const both = generate(`implementation {
+				__print(5::isBetween(1, and 10)::isNot(false))
+			}`)
+
+			expect(both).toContain("const Number = {")
+			expect(both).toContain("const Boolean = {")
+
+			// NOTE: `Boolean` alone — a Program that never names a Number.
+			const booleanOnly = generate(`implementation {
+				__print(true::isNot(false))
+			}`)
+
+			expect(booleanOnly).not.toContain("const Number = {")
+			expect(booleanOnly).toContain("const Boolean = {")
+
+			// NOTE: `Number` alone is not reachable on its own: `isBetween`'s
+			// body names `Boolean.and`, so the pair always arrive together.
+			const numberReached = generate(`implementation {
+				__print(5::isBetween(1, and 10))
+			}`)
+
+			expect(numberReached).toContain("const Number = {")
+			expect(numberReached).toContain("const Boolean = {")
+			expect(numberReached).toContain(
+				"isBetween: function (_self, lower, upper) {",
+			)
+
+			// NOTE: Neither. A String-only Program names no merged Namespace at
+			// all and gets no const, exactly as before either one existed.
+			const neither = generate(`implementation {
+				__print("hello")
+			}`)
+
+			expect(neither).not.toContain("const Number = {")
+			expect(neither).not.toContain("const Boolean = {")
+		})
+
+		// NOTE: A value-LESS `static PI: Transcendental` is a native — it never
+		// reaches the prelude's bodied-Property refusal — so it has to arrive
+		// through the spread of the runtime module into the merged const, like
+		// every other native does.
+		it("reads PI and TAU off the merged const", async () => {
+			const source = `implementation {
+				__print(Number.PI::toString())
+				__print(Number.TAU::toString())
+				__print(Number.PI::isBetween(3, and 22/7)::toString())
+			}`
+
+			expect(generate(source)).toContain("Number.PI")
+			expect(await run(source)).toEqual(['"π"', '"2·π"', '"true"'])
+		})
+
 		// NOTE: Simplifying and optimising the standard library for every file
 		// compiled would be paid once per file for an answer that can not
 		// differ — and the Simplifier writes into the Nodes it is handed, so a
