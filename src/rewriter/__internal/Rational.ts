@@ -13,6 +13,7 @@ import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { NumberFormatType } from "./NumberFormat"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
@@ -349,11 +350,14 @@ export function toString__overload$1(rational: RationalType): StringType {
 	return createString(formatAsRational(rational.rational))
 }
 
+// NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
+// there is no unrecognised spelling to fall back from — the two Cases are the
+// only two a caller can write.
 export function toString__overload$2(
 	rational: RationalType,
-	formatAs: StringType,
+	formatAs: NumberFormatType,
 ): StringType {
-	if (formatAs.value === "decimal") {
+	if (formatAs[typeKeySymbol] === "NumberFormat#Decimal") {
 		return createString(rational.rational.toString())
 	} else {
 		return createString(formatAsRational(rational.rational))
