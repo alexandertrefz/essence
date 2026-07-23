@@ -541,12 +541,23 @@ export function lastIndexOf<ItemType extends AnyType>(
 	return createNothing()
 }
 
-export function joinWith(
-	originalList: ListType<StringType>,
+// NOTE: Joining asks nothing of the items but that each can say what it is, so
+// the Method is bounded by `Printable` rather than fixed to a List of Strings —
+// the conforming Namespace's method map arrives as the hidden trailing
+// Argument, exactly as `sorted`'s does, and its `toString` is the whole of the
+// conversion. For a List of Strings that `toString` is the identity, so the
+// original behaviour is unchanged.
+export function joinWith<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
 	separator: StringType,
+	conformance: {
+		toString: (value: ItemType) => StringType
+	},
 ): StringType {
 	return createString(
-		originalList.value.map((item) => item.value).join(separator.value),
+		originalList.value
+			.map((item) => conformance.toString(item).value)
+			.join(separator.value),
 	)
 }
 

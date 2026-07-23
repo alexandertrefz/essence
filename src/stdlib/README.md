@@ -14,13 +14,14 @@ and a Namespace conforming to it in another resolve across the file boundary —
 and then enriches and validates them. A single Diagnostic anywhere in here is a
 compiler-developer error and throws, fully rendered.
 
-The conversion from the TypeScript tables in `src/enricher/types/*.ts` is in
-flight — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering`,
-`Record`, `String`, and the whole numeric tower (`Integer`, `Rational`,
+The conversion from the TypeScript tables in `src/enricher/types/*.ts` is
+complete — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering`,
+`Record`, `String`, the whole numeric tower (`Integer`, `Rational`,
 `Algebraic`, `Transcendental` and the covering `Number`, which brings the
-`Number` and `Irrational` Union Types with it) have moved; `List` has not.
-Whatever a file here declares is subtracted from those tables, so a Namespace
-moves over one at a time.
+`Number` and `Irrational` Union Types with it) and finally `List` all live
+here. Whatever a file here declares is subtracted from those tables, so the
+Namespaces moved over one at a time; what is left of the legacy half is the
+bare primitive Type tags and `__print`.
 
 A Namespace may be half native and half Essence — `Boolean.isNot` and
 `Number.isBetween` are written here, the rest of both is still bound to
@@ -81,3 +82,40 @@ with the last table.
 - **A `@param` is matched against the Parameter's external and then internal
   name.** One naming neither attaches to nothing and is rendered into every
   Hover regardless. The gate reports these per Overload.
+- **Every Method of a Namespace answers for the Namespace's target Type.**
+  There is no per-Method receiver, and a Method that only some values of the
+  target Type can answer does not belong there. Reach for a **bounded Method
+  Generic** first — `sorted<infer ItemType is Comparable>()` and
+  `joinWith<infer ItemType is Printable>(…)` stay Methods of `List`, which
+  targets every List, and the bound is what a use site has to satisfy. The
+  Method Generic shadows the Namespace's `ItemType` outright, and the bound's
+  conformance arrives as a hidden trailing Argument, so the runtime
+  implementation gains a `conformance` Parameter.
+- **A narrower receiver needs a Namespace of its own — and only when no bound
+  can express it.** `flattened` is the one such Method: its items have to be
+  Lists AND it names the inner item Type, which no Protocol bound can do. It is
+  declared as `NestedList<infer ItemType> for List<List<ItemType>>` in
+  `List.es`, beside the Namespace it left. A receiver matches every Namespace
+  whose target Type it unifies with, so `[[1]]::` reaches both `List` and
+  `NestedList`, and `[1]::flattened()` finds no Namespace to search. Two such
+  Namespaces must not declare the SAME Method name: receiver specificity does
+  not break that tie, and the call is reported as `ambiguous-namespace`.
+- **A new Namespace is a new runtime module.** The Simplifier emits
+  `<Namespace>.<method>(…)`, so each name needs an entry in
+  `runtimeNamespaceNames` (`src/rewriter/index.ts`), a
+  `src/rewriter/__internal/<Name>.ts` — a re-export of the implementation is
+  enough — a place in `builtinMemberOrder` (`src/enricher/builtins.ts`), and a
+  row in `builtins.spec.ts`'s `runtimeModules`.
+
+## The one intentional API change
+
+The conversion is a transcription, and the equivalence gate holds it to that —
+with a single exception, on the record here and in `stdlibEquivalence.spec.ts`.
+`List::joinWith` was fixed to a List of Strings, because a hand written table
+entry had no way to ask for less. Joining asks nothing of the items but that
+each can say what it is, so it is now
+`joinWith<infer ItemType is Printable>(_ separator: String) -> String` and
+`[1, 2, 3]::joinWith(", ")` is `"1, 2, 3"`. Behaviour on a List of Strings is
+unchanged. The gate does not normalize the difference away: `joinWith` is
+excused from `List`'s wholesale comparison and pinned by a test that spells the
+new declaration out in full.
