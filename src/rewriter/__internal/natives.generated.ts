@@ -105,6 +105,8 @@ export type IntegerNatives = {
 	negate: (self: IntegerType) => IntegerType
 	// remainder(dividingBy: Integer) -> Optional<Integer>
 	remainder: (self: IntegerType, dividingBy: IntegerType) => IntegerType | NothingType
+	// quotient(dividingBy: Integer) -> Optional<Integer>
+	quotient: (self: IntegerType, dividingBy: IntegerType) => IntegerType | NothingType
 	// raise(to: Integer) -> Optional<Integer | Rational>
 	raise: (self: IntegerType, to: IntegerType) => IntegerType | RationalType | NothingType
 	// static parse(_: String) -> Optional<Integer>
@@ -332,7 +334,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "repeat" | "reverse" | "slice" | "firstIndex" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "repeat" | "reverse" | "slice" | "firstIndex" | "pad__overload$1" | "pad__overload$2" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule

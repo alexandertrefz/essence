@@ -21,8 +21,8 @@ implementation {
 	__print("  spaced  "::trim())       § "spaced"
 
 	§ Padding reaches a length, counting characters.
-	__print("7"::paddedAtStart(to 3, with "0"))  § "007"
-	__print("7"::paddedAtEnd(to 3, with "."))    § "7.."
+	__print("7"::pad(to 3, with "0"))  § "007"
+	__print("7"::pad(to 3, with ".", at Side#End))    § "7.."
 
 	§ Characters, each its own single-character String.
 	__print(greeting::character(at 1))      § "e"

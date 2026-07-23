@@ -20,7 +20,7 @@ Essence; the rest bind to `src/rewriter/__internal/`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compareTo`), the JavaScript intrinsics Essence has no expression for
-(`String.uppercased`, the trim Methods, `Record`'s reflective Methods,
+(`String.uppercased`, `String.trim(at:)`, `Record`'s reflective Methods,
 `String.compareTo` — there is no way to name a character's code point), and the
 iteration primitives the rest rest on (`List.reduce`, `item(at:)`, `slice`,
 `keepEvery`, `append(contentsOf:)`, `static of`, `String.split(on:)`).

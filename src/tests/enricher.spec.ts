@@ -2241,7 +2241,7 @@ describe("Enricher", () => {
 					constant loud: String = "hi"::uppercased()::trim()
 					constant begins: Boolean = "hi"::starts(with "h")
 					constant at: Integer | Nothing = "hello"::firstIndex(of "l")
-					constant padded: String = "7"::paddedAtStart(to 3, with "0")
+					constant padded: String = "7"::pad(to 3, with "0")
 				}`),
 			).toEqual([])
 		})

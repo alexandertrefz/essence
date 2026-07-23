@@ -500,8 +500,8 @@ describe("Rewriter", () => {
 			// (`src/stdlib/String.es`) and the golden harness covers it —
 			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
 			// `character`, `trimmed`, `startsWith`, `endsWith`, `repeat`,
-			// `reverse`, `slice`, `firstIndex`, `paddedAtStart`,
-			// `paddedAtEnd` and `toString`, alongside the negations
+			// `reverse`, `slice`, `firstIndex`, `pad`,
+			// and `toString`, alongside the negations
 			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStart`,
 			// `doesNotEnd`) that moved earlier. What is left below is the
 			// native floor those Essence bodies stand on, and it is where the

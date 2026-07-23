@@ -173,6 +173,12 @@ declarations {
 		§§ @returns the remainder, or `Nothing` when dividing by zero.
 		remainder(dividingBy divisor: Integer) -> Optional<Integer>
 
+		§§ The whole part of Euclidean division — the count of whole divisors, paired with `remainder` so that `quotient · divisor + remainder` is the original Integer. `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, since the remainder is never negative.
+		§§
+		§§ @param dividingBy the divisor
+		§§ @returns the quotient, or `Nothing` when dividing by zero.
+		quotient(dividingBy divisor: Integer) -> Optional<Integer>
+
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
 		§§
 		§§ @param exponent the exponent

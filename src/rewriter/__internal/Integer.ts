@@ -171,6 +171,32 @@ export function remainder(
 	return createInteger(remainder)
 }
 
+// NOTE: The other half of the same division, and it has to agree with
+// `remainder` exactly: `quotient · divisor + remainder` must be the original
+// Integer. Since the remainder is Euclidean — never negative — the quotient is
+// floored towards negative infinity for a positive divisor rather than
+// truncated towards zero, which is where it parts company with JavaScript's
+// `/`. `(-7) ÷ 3` is `-3` remainder `2`, not `-2` remainder `-1`.
+export function quotient(
+	integer: IntegerType,
+	divisor: IntegerType,
+): IntegerType | NothingType {
+	if (divisor.value === 0n) {
+		return createNothing()
+	}
+
+	let truncated = integer.value / divisor.value
+	let remainder = integer.value % divisor.value
+
+	// NOTE: A negative remainder means the truncation rounded the wrong way for
+	// a Euclidean pairing; step the quotient one towards the divisor's sign.
+	if (remainder < 0n) {
+		truncated += divisor.value < 0n ? 1n : -1n
+	}
+
+	return createInteger(truncated)
+}
+
 export function raise(
 	base: IntegerType,
 	exponent: IntegerType,
