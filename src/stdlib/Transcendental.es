@@ -15,7 +15,9 @@ declarations {
 		§§
 		§§ @param other the Transcendental to compare with
 		§§ @returns `true` when the canonical forms agree.
-		is(_ other: Transcendental) -> Boolean
+		is(_ other: Transcendental) -> Boolean {
+			<- @::<Number>is(other)
+		}
 
 		§§ Whether the Transcendentals have different canonical forms — within the current grammar, different numbers.
 		§§
@@ -37,11 +39,17 @@ declarations {
 
 		§§ Subtracts a number from this Transcendental, exactly. Subtracting an equal π term leaves a Rational.
 		overload subtract {
-			(_ other: Integer) -> Transcendental
+			(_ other: Integer) -> Transcendental {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Rational) -> Transcendental
+			(_ other: Rational) -> Transcendental {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Transcendental) -> Rational | Transcendental
+			(_ other: Transcendental) -> Rational | Transcendental {
+				<- @::add(other::negated())
+			}
 		}
 
 		§§ Multiplies this Transcendental with an Integer or Rational, exactly — multiplying by zero collapses to zero. Two Transcendentals can not be multiplied: `π·π` would leave the linear-in-π grammar.
@@ -62,7 +70,10 @@ declarations {
 		}
 
 		§§ The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.
-		absolute() -> Transcendental
+		absolute() -> Transcendental {
+			if @::<Number>isLessThan(0) { <- @::negated() }
+			<- @
+		}
 
 		§§ The Transcendental with its sign flipped. The π term keeps its non-zero coefficient, so the result is again a Transcendental.
 		negated() -> Transcendental

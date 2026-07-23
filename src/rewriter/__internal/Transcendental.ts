@@ -8,8 +8,6 @@ import {
 	scaledIntervalOf,
 	subtractRationals,
 } from "./Algebraic"
-import type { BooleanType } from "./Boolean"
-import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
@@ -185,22 +183,6 @@ export function signRelativeTo(
 
 // #region Methods
 
-export function is(
-	transcendental: TranscendentalType,
-	other: TranscendentalType,
-): BooleanType {
-	// NOTE: Canonical forms make equality inside the grammar structural.
-	return createBoolean(
-		transcendental.rationalPartNumerator === other.rationalPartNumerator &&
-			transcendental.rationalPartDenominator ===
-				other.rationalPartDenominator &&
-			transcendental.piCoefficientNumerator ===
-				other.piCoefficientNumerator &&
-			transcendental.piCoefficientDenominator ===
-				other.piCoefficientDenominator,
-	)
-}
-
 // NOTE: Exact within the linear grammar: the difference is again
 // `A + B·π`; its sign is B's sign when B ≠ 0 (π-dominance), else A's.
 export function compareTranscendentals(
@@ -267,16 +249,6 @@ export function add(
 	) as TranscendentalType
 }
 
-export function subtract(
-	transcendental: TranscendentalType,
-	other: IntegerType | RationalType,
-): TranscendentalType {
-	return createTranscendental(
-		subtractRationals(rationalPartOf(transcendental), bigRationalOf(other)),
-		piCoefficientOf(transcendental),
-	) as TranscendentalType
-}
-
 export function multiplyWith(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType,
@@ -332,22 +304,6 @@ export function addTranscendental(
 	)
 }
 
-export function subtractTranscendental(
-	transcendental: TranscendentalType,
-	other: TranscendentalType,
-): TranscendentalType | RationalType {
-	return createTranscendental(
-		subtractRationals(
-			rationalPartOf(transcendental),
-			rationalPartOf(other),
-		),
-		subtractRationals(
-			piCoefficientOf(transcendental),
-			piCoefficientOf(other),
-		),
-	)
-}
-
 // NOTE: A quotient of two linear-in-π values is representable exactly when
 // they are proportional — π/π = 1, TAU/PI = 2, (1 + π)/(2 + 2·π) = 1/2.
 // Anything else leaves the grammar and returns Nothing.
@@ -384,19 +340,6 @@ export function negated(
 		piCoefficientNumerator: -transcendental.piCoefficientNumerator,
 		piCoefficientDenominator: transcendental.piCoefficientDenominator,
 	}
-}
-
-export function absolute(
-	transcendental: TranscendentalType,
-): TranscendentalType {
-	// NOTE: The sign against zero is decidable — `a + b·π` can not equal a
-	// rational, so the enclosure loop always separates.
-	const sign = signRelativeTo(transcendental, {
-		[typeKeySymbol]: "Integer",
-		value: 0n,
-	})
-
-	return sign < 0n ? negated(transcendental) : transcendental
 }
 
 // #endregion
@@ -446,9 +389,6 @@ export function toString(transcendental: TranscendentalType): StringType {
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addTranscendental
-export const subtract__overload$1 = subtract
-export const subtract__overload$2 = subtract
-export const subtract__overload$3 = subtractTranscendental
 export const multiplyWith__overload$1 = multiplyWith
 export const multiplyWith__overload$2 = multiplyWith
 export const divideBy__overload$1 = divideBy

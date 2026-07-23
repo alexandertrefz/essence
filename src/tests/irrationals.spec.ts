@@ -165,18 +165,20 @@ describe("Irrationals", () => {
 			)
 
 			expect(doubled[typeKeySymbol]).toBe("Transcendental")
-			expect(
-				transcendental.is(
-					doubled as transcendental.TranscendentalType,
-					number.TAU,
-				).value,
-			).toBeTrue()
+			// NOTE: `Transcendental.is` is written in Essence now
+			// (src/stdlib/Transcendental.es) — `anyIs` compares the canonical
+			// form the same way the deleted native did.
+			expect(anyIs(doubled, number.TAU)).toBeTrue()
 		})
 
 		it("collapses cancelling π-parts to a Rational", () => {
-			const difference = transcendental.subtractTranscendental(
+			// NOTE: `Transcendental.subtract` is written in Essence now
+			// (src/stdlib/Transcendental.es) as `add(other::negated())` — this
+			// is that composition, and the still-native gateway is what
+			// collapses the cancelled π-part.
+			const difference = transcendental.addTranscendental(
 				number.TAU,
-				number.TAU,
+				transcendental.negated(number.TAU),
 			)
 
 			expect(difference[typeKeySymbol]).toBe("Rational")
