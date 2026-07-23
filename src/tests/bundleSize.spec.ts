@@ -47,15 +47,19 @@ async function bundleSizeOf(relativePath: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: Measured 53,983 bytes; a reintroduced `Number` spread was 60,437.
+	// NOTE: Measured 55,292 bytes; a reintroduced `Number` spread was 60,437.
 	// The measured size rose from 48,261 when the `Number` comparison cluster
 	// (`is`, `isNot`, `toString` and the `isLessThan` family) moved into
 	// Essence: each is now emitted as its own const reading the covering
 	// `compareTo`, so an Everyday Program that compares Numbers carries those
 	// bodies. It rose ~900 bytes again when String's derivable Methods
 	// followed — a String Method now pulls in the small chain it is written on
-	// (`length` -> `characters` -> `splitOn`) instead of one native. Still
-	// comfortably below the spread figure, so the guard holds.
+	// (`length` -> `characters` -> `splitOn`) instead of one native, and
+	// ~1,300 more when List's did, for the same reason: `firstItem` now brings
+	// `itemAt`, `removeFirst` brings `slice` and `length`, and so on. Still
+	// below the spread figure, so the guard holds — but the headroom is down
+	// to ~700 bytes, so the next conversion that touches List will want this
+	// ceiling raised along with it.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("testFiles/Everyday.es")).toBeLessThan(56_000)
 	})

@@ -287,14 +287,10 @@ describe("Stdlib", () => {
 			).toBe("1, 2, 3")
 		})
 
-		it("builds a List by repetition, never with a negative count", () => {
-			expect(list.repeating(str("x"), int(3n))).toEqual(
-				list.createList([str("x"), str("x"), str("x")]),
-			)
-			expect(list.repeating(str("x"), int(-1n))).toEqual(
-				list.createList([]),
-			)
-		})
+		// NOTE: `List.repeating` is implemented in Essence now
+		// (`src/stdlib/List.es`), on top of the `List.of` below — the golden
+		// harness covers a count of three, zero and minus one, so the
+		// runtime-direct test that lived here is retired.
 
 		it("builds inclusive Integer ranges, counting either way", () => {
 			expect(list.of(int(1n), int(4n))).toEqual(ints(1n, 2n, 3n, 4n))
@@ -321,16 +317,10 @@ describe("Stdlib", () => {
 			)
 		})
 
-		it("partitions by a check, keeping order on both sides", () => {
-			const partitions = list.partitioned(ints(1n, 2n, 3n, 4n), (item) =>
-				// NOTE: Integer.isEven is written in Essence now; the predicate
-				// here checks parity on the runtime representation directly.
-				boolean.createBoolean(item.value % 2n === 0n),
-			)
-
-			expect(partitions.matching).toEqual(ints(2n, 4n))
-			expect(partitions.rest).toEqual(ints(1n, 3n))
-		})
+		// NOTE: `List.partitioned` is implemented in Essence now
+		// (`src/stdlib/List.es`), as `keepEvery` beside `removeEvery(where:)`
+		// — the golden harness covers both halves and the empty List, so the
+		// runtime-direct test that lived here is retired.
 
 		it("pairs position by position, stopping with the shorter List", () => {
 			const pairs = list.pairedWith(
@@ -356,13 +346,14 @@ describe("Stdlib", () => {
 			)
 		})
 
-		it("sorts through a Comparable conformance", () => {
-			expect(
-				list.sorted(ints(3n, 1n, 2n), {
-					compareTo: number.compareTo,
-				}),
-			).toEqual(ints(1n, 2n, 3n))
-		})
+		// NOTE: `List.sorted` is implemented in Essence now
+		// (`src/stdlib/List.es`) — it hands its hidden conformance Argument's
+		// `compareTo` straight to `sortedBy`, and the golden harness covers the
+		// flat case. What is NOT covered there, and what the two tests below
+		// keep, is the WITNESS a nested List is sorted through: the Essence
+		// body only ever sees `conformance.compareTo`, so the currying
+		// `boundConformance` does is what makes the nesting work. They call
+		// `sortedBy` with exactly the Function the Essence body passes on.
 
 		it("compares Lists lexicographically", () => {
 			let integerConformance = { compareTo: number.compareTo }
@@ -403,9 +394,11 @@ describe("Stdlib", () => {
 			])
 
 			expect(
-				list.sorted(
+				list.sortedBy(
 					list.createList([ints(3n), ints(1n, 2n)]),
-					nested as unknown as Parameters<typeof list.sorted>[1],
+					nested.compareTo as unknown as Parameters<
+						typeof list.sortedBy
+					>[1],
 				),
 			).toEqual(list.createList([ints(1n, 2n), ints(3n)]))
 		})
@@ -432,10 +425,10 @@ describe("Stdlib", () => {
 			let b = list.createList([list.createList([ints(1n), ints(9n)])])
 
 			expect(
-				list.sorted(
+				list.sortedBy(
 					list.createList([a, b]),
-					listOfListOfListOfIntegers as unknown as Parameters<
-						typeof list.sorted
+					listOfListOfListOfIntegers.compareTo as unknown as Parameters<
+						typeof list.sortedBy
 					>[1],
 				),
 			).toEqual(list.createList([b, a]))

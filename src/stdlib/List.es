@@ -60,7 +60,12 @@ declarations {
 		§§ Whether the List has no items at all.
 		§§
 		§§ @returns `true` for the empty List.
-		isEmpty() -> Boolean
+		isEmpty() -> Boolean {
+			§ `List.length` is native and O(1) — it reads the underlying array's
+			§ length — so asking for it costs nothing. `String.isEmpty` is
+			§ written the same way, but there `length` walks the characters.
+			<- @::length()::is(0)
+		}
 
 		§§ Whether an item equal to the given one is in the List.
 		§§
@@ -80,30 +85,63 @@ declarations {
 		§§
 		§§ @returns the matching item, or `Nothing` when there is none.
 		overload firstItem {
-			() -> Optional<ItemType>
+			() -> Optional<ItemType> {
+				§ `itemAt` answers `Nothing` for a position outside the List, so
+				§ the empty case needs no guard of its own.
+				<- @::itemAt(0)
+			}
 
-			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>
+			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
+				§ NOTE: This builds the whole filtered List and then takes its
+				§ first item, where the native stopped at the first match. The
+				§ answer is the same; the work is not. See the note above
+				§ `anyItem`.
+				<- @::keepEvery(where check)::firstItem()
+			}
 		}
 
 		§§ The last item of the List.
 		§§
 		§§ @returns the item, or `Nothing` for the empty List.
-		lastItem() -> Optional<ItemType>
+		lastItem() -> Optional<ItemType> {
+			§ The empty List's last position is -1, which is outside it, so
+			§ `itemAt` answers `Nothing` without a guard here.
+			<- @::itemAt(@::length()::subtract(1))
+		}
 
 		§§ A new List without the first item, or without the given number of leading items.
 		§§
 		§§ @returns the shortened List — empty when more items were removed than it had.
 		overload removeFirst {
-			() -> List<ItemType>
+			() -> List<ItemType> {
+				§ On the empty List this slices [1, 0), an inverted range, which
+				§ `slice` answers with the empty List.
+				<- @::slice(from 1, to @::length())
+			}
 
-			(_ count: Integer) -> List<ItemType>
+			(_ count: Integer) -> List<ItemType> {
+				§ `slice` clamps both ends to the List, which is exactly the
+				§ clamping this needs: a count below one clamps the start to
+				§ zero and keeps every item, and a count at or past the length
+				§ clamps it to the length, leaving nothing.
+				<- @::slice(from count, to @::length())
+			}
 		}
 
 		§§ A new List without the item at the given position, counting from zero.
 		§§
 		§§ @param index the position of the item to remove
 		§§ @returns the List without that item, or unchanged when the position is outside it.
-		removeAt(_ index: Integer) -> List<ItemType>
+		removeAt(_ index: Integer) -> List<ItemType> {
+			§ Everything before the position, then everything after it. A
+			§ position outside the List leaves it unchanged without a guard: a
+			§ negative one empties the first slice and clamps the second's start
+			§ to zero, and one at or past the end fills the first slice with the
+			§ whole List and empties the second.
+			<- @::slice(from 0, to index)::append(
+				contentsOf @::slice(from index::add(1), to @::length()),
+			)
+		}
 
 		§§ A new List without every item equal to the given one, or without every item the given check accepts.
 		§§
@@ -111,16 +149,28 @@ declarations {
 		overload removeEvery {
 			(_ item: ItemType) -> List<ItemType>
 
-			(where check: (_: ItemType) -> Boolean) -> List<ItemType>
+			(where check: (_: ItemType) -> Boolean) -> List<ItemType> {
+				<- @::keepEvery(where (item) { <- check(item)::negate() })
+			}
 		}
 
 		§§ A new List without the last item, or without the given number of trailing items.
 		§§
 		§§ @returns the shortened List — empty when more items were removed than it had.
 		overload removeLast {
-			() -> List<ItemType>
+			() -> List<ItemType> {
+				§ On the empty List the end is -1, which `slice` clamps to zero
+				§ — an empty range, so the empty List comes back unchanged.
+				<- @::slice(from 0, to @::length()::subtract(1))
+			}
 
-			(_ count: Integer) -> List<ItemType>
+			(_ count: Integer) -> List<ItemType> {
+				§ Again `slice`'s clamping is the clamping this needs: a count
+				§ below one puts the end past the length and keeps every item,
+				§ and a count at or past the length drives it below zero,
+				§ leaving nothing.
+				<- @::slice(from 0, to @::length()::subtract(count))
+			}
 		}
 
 		§§ A new List keeping only the first occurrence of each item, in the original order.
@@ -132,16 +182,24 @@ declarations {
 		§§
 		§§ @returns the extended List.
 		overload prepend {
-			(_ item: ItemType) -> List<ItemType>
+			(_ item: ItemType) -> List<ItemType> {
+				<- [item]::append(contentsOf @)
+			}
 
-			(contentsOf other: List<ItemType>) -> List<ItemType>
+			(contentsOf other: List<ItemType>) -> List<ItemType> {
+				<- other::append(contentsOf @)
+			}
 		}
 
 		§§ A new List with the given item — or the contents of the given List — added at the end.
 		§§
 		§§ @returns the extended List.
 		overload append {
-			(_ item: ItemType) -> List<ItemType>
+			(_ item: ItemType) -> List<ItemType> {
+				§ The other entry of this same block — a different emitted
+				§ Function, so this is not recursion.
+				<- @::append(contentsOf [item])
+			}
 
 			(contentsOf other: List<ItemType>) -> List<ItemType>
 		}
@@ -203,12 +261,21 @@ declarations {
 		§ resolves the conforming Namespace at the call site — `Integer` for a
 		§ `List<Integer>`, the covering `Number` for a mixed numeric List — and
 		§ its `compareTo` arrives as a hidden trailing Argument. Its own bounded
-		§ `ItemType` shadows the Namespace's.
+		§ `ItemType` shadows the Namespace's, and because the body below is
+		§ written in Essence, `@` has to be read through that shadowing too —
+		§ a List of the BOUNDED item Type, which is what lets `compareTo` be
+		§ called on an item at all. It is the first Method where that matters.
 
 		§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use `sortedBy`.
 		§§
 		§§ @returns the ordered List.
-		sorted<infer ItemType is Comparable>() -> List<ItemType>
+		sorted<infer ItemType is Comparable>() -> List<ItemType> {
+			§ The bound is the whole of the difference from `sortedBy`: the
+			§ conforming Namespace's `compareTo` arrives as the hidden
+			§ conformance Argument, and this hands it straight on as the
+			§ comparison.
+			<- @::sortedBy((first, second) { <- first::compareTo(second) })
+		}
 
 		§§ A new List ordered by the given comparison, applied to each pair of items.
 		§§
@@ -229,16 +296,31 @@ declarations {
 		§ `anyItem`/`everyItem` read as sentences — "any item matches …", "every
 		§ item matches …" — the existential and universal checks over a
 		§ predicate. The no-argument existential is `hasItems`.
+		§
+		§ NOTE: Both COUNT where the natives stopped at the first answer —
+		§ `countOf(where:)` filters the whole List, so a match in the first
+		§ position costs as much as no match at all, and `everyItem` pays for a
+		§ second predicate closure on top. The answers are identical and the
+		§ cost is linear either way; what is lost is the short circuit, which
+		§ shows on a long List whose answer is decided early. The same is true
+		§ of `firstItem(where:)`. Reverting any of them to a native is a
+		§ one-line change.
 
 		§§ Whether the given check accepts at least one item.
 		§§
 		§§ @returns `true` when some item is accepted.
-		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean
+		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
+			<- @::countOf(where check)::isPositive()
+		}
 
 		§§ Whether the given check accepts every item.
 		§§
 		§§ @returns `true` when all items are accepted, including the empty List.
-		everyItem(matches check: (_: ItemType) -> Boolean) -> Boolean
+		everyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
+			§ No item fails the check. The empty List has none to fail, so it
+			§ answers `true`, as it should.
+			<- @::anyItem(matches (item) { <- check(item)::negate() })::negate()
+		}
 
 		§§ How many items equal the given one, or are accepted by the given check.
 		§§
@@ -246,18 +328,39 @@ declarations {
 		overload countOf {
 			(_ item: ItemType) -> Integer
 
-			(where check: (_: ItemType) -> Boolean) -> Integer
+			(where check: (_: ItemType) -> Boolean) -> Integer {
+				§ NOTE: The filtered List is built only to be measured — see the
+				§ note above `anyItem`, which is written on top of this.
+				<- @::keepEvery(where check)::length()
+			}
 		}
 
 		§§ A new List with the given item inserted before the given position.
 		§§
 		§§ @returns the List with the item inserted.
-		insertAt(_ index: Integer, with item: ItemType) -> List<ItemType>
+		insertAt(_ index: Integer, with item: ItemType) -> List<ItemType> {
+			§ Everything before the position, the item, then everything from the
+			§ position on. `slice` clamps both ends, so a position before the
+			§ start empties the first slice and prepends, and one at or past the
+			§ end fills it with the whole List and appends — insertion never
+			§ drops the item.
+			<- @::slice(from 0, to index)
+				::append(item)
+				::append(contentsOf @::slice(from index, to @::length()))
+		}
 
 		§§ A new List with the item at the given position replaced.
 		§§
 		§§ @returns the List with the item replaced, or unchanged when the position is outside it.
-		replaceAt(_ index: Integer, with item: ItemType) -> List<ItemType>
+		replaceAt(_ index: Integer, with item: ItemType) -> List<ItemType> {
+			§ A position outside the List leaves it unchanged. The guard is
+			§ needed: `removeAt` would ignore such a position but `insertAt`
+			§ clamps it, so without this the item would be added at an end.
+			if index::isLessThan(0) { <- @ }
+			if index::isGreaterThanOrEqualTo(@::length()) { <- @ }
+
+			<- @::removeAt(index)::insertAt(index, with item)
+		}
 
 		§§ The position of the last item equal to the given one.
 		§§
@@ -290,7 +393,14 @@ declarations {
 		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
 		§§
 		§§ @returns a Record with the accepted items under `matching` and the others under `rest`.
-		partitioned(where check: (_: ItemType) -> Boolean) -> { matching: List<ItemType>, rest: List<ItemType> }
+		partitioned(where check: (_: ItemType) -> Boolean) -> { matching: List<ItemType>, rest: List<ItemType> } {
+			§ Two passes where the native made one, each keeping the original
+			§ order — which is what the halves are specified to do.
+			<- {
+				matching = @::keepEvery(where check),
+				rest = @::removeEvery(where check),
+			}
+		}
 
 		§§ Pairs the items of the two Lists position by position. The pairing stops with the shorter List.
 		§§
@@ -309,7 +419,14 @@ declarations {
 		§§ @param item the item to repeat
 		§§ @param times how many copies the List holds
 		§§ @returns the List of repeated items.
-		static repeating(_ item: ItemType, times count: Integer) -> List<ItemType>
+		static repeating(_ item: ItemType, times count: Integer) -> List<ItemType> {
+			§ `of` counts DOWN when the first Integer is the greater, so a count
+			§ below one would give `[1]` rather than nothing — hence the guard.
+			if count::isLessThan(1) { <- [] }
+
+			§ The Integers are only the tally; each is replaced by the item.
+			<- List.of(integersFrom 1, through count)::map((_) { <- item })
+		}
 
 		§ The loop-fuel constructor — Essence has no Range Type by design, so
 		§ counting loops write `List.of(integersFrom 1, through 10)::map(...)`.
