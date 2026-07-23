@@ -16,7 +16,7 @@ import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
-import { equal, greater, less, is as orderingIs } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
 import {
 	createRational,
@@ -683,29 +683,33 @@ export function compareTo(number: NumberType, other: NumberType): OrderingType {
 // Transcendental is compared against another Transcendental; the member
 // Namespaces leave that cell out.
 
+// NOTE: `compareTo` returns the shared `less`/`equal`/`greater` singletons, so
+// the Ordering is compared by reference — the same idiom the cross-kind cells
+// above use (`inverted === less`). This avoids importing `Ordering.is`, which
+// is now implemented in Essence.
 export function isLessThan(number: NumberType, other: NumberType): BooleanType {
-	return createBoolean(orderingIs(compareTo(number, other), less).value)
+	return createBoolean(compareTo(number, other) === less)
 }
 
 export function isLessThanOrEqualTo(
 	number: NumberType,
 	other: NumberType,
 ): BooleanType {
-	return createBoolean(!orderingIs(compareTo(number, other), greater).value)
+	return createBoolean(compareTo(number, other) !== greater)
 }
 
 export function isGreaterThan(
 	number: NumberType,
 	other: NumberType,
 ): BooleanType {
-	return createBoolean(orderingIs(compareTo(number, other), greater).value)
+	return createBoolean(compareTo(number, other) === greater)
 }
 
 export function isGreaterThanOrEqualTo(
 	number: NumberType,
 	other: NumberType,
 ): BooleanType {
-	return createBoolean(!orderingIs(compareTo(number, other), less).value)
+	return createBoolean(compareTo(number, other) !== less)
 }
 
 // NOTE: `isBetween` is written in Essence now — `src/stdlib/Number.es` — as

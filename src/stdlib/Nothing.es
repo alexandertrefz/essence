@@ -5,17 +5,23 @@ declarations {
 		§§
 		§§ @param other the Nothing to compare with
 		§§ @returns `true`.
-		is(_ other: Nothing) -> Boolean
+		is(_ other: Nothing) -> Boolean {
+			<- true
+		}
 
 		§§ Answers whether the values differ — there is only one Nothing, so this is always `false`.
 		§§
 		§§ @param other the Nothing to compare with
 		§§ @returns `false`.
-		isNot(_ other: Nothing) -> Boolean
+		isNot(_ other: Nothing) -> Boolean {
+			<- false
+		}
 
 		§§ Represents Nothing as the String `Nothing`.
 		§§
 		§§ @returns the String `Nothing`.
-		toString() -> String
+		toString() -> String {
+			<- "Nothing"
+		}
 	}
 }

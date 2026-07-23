@@ -17,17 +17,31 @@ declarations {
 		§§
 		§§ @param other the Ordering to compare with
 		§§ @returns `true` when both Orderings are the same variant.
-		is(_ other: Ordering) -> Boolean
+		is(_ other: Ordering) -> Boolean {
+			<- match @ -> Boolean {
+				case #Less { <- match other -> Boolean { case #Less { <- true } case _ { <- false } } }
+				case #Equal { <- match other -> Boolean { case #Equal { <- true } case _ { <- false } } }
+				case #Greater { <- match other -> Boolean { case #Greater { <- true } case _ { <- false } } }
+			}
+		}
 
 		§§ Answers whether the Orderings are different variants.
 		§§
 		§§ @param other the Ordering to compare with
 		§§ @returns `true` when the Orderings are different variants.
-		isNot(_ other: Ordering) -> Boolean
+		isNot(_ other: Ordering) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Represents the Ordering as `Less`, `Equal` or `Greater`.
 		§§
 		§§ @returns the name of the Ordering variant.
-		toString() -> String
+		toString() -> String {
+			<- match @ -> String {
+				case #Less { <- "Less" }
+				case #Equal { <- "Equal" }
+				case #Greater { <- "Greater" }
+			}
+		}
 	}
 }

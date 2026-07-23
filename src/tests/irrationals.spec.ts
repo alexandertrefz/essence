@@ -288,21 +288,22 @@ describe("Irrationals", () => {
 			for (let [aName, a] of values) {
 				for (let [bName, b] of values) {
 					it(`${aName} against ${bName}`, () => {
-						let order = ordering.toString(
-							number.compareTo(a, b),
-						).value
+						// NOTE: `Ordering.toString` is implemented in Essence now,
+						// so the runtime comparison reads the returned Ordering by
+						// reference against the shared singletons instead.
+						let comparison = number.compareTo(a, b)
 
 						expect(number.isLessThan(a, b).value).toBe(
-							order === "Less",
+							comparison === ordering.less,
 						)
 						expect(number.isLessThanOrEqualTo(a, b).value).toBe(
-							order !== "Greater",
+							comparison !== ordering.greater,
 						)
 						expect(number.isGreaterThan(a, b).value).toBe(
-							order === "Greater",
+							comparison === ordering.greater,
 						)
 						expect(number.isGreaterThanOrEqualTo(a, b).value).toBe(
-							order !== "Less",
+							comparison !== ordering.less,
 						)
 					})
 				}
