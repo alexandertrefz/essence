@@ -486,6 +486,10 @@ implementation {
 	§ ——— Optional —————————————————————————————————————————————————————————
 	show("Optional.otherwise<ItemType>(_ ItemType) [present]", numbers::firstItem()::otherwise(0))
 	show("Optional.otherwise<ItemType>(_ ItemType) [Nothing]", noNumbers::firstItem()::otherwise(42))
+	show("Optional.hasValue<ItemType>()", numbers::firstItem()::hasValue())
+	show("Optional.hasValue<ItemType>() [Nothing]", noNumbers::firstItem()::hasValue())
+	show("Optional.isNothing<ItemType>()", noNumbers::firstItem()::isNothing())
+	show("Optional.isNothing<ItemType>() [present]", numbers::firstItem()::isNothing())
 
 	§ ——— Ordering —————————————————————————————————————————————————————————
 	constant less: Ordering = #Less

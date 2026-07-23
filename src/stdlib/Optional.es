@@ -27,5 +27,30 @@ declarations {
 				case _ { <- @ }
 			}
 		}
+
+		§ The two Methods that let a Program ASK, rather than only collapse.
+		§ Without them the only way to test an Optional was to match it apart
+		§ at the use site, or to pick a fallback that could not occur and
+		§ compare against it — which is a lie whenever the payload can equal
+		§ the fallback. They also spell the `isEmpty`/`has…` pair that every
+		§ other Namespace already has: `String::hasAnyContent`,
+		§ `List::hasItems`, and now `Optional::hasValue`.
+
+		§§ Whether the Optional holds a value rather than `Nothing`.
+		§§
+		§§ @returns `true` when there is a value.
+		hasValue() -> Boolean {
+			<- match @ -> Boolean {
+				case Nothing { <- false }
+				case _ { <- true }
+			}
+		}
+
+		§§ Whether the Optional is `Nothing` — the opposite of `hasValue`.
+		§§
+		§§ @returns `true` when there is no value.
+		isNothing() -> Boolean {
+			<- @::hasValue()::negate()
+		}
 	}
 }
