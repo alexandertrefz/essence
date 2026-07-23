@@ -267,44 +267,68 @@ declarations {
 			<- pieces::firstItem()::otherwise("")::length()
 		}
 
-		§§ The String padded at the front, with the given String, up to the given length.
+		§ The same collapse the trim family got, and for the same reason. The
+		§ `at:` entry answers for every `Side`, so nothing about the Choice is
+		§ left unhandled: `BothEnds` centres, which is what padding both ends
+		§ means. Both entries are Essence — the padding is built out of
+		§ `repeat` and `slice`, exactly as the two Methods here did before.
+
+		§§ The String padded with the given String up to the given length — at the front when no end is named, or at the given end.
 		§§
 		§§ @param to the length to reach.
 		§§ @param with the String to pad with, repeated as needed.
 		§§ @returns the padded String; unchanged when it is already that long.
-		paddedAtStart(to: Integer, with pad: String) -> String {
-			§ An empty pad has nothing to repeat, and a String already that
-			§ long needs nothing — both leave it as it is.
-			if pad::isEmpty() { <- @ }
+		overload pad {
+			(to length: Integer, with padding: String) -> String {
+				<- @::pad(to length, with padding, at Side#Start)
+			}
 
-			constant characterCount = @::length()
+			§§ @param at the end to pad
+			(to length: Integer, with padding: String, at side: Side) -> String {
+				§ An empty padding has nothing to repeat, and a String already
+				§ that long needs nothing — both leave it as it is.
+				if padding::isEmpty() { <- @ }
 
-			if to::isLessThanOrEqualTo(characterCount) { <- @ }
+				constant characterCount = @::length()
 
-			constant needed = to::subtract(characterCount)
+				if length::isLessThanOrEqualTo(characterCount) { <- @ }
 
-			§ The pad has at least one character, so repeating it `needed`
-			§ times is at least `needed` characters long; slicing to `needed`
-			§ cuts a partial pad off the end, the way the padding is built
-			§ character by character.
-			<- @::prepend(pad::repeat(times needed)::slice(from 0, to needed))
-		}
+				constant needed = length::subtract(characterCount)
 
-		§§ The String padded at the end, with the given String, up to the given length.
-		§§
-		§§ @param to the length to reach.
-		§§ @param with the String to pad with, repeated as needed.
-		§§ @returns the padded String; unchanged when it is already that long.
-		paddedAtEnd(to: Integer, with pad: String) -> String {
-			if pad::isEmpty() { <- @ }
+				§ The padding has at least one character, so repeating it
+				§ `needed` times is at least `needed` characters long; slicing
+				§ cuts a partial repeat off the end, the way padding is built
+				§ character by character.
+				constant filler = padding::repeat(times needed)
 
-			constant characterCount = @::length()
+				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
+				§ String has to be bound before the match to stay reachable in
+				§ the Case bodies.
+				constant text = @
 
-			if to::isLessThanOrEqualTo(characterCount) { <- @ }
+				<- match side -> String {
+					case #Start {
+						<- text::prepend(filler::slice(from 0, to needed))
+					}
 
-			constant needed = to::subtract(characterCount)
+					case #End {
+						<- text::append(filler::slice(from 0, to needed))
+					}
 
-			<- @::append(pad::repeat(times needed)::slice(from 0, to needed))
+					case #BothEnds {
+						§ Centring splits the padding between the two ends. An
+						§ odd count can not split evenly, so the extra
+						§ character goes to the END — the text sits one to the
+						§ left, which is what centring in a fixed width
+						§ conventionally does. `quotient` can only answer
+						§ `Nothing` for a zero divisor, and this one is two.
+						constant atStart = needed::quotient(dividingBy 2)::otherwise(0)
+
+						<- text::prepend(filler::slice(from 0, to atStart))
+							::append(filler::slice(from 0, to needed::subtract(atStart)))
+					}
+				}
+			}
 		}
 
 		§§ Orders the String against another, by character code point.
