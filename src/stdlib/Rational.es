@@ -59,23 +59,23 @@ declarations {
 		}
 
 		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
-		overload divideBy {
-			(_ other: Rational) -> Optional<Rational>
+		overload divide {
+			(by other: Rational) -> Optional<Rational>
 
-			(_ other: Integer) -> Optional<Rational>
+			(by other: Integer) -> Optional<Rational>
 
-			(_ other: Algebraic) -> Algebraic | Rational
+			(by other: Algebraic) -> Algebraic | Rational
 		}
 
 		§§ Multiplies this Rational with a number, staying exact for every member of the numeric tower.
-		overload multiplyWith {
-			(_ other: Rational) -> Rational
+		overload multiply {
+			(with other: Rational) -> Rational
 
-			(_ other: Integer) -> Rational
+			(with other: Integer) -> Rational
 
-			(_ other: Algebraic) -> Algebraic | Rational
+			(with other: Algebraic) -> Algebraic | Rational
 
-			(_ other: Transcendental) -> Transcendental | Rational
+			(with other: Transcendental) -> Transcendental | Rational
 		}
 
 		§§ Whether this Rational is strictly below the given number.
@@ -174,7 +174,7 @@ declarations {
 		§§
 		§§ @param exponent the exponent
 		§§ @returns the power, or `Nothing` when raising zero to a negative power.
-		toThePowerOf(_ exponent: Integer) -> Optional<Rational>
+		raise(to exponent: Integer) -> Optional<Rational>
 
 		§§ Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.
 		§§

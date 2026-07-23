@@ -181,7 +181,7 @@ describe("Rename", () => {
 		let source = [
 			"implementation {",
 			"\tfunction first<T>(_ items: List<T>) -> T {",
-			"\t\t<- items::itemAt(0)",
+			"\t\t<- items::item(at 0)",
 			"\t}",
 			"}",
 		].join("\n")
@@ -190,7 +190,7 @@ describe("Rename", () => {
 			[
 				"implementation {",
 				"\tfunction first<Item>(_ items: List<Item>) -> Item {",
-				"\t\t<- items::itemAt(0)",
+				"\t\t<- items::item(at 0)",
 				"\t}",
 				"}",
 			].join("\n"),
@@ -863,15 +863,15 @@ describe("Rename through where clauses", () => {
 	].join("\n")
 
 	it("should rename a Namespace Generic from its declaration through the where clause", () => {
-		expect(rename(conditionalSource, { line: 2, column: 23 }, "Element")).toBe(
-			conditionalSource.replaceAll("Item", "Element"),
-		)
+		expect(
+			rename(conditionalSource, { line: 2, column: 23 }, "Element"),
+		).toBe(conditionalSource.replaceAll("Item", "Element"))
 	})
 
 	it("should rename a Namespace Generic from its where-clause mention", () => {
-		expect(rename(conditionalSource, { line: 3, column: 24 }, "Element")).toBe(
-			conditionalSource.replaceAll("Item", "Element"),
-		)
+		expect(
+			rename(conditionalSource, { line: 3, column: 24 }, "Element"),
+		).toBe(conditionalSource.replaceAll("Item", "Element"))
 	})
 
 	it("should rename a Protocol through clause and condition mentions", () => {

@@ -160,7 +160,7 @@ describe("Irrationals", () => {
 		})
 
 		it("uses canonical-form equality", () => {
-			const doubled = transcendental.multiplyWith(
+			const doubled = transcendental.multiply(
 				number.PI,
 				integer.createInteger(2n),
 			)
@@ -285,17 +285,17 @@ describe("Irrationals", () => {
 			expect(anyIsNot(rootTwo, radical(2n))).toBeFalse()
 
 			// NOTE: List.contains / doesNotContain / removeDuplicates are
-			// implemented in Essence now (src/stdlib/List.es); `firstIndexOf`
+			// implemented in Essence now (src/stdlib/List.es); `firstIndex`
 			// is the searching Method still native, and it answers through the
 			// witness.
 			expect(
-				list.firstIndexOf(list.createList([rootTwo]), radical(2n), {
+				list.firstIndex(list.createList([rootTwo]), radical(2n), {
 					is: irrationalIs,
 				}),
 			).toEqual(integer.createInteger(0n))
 
 			expect(
-				list.firstIndexOf(list.createList([rootTwo]), radical(3n), {
+				list.firstIndex(list.createList([rootTwo]), radical(3n), {
 					is: irrationalIs,
 				})[typeKeySymbol],
 			).toBe("Nothing")
@@ -306,7 +306,7 @@ describe("Irrationals", () => {
 			expect(anyIs(number.PI, number.TAU)).toBeFalse()
 
 			expect(
-				list.firstIndexOf(
+				list.firstIndex(
 					list.createList([number.TAU, number.PI]),
 					number.PI,
 					{ is: irrationalIs },
@@ -407,7 +407,7 @@ describe("Irrationals", () => {
 					constant roots: List<Irrational> = [Number.PI, Number.TAU]
 
 					__print(roots::contains(Number.PI)::toString())
-					__print(roots::countOf(Number.TAU)::toString())
+					__print(roots::count(of Number.TAU)::toString())
 					__print(roots::removeDuplicates()::length()::toString())
 					__print(roots::is([Number.PI])::toString())
 				}`),
@@ -420,7 +420,7 @@ describe("Irrationals", () => {
 					constant root = 2::squareRoot()
 
 					__print(match root -> String {
-						case Algebraic { <- 1::divideBy(@)::toString() }
+						case Algebraic { <- 1::divide(by @)::toString() }
 						case Integer { <- @::toString() }
 						case Nothing { <- "impossible" }
 					})

@@ -498,11 +498,11 @@ describe("Rewriter", () => {
 			// NOTE: Most of this Namespace is written in Essence now
 			// (`src/stdlib/String.es`) and the golden harness covers it —
 			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
-			// `characterAt`, `trimmed`, `startsWith`, `endsWith`, `repeated`,
-			// `reverse`, `slice`, `firstIndexOf`, `paddedAtStart`,
+			// `character`, `trimmed`, `startsWith`, `endsWith`, `repeat`,
+			// `reverse`, `slice`, `firstIndex`, `paddedAtStart`,
 			// `paddedAtEnd` and `toString`, alongside the negations
-			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStartWith`,
-			// `doesNotEndWith`) that moved earlier. What is left below is the
+			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStart`,
+			// `doesNotEnd`) that moved earlier. What is left below is the
 			// native floor those Essence bodies stand on, and it is where the
 			// code-point behaviour is actually decided.
 
@@ -536,10 +536,10 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("splitOn", () => {
+			describe("split", () => {
 				it("splits correctly when splitting on an empty string", () => {
 					expect(
-						string.splitOn(
+						string.split(
 							string.createString("abc"),
 							string.createString(""),
 						),
@@ -556,14 +556,14 @@ describe("Rewriter", () => {
 					// NOTE: `String.split("")` would tear the emoji into two
 					// lone surrogates; splitting by code point keeps it whole.
 					// This is the ONE place the runtime decides what a
-					// character is — `characters()` IS `splitOn("")` in
-					// Essence, and `length`, `characterAt`, `slice` and
+					// character is — `characters()` IS `split("")` in
+					// Essence, and `length`, `character`, `slice` and
 					// `reverse` are written on top of `characters()`, so
 					// every one of them inherits this behaviour from here.
 					let emoji = string.createString("a\u{1F600}b")
 
 					expect(
-						string.splitOn(emoji, string.createString("")),
+						string.split(emoji, string.createString("")),
 					).toEqual(
 						list.createList([
 							string.createString("a"),
@@ -575,7 +575,7 @@ describe("Rewriter", () => {
 
 				it("splits correctly using a substring", () => {
 					expect(
-						string.splitOn(
+						string.split(
 							string.createString("1 2 3"),
 							string.createString(" "),
 						),
@@ -590,7 +590,7 @@ describe("Rewriter", () => {
 
 				it("splits on an astral separator", () => {
 					expect(
-						string.splitOn(
+						string.split(
 							string.createString("a\u{1F600}b\u{1F600}c"),
 							string.createString("\u{1F600}"),
 						),
@@ -641,7 +641,7 @@ describe("Rewriter", () => {
 				// every UTF-16 code UNIT boundary — outside the ends, and
 				// BETWEEN the two halves of an astral character, which is a
 				// position Essence can not name. The obvious Essence body,
-				// `@::splitOn(part)::joinWith(replacement)`, would answer
+				// `@::split(on part)::join(with replacement)`, would answer
 				// `"a-b-c"` and `"a-\u{1F600}-b"` here instead.
 				it("places the replacement at every code unit for an empty part", () => {
 					expect(
@@ -748,28 +748,28 @@ describe("Rewriter", () => {
 			describe("multiply", () => {
 				it("multiplies 2 integers correctly", () => {
 					expect(
-						integer.multiplyWith__overload$1(
+						integer.multiply__overload$1(
 							integerOne(),
 							integerOne(),
 						),
 					).toEqual(integerOne())
 
 					expect(
-						integer.multiplyWith__overload$1(
+						integer.multiply__overload$1(
 							integerHundred(),
 							integerOne(),
 						),
 					).toEqual(integerHundred())
 
 					expect(
-						integer.multiplyWith__overload$1(
+						integer.multiply__overload$1(
 							integerTwo(),
 							integerTwo(),
 						),
 					).toEqual(integer.createInteger(4n))
 
 					expect(
-						integer.multiplyWith__overload$1(
+						integer.multiply__overload$1(
 							integerTwo(),
 							integerHundred(),
 						),
@@ -778,7 +778,7 @@ describe("Rewriter", () => {
 
 				it("multiplies an integer and a rational correctly", () => {
 					expect(
-						integer.multiplyWith__overload$2(
+						integer.multiply__overload$2(
 							integerOne(),
 							rationalOneHalf(),
 						),
@@ -786,7 +786,7 @@ describe("Rewriter", () => {
 
 					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						integer.multiplyWith__overload$2(
+						integer.multiply__overload$2(
 							integerHundred(),
 							rationalOneHalf(),
 						),
@@ -794,14 +794,14 @@ describe("Rewriter", () => {
 
 					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						integer.multiplyWith__overload$2(
+						integer.multiply__overload$2(
 							integerTwo(),
 							rationalOneHalf(),
 						),
 					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
-						integer.multiplyWith__overload$2(
+						integer.multiply__overload$2(
 							integerTwo(),
 							rational.createRational(50n, 1n),
 						),
@@ -1382,28 +1382,28 @@ describe("Rewriter", () => {
 			describe("multiply", () => {
 				it("multiplies 2 rationals correctly", () => {
 					expect(
-						rational.multiplyWith__overload$1(
+						rational.multiply__overload$1(
 							rationalOne(),
 							rationalOne(),
 						),
 					).toEqual(rationalOne())
 
 					expect(
-						rational.multiplyWith__overload$1(
+						rational.multiply__overload$1(
 							rationalHundred(),
 							rationalOne(),
 						),
 					).toEqual(rationalHundred())
 
 					expect(
-						rational.multiplyWith__overload$1(
+						rational.multiply__overload$1(
 							rationalTwo(),
 							rationalTwo(),
 						),
 					).toEqual(rational.createRational(4n, 1n))
 
 					expect(
-						rational.multiplyWith__overload$1(
+						rational.multiply__overload$1(
 							rationalTwo(),
 							rationalHundred(),
 						),
@@ -1412,7 +1412,7 @@ describe("Rewriter", () => {
 
 				it("multiplies a rational and an integer correctly", () => {
 					expect(
-						rational.multiplyWith__overload$2(
+						rational.multiply__overload$2(
 							rationalOneHalf(),
 							integerOne(),
 						),
@@ -1420,7 +1420,7 @@ describe("Rewriter", () => {
 
 					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						rational.multiplyWith__overload$2(
+						rational.multiply__overload$2(
 							rationalOneHalf(),
 							integerHundred(),
 						),
@@ -1428,14 +1428,14 @@ describe("Rewriter", () => {
 
 					// NOTE: Rationals are not automatically reduced, so we need to compare against the common demoninator
 					expect(
-						rational.multiplyWith__overload$2(
+						rational.multiply__overload$2(
 							rationalOneHalf(),
 							integerTwo(),
 						),
 					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
-						rational.multiplyWith__overload$2(
+						rational.multiply__overload$2(
 							rational.createRational(50n, 1n),
 							integerTwo(),
 						),
@@ -1446,28 +1446,28 @@ describe("Rewriter", () => {
 			describe("divide", () => {
 				it("divides 2 rationals correctly", () => {
 					expect(
-						rational.divideBy__overload$1(
+						rational.divide__overload$1(
 							rationalOne(),
 							rationalOne(),
 						),
 					).toEqual(rational.createRational(1n, 1n))
 
 					expect(
-						rational.divideBy__overload$1(
+						rational.divide__overload$1(
 							rationalOne(),
 							rationalTwo(),
 						),
 					).toEqual(rational.createRational(1n, 2n))
 
 					expect(
-						rational.divideBy__overload$1(
+						rational.divide__overload$1(
 							rationalOne(),
 							rationalOneHalf(),
 						),
 					).toEqual(rational.createRational(2n, 1n))
 
 					expect(
-						rational.divideBy__overload$1(
+						rational.divide__overload$1(
 							rationalHundred(),
 							rationalTwo(),
 						),
@@ -1476,21 +1476,21 @@ describe("Rewriter", () => {
 
 				it("divides a rational and an integer correctly", () => {
 					expect(
-						rational.divideBy__overload$2(
+						rational.divide__overload$2(
 							rationalOne(),
 							integerOne(),
 						),
 					).toEqual(rationalOne())
 
 					expect(
-						rational.divideBy__overload$2(
+						rational.divide__overload$2(
 							rational.createRational(2n, 1n),
 							integerTwo(),
 						),
 					).toEqual(rational.createRational(2n, 2n))
 
 					expect(
-						rational.divideBy__overload$2(
+						rational.divide__overload$2(
 							rationalHundred(),
 							integerTwo(),
 						),
@@ -1499,14 +1499,14 @@ describe("Rewriter", () => {
 
 				it("returns Nothing when dividing by zero", () => {
 					expect(
-						rational.divideBy__overload$1(
+						rational.divide__overload$1(
 							rationalOne(),
 							rational.createRational(0n, 1n),
 						),
 					).toEqual(nothing())
 
 					expect(
-						rational.divideBy__overload$2(
+						rational.divide__overload$2(
 							rationalOne(),
 							integerZero(),
 						),
@@ -2377,10 +2377,10 @@ describe("Rewriter", () => {
 			})
 
 			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
-			// forms) / removeAt / removeEvery (both forms) / removeLast (both forms)
+			// forms) / remove / removeEvery (both forms) / removeLast (both forms)
 			// / removeDuplicates / prepend (both forms) / append(_:) / contains /
-			// anyItem / everyItem / countOf (both forms) / insertAt / replaceAt /
-			// partition / sorted / repeating are implemented in Essence now
+			// anyItem / everyItem / count (both forms) / insert / replace /
+			// partition / sorted / repeat are implemented in Essence now
 			// (src/stdlib/List.es), so there is no runtime Function left to call
 			// here. The golden harness covers them end to end; the entries of a
 			// mixed `overload` block that are still native keep their tests below.
@@ -2489,10 +2489,10 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("itemAt", () => {
+			describe("item", () => {
 				it("returns the item at a position inside the list", () => {
 					expect(
-						list.itemAt(
+						list.item(
 							list.createList([integerOne(), integerTwo()]),
 							integerOne(),
 						),
@@ -2501,13 +2501,13 @@ describe("Rewriter", () => {
 
 				it("returns nothing for a position outside the list", () => {
 					expect(
-						list.itemAt(
+						list.item(
 							list.createList([integerOne()]),
 							integerTwo(),
 						),
 					).toEqual(nothing())
 					expect(
-						list.itemAt(
+						list.item(
 							list.createList([integerOne()]),
 							integer.createInteger(-1n),
 						),
@@ -2515,13 +2515,13 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("firstIndexOf", () => {
+			describe("firstIndex", () => {
 				// NOTE: Bounded by `Equatable` — the item `is` arrives as the
 				// hidden witness, so which position is found is decided by the
 				// items' own equality rather than by a structural comparison.
 				it("gives the position of the first equal item", () => {
 					expect(
-						list.firstIndexOf(
+						list.firstIndex(
 							list.createList([
 								integerTwo(),
 								integerOne(),
@@ -2535,7 +2535,7 @@ describe("Rewriter", () => {
 
 				it("gives nothing when the item is absent", () => {
 					expect(
-						list.firstIndexOf(
+						list.firstIndex(
 							list.createList([integerOne()]),
 							integerTwo(),
 							{ is: integerIs },

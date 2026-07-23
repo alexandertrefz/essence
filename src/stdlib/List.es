@@ -27,7 +27,7 @@ declarations {
 	§ level at a time.
 	§
 	§ Every Method that asks whether two ITEMS are equal — `is`, `contains`,
-	§ `firstIndexOf`, `lastIndexOf`, `countOf(_:)`, `removeEvery(_:)` and
+	§ `firstIndex`, `lastIndex`, `count(of:)`, `removeEvery(_:)` and
 	§ `removeDuplicates` — carries that bound, for the same reason `sorted`
 	§ carries `Comparable`: equality is the item Type's own `is`, and a List
 	§ whose items can not answer it can not be searched by value. The universal
@@ -40,13 +40,13 @@ declarations {
 		is Comparable where ItemType is Comparable
 	{
 		§ NOTE: This would read better in Essence — length equality AND
-		§ `pairedWith(other)::everyItem(matches (pair) { … })` — and it can not
+		§ `pair(with other)::everyItem(matches (pair) { … })` — and it can not
 		§ be written that way yet. Binding a List Method's own `ItemType` to a
 		§ Type that MENTIONS `ItemType` (the pair Record) makes inference
 		§ substitute the name into itself and recurse until the stack runs out.
 		§ The bound has nothing to do with it: a plain
 		§ `function f<ItemType>(_ a: List<ItemType>, _ b: List<ItemType>) { <-
-		§ a::pairedWith(b)::everyItem(…) }` overflows the same way, and did
+		§ a::pair(with b)::everyItem(…) }` overflows the same way, and did
 		§ before any of this. So `is` stays native and takes the witness — it
 		§ compares each pair with the items' own `is` rather than structurally,
 		§ exactly as `compareTo` below does with their `compareTo`.
@@ -116,9 +116,9 @@ declarations {
 		§§ @returns the matching item, or `Nothing` when there is none.
 		overload firstItem {
 			() -> Optional<ItemType> {
-				§ `itemAt` answers `Nothing` for a position outside the List, so
+				§ `item(at:)` answers `Nothing` for a position outside the List, so
 				§ the empty case needs no guard of its own.
-				<- @::itemAt(0)
+				<- @::item(at 0)
 			}
 
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
@@ -135,8 +135,8 @@ declarations {
 		§§ @returns the item, or `Nothing` for the empty List.
 		lastItem() -> Optional<ItemType> {
 			§ The empty List's last position is -1, which is outside it, so
-			§ `itemAt` answers `Nothing` without a guard here.
-			<- @::itemAt(@::length()::subtract(1))
+			§ `item(at:)` answers `Nothing` without a guard here.
+			<- @::item(at @::length()::subtract(1))
 		}
 
 		§§ A new List without the first item, or without the given number of leading items.
@@ -162,7 +162,7 @@ declarations {
 		§§
 		§§ @param index the position of the item to remove
 		§§ @returns the List without that item, or unchanged when the position is outside it.
-		removeAt(_ index: Integer) -> List<ItemType> {
+		remove(at index: Integer) -> List<ItemType> {
 			§ Everything before the position, then everything after it. A
 			§ position outside the List leaves it unchanged without a guard: a
 			§ negative one empties the first slice and clamps the second's start
@@ -283,11 +283,11 @@ declarations {
 		§§ The item at the given position, counting from zero.
 		§§
 		§§ @returns the item, or `Nothing` when the position is outside the List.
-		itemAt(_ index: Integer) -> Optional<ItemType>
+		item(at index: Integer) -> Optional<ItemType>
 
-		§ NOTE: `firstIndexOf` and `lastIndexOf` stay native and take the
+		§ NOTE: `firstIndex` and `lastIndex` stay native and take the
 		§ witness. Written in Essence each would have to pair every item with
-		§ its position first — `List.of(integersFrom …)::pairedWith(@)` — build
+		§ its position first — `List.of(integersFrom …)::pair(with @)` — build
 		§ that whole List of Records, filter it and read one member back out,
 		§ where the native walks and stops. The bound buys the same thing either
 		§ way: the item Type's own `is` decides which position is found.
@@ -295,7 +295,7 @@ declarations {
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		firstIndexOf<infer ItemType is Equatable>(_ item: ItemType) -> Optional<Integer>
+		firstIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer>
 
 		§§ A new List of the items from one position up to, but not including, another.
 		§§
@@ -350,7 +350,7 @@ declarations {
 		§ predicate. The no-argument existential is `hasItems`.
 		§
 		§ NOTE: Both COUNT where the natives stopped at the first answer —
-		§ `countOf(where:)` filters the whole List, so a match in the first
+		§ `count(where:)` filters the whole List, so a match in the first
 		§ position costs as much as no match at all, and `everyItem` pays for a
 		§ second predicate closure on top. The answers are identical and the
 		§ cost is linear either way; what is lost is the short circuit, which
@@ -362,7 +362,7 @@ declarations {
 		§§
 		§§ @returns `true` when some item is accepted.
 		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
-			<- @::countOf(where check)::isPositive()
+			<- @::count(where check)::isPositive()
 		}
 
 		§§ Whether the given check accepts every item.
@@ -377,9 +377,9 @@ declarations {
 		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the count.
-		overload countOf {
-			<infer ItemType is Equatable>(_ item: ItemType) -> Integer {
-				<- @::countOf(where (candidate) { <- candidate::is(item) })
+		overload count {
+			<infer ItemType is Equatable>(of item: ItemType) -> Integer {
+				<- @::count(where (candidate) { <- candidate::is(item) })
 			}
 
 			(where check: (_: ItemType) -> Boolean) -> Integer {
@@ -392,7 +392,7 @@ declarations {
 		§§ A new List with the given item inserted before the given position.
 		§§
 		§§ @returns the List with the item inserted.
-		insertAt(_ index: Integer, with item: ItemType) -> List<ItemType> {
+		insert(_ item: ItemType, at index: Integer) -> List<ItemType> {
 			§ Everything before the position, the item, then everything from the
 			§ position on. `slice` clamps both ends, so a position before the
 			§ start empties the first slice and prepends, and one at or past the
@@ -406,20 +406,20 @@ declarations {
 		§§ A new List with the item at the given position replaced.
 		§§
 		§§ @returns the List with the item replaced, or unchanged when the position is outside it.
-		replaceAt(_ index: Integer, with item: ItemType) -> List<ItemType> {
+		replace(_ item: ItemType, at index: Integer) -> List<ItemType> {
 			§ A position outside the List leaves it unchanged. The guard is
-			§ needed: `removeAt` would ignore such a position but `insertAt`
+			§ needed: `remove(at:)` would ignore such a position but `insert(_:at:)`
 			§ clamps it, so without this the item would be added at an end.
 			if index::isLessThan(0) { <- @ }
 			if index::isGreaterThanOrEqualTo(@::length()) { <- @ }
 
-			<- @::removeAt(index)::insertAt(index, with item)
+			<- @::remove(at index)::insert(item, at index)
 		}
 
-		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`. See the note above `firstIndexOf` for why this one stays native.
+		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`. See the note above `firstIndex` for why this one stays native.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		lastIndexOf<infer ItemType is Equatable>(_ item: ItemType) -> Optional<Integer>
+		lastIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer>
 
 		§ The one bounded Method whose bound does real work rather than
 		§ restating a conformance of List's own: joining needs nothing of the
@@ -428,16 +428,16 @@ declarations {
 		§ Argument, exactly as `sorted`'s `compareTo` does. Bounding the METHOD
 		§ is what keeps it here — a Namespace targeting `List<String>` would
 		§ have answered for Strings only, and every builtin worth joining is
-		§ Printable, Lists included. `[1, 2, 3]::joinWith(", ")` is `"1, 2, 3"`.
+		§ Printable, Lists included. `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`.
 		§ Items with no `Printable` conformance to hand in — an unbounded Type
 		§ Parameter, a Function — are refused AT the bound, which names the
 		§ Protocol that is missing, rather than by leaving the Method unfound.
 
-		§§ Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::splitOn` for a List of Strings.
+		§§ Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::split(on:)` for a List of Strings.
 		§§
 		§§ @param separator the separator to place between the items
 		§§ @returns the joined String, or the empty String for the empty List.
-		joinWith<infer ItemType is Printable>(_ separator: String) -> String
+		join<infer ItemType is Printable>(with separator: String) -> String
 
 		§ `flatten` would read naturally here too, and it is not here: it is
 		§ not available on every List, and every Method of this Namespace is.
@@ -460,20 +460,20 @@ declarations {
 		§§
 		§§ @param other the List to pair the items with
 		§§ @returns a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
-		pairedWith<infer Other>(_ other: List<Other>) -> List<{ first: ItemType, second: Other }>
+		pair<infer Other>(with other: List<Other>) -> List<{ first: ItemType, second: Other }>
 
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§
 		§§ @param groupsOf how many items each group holds
 		§§ @returns the List of groups, or `Nothing` when the group size is below one.
-		splitInto(groupsOf size: Integer) -> Optional<List<List<ItemType>>>
+		split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
 
 		§§ A List holding the given item the given number of times. Zero or fewer times gives the empty List.
 		§§
 		§§ @param item the item to repeat
 		§§ @param times how many copies the List holds
 		§§ @returns the List of repeated items.
-		static repeating(_ item: ItemType, times count: Integer) -> List<ItemType> {
+		static repeat(_ item: ItemType, times count: Integer) -> List<ItemType> {
 			§ `of` counts DOWN when the first Integer is the greater, so a count
 			§ below one would give `[1]` rather than nothing — hence the guard.
 			if count::isLessThan(1) { <- [] }
@@ -502,7 +502,7 @@ declarations {
 	§ Namespace targeting `List<List<ItemType>>` says exactly that, and says it
 	§ in the one place the compiler already looks.
 	§
-	§ A bound could not have kept it on `List`, the way `joinWith`'s does: the
+	§ A bound could not have kept it on `List`, the way `join(with:)`'s does: the
 	§ depth is the point. `ItemType` here binds to the INNER List's item Type,
 	§ so `[[1, 2], [3]]::flatten()` is a `List<Integer>` rather than a
 	§ `List<List<Integer>>`. Written as a Method of `List` it could only ever

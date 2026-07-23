@@ -5,7 +5,7 @@ import {
 	add as algebraicAdd,
 	bigRationalOf,
 	dividedInto as algebraicDividedInto,
-	multiplyWith as algebraicMultiplyWith,
+	multiply as algebraicMultiplyWith,
 	squareRootOfRational,
 } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
@@ -20,7 +20,7 @@ import { createString } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import {
 	add as transcendentalAdd,
-	multiplyWith as transcendentalMultiplyWith,
+	multiply as transcendentalMultiplyWith,
 } from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
@@ -84,7 +84,7 @@ export function add__overload$2(
 
 // #region Divide
 
-export function divideBy__overload$1(
+export function divide__overload$1(
 	firstRational: RationalType,
 	secondRational: RationalType,
 ): RationalType | NothingType {
@@ -100,7 +100,7 @@ export function divideBy__overload$1(
 	return createRational(numerator1 * denominator2, denominator1 * numerator2)
 }
 
-export function divideBy__overload$2(
+export function divide__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): RationalType | NothingType {
@@ -119,7 +119,7 @@ export function divideBy__overload$2(
 
 // #region Multiply
 
-export function multiplyWith__overload$1(
+export function multiply__overload$1(
 	firstRational: RationalType,
 	secondRational: RationalType,
 ): RationalType {
@@ -131,7 +131,7 @@ export function multiplyWith__overload$1(
 	return createRational(numerator1 * numerator2, denominator1 * denominator2)
 }
 
-export function multiplyWith__overload$2(
+export function multiply__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): RationalType {
@@ -280,7 +280,7 @@ export function truncate(rational: RationalType): IntegerType {
 	}
 }
 
-export function toThePowerOf(
+export function raise(
 	rational: RationalType,
 	exponent: IntegerType,
 ): RationalType | NothingType {
@@ -378,21 +378,21 @@ export function add__overload$4(
 	return transcendentalAdd(transcendental, rational)
 }
 
-export function multiplyWith__overload$3(
+export function multiply__overload$3(
 	rational: RationalType,
 	algebraic: AlgebraicType,
 ): AlgebraicType | RationalType {
 	return algebraicMultiplyWith(algebraic, rational)
 }
 
-export function multiplyWith__overload$4(
+export function multiply__overload$4(
 	rational: RationalType,
 	transcendental: TranscendentalType,
 ): TranscendentalType | RationalType {
 	return transcendentalMultiplyWith(transcendental, rational)
 }
 
-export function divideBy__overload$3(
+export function divide__overload$3(
 	rational: RationalType,
 	algebraic: AlgebraicType,
 ): AlgebraicType | RationalType {

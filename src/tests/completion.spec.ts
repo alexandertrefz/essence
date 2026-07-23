@@ -231,7 +231,7 @@ describe("Completion", () => {
 
 			let labels = labelsOf(source, { line: 3, column: 10 })
 
-			expect(labels).toContain("multiplyWith")
+			expect(labels).toContain("multiply")
 			expect(labels).toContain("toString")
 		})
 	})

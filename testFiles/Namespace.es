@@ -44,8 +44,8 @@ implementation {
 
 	§ variable person = { firstName = "Alexander", lastName = "Trefz", occupation = "Software Engineer" }
 
-	§ __print(person()::fullName()::splitOn(" "))
-	§ __print(FullName.fullName(person)::splitOn(" "))
+	§ __print(person()::fullName()::split(on " "))
+	§ __print(FullName.fullName(person)::split(on " "))
 
 	§ namespace VectorMove<Vector extends { x: Number, y: Number}> for Vector {
 	§ 	translateHorizontally(_ x: Number) -> Vector {

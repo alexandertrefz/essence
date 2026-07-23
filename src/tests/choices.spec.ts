@@ -141,7 +141,7 @@ describe("Choices", () => {
 
 					__print(match operation -> Integer {
 						case #Add { <- @.left::add(@.right) }
-						case #Negate { <- @.number::multiplyWith(2) }
+						case #Negate { <- @.number::multiply(with 2) }
 						case #ClearAll { <- 0 }
 					})
 				}`),

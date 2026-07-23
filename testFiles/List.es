@@ -40,11 +40,11 @@ implementation {
 	__print(numbers::everyItem(matches (n) { <- n::isGreaterThan(0) })) § true
 
 	§ Indexing, slicing and counting — all zero-based, `slice` half-open.
-	__print(numbers::itemAt(2))              § 2
-	__print(numbers::itemAt(99))             § Nothing
-	__print(numbers::firstIndexOf(1))        § 1
+	__print(numbers::item(at 2))              § 2
+	__print(numbers::item(at 99))             § Nothing
+	__print(numbers::firstIndex(of 1))        § 1
 	__print(numbers::slice(from 1, to 3))    § [1, 2]
-	__print(numbers::countOf(1))             § 2
+	__print(numbers::count(of 1))             § 2
 
 	§ Membership tests.
 	__print(numbers::contains(4))            § true
@@ -52,9 +52,9 @@ implementation {
 
 	§ Structural edits, each returning a new List.
 	__print(numbers::reverse())             § [4, 1, 2, 1, 3]
-	__print(numbers::removeAt(2))            § [3, 1, 1, 4]
-	__print(numbers::insertAt(2, with 99))   § [3, 1, 99, 2, 1, 4]
-	__print(numbers::replaceAt(0, with 99))  § [99, 1, 2, 1, 4]
+	__print(numbers::remove(at 2))            § [3, 1, 1, 4]
+	__print(numbers::insert(99, at 2))   § [3, 1, 99, 2, 1, 4]
+	__print(numbers::replace(99, at 0))  § [99, 1, 2, 1, 4]
 	__print(numbers::sortedBy((a, b) { <- a::compareTo(b) }))  § [1, 1, 2, 3, 4]
 
 }

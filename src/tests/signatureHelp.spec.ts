@@ -122,7 +122,7 @@ describe("Signature Help", () => {
 		expect(help?.activeSignature).toBe(1)
 	})
 
-	it("should highlight repeated Parameters by range, not by their text", () => {
+	it("should highlight repeat Parameters by range, not by their text", () => {
 		let source = [
 			"implementation {",
 			"\tfunction pair (first: Integer, second: Integer) -> Integer {",
@@ -222,11 +222,9 @@ describe("Signature Help", () => {
 
 describe("Signature Help for bounded Methods", () => {
 	it("should render the Protocol bound and keep parameter ranges aligned", () => {
-		let source = [
-			"implementation {",
-			"\t[3, 1]::compareTo(",
-			"}",
-		].join("\n")
+		let source = ["implementation {", "\t[3, 1]::compareTo(", "}"].join(
+			"\n",
+		)
 
 		let help = findSignatureHelp(source, { line: 2, column: 20 })
 		let signature = help?.signatures[0]

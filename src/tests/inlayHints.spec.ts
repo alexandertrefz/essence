@@ -38,7 +38,7 @@ describe("Inlay Hints", () => {
 
 	it("should not annotate a Function literal that annotates itself", () => {
 		// NOTE: The literal already spells the whole signature out on the same
-		// line — repeating it beside the name is noise the width of a Type.
+		// line — repeat it beside the name is noise the width of a Type.
 		let source = [
 			"implementation {",
 			"\tconstant halve = (_ value: Integer) -> Integer { <- value }",
@@ -228,7 +228,7 @@ describe("Inlay Hints", () => {
 		it("should describe builtin fallible Methods as `Optional`", () => {
 			let source = [
 				"implementation {",
-				"\tconstant half = 1110::divideBy(2)",
+				"\tconstant half = 1110::divide(by 2)",
 				"\tconstant first = [1, 2, 3]::firstItem()",
 				"}",
 			].join("\n")
@@ -299,7 +299,7 @@ describe("Inlay Hints", () => {
 				"\t}",
 				"",
 				"\tconstant merged = 1::pick((value) {",
-				"\t\tif value::isGreaterThan(0) { <- value::divideBy(2) }",
+				"\t\tif value::isGreaterThan(0) { <- value::divide(by 2) }",
 				"",
 				"\t\t<- value",
 				"\t})",
@@ -319,7 +319,7 @@ describe("Inlay Hints", () => {
 			// `otherwise` bind the payload in one piece.
 			let source = [
 				"implementation {",
-				"\tconstant power = 2::toThePowerOf(-2)",
+				"\tconstant power = 2::raise(to -2)",
 				"\tconstant sure = power::otherwise(0)",
 				"}",
 			].join("\n")
