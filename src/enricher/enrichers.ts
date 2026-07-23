@@ -1003,13 +1003,12 @@ export function enrichNamespaceDefinitionStatement(
 		let result: Record<string, common.typed.NamespaceProperty> = {}
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
-			// NOTE: A value-less native static Property only ever appears in a
-			// `declarations { … }` Program, which the Enricher does not process
-			// yet — Commit 3 wires it.
+			// NOTE: A native static Property has no value to enrich, so there
+			// is nothing for a typed Node to hold — it is in the Namespace
+			// Type (that is what resolution reads) but not in the typed tree
+			// the Rewriter emits from, exactly like a native Method.
 			if (propertyValue.value === null) {
-				throw new Error(
-					"Native static Property reached the Enricher before it was wired",
-				)
+				continue
 			}
 
 			let type: common.Type
@@ -1158,6 +1157,15 @@ export function enrichNamespaceDefinitionStatement(
 	// mention. Pruning a bound Generic from one Overload would leave that
 	// Overload's emitted signature and its call sites disagreeing about how
 	// many hidden Arguments there are.
+	//
+	// NOTE: A NATIVE Method has only TWO of those three views — there is no
+	// typed Node, because there is no body to emit. The retention below still
+	// runs over it (it is keyed off the parser Node, which exists either way),
+	// so its resolved Method Type carries the bound Namespace Generics exactly
+	// as a bodied one does; the typed-Node half is simply absent, and
+	// `enrichMethods` drops the corresponding injected list on the floor. That
+	// is the whole difference: the Type view and the witness view still agree,
+	// which is what call sites and `boundConformance` read.
 	let injectedGenerics = new Map<
 		string,
 		Array<Array<common.typed.GenericDeclarationNode>>
@@ -1705,6 +1713,17 @@ function enrichMethods(
 	let result: common.typed.Methods = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
+		// NOTE: A native Method has no body, so there is nothing to enrich and
+		// nothing for the Rewriter to emit — the runtime already implements
+		// it. It stays in the Namespace Type (which is what resolution,
+		// Completion and Hover read) and is simply absent here.
+		if (
+			memberValue.nodeType === "SimpleMethodSignature" ||
+			memberValue.nodeType === "StaticMethodSignature"
+		) {
+			continue
+		}
+
 		// NOTE: The name is typed as the Method itself, so that whatever
 		// resolves a Type at the cursor describes the Method when the cursor
 		// is on its name.
@@ -1749,6 +1768,9 @@ function enrichMethods(
 					selfType,
 					injected,
 				),
+				// NOTE: Every Overload is bodied here, so the Node's order and
+				// the Type's are the identity.
+				overloadIndices: memberValue.methods.map((_, index) => index),
 			}
 		} else if (memberValue.nodeType === "OverloadedStaticMethod") {
 			result[memberKey] = {
@@ -1760,14 +1782,64 @@ function enrichMethods(
 					selfType,
 					injected,
 				),
+				overloadIndices: memberValue.methods.map((_, index) => index),
 			}
 		} else {
-			// NOTE: The body-less native Method forms only ever appear in a
-			// `declarations { … }` Program, which the Enricher does not process
-			// yet — Commit 3 wires them.
-			throw new Error(
-				`Native Method signature '${memberValue.nodeType}' reached the Enricher before it was wired`,
-			)
+			// NOTE: An Overload block in a `declarations { … }` Program may MIX
+			// bodied and native entries. Only the bodied ones have anything to
+			// emit, so only they reach the typed Node — together with the
+			// Generics that were woven into THEIR entry of the resolved Type,
+			// picked out by the original Overload index so the two views stay
+			// aligned even when a native sits between them.
+			// NOTE: Each survivor's ORIGINAL index travels with it in
+			// `overloadIndices`. That index — its position in the Method
+			// Type's `overloads`, not in this filtered list — is what the
+			// `__overload$N` name is built from, both where a call site
+			// resolves it and where the Simplifier emits the definition. A
+			// native occupies its slot in that numbering even though nothing
+			// is emitted for it, because the runtime export it binds to
+			// already answers to that name.
+			let bodied: Array<parser.FunctionValueNode> = []
+			let bodiedIndices: Array<number> = []
+			let bodiedInjected: Array<
+				Array<common.typed.GenericDeclarationNode>
+			> = []
+
+			for (let [index, overload] of memberValue.methods.entries()) {
+				if (overload.nodeType === "NativeMethodSignature") {
+					continue
+				}
+
+				bodied.push(overload)
+				bodiedIndices.push(index)
+				bodiedInjected.push(injected[index] ?? [])
+			}
+
+			if (bodied.length === 0) {
+				continue
+			}
+
+			let nodeType =
+				memberValue.nodeType === "OverloadedMethodSignatures"
+					? ("OverloadedMethod" as const)
+					: ("OverloadedStaticMethod" as const)
+
+			result[memberKey] = {
+				nodeType,
+				name,
+				methods: enrichMethodsFunctionValue(
+					{
+						nodeType,
+						name: memberValue.name,
+						methods: bodied,
+						documentation: memberValue.documentation,
+					},
+					scope,
+					selfType,
+					bodiedInjected,
+				),
+				overloadIndices: bodiedIndices,
+			}
 		}
 	}
 
@@ -3471,13 +3543,36 @@ export function resolveNamespaceDefinitionStatementType(
 	let methods: Record<string, common.MethodType> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		// NOTE: A value-less native static Property only ever appears in a
-		// `declarations { … }` Program, which the Enricher does not process yet —
-		// Commit 3 wires it.
+		// NOTE: A native static Property declares its Type instead of carrying
+		// a value — `static PI: Transcendental` — so the annotation IS the
+		// Type. Resolved in the outer Scope, like the bodied form's value.
 		if (memberValue.value === null) {
-			throw new Error(
-				"Native static Property reached the Enricher before it was wired",
-			)
+			// NOTE: With neither a value nor an annotation there is nothing
+			// left to say what the Property is. Silently resolving to Error
+			// would let a Namespace ship a Property of no Type at all, and the
+			// standard library's zero-Diagnostic gate would wave it through.
+			if (memberValue.type === null) {
+				reportError(
+					`Native Property '${memberKey}' declares no Type`,
+					memberValue.name.position,
+					{
+						code: "native-property-without-type",
+						labels: [
+							primary(
+								memberValue.name.position,
+								"no Type and no value",
+							),
+						],
+						helps: [
+							`Annotate it: 'static ${memberKey}: Type'.`,
+						],
+					},
+				)
+			}
+
+			properties[memberKey] = resolveDeclaredType(memberValue.type, scope)
+
+			continue
 		}
 
 		// NOTE: A property's Type is its value's, read off the enriched

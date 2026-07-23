@@ -1,4 +1,5 @@
 import type { common } from "../interfaces/index"
+import { loadStdlib } from "./stdlib"
 import {
 	namespace as algebraicNamespace,
 	type as algebraicType,
@@ -48,10 +49,14 @@ import {
 } from "./types/Transcendental"
 
 // NOTE: The single source of truth for what exists before the first line of a
-// Program. The Enricher builds its top-level Scope from these tables, and the
-// Language Server derives its builtin listings from the same tables — a new
+// Program. The Enricher builds its top-level Scope from these accessors, and
+// the Language Server derives its builtin listings from the same ones — a new
 // builtin registered here reaches resolution, completion, rename and
 // semantic tokens in one step, and can not be half-wired again.
+// NOTE: The standard library is being moved out of TypeScript and into Essence
+// source under `src/stdlib`. Until it has all moved, what a Program starts with
+// is the union of both halves — which is what `loadStdlib` assembles, and what
+// the accessors at the foot of this file hand out.
 
 // NOTE: `Irrational` is a transparent alias for `Algebraic | Transcendental`
 // — the pair are definitional complements (transcendental means "not
@@ -63,7 +68,13 @@ const irrationalType: common.UnionType = {
 	types: [algebraicType, transcendentalType],
 }
 
-export const builtinMembers: Record<string, common.Type> = {
+// NOTE: The hand written TypeScript half of the standard library. Every name
+// here is still declared in TypeScript rather than in Essence; as each
+// Namespace is converted the entry is deleted from this table and the `.es`
+// file that replaces it takes over the name. The loader subtracts whatever the
+// sources declare from these before they seed anything, so the two halves can
+// never both claim a name.
+export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
 	String: stringNamespace,
 	Boolean: booleanNamespace,
@@ -79,7 +90,7 @@ export const builtinMembers: Record<string, common.Type> = {
 	List: listNamespace,
 }
 
-export const builtinTypes: Record<string, common.Type> = {
+export const legacyTypes: Record<string, common.Type> = {
 	Nothing: nothingType,
 	Boolean: booleanType,
 	String: stringType,
@@ -95,14 +106,29 @@ export const builtinTypes: Record<string, common.Type> = {
 	Ordering: orderingType,
 }
 
-export const builtinProtocols: Record<string, common.ProtocolType> = {
+export const legacyProtocols: Record<string, common.ProtocolType> = {
 	Equatable,
 	Printable,
 	Comparable,
 }
 
-export const builtinNamespaces: Array<common.NamespaceType> = Object.values(
-	builtinMembers,
-).filter(
-	(member): member is common.NamespaceType => member.type === "Namespace",
-)
+// NOTE: Accessors rather than consts, because half of what they answer with is
+// read from Essence source at first call. `loadStdlib` merges the tables above
+// (minus every name the source declares) with what the source declared, caches
+// the result for the process, and hands back the SAME object every time — so
+// these stay as cheap as the consts they replaced after the first call.
+export function builtinMembers(): Record<string, common.Type> {
+	return loadStdlib().members
+}
+
+export function builtinTypes(): Record<string, common.Type> {
+	return loadStdlib().types
+}
+
+export function builtinProtocols(): Record<string, common.ProtocolType> {
+	return loadStdlib().protocols
+}
+
+export function builtinNamespaces(): Array<common.NamespaceType> {
+	return loadStdlib().namespaces
+}

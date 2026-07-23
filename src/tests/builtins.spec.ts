@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test"
 
 import { builtinNamespaces } from "../enricher/builtins"
+import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
+import type { common } from "../interfaces/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
@@ -35,21 +37,43 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for
 // a single signature, `name__overload$N` for each overload of an Overloaded
-// one (`simplifier/index.ts:142`).
+// one (`simplifier/index.ts:142`). The index is the one the Method was WRITTEN
+// at, natives included, which is exactly how `nativeBindings` is indexed too.
 function expectedExportNames(
 	name: string,
-	method: { type: string },
+	method: common.MethodType,
 ): Array<string> {
 	if (
 		method.type === "OverloadedMethod" ||
 		method.type === "OverloadedStaticMethod"
 	) {
-		return (
-			method as unknown as { overloads: Array<unknown> }
-		).overloads.map((_, index) => resolveOverloadedMethodName(name, index))
+		return method.overloads.map((_, index) =>
+			resolveOverloadedMethodName(name, index),
+		)
 	}
 
 	return [name]
+}
+
+// NOTE: Which entries of a Namespace member are native. A Namespace still
+// declared in the TypeScript tables has no entry in `nativeBindings` at all —
+// every one of its Methods is bound to the runtime by definition, so the
+// default is "all native".
+function nativeFlagsFor(
+	namespaceName: string,
+	memberName: string,
+	count: number,
+): Array<boolean> {
+	let bindings = loadStdlib().nativeBindings[namespaceName]
+
+	if (bindings === undefined) {
+		return Array.from({ length: count }, () => true)
+	}
+
+	return (
+		bindings.methods[memberName] ??
+		Array.from({ length: count }, () => true)
+	)
 }
 
 describe("Builtins", () => {
@@ -61,30 +85,66 @@ describe("Builtins", () => {
 	// `list::removeLast()` was broken. The per-function unit tests missed it
 	// because they call the runtime directly, under the name it happens to
 	// have, rather than the name the Simplifier will ask for.
+	//
+	// NOTE: The check runs in BOTH directions now that a standard library
+	// Method may be implemented in Essence rather than bound to the runtime. A
+	// native without an export is the broken call above; an Essence-bodied
+	// Method WITH an export is dead code — the leftover TypeScript nobody
+	// deleted when the Method moved, which will never be called again and will
+	// quietly rot out of step with the Essence that replaced it.
 	describe("every declared Method has a runtime implementation", () => {
-		for (let namespace of builtinNamespaces) {
+		for (let namespace of builtinNamespaces()) {
 			it(`implements ${namespace.name}`, () => {
-				let runtime = runtimeModules[namespace.name]
-
-				expect(runtime).toBeDefined()
-
 				let missing: Array<string> = []
+				let stale: Array<string> = []
+				let runtime = runtimeModules[namespace.name] ?? {}
 
 				for (let [name, method] of Object.entries(namespace.methods)) {
-					for (let exportName of expectedExportNames(name, method)) {
-						if (typeof runtime[exportName] !== "function") {
-							missing.push(`${namespace.name}.${exportName}`)
+					let exportNames = expectedExportNames(name, method)
+					let native = nativeFlagsFor(
+						namespace.name,
+						name,
+						exportNames.length,
+					)
+
+					exportNames.forEach((exportName, index) => {
+						let implemented =
+							typeof runtime[exportName] === "function"
+
+						if (native[index] ?? true) {
+							if (!implemented) {
+								missing.push(`${namespace.name}.${exportName}`)
+							}
+						} else if (implemented) {
+							stale.push(`${namespace.name}.${exportName}`)
 						}
+					})
+				}
+
+				let propertyBindings =
+					loadStdlib().nativeBindings[namespace.name]?.properties
+
+				for (let name of Object.keys(namespace.properties)) {
+					let native = propertyBindings?.[name] ?? true
+
+					if (native) {
+						if (runtime[name] === undefined) {
+							missing.push(`${namespace.name}.${name}`)
+						}
+					} else if (runtime[name] !== undefined) {
+						stale.push(`${namespace.name}.${name}`)
 					}
 				}
 
-				for (let name of Object.keys(namespace.properties)) {
-					if (runtime[name] === undefined) {
-						missing.push(`${namespace.name}.${name}`)
-					}
+				// NOTE: A Namespace whose every member is written in Essence
+				// needs no runtime module at all — only one that still binds
+				// something native does.
+				if (missing.length > 0) {
+					expect(runtimeModules[namespace.name]).toBeDefined()
 				}
 
 				expect(missing).toEqual([])
+				expect(stale).toEqual([])
 			})
 		}
 	})
@@ -94,16 +154,12 @@ describe("Builtins", () => {
 	// undocumented Method ships a blank tooltip. The backfill of 2026-07-22
 	// took coverage to 100%; this keeps it there.
 	describe("every declared Method carries documentation", () => {
-		for (let namespace of builtinNamespaces) {
+		for (let namespace of builtinNamespaces()) {
 			it(`documents ${namespace.name}`, () => {
 				let undocumented: Array<string> = []
 
 				for (let [name, method] of Object.entries(namespace.methods)) {
-					let documentation = (
-						method as unknown as {
-							documentation?: { description?: string }
-						}
-					).documentation
+					let documentation = method.documentation
 
 					if (
 						documentation === undefined ||

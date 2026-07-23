@@ -19,6 +19,7 @@ import {
 } from "vscode-languageserver/node"
 
 import { enrich } from "../enricher/index"
+import { loadStdlib } from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { analyse } from "./analyse"
@@ -57,7 +58,13 @@ export function startServer() {
 	let documents = new TextDocuments(TextDocument)
 	let pendingAnalyses = new Map<string, ReturnType<typeof setTimeout>>()
 
+	// NOTE: The standard library is read, hoisted, enriched and validated once
+	// per process. Doing it here — while the client is still setting up —
+	// means the first Hover does not pay for it, and a Diagnostic in the
+	// library itself surfaces at startup rather than on a keystroke.
 	connection.onInitialize(() => {
+		loadStdlib()
+
 		return {
 			capabilities: {
 				textDocumentSync: TextDocumentSyncKind.Full,

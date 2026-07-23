@@ -654,6 +654,34 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A user's `overload` block defines every Overload itself, so the
+	// emitted names run 1, 2, 3 in written order — the same numbering the call
+	// site resolves against the Method Type. Only the Namespaces the standard
+	// library declares can leave a gap, where a native holds the slot.
+	describe("Overload Numbering", () => {
+		it("should number a Namespace's own Overloads in written order", async () => {
+			const source = `implementation {
+				namespace Greeter for String {
+					overload greet {
+						() -> String { <- @::append("!") }
+						(_ other: String) -> String { <- @::append(other) }
+					}
+				}
+
+				__print("hello"::greet())
+				__print("hello"::greet(" world"))
+			}`
+
+			const code = generate(source)
+
+			expect(code).toContain("greet__overload$1")
+			expect(code).toContain("greet__overload$2")
+			expect(code).not.toContain("greet__overload$3")
+
+			expect(await run(source)).toEqual(['"hello!"', '"hello world"'])
+		})
+	})
+
 	describe("Union Method Dispatch", () => {
 		it("should emit a runtime dispatch with one statically resolved target per member", () => {
 			const code = generate(`implementation {

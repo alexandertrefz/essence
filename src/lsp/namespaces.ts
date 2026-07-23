@@ -1,6 +1,6 @@
 import {
-	builtinProtocols as builtinProtocolTable,
 	builtinNamespaces,
+	builtinProtocols as builtinProtocolTable,
 } from "../enricher/builtins"
 import { enrich } from "../enricher/index"
 import {
@@ -24,8 +24,11 @@ import { parseWithDiagnostics } from "../parser/index"
 // Language Server.
 export { builtinNamespaces }
 
-export const builtinProtocols: Array<common.ProtocolType> =
-	Object.values(builtinProtocolTable)
+// NOTE: Read on use rather than at import — the tables are assembled on the
+// first call and cached for the process, so this stays a lookup.
+export function builtinProtocols(): Array<common.ProtocolType> {
+	return Object.values(builtinProtocolTable())
+}
 
 export function targetTypeMatches(
 	namespace: common.NamespaceType,
@@ -65,7 +68,7 @@ export function matchingNamespaces(
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
 		let constraint = baseType.constraint
 		let protocol = [
-			...builtinProtocols,
+			...builtinProtocols(),
 			...collectProtocolTypes(documentText),
 		].find((candidate) => candidate.name === constraint)
 
@@ -96,7 +99,7 @@ export function matchingNamespaces(
 	}
 
 	let allNamespaces = [
-		...builtinNamespaces,
+		...builtinNamespaces(),
 		...collectNamespaceTypes(documentText),
 	]
 
