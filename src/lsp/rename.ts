@@ -201,10 +201,9 @@ export function isValidIdentifierName(name: string): boolean {
 // NOTE: What stands between a mis-bound native and a broken build is the
 // runtime-export cross-check in `src/tests/builtins.spec.ts` — it drives
 // `nativeBindings` against the real `__internal` modules in both directions,
-// and it is what fails on the rename above. It is NOT the equivalence gate,
-// which is deleted once the last TypeScript table is gone. That check has to
-// survive commit 11, and it can only speak for Namespaces its `runtimeModules`
-// table names.
+// and it is what fails on the rename above. It is the LAST line of defence now
+// that the standard library is only Essence source, and it can only speak for
+// Namespaces its `runtimeModules` table names.
 export function findRenameableOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,

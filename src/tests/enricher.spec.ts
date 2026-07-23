@@ -5,10 +5,6 @@ import {
 	builtinProtocols,
 } from "../enricher/builtins"
 import { enrich } from "../enricher/index"
-import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
-import { namespace as integerNamespace } from "../enricher/types/Integer"
-import { namespace as numberNamespace } from "../enricher/types/Number"
-import { namespace as transcendentalNamespace } from "../enricher/types/Transcendental"
 import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import { parse } from "../parser/index"
@@ -22,6 +18,25 @@ function enrichSource(source: string): {
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
+}
+
+// NOTE: The LIVE Namespace of that name — the one read from `src/stdlib/*.es`
+// and handed to every Program's top level Scope. Asserting against this rather
+// than against a declaration read straight out of a source file is the point:
+// a test about which Namespace declares a Method has to ask what a Program can
+// actually reach. Throws rather than returning `undefined`, so a renamed or
+// dropped Namespace fails as a missing Namespace instead of as a missing
+// Method.
+function builtinNamespace(name: string): common.NamespaceType {
+	let namespace = builtinNamespaces().find(
+		(candidate) => candidate.name === name,
+	)
+
+	if (namespace === undefined) {
+		throw new Error(`There is no builtin Namespace named '${name}'`)
+	}
+
+	return namespace
 }
 
 // NOTE: Walks the typed Program collecting every resolved Conformance —
@@ -2325,7 +2340,7 @@ describe("Enricher", () => {
 		it("keeps cross-kind comparison off the member Namespaces", () => {
 			// NOTE: The argument Types Integer::isLessThan accepts — no
 			// Algebraic or Transcendental among them.
-			let integerLessThan = integerNamespace.methods
+			let integerLessThan = builtinNamespace("Integer").methods
 				.isLessThan as common.OverloadedMethodType
 			let acceptedKinds = integerLessThan.overloads.map(
 				(overload) => overload.parameterTypes[1].type.type,
@@ -2334,9 +2349,13 @@ describe("Enricher", () => {
 			expect(acceptedKinds).not.toContain("Algebraic")
 			expect(acceptedKinds).not.toContain("Transcendental")
 
-			expect(algebraicNamespace.methods.isLessThan).toBeUndefined()
-			expect(transcendentalNamespace.methods.isLessThan).toBeUndefined()
-			expect(numberNamespace.methods.isLessThan).toBeDefined()
+			expect(
+				builtinNamespace("Algebraic").methods.isLessThan,
+			).toBeUndefined()
+			expect(
+				builtinNamespace("Transcendental").methods.isLessThan,
+			).toBeUndefined()
+			expect(builtinNamespace("Number").methods.isLessThan).toBeDefined()
 		})
 
 		it("should not allow redeclaring a builtin Protocol", () => {

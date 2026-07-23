@@ -5,13 +5,7 @@ import { renderDiagnostics } from "../diagnostics/render"
 import type { common, enricher, parser } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
-import {
-	builtinMemberOrder,
-	builtinTypeOrder,
-	legacyMembers,
-	legacyProtocols,
-	legacyTypes,
-} from "./builtins"
+import { builtinMemberOrder, builtinTypeOrder } from "./builtins"
 import { enrichPrograms } from "./index"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
@@ -61,10 +55,9 @@ export type StdlibSource = {
 
 export type Stdlib = {
 	// NOTE: The three Scope tables the Enricher and the Language Server start
-	// from, already MERGED: the legacy TypeScript tables minus every name the
-	// Essence sources declare, plus what those sources declared. During the
-	// conversion both halves are live at once; when the last table is gone the
-	// legacy half is empty and this is purely the source half.
+	// from — everything `src/stdlib/*.es` declared, listed in
+	// `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries the
+	// native Functions, which have no Namespace to be declared in.
 	members: Record<string, common.Type>
 	types: Record<string, common.Type>
 	protocols: Record<string, common.ProtocolType>
@@ -135,19 +128,18 @@ function throwOnAnyDiagnostics(
 	}
 }
 
-// NOTE: The top level names an Essence source claims, per Scope table. This is
-// the whole of the transitional mechanism: whatever the sources declare is
-// REMOVED from the legacy TypeScript tables before they seed the bootstrap
-// Scope, so a converted Namespace replaces its table entry rather than fighting
-// it, and an unconverted one keeps working untouched. Namespace by Namespace,
-// the legacy side shrinks to nothing.
+// NOTE: The top level names a set of Essence Programs claims, per Scope table.
+// Two callers, for two different reasons:
 //
-// NOTE: The subtraction is PER CATEGORY — a source `type` displaces only the
-// legacy Type of that name, a source `namespace` only the legacy Namespace.
-// Convert a Type and the Namespace that targets it TOGETHER: converting
-// `choice Ordering` alone leaves the legacy `Ordering` Namespace pointing at
-// the old Type object, which is structurally equal to the new one today but is
-// not the same declaration, and nothing here would say so.
+//   - The loader, to know which of the names now in the bootstrap Scope came
+//     from a standard library FILE rather than from `nativeFunctions` or
+//     `primitiveTypes` — those are the ones whose Documentation Positions have
+//     to be stripped, because a builtin is sourceless to every consumer.
+//   - `documents.ts`, to tell the Enricher which builtins a USER Program
+//     shadows with a declaration of its own.
+//
+// It reads the PARSER's nodes, not the enriched Scope, so it answers "what does
+// this file claim" without having to enrich anything first.
 export function declaredNames(programs: Array<parser.Program>): {
 	members: Set<string>
 	types: Set<string>
@@ -182,15 +174,13 @@ export function declaredNames(programs: Array<parser.Program>): {
 	return { members, types, protocols }
 }
 
-// NOTE: The merged member table, listed in the ONE canonical order rather than
-// in "legacy half first, source half after". A source declaration is enriched
-// INTO the Scope, so it lands wherever insertion put it — at the end — and a
-// converted Namespace would jump from its place to last, reordering the
-// Completion list and the Enricher's Namespace search for a change that is
-// supposed to be invisible. Sorting the finished table against
-// `builtinMemberOrder` makes the position a property of the name, not of which
-// half declared it. Anything unlisted keeps its insertion order, after the
-// listed ones.
+// NOTE: The finished member table, listed in the ONE canonical order. A source
+// declaration is enriched INTO the Scope, so it lands wherever insertion put it
+// — which is the order `readStdlibSources` sorted the FILE NAMES in, and
+// renaming a file would silently reorder the Completion list and the Enricher's
+// Namespace search. Sorting the finished table against `builtinMemberOrder`
+// makes the position a property of the name. Anything unlisted keeps its
+// insertion order, after the listed ones.
 function inBuiltinOrder(
 	members: Record<string, common.Type>,
 	order: Array<string>,
@@ -212,27 +202,15 @@ function inBuiltinOrder(
 	return ordered
 }
 
-function withoutNames<Value>(
-	table: Record<string, Value>,
-	names: Set<string>,
-): Record<string, Value> {
-	return Object.fromEntries(
-		Object.entries(table).filter(([name]) => !names.has(name)),
-	)
-}
-
 // NOTE: A Documentation Position read out of a standard library file points
-// into a file no consumer of these tables has — Hover, Signature Help and
-// `go to definition` all treat a builtin as sourceless, and the legacy tables
-// have always written `position: null`. Stripping it keeps the two halves of
-// the merge indistinguishable, and makes it impossible to hand out a Position
-// with no file attached.
+// into a file no consumer of these tables has opened — Hover, Signature Help
+// and `go to definition` all treat a builtin as SOURCELESS, and would otherwise
+// offer to jump into `src/stdlib/List.es` from a user's project. Stripping it
+// here makes it impossible to hand out a Position with no file attached.
 //
-// NOTE: Only SOURCE declared entries are stripped. The legacy remainder is a
-// set of shared module level singletons — every consumer holds the very same
-// object — so writing into one from here would be a mutation of state this
-// loader does not own. It is a no-op today, since every legacy Documentation
-// already carries `position: null`, which is exactly why it would go unnoticed.
+// NOTE: The Language Server DOES open the standard library sources — as
+// ordinary documents, enriched in their own right. That path never goes through
+// this loader, so `go to definition` inside `src/stdlib` keeps working.
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
@@ -348,14 +326,12 @@ export function loadStdlibFrom(
 	let programs = sources.map((source) => source.program)
 	let declared = declaredNames(programs)
 
-	// NOTE: The Scope a standard library file starts from: the bare Type tags,
-	// the native Functions that have no Namespace to live in, and — for as long
-	// as the conversion is in flight — the legacy tables minus whatever the
-	// sources declare for themselves.
-	let members: Record<string, common.Type> = {
-		...nativeFunctions,
-		...withoutNames(legacyMembers, declared.members),
-	}
+	// NOTE: The whole of what a standard library file starts from — the native
+	// Functions, which have no Namespace to be declared in, and the bare Type
+	// tags, the handful of Types that ARE what a declaration bottoms out in.
+	// Everything else in the language is declared by the sources being loaded
+	// here, into this same Scope.
+	let members: Record<string, common.Type> = { ...nativeFunctions }
 
 	let scope: enricher.Scope = {
 		parent: null,
@@ -364,11 +340,8 @@ export function loadStdlibFrom(
 		// scope before the first line has no Position to point a Diagnostic at.
 		declarations: {},
 		constants: new Set(Object.keys(members)),
-		types: {
-			...primitiveTypes,
-			...withoutNames(legacyTypes, declared.types),
-		},
-		protocols: { ...withoutNames(legacyProtocols, declared.protocols) },
+		types: { ...primitiveTypes },
+		protocols: {},
 	}
 
 	let enrichStarted = performance.now()

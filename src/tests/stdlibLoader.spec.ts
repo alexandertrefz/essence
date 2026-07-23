@@ -88,8 +88,10 @@ ${entries.map((entry) => overloadEntries[entry]).join("\n")}
 
 describe("Standard Library Loader", () => {
 	// NOTE: The whole point of the `declarations { … }` form — a signature with
-	// no body IS the declaration. What the Namespace Type ends up with has to be
-	// indistinguishable from what a hand written table produced.
+	// no body IS the declaration. Every shape the Enricher needs of a builtin
+	// Namespace has to come out of a signature alone: the Method Types, the
+	// Type Parameters, the Documentation, and the record of which entries are
+	// bound to the runtime.
 	it("resolves a native Namespace into a complete Namespace Type", () => {
 		let stdlib = load(
 			[
@@ -377,11 +379,9 @@ describe("Standard Library Loader", () => {
 			// NOTE: The bodied Method calls a NATIVE sibling declared in the
 			// same synthetic file rather than a builtin like
 			// `Integer::multiplyWith`. A synthetic standard library is
-			// enriched against the legacy tables plus these sources alone —
-			// nothing of `src/stdlib` is in scope — so reaching for a builtin
-			// Method makes the test fail the moment that Namespace is
-			// converted out of TypeScript, which says nothing about whether a
-			// bodied Method survives.
+			// enriched against the bare Type tags plus these sources ALONE —
+			// nothing of `src/stdlib` is in scope — so reaching for a real
+			// builtin Method would simply not resolve.
 			`declarations {
 				namespace Doubler for Integer {
 					§§ Twice the value.
@@ -605,12 +605,12 @@ describe("Standard Library Loader", () => {
 	// NOTE: Enriched once per process — every consumer reads the same object,
 	// so the library is parsed, hoisted and validated exactly once no matter
 	// how many files are compiled.
-	// NOTE: The merged member table is listed in ONE canonical order, not
-	// "legacy half first, source half after". A source declaration is enriched
-	// INTO the Scope and would otherwise land at the end, so every conversion
-	// would move its Namespace to last — reordering the Completion list and
-	// the Enricher's Namespace search for a change meant to be invisible.
-	it("lists the builtin Namespaces in one order, whichever half declares them", () => {
+	// NOTE: The member table is listed in ONE canonical order, stated in
+	// `builtinMemberOrder`, not in the order the files happened to sort in. A
+	// source declaration is enriched INTO the Scope and lands where insertion
+	// put it, so renaming `List.es` would otherwise reorder the Completion list
+	// and the Enricher's Namespace search.
+	it("lists the builtin Namespaces in one order, whatever the file names", () => {
 		expect(
 			loadStdlib().namespaces.map((namespace) => namespace.name),
 		).toEqual([
@@ -634,12 +634,11 @@ describe("Standard Library Loader", () => {
 		])
 	})
 
-	// NOTE: The other half of the ordering rule, and the half that matters at
-	// commit 11 — by then `builtinMemberOrder` is the SOLE source of order,
-	// with no legacy table's key order left to fall back on. A name listed
-	// that no longer exists is dead weight that reads as intent; a member that
-	// exists but is unlisted is appended LAST, which is exactly the silent
-	// reordering the list is here to prevent.
+	// NOTE: The other half of the ordering rule. `builtinMemberOrder` is the
+	// SOLE source of order — there is no second table whose key order could
+	// stand in for it. A name listed that no longer exists is dead weight that
+	// reads as intent; a member that exists but is unlisted is appended LAST,
+	// which is exactly the silent reordering the list is here to prevent.
 	it("orders every builtin member by name, and names only members that exist", () => {
 		let members = Object.keys(loadStdlib().members)
 
@@ -709,10 +708,11 @@ describe("Standard Library Loader", () => {
 		expect(stdlib.timing.total).toBeGreaterThanOrEqual(0)
 	})
 
-	// NOTE: The transitional mechanism the conversion rides on: whatever the
-	// sources declare REPLACES the legacy TypeScript table entry of the same
-	// name, rather than fighting it.
-	it("subtracts a source declared name from the legacy tables", () => {
+	// NOTE: A standard library file is the WHOLE of what the Namespace it
+	// declares contains. Nothing is merged in from anywhere else — a name the
+	// sources do not write is a name a Program can not reach, which is what
+	// makes `src/stdlib/*.es` readable as the definition of the language.
+	it("gives a Namespace exactly what its source declares", () => {
 		let stdlib = load([
 			"Nothing.es",
 			`declarations {

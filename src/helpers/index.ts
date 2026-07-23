@@ -795,19 +795,6 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }
 
-// NOTE: The Union `itemType | Nothing`, carrying the applied `Optional<...>`
-// spelling for display. The stdlib writes its fallible signatures with this,
-// so Hovers and Diagnostics print the global alias — and a compound payload
-// stays one nested member (`Optional<Integer | Rational>`), which is what
-// lets `otherwise` bind it in one piece.
-export function optionalOf(itemType: common.Type): common.UnionType {
-	return {
-		type: "UnionType",
-		types: [itemType, { type: "Nothing" }],
-		alias: { name: "Optional", typeArguments: [itemType] },
-	}
-}
-
 // NOTE: Builds a Union in its canonical, Optional-shaped form: `Nothing` is
 // hoisted to a single top-level member and every other member becomes the
 // payload — one member, or one anonymous nested Union of them. So
