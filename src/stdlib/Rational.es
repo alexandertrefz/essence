@@ -119,6 +119,12 @@ declarations {
 			(with other: Transcendental) -> Transcendental | Rational
 		}
 
+		§ These four are not a copy of `Number`'s — see the note above
+		§ `Integer::isLessThan`. The same-kind entry is written on Rational's
+		§ OWN `compareTo`, a cross-multiplication, so that comparing two
+		§ Rationals does not reach the sixteen-cell cross-kind table and drag
+		§ the Algebraic and Transcendental machinery in behind it.
+
 		§§ Whether this Rational is strictly below the given number.
 		overload isLessThan {
 			(_ other: Rational) -> Boolean {

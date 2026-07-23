@@ -91,6 +91,24 @@ declarations {
 			(with other: Transcendental) -> Transcendental | Rational
 		}
 
+		§ THE INEQUALITIES LOOK LIKE DUPLICATION OF `Number`'s AND ARE NOT.
+		§ `Number` declares the same four over the whole tower, and deleting
+		§ these four would leave every Integer comparison resolving to those —
+		§ which is exactly the regression `eb27756` fixed. The chain runs
+		§ `Integer.isLessThan` → `compareTo`, and WHICH `compareTo` is the
+		§ whole point: the one below is Integer's own, a bigint comparison,
+		§ while `Number`'s is the sixteen-cell cross-kind table that reaches
+		§ Rational, Algebraic, Transcendental and `bigint-fraction`. Routing
+		§ two Integers through it made `HelloWorld.es` bundle the machinery for
+		§ comparing an Integer with π, and nearly doubled it — 18,271 → 35,729
+		§ bytes. `src/tests/bundleSize.spec.ts` is the guard.
+		§
+		§ So the entries here are a performance stratification, not a copy: the
+		§ same-kind entry is written on the same-kind native, and only the
+		§ mixed-kind ones need the covering Namespace. The same reading applies
+		§ to `Rational`'s four, and to `isPositive`/`isNegative`/`isZero`
+		§ below, which are written on these.
+
 		§§ Whether this Integer is strictly below the given number.
 		overload isLessThan {
 			(_ other: Integer) -> Boolean {
