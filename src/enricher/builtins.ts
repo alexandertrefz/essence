@@ -13,7 +13,10 @@ import { type as booleanType } from "./types/Boolean"
 // tag stays for the same reason Boolean's does — a bare primitive tag with no
 // declaration to write.
 import { type as integerType } from "./types/Integer"
-import { namespace as listNamespace, type as listType } from "./types/List"
+// NOTE: The List NAMESPACE now lives in `src/stdlib/List.es` — the last table
+// to move. Its Type tag stays for the same reason Boolean's does: `GenericList`
+// is a bare tag with an `ItemType` Parameter and no declaration to write.
+import { type as listType } from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
 // NOTE: The Nothing NAMESPACE now lives in `src/stdlib/Nothing.es`. Its Type
 // tag stays for the same reason Boolean's does.
@@ -30,10 +33,12 @@ import { type as nothingType } from "./types/Nothing"
 // `src/stdlib/Ordering.es` the `choice Ordering`, so neither name is left here
 // on either side.
 // NOTE: The three core Protocols are declared in `src/stdlib/Protocols.es`.
-// `types/Protocols.ts` stays plugged in nowhere but keeps its
-// `conformedMethods` helper, which the List table still derives its conformed
-// Methods with — the Protocol objects it reads are structurally the ones the
-// source declares.
+// `types/Protocols.ts` is now imported by nothing in production — the List
+// table was the last consumer of its `conformedMethods` helper, and
+// `src/stdlib/List.es` writes `is`/`isNot`/`toString` out explicitly with the
+// same documentation, with `checkProtocolConformance` guarding the drift the
+// derivation used to make impossible. Only `stdlibEquivalence.spec.ts` still
+// reads it, and it goes with the tables.
 // NOTE: The Rational NAMESPACE now lives in `src/stdlib/Rational.es`. Its Type
 // tag stays for the same reason Integer's does.
 import { type as rationalType } from "./types/Rational"
@@ -65,9 +70,12 @@ import { type as transcendentalType } from "./types/Transcendental"
 // file that replaces it takes over the name. The loader subtracts whatever the
 // sources declare from these before they seed anything, so the two halves can
 // never both claim a name.
+// NOTE: Down to `__print` — every Namespace has moved. What is left is not a
+// legacy table at all any more but `NativeFunctions`, the one member with no
+// Namespace to live in; the name and the subtraction machinery stay only until
+// the tables themselves are deleted.
 export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
-	List: listNamespace,
 }
 
 // NOTE: The order the builtin members are listed in, INDEPENDENT of which half
@@ -99,6 +107,17 @@ export const builtinMemberOrder: Array<string> = [
 	"Ordering",
 	"Record",
 	"List",
+	// NOTE: Directly after `List`, because both target a List and the position
+	// IS the tie-break. The Enricher builds `matchingNamespaces` in this order
+	// and Completion dedupes members first-Namespace-wins, so a
+	// `List<List<…>>` receiver has to meet the general `List` FIRST and pick up
+	// `NestedList::flattened` as the extra it is — putting it ahead of `List`
+	// would make the narrow Namespace the first one searched for every Method a
+	// nested List has, and would name it first in every "searched Namespaces"
+	// Diagnostic. It is listed here at all, rather than left to fall to the
+	// end, so that the two Namespaces a List value can reach sit together where
+	// a reader of this list expects them.
+	"NestedList",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's

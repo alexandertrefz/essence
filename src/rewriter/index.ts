@@ -24,6 +24,7 @@ const runtimeNamespaceNames = [
 	"Ordering",
 	"Record",
 	"List",
+	"NestedList",
 ]
 
 // NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
