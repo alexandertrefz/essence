@@ -4,9 +4,11 @@
 // written as TypeScript so `tsc` can check it. Each `*Natives` type is the
 // shape the runtime module of that Namespace must have; each `*EssenceImplemented`
 // type forbids a runtime export for a Method that is implemented in Essence.
-// This file has ZERO runtime footprint — only `import type` and `type` aliases.
-// Regenerate after changing a standard library signature; `src/tests/natives.spec.ts`
-// fails when it drifts from the renderer.
+// The `$<Namespace>` assertions at the foot check each runtime module against
+// its contract. Nothing imports this file, so its only effect is the type error
+// a drifted native raises under `tsc`. Regenerate after changing a standard
+// library signature; `src/tests/natives.spec.ts` fails when it drifts from the
+// renderer.
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
@@ -559,3 +561,42 @@ export type NestedListNatives = {
 	// flattened<ItemType>() -> List<ItemType>
 	flattened: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
+
+declare const StringModule: typeof import("./String")
+export const $String: StringNatives = StringModule
+
+declare const BooleanModule: typeof import("./Boolean")
+export const $Boolean: BooleanNatives = BooleanModule
+
+declare const IntegerModule: typeof import("./Integer")
+export const $Integer: IntegerNatives = IntegerModule
+
+declare const RationalModule: typeof import("./Rational")
+export const $Rational: RationalNatives = RationalModule
+
+declare const AlgebraicModule: typeof import("./Algebraic")
+export const $Algebraic: AlgebraicNatives = AlgebraicModule
+
+declare const TranscendentalModule: typeof import("./Transcendental")
+export const $Transcendental: TranscendentalNatives = TranscendentalModule
+
+declare const NumberModule: typeof import("./Number")
+export const $Number: NumberNatives = NumberModule
+
+declare const NothingModule: typeof import("./Nothing")
+export const $Nothing: NothingNatives = NothingModule
+
+declare const OptionalModule: typeof import("./Optional")
+export const $Optional: OptionalNatives = OptionalModule
+
+declare const OrderingModule: typeof import("./Ordering")
+export const $Ordering: OrderingNatives = OrderingModule
+
+declare const RecordModule: typeof import("./Record")
+export const $Record: RecordNatives = RecordModule
+
+declare const ListModule: typeof import("./List")
+export const $List: ListNatives = ListModule
+
+declare const NestedListModule: typeof import("./NestedList")
+export const $NestedList: NestedListNatives = NestedListModule
