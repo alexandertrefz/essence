@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"check": "oxlint --fix && oxfmt",
+		"generate:natives": "bun run src/tools/generateNatives.ts",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},

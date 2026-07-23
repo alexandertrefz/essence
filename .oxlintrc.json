@@ -16,6 +16,7 @@
 		"lib/**",
 		"src/coverage/**",
 		"src/parser/grammar.ts",
+		"src/rewriter/__internal/natives.generated.ts",
 		"testFiles/**",
 		"docs/**"
 	]
