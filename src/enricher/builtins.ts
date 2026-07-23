@@ -15,31 +15,30 @@ import {
 } from "./types/Integer"
 import { namespace as listNamespace, type as listType } from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
-import {
-	namespace as nothingNamespace,
-	type as nothingType,
-} from "./types/Nothing"
+// NOTE: The Nothing NAMESPACE now lives in `src/stdlib/Nothing.es`. Its Type
+// tag stays for the same reason Boolean's does.
+import { type as nothingType } from "./types/Nothing"
 import {
 	namespace as numberNamespace,
 	type as numberType,
 } from "./types/Number"
-import {
-	namespace as optionalNamespace,
-	type as optionalType,
-} from "./types/Optional"
-import {
-	namespace as orderingNamespace,
-	type as orderingType,
-} from "./types/Ordering"
-import { Comparable, Equatable, Printable } from "./types/Protocols"
+// NOTE: `Optional` and `Ordering` moved WHOLE — the Type and the Namespace
+// that targets it in one step, as the subtraction in `stdlib.ts` requires.
+// `src/stdlib/Optional.es` declares `type Optional<ItemType>` and
+// `src/stdlib/Ordering.es` the `choice Ordering`, so neither name is left here
+// on either side.
+// NOTE: The three core Protocols are declared in `src/stdlib/Protocols.es`.
+// `types/Protocols.ts` stays plugged in nowhere but keeps its
+// `conformedMethods` helper, which the List table still derives its conformed
+// Methods with — the Protocol objects it reads are structurally the ones the
+// source declares.
 import {
 	namespace as rationalNamespace,
 	type as rationalType,
 } from "./types/Rational"
-import {
-	namespace as recordNamespace,
-	type as recordType,
-} from "./types/Record"
+// NOTE: The Record NAMESPACE now lives in `src/stdlib/Record.es`. Its Type is
+// the open Record `{}`, which has no declaration to write either.
+import { type as recordType } from "./types/Record"
 import {
 	namespace as stringNamespace,
 	type as stringType,
@@ -83,10 +82,6 @@ export const legacyMembers: Record<string, common.Type> = {
 	Algebraic: algebraicNamespace,
 	Transcendental: transcendentalNamespace,
 	Number: numberNamespace,
-	Nothing: nothingNamespace,
-	Optional: optionalNamespace,
-	Ordering: orderingNamespace,
-	Record: recordNamespace,
 	List: listNamespace,
 }
 
@@ -121,6 +116,29 @@ export const builtinMemberOrder: Array<string> = [
 	"List",
 ]
 
+// NOTE: The same rule for the Type table, and for the same reason — a Type's
+// position must be a property of its name, not of which half declares it.
+// Two surfaces read this order and would otherwise shift under a conversion:
+// `closestMatch` breaks a tie on the FIRST candidate, so "did you mean …?"
+// would start naming a different Type (`Oational` is distance 1 from both
+// `Rational` and `Optional`), and Completion of a Type annotation ships these
+// in table order with no `sortText` of its own.
+export const builtinTypeOrder: Array<string> = [
+	"Boolean",
+	"String",
+	"Integer",
+	"Rational",
+	"Algebraic",
+	"Transcendental",
+	"Nothing",
+	"Record",
+	"List",
+	"Irrational",
+	"Number",
+	"Optional",
+	"Ordering",
+]
+
 export const legacyTypes: Record<string, common.Type> = {
 	Nothing: nothingType,
 	Boolean: booleanType,
@@ -133,15 +151,13 @@ export const legacyTypes: Record<string, common.Type> = {
 	Record: recordType,
 	Number: numberType,
 	List: listType,
-	Optional: optionalType,
-	Ordering: orderingType,
 }
 
-export const legacyProtocols: Record<string, common.ProtocolType> = {
-	Equatable,
-	Printable,
-	Comparable,
-}
+// NOTE: Empty — `Equatable`, `Printable` and `Comparable` are declared in
+// `src/stdlib/Protocols.es` now, and every conformance clause in the tables
+// still here resolves against those. The table remains so the shrinking half
+// of the standard library keeps one shape until the last name has moved.
+export const legacyProtocols: Record<string, common.ProtocolType> = {}
 
 // NOTE: Accessors rather than consts, because half of what they answer with is
 // read from Essence source at first call. `loadStdlib` merges the tables above

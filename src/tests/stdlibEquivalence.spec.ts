@@ -9,6 +9,17 @@ import {
 	STDLIB_DIRECTORY,
 } from "../enricher/stdlib"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
+import { namespace as nothingNamespace } from "../enricher/types/Nothing"
+import {
+	namespace as optionalNamespace,
+	type as optionalType,
+} from "../enricher/types/Optional"
+import {
+	namespace as orderingNamespace,
+	type as orderingType,
+} from "../enricher/types/Ordering"
+import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
+import { namespace as recordNamespace } from "../enricher/types/Record"
 import type { common, parser } from "../interfaces/index"
 
 // NOTE: TEMPORARY — this whole file is deleted in the commit that removes the
@@ -55,14 +66,24 @@ function protocolEntry(name: string, legacy: common.ProtocolType): Entry {
 	return { kind: "protocol", name, legacy }
 }
 
-const converted: Array<Entry> = [namespaceEntry("Boolean", booleanNamespace)]
-
-// NOTE: `typeEntry` and `protocolEntry` are unused until the first Type and
-// the first Protocol move — referenced here so the comparators they reach are
-// built and type-checked from the commit that introduces them rather than the
-// one that first needs them.
-void typeEntry
-void protocolEntry
+const converted: Array<Entry> = [
+	protocolEntry("Equatable", Equatable),
+	protocolEntry("Printable", Printable),
+	protocolEntry("Comparable", Comparable),
+	namespaceEntry("Boolean", booleanNamespace),
+	namespaceEntry("Nothing", nothingNamespace),
+	// NOTE: A Type and the Namespace that targets it move together — the
+	// loader subtracts PER CATEGORY, so registering only one of the pair would
+	// leave the other half pointing at a table object nothing compares.
+	// `Nothing`, `Boolean` and `Record` have no `typeEntry`: their Types are
+	// bare tags with no declaration to write, so they stay in the legacy Type
+	// table and are not converted at all.
+	typeEntry("Optional", optionalType),
+	namespaceEntry("Optional", optionalNamespace),
+	typeEntry("Ordering", orderingType),
+	namespaceEntry("Ordering", orderingNamespace),
+	namespaceEntry("Record", recordNamespace),
+]
 
 // ---------------------------------------------------------------------------
 // What the sources wrote
@@ -256,6 +277,25 @@ function isRecord(value: Json): value is { [key: string]: Json } {
 // Protocol); a hand written table wrote the bound only on the DECLARATION. The
 // bound itself is not dropped — `GenericDeclaration.constraint` is compared
 // strictly below, so a conformance requirement can not go missing here.
+//
+// NORMALIZATION 5 — a Generic Alias' Type Parameters are compared through
+// `normalizeGeneric` rather than as a bare Type. A Parameter with no Protocol
+// bound is `constraint: null` when it is resolved from source and has no
+// `constraint` key at all in a table that never wrote one; that is the same
+// statement said two ways. The bound is still compared — `normalizeGeneric`
+// asserts it strictly, exactly as it does for a Method's Parameters.
+//
+// NORMALIZATION 6 — a Generic Alias' BODY drops a display alias that is the
+// Alias' own self-spelling (`Optional<ItemType>` on the body of `type
+// Optional<ItemType> = …`), and only that one. An Essence source has no way to
+// write a display alias onto a Type; the tables wrote it by building the body
+// with `optionalOf`. It makes no difference to what a use site sees:
+// `applyGenericAlias` substitutes the Type Arguments into an alias it finds and
+// STAMPS exactly this spelling onto an applied body that carries none, so both
+// halves produce `Optional<Integer>` for `Optional<Integer>` — and the raw
+// `aliasedType` is read nowhere else (`printType` and `describeType` print a
+// Generic Alias by its name alone). Any OTHER alias in a body — one naming a
+// different Alias, or applied to different Arguments — is compared as written.
 function normalizeType(value: unknown): Json {
 	if (Array.isArray(value)) {
 		return value.map(normalizeType)
@@ -277,10 +317,57 @@ function normalizeType(value: unknown): Json {
 			continue
 		}
 
+		if (record["type"] === "GenericAlias" && key === "generics") {
+			result[key] = (entry as Array<common.GenericDeclaration>).map(
+				normalizeGeneric,
+			)
+
+			continue
+		}
+
+		if (record["type"] === "GenericAlias" && key === "aliasedType") {
+			result[key] = normalizeGenericAliasBody(
+				entry,
+				record as unknown as common.GenericAliasType,
+			)
+
+			continue
+		}
+
 		result[key] = normalizeType(entry)
 	}
 
 	return result
+}
+
+// NOTE: NORMALIZATION 6's "only that one". The spelling an application of the
+// Alias to its own Type Parameters would be stamped with, built the way
+// `applyGenericAlias` builds it.
+function normalizeGenericAliasBody(
+	body: unknown,
+	alias: common.GenericAliasType,
+): Json {
+	let normalized = normalizeType(body)
+
+	if (!isRecord(normalized) || !("alias" in normalized)) {
+		return normalized
+	}
+
+	let selfSpelling: Json = {
+		name: alias.name,
+		typeArguments: alias.generics.map((generic) => ({
+			type: "GenericUse",
+			name: generic.name,
+		})),
+	}
+
+	if (JSON.stringify(normalized["alias"]) !== JSON.stringify(selfSpelling)) {
+		return normalized
+	}
+
+	let { alias: _selfSpelling, ...rest } = normalized
+
+	return rest
 }
 
 // NOTE: A Type Parameter, asserted in full and IN ORDER. `constraint` is
