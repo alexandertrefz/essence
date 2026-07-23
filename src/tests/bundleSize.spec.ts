@@ -56,10 +56,13 @@ describe("Bundle Size", () => {
 	// followed — a String Method now pulls in the small chain it is written on
 	// (`length` -> `characters` -> `splitOn`) instead of one native, and
 	// ~1,300 more when List's did, for the same reason: `firstItem` now brings
-	// `itemAt`, `removeFirst` brings `slice` and `length`, and so on. Still
-	// below the spread figure, so the guard holds — but the headroom is down
-	// to ~700 bytes, so the next conversion that touches List will want this
-	// ceiling raised along with it.
+	// `itemAt`, `removeFirst` brings `slice` and `length`, and so on. It fell
+	// back to 55,163 when List's equality Methods took an `Equatable` bound:
+	// `contains`, `removeDuplicates` and the by-value `countOf`/`removeEvery`
+	// lost their natives, and what replaced them is written on chains the
+	// Program already carried. Still below the spread figure, so the guard
+	// holds — but the headroom is only ~800 bytes, so the next conversion that
+	// touches List will want this ceiling raised along with it.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("testFiles/Everyday.es")).toBeLessThan(56_000)
 	})
