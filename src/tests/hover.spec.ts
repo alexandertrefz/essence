@@ -12,6 +12,16 @@ function hover(source: string, cursor: common.Cursor): string | null {
 	return findHover(enrichedProgram, cursor)?.content ?? null
 }
 
+function hoverDocumentation(
+	source: string,
+	cursor: common.Cursor,
+): string | null {
+	let { program } = parseWithDiagnostics(source)
+	let { program: enrichedProgram } = enrich(program)
+
+	return findHover(enrichedProgram, cursor)?.documentation ?? null
+}
+
 describe("Hover", () => {
 	it("should describe Identifiers with their inferred Type", () => {
 		let source = [
@@ -375,6 +385,52 @@ describe("Hover of conformance clauses", () => {
 
 		expect(hover(source, { line: 2, column: 11 })).toBe(
 			"sorted<ItemType is Comparable>() -> List<ItemType>",
+		)
+	})
+})
+
+// NOTE: Boolean is the first Namespace read from Essence source rather than
+// from a TypeScript table (`src/stdlib/Boolean.es`). What an Editor shows for
+// it has to be as complete as it ever was — a Namespace that moved and took
+// its documentation with it is the whole point of the move.
+describe("Hover of a standard library Method", () => {
+	let source = [
+		"implementation {",
+		"\t__print(true::negate())",
+		"\t__print(true::is(false))",
+		"}",
+	].join("\n")
+
+	it("should describe a Method declared in Essence", () => {
+		expect(hover(source, { line: 2, column: 17 })).toBe(
+			"negate() -> Boolean",
+		)
+		expect(hoverDocumentation(source, { line: 2, column: 17 })).toBe(
+			"The opposite truth value — `false` for `true`, `true` for `false`.",
+		)
+	})
+
+	// NOTE: A `@param` reaches Hover as a section of its own, which is more
+	// than the TypeScript table this replaced could show — it recorded a
+	// Parameter's text where only Signature Help would look for it. Signature
+	// Help's own output is unchanged.
+	//
+	// NOTE: A DELIBERATE decision, inherited by every Method still to be
+	// converted. The name in that section is the Parameter's INTERNAL one —
+	// `other`, which no call site can write, since `_ other: Boolean` takes
+	// its Argument positionally and Signature Help labels it `_`. Naming it
+	// anyway beats an anonymous section: it is the name the standard library
+	// author wrote, the prose reads as being about `other`, and the
+	// alternative — dropping the section — would put the text back where only
+	// Signature Help can reach it. Nothing is said twice; the description
+	// carries no copy of it.
+	it("should show a Parameter's text and the return text", () => {
+		expect(hoverDocumentation(source, { line: 3, column: 17 })).toBe(
+			[
+				"Checks whether the Boolean has the same truth value as another.",
+				"**other** — the Boolean to compare against",
+				"**Returns** — `true` when both are equal.",
+			].join("\n\n"),
 		)
 	})
 })
