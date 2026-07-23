@@ -1469,6 +1469,404 @@ describe("Enricher", () => {
 		})
 	})
 
+	describe("Namespace Generic Merge", () => {
+		// NOTE: A Namespace Generic reaches a Method only when that Method's
+		// resolved signature mentions it — anything else would be a Type
+		// Parameter no call site could ever bind.
+		function methodTypeFor(
+			source: string,
+			namespaceName: string,
+			methodName: string,
+		): common.MethodType {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			for (let node of program.implementation.nodes) {
+				if (
+					node.nodeType === "NamespaceDefinitionStatement" &&
+					node.type.name === namespaceName
+				) {
+					let method = node.type.methods[methodName]
+
+					expect(method).toBeDefined()
+
+					return method!
+				}
+			}
+
+			throw new Error(`No Namespace '${namespaceName}' in the Program`)
+		}
+
+		function genericsOf(method: common.MethodType) {
+			expect(method.type === "SimpleMethod").toBe(true)
+
+			return (method as common.SimpleMethodType).generics
+		}
+
+		it("should prune a Namespace Generic a Method never mentions", () => {
+			let method = methodTypeFor(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						describe() -> String {
+							<- "tag"
+						}
+					}
+				}`,
+				"Tags",
+				"describe",
+			)
+
+			expect(genericsOf(method)).toEqual([])
+		})
+
+		it("should keep a Namespace Generic the injected self Parameter mentions", () => {
+			let method = methodTypeFor(
+				`implementation {
+					namespace Boxes<infer Item> for List<Item> {
+						describe() -> String {
+							<- "box"
+						}
+					}
+				}`,
+				"Boxes",
+				"describe",
+			)
+
+			expect(genericsOf(method)).toEqual([
+				{
+					name: "Item",
+					infer: true,
+					defaultType: null,
+					constraint: null,
+				},
+			])
+		})
+
+		it("should let a same-named Method Generic shadow the Namespace one", () => {
+			let method = methodTypeFor(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						ranked<infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+							<- items
+						}
+					}
+				}`,
+				"Tags",
+				"ranked",
+			)
+
+			// NOTE: Exactly one entry, and it is the METHOD's — its bound is
+			// what the signature was resolved under.
+			expect(genericsOf(method)).toEqual([
+				{
+					name: "Item",
+					infer: true,
+					defaultType: null,
+					constraint: "Comparable",
+				},
+			])
+		})
+
+		it("should keep the Namespace Generics ahead of the Method's own", () => {
+			let method = methodTypeFor(
+				`implementation {
+					namespace Boxes<infer Item> for List<Item> {
+						pair<infer Other>(_ other: Other) -> Boolean {
+							<- true
+						}
+					}
+				}`,
+				"Boxes",
+				"pair",
+			)
+
+			expect(genericsOf(method).map((generic) => generic.name)).toEqual([
+				"Item",
+				"Other",
+			])
+		})
+
+		it("should prune per Overload", () => {
+			let method = methodTypeFor(
+				`implementation {
+					namespace Tags<infer Item> for Integer {
+						overload static make {
+							(_ item: Item) -> Boolean {
+								<- true
+							}
+
+							(_ count: Integer) -> Boolean {
+								<- true
+							}
+						}
+					}
+				}`,
+				"Tags",
+				"make",
+			)
+
+			expect(method.type).toBe("OverloadedStaticMethod")
+			expect(
+				(method as common.OverloadedStaticMethodType).overloads.map(
+					(overload) =>
+						overload.generics.map((generic) => generic.name),
+				),
+			).toEqual([["Item"], []])
+		})
+
+		describe("Nested mentions", () => {
+			// NOTE: One case per Type shape the walk has to see through — a
+			// missed shape would silently prune a Generic that IS used, leaving
+			// it unbindable at the call site.
+			const cases: Array<[string, string]> = [
+				["the return Type alone", "produce() -> Item | Nothing"],
+				["a List item Type", "collect(_ items: List<Item>) -> Boolean"],
+				[
+					"a Record member",
+					"unwrap(_ box: { value: Item }) -> Boolean",
+				],
+				["a Union member", "store(_ maybe: Item | Nothing) -> Boolean"],
+				[
+					"a Function Parameter Type",
+					"apply(_ transform: (_: Item) -> Boolean) -> Boolean",
+				],
+				[
+					"a Function return Type",
+					"lazily(_ make: () -> Item) -> Boolean",
+				],
+				[
+					"a Generic Alias application",
+					"hold(_ maybe: Maybe<Item>) -> Boolean",
+				],
+			]
+
+			for (let [name, signature] of cases) {
+				it(`should keep a Namespace Generic used in ${name}`, () => {
+					let returnsUnion = signature.includes("-> Item | Nothing")
+
+					let method = methodTypeFor(
+						`implementation {
+							type Maybe<Value> = Value | Nothing
+
+							namespace Tags<infer Item> for Integer {
+								${signature} {
+									<- ${returnsUnion ? "nothing" : "true"}
+								}
+							}
+						}`,
+						"Tags",
+						signature.slice(0, signature.indexOf("(")),
+					)
+
+					expect(
+						genericsOf(method).map((generic) => generic.name),
+					).toEqual(["Item"])
+				})
+			}
+		})
+
+		it("should still bound a conditional conformance's fulfilling Method", () => {
+			// NOTE: Guards the interaction with the conditional-conformance
+			// Generic weaving: `compareTo` uses `Item`, so it survives pruning
+			// and keeps its retrofitted bound — which is what makes the hidden
+			// conformance Parameter emitted for it.
+			let source = `implementation {
+				namespace Boxes<infer Item> for { value: Item }
+					is Comparable where Item is Comparable
+				{
+					compareTo(_ other: { value: Item }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+
+					static describe() -> String {
+						<- "box"
+					}
+				}
+			}`
+
+			expect(
+				genericsOf(methodTypeFor(source, "Boxes", "compareTo")),
+			).toEqual([
+				{
+					name: "Item",
+					infer: true,
+					defaultType: null,
+					constraint: "Comparable",
+				},
+			])
+
+			// NOTE: And the typed Node agrees — its leading Generic is the same
+			// bounded `Item`, so `simplifyFunctionDefinition` emits exactly one
+			// hidden conformance Parameter, first.
+			let { program } = enrichSource(source)
+
+			let namespaceNode = program.implementation.nodes.find(
+				(node) => node.nodeType === "NamespaceDefinitionStatement",
+			) as common.typed.NamespaceDefinitionStatementNode
+
+			let compareTo = namespaceNode.methods.compareTo
+
+			expect(compareTo?.nodeType).toBe("SimpleMethod")
+			expect(
+				(compareTo as common.typed.SimpleMethod).method.value.generics,
+			).toMatchObject([{ name: "Item", constraint: "Comparable" }])
+
+			// NOTE: A Method that does not fulfil the conformance carries
+			// neither the Generic nor its hidden Parameter.
+			let describe = namespaceNode.methods.describe
+
+			expect(
+				(describe as common.typed.StaticMethod).method.value.generics,
+			).toEqual([])
+		})
+
+		it("should retain a bound Generic on a fulfilling Method that never mentions it", () => {
+			// NOTE: The exception to the merge rule. A `where` bound is
+			// witnessed by `$type.boundConformance`, which curries a witness
+			// onto EVERY fulfilling Method whatever its signature mentions —
+			// so a fulfilling Method keeps the bound Namespace Generic even
+			// when nothing in its signature names it, and both views say so.
+			let source = `implementation {
+				protocol Nameable {
+					static nameOf() -> String
+				}
+
+				namespace Bags<infer Item> for List<Item>
+					is Nameable where Item is Comparable
+				{
+					static nameOf() -> String {
+						<- "bag"
+					}
+				}
+			}`
+
+			let method = methodTypeFor(source, "Bags", "nameOf")
+
+			expect(method.type).toBe("StaticMethod")
+			expect((method as common.StaticMethodType).generics).toEqual([
+				{
+					name: "Item",
+					infer: true,
+					defaultType: null,
+					constraint: "Comparable",
+				},
+			])
+
+			let { program } = enrichSource(source)
+
+			let namespaceNode = program.implementation.nodes.find(
+				(node) => node.nodeType === "NamespaceDefinitionStatement",
+			) as common.typed.NamespaceDefinitionStatementNode
+
+			expect(
+				(namespaceNode.methods.nameOf as common.typed.StaticMethod)
+					.method.value.generics,
+			).toMatchObject([{ name: "Item", constraint: "Comparable" }])
+		})
+
+		it("should retain a bound Generic on every Overload of a fulfilling Method", () => {
+			// NOTE: Regression guard. Pruning per Overload while the
+			// conformance witness is curried per Method let one Overload emit a
+			// hidden conformance Parameter its Type never declared — the
+			// Argument then landed in the wrong slot at runtime.
+			let source = `implementation {
+				protocol Nameable {
+					static nameOf() -> String
+				}
+
+				namespace Bags<infer Item> for { items: List<Item> }
+					is Nameable where Item is Comparable
+				{
+					overload static nameOf {
+						() -> String {
+							<- "bag"
+						}
+
+						(_ item: Item) -> String {
+							<- "item"
+						}
+
+						<infer Other is Comparable>(_ a: Other, _ b: Other) -> String {
+							<- a::compareTo(b)::toString()
+						}
+					}
+				}
+			}`
+
+			let method = methodTypeFor(source, "Bags", "nameOf")
+
+			expect(method.type).toBe("OverloadedStaticMethod")
+			expect(
+				(method as common.OverloadedStaticMethodType).overloads.map(
+					(overload) =>
+						overload.generics.map(
+							(generic) =>
+								`${generic.name}:${generic.constraint}`,
+						),
+				),
+			).toEqual([
+				["Item:Comparable"],
+				["Item:Comparable"],
+				["Item:Comparable", "Other:Comparable"],
+			])
+
+			let { program } = enrichSource(source)
+
+			let namespaceNode = program.implementation.nodes.find(
+				(node) => node.nodeType === "NamespaceDefinitionStatement",
+			) as common.typed.NamespaceDefinitionStatementNode
+
+			// NOTE: The typed Node's Overloads carry the SAME leading bounded
+			// `Item` — one hidden conformance Parameter each, first.
+			expect(
+				(
+					namespaceNode.methods
+						.nameOf as common.typed.OverloadedStaticMethod
+				).methods.map((overload) =>
+					overload.value.generics.map(
+						(generic) => `${generic.name}:${generic.constraint}`,
+					),
+				),
+			).toEqual([
+				["Item:Comparable"],
+				["Item:Comparable"],
+				["Item:Comparable", "Other:Comparable"],
+			])
+		})
+
+		it("should still reject a call that can not bind a retained bound Generic", () => {
+			// NOTE: The other half of the same regression — with `Item`
+			// retained, a static call that binds nothing is the compile error
+			// it has always been, rather than a miscompile.
+			let diagnostics = diagnosticsFor(`implementation {
+				protocol Nameable {
+					static nameOf() -> String
+				}
+
+				namespace Bags<infer Item> for { items: List<Item> }
+					is Nameable where Item is Comparable
+				{
+					overload static nameOf {
+						() -> String {
+							<- "bag"
+						}
+
+						<infer Other is Comparable>(_ a: Other, _ b: Other) -> String {
+							<- a::compareTo(b)::toString()
+						}
+					}
+				}
+
+				__print(Bags.nameOf("a", "b"))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"uninferable-type-parameter",
+			])
+		})
+	})
+
 	describe("Protocol Bounds", () => {
 		const printableSetup = `
 			protocol Showable {

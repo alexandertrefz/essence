@@ -2308,6 +2308,48 @@ export function parameterDocumentation(
 	return undefined
 }
 
+// NOTE: Which Namespace Generics belong on one Method signature, ahead of the
+// Method's own. A Namespace Generic is merged in only when the resolved
+// signature — the injected `self` Parameter, the declared Parameters and the
+// return Type — actually mentions it: a Generic nothing in the signature names
+// could never be bound by inference at a call site, so carrying it would leave
+// a phantom Type Parameter (and, under a `where` clause, a hidden conformance
+// Parameter with nothing to prove it). A Method Generic of the same name
+// shadows the Namespace one outright — the Method's own declaration wins,
+// constraint, `infer` and default included, and it appears exactly once.
+// The retained Namespace Generics keep their declaration order and LEAD the
+// Method's own, because hidden conformance Parameters, witness Arguments and
+// `boundConformance` conditions are all emitted in that order.
+function mergeNamespaceGenerics(
+	namespaceGenerics: Array<common.GenericDeclaration>,
+	methodGenerics: Array<common.GenericDeclaration>,
+	signature: {
+		parameterTypes: Array<common.Parameter>
+		returnType: common.Type
+	},
+): Array<common.GenericDeclaration> {
+	if (namespaceGenerics.length === 0) {
+		return methodGenerics
+	}
+
+	let shadowed = new Set(methodGenerics.map((generic) => generic.name))
+
+	let signatureTypes = [
+		...signature.parameterTypes.map((parameter) => parameter.type),
+		signature.returnType,
+	]
+
+	let used = namespaceGenerics.filter(
+		(generic) =>
+			!shadowed.has(generic.name) &&
+			signatureTypes.some((type) =>
+				typeMentionsGeneric(type, generic.name),
+			),
+	)
+
+	return [...used, ...methodGenerics]
+}
+
 export function resolveMethodType(
 	node: parser.NamespaceMethods[string],
 	scope: enricher.Scope,
@@ -2352,15 +2394,15 @@ export function resolveMethodType(
 
 		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
 
-		return {
-			type: "SimpleMethod",
-			generics: [
-				...namespaceGenerics,
-				...resolveGenericDeclarations(
-					node.method.value.generics,
-					scope,
-				),
-			],
+		// NOTE: The Generics are resolved BEFORE the signature, as the object
+		// literal this replaced did — both report Diagnostics, and they are
+		// reported in the order the Method reads.
+		let methodGenerics = resolveGenericDeclarations(
+			node.method.value.generics,
+			scope,
+		)
+
+		let signature = {
 			parameterTypes: [
 				{ name: null, type: selfType },
 				...resolveParameterTypes(node.method.value, methodScope),
@@ -2369,20 +2411,28 @@ export function resolveMethodType(
 				node.method.value.returnType,
 				methodScope,
 			),
+		}
+
+		return {
+			type: "SimpleMethod",
+			generics: mergeNamespaceGenerics(
+				namespaceGenerics,
+				methodGenerics,
+				signature,
+			),
+			...signature,
 			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "StaticMethod") {
 		let methodScope = scopeWithGenerics(node.method.value.generics, scope)
 
-		return {
-			type: "StaticMethod",
-			generics: [
-				...namespaceGenerics,
-				...resolveGenericDeclarations(
-					node.method.value.generics,
-					scope,
-				),
-			],
+		// NOTE: Generics before signature, as above.
+		let methodGenerics = resolveGenericDeclarations(
+			node.method.value.generics,
+			scope,
+		)
+
+		let signature = {
 			parameterTypes: resolveParameterTypes(
 				node.method.value,
 				methodScope,
@@ -2391,6 +2441,16 @@ export function resolveMethodType(
 				node.method.value.returnType,
 				methodScope,
 			),
+		}
+
+		return {
+			type: "StaticMethod",
+			generics: mergeNamespaceGenerics(
+				namespaceGenerics,
+				methodGenerics,
+				signature,
+			),
+			...signature,
 			documentation: node.method.value.documentation ?? undefined,
 		}
 	} else if (node.nodeType === "OverloadedMethod") {
@@ -2434,14 +2494,16 @@ export function resolveMethodType(
 					scope,
 				)
 
-				return {
-					generics: [
-						...namespaceGenerics,
-						...resolveGenericDeclarations(
-							method.value.generics,
-							scope,
-						),
-					],
+				// NOTE: Pruned per Overload — Overloads differ in what they
+				// mention, so each gets the Namespace Generics its own
+				// signature actually uses. Generics before signature, so
+				// Diagnostics still come in reading order.
+				let overloadGenerics = resolveGenericDeclarations(
+					method.value.generics,
+					scope,
+				)
+
+				let signature = {
 					parameterTypes: [
 						{ name: null, type: methodSelfType },
 						...resolveParameterTypes(method.value, methodScope),
@@ -2450,6 +2512,15 @@ export function resolveMethodType(
 						method.value.returnType,
 						methodScope,
 					),
+				}
+
+				return {
+					generics: mergeNamespaceGenerics(
+						namespaceGenerics,
+						overloadGenerics,
+						signature,
+					),
+					...signature,
 					documentation: method.value.documentation ?? undefined,
 				}
 			}),
@@ -2464,14 +2535,13 @@ export function resolveMethodType(
 					scope,
 				)
 
-				return {
-					generics: [
-						...namespaceGenerics,
-						...resolveGenericDeclarations(
-							method.value.generics,
-							scope,
-						),
-					],
+				// NOTE: Pruned per Overload, as above.
+				let overloadGenerics = resolveGenericDeclarations(
+					method.value.generics,
+					scope,
+				)
+
+				let signature = {
 					parameterTypes: resolveParameterTypes(
 						method.value,
 						methodScope,
@@ -2480,6 +2550,15 @@ export function resolveMethodType(
 						method.value.returnType,
 						methodScope,
 					),
+				}
+
+				return {
+					generics: mergeNamespaceGenerics(
+						namespaceGenerics,
+						overloadGenerics,
+						signature,
+					),
+					...signature,
 					documentation: method.value.documentation ?? undefined,
 				}
 			}),

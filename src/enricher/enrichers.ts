@@ -466,13 +466,16 @@ export function enrichMethodsFunctionValue(
 	node: parser.OverloadedMethod | parser.OverloadedStaticMethod,
 	scope: enricher.Scope,
 	selfType: common.Type | null,
-	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
+	// NOTE: One list per Overload — an Overload's woven Generics are exactly
+	// the ones its own entry in the resolved Method Type retained, so the two
+	// views can not drift apart.
+	injectedGenerics: Array<Array<common.typed.GenericDeclarationNode>> = [],
 ): Array<common.typed.FunctionValueNode> {
 	let results: Array<common.typed.FunctionValueNode> = []
 
-	let bounded = withInjectedBounds(scope, selfType, injectedGenerics)
-
-	for (let method of Object.values(node.methods)) {
+	for (let [index, method] of Object.values(node.methods).entries()) {
+		let injected = injectedGenerics[index] ?? []
+		let bounded = withInjectedBounds(scope, selfType, injected)
 		let type = resolveFunctionValueType(method, bounded.scope)
 
 		results.push({
@@ -482,7 +485,7 @@ export function enrichMethodsFunctionValue(
 				bounded.scope,
 				bounded.selfType,
 				type,
-				injectedGenerics,
+				injected,
 			),
 			position: method.position,
 			type,
@@ -1138,47 +1141,93 @@ export function enrichNamespaceDefinitionStatement(
 	}
 
 	// NOTE: The constrained Namespace Generics to weave into each fulfilling
-	// Method, as typed Generic Declarations. They lead the Method's own
+	// Method, as typed Generic Declarations, ONE LIST PER OVERLOAD (a
+	// non-overloaded Method has exactly one). They lead the Method's own
 	// Generics so `simplifyFunctionDefinition` emits their hidden conformance
 	// Parameters first, in Namespace declaration order.
+	//
+	// INVARIANT (the three views of a Method's Type Parameters must agree, per
+	// Overload): the resolved Method Type, the typed Node the Rewriter emits
+	// from, and the witnesses `$type.boundConformance` curries onto a
+	// conformance value are all derived from ONE retained list. A Namespace
+	// Generic is retained on an Overload when its signature mentions it OR when
+	// a conditional conformance this Method fulfils bounds it — the latter is
+	// what makes the hidden conformance Parameter honest, because
+	// `boundConformance` curries a witness for every `where` condition onto
+	// EVERY fulfilling Method uniformly, whatever each Overload happens to
+	// mention. Pruning a bound Generic from one Overload would leave that
+	// Overload's emitted signature and its call sites disagreeing about how
+	// many hidden Arguments there are.
 	let injectedGenerics = new Map<
 		string,
-		Array<common.typed.GenericDeclarationNode>
+		Array<Array<common.typed.GenericDeclarationNode>>
 	>()
 
 	for (let [methodName, bounds] of methodBounds) {
-		let injected: Array<common.typed.GenericDeclarationNode> = []
+		let methodNode = node.methods[methodName]
+		let methodType = type.methods[methodName]
 
-		for (let generic of node.generics) {
-			let constraint = bounds.get(generic.name.content)
-
-			if (constraint === undefined) {
-				continue
-			}
-
-			injected.push({
-				nodeType: "GenericDeclaration",
-				name: generic.name.content,
-				inferred: generic.inferred,
-				defaultType: generic.defaultType
-					? resolveType(generic.defaultType, scope)
-					: null,
-				constraint,
-				position: generic.position,
-			})
+		if (methodNode === undefined || methodType === undefined) {
+			continue
 		}
 
-		if (injected.length > 0) {
-			injectedGenerics.set(methodName, injected)
+		// NOTE: The Generics each form declares for itself, per Overload — what
+		// tells a retained Namespace Generic apart from a Method Generic that
+		// shadows its name, which no amount of inspecting the merged list can.
+		let ownGenerics = ownGenericNames(methodNode)
 
-			// NOTE: Retrofit the same bound onto the Namespace-Generic entries
-			// of the Method's resolved Type, on fresh Generic objects so the
-			// shared unbounded Namespace Generics (and every other Method) stay
-			// untouched. Idempotent: re-running sets the same constraint.
-			type.methods[methodName] = retrofitNamespaceBounds(
-				type.methods[methodName],
-				bounds,
-			)
+		// NOTE: Force the bound Namespace Generics back onto every Overload the
+		// signature-driven merge pruned them from, and retrofit the bound onto
+		// the entries that survived — on fresh Generic objects, so the shared
+		// unbounded Namespace Generics (and every other Method) stay untouched.
+		// Idempotent: re-running retains and bounds exactly the same set.
+		methodType = retainNamespaceBounds(
+			methodType,
+			ownGenerics,
+			bounds,
+			type.generics,
+		)
+
+		type.methods[methodName] = methodType
+
+		// NOTE: The typed Node's Generics are READ BACK OFF the retained Type,
+		// per Overload, rather than derived a second way — that is what keeps
+		// the two views in step by construction.
+		let retained =
+			methodType.type === "SimpleMethod" ||
+			methodType.type === "StaticMethod"
+				? [methodType.generics]
+				: methodType.overloads.map((overload) => overload.generics)
+
+		let injected = retained.map((generics, index) =>
+			node.generics
+				.filter(
+					(generic) =>
+						bounds.has(generic.name.content) &&
+						!(ownGenerics[index] ?? new Set()).has(
+							generic.name.content,
+						) &&
+						generics.some(
+							(candidate) =>
+								candidate.name === generic.name.content,
+						),
+				)
+				.map(
+					(generic): common.typed.GenericDeclarationNode => ({
+						nodeType: "GenericDeclaration",
+						name: generic.name.content,
+						inferred: generic.inferred,
+						defaultType: generic.defaultType
+							? resolveType(generic.defaultType, scope)
+							: null,
+						constraint: bounds.get(generic.name.content)!,
+						position: generic.position,
+					}),
+				),
+		)
+
+		if (injected.some((list) => list.length > 0)) {
+			injectedGenerics.set(methodName, injected)
 		}
 	}
 
@@ -1212,33 +1261,103 @@ export function enrichNamespaceDefinitionStatement(
 	}
 }
 
-// NOTE: Returns a copy of a Method Type with the given bounds set on its
-// Namespace-Generic entries — fresh Generic objects, so the shared unbounded
-// Namespace Generics are never mutated.
-function retrofitNamespaceBounds(
+// NOTE: The Type Parameter names each form of a Namespace Method declares for
+// ITSELF, one Set per Overload. A Method Generic shadows a Namespace Generic of
+// the same name, and once the two are merged into one list the entry no longer
+// says which it came from — this is what remembers.
+function ownGenericNames(
+	method: parser.NamespaceMethods[string],
+): Array<Set<string>> {
+	let namesOf = (generics: Array<parser.GenericDeclarationNode>) =>
+		new Set(generics.map((generic) => generic.name.content))
+
+	if (
+		method.nodeType === "SimpleMethod" ||
+		method.nodeType === "StaticMethod"
+	) {
+		return [namesOf(method.method.value.generics)]
+	}
+
+	if (
+		method.nodeType === "SimpleMethodSignature" ||
+		method.nodeType === "StaticMethodSignature"
+	) {
+		return [namesOf(method.signature.generics)]
+	}
+
+	return method.methods.map((overload) =>
+		namesOf(
+			overload.nodeType === "NativeMethodSignature"
+				? overload.generics
+				: overload.value.generics,
+		),
+	)
+}
+
+// NOTE: Returns a copy of a Method Type whose every Overload carries the bound
+// Namespace Generics — re-adding the ones the signature-driven merge pruned
+// because that Overload's signature never mentions them, and retrofitting the
+// bound onto the ones that survived. A conditional conformance's witnesses are
+// curried onto every fulfilling Method uniformly, so an Overload that drops one
+// would emit a signature its call sites do not agree with; retaining them is
+// what keeps the arity honest (and, as at HEAD, is what makes an unbindable
+// Type Parameter the reportable error it should be).
+// Fresh Generic objects throughout, so the shared unbounded Namespace Generics
+// are never mutated. Idempotent: re-running retains and bounds the same set.
+function retainNamespaceBounds(
 	method: common.MethodType,
+	ownGenerics: Array<Set<string>>,
 	bounds: Map<string, string>,
+	namespaceGenerics: Array<common.GenericDeclaration>,
 ): common.MethodType {
 	let apply = (
 		generics: Array<common.GenericDeclaration>,
-	): Array<common.GenericDeclaration> =>
-		generics.map((generic) => {
-			let constraint = bounds.get(generic.name)
+		own: Set<string>,
+	): Array<common.GenericDeclaration> => {
+		let leading: Array<common.GenericDeclaration> = []
 
-			return constraint === undefined
-				? generic
-				: { ...generic, constraint }
-		})
+		for (let namespaceGeneric of namespaceGenerics) {
+			// NOTE: A Method Generic of the same name shadows this one
+			// outright — it is the Method's entry that is in the list, and
+			// re-adding would duplicate the name.
+			if (own.has(namespaceGeneric.name)) {
+				continue
+			}
+
+			let existing = generics.find(
+				(generic) => generic.name === namespaceGeneric.name,
+			)
+			let constraint = bounds.get(namespaceGeneric.name)
+
+			if (existing === undefined && constraint === undefined) {
+				continue
+			}
+
+			let base = existing ?? namespaceGeneric
+
+			leading.push(
+				constraint === undefined ? base : { ...base, constraint },
+			)
+		}
+
+		return [
+			...leading,
+			...generics.filter((generic) => own.has(generic.name)),
+		]
+	}
 
 	if (method.type === "SimpleMethod" || method.type === "StaticMethod") {
-		return { ...method, generics: apply(method.generics) }
+		return {
+			...method,
+			generics: apply(method.generics, ownGenerics[0] ?? new Set()),
+		}
 	}
 
 	return {
 		...method,
-		overloads: method.overloads.map((overload) => ({
+		overloads: method.overloads.map((overload, index) => ({
 			...overload,
-			generics: apply(overload.generics),
+			generics: apply(overload.generics, ownGenerics[index] ?? new Set()),
 		})),
 	}
 }
@@ -1576,10 +1695,11 @@ function enrichMethods(
 	selfType: common.Type | null,
 	methodTypes: Record<string, common.MethodType>,
 	// NOTE: The constrained Namespace Generics to weave into each conditional
-	// conformance's fulfilling Methods — empty for every other Method.
+	// conformance's fulfilling Methods, one list per Overload — empty for every
+	// other Method.
 	injectedGenerics: Map<
 		string,
-		Array<common.typed.GenericDeclarationNode>
+		Array<Array<common.typed.GenericDeclarationNode>>
 	> = new Map(),
 ): common.typed.Methods {
 	let result: common.typed.Methods = {}
@@ -1605,7 +1725,7 @@ function enrichMethods(
 					memberValue,
 					scope,
 					selfType,
-					injected,
+					injected[0] ?? [],
 				),
 			}
 		} else if (memberValue.nodeType === "StaticMethod") {
@@ -1616,7 +1736,7 @@ function enrichMethods(
 					memberValue,
 					scope,
 					selfType,
-					injected,
+					injected[0] ?? [],
 				),
 			}
 		} else if (memberValue.nodeType === "OverloadedMethod") {
