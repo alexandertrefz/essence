@@ -31,5 +31,5 @@ implementation {
 	§ unsatisfied-conformance-condition — a List of Lists of Booleans can not be
 	§ sorted, because Boolean is not Comparable. The because-chain names each
 	§ level of the failure.
-	constant ordered = [[true], [false]]::sorted()
+	constant ordered = [[true], [false]]::sort()
 }

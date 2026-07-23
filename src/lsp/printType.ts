@@ -177,7 +177,7 @@ export function describeSignature(
 					.map((generic) =>
 						// NOTE: A Protocol-bounded Type Parameter reads back as it
 						// is written — `ItemType is Comparable` — so a Hover or
-						// Signature Help over `sorted` shows the bound its ordering
+						// Signature Help over `sort` shows the bound its ordering
 						// depends on rather than a bare `ItemType`.
 						generic.constraint == null
 							? generic.name

@@ -345,7 +345,7 @@ export function enrichMethodFunctionDefinition(
 // `List.sorted<infer ItemType is Comparable>`, declared on a Namespace that
 // already has an unbounded `ItemType`. The Method's Parameter and return Types
 // are resolved in a Scope where the name is the Method's, so `@` has to agree:
-// the receiver of `sorted` is a List of the BOUNDED ItemType, which is what
+// the receiver of `sort` is a List of the BOUNDED ItemType, which is what
 // lets `first::compareTo(second)` in the body resolve through the bound and
 // reach the hidden conformance Argument. Left unshadowed, `@` would carry the
 // Namespace's opaque Generic, an item read off it would have no bound, and the
@@ -474,9 +474,7 @@ function withInjectedBounds(
 	return {
 		scope: boundedScope,
 		selfType:
-			selfType === null
-				? null
-				: applyGenericBindings(selfType, bindings),
+			selfType === null ? null : applyGenericBindings(selfType, bindings),
 	}
 }
 
@@ -3608,9 +3606,7 @@ export function resolveNamespaceDefinitionStatementType(
 								"no Type and no value",
 							),
 						],
-						helps: [
-							`Annotate it: 'static ${memberKey}: Type'.`,
-						],
+						helps: [`Annotate it: 'static ${memberKey}: Type'.`],
 					},
 				)
 			}

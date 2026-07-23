@@ -382,12 +382,12 @@ describe("Stdlib", () => {
 
 		// NOTE: `List.sorted` is implemented in Essence now
 		// (`src/stdlib/List.es`) — it hands its hidden conformance Argument's
-		// `compareTo` straight to `sortedBy`, and the golden harness covers the
+		// `compareTo` straight to `sort__overload$2`, and the golden harness covers the
 		// flat case. What is NOT covered there, and what the two tests below
 		// keep, is the WITNESS a nested List is sorted through: the Essence
 		// body only ever sees `conformance.compareTo`, so the currying
 		// `boundConformance` does is what makes the nesting work. They call
-		// `sortedBy` with exactly the Function the Essence body passes on.
+		// `sort__overload$2` with exactly the Function the Essence body passes on.
 
 		it("compares Lists lexicographically", () => {
 			let integerConformance = { compareTo: number.compareTo }
@@ -428,10 +428,10 @@ describe("Stdlib", () => {
 			])
 
 			expect(
-				list.sortedBy(
+				list.sort__overload$2(
 					list.createList([ints(3n), ints(1n, 2n)]),
 					nested.compareTo as unknown as Parameters<
-						typeof list.sortedBy
+						typeof list.sort__overload$2
 					>[1],
 				),
 			).toEqual(list.createList([ints(1n, 2n), ints(3n)]))
@@ -459,10 +459,10 @@ describe("Stdlib", () => {
 			let b = list.createList([list.createList([ints(1n), ints(9n)])])
 
 			expect(
-				list.sortedBy(
+				list.sort__overload$2(
 					list.createList([a, b]),
 					listOfListOfListOfIntegers.compareTo as unknown as Parameters<
-						typeof list.sortedBy
+						typeof list.sort__overload$2
 					>[1],
 				),
 			).toEqual(list.createList([b, a]))
@@ -530,13 +530,13 @@ describe("Stdlib", () => {
 		it("bounds sorted by Comparable", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordered: List<Integer> = [3, 1, 2]::sorted()
+					constant ordered: List<Integer> = [3, 1, 2]::sort()
 				}`),
 			).toEqual([])
 
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordered = [true, false]::sorted()
+					constant ordered = [true, false]::sort()
 				}`),
 			).not.toEqual([])
 		})

@@ -13,13 +13,13 @@ implementation {
 
 	constant boxes = [{ value = 3 }, { value = 1 }, { value = 2 }]
 
-	__print(boxes::sorted()::map((box) { <- box.value }))  § [ 1, 2, 3 ]
+	__print(boxes::sort()::map((box) { <- box.value }))  § [ 1, 2, 3 ]
 
 	§ List conforms the same way — `is Comparable where ItemType is
 	§ Comparable` — so Lists of Lists sort, the witnesses composing all the
 	§ way down.
-	__print([[3], [1, 2]]::sorted())                   § [ [ 1, 2 ], [ 3 ] ]
-	__print([[[2]], [[1]]]::sorted())                  § [ [ [ 1 ] ], [ [ 2 ] ] ]
+	__print([[3], [1, 2]]::sort())                   § [ [ 1, 2 ], [ 3 ] ]
+	__print([[[2]], [[1]]]::sort())                  § [ [ [ 1 ] ], [ [ 2 ] ] ]
 
 	§ Two Lists compare lexicographically; on an equal prefix, shorter first.
 	__print([1, 2]::compareTo([1, 2, 3])::toString())  § "Less"

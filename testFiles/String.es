@@ -38,7 +38,7 @@ implementation {
 
 	§ String is Comparable now, so a List of Strings sorts with a real
 	§ comparator, and `compareTo` orders by code point.
-	__print(["banana", "apple", "cherry"]::sortedBy((a, b) {
+	__print(["banana", "apple", "cherry"]::sort(by (a, b) {
 		<- a::compareTo(b)
 	}))                                    § ["apple", "banana", "cherry"]
 
