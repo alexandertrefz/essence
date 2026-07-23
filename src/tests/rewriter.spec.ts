@@ -437,27 +437,11 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("isNot", () => {
-				it("returns false when both sides match", () => {
-					expect(boolean.isNot(booleanTrue(), booleanTrue())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(
-						boolean.isNot(booleanFalse(), booleanFalse()),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns true when the sides dont match ", () => {
-					expect(
-						boolean.isNot(booleanTrue(), booleanFalse()),
-					).toEqual(booleanTrue())
-
-					expect(
-						boolean.isNot(booleanFalse(), booleanTrue()),
-					).toEqual(booleanTrue())
-				})
-			})
+			// NOTE: `isNot` is not here because it is not native any more — it
+			// is written in Essence in `src/stdlib/Boolean.es` and reaches the
+			// emitted Program through the standard library prelude. There is
+			// nothing in this module left to call; what it does now is asserted
+			// end to end in `codeGeneration.spec.ts`.
 
 			describe("and", () => {
 				it("returns true if both sides are true", () => {
