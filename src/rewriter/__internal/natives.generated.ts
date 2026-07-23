@@ -566,7 +566,7 @@ declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
 
 declare const BooleanModule: typeof import("./Boolean")
-export const $Boolean: BooleanNatives = BooleanModule
+export const $Boolean: BooleanNatives & BooleanEssenceImplemented = BooleanModule
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
@@ -581,7 +581,7 @@ declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
 
 declare const NumberModule: typeof import("./Number")
-export const $Number: NumberNatives = NumberModule
+export const $Number: NumberNatives & NumberEssenceImplemented = NumberModule
 
 declare const NothingModule: typeof import("./Nothing")
 export const $Nothing: NothingNatives = NothingModule
