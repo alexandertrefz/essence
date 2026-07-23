@@ -1439,6 +1439,56 @@ describe("Helpers", () => {
 				expect(context.bindings.has("T")).toBe(false)
 			})
 
+			// NOTE: When a Method forwards to another whose `infer` generic is
+			// spelled the same — every `List` Method binds `ItemType`, so
+			// `firstItem` calling `itemAt` matches the callee's bindable `ItemType`
+			// against the caller's opaque `ItemType` carried by the receiver — the
+			// bindable side must RECORD the binding off the actual Type, not be
+			// waved through by bare name equality with nothing bound. Generic
+			// identity is by name across the compiler, so the bindable-name check
+			// is the only thing that keeps the two apart.
+			it("should bind a Generic against a same-named opaque Generic", () => {
+				let context = inferContextFor(["T"])
+				let opaqueT: GenericUse = { type: "GenericUse", name: "T" }
+				let listOfBindableT: ListType = {
+					type: "List",
+					itemType: genericT,
+				}
+				let listOfOpaqueT: ListType = {
+					type: "List",
+					itemType: opaqueT,
+				}
+
+				expect(
+					matchesTypeWithBindings(
+						listOfBindableT,
+						listOfOpaqueT,
+						context,
+					),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(opaqueT)
+			})
+
+			// NOTE: A Method that forwards a same-named Generic through both its
+			// receiver AND an Argument — `isNot(_ other: List<ItemType>)` binds
+			// `ItemType` off the receiver, then matches the SAME Generic again for
+			// `other`. The second occurrence verifies the binding, and the bound
+			// value is the same opaque Generic use, so the verification must
+			// short-circuit rather than re-match it forever. Without the guard
+			// this test hangs.
+			it("should accept a re-match of a Generic bound to a same-named opaque Generic", () => {
+				let context = inferContextFor(["T"])
+				let opaqueT: GenericUse = { type: "GenericUse", name: "T" }
+
+				expect(
+					matchesTypeWithBindings(genericT, opaqueT, context),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(genericT, opaqueT, context),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(opaqueT)
+			})
+
 			it("should bind Generics nested in Records", () => {
 				let context = inferContextFor(["T"])
 				let recordOfT: RecordType = {
