@@ -1,5 +1,51 @@
 declarations {
 
+	§ Which end of a String a Method works on. It lives here because both of
+	§ its users do — `trim(at:)` and `pad(…, at:)` — and it is what keeps each
+	§ of them ONE Method instead of the three and two they used to be. A fixed
+	§ set of modes is a Choice, never a String: `trim(at "start")` would be a
+	§ typo waiting to happen, and `trim(at Side#Start)` is exhaustively checked.
+	choice Side {
+		Start,
+		End,
+		BothEnds,
+	}
+
+	§ The same shape as `Ordering`'s Namespace — unit Cases compared and
+	§ printed by tag, with nothing else to say about them.
+	namespace Side for Side is Equatable, is Printable {
+		§§ Answers whether both Sides are the same variant.
+		§§
+		§§ @param other the Side to compare with
+		§§ @returns `true` when both Sides are the same variant.
+		is(_ other: Side) -> Boolean {
+			<- match @ -> Boolean {
+				case #Start { <- match other -> Boolean { case #Start { <- true } case _ { <- false } } }
+				case #End { <- match other -> Boolean { case #End { <- true } case _ { <- false } } }
+				case #BothEnds { <- match other -> Boolean { case #BothEnds { <- true } case _ { <- false } } }
+			}
+		}
+
+		§§ Answers whether the Sides are different variants.
+		§§
+		§§ @param other the Side to compare with
+		§§ @returns `true` when the Sides are different variants.
+		isNot(_ other: Side) -> Boolean {
+			<- @::is(other)::negate()
+		}
+
+		§§ Represents the Side as `Start`, `End` or `BothEnds`.
+		§§
+		§§ @returns the name of the Side variant.
+		toString() -> String {
+			<- match @ -> String {
+				case #Start { <- "Start" }
+				case #End { <- "End" }
+				case #BothEnds { <- "BothEnds" }
+			}
+		}
+	}
+
 	§ Indices and character counts are by Unicode code point, not UTF-16 code
 	§ unit — so `character(at:)` never returns a lone surrogate, and `length`
 	§ counts what a reader would call characters. `split` matches its
@@ -111,16 +157,22 @@ declarations {
 		§§ The String with every character in lower case.
 		lowercased() -> String
 
-		§§ The String without surrounding whitespace.
-		trimmed() -> String {
-			<- @::trimmedAtStart()::trimmedAtEnd()
+		§ One Method, not three. `trim(at:)` is the single native — it reads
+		§ the Case and calls the matching JavaScript intrinsic — and the
+		§ no-Argument entry is written on top of it, naming the end it means.
+		§ `BothEnds` is the default because trimming usually means both.
+
+		§§ The String without surrounding whitespace — at both ends when called with no Argument, or at the given end.
+		§§
+		§§ @returns the trimmed String.
+		overload trim {
+			() -> String {
+				<- @::trim(at Side#BothEnds)
+			}
+
+			§§ @param at the end to trim
+			(at side: Side) -> String
 		}
-
-		§§ The String without leading whitespace.
-		trimmedAtStart() -> String
-
-		§§ The String without trailing whitespace.
-		trimmedAtEnd() -> String
 
 		§§ Whether the String begins with the given one.
 		starts(with prefix: String) -> Boolean {

@@ -243,9 +243,21 @@ A new Namespace is a new runtime module. The Simplifier emits
 3. a place in `builtinMemberOrder` (`src/enricher/builtins.ts`), and
 4. a row in `builtins.spec.ts`'s `runtimeModules`.
 
+A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
+do — needs a fifth: a place in `builtinTypeOrder`, beside `builtinMemberOrder`.
+
 `builtins.spec.ts` cross-checks the first, third and fourth against each other
 and against the Namespaces declared here, so a missing registration is a failing
 test rather than a call to `undefined`.
+
+One more site is easy to miss because it is not a registration list: the native
+contract generator (`src/tools/generateNatives.ts`) maps each Essence Type to
+the runtime type that stands for it. A new `choice` whose Cases appear in ANY
+native signature needs its Union alias in `UNION_NAME_ALIASES`, its Case types
+in `CASE_TYPES`, and each of those names in `RUNTIME_TYPE_MODULES` — otherwise
+`generate:natives` throws `no runtime type known for Case '<Choice>#<Case>'`
+rather than rendering the contract. `Side` needed all three, because
+`String::trim(at:)` takes one.
 
 ## The native contract
 
