@@ -548,16 +548,7 @@ function rewriteConformanceValue(
 			([protocolMethodName, namespaceMethodName]): estree.Property => ({
 				type: "Property",
 				key: { type: "Identifier", name: protocolMethodName },
-				value: {
-					type: "MemberExpression",
-					object: { type: "Identifier", name: node.namespaceName },
-					property: {
-						type: "Identifier",
-						name: namespaceMethodName,
-					},
-					computed: false,
-					optional: false,
-				},
+				value: namespaceMember(node.namespaceName, namespaceMethodName),
 				kind: "init",
 				method: false,
 				shorthand: false,
@@ -652,22 +643,35 @@ function rewriteFunctionInvocation(
 	}
 }
 
+// NOTE: One reference to a member of a standard library Namespace, in the one
+// place every emission site routes through. Today it is always a member read
+// off the plain `import * as <Namespace>`; the next commit lets it emit a bare
+// Identifier instead for a Method the standard library implements in Essence,
+// so that a native stays tree-shakeable and an Essence-implemented Method needs
+// no materialised module namespace object. The literal constructors
+// (`String.createString`, `List.createList`, …) do NOT come through here: they
+// name their Namespace directly and are not declared in `src/stdlib`, so they
+// can never be Essence-implemented.
+function namespaceMember(
+	namespaceName: string,
+	memberName: string,
+): estree.Expression {
+	return {
+		type: "MemberExpression",
+		optional: false,
+		computed: false,
+		object: { type: "Identifier", name: namespaceName },
+		property: { type: "Identifier", name: memberName },
+	}
+}
+
 function rewriteMethodInvocation(
 	node: common.typedSimple.MethodInvocationNode,
 ): estree.CallExpression {
 	return {
 		type: "CallExpression",
 		optional: false,
-		callee: {
-			type: "MemberExpression",
-			optional: false,
-			object: rewriteExpression(node.base),
-			property: {
-				type: "Identifier",
-				name: node.member.name,
-			},
-			computed: false,
-		},
+		callee: namespaceMember(node.base.name, node.member.name),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
@@ -706,19 +710,10 @@ function rewriteUnionMethodInvocation(
 							convertObjectToObjectExpression(
 								dispatchCase.memberType,
 							),
-							{
-								type: "MemberExpression",
-								optional: false,
-								object: {
-									type: "Identifier",
-									name: dispatchCase.namespaceName,
-								},
-								property: {
-									type: "Identifier",
-									name: dispatchCase.methodName,
-								},
-								computed: false,
-							},
+							namespaceMember(
+								dispatchCase.namespaceName,
+								dispatchCase.methodName,
+							),
 							{
 								type: "ArrayExpression",
 								elements: dispatchCase.conformanceArguments.map(
@@ -982,9 +977,20 @@ function rewriteListValue(
 	}
 }
 
+// NOTE: A Lookup reaches here for a static Method call (`Number.sum(…)`), a
+// static Property read (`Number.PI`) and a plain Record member access
+// (`record.field`). Only the first two name a Namespace, so only a Lookup whose
+// base is an Identifier routes through `namespaceMember` — and even then the
+// member read is unchanged unless the pair is Essence-implemented, which a
+// Record field or a Property never is. A base that is any other Expression
+// (a chained access, a call result) keeps the plain member read.
 function rewriteLookup(
 	node: common.typedSimple.LookupNode,
-): estree.MemberExpression {
+): estree.Expression {
+	if (node.base.nodeType === "Identifier") {
+		return namespaceMember(node.base.name, node.member.name)
+	}
+
 	return {
 		type: "MemberExpression",
 		optional: false,
