@@ -47,12 +47,17 @@ async function bundleSizeOf(relativePath: string): Promise<number> {
 }
 
 describe("Bundle Size", () => {
-	// NOTE: Measured 48,261 bytes; a reintroduced `Number` spread was 60,437.
+	// NOTE: Measured 53,074 bytes; a reintroduced `Number` spread was 60,437.
+	// The measured size rose from 48,261 when the `Number` comparison cluster
+	// (`is`, `isNot`, `toString` and the `isLessThan` family) moved into
+	// Essence: each is now emitted as its own const reading the covering
+	// `compareTo`, so an Everyday Program that compares Numbers carries those
+	// bodies. Still comfortably below the spread figure, so the guard holds.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("testFiles/Everyday.es")).toBeLessThan(52_000)
+		expect(await bundleSizeOf("testFiles/Everyday.es")).toBeLessThan(56_000)
 	})
 
-	// NOTE: Measured 40,909 bytes; a reintroduced `Number` spread was 54,849.
+	// NOTE: Measured 42,827 bytes; a reintroduced `Number` spread was 54,849.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("testFiles/Irrational.es")).toBeLessThan(
 			44_000,
