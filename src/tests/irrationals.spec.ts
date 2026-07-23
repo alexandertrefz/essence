@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
+import { createBoolean } from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
 import { anyIs, anyIsNot } from "../rewriter/__internal/internalHelpers"
 import * as list from "../rewriter/__internal/List"
@@ -261,10 +262,21 @@ describe("Irrationals", () => {
 	})
 
 	describe("Structural equality", () => {
-		// NOTE: `anyIs` is what every List operation compares with. It branched
-		// on the type tag for the other kinds and fell through to `false` for
-		// Algebraic and Transcendental, so a List could not find a value it
-		// held.
+		// NOTE: `anyIs` used to be what every List operation compared with. It
+		// branched on the type tag for the other kinds and fell through to
+		// `false` for Algebraic and Transcendental, so a List could not find a
+		// value it held. The List Methods are bounded by `Equatable` now and
+		// take the items' own `is` as a witness instead — `anyIs` still answers
+		// for a Record's members and for a literal Matcher, so it keeps these
+		// tests, and the searching Methods are exercised through the witness
+		// beside them. `Algebraic.is` and `Transcendental.is` are Essence
+		// (both read `compareTo`), so the witnesses are spelled out here the
+		// way the Simplifier passes them.
+		const irrationalIs = (
+			first: algebraic.AlgebraicType | transcendental.TranscendentalType,
+			second: algebraic.AlgebraicType | transcendental.TranscendentalType,
+		) => createBoolean(anyIs(first, second))
+
 		it("finds an Algebraic in a List", () => {
 			const rootTwo = radical(2n)
 
@@ -272,10 +284,21 @@ describe("Irrationals", () => {
 			expect(anyIs(rootTwo, radical(3n))).toBeFalse()
 			expect(anyIsNot(rootTwo, radical(2n))).toBeFalse()
 
-			// NOTE: List.doesNotContain is implemented in Essence now (src/stdlib/List.es); the golden harness covers it.
+			// NOTE: List.contains / doesNotContain / removeDuplicates are
+			// implemented in Essence now (src/stdlib/List.es); `firstIndexOf`
+			// is the searching Method still native, and it answers through the
+			// witness.
 			expect(
-				list.contains(list.createList([rootTwo]), radical(2n)).value,
-			).toBeTrue()
+				list.firstIndexOf(list.createList([rootTwo]), radical(2n), {
+					is: irrationalIs,
+				}),
+			).toEqual(integer.createInteger(0n))
+
+			expect(
+				list.firstIndexOf(list.createList([rootTwo]), radical(3n), {
+					is: irrationalIs,
+				})[typeKeySymbol],
+			).toBe("Nothing")
 		})
 
 		it("finds a Transcendental in a List", () => {
@@ -283,22 +306,30 @@ describe("Irrationals", () => {
 			expect(anyIs(number.PI, number.TAU)).toBeFalse()
 
 			expect(
-				list.contains(list.createList([number.PI]), number.PI).value,
-			).toBeTrue()
+				list.firstIndexOf(
+					list.createList([number.TAU, number.PI]),
+					number.PI,
+					{ is: irrationalIs },
+				),
+			).toEqual(integer.createInteger(1n))
 		})
 
-		it("collapses duplicate irrationals", () => {
+		it("compares Lists of irrationals through the item witness", () => {
 			expect(
-				list.removeDuplicates(
-					list.createList([radical(2n), radical(2n), radical(3n)]),
-				),
-			).toEqual(list.createList([radical(2n), radical(3n)]))
+				list.is(
+					list.createList([radical(2n), radical(3n)]),
+					list.createList([radical(2n), radical(3n)]),
+					{ is: irrationalIs },
+				).value,
+			).toBeTrue()
 
 			expect(
-				list.removeDuplicates(
-					list.createList([number.PI, number.TAU, number.PI]),
-				),
-			).toEqual(list.createList([number.PI, number.TAU]))
+				list.is(
+					list.createList([number.PI, number.TAU]),
+					list.createList([number.PI, number.PI]),
+					{ is: irrationalIs },
+				).value,
+			).toBeFalse()
 		})
 
 		it("keeps kinds apart", () => {
@@ -362,6 +393,23 @@ describe("Irrationals", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant order: Ordering = Number.PI::compareTo(22/7)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: The List Methods that search by value are bounded by
+		// `Equatable` now, so a List of irrationals only keeps them if the
+		// covering `Number` Namespace's conformance is what solves the bound.
+		// This is the gate on that: no Diagnostic means the witness was found.
+		it("satisfies the Equatable bound of the searching List Methods", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant roots: List<Irrational> = [Number.PI, Number.TAU]
+
+					__print(roots::contains(Number.PI)::toString())
+					__print(roots::countOf(Number.TAU)::toString())
+					__print(roots::removeDuplicates()::length()::toString())
+					__print(roots::is([Number.PI])::toString())
 				}`),
 			).toEqual([])
 		})

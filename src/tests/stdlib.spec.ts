@@ -40,6 +40,14 @@ const ratIs = (
 // what the Simplifier now passes.
 const stringToString = (value: string.StringType) => value
 
+// NOTE: The same story for `Integer.is` (src/stdlib/Integer.es), which the
+// List Methods bounded by `Equatable` now take as their hidden witness. The
+// Essence body reads `compareTo(other)::is(Ordering#Equal)`; two Integers
+// answer that exactly when their values match, so this is what the Simplifier
+// passes at a `List<Integer>` call site.
+const integerIs = (first: integer.IntegerType, second: integer.IntegerType) =>
+	bool(first.value === second.value)
+
 function diagnosticsFor(source: string) {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -308,13 +316,56 @@ describe("Stdlib", () => {
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
+		// NOTE: `lastIndexOf` is bounded by `Equatable` — which position it
+		// finds is decided by the items' own `is`, handed in as the hidden
+		// witness the way `joinWith` above takes its `toString`.
 		it("finds the last occurrence", () => {
-			expect(list.lastIndexOf(ints(1n, 2n, 3n, 2n), int(2n))).toEqual(
-				int(3n),
-			)
-			expect(list.lastIndexOf(ints(1n, 2n), int(9n))[typeKeySymbol]).toBe(
-				"Nothing",
-			)
+			expect(
+				list.lastIndexOf(ints(1n, 2n, 3n, 2n), int(2n), {
+					is: integerIs,
+				}),
+			).toEqual(int(3n))
+			expect(
+				list.lastIndexOf(ints(1n, 2n), int(9n), { is: integerIs })[
+					typeKeySymbol
+				],
+			).toBe("Nothing")
+		})
+
+		// NOTE: The equality counterpart of "sorts nested Lists through a bound
+		// conformance" below. `List is Equatable` is conditional, so the witness
+		// a `List<List<Integer>>` is compared through is `List.is` curried with
+		// the inner Integer equality — exactly what `$type.boundConformance(...)`
+		// emits. Nothing here reaches for a universal structural comparison; the
+		// nesting is what carries equality down to the Integers.
+		it("compares nested Lists through a bound conformance", () => {
+			let innerLists = boundConformance({ is: list.is }, [
+				{ is: integerIs },
+			]) as unknown as Parameters<typeof list.is>[2]
+
+			expect(
+				list.is(
+					list.createList([ints(1n, 2n), ints(3n)]),
+					list.createList([ints(1n, 2n), ints(3n)]),
+					innerLists,
+				),
+			).toEqual(bool(true))
+
+			expect(
+				list.is(
+					list.createList([ints(1n, 2n), ints(3n)]),
+					list.createList([ints(1n, 2n), ints(9n)]),
+					innerLists,
+				),
+			).toEqual(bool(false))
+
+			expect(
+				list.is(
+					list.createList([ints(1n, 2n)]),
+					list.createList([ints(1n, 2n), ints(3n)]),
+					innerLists,
+				),
+			).toEqual(bool(false))
 		})
 
 		// NOTE: `List.partitioned` is implemented in Essence now

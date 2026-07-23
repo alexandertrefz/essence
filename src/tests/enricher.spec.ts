@@ -1179,6 +1179,11 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toEqual([])
 
+			// NOTE: `List is Equatable` is CONDITIONAL — a List is equatable
+			// exactly when its items are — so the bounded `Value` is solved by
+			// List's own conformance carrying Integer's as its condition, and
+			// the nested one is collected here alongside it. The generic the
+			// call site had to fill is `Value`; that one is List's.
 			let namespaceSources = collectConformances(program).filter(
 				(conformance) =>
 					conformance.protocolName === "Equatable" &&
@@ -1186,13 +1191,24 @@ describe("Enricher", () => {
 			)
 
 			expect(namespaceSources.length).toBeGreaterThan(0)
-			expect(
-				namespaceSources.every(
-					(conformance) =>
-						conformance.source.kind === "namespace" &&
-						conformance.source.name === "List",
-				),
-			).toBe(true)
+
+			let outer = namespaceSources.find(
+				(conformance) => conformance.genericName === "Value",
+			)
+
+			expect(outer).toBeDefined()
+
+			if (outer !== undefined && outer.source.kind === "namespace") {
+				expect(outer.source.name).toBe("List")
+				expect(outer.source.conditions).toHaveLength(1)
+				expect(outer.source.conditions[0].source.kind).toBe("namespace")
+
+				if (outer.source.conditions[0].source.kind === "namespace") {
+					expect(outer.source.conditions[0].source.name).toBe(
+						"Integer",
+					)
+				}
+			}
 		})
 
 		it("should prefer a concrete Namespace over the generic blanket", () => {
