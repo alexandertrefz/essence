@@ -15,7 +15,11 @@ import {
 import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
-import { reachableEssenceMethods, rewrite } from "../rewriter/index"
+import {
+	essenceMethodReferences,
+	reachableEssenceMethods,
+	rewrite,
+} from "../rewriter/index"
 import {
 	buildStdlibPrelude,
 	essenceMethodIdentifier,
@@ -914,18 +918,20 @@ describe("Code Generation", () => {
 		})
 
 		// NOTE: The regression is the merged const, whose whole cost was the
-		// `...$native_X` spread that materialised a module namespace object. No
-		// emitted Program may spread a `$`-prefixed identifier — that names the
-		// mechanism directly, where the bundle-size ceilings catch it arriving by
-		// any other route. `Everyday.es` reaches an Essence Method AND a large
-		// runtime module, the exact shape that used to spread.
+		// spread that materialised a module namespace object — `{ ...Number, … }`,
+		// whether the spread names `$native_Number` (the old shape) or the bare
+		// `Number` import. No emitted Program spreads anything at all today, so an
+		// object literal opening with a spread names the mechanism directly, where
+		// the bundle-size ceilings catch it arriving by any other route.
+		// `Everyday.es` reaches an Essence Method AND a large runtime module, the
+		// exact shape that used to spread.
 		it("never spreads a runtime module", () => {
 			const source = readFileSync(
 				join(import.meta.dir, "../..", "testFiles/Everyday.es"),
 				{ encoding: "utf-8" },
 			)
 
-			expect(generate(source)).not.toMatch(/\.\.\.\$/)
+			expect(generate(source)).not.toMatch(/\{\s*\.\.\./)
 		})
 
 		// NOTE: The `$es_` prefix can not collide with a user identifier because
@@ -1222,6 +1228,122 @@ describe("Code Generation", () => {
 				])
 
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
+			})
+
+			// NOTE: The edge finder must recognise EVERY shape `namespaceMember`
+			// turns into a `$es_…` Identifier, or a Method reached only through a
+			// missing shape is named in an emitted body while its const is never
+			// pulled in — a `ReferenceError` at run time that compiles green. Fed
+			// each shape directly, because the two live Essence Methods reach
+			// other Methods only through a `MethodInvocation`, so the prelude
+			// never exercises the witness and static-reference shapes on its own.
+			describe("edge shapes", () => {
+				const implemented = new Set([
+					"Target instance",
+					"Target static",
+					"Target witnessed",
+					"Target dispatched",
+				])
+
+				it("follows an instance MethodInvocation", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "MethodInvocation",
+							base: { nodeType: "Identifier", name: "Target" },
+							member: { name: "instance" },
+							arguments: [],
+						},
+						implemented,
+					)
+
+					expect([...refs]).toEqual(["$es_Target_instance"])
+				})
+
+				it("follows a static Lookup, as callee and as a bare value", () => {
+					const lookup = {
+						nodeType: "Lookup",
+						base: {
+							nodeType: "Identifier",
+							name: "Target",
+							type: { type: "Namespace" },
+						},
+						member: { nodeType: "Identifier", name: "static" },
+					}
+
+					expect([
+						...essenceMethodReferences(
+							{
+								nodeType: "FunctionInvocation",
+								name: lookup,
+								arguments: [],
+							},
+							implemented,
+						),
+					]).toEqual(["$es_Target_static"])
+
+					// NOTE: A static Method passed as a value, not called — the
+					// shape an earlier version missed by only inspecting a
+					// `FunctionInvocation`'s callee.
+					expect([
+						...essenceMethodReferences(
+							{ nodeType: "Argument", value: lookup },
+							implemented,
+						),
+					]).toEqual(["$es_Target_static"])
+				})
+
+				it("follows a conformance witness's method map", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "ConformanceValue",
+							namespaceName: "Target",
+							methodMap: { someProtocolMethod: "witnessed" },
+							conditions: [],
+						},
+						implemented,
+					)
+
+					expect([...refs]).toEqual(["$es_Target_witnessed"])
+				})
+
+				it("follows a Union dispatch case", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "UnionMethodInvocation",
+							base: { nodeType: "Identifier", name: "value" },
+							cases: [
+								{
+									namespaceName: "Target",
+									methodName: "dispatched",
+									conformanceArguments: [],
+								},
+							],
+							arguments: [],
+						},
+						implemented,
+					)
+
+					expect([...refs]).toEqual(["$es_Target_dispatched"])
+				})
+
+				it("draws no edge to a Method the prelude does not implement", () => {
+					// NOTE: A Record field access is an Identifier-based `Lookup`
+					// too — it must not be mistaken for a static reference.
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "Lookup",
+							base: {
+								nodeType: "Identifier",
+								name: "record",
+								type: { type: "Record" },
+							},
+							member: { nodeType: "Identifier", name: "instance" },
+						},
+						implemented,
+					)
+
+					expect([...refs]).toEqual([])
+				})
 			})
 		})
 
