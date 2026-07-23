@@ -5,7 +5,6 @@ import type { IntegerType } from "./Integer"
 import { is as listIs } from "./List"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
-import { is as stringIs } from "./String"
 import type { AnyType } from "./type"
 import { typeKeySymbol } from "./type"
 
@@ -42,7 +41,11 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "String" && //
 		b[typeKeySymbol] === "String"
 	) {
-		return stringIs(a, b).value
+		// NOTE: String.is is written in Essence now — it reads `compareTo`,
+		// which is lexicographic by code point and answers `Equal` exactly for
+		// two Strings of the same code points. Compare the runtime
+		// representation directly rather than importing the deleted native.
+		return a.value === b.value
 	} else if (
 		a[typeKeySymbol] === "Integer" &&
 		b[typeKeySymbol] === "Integer"

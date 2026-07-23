@@ -494,126 +494,16 @@ describe("Rewriter", () => {
 		})
 
 		describe("String", () => {
-			describe("isEmpty", () => {
-				it("returns true for an empty string", () => {
-					expect(string.isEmpty(stringEmpty())).toEqual(booleanTrue())
-				})
-
-				it("returns false for non-empty strings", () => {
-					expect(string.isEmpty(string.createString(" "))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.isEmpty(string.createString("a"))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.isEmpty(string.createString("abc"))).toEqual(
-						booleanFalse(),
-					)
-
-					expect(string.isEmpty(string.createString("!"))).toEqual(
-						booleanFalse(),
-					)
-				})
-			})
-
-			// NOTE: hasAnyContent / isNot / doesNotContain / doesNotStartWith / doesNotEndWith are implemented in Essence now (src/stdlib/String.es); the golden harness covers them.
-
-			describe("is", () => {
-				it("returns true when the strings are equal", () => {
-					expect(string.is(stringEmpty(), stringEmpty())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(
-						string.is(
-							string.createString("a"),
-							string.createString("a"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.is(
-							string.createString("abc"),
-							string.createString("abc"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.is(
-							string.createString("!"),
-							string.createString("!"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.is(
-							string.createString(" "),
-							string.createString(" "),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the strings are not equal", () => {
-					expect(
-						string.is(stringEmpty(), string.createString("a")),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.is(stringEmpty(), string.createString("abc")),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.is(stringEmpty(), string.createString("!")),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.is(stringEmpty(), string.createString(" ")),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.is(
-							string.createString("abc"),
-							string.createString(" "),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.is(string.createString("abc"), stringEmpty()),
-					).toEqual(booleanFalse())
-				})
-			})
-
-			describe("prepend", () => {
-				it("prepends any string in front of another", () => {
-					expect(
-						string.prepend(stringEmpty(), string.createString("a")),
-					).toEqual(string.createString("a"))
-
-					expect(
-						string.prepend(
-							stringEmpty(),
-							string.createString("abc"),
-						),
-					).toEqual(string.createString("abc"))
-
-					expect(
-						string.prepend(stringEmpty(), string.createString("!")),
-					).toEqual(string.createString("!"))
-
-					expect(
-						string.prepend(stringEmpty(), string.createString(" ")),
-					).toEqual(string.createString(" "))
-
-					expect(
-						string.prepend(
-							string.createString("bc"),
-							string.createString("a"),
-						),
-					).toEqual(string.createString("abc"))
-				})
-			})
+			// NOTE: Most of this Namespace is written in Essence now
+			// (`src/stdlib/String.es`) and the golden harness covers it —
+			// `isEmpty`, `is`, `prepend`, `contains`, `length`, `characters`,
+			// `characterAt`, `trimmed`, `startsWith`, `endsWith`, `repeated`,
+			// `reversed`, `slice`, `firstIndexOf`, `paddedAtStart`,
+			// `paddedAtEnd` and `toString`, alongside the negations
+			// (`hasAnyContent`, `isNot`, `doesNotContain`, `doesNotStartWith`,
+			// `doesNotEndWith`) that moved earlier. What is left below is the
+			// native floor those Essence bodies stand on, and it is where the
+			// code-point behaviour is actually decided.
 
 			describe("append", () => {
 				it("appends any string to any other", () => {
@@ -663,8 +553,12 @@ describe("Rewriter", () => {
 
 				it("splits an empty splitter by code point, keeping astral characters whole", () => {
 					// NOTE: `String.split("")` would tear the emoji into two
-					// lone surrogates; splitting by code point keeps it whole,
-					// so this matches `characters()` exactly.
+					// lone surrogates; splitting by code point keeps it whole.
+					// This is the ONE place the runtime decides what a
+					// character is — `characters()` IS `splitOn("")` in
+					// Essence, and `length`, `characterAt`, `slice` and
+					// `reversed` are written on top of `characters()`, so
+					// every one of them inherits this behaviour from here.
 					let emoji = string.createString("a\u{1F600}b")
 
 					expect(
@@ -676,9 +570,6 @@ describe("Rewriter", () => {
 							string.createString("b"),
 						]),
 					)
-					expect(
-						string.splitOn(emoji, string.createString("")),
-					).toEqual(string.characters(emoji))
 				})
 
 				it("splits correctly using a substring", () => {
@@ -712,118 +603,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("contains", () => {
-				it("returns true when the partial string is empty", () => {
-					expect(
-						string.contains(
-							string.createString("abc"),
-							stringEmpty(),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns true when the partial string is found", () => {
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("a"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("b"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("ab"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("bc"),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns true when the string is matched", () => {
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("abc"),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the partial string is not found", () => {
-					expect(
-						string.contains(
-							stringEmpty(),
-							string.createString("abc"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.contains(
-							string.createString("abc"),
-							string.createString("d"),
-						),
-					).toEqual(booleanFalse())
-				})
-			})
-
-			describe("length and characters", () => {
-				it("counts and splits by code point", () => {
-					expect(string.length(string.createString("abc"))).toEqual(
-						integer.createInteger(3n),
-					)
-					// NOTE: The emoji is one code point, not two code units.
-					expect(
-						string.length(string.createString("a\u{1F600}b")),
-					).toEqual(integer.createInteger(3n))
-					expect(
-						string.characters(string.createString("a\u{1F600}")),
-					).toEqual(
-						list.createList([
-							string.createString("a"),
-							string.createString("\u{1F600}"),
-						]),
-					)
-				})
-			})
-
-			describe("characterAt", () => {
-				it("returns the code point at the position", () => {
-					expect(
-						string.characterAt(
-							string.createString("a\u{1F600}b"),
-							integerOne(),
-						),
-					).toEqual(string.createString("\u{1F600}"))
-				})
-
-				it("returns nothing outside the String", () => {
-					expect(
-						string.characterAt(
-							string.createString("a"),
-							integerTwo(),
-						),
-					).toEqual(nothing())
-					expect(
-						string.characterAt(
-							string.createString("a"),
-							integer.createInteger(-1n),
-						),
-					).toEqual(nothing())
-				})
-			})
-
 			describe("casing and trimming", () => {
 				it("upper- and lower-cases", () => {
 					expect(
@@ -834,29 +613,14 @@ describe("Rewriter", () => {
 					).toEqual(string.createString("ab"))
 				})
 
-				it("trims from either or both ends", () => {
-					expect(
-						string.trimmed(string.createString("  hi  ")),
-					).toEqual(string.createString("hi"))
+				it("trims from either end", () => {
+					// NOTE: `trimmed` is the Essence composition of these two.
 					expect(
 						string.trimmedAtStart(string.createString("  hi  ")),
 					).toEqual(string.createString("hi  "))
 					expect(
 						string.trimmedAtEnd(string.createString("  hi  ")),
 					).toEqual(string.createString("  hi"))
-				})
-			})
-
-			describe("prefixes and suffixes", () => {
-				it("answers starts/ends and their negations", () => {
-					const hello = string.createString("hello")
-
-					expect(
-						string.startsWith(hello, string.createString("he")),
-					).toEqual(booleanTrue())
-					expect(
-						string.endsWith(hello, string.createString("lo")),
-					).toEqual(booleanTrue())
 				})
 			})
 
@@ -870,134 +634,38 @@ describe("Rewriter", () => {
 						),
 					).toEqual(string.createString("b-b-b"))
 				})
-			})
 
-			describe("repeated", () => {
-				it("joins the String to itself", () => {
+				// NOTE: This is why `replaceEvery` is the one substring Method
+				// still native. On the empty part the replacement lands at
+				// every UTF-16 code UNIT boundary — outside the ends, and
+				// BETWEEN the two halves of an astral character, which is a
+				// position Essence can not name. The obvious Essence body,
+				// `@::splitOn(part)::joinWith(replacement)`, would answer
+				// `"a-b-c"` and `"a-\u{1F600}-b"` here instead.
+				it("places the replacement at every code unit for an empty part", () => {
 					expect(
-						string.repeated(
-							string.createString("ab"),
-							integerTwo(),
-						),
-					).toEqual(string.createString("abab"))
-				})
-
-				it("is empty for a count below one", () => {
-					expect(
-						string.repeated(
-							string.createString("ab"),
-							integerZero(),
-						),
-					).toEqual(stringEmpty())
-					expect(
-						string.repeated(
-							string.createString("ab"),
-							integer.createInteger(-3n),
-						),
-					).toEqual(stringEmpty())
-				})
-			})
-
-			describe("reversed", () => {
-				it("reverses by code point, keeping astral characters whole", () => {
-					expect(
-						string.reversed(string.createString("a\u{1F600}b")),
-					).toEqual(string.createString("b\u{1F600}a"))
-				})
-			})
-
-			describe("slice", () => {
-				const abcde = () => string.createString("abcde")
-
-				it("returns the half-open range", () => {
-					expect(
-						string.slice(
-							abcde(),
-							integerOne(),
-							integer.createInteger(3n),
-						),
-					).toEqual(string.createString("bc"))
-				})
-
-				it("clamps each end", () => {
-					expect(
-						string.slice(
-							abcde(),
-							integer.createInteger(-2n),
-							integer.createInteger(99n),
-						),
-					).toEqual(abcde())
-				})
-
-				it("is empty when the range is empty or reversed", () => {
-					expect(
-						string.slice(
-							abcde(),
-							integer.createInteger(3n),
-							integerOne(),
-						),
-					).toEqual(stringEmpty())
-				})
-			})
-
-			describe("firstIndexOf", () => {
-				it("gives the code-point position of the first occurrence", () => {
-					expect(
-						string.firstIndexOf(
-							string.createString("a\u{1F600}bc"),
-							string.createString("b"),
-						),
-					).toEqual(integerTwo())
-				})
-
-				it("gives nothing when absent", () => {
-					expect(
-						string.firstIndexOf(
+						string.replaceEvery(
 							string.createString("abc"),
-							string.createString("z"),
-						),
-					).toEqual(nothing())
-				})
-			})
-
-			describe("padding", () => {
-				it("pads at the start and end up to a length in code points", () => {
-					expect(
-						string.paddedAtStart(
-							string.createString("7"),
-							integer.createInteger(3n),
-							string.createString("0"),
-						),
-					).toEqual(string.createString("007"))
-					expect(
-						string.paddedAtEnd(
-							string.createString("7"),
-							integer.createInteger(3n),
-							string.createString("."),
-						),
-					).toEqual(string.createString("7.."))
-				})
-
-				it("leaves a long-enough String unchanged, and an empty pad has no effect", () => {
-					expect(
-						string.paddedAtStart(
-							string.createString("hello"),
-							integerTwo(),
-							string.createString("0"),
-						),
-					).toEqual(string.createString("hello"))
-					expect(
-						string.paddedAtStart(
-							string.createString("hi"),
-							integerHundred(),
 							stringEmpty(),
+							string.createString("-"),
 						),
-					).toEqual(string.createString("hi"))
+					).toEqual(string.createString("-a-b-c-"))
+
+					expect(
+						string.replaceEvery(
+							string.createString("a\u{1F600}b"),
+							stringEmpty(),
+							string.createString("-"),
+						),
+					).toEqual(string.createString("-a-\uD83D-\uDE00-b-"))
 				})
 			})
 
 			describe("compareTo", () => {
 				it("orders lexicographically by code point", () => {
+					// NOTE: This is also the whole of String equality —
+					// `String.is` is `compareTo(other)::is(Ordering#Equal)` in
+					// Essence.
 					expect(
 						string.compareTo(
 							string.createString("apple"),
@@ -4253,11 +3921,10 @@ describe("Rewriter", () => {
 		})
 
 		describe("Protocol runtime gap fills", () => {
-			it("represents a String as itself", () => {
-				expect(string.toString(string.createString("text"))).toEqual(
-					string.createString("text"),
-				)
-			})
+			// NOTE: `String.toString` is implemented in Essence now
+			// (`src/stdlib/String.es`, `<- @`) and covered by the golden
+			// harness; only `List.toString`, which has a representation to
+			// build, is still native.
 
 			it("represents a List with its items", () => {
 				expect(
