@@ -219,6 +219,12 @@ runtime, so the correct Method can not be chosen. Narrow the value with a
 A Namespace declared without a target Type (`for …`) can only hold static
 Methods.
 
+### `native-property-without-type`
+
+A static Property in a `declarations { … }` Program declared neither a value
+nor a Type. A native Property is exactly its annotation — `static PI:
+Transcendental` — so without one there is nothing to declare.
+
 ## Choices
 
 ### `empty-choice`

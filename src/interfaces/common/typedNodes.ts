@@ -296,16 +296,31 @@ export interface StaticMethod {
 	method: FunctionValueNode
 }
 
+// NOTE: `overloadIndices` says where each entry of `methods` sits in the
+// Method TYPE's `overloads` array — parallel to `methods`, one entry each.
+// The two are usually the identity, and differ exactly when the Method Type
+// holds Overloads this Node does not: a `declarations { … }` block may bind
+// some Overloads to the runtime and write others in Essence, and only the
+// latter have a body to enrich or emit.
+//
+// INVARIANT: the `__overload$N` suffix is ALWAYS derived from the position in
+// the Method Type's `overloads` array, never from a position in `methods`.
+// A call site resolves its `overloadedMethodIndex` against the full Type, so
+// an Overload emitted under a filtered index would answer to a name nobody
+// calls — and would overwrite the native runtime export that legitimately
+// owns that name.
 export interface OverloadedMethod {
 	nodeType: "OverloadedMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	overloadIndices: Array<number>
 }
 
 export interface OverloadedStaticMethod {
 	nodeType: "OverloadedStaticMethod"
 	name: IdentifierNode
 	methods: Array<FunctionValueNode>
+	overloadIndices: Array<number>
 }
 
 export type Methods = Record<

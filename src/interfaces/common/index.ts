@@ -137,6 +137,7 @@ export type DiagnosticCode =
 	| "no-namespace-for-value"
 	| "undispatchable-method"
 	| "untyped-namespace-method"
+	| "native-property-without-type"
 	// Choices and their Cases.
 	| "empty-choice"
 	| "unknown-case"

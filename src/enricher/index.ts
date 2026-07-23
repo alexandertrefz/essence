@@ -22,7 +22,7 @@ export const enrich = (
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
 			let members: Record<string, common.Type> = {
-				...builtinMembers,
+				...builtinMembers(),
 			}
 
 			let topLevelScope: enricher.Scope = {
@@ -33,8 +33,8 @@ export const enrich = (
 				// Diagnostic at.
 				declarations: {},
 				constants: new Set(Object.keys(members)),
-				types: { ...builtinTypes },
-				protocols: { ...builtinProtocols },
+				types: { ...builtinTypes() },
+				protocols: { ...builtinProtocols() },
 			}
 
 			return {
@@ -49,6 +49,43 @@ export const enrich = (
 	)
 
 	return { program: result, diagnostics }
+}
+
+// NOTE: Several Programs enriched into ONE shared Scope, which is how the
+// standard library is read: its files are one declaration space, not a chain
+// of imports. Hoisting runs ONCE over every file's Nodes concatenated, so the
+// speculative rounds resolve across file boundaries too — a Protocol declared
+// in one file and a Namespace conforming to it in another hoist in whichever
+// order they happen to resolve, exactly as two Statements in one file do.
+// Diagnostics are collected per Program, so each stays attributable to the
+// file it came from.
+export const enrichPrograms = (
+	programs: Array<parser.Program>,
+	scope: enricher.Scope,
+): Array<{
+	program: common.typed.Program
+	diagnostics: Array<common.Diagnostic>
+}> => {
+	let hoistedTypes = hoistDeclarations(
+		programs.flatMap((program) => program.implementation.nodes),
+		scope,
+	)
+
+	return programs.map((program) => {
+		let { result, diagnostics } = collectDiagnostics(
+			(): common.typed.Program => ({
+				nodeType: "Program",
+				implementation: enrichImplementation(
+					program.implementation,
+					scope,
+					hoistedTypes,
+				),
+				position: program.position,
+			}),
+		)
+
+		return { program: result, diagnostics }
+	})
 }
 
 type HoistableStatementNode =
@@ -170,12 +207,14 @@ function hoistDeclarations(
 	return hoistedTypes
 }
 
+// NOTE: `hoistedTypes` is passed in when the hoist already ran over a WIDER
+// set of Nodes than this section's — the standard library hoists every file at
+// once before any of them is enriched. A lone Program hoists its own.
 const enrichImplementation = (
 	implementation: parser.ImplementationSectionNode,
 	scope: enricher.Scope,
+	hoistedTypes: HoistedTypes = hoistDeclarations(implementation.nodes, scope),
 ): common.typed.ImplementationSectionNode => {
-	let hoistedTypes = hoistDeclarations(implementation.nodes, scope)
-
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) => {

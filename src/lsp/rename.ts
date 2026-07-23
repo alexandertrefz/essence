@@ -121,11 +121,14 @@ type WalkContext = {
 // NOTE: These ARE the top level Scope the Enricher starts from — derived
 // from its builtin tables, never listed by hand. Builtins participate in
 // resolution — so that shadowing works — but are rejected as rename targets.
-const builtinValues = Object.keys(builtinMembers)
+// NOTE: Read on use rather than at import. Half of what the tables answer with
+// is enriched from Essence source, once per process and cached — building the
+// index is where that belongs, not module evaluation order.
+const builtinValues = () => Object.keys(builtinMembers())
 
-const builtinTypes = Object.keys(builtinTypeTable)
+const builtinTypes = () => Object.keys(builtinTypeTable())
 
-const builtinProtocols = Object.keys(builtinProtocolTable)
+const builtinProtocols = () => Object.keys(builtinProtocolTable())
 
 const reservedWords = new Set([
 	"if",
@@ -262,7 +265,7 @@ export function indexProgram(
 
 	context.scopes.push({ range: null, scope: topLevelScope })
 
-	for (let name of builtinValues) {
+	for (let name of builtinValues()) {
 		topLevelScope.values.set(name, {
 			builtin: true,
 			kind: name === "__print" ? "function" : "namespace",
@@ -272,7 +275,7 @@ export function indexProgram(
 		})
 	}
 
-	for (let name of builtinTypes) {
+	for (let name of builtinTypes()) {
 		topLevelScope.types.set(name, {
 			builtin: true,
 			kind: "type",
@@ -285,7 +288,7 @@ export function indexProgram(
 	// NOTE: Protocols share the `types` symbol space here — they are only
 	// nameable in Type-like positions (bounds, conformance clauses), and the
 	// Enricher keeps them apart where it matters.
-	for (let name of builtinProtocols) {
+	for (let name of builtinProtocols()) {
 		topLevelScope.types.set(name, {
 			builtin: true,
 			kind: "protocol",
