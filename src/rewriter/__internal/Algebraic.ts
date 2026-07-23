@@ -1,5 +1,3 @@
-import type { BooleanType } from "./Boolean"
-import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
@@ -106,13 +104,6 @@ function rationalSign(rational: BigRational): -1n | 0n | 1n {
 	}
 
 	return rational.numerator < 0n ? -1n : 1n
-}
-
-function rationalsAreEqual(first: BigRational, second: BigRational): boolean {
-	return (
-		first.numerator === second.numerator &&
-		first.denominator === second.denominator
-	)
 }
 
 export function bigRationalOf(value: IntegerType | RationalType): BigRational {
@@ -428,24 +419,6 @@ export function scaledIntervalOf(
 
 // #region Methods
 
-export function is(
-	algebraic: AlgebraicType,
-	other: AlgebraicType,
-): BooleanType {
-	// NOTE: Normal forms make numeric equality a structural check.
-	return createBoolean(
-		algebraic.radicand === other.radicand &&
-			rationalsAreEqual(
-				rationalPartOf(algebraic),
-				rationalPartOf(other),
-			) &&
-			rationalsAreEqual(
-				radicalCoefficientOf(algebraic),
-				radicalCoefficientOf(other),
-			),
-	)
-}
-
 export function compareTo(
 	algebraic: AlgebraicType,
 	other: AlgebraicType | IntegerType | RationalType,
@@ -461,17 +434,6 @@ export function add(
 	// the radical — the result is total.
 	return createAlgebraic(
 		addRationals(rationalPartOf(algebraic), bigRationalOf(other)),
-		radicalCoefficientOf(algebraic),
-		algebraic.radicand,
-	) as AlgebraicType
-}
-
-export function subtract(
-	algebraic: AlgebraicType,
-	other: IntegerType | RationalType,
-): AlgebraicType {
-	return createAlgebraic(
-		subtractRationals(rationalPartOf(algebraic), bigRationalOf(other)),
 		radicalCoefficientOf(algebraic),
 		algebraic.radicand,
 	) as AlgebraicType
@@ -521,24 +483,6 @@ export function addAlgebraic(
 	return createAlgebraic(
 		addRationals(rationalPartOf(algebraic), rationalPartOf(other)),
 		addRationals(
-			radicalCoefficientOf(algebraic),
-			radicalCoefficientOf(other),
-		),
-		algebraic.radicand,
-	)
-}
-
-export function subtractAlgebraic(
-	algebraic: AlgebraicType,
-	other: AlgebraicType,
-): AlgebraicType | RationalType | NothingType {
-	if (algebraic.radicand !== other.radicand) {
-		return createNothing()
-	}
-
-	return createAlgebraic(
-		subtractRationals(rationalPartOf(algebraic), rationalPartOf(other)),
-		subtractRationals(
 			radicalCoefficientOf(algebraic),
 			radicalCoefficientOf(other),
 		),
@@ -684,18 +628,6 @@ export function negated(algebraic: AlgebraicType): AlgebraicType {
 	}
 }
 
-export function absolute(algebraic: AlgebraicType): AlgebraicType {
-	// NOTE: The sign is exactly decidable, and never zero — an Algebraic is
-	// irrational by construction.
-	const sign = signOfLinearRadical(
-		rationalPartOf(algebraic),
-		radicalCoefficientOf(algebraic),
-		algebraic.radicand,
-	)
-
-	return sign < 0n ? negated(algebraic) : algebraic
-}
-
 // #endregion
 
 // #region Printing
@@ -747,9 +679,6 @@ export function toString(algebraic: AlgebraicType): StringType {
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addAlgebraic
-export const subtract__overload$1 = subtract
-export const subtract__overload$2 = subtract
-export const subtract__overload$3 = subtractAlgebraic
 export const multiplyWith__overload$1 = multiplyWith
 export const multiplyWith__overload$2 = multiplyWith
 export const multiplyWith__overload$3 = multiplyWithAlgebraic

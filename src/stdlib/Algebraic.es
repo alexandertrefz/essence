@@ -11,7 +11,9 @@ declarations {
 		§§
 		§§ @param other the Algebraic to compare with
 		§§ @returns `true` when the numbers are equal.
-		is(_ other: Algebraic) -> Boolean
+		is(_ other: Algebraic) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Equal)
+		}
 
 		§§ Whether the Algebraics are different numbers — exactly, no approximation is consulted.
 		§§
@@ -39,11 +41,17 @@ declarations {
 
 		§§ Subtracts a number from this Algebraic, exactly. Subtracting an equal radical part leaves a Rational.
 		overload subtract {
-			(_ other: Integer) -> Algebraic
+			(_ other: Integer) -> Algebraic {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Rational) -> Algebraic
+			(_ other: Rational) -> Algebraic {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Algebraic) -> Optional<Rational | Algebraic>
+			(_ other: Algebraic) -> Optional<Rational | Algebraic> {
+				<- @::add(other::negated())
+			}
 		}
 
 		§§ Multiplies this Algebraic with a number, exactly. A radical times itself turns rational — `√2 · √2` is `2` — and multiplying by zero collapses to zero.
@@ -66,7 +74,10 @@ declarations {
 		}
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
-		absolute() -> Algebraic
+		absolute() -> Algebraic {
+			if @::<Number>isLessThan(0) { <- @::negated() }
+			<- @
+		}
 
 		§§ The Algebraic with its sign flipped. Negating an irrational leaves it irrational, so the result is again an Algebraic.
 		negated() -> Algebraic

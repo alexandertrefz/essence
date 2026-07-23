@@ -199,8 +199,6 @@ export type RationalNatives = {
 }
 
 export type AlgebraicNatives = {
-	// is(_: Algebraic) -> Boolean
-	is: (self: AlgebraicType, argument1: AlgebraicType) => BooleanType
 	// compareTo(_: Algebraic) -> Ordering
 	compareTo: (self: AlgebraicType, argument1: AlgebraicType) => OrderingType
 	// add(_: Integer) -> Algebraic
@@ -209,12 +207,6 @@ export type AlgebraicNatives = {
 	add__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType
 	// add(_: Algebraic) -> Optional<Rational | Algebraic>
 	add__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
-	// subtract(_: Integer) -> Algebraic
-	subtract__overload$1: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType
-	// subtract(_: Rational) -> Algebraic
-	subtract__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType
-	// subtract(_: Algebraic) -> Optional<Rational | Algebraic>
-	subtract__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
 	// multiplyWith(_: Integer) -> Algebraic | Rational
 	multiplyWith__overload$1: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType | RationalType
 	// multiplyWith(_: Rational) -> Algebraic | Rational
@@ -227,8 +219,6 @@ export type AlgebraicNatives = {
 	divideBy__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType | NothingType
 	// divideBy(_: Algebraic) -> Optional<Rational | Algebraic>
 	divideBy__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
-	// absolute() -> Algebraic
-	absolute: (self: AlgebraicType) => AlgebraicType
 	// negated() -> Algebraic
 	negated: (self: AlgebraicType) => AlgebraicType
 	// toString() -> String
@@ -236,20 +226,12 @@ export type AlgebraicNatives = {
 }
 
 export type TranscendentalNatives = {
-	// is(_: Transcendental) -> Boolean
-	is: (self: TranscendentalType, argument1: TranscendentalType) => BooleanType
 	// add(_: Integer) -> Transcendental
 	add__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
 	// add(_: Rational) -> Transcendental
 	add__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType
 	// add(_: Transcendental) -> Rational | Transcendental
 	add__overload$3: (self: TranscendentalType, argument1: TranscendentalType) => RationalType | TranscendentalType
-	// subtract(_: Integer) -> Transcendental
-	subtract__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
-	// subtract(_: Rational) -> Transcendental
-	subtract__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType
-	// subtract(_: Transcendental) -> Rational | Transcendental
-	subtract__overload$3: (self: TranscendentalType, argument1: TranscendentalType) => RationalType | TranscendentalType
 	// multiplyWith(_: Integer) -> Transcendental | Rational
 	multiplyWith__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType | RationalType
 	// multiplyWith(_: Rational) -> Transcendental | Rational
@@ -260,8 +242,6 @@ export type TranscendentalNatives = {
 	divideBy__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType | NothingType
 	// divideBy(_: Transcendental) -> Optional<Rational>
 	divideBy__overload$3: (self: TranscendentalType, argument1: TranscendentalType) => RationalType | NothingType
-	// absolute() -> Transcendental
-	absolute: (self: TranscendentalType) => TranscendentalType
 	// negated() -> Transcendental
 	negated: (self: TranscendentalType) => TranscendentalType
 	// toString() -> String
@@ -440,11 +420,11 @@ export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational")
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
-export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "isNot"> = true
+export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
-export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "isNot"> = true
+export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule

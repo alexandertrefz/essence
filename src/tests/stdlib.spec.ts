@@ -150,8 +150,13 @@ describe("Stdlib", () => {
 		})
 	})
 
+	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
+	// (src/stdlib/Algebraic.es) and Transcendental
+	// (src/stdlib/Transcendental.es), so only `negated` is still native here.
+	// Their behaviour is covered through the language by
+	// testFiles/Irrational.es and the golden output.
 	describe("Irrational sign Methods", () => {
-		it("negates and takes the absolute value of an Algebraic", () => {
+		it("negates an Algebraic", () => {
 			const rootTwo = algebraic.createAlgebraic(
 				{ numerator: 0n, denominator: 1n },
 				{ numerator: 1n, denominator: 1n },
@@ -160,29 +165,14 @@ describe("Stdlib", () => {
 
 			const negatedRoot = algebraic.negated(rootTwo)
 			expect(negatedRoot.radicalCoefficientNumerator).toBe(-1n)
-			expect(
-				algebraic.is(algebraic.negated(negatedRoot), rootTwo).value,
-			).toBe(true)
-			expect(
-				algebraic.is(algebraic.absolute(negatedRoot), rootTwo).value,
-			).toBe(true)
-			expect(
-				algebraic.is(algebraic.absolute(rootTwo), rootTwo).value,
-			).toBe(true)
+			expect(algebraic.negated(negatedRoot)).toEqual(rootTwo)
 		})
 
-		it("negates and takes the absolute value of a Transcendental", () => {
+		it("negates a Transcendental", () => {
 			const negatedPi = transcendental.negated(number.PI)
 
 			expect(negatedPi.piCoefficientNumerator).toBe(-1n)
-			expect(
-				transcendental.is(transcendental.absolute(negatedPi), number.PI)
-					.value,
-			).toBe(true)
-			expect(
-				transcendental.is(transcendental.absolute(number.PI), number.PI)
-					.value,
-			).toBe(true)
+			expect(transcendental.negated(negatedPi)).toEqual(number.PI)
 		})
 	})
 
