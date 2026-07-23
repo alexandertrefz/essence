@@ -16,9 +16,9 @@ compiler-developer error and throws, fully rendered.
 
 The conversion from the TypeScript tables in `src/enricher/types/*.ts` is in
 flight — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering`,
-`Record` and `String` have moved, the rest have not. Whatever a file here
-declares is subtracted from those tables, so a Namespace moves over one at a
-time.
+`Record`, `String`, `Integer` and `Rational` have moved, the rest have not.
+Whatever a file here declares is subtracted from those tables, so a Namespace
+moves over one at a time.
 
 A Namespace may be half native and half Essence — `Boolean.isNot` is written
 here, the rest of `Boolean` is still bound to `src/rewriter/__internal/Boolean.ts`
