@@ -246,22 +246,9 @@ describe("Stdlib", () => {
 	// compiled Method the way a Program reaches it. The same move was made for
 	// `Boolean.isNot` when it became the first Method to be written in Essence.
 
-	describe("Boolean exclusiveOr", () => {
-		it("is true for exactly one true operand", () => {
-			expect(boolean.exclusiveOr(bool(true), bool(false)).value).toBe(
-				true,
-			)
-			expect(boolean.exclusiveOr(bool(false), bool(true)).value).toBe(
-				true,
-			)
-			expect(boolean.exclusiveOr(bool(true), bool(true)).value).toBe(
-				false,
-			)
-			expect(boolean.exclusiveOr(bool(false), bool(false)).value).toBe(
-				false,
-			)
-		})
-	})
+	// NOTE: `Boolean.exclusiveOr` is implemented in Essence now
+	// (`src/stdlib/Boolean.es`) — the golden harness exercises it end to end,
+	// so the runtime-direct test that lived here is retired.
 
 	// NOTE: `Optional.otherwise` is implemented in Essence now
 	// (`src/stdlib/Optional.es`) — the golden harness exercises it end to end,

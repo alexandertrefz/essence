@@ -1,6 +1,5 @@
 import { toString as algebraicToString } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
-import { toString as boolToString } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { toString as integerToString } from "./Integer"
 import type { ListType } from "./List"
@@ -77,7 +76,9 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	} else if (obj[typeKeySymbol] === "Integer") {
 		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {
-		return boolToString(obj).value
+		// NOTE: `Boolean.toString` is implemented in Essence now, so the
+		// rendering it does is spelled out here rather than called.
+		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
 		return `"${obj.value}"`
 	} else if (obj[typeKeySymbol].includes("#")) {
