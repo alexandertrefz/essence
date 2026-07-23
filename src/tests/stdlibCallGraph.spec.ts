@@ -296,6 +296,8 @@ describe("Stdlib Call Graph", () => {
 			"NumberFormat.is",
 			"NumberFormat.isNot",
 			"NumberFormat.toString",
+			"Optional.hasValue",
+			"Optional.isNothing",
 			"Optional.otherwise",
 			"Ordering.is",
 			"Ordering.isNot",
