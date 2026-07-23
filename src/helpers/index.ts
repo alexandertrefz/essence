@@ -376,6 +376,22 @@ function matchGenericUse(
 		let binding = context.bindings.get(generic.name)
 
 		if (binding !== undefined) {
+			// NOTE: A Generic already bound to exactly this opaque Generic is
+			// consistent by identity — short-circuit. Without this, verifying
+			// the binding recurses forever when the bound value is a Generic use
+			// of the same name: a Method forwarding a same-named Generic to
+			// another binds `ItemType := ItemType` off the receiver, then
+			// re-matches that binding against the argument's identical
+			// `ItemType`, which matches the binding, which re-matches… A concrete
+			// binding never hits this and still checks through `checkAgainstBinding`.
+			if (
+				binding.type === "GenericUse" &&
+				otherType.type === "GenericUse" &&
+				binding.name === otherType.name
+			) {
+				return true
+			}
+
 			return checkAgainstBinding(binding)
 		}
 

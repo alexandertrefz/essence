@@ -1469,6 +1469,26 @@ describe("Helpers", () => {
 				expect(context.bindings.get("T")).toEqual(opaqueT)
 			})
 
+			// NOTE: A Method that forwards a same-named Generic through both its
+			// receiver AND an Argument — `isNot(_ other: List<ItemType>)` binds
+			// `ItemType` off the receiver, then matches the SAME Generic again for
+			// `other`. The second occurrence verifies the binding, and the bound
+			// value is the same opaque Generic use, so the verification must
+			// short-circuit rather than re-match it forever. Without the guard
+			// this test hangs.
+			it("should accept a re-match of a Generic bound to a same-named opaque Generic", () => {
+				let context = inferContextFor(["T"])
+				let opaqueT: GenericUse = { type: "GenericUse", name: "T" }
+
+				expect(
+					matchesTypeWithBindings(genericT, opaqueT, context),
+				).toBe(true)
+				expect(
+					matchesTypeWithBindings(genericT, opaqueT, context),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(opaqueT)
+			})
+
 			it("should bind Generics nested in Records", () => {
 				let context = inferContextFor(["T"])
 				let recordOfT: RecordType = {
