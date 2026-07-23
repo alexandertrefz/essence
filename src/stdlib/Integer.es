@@ -64,31 +64,31 @@ declarations {
 		}
 
 		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
-		overload divideBy {
-			(_ other: Integer) -> Optional<Rational> {
+		overload divide {
+			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
 			}
 
-			(_ other: Rational) -> Optional<Rational> {
+			(by other: Rational) -> Optional<Rational> {
 				constant dividend = @
 				<- match other::reciprocal() -> Optional<Rational> {
-					case Rational { <- dividend::multiplyWith(@) }
+					case Rational { <- dividend::multiply(with @) }
 					case Nothing { <- nothing }
 				}
 			}
 
-			(_ other: Algebraic) -> Algebraic | Rational
+			(by other: Algebraic) -> Algebraic | Rational
 		}
 
 		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.
-		overload multiplyWith {
-			(_ other: Integer) -> Integer
+		overload multiply {
+			(with other: Integer) -> Integer
 
-			(_ other: Rational) -> Rational
+			(with other: Rational) -> Rational
 
-			(_ other: Algebraic) -> Algebraic | Rational
+			(with other: Algebraic) -> Algebraic | Rational
 
-			(_ other: Transcendental) -> Transcendental | Rational
+			(with other: Transcendental) -> Transcendental | Rational
 		}
 
 		§§ Whether this Integer is strictly below the given number.
@@ -141,7 +141,7 @@ declarations {
 
 		§§ Whether the Integer is divisible by two. Zero is even.
 		isEven() -> Boolean {
-			<- match @::remainderOf(dividingBy 2) -> Boolean {
+			<- match @::remainder(dividingBy 2) -> Boolean {
 				case 0 { <- true }
 				case _ { <- false }
 			}
@@ -167,24 +167,24 @@ declarations {
 			<- @::is(0)
 		}
 
-		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainderOf(dividingBy 3)` is `2`.
+		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainder(dividingBy 3)` is `2`.
 		§§
 		§§ @param dividingBy the divisor
 		§§ @returns the remainder, or `Nothing` when dividing by zero.
-		remainderOf(dividingBy divisor: Integer) -> Optional<Integer>
+		remainder(dividingBy divisor: Integer) -> Optional<Integer>
 
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
 		§§
 		§§ @param exponent the exponent
 		§§ @returns the power, or `Nothing` when raising zero to a negative power.
-		toThePowerOf(_ exponent: Integer) -> Optional<Integer | Rational>
+		raise(to exponent: Integer) -> Optional<Integer | Rational>
 
 		§§ The Integer, pulled into the given bounds — the lower bound when below it, the upper when above it, itself otherwise.
 		§§
 		§§ @param lowest the lowest allowed value
 		§§ @param and the highest allowed value
 		§§ @returns the clamped Integer, or `Nothing` when the bounds are in the wrong order.
-		clampedBetween(_ lowest: Integer, and highest: Integer) -> Optional<Integer> {
+		clamp(between lowest: Integer, and highest: Integer) -> Optional<Integer> {
 			if lowest::isGreaterThan(highest) { <- nothing }
 			if @::isLessThan(lowest) { <- lowest }
 			if @::isGreaterThan(highest) { <- highest }

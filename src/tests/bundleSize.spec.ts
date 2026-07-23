@@ -1,7 +1,6 @@
+import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-
-import { describe, expect, it } from "bun:test"
 
 import { bundle } from "../bundler/index"
 import { enrich } from "../enricher/index"
@@ -54,11 +53,11 @@ describe("Bundle Size", () => {
 	// `compareTo`, so an Everyday Program that compares Numbers carries those
 	// bodies. It rose ~900 bytes again when String's derivable Methods
 	// followed — a String Method now pulls in the small chain it is written on
-	// (`length` -> `characters` -> `splitOn`) instead of one native, and
+	// (`length` -> `characters` -> `split`) instead of one native, and
 	// ~1,300 more when List's did, for the same reason: `firstItem` now brings
-	// `itemAt`, `removeFirst` brings `slice` and `length`, and so on. It fell
+	// `item`, `removeFirst` brings `slice` and `length`, and so on. It fell
 	// back to 55,163 when List's equality Methods took an `Equatable` bound:
-	// `contains`, `removeDuplicates` and the by-value `countOf`/`removeEvery`
+	// `contains`, `removeDuplicates` and the by-value `count`/`removeEvery`
 	// lost their natives, and what replaced them is written on chains the
 	// Program already carried. Still below the spread figure, so the guard
 	// holds — but the headroom is only ~800 bytes, so the next conversion that

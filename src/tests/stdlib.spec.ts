@@ -25,7 +25,7 @@ const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 // NOTE: `Rational.is` is written in Essence now (src/stdlib/Rational.es), so
 // there is no runtime function left to compare two Rationals with. The
 // assertions below that reach for it are about OTHER natives — `parse`,
-// `toThePowerOf`, the Number aggregates — and only need value equality, so
+// `raise`, the Number aggregates — and only need value equality, so
 // they cross-multiply here the way the Essence `is` does through `compareTo`.
 const ratIs = (
 	first: rational.RationalType,
@@ -35,7 +35,7 @@ const ratIs = (
 	second.rational.numerator * first.rational.denominator
 
 // NOTE: `String.toString` is written in Essence now (src/stdlib/String.es) —
-// `<- @`, the identity — so there is no runtime export left to hand `joinWith`
+// `<- @`, the identity — so there is no runtime export left to hand `join`
 // as its `Printable` witness. This spells the identity out, which is exactly
 // what the Simplifier now passes.
 const stringToString = (value: string.StringType) => value
@@ -59,31 +59,31 @@ function diagnosticsFor(source: string) {
 describe("Stdlib", () => {
 	describe("Integer everyday Methods", () => {
 		it("takes the Euclidean remainder — never negative", () => {
-			expect(integer.remainderOf(int(7n), int(3n))).toEqual(int(1n))
-			expect(integer.remainderOf(int(-7n), int(3n))).toEqual(int(2n))
-			expect(integer.remainderOf(int(-7n), int(-3n))).toEqual(int(2n))
-			expect(integer.remainderOf(int(7n), int(-3n))).toEqual(int(1n))
-			expect(integer.remainderOf(int(7n), int(0n))[typeKeySymbol]).toBe(
+			expect(integer.remainder(int(7n), int(3n))).toEqual(int(1n))
+			expect(integer.remainder(int(-7n), int(3n))).toEqual(int(2n))
+			expect(integer.remainder(int(-7n), int(-3n))).toEqual(int(2n))
+			expect(integer.remainder(int(7n), int(-3n))).toEqual(int(1n))
+			expect(integer.remainder(int(7n), int(0n))[typeKeySymbol]).toBe(
 				"Nothing",
 			)
 		})
 
 		it("raises to a power, exactly in both directions", () => {
-			expect(integer.toThePowerOf(int(2n), int(10n))).toEqual(int(1024n))
-			expect(integer.toThePowerOf(int(0n), int(0n))).toEqual(int(1n))
+			expect(integer.raise(int(2n), int(10n))).toEqual(int(1024n))
+			expect(integer.raise(int(0n), int(0n))).toEqual(int(1n))
 
-			const reciprocalPower = integer.toThePowerOf(int(2n), int(-2n))
+			const reciprocalPower = integer.raise(int(2n), int(-2n))
 			expect(reciprocalPower[typeKeySymbol]).toBe("Rational")
 			expect(ratIs(reciprocalPower as never, rat(1n, 4n))).toBe(true)
 
-			expect(integer.toThePowerOf(int(0n), int(-1n))[typeKeySymbol]).toBe(
+			expect(integer.raise(int(0n), int(-1n))[typeKeySymbol]).toBe(
 				"Nothing",
 			)
 		})
 
 		it("negates a value", () => {
 			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
-			// isNegative/isZero) and clampedBetween are implemented in Essence
+			// isNegative/isZero) and clamp are implemented in Essence
 			// now (src/stdlib/Integer.es); the golden harness covers them. Only
 			// negate stays native here.
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
@@ -128,19 +128,19 @@ describe("Stdlib", () => {
 		it("raises to a power, exactly in both directions", () => {
 			expect(
 				ratIs(
-					rational.toThePowerOf(rat(2n, 3n), int(2n)) as never,
+					rational.raise(rat(2n, 3n), int(2n)) as never,
 					rat(4n, 9n),
 				),
 			).toBe(true)
 			expect(
 				ratIs(
-					rational.toThePowerOf(rat(2n, 3n), int(-2n)) as never,
+					rational.raise(rat(2n, 3n), int(-2n)) as never,
 					rat(9n, 4n),
 				),
 			).toBe(true)
-			expect(
-				rational.toThePowerOf(rat(0n, 1n), int(-1n))[typeKeySymbol],
-			).toBe("Nothing")
+			expect(rational.raise(rat(0n, 1n), int(-1n))[typeKeySymbol]).toBe(
+				"Nothing",
+			)
 		})
 
 		it("parses fractions, decimals and whole numbers", () => {
@@ -255,20 +255,20 @@ describe("Stdlib", () => {
 	// so the runtime-direct test that lived here is retired.
 
 	describe("List round trips and construction", () => {
-		// NOTE: `joinWith` is bounded by `Printable` rather than fixed to a
+		// NOTE: `join` is bounded by `Printable` rather than fixed to a
 		// List of Strings, so the conformance witness is passed by hand here
 		// the way the Simplifier passes it — String's `toString` is the
 		// identity, Integer's is the conversion the widening bought.
-		it("joins Strings — the return trip of splitOn", () => {
-			const pieces = string.splitOn(str("a,b,c"), str(","))
+		it("joins Strings — the return trip of split", () => {
+			const pieces = string.split(str("a,b,c"), str(","))
 
 			expect(
-				list.joinWith(pieces, str(" + "), {
+				list.join(pieces, str(" + "), {
 					toString: stringToString,
 				}).value,
 			).toBe("a + b + c")
 			expect(
-				list.joinWith(list.createList([]), str(","), {
+				list.join(list.createList([]), str(","), {
 					toString: stringToString,
 				}).value,
 			).toBe("")
@@ -276,13 +276,13 @@ describe("Stdlib", () => {
 
 		it("joins any Printable items, not just Strings", () => {
 			expect(
-				list.joinWith(ints(1n, 2n, 3n), str(", "), {
+				list.join(ints(1n, 2n, 3n), str(", "), {
 					toString: integer.toString,
 				}).value,
 			).toBe("1, 2, 3")
 		})
 
-		// NOTE: `List.repeating` is implemented in Essence now
+		// NOTE: `List.repeat` is implemented in Essence now
 		// (`src/stdlib/List.es`), on top of the `List.of` below — the golden
 		// harness covers a count of three, zero and minus one, so the
 		// runtime-direct test that lived here is retired.
@@ -301,17 +301,17 @@ describe("Stdlib", () => {
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
-		// NOTE: `lastIndexOf` is bounded by `Equatable` — which position it
+		// NOTE: `lastIndex` is bounded by `Equatable` — which position it
 		// finds is decided by the items' own `is`, handed in as the hidden
-		// witness the way `joinWith` above takes its `toString`.
+		// witness the way `join` above takes its `toString`.
 		it("finds the last occurrence", () => {
 			expect(
-				list.lastIndexOf(ints(1n, 2n, 3n, 2n), int(2n), {
+				list.lastIndex(ints(1n, 2n, 3n, 2n), int(2n), {
 					is: integerIs,
 				}),
 			).toEqual(int(3n))
 			expect(
-				list.lastIndexOf(ints(1n, 2n), int(9n), { is: integerIs })[
+				list.lastIndex(ints(1n, 2n), int(9n), { is: integerIs })[
 					typeKeySymbol
 				],
 			).toBe("Nothing")
@@ -359,7 +359,7 @@ describe("Stdlib", () => {
 		// runtime-direct test that lived here is retired.
 
 		it("pairs position by position, stopping with the shorter List", () => {
-			const pairs = list.pairedWith(
+			const pairs = list.pair(
 				list.createList([str("a"), str("b")]),
 				ints(1n, 2n, 3n),
 			)
@@ -372,14 +372,12 @@ describe("Stdlib", () => {
 		})
 
 		it("splits into groups, the last one shorter", () => {
-			const groups = list.splitInto(ints(1n, 2n, 3n, 4n, 5n), int(2n))
+			const groups = list.split(ints(1n, 2n, 3n, 4n, 5n), int(2n))
 
 			expect(groups).toEqual(
 				list.createList([ints(1n, 2n), ints(3n, 4n), ints(5n)]),
 			)
-			expect(list.splitInto(ints(1n), int(0n))[typeKeySymbol]).toBe(
-				"Nothing",
-			)
+			expect(list.split(ints(1n), int(0n))[typeKeySymbol]).toBe("Nothing")
 		})
 
 		// NOTE: `List.sorted` is implemented in Essence now
@@ -498,22 +496,22 @@ describe("Stdlib", () => {
 			).not.toEqual([])
 		})
 
-		it("bounds joinWith by Printable, not by a String item Type", () => {
+		it("bounds join by Printable, not by a String item Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant joined: String = ["a", "b"]::joinWith(",")
+					constant joined: String = ["a", "b"]::join(with ",")
 				}`),
 			).toEqual([])
 
 			expect(
 				diagnosticsFor(`implementation {
-					constant joined: String = [1, 2]::joinWith(",")
+					constant joined: String = [1, 2]::join(with ",")
 				}`),
 			).toEqual([])
 
 			expect(
 				diagnosticsFor(`implementation {
-					constant joined: String = [[1], [2]]::joinWith(",")
+					constant joined: String = [[1], [2]]::join(with ",")
 				}`),
 			).toEqual([])
 
@@ -523,7 +521,7 @@ describe("Stdlib", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function joinAll<Item>(_ items: List<Item>) -> String {
-						<- items::joinWith(",")
+						<- items::join(with ",")
 					}
 				}`),
 			).not.toEqual([])

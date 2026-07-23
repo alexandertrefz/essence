@@ -378,7 +378,7 @@ describe("Standard Library Loader", () => {
 			"Bodied.es",
 			// NOTE: The bodied Method calls a NATIVE sibling declared in the
 			// same synthetic file rather than a builtin like
-			// `Integer::multiplyWith`. A synthetic standard library is
+			// `Integer::multiply`. A synthetic standard library is
 			// enriched against the bare Type tags plus these sources ALONE —
 			// nothing of `src/stdlib` is in scope — so reaching for a real
 			// builtin Method would simply not resolve.
@@ -594,7 +594,7 @@ describe("Standard Library Loader", () => {
 				`implementation {
 					namespace Doubler for Integer {
 						double() -> Integer {
-							<- @::multiplyWith(2)
+							<- @::multiply(with 2)
 						}
 					}
 				}`,
@@ -658,12 +658,12 @@ describe("Standard Library Loader", () => {
 	it("orders every builtin Type by name, and names only Types that exist", () => {
 		let types = Object.keys(loadStdlib().types)
 
-		expect(types.filter((name) => !builtinTypeOrder.includes(name))).toEqual(
-			[],
-		)
-		expect(builtinTypeOrder.filter((name) => !types.includes(name))).toEqual(
-			[],
-		)
+		expect(
+			types.filter((name) => !builtinTypeOrder.includes(name)),
+		).toEqual([])
+		expect(
+			builtinTypeOrder.filter((name) => !types.includes(name)),
+		).toEqual([])
 	})
 
 	// NOTE: The shared Scope, proven on the REAL standard library rather than a

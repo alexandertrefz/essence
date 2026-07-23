@@ -983,7 +983,7 @@ function matchTypes(
 	// This must NOT short-circuit a BINDABLE Generic that happens to share a name
 	// with an opaque one: when a Method forwards to another whose `infer` generic
 	// is spelled identically — `List`'s Methods all bind `ItemType`, so
-	// `firstItem` calling `itemAt` is `ItemType` matched against `ItemType` — the
+	// `firstItem` calling `item(at:)` is `ItemType` matched against `ItemType` — the
 	// bindable side has to reach `matchGenericUse` below and RECORD the binding
 	// off the receiver's Type argument, not be waved through here with nothing
 	// bound. Generic identity is by name across the compiler, so a bindable name

@@ -53,20 +53,20 @@ declarations {
 		}
 
 		§§ Multiplies this Transcendental with an Integer or Rational, exactly — multiplying by zero collapses to zero. Two Transcendentals can not be multiplied: `π·π` would leave the linear-in-π grammar.
-		overload multiplyWith {
-			(_ other: Integer) -> Transcendental | Rational
+		overload multiply {
+			(with other: Integer) -> Transcendental | Rational
 
-			(_ other: Rational) -> Transcendental | Rational
+			(with other: Rational) -> Transcendental | Rational
 		}
 
-		§§ Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational gives `Nothing` only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `TAU::divideBy(PI)` is `2` — and gives `Nothing` otherwise.
-		overload divideBy {
-			(_ other: Integer) -> Optional<Transcendental>
+		§§ Divides this Transcendental by a number, exactly. Dividing by an Integer or Rational gives `Nothing` only for zero; dividing by another Transcendental succeeds exactly when the two are proportional — `TAU::divide(by PI)` is `2` — and gives `Nothing` otherwise.
+		overload divide {
+			(by other: Integer) -> Optional<Transcendental>
 
-			(_ other: Rational) -> Optional<Transcendental>
+			(by other: Rational) -> Optional<Transcendental>
 
 			§§ Divides by another Transcendental. Proportional values give an exact Rational — TAU divided by PI is exactly 2. Anything else is not representable yet and gives Nothing.
-			(_ other: Transcendental) -> Optional<Rational>
+			(by other: Transcendental) -> Optional<Rational>
 		}
 
 		§§ The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.

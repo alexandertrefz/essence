@@ -107,7 +107,7 @@ export function keepEvery<ItemType extends AnyType>(
 	return createList(keptList)
 }
 
-export function itemAt<ItemType extends AnyType>(
+export function item<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
 ): ItemType | NothingType {
@@ -122,8 +122,8 @@ export function itemAt<ItemType extends AnyType>(
 // item with its position first, build that whole List of Records and read one
 // member back out, where this walks and stops. The item `is` arrives as the
 // hidden conformance Argument, so which position is found is decided by the
-// items' own equality either way. `lastIndexOf` is the same walk, backwards.
-export function firstIndexOf<ItemType extends AnyType>(
+// items' own equality either way. `lastIndex` is the same walk, backwards.
+export function firstIndex<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 	conformance: {
@@ -224,7 +224,7 @@ export function compareTo<ItemType extends AnyType>(
 	return equal
 }
 
-export function lastIndexOf<ItemType extends AnyType>(
+export function lastIndex<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
 	conformance: {
@@ -246,7 +246,7 @@ export function lastIndexOf<ItemType extends AnyType>(
 // Argument, exactly as `sorted`'s does, and its `toString` is the whole of the
 // conversion. For a List of Strings that `toString` is the identity, so the
 // original behaviour is unchanged.
-export function joinWith<ItemType extends AnyType>(
+export function join<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	separator: StringType,
 	conformance: {
@@ -268,7 +268,7 @@ export function flatten<ItemType extends AnyType>(
 	)
 }
 
-export function pairedWith<ItemType extends AnyType, Other extends AnyType>(
+export function pair<ItemType extends AnyType, Other extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<Other>,
 ): ListType<RecordType & { first: ItemType; second: Other }> {
@@ -286,7 +286,7 @@ export function pairedWith<ItemType extends AnyType, Other extends AnyType>(
 	return createList(pairs)
 }
 
-export function splitInto<ItemType extends AnyType>(
+export function split<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	groupSize: IntegerType,
 ): ListType<ListType<ItemType>> | NothingType {

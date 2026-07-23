@@ -32,7 +32,7 @@ implementation {
 	constant list = [1, 2, 3]
 
 	constant maybeRational: Maybe<Rational> = list::firstItem()::andThen((_ item: Integer) -> Rational {
-		<- item::multiplyWith(1/5)
+		<- item::multiply(with 1/5)
 	})
 
 	__print(maybeRational)                             § 1/5
@@ -44,7 +44,7 @@ implementation {
 	constant missing: Maybe<Integer> = nothing
 
 	__print(missing::andThen((_ item: Integer) -> Rational {
-		<- item::multiplyWith(1/5)
+		<- item::multiply(with 1/5)
 	}))                                                § Nothing
 	__print(maybeRational::default(computedBy () -> Rational {
 		<- 0/1

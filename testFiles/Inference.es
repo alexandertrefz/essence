@@ -50,7 +50,7 @@ implementation {
 
 	§ Several `<-` Statements give the Union of what they return.
 	__print(numbers::transformFirst((item) {
-		if item::isGreaterThan(0) { <- item::multiplyWith(2) }
+		if item::isGreaterThan(0) { <- item::multiply(with 2) }
 
 		<- nothing
 	}, fallback nothing))
@@ -59,7 +59,7 @@ implementation {
 	§ it writes its annotations in full — inferring a whole signature from a
 	§ body is what makes a Program hard to follow.
 	constant halve = (_ value: Integer) -> Rational | Nothing {
-		<- value::divideBy(2)
+		<- value::divide(by 2)
 	}
 
 	__print(halve(9))
