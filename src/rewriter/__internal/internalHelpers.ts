@@ -4,7 +4,6 @@ import { is as algebraicIs } from "./Algebraic"
 import { is as boolIs } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { is as listIs } from "./List"
-import { is as rationalIs } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
@@ -57,7 +56,15 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "Rational" &&
 		b[typeKeySymbol] === "Rational"
 	) {
-		return rationalIs(a, b).value
+		// NOTE: Rational.is is written in Essence now — it reads `compareTo`,
+		// which cross-multiplies. Compare the runtime representation the same
+		// way rather than importing the deleted native; cross-multiplication
+		// answers for unreduced Fractions too, and denominators are kept
+		// positive by `createRational`.
+		return (
+			a.rational.numerator * b.rational.denominator ===
+			b.rational.numerator * a.rational.denominator
+		)
 	} else if (
 		a[typeKeySymbol] === "Algebraic" &&
 		b[typeKeySymbol] === "Algebraic"

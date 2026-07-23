@@ -22,6 +22,18 @@ const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 
+// NOTE: `Rational.is` is written in Essence now (src/stdlib/Rational.es), so
+// there is no runtime function left to compare two Rationals with. The
+// assertions below that reach for it are about OTHER natives — `parse`,
+// `toThePowerOf`, the Number aggregates — and only need value equality, so
+// they cross-multiply here the way the Essence `is` does through `compareTo`.
+const ratIs = (
+	first: rational.RationalType,
+	second: rational.RationalType,
+): boolean =>
+	first.rational.numerator * second.rational.denominator ===
+	second.rational.numerator * first.rational.denominator
+
 function diagnosticsFor(source: string) {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -48,9 +60,7 @@ describe("Stdlib", () => {
 
 			const reciprocalPower = integer.toThePowerOf(int(2n), int(-2n))
 			expect(reciprocalPower[typeKeySymbol]).toBe("Rational")
-			expect(
-				rational.is(reciprocalPower as never, rat(1n, 4n)).value,
-			).toBe(true)
+			expect(ratIs(reciprocalPower as never, rat(1n, 4n))).toBe(true)
 
 			expect(integer.toThePowerOf(int(0n), int(-1n))[typeKeySymbol]).toBe(
 				"Nothing",
@@ -83,52 +93,36 @@ describe("Stdlib", () => {
 			expect(rational.denominator(rat(3n, -4n))).toEqual(int(4n))
 		})
 
-		it("answers absolute value, negation and the reciprocal", () => {
-			expect(
-				rational.is(rational.absolute(rat(-3n, 4n)), rat(3n, 4n)).value,
-			).toBe(true)
-			expect(
-				rational.is(rational.negated(rat(3n, 4n)), rat(-3n, 4n)).value,
-			).toBe(true)
+		// NOTE: `absolute`, `negated`, `reciprocal` and `isWholeNumber` used to
+		// be tested here against the runtime functions directly. They are
+		// written in Essence now — `src/stdlib/Rational.es` — so there is no
+		// runtime function left to call, and the golden harness
+		// (`testFiles/StdlibExhaustive.es`) covers every one of them, including
+		// the reciprocal of zero. The same move was made for the Integer
+		// everyday Methods above.
 
-			const flipped = rational.reciprocal(rat(-3n, 4n))
-			expect(flipped[typeKeySymbol]).toBe("Rational")
-			expect(rational.is(flipped as never, rat(-4n, 3n)).value).toBe(true)
-
-			expect(rational.reciprocal(rat(0n, 1n))[typeKeySymbol]).toBe(
-				"Nothing",
-			)
-		})
-
-		it("knows whether it is a whole number", () => {
-			expect(rational.isWholeNumber(rat(4n, 2n)).value).toBe(true)
-			expect(rational.isWholeNumber(rat(1n, 2n)).value).toBe(false)
-		})
-
-		it("rounds in all four directions", () => {
+		it("rounds to the nearest and towards zero", () => {
+			// NOTE: `roundedDown` and `roundedUp` are written in Essence now;
+			// only `rounded` and `truncated` are still natives to call here.
 			expect(rational.rounded(rat(7n, 2n))).toEqual(int(4n))
 			expect(rational.rounded(rat(-7n, 2n))).toEqual(int(-4n))
 			expect(rational.rounded(rat(1n, 3n))).toEqual(int(0n))
-			expect(rational.roundedDown(rat(7n, 2n))).toEqual(int(3n))
-			expect(rational.roundedDown(rat(-7n, 2n))).toEqual(int(-4n))
-			expect(rational.roundedUp(rat(7n, 2n))).toEqual(int(4n))
-			expect(rational.roundedUp(rat(-7n, 2n))).toEqual(int(-3n))
 			expect(rational.truncated(rat(7n, 2n))).toEqual(int(3n))
 			expect(rational.truncated(rat(-7n, 2n))).toEqual(int(-3n))
 		})
 
 		it("raises to a power, exactly in both directions", () => {
 			expect(
-				rational.is(
+				ratIs(
 					rational.toThePowerOf(rat(2n, 3n), int(2n)) as never,
 					rat(4n, 9n),
-				).value,
+				),
 			).toBe(true)
 			expect(
-				rational.is(
+				ratIs(
 					rational.toThePowerOf(rat(2n, 3n), int(-2n)) as never,
 					rat(9n, 4n),
-				).value,
+				),
 			).toBe(true)
 			expect(
 				rational.toThePowerOf(rat(0n, 1n), int(-1n))[typeKeySymbol],
@@ -136,26 +130,21 @@ describe("Stdlib", () => {
 		})
 
 		it("parses fractions, decimals and whole numbers", () => {
+			expect(ratIs(rational.parse(str("3/4")) as never, rat(3n, 4n))).toBe(
+				true,
+			)
 			expect(
-				rational.is(rational.parse(str("3/4")) as never, rat(3n, 4n))
-					.value,
+				ratIs(rational.parse(str("-3/4")) as never, rat(-3n, 4n)),
 			).toBe(true)
 			expect(
-				rational.is(rational.parse(str("-3/4")) as never, rat(-3n, 4n))
-					.value,
+				ratIs(rational.parse(str("0.75")) as never, rat(3n, 4n)),
 			).toBe(true)
 			expect(
-				rational.is(rational.parse(str("0.75")) as never, rat(3n, 4n))
-					.value,
+				ratIs(rational.parse(str("-1.5")) as never, rat(-3n, 2n)),
 			).toBe(true)
-			expect(
-				rational.is(rational.parse(str("-1.5")) as never, rat(-3n, 2n))
-					.value,
-			).toBe(true)
-			expect(
-				rational.is(rational.parse(str("5")) as never, rat(5n, 1n))
-					.value,
-			).toBe(true)
+			expect(ratIs(rational.parse(str("5")) as never, rat(5n, 1n))).toBe(
+				true,
+			)
 			expect(rational.parse(str("1/0"))[typeKeySymbol]).toBe("Nothing")
 			expect(rational.parse(str("nope"))[typeKeySymbol]).toBe("Nothing")
 		})
@@ -202,12 +191,12 @@ describe("Stdlib", () => {
 			expect(number.sum__overload$1(ints(1n, 2n, 3n))).toEqual(int(6n))
 			expect(number.sum__overload$1(list.createList([]))).toEqual(int(0n))
 			expect(
-				rational.is(
+				ratIs(
 					number.sum__overload$2(
 						list.createList([rat(1n, 2n), rat(1n, 3n)]),
 					),
 					rat(5n, 6n),
-				).value,
+				),
 			).toBe(true)
 		})
 
@@ -237,7 +226,7 @@ describe("Stdlib", () => {
 			const mean = number.average__overload$1(ints(1n, 2n))
 
 			expect(mean[typeKeySymbol]).toBe("Rational")
-			expect(rational.is(mean as never, rat(3n, 2n)).value).toBe(true)
+			expect(ratIs(mean as never, rat(3n, 2n))).toBe(true)
 
 			expect(
 				number.average__overload$1(list.createList([]))[typeKeySymbol],
