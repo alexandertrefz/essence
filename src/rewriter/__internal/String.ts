@@ -1,3 +1,5 @@
+import type { IntegerType } from "./Integer"
+import { createInteger } from "./Integer"
 import type { ListType } from "./List"
 import { createList } from "./List"
 import type { OrderingType } from "./Ordering"
@@ -101,4 +103,14 @@ export function compareTo(
 	} else {
 		return equal
 	}
+}
+
+// NOTE: `length` stays native deliberately. Writing it as
+// `@::characters()::length()` is correct but makes counting characters build a
+// List of every one of them — turning an O(1) read into an O(n) allocation, and
+// pulling `List` and its whole import graph into any Program that so much as
+// asks whether a String is empty. `characters`, `slice` and `reversed` are
+// still written in Essence on top of `splitOn`.
+export function length(originalString: StringType): IntegerType {
+	return createInteger(BigInt(Array.from(originalString.value).length))
 }

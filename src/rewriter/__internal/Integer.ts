@@ -18,6 +18,8 @@ import {
 	add as transcendentalAdd,
 	multiplyWith as transcendentalMultiplyWith,
 } from "./Transcendental"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import { typeKeySymbol } from "./type"
 
 export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
@@ -253,3 +255,22 @@ export function squareRoot(
 }
 
 // #endregion
+
+// NOTE: Same-kind ordering stays native deliberately. Routing it through the
+// covering `Number.compareTo` reads better, but that Method decides every
+// cross-kind cell, so comparing two Integers would drag the Algebraic,
+// Transcendental and Rational machinery — and `bigint-fraction` — into any
+// Program that compares two Integers, which is nearly all of them. `is` and the
+// inequalities are still written in Essence on top of this.
+export function compareTo(
+	originalInteger: IntegerType,
+	otherInteger: IntegerType,
+): OrderingType {
+	if (originalInteger.value < otherInteger.value) {
+		return less
+	} else if (originalInteger.value > otherInteger.value) {
+		return greater
+	} else {
+		return equal
+	}
+}

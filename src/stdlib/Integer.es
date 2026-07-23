@@ -204,8 +204,6 @@ declarations {
 		§§
 		§§ @param other the Integer to order against
 		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Integer) -> Ordering {
-			<- @::<Number>compareTo(other)
-		}
+		compareTo(_ other: Integer) -> Ordering
 	}
 }

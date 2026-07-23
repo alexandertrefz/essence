@@ -193,8 +193,6 @@ declarations {
 		§§
 		§§ @param other the Rational to order against
 		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Rational) -> Ordering {
-			<- @::<Number>compareTo(other)
-		}
+		compareTo(_ other: Rational) -> Ordering
 	}
 }
