@@ -3495,145 +3495,10 @@ describe("Rewriter", () => {
 
 		describe("Number", () => {
 			describe("lowestNumber", () => {
-				it("returns the smaller of 2 integers", () => {
-					expect(
-						number.lowestNumber__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.lowestNumber__overload$1(
-							integer.createInteger(-2n),
-							integerTwo(),
-						),
-					).toEqual(integer.createInteger(-2n))
-				})
-
-				it("returns the smaller of 2 rationals", () => {
-					expect(
-						number.lowestNumber__overload$2(
-							rationalOne(),
-							rationalTwo(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$2(
-							rationalTwo(),
-							rationalOne(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$2(
-							rationalHundred(),
-							rationalTwo(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.lowestNumber__overload$2(
-							rationalOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(rationalOneHalf())
-
-					expect(
-						number.lowestNumber__overload$2(
-							rational.createRational(-1n, 1n),
-							rationalOne(),
-						),
-					).toEqual(rational.createRational(-1n, 1n))
-				})
-
-				it("returns the smaller number of an integer and a rational", () => {
-					expect(
-						number.lowestNumber__overload$3(
-							integerOne(),
-							rationalTwo(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$3(
-							integerTwo(),
-							rationalOne(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$3(
-							integerHundred(),
-							rationalTwo(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.lowestNumber__overload$3(
-							integerOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(rationalOneHalf())
-
-					expect(
-						number.lowestNumber__overload$3(
-							integer.createInteger(-1n),
-							rationalOne(),
-						),
-					).toEqual(integer.createInteger(-1n))
-
-					expect(
-						number.lowestNumber__overload$4(
-							rationalOne(),
-							integerTwo(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$4(
-							rationalTwo(),
-							integerOne(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$4(
-							rationalHundred(),
-							integerTwo(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.lowestNumber__overload$4(
-							rationalOneHalf(),
-							integerOne(),
-						),
-					).toEqual(rationalOneHalf())
-
-					expect(
-						number.lowestNumber__overload$4(
-							rational.createRational(-1n, 1n),
-							integerOne(),
-						),
-					).toEqual(rational.createRational(-1n, 1n))
-				})
-
+				// NOTE: the pairwise `lowestNumber` overloads ($1-$4) are
+				// implemented in Essence now (`src/stdlib/Number.es`) and
+				// covered by the golden harness; only the List-form overloads
+				// ($5-$7) stay native.
 				it("returns the smallest number of a list", () => {
 					expect(
 						number.lowestNumber__overload$5(
@@ -3750,145 +3615,10 @@ describe("Rewriter", () => {
 			})
 
 			describe("greatestNumber", () => {
-				it("returns the larger of 2 integers", () => {
-					expect(
-						number.greatestNumber__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.greatestNumber__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.greatestNumber__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$1(
-							integer.createInteger(-2n),
-							integerTwo(),
-						),
-					).toEqual(integerTwo())
-				})
-
-				it("returns the larger of 2 rationals", () => {
-					expect(
-						number.greatestNumber__overload$2(
-							rationalOne(),
-							rationalTwo(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.greatestNumber__overload$2(
-							rationalTwo(),
-							rationalOne(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.greatestNumber__overload$2(
-							rationalHundred(),
-							rationalTwo(),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$2(
-							rationalOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.greatestNumber__overload$2(
-							rational.createRational(-1n, 1n),
-							rationalOne(),
-						),
-					).toEqual(rationalOne())
-				})
-
-				it("returns the larger number of an integer and a rational", () => {
-					expect(
-						number.greatestNumber__overload$3(
-							integerOne(),
-							rationalTwo(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.greatestNumber__overload$3(
-							integerTwo(),
-							rationalOne(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.greatestNumber__overload$3(
-							integerHundred(),
-							rationalTwo(),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$3(
-							integerOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.greatestNumber__overload$3(
-							integer.createInteger(-1n),
-							rationalOne(),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.greatestNumber__overload$4(
-							rationalOne(),
-							integerTwo(),
-						),
-					).toEqual(integerTwo())
-
-					expect(
-						number.greatestNumber__overload$4(
-							rationalTwo(),
-							integerOne(),
-						),
-					).toEqual(rationalTwo())
-
-					expect(
-						number.greatestNumber__overload$4(
-							rationalHundred(),
-							integerTwo(),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$4(
-							rationalOneHalf(),
-							integerOne(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.greatestNumber__overload$4(
-							rational.createRational(-1n, 1n),
-							integerOne(),
-						),
-					).toEqual(integerOne())
-				})
-
+				// NOTE: the pairwise `greatestNumber` overloads ($1-$4) are
+				// implemented in Essence now (`src/stdlib/Number.es`) and
+				// covered by the golden harness; only the List-form overloads
+				// ($5-$7) stay native.
 				it("returns the largest number of a list", () => {
 					expect(
 						number.greatestNumber__overload$5(
@@ -5724,17 +5454,11 @@ describe("Rewriter", () => {
 		})
 
 		describe("Number", () => {
-			it("compares numerically across members", () => {
-				expect(number.is(integerOne(), rationalOne()).value).toBe(true)
-				expect(number.is(integerOne(), rationalOneHalf()).value).toBe(
-					false,
-				)
-				expect(
-					number.isNot(integerOne(), rationalOneHalf()).value,
-				).toBe(true)
-				expect(number.is(integerTwo(), integerTwo()).value).toBe(true)
-			})
-
+			// NOTE: `Number.is`, `isNot`, `toString` and the `isLessThan`
+			// family are implemented in Essence now
+			// (`src/stdlib/Number.es`) and covered by the golden harness.
+			// Only `compareTo`, the one ordering primitive they all fall
+			// out of, stays native.
 			it("orders numerically across members", () => {
 				expect(number.compareTo(integerOne(), rationalOneHalf())).toBe(
 					ordering.greater,
@@ -5748,43 +5472,6 @@ describe("Rewriter", () => {
 				expect(number.compareTo(integerTwo(), integerHundred())).toBe(
 					ordering.less,
 				)
-			})
-
-			it("represents each member in its own notation", () => {
-				expect(number.toString(integerTwo())).toEqual(
-					string.createString("2"),
-				)
-				expect(number.toString(rationalOneHalf())).toEqual(
-					string.createString("1/2"),
-				)
-			})
-
-			it("orders with the isLessThan family, reading compareTo", () => {
-				// NOTE: 1/2 < 1, so the strict pair splits and the
-				// or-equal-to pair follows the strict one.
-				expect(
-					number.isLessThan(rationalOneHalf(), integerOne()).value,
-				).toBe(true)
-				expect(
-					number.isGreaterThan(rationalOneHalf(), integerOne()).value,
-				).toBe(false)
-				expect(
-					number.isLessThanOrEqualTo(rationalOneHalf(), integerOne())
-						.value,
-				).toBe(true)
-
-				// NOTE: 1 == 1/1, so only the or-equal-to members hold.
-				expect(
-					number.isLessThan(integerOne(), rationalOne()).value,
-				).toBe(false)
-				expect(
-					number.isLessThanOrEqualTo(integerOne(), rationalOne())
-						.value,
-				).toBe(true)
-				expect(
-					number.isGreaterThanOrEqualTo(integerOne(), rationalOne())
-						.value,
-				).toBe(true)
 			})
 		})
 

@@ -1,16 +1,9 @@
 import { Fraction } from "bigint-fraction"
 
 import type { AlgebraicType } from "./Algebraic"
-import {
-	compareTo as compareAlgebraicTo,
-	is as algebraicIs,
-	reduced,
-	toString as algebraicToString,
-} from "./Algebraic"
-import type { BooleanType } from "./Boolean"
-import { createBoolean } from "./Boolean"
+import { compareTo as compareAlgebraicTo, reduced } from "./Algebraic"
 import type { IntegerType } from "./Integer"
-import { createInteger, toString as integerToString } from "./Integer"
+import { createInteger } from "./Integer"
 import { isFirstRationalBigger } from "./internalHelpers"
 import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
@@ -18,18 +11,12 @@ import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
-import {
-	createRational,
-	toString__overload$1 as rationalToString,
-} from "./Rational"
-import type { StringType } from "./String"
+import { createRational } from "./Rational"
 import type { TranscendentalType } from "./Transcendental"
 import {
 	compareTranscendentals,
 	createTranscendental,
-	is as transcendentalIs,
 	signRelativeTo,
-	toString as transcendentalToString,
 } from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
@@ -47,66 +34,6 @@ export const TAU = createTranscendental(
 // #endregion
 
 // #region lowestNumber
-
-export function lowestNumber__overload$1(
-	firstNumber: IntegerType,
-	secondNumber: IntegerType,
-): IntegerType {
-	if (firstNumber.value <= secondNumber.value) {
-		return createInteger(firstNumber.value)
-	} else {
-		return createInteger(secondNumber.value)
-	}
-}
-
-export function lowestNumber__overload$2(
-	firstNumber: RationalType,
-	secondNumber: RationalType,
-): RationalType {
-	if (isFirstRationalBigger(firstNumber.rational, secondNumber.rational)) {
-		return createRational(
-			secondNumber.rational.numerator,
-			secondNumber.rational.denominator,
-		)
-	} else {
-		return createRational(
-			firstNumber.rational.numerator,
-			firstNumber.rational.denominator,
-		)
-	}
-}
-
-export function lowestNumber__overload$3(
-	firstNumber: IntegerType,
-	secondNumber: RationalType,
-): IntegerType | RationalType {
-	let firstNumberRational = new Fraction(firstNumber.value, 1)
-
-	if (isFirstRationalBigger(firstNumberRational, secondNumber.rational)) {
-		return createRational(
-			secondNumber.rational.numerator,
-			secondNumber.rational.denominator,
-		)
-	} else {
-		return createInteger(firstNumber.value)
-	}
-}
-
-export function lowestNumber__overload$4(
-	firstNumber: RationalType,
-	secondNumber: IntegerType,
-): IntegerType | RationalType {
-	let secondNumberRational = new Fraction(secondNumber.value, 1)
-
-	if (isFirstRationalBigger(firstNumber.rational, secondNumberRational)) {
-		return createInteger(secondNumber.value)
-	} else {
-		return createRational(
-			firstNumber.rational.numerator,
-			firstNumber.rational.denominator,
-		)
-	}
-}
 
 export function lowestNumber__overload$5(
 	integers: ListType<IntegerType>,
@@ -208,66 +135,6 @@ export function lowestNumber__overload$7(
 // #endregion
 
 // #region greatestNumber
-
-export function greatestNumber__overload$1(
-	firstNumber: IntegerType,
-	secondNumber: IntegerType,
-): IntegerType {
-	if (firstNumber.value >= secondNumber.value) {
-		return createInteger(firstNumber.value)
-	} else {
-		return createInteger(secondNumber.value)
-	}
-}
-
-export function greatestNumber__overload$2(
-	firstNumber: RationalType,
-	secondNumber: RationalType,
-): RationalType {
-	if (isFirstRationalBigger(firstNumber.rational, secondNumber.rational)) {
-		return createRational(
-			firstNumber.rational.numerator,
-			firstNumber.rational.denominator,
-		)
-	} else {
-		return createRational(
-			secondNumber.rational.numerator,
-			secondNumber.rational.denominator,
-		)
-	}
-}
-
-export function greatestNumber__overload$3(
-	firstNumber: IntegerType,
-	secondNumber: RationalType,
-): IntegerType | RationalType {
-	let firstNumberRational = new Fraction(firstNumber.value, 1)
-
-	if (isFirstRationalBigger(firstNumberRational, secondNumber.rational)) {
-		return createInteger(firstNumber.value)
-	} else {
-		return createRational(
-			secondNumber.rational.numerator,
-			secondNumber.rational.denominator,
-		)
-	}
-}
-
-export function greatestNumber__overload$4(
-	firstNumber: RationalType,
-	secondNumber: IntegerType,
-): IntegerType | RationalType {
-	let secondNumberRational = new Fraction(secondNumber.value, 1)
-
-	if (isFirstRationalBigger(firstNumber.rational, secondNumberRational)) {
-		return createRational(
-			firstNumber.rational.numerator,
-			firstNumber.rational.denominator,
-		)
-	} else {
-		return createInteger(secondNumber.value)
-	}
-}
 
 export function greatestNumber__overload$5(
 	integers: ListType<IntegerType>,
@@ -551,56 +418,11 @@ function denominatorOf(number: RationalKind): bigint {
 	}
 }
 
-export function is(number: NumberType, other: NumberType): BooleanType {
-	const numberKind = number[typeKeySymbol]
-	const otherKind = other[typeKeySymbol]
-
-	if (numberKind === "Algebraic" || otherKind === "Algebraic") {
-		// NOTE: An Algebraic is irrational by construction — it can only ever
-		// equal another Algebraic.
-		if (numberKind === "Algebraic" && otherKind === "Algebraic") {
-			return algebraicIs(number as AlgebraicType, other as AlgebraicType)
-		}
-
-		return createBoolean(false)
-	}
-
-	if (numberKind === "Transcendental" || otherKind === "Transcendental") {
-		// NOTE: A Transcendental is provably not algebraic — it can only ever
-		// equal another Transcendental.
-		if (numberKind === "Transcendental" && otherKind === "Transcendental") {
-			return transcendentalIs(
-				number as TranscendentalType,
-				other as TranscendentalType,
-			)
-		}
-
-		return createBoolean(false)
-	}
-
-	return createBoolean(
-		numeratorOf(number as RationalKind) *
-			denominatorOf(other as RationalKind) ===
-			numeratorOf(other as RationalKind) *
-				denominatorOf(number as RationalKind),
-	)
-}
-
-export function isNot(number: NumberType, other: NumberType): BooleanType {
-	return createBoolean(!is(number, other).value)
-}
-
-export function toString(number: NumberType): StringType {
-	if (number[typeKeySymbol] === "Integer") {
-		return integerToString(number)
-	} else if (number[typeKeySymbol] === "Rational") {
-		return rationalToString(number)
-	} else if (number[typeKeySymbol] === "Algebraic") {
-		return algebraicToString(number)
-	} else {
-		return transcendentalToString(number)
-	}
-}
+// NOTE: `is`, `isNot` and `toString` are written in Essence now —
+// `src/stdlib/Number.es`. `is` reads the covering `compareTo` against
+// `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
+// and defers to that member's own `toString`. `compareTo` below is the one
+// ordering primitive they all fall out of, and it stays native.
 
 // NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
 // Every cross-kind cell is total and exact, because equality across kinds is
@@ -678,39 +500,12 @@ export function compareTo(number: NumberType, other: NumberType): OrderingType {
 
 // #region Comparisons
 
-// NOTE: The Union-level ordering — one signature over every pair, reading the
-// covering `compareTo`, which hand-writes all sixteen cells. This is where a
-// Transcendental is compared against another Transcendental; the member
-// Namespaces leave that cell out.
-
-// NOTE: `compareTo` returns the shared `less`/`equal`/`greater` singletons, so
-// the Ordering is compared by reference — the same idiom the cross-kind cells
-// above use (`inverted === less`). This avoids importing `Ordering.is`, which
-// is now implemented in Essence.
-export function isLessThan(number: NumberType, other: NumberType): BooleanType {
-	return createBoolean(compareTo(number, other) === less)
-}
-
-export function isLessThanOrEqualTo(
-	number: NumberType,
-	other: NumberType,
-): BooleanType {
-	return createBoolean(compareTo(number, other) !== greater)
-}
-
-export function isGreaterThan(
-	number: NumberType,
-	other: NumberType,
-): BooleanType {
-	return createBoolean(compareTo(number, other) === greater)
-}
-
-export function isGreaterThanOrEqualTo(
-	number: NumberType,
-	other: NumberType,
-): BooleanType {
-	return createBoolean(compareTo(number, other) !== less)
-}
+// NOTE: The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
+// `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
+// `src/stdlib/Number.es`. Each reads the covering `compareTo` above against the
+// matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
+// on), and the `…OrEqualTo` pair negates the strict opposite. `compareTo` is
+// the one ordering primitive they all fall out of, and it stays native.
 
 // NOTE: `isBetween` is written in Essence now — `src/stdlib/Number.es` — as
 // `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
