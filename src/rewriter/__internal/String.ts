@@ -4,6 +4,7 @@ import type { ListType } from "./List"
 import { createList } from "./List"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
+import type { SideType } from "./Side"
 import { typeKeySymbol } from "./type"
 
 export type StringType = { [typeKeySymbol]: "String"; value: string }
@@ -48,12 +49,23 @@ export function lowercased(originalString: StringType): StringType {
 	return createString(originalString.value.toLowerCase())
 }
 
-export function trimmedAtStart(originalString: StringType): StringType {
-	return createString(originalString.value.trimStart())
-}
-
-export function trimmedAtEnd(originalString: StringType): StringType {
-	return createString(originalString.value.trimEnd())
+// NOTE: The one native behind the whole trim family, where there used to be
+// two — it reads the `Side` Case and calls the matching JavaScript intrinsic.
+// `String::trim()` is written in Essence on top of it, as
+// `trim(at Side#BothEnds)`, so it binds to Overload position 2. Whitespace is
+// whatever JavaScript calls whitespace, which is the Unicode definition.
+export function trim__overload$2(
+	originalString: StringType,
+	side: SideType,
+): StringType {
+	switch (side[typeKeySymbol]) {
+		case "Side#Start":
+			return createString(originalString.value.trimStart())
+		case "Side#End":
+			return createString(originalString.value.trimEnd())
+		default:
+			return createString(originalString.value.trim())
+	}
 }
 
 // NOTE: The one Method here that still matches by UTF-16 code unit, and the

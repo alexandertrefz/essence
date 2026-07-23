@@ -106,10 +106,10 @@ implementation {
 	show("String.uppercased()", greeting::uppercased())
 	show("String.uppercased() [empty]", emptyText::uppercased())
 	show("String.lowercased()", greeting::lowercased())
-	show("String.trimmed()", "  spaced  "::trimmed())
-	show("String.trimmed() [nothing to trim]", greeting::trimmed())
-	show("String.trimmedAtStart()", "  spaced  "::trimmedAtStart())
-	show("String.trimmedAtEnd()", "  spaced  "::trimmedAtEnd())
+	show("String.trim()", "  spaced  "::trim())
+	show("String.trim() [nothing to trim]", greeting::trim())
+	show("String.trim(at: Side) [start]", "  spaced  "::trim(at Side#Start))
+	show("String.trim(at: Side) [end]", "  spaced  "::trim(at Side#End))
 	show("String.starts(with: String)", greeting::starts(with "Hello"))
 	show("String.starts(with: String) [absent]", greeting::starts(with "World"))
 	show("String.starts(with: String) [empty prefix]", greeting::starts(with emptyText))
@@ -495,6 +495,21 @@ implementation {
 	show("Ordering.toString() [Less]", less::toString())
 	show("Ordering.toString() [Equal]", equal::toString())
 	show("Ordering.toString() [Greater]", greater::toString())
+
+	§ ——— Side —————————————————————————————————————————————————————————————
+	constant atStart: Side = #Start
+	constant atEnd: Side = #End
+	constant atBothEnds: Side = #BothEnds
+
+	show("Side.is(_ Side) [Start]", atStart::is(#Start))
+	show("Side.is(_ Side) [End]", atEnd::is(#End))
+	show("Side.is(_ Side) [BothEnds]", atBothEnds::is(#BothEnds))
+	show("Side.is(_ Side) [differing]", atStart::is(#End))
+	show("Side.isNot(_ Side) [differing]", atStart::isNot(#End))
+	show("Side.isNot(_ Side) [same]", atStart::isNot(#Start))
+	show("Side.toString() [Start]", atStart::toString())
+	show("Side.toString() [End]", atEnd::toString())
+	show("Side.toString() [BothEnds]", atBothEnds::toString())
 
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty

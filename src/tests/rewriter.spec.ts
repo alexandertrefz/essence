@@ -15,6 +15,7 @@ import * as number from "../rewriter/__internal/Number"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
+import * as side from "../rewriter/__internal/Side"
 import * as string from "../rewriter/__internal/String"
 import { dispatchMethod, isValueOfType } from "../rewriter/__internal/type"
 
@@ -615,13 +616,26 @@ describe("Rewriter", () => {
 				})
 
 				it("trims from either end", () => {
-					// NOTE: `trimmed` is the Essence composition of these two.
+					// NOTE: One native reads the `Side` Case; `trim()` is the Essence
+					// entry that passes `BothEnds`.
 					expect(
-						string.trimmedAtStart(string.createString("  hi  ")),
+						string.trim__overload$2(
+							string.createString("  hi  "),
+							side.start,
+						),
 					).toEqual(string.createString("hi  "))
 					expect(
-						string.trimmedAtEnd(string.createString("  hi  ")),
+						string.trim__overload$2(
+							string.createString("  hi  "),
+							side.end,
+						),
 					).toEqual(string.createString("  hi"))
+					expect(
+						string.trim__overload$2(
+							string.createString("  hi  "),
+							side.bothEnds,
+						),
+					).toEqual(string.createString("hi"))
 				})
 			})
 

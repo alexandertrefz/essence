@@ -4,7 +4,6 @@ import { builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import type { common } from "../interfaces/index"
-import { runtimeNamespaceNames } from "../rewriter/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
@@ -16,8 +15,10 @@ import * as optional from "../rewriter/__internal/Optional"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
+import * as side from "../rewriter/__internal/Side"
 import * as string from "../rewriter/__internal/String"
 import * as transcendental from "../rewriter/__internal/Transcendental"
+import { runtimeNamespaceNames } from "../rewriter/index"
 
 // NOTE: The Rewriter imports one runtime module per builtin Namespace, under
 // the Namespace's own name, so the mapping is the identity. The keys are
@@ -34,6 +35,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Nothing: nothing,
 	Optional: optional,
 	Ordering: ordering,
+	Side: side,
 	Record: record,
 	List: list,
 	NestedList: nestedList,
