@@ -74,6 +74,17 @@ at `index`" — the item is the direct object, the index is reached through *at*
 `sorted`/`sortedBy`. And a fixed set of modes is a `choice`, never a `String` —
 `trim(at Side#Start)`, not `trim("start")`.
 
+**The one thing rule 4 does NOT license.** The numeric tower declares the four
+inequalities on `Integer` and `Rational` AND on the covering `Number`, and that
+is not duplication to collapse — it is a performance stratification. The
+same-kind entry is written on the member's own `compareTo`; `Number`'s is the
+sixteen-cell cross-kind table that reaches `bigint-fraction` and the whole
+tower. Deleting the member entries would route two Integers through it and
+nearly double a Program that only prints a greeting. The reasoning is written
+above `Integer::isLessThan`, and `src/tests/bundleSize.spec.ts` is the guard.
+Before collapsing anything that looks repeated here, check whether the repeat
+is what keeps a body reaching only its own Namespace's primitives.
+
 Three name SHAPES, so rule 1 is not misapplied:
 
 | Shape | Form | Examples |
