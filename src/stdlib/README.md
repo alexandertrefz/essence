@@ -16,13 +16,15 @@ compiler-developer error and throws, fully rendered.
 
 The conversion from the TypeScript tables in `src/enricher/types/*.ts` is in
 flight — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering`,
-`Record`, `String`, `Integer` and `Rational` have moved, the rest have not.
+`Record`, `String`, and the whole numeric tower (`Integer`, `Rational`,
+`Algebraic`, `Transcendental` and the covering `Number`, which brings the
+`Number` and `Irrational` Union Types with it) have moved; `List` has not.
 Whatever a file here declares is subtracted from those tables, so a Namespace
 moves over one at a time.
 
-A Namespace may be half native and half Essence — `Boolean.isNot` is written
-here, the rest of `Boolean` is still bound to `src/rewriter/__internal/Boolean.ts`
-— and emitted user code can not tell the two apart. `src/rewriter/stdlibPrelude.ts`
+A Namespace may be half native and half Essence — `Boolean.isNot` and
+`Number.isBetween` are written here, the rest of both is still bound to
+`src/rewriter/__internal/` — and emitted user code can not tell the two apart. `src/rewriter/stdlibPrelude.ts`
 is what makes that true: it simplifies the enriched sources once per process, and
 the Rewriter imports every merged Namespace's runtime module as `$native_<Name>`
 and emits
@@ -44,6 +46,13 @@ follow for whoever converts the next one: a **bodied static Property is refused*
 the const exists, so declare it without a value until the Rewriter emits
 Properties as assignments — and adding a Method that calls into a second merged
 Namespace is fine, the reachability search follows it.
+
+`Number` is where both of those stopped being hypothetical. Its `PI` and `TAU`
+are value-less native static Properties, so they arrive through the spread like
+any other native and never reach the refusal; and `isBetween`'s body ends in
+`::and(…)`, so a Program that reaches `Number` pulls `Boolean` in behind it and
+gets both consts. A Program that names `Number` at all — `Number.PI` is
+enough — gets the const, because the const is what carries the natives too.
 
 A Type and the Namespace that targets it move TOGETHER: the subtraction is per
 category, so converting `choice Ordering` alone would leave the legacy

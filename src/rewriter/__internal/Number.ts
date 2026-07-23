@@ -708,18 +708,10 @@ export function isGreaterThanOrEqualTo(
 	return createBoolean(!orderingIs(compareTo(number, other), less).value)
 }
 
-export function isBetween(
-	number: NumberType,
-	lowerBound: NumberType,
-	upperBound: NumberType,
-): BooleanType {
-	// NOTE: Both bounds are included. Bounds in the wrong order enclose no
-	// Number at all, so the answer is simply `false` — a predicate can say
-	// that honestly, where `clampedBetween` has to answer `Nothing`.
-	return createBoolean(
-		!orderingIs(compareTo(lowerBound, number), greater).value &&
-			!orderingIs(compareTo(number, upperBound), greater).value,
-	)
-}
+// NOTE: `isBetween` is written in Essence now — `src/stdlib/Number.es` — as
+// `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
+// is the same two comparisons this function made, read off the same covering
+// order. Both bounds stay included, and bounds in the wrong order still enclose
+// no Number at all, so the answer is simply `false`.
 
 // #endregion

@@ -1,9 +1,9 @@
 import type { common } from "../interfaces/index"
 import { loadStdlib } from "./stdlib"
-import {
-	namespace as algebraicNamespace,
-	type as algebraicType,
-} from "./types/Algebraic"
+// NOTE: The Algebraic NAMESPACE now lives in `src/stdlib/Algebraic.es`. Its
+// Type tag stays for the same reason Boolean's does — a bare primitive tag with
+// no declaration to write.
+import { type as algebraicType } from "./types/Algebraic"
 // NOTE: The Boolean NAMESPACE now lives in `src/stdlib/Boolean.es` and is
 // gone from the table below. Its Type tag stays — a `type` is subtracted from
 // the legacy tables only by a source `type` declaration, and Boolean's is a
@@ -18,10 +18,12 @@ import nativeFunctions from "./types/NativeFunctions"
 // NOTE: The Nothing NAMESPACE now lives in `src/stdlib/Nothing.es`. Its Type
 // tag stays for the same reason Boolean's does.
 import { type as nothingType } from "./types/Nothing"
-import {
-	namespace as numberNamespace,
-	type as numberType,
-} from "./types/Number"
+// NOTE: The Number NAMESPACE and BOTH Union Types it brought with it —
+// `Number` itself and the `Irrational` alias, which used to be assembled inline
+// right here — now live in `src/stdlib/Number.es`. A Type and the Namespace
+// that targets it move together, so `types/Number.ts` is imported nowhere any
+// more; it stays on disk only for `stdlibEquivalence.spec.ts` to compare
+// against.
 // NOTE: `Optional` and `Ordering` moved WHOLE — the Type and the Namespace
 // that targets it in one step, as the subtraction in `stdlib.ts` requires.
 // `src/stdlib/Optional.es` declares `type Optional<ItemType>` and
@@ -42,10 +44,10 @@ import { type as recordType } from "./types/Record"
 // stays for the same reason Boolean's does — a bare primitive tag with no
 // declaration to write.
 import { type as stringType } from "./types/String"
-import {
-	namespace as transcendentalNamespace,
-	type as transcendentalType,
-} from "./types/Transcendental"
+// NOTE: The Transcendental NAMESPACE now lives in
+// `src/stdlib/Transcendental.es`. Its Type tag stays for the same reason
+// Algebraic's does.
+import { type as transcendentalType } from "./types/Transcendental"
 
 // NOTE: The single source of truth for what exists before the first line of a
 // Program. The Enricher builds its top-level Scope from these accessors, and
@@ -57,16 +59,6 @@ import {
 // is the union of both halves — which is what `loadStdlib` assembles, and what
 // the accessors at the foot of this file hand out.
 
-// NOTE: `Irrational` is a transparent alias for `Algebraic | Transcendental`
-// — the pair are definitional complements (transcendental means "not
-// algebraic"), so the alias covers exactly the representable irrationals and
-// makes `π is Irrational` a true sentence.
-const irrationalType: common.UnionType = {
-	type: "UnionType",
-	name: "Irrational",
-	types: [algebraicType, transcendentalType],
-}
-
 // NOTE: The hand written TypeScript half of the standard library. Every name
 // here is still declared in TypeScript rather than in Essence; as each
 // Namespace is converted the entry is deleted from this table and the `.es`
@@ -75,9 +67,6 @@ const irrationalType: common.UnionType = {
 // never both claim a name.
 export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
-	Algebraic: algebraicNamespace,
-	Transcendental: transcendentalNamespace,
-	Number: numberNamespace,
 	List: listNamespace,
 }
 
@@ -143,9 +132,7 @@ export const legacyTypes: Record<string, common.Type> = {
 	Rational: rationalType,
 	Algebraic: algebraicType,
 	Transcendental: transcendentalType,
-	Irrational: irrationalType,
 	Record: recordType,
-	Number: numberType,
 	List: listType,
 }
 
