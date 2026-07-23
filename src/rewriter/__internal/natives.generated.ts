@@ -2,13 +2,13 @@
 //
 // The calling convention every native binding in `src/stdlib/*.es` must keep,
 // written as TypeScript so `tsc` can check it. Each `*Natives` type is the
-// shape the runtime module of that Namespace must have; each `*EssenceImplemented`
-// type forbids a runtime export for a Method that is implemented in Essence.
-// The `$<Namespace>` assertions at the foot check each runtime module against
-// its contract. Nothing imports this file, so its only effect is the type error
-// a drifted native raises under `tsc`. Regenerate after changing a standard
-// library signature; `src/tests/natives.spec.ts` fails when it drifts from the
-// renderer.
+// shape the runtime module of that Namespace must have. The `$<Namespace>`
+// assertions at the foot check each runtime module against it; the paired
+// `$<Namespace>Absent` assertion forbids a runtime export for any Method that is
+// implemented in Essence. Nothing imports this file, so its only effect is the
+// type error a drifted native raises under `tsc`. Regenerate after changing a
+// standard library signature; `src/tests/natives.spec.ts` fails when it drifts
+// from the renderer.
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
@@ -22,6 +22,11 @@ import type { RecordType } from "./Record"
 import type { StringType } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
+
+type AssertNoEssenceExports<Module, Forbidden extends string> =
+	Extract<keyof Module, Forbidden> extends never
+		? true
+		: ["a Method implemented in Essence must not be a runtime export", Extract<keyof Module, Forbidden>]
 
 type ComparableConformance<Self extends AnyType> = {
 	compareTo: (self: Self, argument1: Self) => OrderingType
@@ -107,10 +112,6 @@ export type BooleanNatives = {
 	exclusiveOr: (self: BooleanType, argument1: BooleanType) => BooleanType
 	// toString() -> String
 	toString: (self: BooleanType) => StringType
-}
-
-export type BooleanEssenceImplemented = {
-	isNot?: never
 }
 
 export type IntegerNatives = {
@@ -424,10 +425,6 @@ export type NumberNatives = {
 	greatestNumber__overload$7: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType | NothingType
 }
 
-export type NumberEssenceImplemented = {
-	isBetween?: never
-}
-
 export type NothingNatives = {
 	// is(_: Nothing) -> Boolean
 	is: (self: NothingType, argument1: NothingType) => BooleanType
@@ -566,7 +563,8 @@ declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
 
 declare const BooleanModule: typeof import("./Boolean")
-export const $Boolean: BooleanNatives & BooleanEssenceImplemented = BooleanModule
+export const $Boolean: BooleanNatives = BooleanModule
+export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), "isNot"> = true
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
@@ -581,7 +579,8 @@ declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
 
 declare const NumberModule: typeof import("./Number")
-export const $Number: NumberNatives & NumberEssenceImplemented = NumberModule
+export const $Number: NumberNatives = NumberModule
+export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "isBetween"> = true
 
 declare const NothingModule: typeof import("./Nothing")
 export const $Nothing: NothingNatives = NothingModule
