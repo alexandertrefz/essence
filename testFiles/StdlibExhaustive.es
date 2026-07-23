@@ -315,8 +315,8 @@ implementation {
 	showMaybe("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
 	show("Rational.toString()", 3/4::toString())
 	show("Rational.toString() [whole]", 4/2::toString())
-	show("Rational.toString(formatAs: String) [decimal]", 1/2::toString(formatAs "decimal"))
-	show("Rational.toString(formatAs: String) [fraction]", 1/2::toString(formatAs "fraction"))
+	show("Rational.toString(formatAs: NumberFormat) [decimal]", 1/2::toString(formatAs NumberFormat#Decimal))
+	show("Rational.toString(formatAs: NumberFormat) [fraction]", 1/2::toString(formatAs NumberFormat#Fraction))
 	show("Rational.compareTo(_ Rational)", 1/2::compareTo(2/3))
 	show("Rational.compareTo(_ Rational) [equal]", 1/2::compareTo(2/4))
 	show("Rational.compareTo(_ Rational) [greater]", 2/3::compareTo(1/2))
@@ -517,6 +517,17 @@ implementation {
 	show("Side.toString() [Start]", atStart::toString())
 	show("Side.toString() [End]", atEnd::toString())
 	show("Side.toString() [BothEnds]", atBothEnds::toString())
+
+	§ ——— NumberFormat ———————————————————————————————————————————————————————
+	constant asFraction: NumberFormat = #Fraction
+	constant asDecimal: NumberFormat = #Decimal
+
+	show("NumberFormat.is(_ NumberFormat)", asFraction::is(#Fraction))
+	show("NumberFormat.is(_ NumberFormat) [differing]", asFraction::is(#Decimal))
+	show("NumberFormat.isNot(_ NumberFormat)", asFraction::isNot(#Decimal))
+	show("NumberFormat.isNot(_ NumberFormat) [same]", asDecimal::isNot(#Decimal))
+	show("NumberFormat.toString() [Fraction]", asFraction::toString())
+	show("NumberFormat.toString() [Decimal]", asDecimal::toString())
 
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty

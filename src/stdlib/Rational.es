@@ -1,5 +1,46 @@
 declarations {
 
+	§ The forms a Rational can be written in. `Fraction` is `"3/4"`, the
+	§ lowest-terms form `toString` gives with no Argument; `Decimal` is
+	§ `"0.75"`. It lives here because `Rational::toString` is its only user.
+	choice NumberFormat {
+		Fraction,
+		Decimal,
+	}
+
+	§ The same shape as `Ordering`'s and `Side`'s Namespaces — unit Cases
+	§ compared and printed by tag.
+	namespace NumberFormat for NumberFormat is Equatable, is Printable {
+		§§ Answers whether both NumberFormats are the same variant.
+		§§
+		§§ @param other the NumberFormat to compare with
+		§§ @returns `true` when both NumberFormats are the same variant.
+		is(_ other: NumberFormat) -> Boolean {
+			<- match @ -> Boolean {
+				case #Fraction { <- match other -> Boolean { case #Fraction { <- true } case _ { <- false } } }
+				case #Decimal { <- match other -> Boolean { case #Decimal { <- true } case _ { <- false } } }
+			}
+		}
+
+		§§ Answers whether the NumberFormats are different variants.
+		§§
+		§§ @param other the NumberFormat to compare with
+		§§ @returns `true` when the NumberFormats are different variants.
+		isNot(_ other: NumberFormat) -> Boolean {
+			<- @::is(other)::negate()
+		}
+
+		§§ Represents the NumberFormat as `Fraction` or `Decimal`.
+		§§
+		§§ @returns the name of the NumberFormat variant.
+		toString() -> String {
+			<- match @ -> String {
+				case #Fraction { <- "Fraction" }
+				case #Decimal { <- "Decimal" }
+			}
+		}
+	}
+
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
 	§ numerator. The literal form is `3/4`; `Rational.of` builds one from two
 	§ computed Integers. Arithmetic never rounds — an operation that leaves
@@ -182,11 +223,20 @@ declarations {
 		§§ @returns the Rational, or `Nothing` when the text has any other shape or divides by zero.
 		static parse(_ text: String) -> Optional<Rational>
 
-		§§ Represents the Rational as a String — `"3/4"` in lowest terms, or its decimal form with `formatAs "decimal"`.
+		§ The format was a String — `toString(formatAs "decimal")` — which meant
+		§ every other spelling silently fell back to the fraction form, and
+		§ nothing told a caller which words were understood. `NumberFormat` is
+		§ a Choice, so the two forms are the only two that can be written and
+		§ a typo is a Diagnostic rather than a wrong answer.
+
+		§§ Represents the Rational as a String — `"3/4"` in lowest terms when no format is named, or in the named format.
+		§§
+		§§ @returns the String representation of the Rational.
 		overload toString {
 			() -> String
 
-			(formatAs: String) -> String
+			§§ @param formatAs the form to represent the Rational in
+			(formatAs: NumberFormat) -> String
 		}
 
 		§§ Orders the Rational against another Rational.

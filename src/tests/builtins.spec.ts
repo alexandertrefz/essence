@@ -11,6 +11,7 @@ import * as list from "../rewriter/__internal/List"
 import * as nestedList from "../rewriter/__internal/NestedList"
 import * as nothing from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
+import * as numberFormat from "../rewriter/__internal/NumberFormat"
 import * as optional from "../rewriter/__internal/Optional"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as rational from "../rewriter/__internal/Rational"
@@ -36,6 +37,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Optional: optional,
 	Ordering: ordering,
 	Side: side,
+	NumberFormat: numberFormat,
 	Record: record,
 	List: list,
 	NestedList: nestedList,

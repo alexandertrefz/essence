@@ -12,6 +12,7 @@ import {
 import * as list from "../rewriter/__internal/List"
 import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
+import * as numberFormat from "../rewriter/__internal/NumberFormat"
 import * as ordering from "../rewriter/__internal/Ordering"
 import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
@@ -2003,14 +2004,14 @@ describe("Rewriter", () => {
 					expect(
 						rational.toString__overload$2(
 							rationalOneHalf(),
-							string.createString("rational"),
+							numberFormat.fraction,
 						),
 					).toEqual(string.createString("1/2"))
 
 					expect(
 						rational.toString__overload$2(
 							rationalOneHalf(),
-							string.createString("decimal"),
+							numberFormat.decimal,
 						),
 					).toEqual(string.createString("0.5"))
 				})

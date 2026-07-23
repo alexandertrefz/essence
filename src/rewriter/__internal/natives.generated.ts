@@ -16,6 +16,7 @@ import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NothingType } from "./Nothing"
 import type { NumberType } from "./Number"
+import type { NumberFormatType } from "./NumberFormat"
 import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
@@ -166,8 +167,8 @@ export type RationalNatives = {
 	parse: (argument0: StringType) => RationalType | NothingType
 	// toString() -> String
 	toString__overload$1: (self: RationalType) => StringType
-	// toString(formatAs: String) -> String
-	toString__overload$2: (self: RationalType, formatAs: StringType) => StringType
+	// toString(formatAs: NumberFormat) -> String
+	toString__overload$2: (self: RationalType, formatAs: NumberFormatType) => StringType
 	// compareTo(_: Rational) -> Ordering
 	compareTo: (self: RationalType, argument1: RationalType) => OrderingType
 }
@@ -277,6 +278,10 @@ export type SideNatives = {
 
 }
 
+export type NumberFormatNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -375,6 +380,10 @@ export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering")
 declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
 export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "is" | "isNot" | "toString"> = true
+
+declare const NumberFormatModule: typeof import("./NumberFormat")
+export const $NumberFormat: NumberFormatNatives = NumberFormatModule
+export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "is" | "isNot" | "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

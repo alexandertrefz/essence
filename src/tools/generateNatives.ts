@@ -35,6 +35,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	StartType: "./Side",
 	EndType: "./Side",
 	BothEndsType: "./Side",
+	NumberFormatType: "./NumberFormat",
+	FractionType: "./NumberFormat",
+	DecimalType: "./NumberFormat",
 	RationalType: "./Rational",
 	RecordType: "./Record",
 	StringType: "./String",
@@ -50,6 +53,7 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 const UNION_NAME_ALIASES: Record<string, string> = {
 	Ordering: "OrderingType",
 	Side: "SideType",
+	NumberFormat: "NumberFormatType",
 	Number: "NumberType",
 }
 
@@ -63,6 +67,8 @@ const CASE_TYPES: Record<string, string> = {
 	"Side#Start": "StartType",
 	"Side#End": "EndType",
 	"Side#BothEnds": "BothEndsType",
+	"NumberFormat#Fraction": "FractionType",
+	"NumberFormat#Decimal": "DecimalType",
 }
 
 // NOTE: The mutable state threaded through one render — every runtime type name
