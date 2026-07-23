@@ -14,6 +14,7 @@ import {
 } from "../enricher/types/Algebraic"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
+import { namespace as listNamespace } from "../enricher/types/List"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import {
 	namespace as numberNamespace,
@@ -65,12 +66,105 @@ import type { common, parser } from "../interfaces/index"
 // lines, added in the same commit.
 
 type Entry =
-	| { kind: "namespace"; name: string; legacy: common.NamespaceType }
+	| {
+			kind: "namespace"
+			name: string
+			legacy: common.NamespaceType
+			// NOTE: Method names this entry does NOT compare — dropped from
+			// BOTH halves before the comparison, so the entry stays a whole
+			// check of everything it does not name. Only `List` uses it, and
+			// every name it lists is answered for by a check of its own; see
+			// `listMethodsCheckedElsewhere`.
+			omittedMethods?: Array<string>
+	  }
+	// NOTE: A Namespace that is not a converted table but a PIECE of one — see
+	// `movedListMethods`. Only its Methods are compared, against the Methods of
+	// the table they were lifted out of; its name, target Type and Generics are
+	// new, so there is nothing on the legacy side to hold them to.
+	| { kind: "methods"; name: string; legacy: common.NamespaceType }
 	| { kind: "type"; name: string; legacy: common.Type }
 	| { kind: "protocol"; name: string; legacy: common.ProtocolType }
 
-function namespaceEntry(name: string, legacy: common.NamespaceType): Entry {
-	return { kind: "namespace", name, legacy }
+function namespaceEntry(
+	name: string,
+	legacy: common.NamespaceType,
+	omittedMethods?: Array<string>,
+): Entry {
+	return { kind: "namespace", name, legacy, omittedMethods }
+}
+
+// NOTE: The Methods of the legacy `List` table that are NOT Methods of the
+// `List` Namespace any more, and the Namespace each one moved to. `flattened`
+// does not answer for every List — its items have to be Lists themselves, and
+// no Protocol bound can say that AND name the inner item Type — so it can not
+// belong to the Namespace that targets every List. It is declared in
+// `src/stdlib/List.es` all the same, as `NestedList`.
+//
+// This table is one half of what keeps the gate whole. `List`'s own entry
+// compares the legacy table MINUS these names, one entry below compares each
+// moved Method against the very same table's version of it, and `accounts for
+// every Method` asserts the split is a partition: every Method of the legacy
+// table is checked, in exactly one place, and none is checked twice.
+const movedListMethods: Record<string, Array<string>> = {
+	NestedList: ["flattened"],
+}
+
+// NOTE: THE ONE INTENTIONAL API CHANGE OF THE WHOLE MIGRATION, and the other
+// half of what keeps the gate whole. `joinWith` is still a Method of `List` —
+// it did not move anywhere — but it is no longer the Method the legacy table
+// declared, and it is not supposed to be:
+//
+//   legacy   joinWith(_: List<String>, _ separator: String) -> String
+//   source   joinWith<infer ItemType is Printable>(_ separator: String) -> String
+//
+// The table fixed the receiver to a List of Strings because a hand written
+// entry had no way to ask for less. Joining asks nothing of the items but that
+// each can say what it is, which is exactly `Printable`, so the source declares
+// the bound and `[1, 2, 3]::joinWith(", ")` works. Its documentation is
+// rewritten to match — it joins ITEMS now, not Strings.
+//
+// The difference is therefore REAL, in the Type, the Generics and the
+// documentation, and normalizing it away would be the gate lying. Instead the
+// name is dropped from `List`'s wholesale comparison and pinned by
+// `pins joinWith's widened signature` below, which spells the new declaration
+// out in full. `accounts for every Method` keeps counting it as a Method of
+// `List`, because it is one.
+const deviatingListMethods: Array<string> = ["joinWith"]
+
+// NOTE: Every Method of the legacy `List` table that `List`'s own entry does
+// not compare — the ones that moved to a Namespace of their own, and the one
+// that deliberately changed. Each is checked somewhere else in this file; an
+// unlisted Method that went missing from the source is still a failure.
+const listMethodsCheckedElsewhere: Array<string> = [
+	...Object.values(movedListMethods).flat(),
+	...deviatingListMethods,
+]
+
+function pickMethods(
+	namespace: common.NamespaceType,
+	keep: (name: string) => boolean,
+): common.NamespaceType {
+	return {
+		...namespace,
+		methods: Object.fromEntries(
+			Object.entries(namespace.methods).filter(([name]) => keep(name)),
+		),
+	}
+}
+
+// NOTE: One moved Method set, held to the legacy table's own declaration of it
+// — same Type, same Generics, same documentation, same Overload order. The
+// legacy side is the table narrowed to those names; the source side is the new
+// Namespace WHOLE, so a Method that appeared out of nowhere in it is a
+// difference rather than something the comparison quietly skips over.
+function movedMethodsEntry(name: string): Entry {
+	let names = new Set(movedListMethods[name] ?? [])
+
+	return {
+		kind: "methods",
+		name,
+		legacy: pickMethods(listNamespace, (method) => names.has(method)),
+	}
 }
 
 function typeEntry(name: string, legacy: common.Type): Entry {
@@ -124,6 +218,23 @@ const converted: Array<Entry> = [
 	typeEntry("Number", numberType),
 	typeEntry("Irrational", legacyIrrationalType),
 	namespaceEntry("Number", numberNamespace),
+	// NOTE: `List` is the last table to move, and the only one whose Namespace
+	// carries a non-empty `conformanceConditions` — `is Comparable where
+	// ItemType is Comparable`. Its Type is the `GenericList` tag, which has no
+	// declaration to write, so it stays in the legacy Type table and gets no
+	// `typeEntry` (the same reason `Integer` and `Boolean` have none).
+	//
+	// NOTE: It is also the one table that did not land as ONE Namespace.
+	// `flattened` does not answer for every List and is declared in a Namespace
+	// of its own; `movedListMethods` says so, and the entry after this one
+	// holds it to the same table.
+	//
+	// NOTE: And it is the one table with a deliberate API change in it —
+	// `joinWith` is widened from a List of Strings to any Printable items. See
+	// `deviatingListMethods`; it is pinned by a test of its own rather than
+	// compared here, because it is MEANT to differ.
+	namespaceEntry("List", listNamespace, listMethodsCheckedElsewhere),
+	movedMethodsEntry("NestedList"),
 ]
 
 // ---------------------------------------------------------------------------
@@ -688,7 +799,12 @@ function normalizeEntry(entry: Entry, value: unknown): Json {
 	let parameterNames: ParameterNamesByMethod | null = null
 
 	if (entry.kind !== "type") {
-		let key = parameterNamesKey(entry.kind, entry.name)
+		// NOTE: A `methods` entry names a NAMESPACE — the Parameter names it is
+		// checked against are the ones the source declares for it.
+		let key = parameterNamesKey(
+			entry.kind === "methods" ? "namespace" : entry.kind,
+			entry.name,
+		)
 		let found = sourceParameterNames().get(key)
 
 		if (found === undefined) {
@@ -701,11 +817,31 @@ function normalizeEntry(entry: Entry, value: unknown): Json {
 	}
 
 	switch (entry.kind) {
-		case "namespace":
-			return normalizeNamespace(
-				value as common.NamespaceType,
-				parameterNames,
-			)
+		case "namespace": {
+			let namespace = value as common.NamespaceType
+
+			// NOTE: Applied to BOTH halves, from the one list — a name the
+			// entry does not compare is dropped from the legacy table and from
+			// the source alike, so `methodOrder` still lines up and every
+			// Method the entry DOES name is compared in full. Dropping it on
+			// one side only would turn "checked elsewhere" into "reported as
+			// missing here".
+			if (entry.omittedMethods !== undefined) {
+				let omitted = new Set(entry.omittedMethods)
+
+				namespace = pickMethods(namespace, (name) => !omitted.has(name))
+			}
+
+			return normalizeNamespace(namespace, parameterNames)
+		}
+		case "methods": {
+			let namespace = value as common.NamespaceType
+
+			return {
+				methodOrder: Object.keys(namespace.methods),
+				methods: normalizeMembers(namespace.methods, parameterNames),
+			}
+		}
 		case "type":
 			return normalizeType(value)
 		case "protocol":
@@ -813,7 +949,8 @@ function sourceValue(entry: Entry): unknown {
 	let stdlib = loadStdlib()
 
 	switch (entry.kind) {
-		case "namespace": {
+		case "namespace":
+		case "methods": {
 			let member = stdlib.members[entry.name]
 
 			if (member === undefined || member.type !== "Namespace") {
@@ -851,14 +988,22 @@ function sourceValue(entry: Entry): unknown {
 
 describe("Standard Library Equivalence", () => {
 	for (let entry of converted) {
-		it(`declares the same ${entry.kind} '${entry.name}' as the table it replaced`, () => {
+		// NOTE: A `methods` entry is compared against the table its Methods were
+		// lifted OUT of, which is not a table of its own name.
+		let table = entry.kind === "methods" ? "List" : entry.name
+		let what =
+			entry.kind === "methods"
+				? `the Methods '${entry.name}' took over from 'List'`
+				: `the ${entry.kind} '${entry.name}'`
+
+		it(`declares ${what} as the table it replaced`, () => {
 			let legacy = normalizeEntry(entry, entry.legacy)
 			let source = normalizeEntry(entry, sourceValue(entry))
 			let found = differences("", legacy, source)
 
 			if (found.length > 0) {
 				throw new Error(
-					`The ${entry.kind} '${entry.name}' read from Essence source differs from 'src/enricher/types/${entry.name}.ts':\n\n${found
+					`${what} read from Essence source differs from 'src/enricher/types/${table}.ts':\n\n${found
 						.map((difference) => `  • ${difference}`)
 						.join("\n")}\n`,
 				)
@@ -873,6 +1018,156 @@ describe("Standard Library Equivalence", () => {
 	// state a botched rebase leaves it in.
 	it("has something to compare", () => {
 		expect(converted.length).toBeGreaterThan(0)
+	})
+
+	// NOTE: The one table that did not land as one Namespace needs the hole
+	// closed by hand. The entries above compare `List` against the table minus
+	// the Methods checked elsewhere, and the moved set against the table's own
+	// version of it — which is a complete check ONLY if what is left over is
+	// accounted for. This says so outright: every Method of the legacy table is
+	// somewhere, no Method is in two places, the one that moved really did
+	// leave `List` rather than being declared twice, and the one that
+	// deliberately changed did NOT leave — it is still a Method of `List`, in
+	// the position the table had it, and is pinned by the test below.
+	it("accounts for every Method of the legacy List table exactly once", () => {
+		let stdlib = loadStdlib()
+
+		let methodsOf = (name: string): Array<string> => {
+			let member = stdlib.members[name]
+
+			if (member === undefined || member.type !== "Namespace") {
+				throw new Error(
+					`'${name}' is not a Namespace in the loaded standard library`,
+				)
+			}
+
+			return Object.keys(member.methods)
+		}
+
+		let moved = Object.values(movedListMethods).flat()
+
+		// NOTE: Every name excused from `List`'s wholesale comparison is a real
+		// Method of the table, and they are distinct — a typo here would
+		// silently subtract nothing from `List` and compare an empty Method set
+		// against an empty one.
+		expect(listMethodsCheckedElsewhere).toEqual([
+			...new Set(listMethodsCheckedElsewhere),
+		])
+		expect(
+			listMethodsCheckedElsewhere.filter(
+				(name) => listNamespace.methods[name] === undefined,
+			),
+		).toEqual([])
+
+		// NOTE: Gone from `List`, and gone only from there.
+		expect(
+			methodsOf("List").filter((name) => moved.includes(name)),
+		).toEqual([])
+
+		for (let [namespace, names] of Object.entries(movedListMethods)) {
+			expect(methodsOf(namespace)).toEqual(names)
+		}
+
+		// NOTE: The deviating Methods are the opposite case — excused from the
+		// comparison because they CHANGED, not because they left. They are
+		// still Methods of `List`, and nothing else declares them.
+		expect(
+			deviatingListMethods.filter(
+				(name) => !methodsOf("List").includes(name),
+			),
+		).toEqual([])
+
+		// NOTE: The partition itself — the Methods the source declares across
+		// the two Namespaces are exactly the Methods the table declared, name
+		// for name, with nothing lost, gained or duplicated.
+		let declared = [
+			...methodsOf("List"),
+			...Object.keys(movedListMethods).flatMap(methodsOf),
+		]
+
+		expect(declared).toEqual([...new Set(declared)])
+		expect([...declared].sort()).toEqual(
+			Object.keys(listNamespace.methods).sort(),
+		)
+
+		// NOTE: `List`'s Method ORDER is only compared for the names its entry
+		// does not omit, so the deviating Methods' positions would otherwise go
+		// unchecked. They did not move within the table either: the source's
+		// order is the table's order with the moved names taken out, and
+		// nothing else rearranged.
+		expect(methodsOf("List")).toEqual(
+			Object.keys(listNamespace.methods).filter(
+				(name) => !moved.includes(name),
+			),
+		)
+	})
+
+	// NOTE: THE ONE INTENTIONAL API CHANGE — see `deviatingListMethods`. The
+	// gate refuses to normalize it away, so it is written out here instead:
+	// what `joinWith` is now, in full, so that the widening is a decision on
+	// the record rather than a Method nobody checks any more. Every field the
+	// wholesale comparison would have looked at is asserted, and every one of
+	// them is stated as a literal rather than derived from the source.
+	it("pins joinWith's widened signature — the migration's one API change", () => {
+		let stdlib = loadStdlib()
+		let list = stdlib.members["List"]
+
+		if (list === undefined || list.type !== "Namespace") {
+			throw new Error("'List' is not a Namespace in the standard library")
+		}
+
+		let joinWith = list.methods["joinWith"]
+
+		expect(joinWith?.type).toBe("SimpleMethod")
+
+		let method = joinWith as common.SimpleMethodType
+
+		// NOTE: Its own bounded Type Parameter, which SHADOWS the Namespace's
+		// `ItemType` outright — the same shape `sorted` and `compareTo` carry,
+		// and the reason the Namespace's unbounded `ItemType` is not merged in
+		// ahead of it. `isInfer` is what puts the name into `bindableNames`; an
+		// uninferred Generic would never bind and every call would fail.
+		expect(method.generics).toEqual([
+			{
+				name: "ItemType",
+				infer: true,
+				defaultType: null,
+				constraint: "Printable",
+			},
+		])
+
+		// NOTE: The receiver is `List<ItemType>` — every List — where the
+		// legacy table wrote `List<String>`. This line IS the widening.
+		expect(method.parameterTypes).toEqual([
+			{
+				name: null,
+				type: {
+					type: "List",
+					itemType: { type: "GenericUse", name: "ItemType" },
+				},
+			},
+			{
+				name: null,
+				type: { type: "String" },
+				documentation: "the separator to place between the items",
+			},
+		])
+
+		expect(method.returnType).toEqual({ type: "String" })
+
+		// NOTE: Rewritten with the signature rather than carried over — the
+		// legacy text said "Joins the Strings into one", which is no longer
+		// what it does.
+		expect(method.documentation).toEqual({
+			description:
+				"Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::splitOn` for a List of Strings.",
+			parameters: {
+				separator: "the separator to place between the items",
+			},
+			returns:
+				"the joined String, or the empty String for the empty List.",
+			position: null,
+		})
 	})
 
 	// NOTE: The premise `effectiveParameterDocumentation` rests on, checked

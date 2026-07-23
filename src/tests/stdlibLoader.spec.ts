@@ -626,6 +626,11 @@ describe("Standard Library Loader", () => {
 			"Ordering",
 			"Record",
 			"List",
+			// NOTE: The one Namespace a List value can reach besides `List`,
+			// listed after it — see `builtinMemberOrder`. `List` has to be
+			// searched FIRST for a `List<List<…>>` receiver, so that the
+			// narrow Namespace reads as the extra it is.
+			"NestedList",
 		])
 	})
 

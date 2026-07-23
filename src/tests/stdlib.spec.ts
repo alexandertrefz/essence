@@ -300,11 +300,31 @@ describe("Stdlib", () => {
 	})
 
 	describe("List round trips and construction", () => {
+		// NOTE: `joinWith` is bounded by `Printable` rather than fixed to a
+		// List of Strings, so the conformance witness is passed by hand here
+		// the way the Simplifier passes it — String's `toString` is the
+		// identity, Integer's is the conversion the widening bought.
 		it("joins Strings — the return trip of splitOn", () => {
 			const pieces = string.splitOn(str("a,b,c"), str(","))
 
-			expect(list.joinWith(pieces, str(" + ")).value).toBe("a + b + c")
-			expect(list.joinWith(list.createList([]), str(",")).value).toBe("")
+			expect(
+				list.joinWith(pieces, str(" + "), {
+					toString: string.toString,
+				}).value,
+			).toBe("a + b + c")
+			expect(
+				list.joinWith(list.createList([]), str(","), {
+					toString: string.toString,
+				}).value,
+			).toBe("")
+		})
+
+		it("joins any Printable items, not just Strings", () => {
+			expect(
+				list.joinWith(ints(1n, 2n, 3n), str(", "), {
+					toString: integer.toString,
+				}).value,
+			).toBe("1, 2, 3")
 		})
 
 		it("builds a List by repetition, never with a negative count", () => {
@@ -487,7 +507,7 @@ describe("Stdlib", () => {
 			).not.toEqual([])
 		})
 
-		it("offers joinWith only on a List of Strings", () => {
+		it("bounds joinWith by Printable, not by a String item Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant joined: String = ["a", "b"]::joinWith(",")
@@ -496,7 +516,24 @@ describe("Stdlib", () => {
 
 			expect(
 				diagnosticsFor(`implementation {
-					constant joined = [1, 2]::joinWith(",")
+					constant joined: String = [1, 2]::joinWith(",")
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					constant joined: String = [[1], [2]]::joinWith(",")
+				}`),
+			).toEqual([])
+
+			// NOTE: The bound is what refuses a join, not a missing Method —
+			// an unbounded Type Parameter conforms to nothing, so its items
+			// have no `toString` to hand in.
+			expect(
+				diagnosticsFor(`implementation {
+					function joinAll<Item>(_ items: List<Item>) -> String {
+						<- items::joinWith(",")
+					}
 				}`),
 			).not.toEqual([])
 		})

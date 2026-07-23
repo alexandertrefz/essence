@@ -8,6 +8,7 @@ import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
+import * as nestedList from "../rewriter/__internal/NestedList"
 import * as nothing from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
 import * as optional from "../rewriter/__internal/Optional"
@@ -33,6 +34,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Ordering: ordering,
 	Record: record,
 	List: list,
+	NestedList: nestedList,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for
