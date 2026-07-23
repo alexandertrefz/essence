@@ -87,11 +87,7 @@ declarations {
 		§§ How many characters the String has.
 		§§
 		§§ @returns the number of characters.
-		length() -> Integer {
-			§ `List.length`, not this Method — the receiver is the List
-			§ `characters` returns, so there is no recursion here.
-			<- @::characters()::length()
-		}
+		length() -> Integer
 
 		§§ The String's characters, each as its own single-character String.
 		§§

@@ -46,6 +46,8 @@ export type StringNatives = {
 	append: (self: StringType, argument1: StringType) => StringType
 	// splitOn(_: String) -> List<String>
 	splitOn: (self: StringType, argument1: StringType) => ListType<StringType>
+	// length() -> Integer
+	length: (self: StringType) => IntegerType
 	// uppercased() -> String
 	uppercased: (self: StringType) => StringType
 	// lowercased() -> String
@@ -110,6 +112,8 @@ export type IntegerNatives = {
 	parse: (argument0: StringType) => IntegerType | NothingType
 	// toString() -> String
 	toString: (self: IntegerType) => StringType
+	// compareTo(_: Integer) -> Ordering
+	compareTo: (self: IntegerType, argument1: IntegerType) => OrderingType
 }
 
 export type RationalNatives = {
@@ -163,6 +167,8 @@ export type RationalNatives = {
 	toString__overload$1: (self: RationalType) => StringType
 	// toString(formatAs: String) -> String
 	toString__overload$2: (self: RationalType, formatAs: StringType) => StringType
+	// compareTo(_: Rational) -> Ordering
+	compareTo: (self: RationalType, argument1: RationalType) => OrderingType
 }
 
 export type AlgebraicNatives = {
@@ -321,7 +327,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "length" | "characters" | "characterAt" | "trimmed" | "startsWith" | "doesNotStartWith" | "endsWith" | "doesNotEndWith" | "repeated" | "reversed" | "slice" | "firstIndexOf" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "characterAt" | "trimmed" | "startsWith" | "doesNotStartWith" | "endsWith" | "doesNotEndWith" | "repeated" | "reversed" | "slice" | "firstIndexOf" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -329,11 +335,11 @@ export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), 
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
-export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divideBy__overload$1" | "divideBy__overload$2" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "clampedBetween" | "compareTo"> = true
+export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divideBy__overload$1" | "divideBy__overload$2" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "clampedBetween"> = true
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negated" | "reciprocal" | "isWholeNumber" | "roundedDown" | "roundedUp" | "compareTo"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negated" | "reciprocal" | "isWholeNumber" | "roundedDown" | "roundedUp"> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
