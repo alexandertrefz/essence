@@ -4,6 +4,7 @@ import { builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import type { common } from "../interfaces/index"
+import { runtimeNamespaceNames } from "../rewriter/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
@@ -19,8 +20,9 @@ import * as string from "../rewriter/__internal/String"
 import * as transcendental from "../rewriter/__internal/Transcendental"
 
 // NOTE: The Rewriter imports one runtime module per builtin Namespace, under
-// the Namespace's own name (`src/rewriter/index.ts:17-34`), so the mapping is
-// the identity — and this table is the only place it is written twice.
+// the Namespace's own name, so the mapping is the identity. The keys are
+// cross-checked against `runtimeNamespaceNames` below, so this table can not
+// silently fall out of step with what the Rewriter actually imports.
 const runtimeModules: Record<string, Record<string, unknown>> = {
 	String: string,
 	Boolean: boolean,
@@ -80,6 +82,28 @@ function nativeFlagsFor(
 }
 
 describe("Builtins", () => {
+	// NOTE: The stronger, per-signature form of this cross-check now lives in
+	// `natives.generated.ts`, which tsc holds against every runtime module. This
+	// stays because it gives a friendlier, Namespace-grouped message at test
+	// time and is the only check that covers a Namespace with NO runtime module
+	// at all. The set cross-check below closes the registration-site drift the
+	// README warns about: a Namespace declared in `src/stdlib` but missing from
+	// the Rewriter's import list, or vice versa, emits a call to `undefined`.
+	it("registers every builtin Namespace at every site", () => {
+		let declared = builtinNamespaces()
+			.map((namespace) => namespace.name)
+			.sort()
+		let imported = [...runtimeNamespaceNames].sort()
+		let tabled = Object.keys(runtimeModules).sort()
+
+		// NOTE: Every declared Namespace has a runtime module the Rewriter
+		// imports, and the Rewriter imports nothing the standard library does not
+		// declare.
+		expect(imported).toEqual(declared)
+		// NOTE: This spec's own module table agrees with the Rewriter's list.
+		expect(tabled).toEqual(imported)
+	})
+
 	// NOTE: The Enricher's tables promise a Method exists; the runtime module
 	// has to keep that promise. Nothing between the two stages checks it — a
 	// declared Method with no matching export type-checks, compiles, and then
