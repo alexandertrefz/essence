@@ -98,10 +98,7 @@ describe("Irrationals", () => {
 			const product = algebraic.multiplyWithAlgebraic(rootTwo, rootTwo)
 
 			expect(product[typeKeySymbol]).toBe("Rational")
-			expect(
-				number.is(product as never, integer.createInteger(2n) as never)
-					.value,
-			).toBeTrue()
+			// NOTE: `Number.is` (√2·√2 is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("combines pure radicals across radicands — √2·√3 is √6", () => {
@@ -192,10 +189,7 @@ describe("Irrationals", () => {
 			)
 
 			expect(quotient[typeKeySymbol]).toBe("Rational")
-			expect(
-				number.is(quotient as never, integer.createInteger(2n) as never)
-					.value,
-			).toBeTrue()
+			// NOTE: `Number.is` (TAU/π is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("returns Nothing for non-proportional quotients", () => {
@@ -244,15 +238,7 @@ describe("Irrationals", () => {
 	})
 
 	describe("Number cross-kind semantics", () => {
-		it("keeps cross-kind equality false by definition", () => {
-			expect(
-				number.is(radical(2n), rational.createRational(3n, 2n)).value,
-			).toBeFalse()
-			expect(number.is(number.PI, radical(2n)).value).toBeFalse()
-			expect(
-				number.is(number.PI, rational.createRational(355n, 113n)).value,
-			).toBeFalse()
-		})
+		// NOTE: cross-kind `Number.is` is Essence now (`src/stdlib/Number.es`) and covered by the golden harness.
 
 		it("crashes no longer on empty lists — lowestNumber gives Nothing", () => {
 			expect(
@@ -268,69 +254,8 @@ describe("Irrationals", () => {
 				}),
 			).toEqual(createNothing())
 		})
-
-		// NOTE: The `isLessThan` family is thin wrappers over `compareTo`, and
-		// the whole reason Phase 1 was cheap is that `compareTo` was already
-		// total and exact across all sixteen cells. These two properties pin
-		// that the wrappers really do agree with it — checked over every
-		// ordered pair of one value per kind, including √2 and π.
-		describe("the ordering family agrees with compareTo", () => {
-			// NOTE: One representative per kind. √2 < 3/2 < 2 < π, so the set
-			// also exercises every strict outcome, not just the reflexive one.
-			let values: Array<[string, never]> = [
-				["1", integer.createInteger(1n) as never],
-				["3/2", rational.createRational(3n, 2n) as never],
-				["2", integer.createInteger(2n) as never],
-				["√2", radical(2n) as never],
-				["π", number.PI as never],
-			]
-
-			for (let [aName, a] of values) {
-				for (let [bName, b] of values) {
-					it(`${aName} against ${bName}`, () => {
-						// NOTE: `Ordering.toString` is implemented in Essence now,
-						// so the runtime comparison reads the returned Ordering by
-						// reference against the shared singletons instead.
-						let comparison = number.compareTo(a, b)
-
-						expect(number.isLessThan(a, b).value).toBe(
-							comparison === ordering.less,
-						)
-						expect(number.isLessThanOrEqualTo(a, b).value).toBe(
-							comparison !== ordering.greater,
-						)
-						expect(number.isGreaterThan(a, b).value).toBe(
-							comparison === ordering.greater,
-						)
-						expect(number.isGreaterThanOrEqualTo(a, b).value).toBe(
-							comparison !== ordering.less,
-						)
-					})
-				}
-			}
-		})
-
-		it("orders the family symmetrically", () => {
-			// NOTE: `a < b` must agree with `b > a` for every pair, the
-			// property a broken cross-kind cell would break first.
-			let values = [
-				integer.createInteger(1n) as never,
-				rational.createRational(3n, 2n) as never,
-				radical(2n) as never,
-				number.PI as never,
-			]
-
-			for (let a of values) {
-				for (let b of values) {
-					expect(number.isLessThan(a, b).value).toBe(
-						number.isGreaterThan(b, a).value,
-					)
-					expect(number.isLessThanOrEqualTo(a, b).value).toBe(
-						number.isGreaterThanOrEqualTo(b, a).value,
-					)
-				}
-			}
-		})
+		// NOTE: the `isLessThan` family is Essence now (`src/stdlib/Number.es`) — its agreement with `compareTo` is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`src/stdlib/Number.es`); its symmetry with itself is covered by the golden harness.
 	})
 
 	describe("Structural equality", () => {

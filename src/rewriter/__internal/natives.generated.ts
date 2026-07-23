@@ -341,22 +341,8 @@ export type NumberNatives = {
 	PI: TranscendentalType
 	// TAU: Transcendental
 	TAU: TranscendentalType
-	// is(_: Number) -> Boolean
-	is: (self: NumberType, argument1: NumberType) => BooleanType
-	// isNot(_: Number) -> Boolean
-	isNot: (self: NumberType, argument1: NumberType) => BooleanType
-	// toString() -> String
-	toString: (self: NumberType) => StringType
 	// compareTo(_: Number) -> Ordering
 	compareTo: (self: NumberType, argument1: NumberType) => OrderingType
-	// isLessThan(_: Number) -> Boolean
-	isLessThan: (self: NumberType, argument1: NumberType) => BooleanType
-	// isLessThanOrEqualTo(_: Number) -> Boolean
-	isLessThanOrEqualTo: (self: NumberType, argument1: NumberType) => BooleanType
-	// isGreaterThan(_: Number) -> Boolean
-	isGreaterThan: (self: NumberType, argument1: NumberType) => BooleanType
-	// isGreaterThanOrEqualTo(_: Number) -> Boolean
-	isGreaterThanOrEqualTo: (self: NumberType, argument1: NumberType) => BooleanType
 	// static sum(_: List<Integer>) -> Integer
 	sum__overload$1: (argument0: ListType<IntegerType>) => IntegerType
 	// static sum(_: List<Rational>) -> Rational
@@ -375,28 +361,12 @@ export type NumberNatives = {
 	average__overload$2: (argument0: ListType<RationalType>) => RationalType | NothingType
 	// static average(_: List<Integer | Rational>) -> Optional<Rational>
 	average__overload$3: (argument0: ListType<IntegerType | RationalType>) => RationalType | NothingType
-	// static lowestNumber(_: Integer, _: Integer) -> Integer
-	lowestNumber__overload$1: (argument0: IntegerType, argument1: IntegerType) => IntegerType
-	// static lowestNumber(_: Rational, _: Rational) -> Rational
-	lowestNumber__overload$2: (argument0: RationalType, argument1: RationalType) => RationalType
-	// static lowestNumber(_: Integer, _: Rational) -> Integer | Rational
-	lowestNumber__overload$3: (argument0: IntegerType, argument1: RationalType) => IntegerType | RationalType
-	// static lowestNumber(_: Rational, _: Integer) -> Integer | Rational
-	lowestNumber__overload$4: (argument0: RationalType, argument1: IntegerType) => IntegerType | RationalType
 	// static lowestNumber(_: List<Integer>) -> Optional<Integer>
 	lowestNumber__overload$5: (argument0: ListType<IntegerType>) => IntegerType | NothingType
 	// static lowestNumber(_: List<Rational>) -> Optional<Rational>
 	lowestNumber__overload$6: (argument0: ListType<RationalType>) => RationalType | NothingType
 	// static lowestNumber(_: List<Integer | Rational>) -> Optional<Integer | Rational>
 	lowestNumber__overload$7: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType | NothingType
-	// static greatestNumber(_: Integer, _: Integer) -> Integer
-	greatestNumber__overload$1: (argument0: IntegerType, argument1: IntegerType) => IntegerType
-	// static greatestNumber(_: Rational, _: Rational) -> Rational
-	greatestNumber__overload$2: (argument0: RationalType, argument1: RationalType) => RationalType
-	// static greatestNumber(_: Integer, _: Rational) -> Integer | Rational
-	greatestNumber__overload$3: (argument0: IntegerType, argument1: RationalType) => IntegerType | RationalType
-	// static greatestNumber(_: Rational, _: Integer) -> Integer | Rational
-	greatestNumber__overload$4: (argument0: RationalType, argument1: IntegerType) => IntegerType | RationalType
 	// static greatestNumber(_: List<Integer>) -> Optional<Integer>
 	greatestNumber__overload$5: (argument0: ListType<IntegerType>) => IntegerType | NothingType
 	// static greatestNumber(_: List<Rational>) -> Optional<Rational>
@@ -546,7 +516,7 @@ export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Tran
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
-export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "isBetween"> = true
+export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4"> = true
 
 declare const NothingModule: typeof import("./Nothing")
 export const $Nothing: NothingNatives = NothingModule

@@ -37,16 +37,27 @@ declarations {
 		§§
 		§§ @param other the Number to compare against
 		§§ @returns `true` when both Numbers have the same numeric value.
-		is(_ other: Number) -> Boolean
+		is(_ other: Number) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Equal)
+		}
 
 		§§ Checks whether the Number has a different numeric value than another Number.
 		§§
 		§§ @param other the Number to compare against
 		§§ @returns `true` when the Numbers have different numeric values.
-		isNot(_ other: Number) -> Boolean
+		isNot(_ other: Number) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Represents the Number as a String, in the notation of the member Type it currently holds.
-		toString() -> String
+		toString() -> String {
+			<- match @ -> String {
+				case Integer { <- @::toString() }
+				case Rational { <- @::toString() }
+				case Algebraic { <- @::toString() }
+				case Transcendental { <- @::toString() }
+			}
+		}
 
 		§§ Orders the Number against another Number by numeric value, across Integers and Rationals.
 		§§
@@ -57,22 +68,30 @@ declarations {
 		§§ Whether this Number is strictly below the given one.
 		§§
 		§§ @param other the Number to compare against
-		isLessThan(_ other: Number) -> Boolean
+		isLessThan(_ other: Number) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Less)
+		}
 
 		§§ Whether this Number is below the given one, or equal to it.
 		§§
 		§§ @param other the Number to compare against
-		isLessThanOrEqualTo(_ other: Number) -> Boolean
+		isLessThanOrEqualTo(_ other: Number) -> Boolean {
+			<- @::isGreaterThan(other)::negate()
+		}
 
 		§§ Whether this Number is strictly above the given one.
 		§§
 		§§ @param other the Number to compare against
-		isGreaterThan(_ other: Number) -> Boolean
+		isGreaterThan(_ other: Number) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Greater)
+		}
 
 		§§ Whether this Number is above the given one, or equal to it.
 		§§
 		§§ @param other the Number to compare against
-		isGreaterThanOrEqualTo(_ other: Number) -> Boolean
+		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
+			<- @::isLessThan(other)::negate()
+		}
 
 		§§ Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.PI::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.
 		§§
@@ -120,13 +139,25 @@ declarations {
 		§§
 		§§ @returns the lowest Number — `Nothing` for the empty List, which has none.
 		overload static lowestNumber {
-			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer
+			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
+				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational
+			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
+				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
+				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
+				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
 			(_ integers: List<Integer>) -> Optional<Integer>
 
@@ -139,13 +170,25 @@ declarations {
 		§§
 		§§ @returns the greatest Number — `Nothing` for the empty List, which has none.
 		overload static greatestNumber {
-			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer
+			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational
+			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
+				<- secondNumber
+			}
 
 			(_ integers: List<Integer>) -> Optional<Integer>
 
