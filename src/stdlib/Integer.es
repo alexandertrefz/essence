@@ -9,7 +9,9 @@ declarations {
 		§§
 		§§ @param other the Integer to compare against
 		§§ @returns `true` when both are equal.
-		is(_ other: Integer) -> Boolean
+		is(_ other: Integer) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Equal)
+		}
 
 		§§ Checks whether the Integer has a different value than another.
 		§§
@@ -44,20 +46,36 @@ declarations {
 
 		§§ Subtracts a number from this Integer, staying exact for every member of the numeric tower.
 		overload subtract {
-			(_ other: Integer) -> Integer
+			(_ other: Integer) -> Integer {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Rational) -> Rational
+			(_ other: Rational) -> Rational {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Algebraic) -> Algebraic
+			(_ other: Algebraic) -> Algebraic {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Transcendental) -> Transcendental
+			(_ other: Transcendental) -> Transcendental {
+				<- @::add(other::negated())
+			}
 		}
 
 		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
 		overload divideBy {
-			(_ other: Integer) -> Optional<Rational>
+			(_ other: Integer) -> Optional<Rational> {
+				<- Rational.of(@, over other)
+			}
 
-			(_ other: Rational) -> Optional<Rational>
+			(_ other: Rational) -> Optional<Rational> {
+				constant dividend = @
+				<- match other::reciprocal() -> Optional<Rational> {
+					case Rational { <- dividend::multiplyWith(@) }
+					case Nothing { <- nothing }
+				}
+			}
 
 			(_ other: Algebraic) -> Algebraic | Rational
 		}
@@ -75,28 +93,36 @@ declarations {
 
 		§§ Whether this Integer is strictly below the given number.
 		overload isLessThan {
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::compareTo(other)::is(Ordering#Less)
+			}
 
 			(_ other: Rational) -> Boolean
 		}
 
 		§§ Whether this Integer is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::isGreaterThan(other)::negate()
+			}
 
 			(_ other: Rational) -> Boolean
 		}
 
 		§§ Whether this Integer is strictly above the given number.
 		overload isGreaterThan {
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::compareTo(other)::is(Ordering#Greater)
+			}
 
 			(_ other: Rational) -> Boolean
 		}
 
 		§§ Whether this Integer is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::isLessThan(other)::negate()
+			}
 
 			(_ other: Rational) -> Boolean
 		}
@@ -105,13 +131,21 @@ declarations {
 		squareRoot() -> Optional<Integer | Algebraic>
 
 		§§ The Integer without its sign — its distance from zero.
-		absolute() -> Integer
+		absolute() -> Integer {
+			if @::isNegative() { <- @::negated() }
+			<- @
+		}
 
 		§§ The Integer with its sign flipped.
 		negated() -> Integer
 
 		§§ Whether the Integer is divisible by two. Zero is even.
-		isEven() -> Boolean
+		isEven() -> Boolean {
+			<- match @::remainderOf(dividingBy 2) -> Boolean {
+				case 0 { <- true }
+				case _ { <- false }
+			}
+		}
 
 		§§ Whether the Integer is not divisible by two.
 		isOdd() -> Boolean {
@@ -119,13 +153,19 @@ declarations {
 		}
 
 		§§ Whether the Integer is above zero. Zero is neither positive nor negative.
-		isPositive() -> Boolean
+		isPositive() -> Boolean {
+			<- @::isGreaterThan(0)
+		}
 
 		§§ Whether the Integer is below zero. Zero is neither positive nor negative.
-		isNegative() -> Boolean
+		isNegative() -> Boolean {
+			<- @::isLessThan(0)
+		}
 
 		§§ Whether the Integer is exactly zero.
-		isZero() -> Boolean
+		isZero() -> Boolean {
+			<- @::is(0)
+		}
 
 		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainderOf(dividingBy 3)` is `2`.
 		§§
@@ -144,7 +184,12 @@ declarations {
 		§§ @param lowest the lowest allowed value
 		§§ @param and the highest allowed value
 		§§ @returns the clamped Integer, or `Nothing` when the bounds are in the wrong order.
-		clampedBetween(_ lowest: Integer, and highest: Integer) -> Optional<Integer>
+		clampedBetween(_ lowest: Integer, and highest: Integer) -> Optional<Integer> {
+			if lowest::isGreaterThan(highest) { <- nothing }
+			if @::isLessThan(lowest) { <- lowest }
+			if @::isGreaterThan(highest) { <- highest }
+			<- @
+		}
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.
 		§§
@@ -159,6 +204,8 @@ declarations {
 		§§
 		§§ @param other the Integer to order against
 		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Integer) -> Ordering
+		compareTo(_ other: Integer) -> Ordering {
+			<- @::<Number>compareTo(other)
+		}
 	}
 }
