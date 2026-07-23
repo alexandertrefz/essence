@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -911,6 +911,39 @@ describe("Code Generation", () => {
 
 			expect(code).toContain("record.Boolean")
 			expect(code).not.toContain("$es_")
+		})
+
+		// NOTE: The regression is the merged const, whose whole cost was the
+		// `...$native_X` spread that materialised a module namespace object. No
+		// emitted Program may spread a `$`-prefixed identifier — that names the
+		// mechanism directly, where the bundle-size ceilings catch it arriving by
+		// any other route. `Everyday.es` reaches an Essence Method AND a large
+		// runtime module, the exact shape that used to spread.
+		it("never spreads a runtime module", () => {
+			const source = readFileSync(
+				join(import.meta.dir, "../..", "testFiles/Everyday.es"),
+				{ encoding: "utf-8" },
+			)
+
+			expect(generate(source)).not.toMatch(/\.\.\.\$/)
+		})
+
+		// NOTE: The `$es_` prefix can not collide with a user identifier because
+		// `_` is a Lexer Symbol — no user name contains one. `$esBooleanisNot` is
+		// the closest a user can write, and it must survive as its own distinct
+		// binding alongside the Rewriter's `$es_Boolean_isNot`.
+		it("keeps a user identifier near the prefix distinct", async () => {
+			const source = `implementation {
+				constant $esBooleanisNot = "mine"
+
+				__print($esBooleanisNot::append(true::isNot(false)::toString()))
+			}`
+
+			const code = generate(source)
+
+			expect(code).toContain("$esBooleanisNot")
+			expect(code).toContain("$es_Boolean_isNot")
+			expect(await run(source)).toEqual(['"minetrue"'])
 		})
 
 		it("runs isNot from its const", async () => {
