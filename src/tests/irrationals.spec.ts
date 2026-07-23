@@ -174,12 +174,12 @@ describe("Irrationals", () => {
 
 		it("collapses cancelling π-parts to a Rational", () => {
 			// NOTE: `Transcendental.subtract` is written in Essence now
-			// (src/stdlib/Transcendental.es) as `add(other::negated())` — this
+			// (src/stdlib/Transcendental.es) as `add(other::negate())` — this
 			// is that composition, and the still-native gateway is what
 			// collapses the cancelled π-part.
 			const difference = transcendental.addTranscendental(
 				number.TAU,
-				transcendental.negated(number.TAU),
+				transcendental.negate(number.TAU),
 			)
 
 			expect(difference[typeKeySymbol]).toBe("Rational")

@@ -36,6 +36,70 @@ calls every declared Method across its edge cases and its output is diffed
 against a checked-in capture. Never regenerate that capture to make a test
 pass — a changed value means a body is wrong.
 
+## The voice
+
+The library is meant to be guessable: after a handful of Methods, a reader
+should be able to predict what the next one is CALLED and which of its Arguments
+carry a label. Four rules decide that, and every Method here follows them.
+
+**1. A transforming Method is an imperative command.** `add`, `sort`, `reverse`,
+`trim`, `round`, `negate`, `flatten`, `map`, `split`, `insert`, `clamp` — never
+the past-tense participle (`sorted`, `reversed`, `trimmed`). In a mutating
+language `list.sort()` is dangerous and `sorted()` is how an immutable API warns
+you; Essence has no such hazard to warn against, because EVERY Method is a Query
+and nothing is ever changed in place. `list::sort()` can only mean "give me the
+sorted List" — there is no mutating `sort` to confuse it with. Immutability is a
+global invariant, stated once here, not something each name re-encodes. `::`
+already lends the receiver-first feel; the imperative completes it and reads
+better (`1::add(2)`, not `1::added(2)`).
+
+**2. A preposition is a label, never fused into the verb.** When an Argument is
+reached through a preposition — *of* a thing, *on* a separator, *with* a prefix,
+*by* a comparison, *at* an index — the preposition is that Argument's label and
+the verb stem stays bare: `text::firstIndex(of: ",")`, `text::split(on: ",")`,
+`text::starts(with: "x")`, `list::sort(by: compare)`, `list::item(at: 0)`,
+`2::raise(to: 10)`, `1::divide(by: 2)`.
+
+**3. Direct object positional, everything prepositional labelled.** A verb's
+direct object — what it acts on, with no preposition between — stays positional
+and bare: `contains(_ other)`, `prepend(_ item)`, `add(_ other)`,
+`insert(_ item, …)`. Everything reached THROUGH a preposition is labelled,
+whether it is the only Argument (`firstIndex(of:)`) or a later one
+(`replaceEvery(_ part, with:)`, `insert(_ item, at index)`,
+`pad(to length, with pad)`). So `insert(_ item, at index)` reads "insert `item`,
+at `index`" — the item is the direct object, the index is reached through *at*.
+
+**4. A variant of one idea is an Overload, not a new name.** One `trim` with an
+`at:` Overload, not `trimmed`/`trimmedAtStart`/`trimmedAtEnd`; one `sort`, not
+`sorted`/`sortedBy`. And a fixed set of modes is a `choice`, never a `String` —
+`trim(at: Side#Start)`, not `trim("start")`.
+
+Three name SHAPES, so rule 1 is not misapplied:
+
+| Shape | Form | Examples |
+|---|---|---|
+| **Transformation** — does something, returns the result | imperative command | `sort`, `reverse`, `trim`, `negate`, `pad`, `clamp`, `raise(to:)`, `join(with:)` |
+| **Predicate** — returns a `Boolean` | `is…`/`has…`/`doesNot…` prefix, or a direct verb | `isEmpty`, `isEven`, `hasItems`, `contains`, `starts(with:)` |
+| **Accessor** — returns an intrinsic part | noun or adjective; no verb to force | `length`, `numerator`, `reciprocal`, `absolute`, `keys`, `firstItem`, `item(at:)`, `firstIndex(of:)`, `indexed` |
+
+Rules 2 and 3 do NOT apply to the `is…`/`has…`/`doesNot…` prefixes — those are
+predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`
+and `doesNotContain` keep their fused word. Quantifiers and adjectives are not
+prepositions either: `removeEvery`, `keepEvery`, `removeFirst`,
+`removeDuplicates`, `firstItem`/`lastItem` keep theirs.
+
+Two more conventions worth stating because they are already consistent and easy
+to break:
+
+- **A predicate Parameter is always labelled `where`** — `keepEvery(where:)`,
+  `count(where:)`, `anyItem(where:)`.
+- **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
+  `List.repeat(_, times: 0)` is the empty List, while `clamp` with inverted
+  bounds is `Nothing`.
+- **Keep return Types tight.** Add Overloads rather than widening one signature:
+  `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
+  single `add(Number) -> Number`.
+
 ## `declarations { … }`
 
 Each file opens with `declarations { … }` rather than `implementation { … }`.
@@ -155,12 +219,12 @@ guards two files, but it is a floor, not a substitute for measuring.
   conformance arrives as a hidden trailing Argument, so the runtime
   implementation gains a `conformance` Parameter.
 - **A narrower receiver needs a Namespace of its own — and only when no bound
-  can express it.** `flattened` is the one such Method: its items have to be
+  can express it.** `flatten` is the one such Method: its items have to be
   Lists AND it names the inner item Type, which no Protocol bound can do. It is
   declared as `NestedList<infer ItemType> for List<List<ItemType>>` in
   `List.es`, beside the Namespace it left. A receiver matches every Namespace
   whose target Type it unifies with, so `[[1]]::` reaches both `List` and
-  `NestedList`, and `[1]::flattened()` finds no Namespace to search. Two such
+  `NestedList`, and `[1]::flatten()` finds no Namespace to search. Two such
   Namespaces must not declare the SAME Method name: receiver specificity does
   not break that tie, and the call is reported as `ambiguous-namespace`.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`

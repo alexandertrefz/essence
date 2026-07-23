@@ -11,9 +11,9 @@ implementation {
 
 	§ The everyday Rational Methods — and the way back to Integer.
 	constant sevenHalves = 7/2
-	__print(sevenHalves::rounded())                      § 4 — halves round away from zero
-	__print(sevenHalves::roundedDown())                  § 3
-	__print(sevenHalves::negated()::truncated())         § -3 — towards zero
+	__print(sevenHalves::round())                      § 4 — halves round away from zero
+	__print(sevenHalves::roundDown())                  § 3
+	__print(sevenHalves::negate()::truncate())         § -3 — towards zero
 	__print(3/4::numerator())                            § 3
 	__print(3/4::reciprocal())                           § 4/3
 	__print(2/3::toThePowerOf(2))                        § 4/9
@@ -30,7 +30,7 @@ implementation {
 	__print(Number.average([1, 2])::otherwise(0/1))      § 3/2
 
 	§ The sign Methods reach the whole tower.
-	__print(Number.PI::negated()::absolute())            § π
+	__print(Number.PI::negate()::absolute())            § π
 
 	§ isBetween reads the tower's one order, bounds included.
 	__print(5::isBetween(1, and 10))                     § true
@@ -50,9 +50,9 @@ implementation {
 	__print([3/2, 1, 1/2]::sorted())                     § [ 1/2, 1, 3/2 ] — via Number
 
 	§ The new List shapes.
-	__print([[1, 2], [3]]::flattened())                  § [ 1, 2, 3 ]
+	__print([[1, 2], [3]]::flatten())                  § [ 1, 2, 3 ]
 	__print([1, 2, 3, 2]::lastIndexOf(2))                § 3
-	__print([1, 2, 3, 4]::partitioned(where (n) { <- n::isEven() }))
+	__print([1, 2, 3, 4]::partition(where (n) { <- n::isEven() }))
 	__print(["a", "b"]::pairedWith([1, 2, 3]))           § pairs stop with the shorter List
 	__print([1, 2, 3, 4, 5]::splitInto(groupsOf 2))      § [ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
 

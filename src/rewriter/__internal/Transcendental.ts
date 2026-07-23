@@ -330,9 +330,7 @@ export function divideByTranscendental(
 // NOTE: Negation flips both components and keeps the π coefficient non-zero,
 // so the result stays a Transcendental without consulting the
 // `createTranscendental` gateway.
-export function negated(
-	transcendental: TranscendentalType,
-): TranscendentalType {
+export function negate(transcendental: TranscendentalType): TranscendentalType {
 	return {
 		[typeKeySymbol]: "Transcendental",
 		rationalPartNumerator: -transcendental.rationalPartNumerator,

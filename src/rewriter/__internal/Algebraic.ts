@@ -617,7 +617,7 @@ export function reciprocalOf(
 // NOTE: Negation flips both components and touches neither invariant — the
 // radicand stays squarefree and the coefficient stays non-zero, so the result
 // is an Algebraic without consulting the `createAlgebraic` gateway.
-export function negated(algebraic: AlgebraicType): AlgebraicType {
+export function negate(algebraic: AlgebraicType): AlgebraicType {
 	return {
 		[typeKeySymbol]: "Algebraic",
 		rationalPartNumerator: -algebraic.rationalPartNumerator,

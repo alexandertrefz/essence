@@ -102,8 +102,8 @@ export type IntegerNatives = {
 	isGreaterThanOrEqualTo__overload$2: (self: IntegerType, argument1: RationalType) => BooleanType
 	// squareRoot() -> Optional<Integer | Algebraic>
 	squareRoot: (self: IntegerType) => IntegerType | AlgebraicType | NothingType
-	// negated() -> Integer
-	negated: (self: IntegerType) => IntegerType
+	// negate() -> Integer
+	negate: (self: IntegerType) => IntegerType
 	// remainderOf(dividingBy: Integer) -> Optional<Integer>
 	remainderOf: (self: IntegerType, dividingBy: IntegerType) => IntegerType | NothingType
 	// toThePowerOf(_: Integer) -> Optional<Integer | Rational>
@@ -155,10 +155,10 @@ export type RationalNatives = {
 	numerator: (self: RationalType) => IntegerType
 	// denominator() -> Integer
 	denominator: (self: RationalType) => IntegerType
-	// rounded() -> Integer
-	rounded: (self: RationalType) => IntegerType
-	// truncated() -> Integer
-	truncated: (self: RationalType) => IntegerType
+	// round() -> Integer
+	round: (self: RationalType) => IntegerType
+	// truncate() -> Integer
+	truncate: (self: RationalType) => IntegerType
 	// toThePowerOf(_: Integer) -> Optional<Rational>
 	toThePowerOf: (self: RationalType, argument1: IntegerType) => RationalType | NothingType
 	// static parse(_: String) -> Optional<Rational>
@@ -192,8 +192,8 @@ export type AlgebraicNatives = {
 	divideBy__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType | NothingType
 	// divideBy(_: Algebraic) -> Optional<Rational | Algebraic>
 	divideBy__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
-	// negated() -> Algebraic
-	negated: (self: AlgebraicType) => AlgebraicType
+	// negate() -> Algebraic
+	negate: (self: AlgebraicType) => AlgebraicType
 	// toString() -> String
 	toString: (self: AlgebraicType) => StringType
 }
@@ -215,8 +215,8 @@ export type TranscendentalNatives = {
 	divideBy__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType | NothingType
 	// divideBy(_: Transcendental) -> Optional<Rational>
 	divideBy__overload$3: (self: TranscendentalType, argument1: TranscendentalType) => RationalType | NothingType
-	// negated() -> Transcendental
-	negated: (self: TranscendentalType) => TranscendentalType
+	// negate() -> Transcendental
+	negate: (self: TranscendentalType) => TranscendentalType
 	// toString() -> String
 	toString: (self: TranscendentalType) => StringType
 }
@@ -302,8 +302,8 @@ export type ListNatives = {
 	firstIndexOf: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, ItemType__conformance: EquatableConformance<ItemType>) => IntegerType | NothingType
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
-	// reversed<ItemType>() -> List<ItemType>
-	reversed: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
+	// reverse<ItemType>() -> List<ItemType>
+	reverse: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
 	// sortedBy<ItemType>(_: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
 	sortedBy: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// compareTo<ItemType is Comparable>(_: List<ItemType>) -> Ordering
@@ -321,13 +321,13 @@ export type ListNatives = {
 }
 
 export type NestedListNatives = {
-	// flattened<ItemType>() -> List<ItemType>
-	flattened: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
+	// flatten<ItemType>() -> List<ItemType>
+	flatten: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "characterAt" | "trimmed" | "startsWith" | "doesNotStartWith" | "endsWith" | "doesNotEndWith" | "repeated" | "reversed" | "slice" | "firstIndexOf" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "characterAt" | "trimmed" | "startsWith" | "doesNotStartWith" | "endsWith" | "doesNotEndWith" | "repeated" | "reverse" | "slice" | "firstIndexOf" | "paddedAtStart" | "paddedAtEnd" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -339,7 +339,7 @@ export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), 
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negated" | "reciprocal" | "isWholeNumber" | "roundedDown" | "roundedUp"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "roundDown" | "roundUp"> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
@@ -371,7 +371,7 @@ export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "i
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeAt" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "sorted" | "anyItem" | "everyItem" | "countOf__overload$1" | "countOf__overload$2" | "insertAt" | "replaceAt" | "partitioned" | "repeating"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeAt" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "sorted" | "anyItem" | "everyItem" | "countOf__overload$1" | "countOf__overload$2" | "insertAt" | "replaceAt" | "partition" | "repeating"> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule
