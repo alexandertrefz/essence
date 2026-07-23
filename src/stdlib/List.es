@@ -36,7 +36,9 @@ declarations {
 		§§
 		§§ @param other the value to compare with
 		§§ @returns `true` when the Lists are not equal.
-		isNot(_ other: List<ItemType>) -> Boolean
+		isNot(_ other: List<ItemType>) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Represents the List and its items as a String.
 		§§
@@ -51,7 +53,9 @@ declarations {
 		§§ Whether the List has at least one item — the opposite of `isEmpty`.
 		§§
 		§§ @returns `true` when the List is not empty.
-		hasItems() -> Boolean
+		hasItems() -> Boolean {
+			<- @::isEmpty()::negate()
+		}
 
 		§§ Whether the List has no items at all.
 		§§
@@ -68,7 +72,9 @@ declarations {
 		§§
 		§§ @param item the item to look for
 		§§ @returns `true` when the item does not occur.
-		doesNotContain(_ item: ItemType) -> Boolean
+		doesNotContain(_ item: ItemType) -> Boolean {
+			<- @::contains(item)::negate()
+		}
 
 		§§ The first item, or the first item the given check accepts.
 		§§

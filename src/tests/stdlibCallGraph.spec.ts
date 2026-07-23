@@ -198,12 +198,11 @@ function preludeOf(source: string): Array<PreludeNamespace> {
 }
 
 describe("Stdlib Call Graph", () => {
-	// NOTE: Planted before it is needed. The standard library has two
-	// Essence-implemented Methods today and neither calls the other, so this
-	// passes trivially — the point is that it is already in place for the
-	// commits that rewrite the native Methods in terms of each other, where an
-	// accidental cycle is a stack overflow at run time and no Diagnostic at
-	// all.
+	// NOTE: This now guards real edges — `Ordering.isNot` calls `Ordering.is`,
+	// `String.isNot` calls `String.is`, and the conversion adds more Methods
+	// written in terms of each other every commit. An accidental cycle among
+	// them is a stack overflow at run time with no Diagnostic, which is exactly
+	// what this catches before it ships.
 	it("has no cycle among the Essence-implemented Methods", () => {
 		let cycle = findCycle(buildCallGraph(stdlibPrelude()))
 
@@ -220,7 +219,13 @@ describe("Stdlib Call Graph", () => {
 		let graph = buildCallGraph(stdlibPrelude())
 
 		expect([...graph.keys()].sort()).toEqual([
+			"Algebraic.isNot",
 			"Boolean.isNot",
+			"Integer.isNot",
+			"Integer.isOdd",
+			"List.doesNotContain",
+			"List.hasItems",
+			"List.isNot",
 			"Nothing.is",
 			"Nothing.isNot",
 			"Nothing.toString",
@@ -229,6 +234,14 @@ describe("Stdlib Call Graph", () => {
 			"Ordering.is",
 			"Ordering.isNot",
 			"Ordering.toString",
+			"Rational.isNot",
+			"Record.isNot",
+			"String.doesNotContain",
+			"String.doesNotEndWith",
+			"String.doesNotStartWith",
+			"String.hasAnyContent",
+			"String.isNot",
+			"Transcendental.isNot",
 		])
 	})
 

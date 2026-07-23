@@ -345,12 +345,9 @@ describe("Irrationals", () => {
 			expect(anyIs(rootTwo, radical(3n))).toBeFalse()
 			expect(anyIsNot(rootTwo, radical(2n))).toBeFalse()
 
+			// NOTE: List.doesNotContain is implemented in Essence now (src/stdlib/List.es); the golden harness covers it.
 			expect(
 				list.contains(list.createList([rootTwo]), radical(2n)).value,
-			).toBeTrue()
-			expect(
-				list.doesNotContain(list.createList([rootTwo]), radical(3n))
-					.value,
 			).toBeTrue()
 		})
 

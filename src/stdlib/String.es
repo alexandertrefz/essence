@@ -15,7 +15,9 @@ declarations {
 		§§ Whether this String has at least one character — the opposite of `isEmpty`.
 		§§
 		§§ @returns `true` when the String is not empty.
-		hasAnyContent() -> Boolean
+		hasAnyContent() -> Boolean {
+			<- @::isEmpty()::negate()
+		}
 
 		§§ Checks whether the String has exactly the same characters as another.
 		§§
@@ -27,7 +29,9 @@ declarations {
 		§§
 		§§ @param other the String to compare against
 		§§ @returns `true` when the Strings are not equal.
-		isNot(_ other: String) -> Boolean
+		isNot(_ other: String) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Joins another String onto the front of this one.
 		§§
@@ -61,7 +65,9 @@ declarations {
 		§§
 		§§ @param other the String to look for
 		§§ @returns `true` when it does not occur.
-		doesNotContain(_ other: String) -> Boolean
+		doesNotContain(_ other: String) -> Boolean {
+			<- @::contains(other)::negate()
+		}
 
 		§§ How many characters the String has.
 		§§
@@ -97,13 +103,17 @@ declarations {
 		startsWith(_ prefix: String) -> Boolean
 
 		§§ Whether the String does not begin with the given one.
-		doesNotStartWith(_ prefix: String) -> Boolean
+		doesNotStartWith(_ prefix: String) -> Boolean {
+			<- @::startsWith(prefix)::negate()
+		}
 
 		§§ Whether the String ends with the given one.
 		endsWith(_ suffix: String) -> Boolean
 
 		§§ Whether the String does not end with the given one.
-		doesNotEndWith(_ suffix: String) -> Boolean
+		doesNotEndWith(_ suffix: String) -> Boolean {
+			<- @::endsWith(suffix)::negate()
+		}
 
 		§§ The String with every occurrence of one part replaced by another.
 		§§

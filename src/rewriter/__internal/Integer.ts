@@ -39,13 +39,6 @@ export function is(
 	return createBoolean(originalInteger.value === otherInteger.value)
 }
 
-export function isNot(
-	originalInteger: IntegerType,
-	otherInteger: IntegerType,
-): BooleanType {
-	return createBoolean(originalInteger.value !== otherInteger.value)
-}
-
 // #region Add
 
 export function add__overload$1(
@@ -256,10 +249,6 @@ export function negated(integer: IntegerType): IntegerType {
 
 export function isEven(integer: IntegerType): BooleanType {
 	return createBoolean(integer.value % 2n === 0n)
-}
-
-export function isOdd(integer: IntegerType): BooleanType {
-	return createBoolean(integer.value % 2n !== 0n)
 }
 
 export function isPositive(integer: IntegerType): BooleanType {

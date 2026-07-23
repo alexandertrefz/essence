@@ -62,7 +62,7 @@ describe("Stdlib", () => {
 			expect(integer.absolute(int(5n))).toEqual(int(5n))
 			expect(integer.negated(int(5n))).toEqual(int(-5n))
 			expect(integer.isEven(int(0n)).value).toBe(true)
-			expect(integer.isOdd(int(-3n)).value).toBe(true)
+			// NOTE: isOdd is implemented in Essence now (src/stdlib/Integer.es); the golden harness covers it.
 			expect(integer.isPositive(int(0n)).value).toBe(false)
 			expect(integer.isNegative(int(0n)).value).toBe(false)
 			expect(integer.isZero(int(0n)).value).toBe(true)

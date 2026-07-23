@@ -73,13 +73,6 @@ export function is(
 	return createBoolean(true)
 }
 
-export function isNot(
-	firstRecordInstance: RecordType,
-	secondRecordInstance: RecordType,
-): BooleanType {
-	return negate(is(firstRecordInstance, secondRecordInstance))
-}
-
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(recordInstance: RecordType): StringType {
 	return createString(getStringRepresentation(recordInstance))

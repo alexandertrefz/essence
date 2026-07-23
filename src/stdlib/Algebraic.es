@@ -17,7 +17,9 @@ declarations {
 		§§
 		§§ @param other the Algebraic to compare with
 		§§ @returns `true` when the numbers differ.
-		isNot(_ other: Algebraic) -> Boolean
+		isNot(_ other: Algebraic) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Orders the Algebraic against another Algebraic — exactly, by symbolic comparison.
 		§§
