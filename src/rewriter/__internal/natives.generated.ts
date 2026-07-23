@@ -69,10 +69,6 @@ export type BooleanNatives = {
 	and: (self: BooleanType, argument1: BooleanType) => BooleanType
 	// or(_: Boolean) -> Boolean
 	or: (self: BooleanType, argument1: BooleanType) => BooleanType
-	// exclusiveOr(_: Boolean) -> Boolean
-	exclusiveOr: (self: BooleanType, argument1: BooleanType) => BooleanType
-	// toString() -> String
-	toString: (self: BooleanType) => StringType
 }
 
 export type IntegerNatives = {
@@ -329,7 +325,7 @@ export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "i
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
-export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), "isNot"> = true
+export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), "isNot" | "exclusiveOr" | "toString"> = true
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
