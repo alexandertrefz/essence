@@ -442,13 +442,13 @@ describe("Code Generation", () => {
 		it("sorts a List of Strings through String.compareTo", () => {
 			let generated = generate(`
 				implementation {
-					__print(["b", "a"]::sortedBy(
+					__print(["b", "a"]::sort(by 
 						(first, second) { <- first::compareTo(second) },
 					))
 				}
 			`)
 
-			expect(generated).toContain("List.sortedBy(")
+			expect(generated).toContain("List.sort__overload$2(")
 			expect(generated).toContain("String.compareTo(")
 		})
 	})
@@ -614,7 +614,7 @@ describe("Code Generation", () => {
 
 		it("should keep a flat witness a plain object literal", () => {
 			const code = generate(`implementation {
-				constant ordered: List<Integer> = [3, 1, 2]::sorted()
+				constant ordered: List<Integer> = [3, 1, 2]::sort()
 			}`)
 
 			// NOTE: An unconditional witness stays exactly the method-map object
@@ -626,7 +626,7 @@ describe("Code Generation", () => {
 
 		it("should wrap a nested witness in boundConformance", () => {
 			const code = generate(`implementation {
-				constant ordered = [[1, 2], [3]]::sorted()
+				constant ordered = [[1, 2], [3]]::sort()
 			}`)
 
 			// NOTE: `List<List<Integer>>` sorts through List's own `compareTo`,

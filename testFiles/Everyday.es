@@ -45,9 +45,9 @@ implementation {
 	__print([1]::removeFirst()::firstItem()::otherwise(99)) § 99
 
 	§ Sorting through Comparable — no comparison to write.
-	__print([3, 1, 2]::sorted())                         § [ 1, 2, 3 ]
-	__print(["banana", "apple"]::sorted())               § [ "apple", "banana" ]
-	__print([3/2, 1, 1/2]::sorted())                     § [ 1/2, 1, 3/2 ] — via Number
+	__print([3, 1, 2]::sort())                         § [ 1, 2, 3 ]
+	__print(["banana", "apple"]::sort())               § [ "apple", "banana" ]
+	__print([3/2, 1, 1/2]::sort())                     § [ 1/2, 1, 3/2 ] — via Number
 
 	§ The new List shapes.
 	__print([[1, 2], [3]]::flatten())                  § [ 1, 2, 3 ]

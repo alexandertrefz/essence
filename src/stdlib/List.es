@@ -28,7 +28,7 @@ declarations {
 	§
 	§ Every Method that asks whether two ITEMS are equal — `is`, `contains`,
 	§ `firstIndex`, `lastIndex`, `count(of:)`, `removeEvery(_:)` and
-	§ `removeDuplicates` — carries that bound, for the same reason `sorted`
+	§ `removeDuplicates` — carries that bound, for the same reason `sort`
 	§ carries `Comparable`: equality is the item Type's own `is`, and a List
 	§ whose items can not answer it can not be searched by value. The universal
 	§ structural comparison that stood in for it before was not a Type the
@@ -306,38 +306,46 @@ declarations {
 
 		§§ A new List with the items in the opposite order.
 		§§
-		§§ @returns the reverse List.
+		§§ @returns the reversed List.
 		reverse() -> List<ItemType>
 
 		§ The `Comparable` bound works exactly as the `Equatable` one above
 		§ does. It resolves the conforming Namespace at the call site —
 		§ `Integer` for a `List<Integer>`, the covering `Number` for a mixed
 		§ numeric List — and its `compareTo` arrives as a hidden trailing
-		§ Argument. Its own bounded `ItemType` shadows the Namespace's, and
-		§ because the body below is written in Essence, `@` has to be read
-		§ through that shadowing too — a List of the BOUNDED item Type, which is
-		§ what lets `compareTo` be called on an item at all.
+		§ Argument. Its own bounded `ItemType` shadows the Namespace's.
+		§
+		§ BOTH entries are native, and the no-Argument one is native for a
+		§ reason worth keeping: written in Essence its body would be
+		§ `@::sort(by …)`, a call that has to pick between the two entries
+		§ HERE. Picking one is what would give the comparison's Parameters
+		§ their Types, so they can not be inferred; and annotating them does
+		§ not rescue it either, because this entry's bounded `ItemType`
+		§ shadows the Namespace's, so the annotated Function is typed in a
+		§ DIFFERENT `ItemType` than the `by:` entry expects and no Overload
+		§ matches. A sibling Overload is not reachable from an Essence body
+		§ the way a separately named Method was.
 
-		§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use `sortedBy`.
+		§§ A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison.
 		§§
 		§§ @returns the ordered List.
-		sorted<infer ItemType is Comparable>() -> List<ItemType> {
-			§ The bound is the whole of the difference from `sortedBy`: the
-			§ conforming Namespace's `compareTo` arrives as the hidden
-			§ conformance Argument, and this hands it straight on as the
-			§ comparison.
-			<- @::sortedBy((first, second) { <- first::compareTo(second) })
+		overload sort {
+			§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use the `by:` entry.
+			§§
+			§§ @returns the ordered List.
+			<infer ItemType is Comparable>() -> List<ItemType>
+
+			§§ A new List ordered by the given comparison, applied to each pair of items.
+			§§
+			§§ @param by the comparison to order the items with
+			§§ @returns the ordered List.
+			(by comparison: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
 		}
-
-		§§ A new List ordered by the given comparison, applied to each pair of items.
-		§§
-		§§ @returns the ordered List.
-		sortedBy(_ comparison: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
 
 		§ The witness behind List's conditional Comparable conformance —
 		§ lexicographic ordering, available whenever the items are `Comparable`.
 		§ Its own bounded `ItemType` shadows the Namespace's, exactly as
-		§ `sorted`'s does.
+		§ `sort`'s does.
 
 		§§ Orders the List against another one lexicographically — the first differing pair of items decides, and on an equal prefix the shorter List comes first. Available whenever the items conform to `Comparable`.
 		§§
@@ -425,7 +433,7 @@ declarations {
 		§ restating a conformance of List's own: joining needs nothing of the
 		§ items but that each can say what it is, so the bound is `Printable`
 		§ and the conforming Namespace's `toString` arrives as the hidden
-		§ Argument, exactly as `sorted`'s `compareTo` does. Bounding the METHOD
+		§ Argument, exactly as `sort`'s `compareTo` does. Bounding the METHOD
 		§ is what keeps it here — a Namespace targeting `List<String>` would
 		§ have answered for Strings only, and every builtin worth joining is
 		§ Printable, Lists included. `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`.
@@ -519,7 +527,7 @@ declarations {
 	namespace NestedList<infer ItemType> for List<List<ItemType>> {
 		§§ Flattens a List of Lists by one level — every inner List's items, in order, in a single List.
 		§§
-		§§ @returns the flatten List.
+		§§ @returns the flattened List.
 		flatten() -> List<ItemType>
 	}
 }

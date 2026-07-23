@@ -55,6 +55,6 @@ implementation {
 	__print(numbers::remove(at 2))            § [3, 1, 1, 4]
 	__print(numbers::insert(99, at 2))   § [3, 1, 99, 2, 1, 4]
 	__print(numbers::replace(99, at 0))  § [99, 1, 2, 1, 4]
-	__print(numbers::sortedBy((a, b) { <- a::compareTo(b) }))  § [1, 1, 2, 3, 4]
+	__print(numbers::sort(by (a, b) { <- a::compareTo(b) }))  § [1, 1, 2, 3, 4]
 
 }

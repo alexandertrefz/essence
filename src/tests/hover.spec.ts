@@ -377,14 +377,10 @@ describe("Hover of conformance clauses", () => {
 	})
 
 	it("should show a Method's Protocol bound", () => {
-		let source = [
-			"implementation {",
-			"\t[3, 1]::sorted()",
-			"}",
-		].join("\n")
+		let source = ["implementation {", "\t[3, 1]::sort()", "}"].join("\n")
 
 		expect(hover(source, { line: 2, column: 11 })).toBe(
-			"sorted<ItemType is Comparable>() -> List<ItemType>",
+			"sort<ItemType is Comparable>() -> List<ItemType>",
 		)
 	})
 })
