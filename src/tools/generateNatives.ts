@@ -382,7 +382,7 @@ function renderNamespace(
 	namespace: common.NamespaceType,
 	nativeBindings: Stdlib["nativeBindings"],
 	ctx: RenderContext,
-): string {
+): { text: string; hasEssenceImplemented: boolean } {
 	let bindings = nativeBindings[namespace.name]
 	let nativeEntries: Array<string> = []
 	let bodiedKeys: Array<string> = []
@@ -462,7 +462,9 @@ function renderNamespace(
 		`export type ${namespace.name}Natives = {\n${nativeEntries.join("\n")}\n}`,
 	)
 
-	if (bodiedKeys.length > 0) {
+	let hasEssenceImplemented = bodiedKeys.length > 0
+
+	if (hasEssenceImplemented) {
 		let absence = bodiedKeys.map((key) => `\t${key}?: never`).join("\n")
 
 		sections.push(
@@ -470,7 +472,7 @@ function renderNamespace(
 		)
 	}
 
-	return sections.join("\n\n")
+	return { text: sections.join("\n\n"), hasEssenceImplemented }
 }
 
 // NOTE: The witness object a bounded Type Parameter is fulfilled with — the
@@ -546,13 +548,30 @@ function renderImports(used: Set<string>): string {
 // (wrong arity, receiver, conformance Parameter or Type) fails on that property,
 // while EXTRA exports (`createBoolean`, `Record.entries`) are correctly
 // permitted — a reference, unlike an object literal, is not excess-checked.
+//
+// When the Namespace has any Essence-implemented Method, its `*EssenceImplemented`
+// type is intersected IN — `BooleanNatives & BooleanEssenceImplemented` — so a
+// runtime export for a bodied Method (an `isNot` typed against `never`) is
+// rejected too. The intersection is required, not cosmetic: a lone
+// `{ isNot?: never }` is a weak type, and assigning a module that LACKS `isNot`
+// would wrongly fail with TS2559 ("has no properties in common"). Intersecting
+// with the positive `*Natives` type gives the module properties in common, so
+// the absence keys are checked without the weak-type trap.
+//
 // The `declare const` carries no runtime value; nothing imports this file, so
 // the `export const` is never evaluated. The Namespace → module path is the
 // identity.
-function renderModuleAssertion(namespace: common.NamespaceType): string {
+function renderModuleAssertion(
+	namespace: common.NamespaceType,
+	hasEssenceImplemented: boolean,
+): string {
+	let contract = hasEssenceImplemented
+		? `${namespace.name}Natives & ${namespace.name}EssenceImplemented`
+		: `${namespace.name}Natives`
+
 	return [
 		`declare const ${namespace.name}Module: typeof import("./${namespace.name}")`,
-		`export const $${namespace.name}: ${namespace.name}Natives = ${namespace.name}Module`,
+		`export const $${namespace.name}: ${contract} = ${namespace.name}Module`,
 	].join("\n")
 }
 
@@ -580,9 +599,14 @@ export function renderNativesModule(stdlib: Stdlib): string {
 
 	// NOTE: Rendered before the imports and conformance types are assembled, so
 	// that `ctx` records every runtime type and every bounded Protocol first.
-	let namespaceSections = stdlib.namespaces.map((namespace) =>
-		renderNamespace(namespace, stdlib.nativeBindings, ctx),
-	)
+	// Each render reports whether it emitted a `*EssenceImplemented` type, so the
+	// assertion below intersects it in exactly where one exists.
+	let namespaces = stdlib.namespaces.map((namespace) => ({
+		namespace,
+		...renderNamespace(namespace, stdlib.nativeBindings, ctx),
+	}))
+
+	let namespaceSections = namespaces.map((entry) => entry.text)
 
 	let conformanceSections = [...ctx.usedProtocols].sort().map((name) => {
 		let protocol = stdlib.protocols[name]
@@ -596,8 +620,8 @@ export function renderNativesModule(stdlib: Stdlib): string {
 		return renderConformanceType(protocol, ctx)
 	})
 
-	let assertionSections = stdlib.namespaces.map((namespace) =>
-		renderModuleAssertion(namespace),
+	let assertionSections = namespaces.map((entry) =>
+		renderModuleAssertion(entry.namespace, entry.hasEssenceImplemented),
 	)
 
 	let parts = [HEADER, renderImports(ctx.used)]
