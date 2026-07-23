@@ -57,32 +57,12 @@ describe("Stdlib", () => {
 			)
 		})
 
-		it("answers absolute value, negation, parity and sign", () => {
-			expect(integer.absolute(int(-5n))).toEqual(int(5n))
-			expect(integer.absolute(int(5n))).toEqual(int(5n))
+		it("negates a value", () => {
+			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
+			// isNegative/isZero) and clampedBetween are implemented in Essence
+			// now (src/stdlib/Integer.es); the golden harness covers them. Only
+			// negated stays native here.
 			expect(integer.negated(int(5n))).toEqual(int(-5n))
-			expect(integer.isEven(int(0n)).value).toBe(true)
-			// NOTE: isOdd is implemented in Essence now (src/stdlib/Integer.es); the golden harness covers it.
-			expect(integer.isPositive(int(0n)).value).toBe(false)
-			expect(integer.isNegative(int(0n)).value).toBe(false)
-			expect(integer.isZero(int(0n)).value).toBe(true)
-		})
-
-		it("clamps into bounds, refusing inverted ones", () => {
-			expect(integer.clampedBetween(int(15n), int(1n), int(10n))).toEqual(
-				int(10n),
-			)
-			expect(integer.clampedBetween(int(-2n), int(1n), int(10n))).toEqual(
-				int(1n),
-			)
-			expect(integer.clampedBetween(int(5n), int(1n), int(10n))).toEqual(
-				int(5n),
-			)
-			expect(
-				integer.clampedBetween(int(5n), int(10n), int(1n))[
-					typeKeySymbol
-				],
-			).toBe("Nothing")
 		})
 
 		it("parses exactly the shape toString produces", () => {
@@ -358,7 +338,9 @@ describe("Stdlib", () => {
 
 		it("partitions by a check, keeping order on both sides", () => {
 			const partitions = list.partitioned(ints(1n, 2n, 3n, 4n), (item) =>
-				integer.isEven(item),
+				// NOTE: Integer.isEven is written in Essence now; the predicate
+				// here checks parity on the runtime representation directly.
+				boolean.createBoolean(item.value % 2n === 0n),
 			)
 
 			expect(partitions.matching).toEqual(ints(2n, 4n))
@@ -392,13 +374,13 @@ describe("Stdlib", () => {
 		it("sorts through a Comparable conformance", () => {
 			expect(
 				list.sorted(ints(3n, 1n, 2n), {
-					compareTo: integer.compareTo,
+					compareTo: number.compareTo,
 				}),
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
 		it("compares Lists lexicographically", () => {
-			let integerConformance = { compareTo: integer.compareTo }
+			let integerConformance = { compareTo: number.compareTo }
 
 			expect(
 				list.compareTo(ints(1n, 2n), ints(1n, 3n), integerConformance)[
@@ -422,7 +404,7 @@ describe("Stdlib", () => {
 		it("orders a shorter List before a longer one that shares its prefix", () => {
 			expect(
 				list.compareTo(ints(1n), ints(1n, 2n), {
-					compareTo: integer.compareTo,
+					compareTo: number.compareTo,
 				})[typeKeySymbol],
 			).toBe("Ordering#Less")
 		})
@@ -432,7 +414,7 @@ describe("Stdlib", () => {
 			// `boundConformance` curries the inner Integer ordering onto
 			// `List.compareTo`, exactly what `$type.boundConformance(...)` emits.
 			let nested = boundConformance({ compareTo: list.compareTo }, [
-				{ compareTo: integer.compareTo },
+				{ compareTo: number.compareTo },
 			])
 
 			expect(
@@ -444,7 +426,7 @@ describe("Stdlib", () => {
 		})
 
 		it("sorts three-level nested Lists", () => {
-			let integerConformance = { compareTo: integer.compareTo }
+			let integerConformance = { compareTo: number.compareTo }
 			let listOfIntegers = boundConformance(
 				{ compareTo: list.compareTo },
 				[integerConformance],

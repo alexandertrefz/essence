@@ -1034,48 +1034,6 @@ describe("Rewriter", () => {
 		})
 
 		describe("Integer", () => {
-			describe("is", () => {
-				it("returns true if the integers are the same", () => {
-					expect(integer.is(integerOne(), integerOne())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(integer.is(integerTwo(), integerTwo())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(
-						integer.is(integerHundred(), integerHundred()),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false if the integers are not the same", () => {
-					expect(integer.is(integerOne(), integerTwo())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.is(integerOne(), integerHundred())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.is(integerTwo(), integerOne())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.is(integerTwo(), integerHundred())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.is(integerHundred(), integerOne())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.is(integerHundred(), integerTwo())).toEqual(
-						booleanFalse(),
-					)
-				})
-			})
-
 			// NOTE: isNot / isOdd are implemented in Essence now (src/stdlib/Integer.es); the golden harness covers them.
 
 			describe("add", () => {
@@ -1121,54 +1079,6 @@ describe("Rewriter", () => {
 							rational.createRational(1n, -2n),
 						),
 					).toEqual(rationalOneHalf())
-				})
-			})
-
-			describe("subtract", () => {
-				it("subtract 2 integers correctly", () => {
-					expect(
-						integer.subtract__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						integer.subtract__overload$1(
-							integerHundred(),
-							integerOne(),
-						),
-					).toEqual(integer.createInteger(99n))
-
-					expect(
-						integer.subtract__overload$1(
-							integerOne(),
-							integerHundred(),
-						),
-					).toEqual(integer.createInteger(-99n))
-				})
-
-				it("subtracts a rational from an integer correctly", () => {
-					expect(
-						integer.subtract__overload$2(
-							integerOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(rationalOneHalf())
-
-					expect(
-						integer.subtract__overload$2(
-							integerHundred(),
-							rationalOneHalf(),
-						),
-					).toEqual(rational.createRational(199n, 2n))
-
-					expect(
-						integer.subtract__overload$2(
-							integerOne(),
-							rational.createRational(-1n, 2n),
-						),
-					).toEqual(rational.createRational(3n, 2n))
 				})
 			})
 
@@ -1236,114 +1146,8 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("divide", () => {
-				it("divides 2 integers correctly", () => {
-					expect(
-						integer.divideBy__overload$1(
-							integerOne(),
-							integerOne(),
-						),
-					).toEqual(rational.createRational(1n, 1n))
-
-					expect(
-						integer.divideBy__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(rational.createRational(1n, 2n))
-
-					expect(
-						integer.divideBy__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(rational.createRational(100n, 2n))
-				})
-
-				it("divides an integer and a rational correctly", () => {
-					expect(
-						integer.divideBy__overload$2(
-							integerOne(),
-							rationalOneHalf(),
-						),
-					).toEqual(rational.createRational(2n, 1n))
-
-					expect(
-						integer.divideBy__overload$2(
-							integerOne(),
-							rational.createRational(2n, 1n),
-						),
-					).toEqual(rational.createRational(1n, 2n))
-
-					expect(
-						integer.divideBy__overload$2(
-							integerHundred(),
-							rational.createRational(2n, 1n),
-						),
-					).toEqual(rational.createRational(100n, 2n))
-				})
-
-				it("returns Nothing when dividing by zero", () => {
-					expect(
-						integer.divideBy__overload$1(
-							integerOne(),
-							integerZero(),
-						),
-					).toEqual(nothing())
-
-					expect(
-						integer.divideBy__overload$2(
-							integerOne(),
-							rational.createRational(0n, 1n),
-						),
-					).toEqual(nothing())
-				})
-			})
-
 			describe("isLessThan", () => {
 				it("returns true if the first number is less than the second", () => {
-					expect(
-						integer.isLessThan__overload$1(
-							integerZero(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerZero(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerZero(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerOne(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerTwo(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
 					expect(
 						integer.isLessThan__overload$2(
 							integerZero(),
@@ -1396,34 +1200,6 @@ describe("Rewriter", () => {
 
 				it("returns false if the numbers are equal", () => {
 					expect(
-						integer.isLessThan__overload$1(
-							integerZero(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerOne(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerTwo(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerHundred(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
 							rationalOne(),
@@ -1446,48 +1222,6 @@ describe("Rewriter", () => {
 				})
 
 				it("returns false if the first number is bigger than the second", () => {
-					expect(
-						integer.isLessThan__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerHundred(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerHundred(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerTwo(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThan__overload$1(
-							integerOne(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
 					expect(
 						integer.isLessThan__overload$2(
 							integerOne(),
@@ -1535,48 +1269,6 @@ describe("Rewriter", () => {
 			describe("isLessThanOrEqualTo", () => {
 				it("returns true if the first number is less than the second", () => {
 					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerZero(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerZero(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerZero(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerOne(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerZero(),
 							rationalOneHalf(),
@@ -1628,34 +1320,6 @@ describe("Rewriter", () => {
 
 				it("returns true if the numbers are equal", () => {
 					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerZero(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerOne(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
 							rationalOne(),
@@ -1678,48 +1342,6 @@ describe("Rewriter", () => {
 				})
 
 				it("returns false if the first number is bigger than the second", () => {
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isLessThanOrEqualTo__overload$1(
-							integerOne(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
 					expect(
 						integer.isLessThanOrEqualTo__overload$2(
 							integerOne(),
@@ -1766,48 +1388,6 @@ describe("Rewriter", () => {
 
 			describe("isGreaterThan", () => {
 				it("returns false if the first number is less than the second", () => {
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerZero(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerZero(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerZero(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerOne(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerTwo(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerZero(),
@@ -1860,34 +1440,6 @@ describe("Rewriter", () => {
 
 				it("returns false if the numbers are equal", () => {
 					expect(
-						integer.isGreaterThan__overload$1(
-							integerZero(),
-							integerZero(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerOne(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerTwo(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerHundred(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
 							rationalOne(),
@@ -1910,48 +1462,6 @@ describe("Rewriter", () => {
 				})
 
 				it("returns true if the first number is bigger than the second", () => {
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerHundred(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerHundred(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerTwo(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThan__overload$1(
-							integerOne(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
 					expect(
 						integer.isGreaterThan__overload$2(
 							integerOne(),
@@ -1998,48 +1508,6 @@ describe("Rewriter", () => {
 
 			describe("isGreaterThanOrEqualTo", () => {
 				it("returns false if the first number is less than the second", () => {
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerZero(),
-							integerOne(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerZero(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerZero(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerOne(),
-							integerTwo(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerOne(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerHundred(),
-						),
-					).toEqual(booleanFalse())
-
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerZero(),
@@ -2092,34 +1560,6 @@ describe("Rewriter", () => {
 
 				it("returns true if the numbers are equal", () => {
 					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerZero(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerOne(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerHundred(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
 							rationalOne(),
@@ -2142,48 +1582,6 @@ describe("Rewriter", () => {
 				})
 
 				it("returns true if the first number is bigger than the second", () => {
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerTwo(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerHundred(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerOne(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerTwo(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isGreaterThanOrEqualTo__overload$1(
-							integerOne(),
-							integerZero(),
-						),
-					).toEqual(booleanTrue())
-
 					expect(
 						integer.isGreaterThanOrEqualTo__overload$2(
 							integerOne(),
@@ -5052,7 +4450,7 @@ describe("Rewriter", () => {
 					const ascending = (
 						first: integer.IntegerType,
 						second: integer.IntegerType,
-					) => integer.compareTo(first, second)
+					) => number.compareTo(first, second)
 
 					expect(
 						list.sortedBy(
@@ -5400,24 +4798,14 @@ describe("Rewriter", () => {
 		describe("Ordering", () => {
 			// NOTE: `Ordering.is`, `isNot` and `toString` are implemented in
 			// Essence now (`src/stdlib/Ordering.es`) — the golden harness
-			// exercises them end to end. Only the runtime `anyIs` and the
-			// numeric `compareTo` remain native and keep their unit tests.
+			// exercises them end to end. `Integer.compareTo` is Essence too now
+			// (it routes through the native `Number.compareTo`); only the runtime
+			// `anyIs` and `Rational.compareTo` remain native and keep their unit
+			// tests.
 			it("compares Ordering values with anyIs", () => {
 				expect(anyIs(ordering.less, ordering.less)).toBeTrue()
 				expect(anyIs(ordering.less, ordering.equal)).toBeFalse()
 				expect(anyIs(ordering.less, integerOne())).toBeFalse()
-			})
-
-			it("orders Integers with compareTo", () => {
-				expect(integer.compareTo(integerOne(), integerTwo())).toBe(
-					ordering.less,
-				)
-				expect(integer.compareTo(integerTwo(), integerTwo())).toBe(
-					ordering.equal,
-				)
-				expect(integer.compareTo(integerHundred(), integerTwo())).toBe(
-					ordering.greater,
-				)
 			})
 
 			it("orders Rationals with compareTo", () => {
