@@ -374,12 +374,23 @@ describe("Standard Library Loader", () => {
 	it("keeps a bodied Method's typed Node", () => {
 		let stdlib = load([
 			"Bodied.es",
+			// NOTE: The bodied Method calls a NATIVE sibling declared in the
+			// same synthetic file rather than a builtin like
+			// `Integer::multiplyWith`. A synthetic standard library is
+			// enriched against the legacy tables plus these sources alone —
+			// nothing of `src/stdlib` is in scope — so reaching for a builtin
+			// Method makes the test fail the moment that Namespace is
+			// converted out of TypeScript, which says nothing about whether a
+			// bodied Method survives.
 			`declarations {
 				namespace Doubler for Integer {
 					§§ Twice the value.
 					double() -> Integer {
-						<- @::multiplyWith(2)
+						<- @::twice()
 					}
+
+					§§ Twice the value, natively.
+					twice() -> Integer
 				}
 			}`,
 		])

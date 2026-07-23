@@ -9,6 +9,7 @@ import {
 	STDLIB_DIRECTORY,
 } from "../enricher/stdlib"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
+import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import {
 	namespace as optionalNamespace,
@@ -19,6 +20,7 @@ import {
 	type as orderingType,
 } from "../enricher/types/Ordering"
 import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
+import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
 import type { common, parser } from "../interfaces/index"
@@ -85,6 +87,8 @@ const converted: Array<Entry> = [
 	namespaceEntry("Ordering", orderingNamespace),
 	namespaceEntry("Record", recordNamespace),
 	namespaceEntry("String", stringNamespace),
+	namespaceEntry("Integer", integerNamespace),
+	namespaceEntry("Rational", rationalNamespace),
 ]
 
 // ---------------------------------------------------------------------------

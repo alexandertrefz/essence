@@ -9,10 +9,10 @@ import {
 // the legacy tables only by a source `type` declaration, and Boolean's is a
 // bare primitive tag with no declaration to write.
 import { type as booleanType } from "./types/Boolean"
-import {
-	namespace as integerNamespace,
-	type as integerType,
-} from "./types/Integer"
+// NOTE: The Integer NAMESPACE now lives in `src/stdlib/Integer.es`. Its Type
+// tag stays for the same reason Boolean's does — a bare primitive tag with no
+// declaration to write.
+import { type as integerType } from "./types/Integer"
 import { namespace as listNamespace, type as listType } from "./types/List"
 import nativeFunctions from "./types/NativeFunctions"
 // NOTE: The Nothing NAMESPACE now lives in `src/stdlib/Nothing.es`. Its Type
@@ -32,10 +32,9 @@ import {
 // `conformedMethods` helper, which the List table still derives its conformed
 // Methods with — the Protocol objects it reads are structurally the ones the
 // source declares.
-import {
-	namespace as rationalNamespace,
-	type as rationalType,
-} from "./types/Rational"
+// NOTE: The Rational NAMESPACE now lives in `src/stdlib/Rational.es`. Its Type
+// tag stays for the same reason Integer's does.
+import { type as rationalType } from "./types/Rational"
 // NOTE: The Record NAMESPACE now lives in `src/stdlib/Record.es`. Its Type is
 // the open Record `{}`, which has no declaration to write either.
 import { type as recordType } from "./types/Record"
@@ -76,8 +75,6 @@ const irrationalType: common.UnionType = {
 // never both claim a name.
 export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
-	Integer: integerNamespace,
-	Rational: rationalNamespace,
 	Algebraic: algebraicNamespace,
 	Transcendental: transcendentalNamespace,
 	Number: numberNamespace,
