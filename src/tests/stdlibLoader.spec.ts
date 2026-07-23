@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { builtinMemberOrder } from "../enricher/builtins"
+import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
 import {
 	loadStdlib,
 	loadStdlibFrom,
@@ -91,9 +91,10 @@ describe("Standard Library Loader", () => {
 	// no body IS the declaration. What the Namespace Type ends up with has to be
 	// indistinguishable from what a hand written table produced.
 	it("resolves a native Namespace into a complete Namespace Type", () => {
-		let stdlib = load([
-			"Boxes.es",
-			`declarations {
+		let stdlib = load(
+			[
+				"Boxes.es",
+				`declarations {
 				namespace Boxes <ItemType> for List<ItemType> {
 					§§ The first item, if there is one.
 					§§ @returns the first item.
@@ -106,7 +107,18 @@ describe("Standard Library Loader", () => {
 					static emptyCount: Integer
 				}
 			}`,
-		])
+			],
+			// NOTE: `Optional` is declared in Essence now, so a synthetic
+			// library that uses it has to bring its own — which is the point:
+			// the file that USES a name is hoisted alongside the file that
+			// DECLARES it, in either order.
+			[
+				"Fallible.es",
+				`declarations {
+				type Optional<ItemType> = ItemType | Nothing
+			}`,
+			],
+		)
 
 		let namespace = namespaceNamed(stdlib, "Boxes")
 
@@ -396,9 +408,10 @@ describe("Standard Library Loader", () => {
 	// Generic, or the hidden conformance Parameter its call sites pass would
 	// have nothing to bind to.
 	it("retains a bound Namespace Generic on a native fulfilling Method", () => {
-		let stdlib = load([
-			"Boxes.es",
-			`declarations {
+		let stdlib = load(
+			[
+				"Boxes.es",
+				`declarations {
 				namespace Boxes <infer Item> for { value: Item }
 					is Comparable where Item is Comparable
 				{
@@ -406,7 +419,22 @@ describe("Standard Library Loader", () => {
 					compareTo(_ other: { value: Item }) -> Ordering
 				}
 			}`,
-		])
+			],
+			// NOTE: `Comparable` and `Ordering` are declared in Essence now.
+			// The conforming file is hoisted BEFORE the one that declares the
+			// Protocol it conforms to, in sorted order — which is exactly what
+			// the shared Scope is for.
+			[
+				"Ordered.es",
+				`declarations {
+				choice Ordering { Less, Equal, Greater }
+
+				protocol Comparable {
+					compareTo(_ other: Self) -> Ordering
+				}
+			}`,
+			],
+		)
 
 		let namespace = namespaceNamed(stdlib, "Boxes")
 		let compareTo = namespace.methods["compareTo"]!
@@ -605,6 +633,50 @@ describe("Standard Library Loader", () => {
 		expect(
 			builtinMemberOrder.filter((name) => !members.includes(name)),
 		).toEqual([])
+	})
+
+	// NOTE: The same for the Type table, which two surfaces read in order:
+	// `closestMatch` breaks a tie on the first candidate, so "did you mean …?"
+	// would name a different Type, and Completion of a Type annotation ships
+	// these unsorted. A conversion moves a name between the halves; neither
+	// half may decide where it sits.
+	it("orders every builtin Type by name, and names only Types that exist", () => {
+		let types = Object.keys(loadStdlib().types)
+
+		expect(types.filter((name) => !builtinTypeOrder.includes(name))).toEqual(
+			[],
+		)
+		expect(builtinTypeOrder.filter((name) => !types.includes(name))).toEqual(
+			[],
+		)
+	})
+
+	// NOTE: The shared Scope, proven on the REAL standard library rather than a
+	// synthetic one. Sorted order hoists `Boolean.es` first, `Ordering.es`
+	// fourth and `Protocols.es` fifth, so each of these resolves a name that a
+	// file OTHER than its own declares — and two of them resolve one declared
+	// in a file that comes after them.
+	it("resolves names across standard library files", () => {
+		let stdlib = loadStdlib()
+		let compareTo = stdlib.protocols["Comparable"]!.methods["compareTo"]!
+
+		expect(compareTo.type).toBe("SimpleMethod")
+
+		if (compareTo.type === "SimpleMethod") {
+			// NOTE: The SAME object the `choice Ordering` in `Ordering.es`
+			// declared, not a structural twin left behind by a table.
+			expect(compareTo.returnType).toBe(stdlib.types["Ordering"]!)
+		}
+
+		// NOTE: `Boolean.es` declares no Protocol and is hoisted before the
+		// file that does.
+		expect(namespaceNamed(stdlib, "Boolean").conformsTo).toEqual([
+			"Equatable",
+			"Printable",
+		])
+		expect(namespaceNamed(stdlib, "Ordering").targetType).toBe(
+			stdlib.types["Ordering"]!,
+		)
 	})
 
 	it("caches the loaded standard library", () => {

@@ -1,17 +1,13 @@
 import { describe, expect, it } from "bun:test"
 
+import {
+	builtinNamespaces,
+	builtinProtocols,
+} from "../enricher/builtins"
 import { enrich } from "../enricher/index"
 import { namespace as algebraicNamespace } from "../enricher/types/Algebraic"
-import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
-import { namespace as listNamespace } from "../enricher/types/List"
-import { namespace as nothingNamespace } from "../enricher/types/Nothing"
 import { namespace as numberNamespace } from "../enricher/types/Number"
-import { namespace as orderingNamespace } from "../enricher/types/Ordering"
-import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
-import { namespace as rationalNamespace } from "../enricher/types/Rational"
-import { namespace as recordNamespace } from "../enricher/types/Record"
-import { namespace as stringNamespace } from "../enricher/types/String"
 import { namespace as transcendentalNamespace } from "../enricher/types/Transcendental"
 import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
@@ -2088,27 +2084,24 @@ describe("Enricher", () => {
 	})
 
 	describe("Builtin Protocols", () => {
-		// NOTE: The safety net for the hand written builtin signatures — every
-		// declared conformance must actually be fulfilled, via the same helper
-		// that drives conformance checking and conformance-value codegen.
+		// NOTE: The safety net for the builtin signatures — every declared
+		// conformance must actually be fulfilled, via the same helper that
+		// drives conformance checking and conformance-value codegen.
+		//
+		// NOTE: Driven from the ACCESSORS rather than from the TypeScript
+		// tables, so it keeps testing whatever is live. A Namespace declared in
+		// Essence is checked at load, but only the one that is loaded — reading
+		// the tables directly would leave this asserting a property of objects
+		// no compilation touches as the conversion moves them across.
 		describe("Conformance of builtin Namespaces", () => {
-			const protocols: Record<string, common.ProtocolType> = {
-				Equatable,
-				Printable,
-				Comparable,
-			}
+			const protocols = builtinProtocols()
+			const namespaces = builtinNamespaces().filter(
+				(namespace) => (namespace.conformsTo ?? []).length > 0,
+			)
 
-			const namespaces = [
-				stringNamespace,
-				booleanNamespace,
-				integerNamespace,
-				rationalNamespace,
-				numberNamespace,
-				recordNamespace,
-				nothingNamespace,
-				orderingNamespace,
-				listNamespace,
-			]
+			it("finds Namespaces that declare a conformance", () => {
+				expect(namespaces.length).toBeGreaterThan(0)
+			})
 
 			for (const namespace of namespaces) {
 				it(`${namespace.name} fulfills its declared conformances`, () => {

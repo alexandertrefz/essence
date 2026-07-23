@@ -7,6 +7,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 import {
 	builtinMemberOrder,
+	builtinTypeOrder,
 	legacyMembers,
 	legacyProtocols,
 	legacyTypes,
@@ -192,10 +193,11 @@ export function declaredNames(programs: Array<parser.Program>): {
 // listed ones.
 function inBuiltinOrder(
 	members: Record<string, common.Type>,
+	order: Array<string>,
 ): Record<string, common.Type> {
 	let ordered: Record<string, common.Type> = {}
 
-	for (let name of builtinMemberOrder) {
+	for (let name of order) {
 		if (Object.hasOwn(members, name)) {
 			ordered[name] = members[name]!
 		}
@@ -390,7 +392,7 @@ export function loadStdlibFrom(
 
 	let validateDuration = performance.now() - validateStarted
 
-	let orderedMembers = inBuiltinOrder(scope.members)
+	let orderedMembers = inBuiltinOrder(scope.members, builtinMemberOrder)
 
 	let namespaces = Object.values(orderedMembers).filter(
 		(member): member is common.NamespaceType => member.type === "Namespace",
@@ -400,7 +402,7 @@ export function loadStdlibFrom(
 
 	return {
 		members: orderedMembers,
-		types: scope.types,
+		types: inBuiltinOrder(scope.types, builtinTypeOrder),
 		protocols: scope.protocols,
 		namespaces,
 		typedPrograms: enriched.map((result) => result.program),

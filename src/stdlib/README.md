@@ -15,8 +15,13 @@ and then enriches and validates them. A single Diagnostic anywhere in here is a
 compiler-developer error and throws, fully rendered.
 
 The conversion from the TypeScript tables in `src/enricher/types/*.ts` is in
-flight — `Boolean` has moved, the rest have not. Whatever a file here declares
-is subtracted from those tables, so a Namespace moves over one at a time.
+flight — the core Protocols, `Boolean`, `Nothing`, `Optional`, `Ordering` and
+`Record` have moved, the rest have not. Whatever a file here declares is
+subtracted from those tables, so a Namespace moves over one at a time.
+
+A Type and the Namespace that targets it move TOGETHER: the subtraction is per
+category, so converting `choice Ordering` alone would leave the legacy
+`Ordering` Namespace pointing at the old Type object and say nothing about it.
 
 `src/tests/stdlibEquivalence.spec.ts` is the net the move rides on: for every
 name already converted it deep-compares what was read from here against the
