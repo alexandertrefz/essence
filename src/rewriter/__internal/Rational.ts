@@ -20,6 +20,8 @@ import {
 	add as transcendentalAdd,
 	multiplyWith as transcendentalMultiplyWith,
 } from "./Transcendental"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import { typeKeySymbol } from "./type"
 
 export type RationalType = { [typeKeySymbol]: "Rational"; rational: Fraction }
@@ -404,3 +406,24 @@ export function squareRoot(
 }
 
 // #endregion
+
+// NOTE: Same-kind ordering stays native — see the NOTE on `Integer.compareTo`.
+// Cross-multiplication is exact, and denominators are kept positive by
+// `createRational`, so the sign of the comparison is the sign of the products.
+export function compareTo(
+	originalRational: RationalType,
+	otherRational: RationalType,
+): OrderingType {
+	const lhs =
+		originalRational.rational.numerator * otherRational.rational.denominator
+	const rhs =
+		otherRational.rational.numerator * originalRational.rational.denominator
+
+	if (lhs < rhs) {
+		return less
+	} else if (lhs > rhs) {
+		return greater
+	} else {
+		return equal
+	}
+}

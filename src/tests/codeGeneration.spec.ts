@@ -580,7 +580,7 @@ describe("Code Generation", () => {
 				__print(smaller(5, 3))
 			}`)
 
-			expect(code).toContain("compareTo: $es_Integer_compareTo")
+			expect(code).toContain("compareTo: Integer.compareTo")
 			expect(code).toContain("Item__conformance.compareTo(")
 		})
 
@@ -619,9 +619,8 @@ describe("Code Generation", () => {
 
 			// NOTE: An unconditional witness stays exactly the method-map object
 			// literal — no `boundConformance` wrapper. `Integer.compareTo` is
-			// written in Essence now, so the witness points at its emitted const
-			// (`$es_Integer_compareTo`) rather than a native binding.
-			expect(code).toContain("compareTo: $es_Integer_compareTo")
+			// native, so the witness is a plain member read.
+			expect(code).toContain("compareTo: Integer.compareTo")
 			expect(code).not.toContain("boundConformance")
 		})
 
@@ -634,7 +633,7 @@ describe("Code Generation", () => {
 			// curried with the inner Integer ordering — the conditional witness.
 			expect(code).toContain("$type.boundConformance(")
 			expect(code).toContain("compareTo: List.compareTo")
-			expect(code).toContain("compareTo: $es_Integer_compareTo")
+			expect(code).toContain("compareTo: Integer.compareTo")
 		})
 
 		it("should order multiple retrofitted bounds by Namespace Generic declaration", () => {
