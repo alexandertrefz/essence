@@ -38,6 +38,16 @@ const recordEmpty = () => record.createRecord({})
 
 const nothing = () => createNothing()
 
+// NOTE: `Integer.is` and `String.is` are written in Essence now — so are the
+// `Equatable` witnesses the bounded List Methods take. These spell out the
+// answer each Essence body gives, which is what the Simplifier passes at a
+// `List<Integer>` or `List<String>` call site.
+const integerIs = (first: integer.IntegerType, second: integer.IntegerType) =>
+	boolean.createBoolean(first.value === second.value)
+
+const stringIs = (first: string.StringType, second: string.StringType) =>
+	boolean.createBoolean(first.value === second.value)
+
 describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
@@ -2245,16 +2255,24 @@ describe("Rewriter", () => {
 		})
 
 		describe("List", () => {
+			// NOTE: `is` takes a conformance witness now — equality of a List is
+			// its items\' own equality, handed in by the call site — so the mixed
+			// Lists this block used to compare (a String beside an Integer beside
+			// a Rational) have no single witness to be compared through, and are
+			// not a List any Program can call `is` on. The universal structural
+			// comparison they exercised is `anyIs`, which keeps its own tests at
+			// the top of this file.
 			describe("is", () => {
 				it("returns true if the lists have the same items in the same order", () => {
-					expect(list.is(listEmpty(), listEmpty())).toEqual(
-						booleanTrue(),
-					)
+					expect(
+						list.is(listEmpty(), listEmpty(), { is: integerIs }),
+					).toEqual(booleanTrue())
 
 					expect(
 						list.is(
 							list.createList([integerOne()]),
 							list.createList([integerOne()]),
+							{ is: integerIs },
 						),
 					).toEqual(booleanTrue())
 
@@ -2262,6 +2280,7 @@ describe("Rewriter", () => {
 						list.is(
 							list.createList([integerOne(), integerTwo()]),
 							list.createList([integerOne(), integerTwo()]),
+							{ is: integerIs },
 						),
 					).toEqual(booleanTrue())
 
@@ -2269,32 +2288,7 @@ describe("Rewriter", () => {
 						list.is(
 							list.createList([stringEmpty()]),
 							list.createList([stringEmpty()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.is(
-							list.createList([rationalOne()]),
-							list.createList([rationalOne()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.is(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
+							{ is: stringIs },
 						),
 					).toEqual(booleanTrue())
 				})
@@ -2304,25 +2298,7 @@ describe("Rewriter", () => {
 						list.is(
 							list.createList([integerOne(), integerTwo()]),
 							list.createList([integerTwo(), integerOne()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.is(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								nothing(),
-								rationalHundred(),
-								booleanFalse(),
-							]),
+							{ is: integerIs },
 						),
 					).toEqual(booleanFalse())
 				})
@@ -2332,13 +2308,7 @@ describe("Rewriter", () => {
 						list.is(
 							list.createList([integerOne()]),
 							list.createList([integerTwo()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.is(
-							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerOne(), rationalTwo()]),
+							{ is: integerIs },
 						),
 					).toEqual(booleanFalse())
 
@@ -2346,43 +2316,26 @@ describe("Rewriter", () => {
 						list.is(
 							list.createList([stringEmpty()]),
 							list.createList([string.createString("not empty")]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.is(
-							list.createList([rationalOne()]),
-							list.createList([rationalOneHalf()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.is(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanTrue(),
-							]),
+							{ is: stringIs },
 						),
 					).toEqual(booleanFalse())
 				})
 
 				it("returns false if the lists are not the same length", () => {
 					expect(
-						list.is(listEmpty(), list.createList([integerTwo()])),
+						list.is(
+							listEmpty(),
+							list.createList([integerTwo()]),
+							{ is: integerIs },
+						),
 					).toEqual(booleanFalse())
 
 					expect(
-						list.is(list.createList([integerTwo()]), listEmpty()),
+						list.is(
+							list.createList([integerTwo()]),
+							listEmpty(),
+							{ is: integerIs },
+						),
 					).toEqual(booleanFalse())
 
 					expect(
@@ -2392,17 +2345,8 @@ describe("Rewriter", () => {
 								integerTwo(),
 								integerHundred(),
 							]),
-							list.createList([integerOne(), rationalTwo()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.is(
-							list.createList([stringEmpty()]),
-							list.createList([
-								string.createString("not empty"),
-								stringEmpty(),
-							]),
+							list.createList([integerOne(), integerTwo()]),
+							{ is: integerIs },
 						),
 					).toEqual(booleanFalse())
 				})
@@ -2446,223 +2390,13 @@ describe("Rewriter", () => {
 			})
 
 			// NOTE: isEmpty / firstItem (both forms) / lastItem / removeFirst (both
-			// forms) / removeAt / removeEvery(where:) / removeLast (both forms) /
-			// prepend (both forms) / append(_:) / anyItem / everyItem /
-			// countOf(where:) / insertAt / replaceAt / partitioned / sorted /
-			// repeating are implemented in Essence now (src/stdlib/List.es), so there
-			// is no runtime Function left to call here. The golden harness covers
-			// them end to end; the entries of a mixed `overload` block that are still
-			// native keep their tests below.
-
-			describe("contains", () => {
-				it("returns true if the item is in the list", () => {
-					const numbersList = list.createList([
-						integerZero(),
-						integerOne(),
-						integerTwo(),
-					])
-
-					expect(list.contains(numbersList, integerOne())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(list.contains(numbersList, integerTwo())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(list.contains(numbersList, integerOne())).toEqual(
-						booleanTrue(),
-					)
-
-					const stringList = list.createList([
-						string.createString("a"),
-						string.createString("b"),
-						string.createString("c"),
-					])
-
-					expect(
-						list.contains(stringList, string.createString("a")),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.contains(stringList, string.createString("b")),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.contains(stringList, string.createString("c")),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false if the item is not in the list", () => {
-					const numbersList = list.createList([
-						integerZero(),
-						integerOne(),
-						integerTwo(),
-					])
-
-					expect(
-						list.contains(numbersList, integerHundred()),
-					).toEqual(booleanFalse())
-
-					const stringList = list.createList([
-						string.createString("a"),
-						string.createString("b"),
-						string.createString("c"),
-					])
-
-					expect(
-						list.contains(stringList, string.createString("d")),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns false if the list is empty", () => {
-					expect(
-						list.contains(list.createList([]), integerOne()),
-					).toEqual(booleanFalse())
-				})
-			})
-
-			describe("removeEvery", () => {
-				it("removes every instance from the list that match the excluded item", () => {
-					const integerList = list.createList([
-						integerZero(),
-						integerOne(),
-						integerOne(),
-						integerTwo(),
-					])
-
-					expect(
-						list.removeEvery__overload$1(
-							integerList,
-							integerZero(),
-						),
-					).toEqual(
-						list.createList([
-							integerOne(),
-							integerOne(),
-							integerTwo(),
-						]),
-					)
-
-					expect(
-						list.removeEvery__overload$1(integerList, integerOne()),
-					).toEqual(list.createList([integerZero(), integerTwo()]))
-
-					expect(
-						list.removeEvery__overload$1(integerList, integerTwo()),
-					).toEqual(
-						list.createList([
-							integerZero(),
-							integerOne(),
-							integerOne(),
-						]),
-					)
-
-					expect(
-						list.removeEvery__overload$1(
-							list.createList([booleanTrue(), booleanFalse()]),
-							booleanTrue(),
-						),
-					).toEqual(list.createList([booleanFalse()]))
-
-					expect(
-						list.removeEvery__overload$1(
-							list.createList([booleanTrue(), booleanFalse()]),
-							booleanFalse(),
-						),
-					).toEqual(list.createList([booleanTrue()]))
-				})
-			})
-
-			describe("removeDuplicates", () => {
-				it("returns the same list if it is already unique", () => {
-					expect(list.removeDuplicates(listEmpty())).toEqual(
-						listEmpty(),
-					)
-
-					expect(
-						list.removeDuplicates(list.createList([integerOne()])),
-					).toEqual(list.createList([integerOne()]))
-
-					expect(
-						list.removeDuplicates(
-							list.createList([integerOne(), integerTwo()]),
-						),
-					).toEqual(list.createList([integerOne(), integerTwo()]))
-
-					expect(
-						list.removeDuplicates(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(
-						list.createList([
-							integerOne(),
-							integerTwo(),
-							integerHundred(),
-						]),
-					)
-				})
-
-				it("returns a list of unique items", () => {
-					expect(
-						list.removeDuplicates(
-							list.createList([integerOne(), integerOne()]),
-						),
-					).toEqual(list.createList([integerOne()]))
-
-					expect(
-						list.removeDuplicates(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerTwo(),
-							]),
-						),
-					).toEqual(list.createList([integerOne(), integerTwo()]))
-
-					expect(
-						list.removeDuplicates(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(
-						list.createList([
-							integerOne(),
-							integerTwo(),
-							integerHundred(),
-						]),
-					)
-
-					expect(
-						list.removeDuplicates(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-								integerHundred(),
-								integerTwo(),
-								integerOne(),
-							]),
-						),
-					).toEqual(
-						list.createList([
-							integerOne(),
-							integerTwo(),
-							integerHundred(),
-						]),
-					)
-				})
-			})
+			// forms) / removeAt / removeEvery (both forms) / removeLast (both forms)
+			// / removeDuplicates / prepend (both forms) / append(_:) / contains /
+			// anyItem / everyItem / countOf (both forms) / insertAt / replaceAt /
+			// partitioned / sorted / repeating are implemented in Essence now
+			// (src/stdlib/List.es), so there is no runtime Function left to call
+			// here. The golden harness covers them end to end; the entries of a
+			// mixed `overload` block that are still native keep their tests below.
 
 			describe("append", () => {
 				it("appends contents of a list to another list correctly", () => {
@@ -2795,6 +2529,9 @@ describe("Rewriter", () => {
 			})
 
 			describe("firstIndexOf", () => {
+				// NOTE: Bounded by `Equatable` — the item `is` arrives as the
+				// hidden witness, so which position is found is decided by the
+				// items' own equality rather than by a structural comparison.
 				it("gives the position of the first equal item", () => {
 					expect(
 						list.firstIndexOf(
@@ -2804,6 +2541,7 @@ describe("Rewriter", () => {
 								integerOne(),
 							]),
 							integerOne(),
+							{ is: integerIs },
 						),
 					).toEqual(integerOne())
 				})
@@ -2813,6 +2551,7 @@ describe("Rewriter", () => {
 						list.firstIndexOf(
 							list.createList([integerOne()]),
 							integerTwo(),
+							{ is: integerIs },
 						),
 					).toEqual(nothing())
 				})
@@ -2913,21 +2652,6 @@ describe("Rewriter", () => {
 							integerHundred(),
 						]),
 					)
-				})
-			})
-
-			describe("countOf", () => {
-				it("counts equal items", () => {
-					expect(
-						list.countOf__overload$1(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerOne(),
-							]),
-							integerOne(),
-						),
-					).toEqual(integerTwo())
 				})
 			})
 		})

@@ -32,6 +32,11 @@ type ComparableConformance<Self extends AnyType> = {
 	compareTo: (self: Self, argument1: Self) => OrderingType
 }
 
+type EquatableConformance<Self extends AnyType> = {
+	is: (self: Self, argument1: Self) => BooleanType
+	isNot: (self: Self, argument1: Self) => BooleanType
+}
+
 type PrintableConformance<Self extends AnyType> = {
 	toString: (self: Self) => StringType
 }
@@ -275,18 +280,12 @@ export type RecordNatives = {
 }
 
 export type ListNatives = {
-	// is<ItemType>(_: List<ItemType>) -> Boolean
-	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>) => BooleanType
+	// is<ItemType is Equatable>(_: List<ItemType>) -> Boolean
+	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
 	// toString<ItemType>() -> String
 	toString: <ItemType extends AnyType>(self: ListType<ItemType>) => StringType
 	// length<ItemType>() -> Integer
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
-	// contains<ItemType>(_: ItemType) -> Boolean
-	contains: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => BooleanType
-	// removeEvery<ItemType>(_: ItemType) -> List<ItemType>
-	removeEvery__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => ListType<ItemType>
-	// removeDuplicates<ItemType>() -> List<ItemType>
-	removeDuplicates: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
 	// append<ItemType>(contentsOf: List<ItemType>) -> List<ItemType>
 	append__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> List<Result>
@@ -297,8 +296,8 @@ export type ListNatives = {
 	keepEvery: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// itemAt<ItemType>(_: Integer) -> Optional<ItemType>
 	itemAt: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: IntegerType) => ItemType | NothingType
-	// firstIndexOf<ItemType>(_: ItemType) -> Optional<Integer>
-	firstIndexOf: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => IntegerType | NothingType
+	// firstIndexOf<ItemType is Equatable>(_: ItemType) -> Optional<Integer>
+	firstIndexOf: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, ItemType__conformance: EquatableConformance<ItemType>) => IntegerType | NothingType
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
 	// reversed<ItemType>() -> List<ItemType>
@@ -307,10 +306,8 @@ export type ListNatives = {
 	sortedBy: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// compareTo<ItemType is Comparable>(_: List<ItemType>) -> Ordering
 	compareTo: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
-	// countOf<ItemType>(_: ItemType) -> Integer
-	countOf__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => IntegerType
-	// lastIndexOf<ItemType>(_: ItemType) -> Optional<Integer>
-	lastIndexOf: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => IntegerType | NothingType
+	// lastIndexOf<ItemType is Equatable>(_: ItemType) -> Optional<Integer>
+	lastIndexOf: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, ItemType__conformance: EquatableConformance<ItemType>) => IntegerType | NothingType
 	// joinWith<ItemType is Printable>(_: String) -> String
 	joinWith: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// pairedWith<ItemType, Other>(_: List<Other>) -> List<{ first: ItemType, second: Other }>
@@ -372,7 +369,7 @@ export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "i
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeAt" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "sorted" | "anyItem" | "everyItem" | "countOf__overload$2" | "insertAt" | "replaceAt" | "partitioned" | "repeating"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "removeAt" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "sorted" | "anyItem" | "everyItem" | "countOf__overload$1" | "countOf__overload$2" | "insertAt" | "replaceAt" | "partitioned" | "repeating"> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule

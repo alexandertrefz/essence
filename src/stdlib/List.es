@@ -6,10 +6,9 @@ declarations {
 	§
 	§ `ItemType` is the Namespace's own Type Parameter, and it is merged into a
 	§ Method's signature exactly when that signature mentions it. `of` fixes
-	§ its Types outright (an Integer-only result), so it does not carry it;
-	§ `sorted`, `compareTo` and `joinWith` declare their own `ItemType`, bounded
-	§ by the Protocol each of them needs, which shadows the Namespace's
-	§ outright.
+	§ its Types outright (an Integer-only result), so it does not carry it; the
+	§ bounded Methods below declare their own `ItemType`, bounded by the
+	§ Protocol each of them needs, which shadows the Namespace's outright.
 	§
 	§ A Method that asks something of the items asks for it with a BOUND, not
 	§ with a narrower receiver — the Method stays here, on the Namespace that
@@ -18,25 +17,51 @@ declarations {
 	§ holds `flattened`, because no bound can say "the items are themselves
 	§ Lists" and still name the inner item Type.
 	§
-	§ The Comparable conformance is conditional — a List is orderable exactly
-	§ when its items are. `compareTo` carries the same bound as its own Method
-	§ Generic, so a use site solving `List<ItemType> is Comparable` recursively
-	§ solves `ItemType is Comparable` and hands the item ordering in as the
-	§ hidden conformance Argument.
+	§ The Equatable and Comparable conformances are BOTH conditional — a List is
+	§ equatable exactly when its items are, and orderable exactly when its items
+	§ are. `is` and `compareTo` carry the same bound as their own Method
+	§ Generic, so a use site solving `List<ItemType> is Equatable` recursively
+	§ solves `ItemType is Equatable` and hands the item equality in as the
+	§ hidden conformance Argument. That recursion is what makes a
+	§ `List<List<Integer>>` compare through Integer's own `is`, one nesting
+	§ level at a time.
+	§
+	§ Every Method that asks whether two ITEMS are equal — `is`, `contains`,
+	§ `firstIndexOf`, `lastIndexOf`, `countOf(_:)`, `removeEvery(_:)` and
+	§ `removeDuplicates` — carries that bound, for the same reason `sorted`
+	§ carries `Comparable`: equality is the item Type's own `is`, and a List
+	§ whose items can not answer it can not be searched by value. The universal
+	§ structural comparison that stood in for it before was not a Type the
+	§ language could name, and gave `1/2` and `2/4` whatever answer the runtime
+	§ representation happened to give.
 	namespace List<infer ItemType> for List<ItemType>
-		is Equatable, is Printable, is Comparable where ItemType is Comparable
+		is Printable,
+		is Equatable where ItemType is Equatable,
+		is Comparable where ItemType is Comparable
 	{
-		§§ Checks whether the Lists are structurally equal — the same items, in the same order.
+		§ NOTE: This would read better in Essence — length equality AND
+		§ `pairedWith(other)::everyItem(matches (pair) { … })` — and it can not
+		§ be written that way yet. Binding a List Method's own `ItemType` to a
+		§ Type that MENTIONS `ItemType` (the pair Record) makes inference
+		§ substitute the name into itself and recurse until the stack runs out.
+		§ The bound has nothing to do with it: a plain
+		§ `function f<ItemType>(_ a: List<ItemType>, _ b: List<ItemType>) { <-
+		§ a::pairedWith(b)::everyItem(…) }` overflows the same way, and did
+		§ before any of this. So `is` stays native and takes the witness — it
+		§ compares each pair with the items' own `is` rather than structurally,
+		§ exactly as `compareTo` below does with their `compareTo`.
+
+		§§ Checks whether the Lists are structurally equal — the same items in the same order, each pair compared with the items' own `is`. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @param other the value to compare with
 		§§ @returns `true` when the Lists are equal.
-		is(_ other: List<ItemType>) -> Boolean
+		is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
 
-		§§ Checks whether the Lists differ — in any item or in their order.
+		§§ Checks whether the Lists differ — in any item or in their order. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @param other the value to compare with
 		§§ @returns `true` when the Lists are not equal.
-		isNot(_ other: List<ItemType>) -> Boolean {
+		isNot<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
@@ -67,17 +92,22 @@ declarations {
 			<- @::length()::is(0)
 		}
 
-		§§ Whether an item equal to the given one is in the List.
+		§§ Whether an item equal to the given one — by the items' own `is` — is in the List. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @param item the item to look for
 		§§ @returns `true` when the item occurs.
-		contains(_ item: ItemType) -> Boolean
+		contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
+			§ The bound is the whole of the difference from `anyItem`: the
+			§ conforming Namespace's `is` arrives as the hidden conformance
+			§ Argument, and this hands it straight on as the check.
+			<- @::anyItem(matches (candidate) { <- candidate::is(item) })
+		}
 
-		§§ Whether no item equal to the given one is in the List.
+		§§ Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @param item the item to look for
 		§§ @returns `true` when the item does not occur.
-		doesNotContain(_ item: ItemType) -> Boolean {
+		doesNotContain<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
 			<- @::contains(item)::negate()
 		}
 
@@ -143,11 +173,13 @@ declarations {
 			)
 		}
 
-		§§ A new List without every item equal to the given one, or without every item the given check accepts.
+		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the List of remaining items.
 		overload removeEvery {
-			(_ item: ItemType) -> List<ItemType>
+			<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
+				<- @::removeEvery(where (candidate) { <- candidate::is(item) })
+			}
 
 			(where check: (_: ItemType) -> Boolean) -> List<ItemType> {
 				<- @::keepEvery(where (item) { <- check(item)::negate() })
@@ -173,10 +205,23 @@ declarations {
 			}
 		}
 
-		§§ A new List keeping only the first occurrence of each item, in the original order.
+		§§ A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the List without duplicates.
-		removeDuplicates() -> List<ItemType>
+		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
+			§ NOTE: Quadratic, as the native was — each item is looked for among
+			§ the ones kept so far. The empty List the fold starts from is
+			§ annotated: `reduce` binds `Result` from the `startingWith` value
+			§ before the callback is even checked, and a bare `[]` has no items
+			§ to read the item Type from.
+			constant kept: List<ItemType> = []
+
+			<- @::reduce(startingWith kept, (accumulated, item) {
+				if accumulated::contains(item) { <- accumulated }
+
+				<- accumulated::append(item)
+			})
+		}
 
 		§§ A new List with the given item — or the contents of the given List — added at the front.
 		§§
@@ -240,10 +285,17 @@ declarations {
 		§§ @returns the item, or `Nothing` when the position is outside the List.
 		itemAt(_ index: Integer) -> Optional<ItemType>
 
-		§§ The position of the first item equal to the given one.
+		§ NOTE: `firstIndexOf` and `lastIndexOf` stay native and take the
+		§ witness. Written in Essence each would have to pair every item with
+		§ its position first — `List.of(integersFrom …)::pairedWith(@)` — build
+		§ that whole List of Records, filter it and read one member back out,
+		§ where the native walks and stops. The bound buys the same thing either
+		§ way: the item Type's own `is` decides which position is found.
+
+		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		firstIndexOf(_ item: ItemType) -> Optional<Integer>
+		firstIndexOf<infer ItemType is Equatable>(_ item: ItemType) -> Optional<Integer>
 
 		§§ A new List of the items from one position up to, but not including, another.
 		§§
@@ -257,14 +309,14 @@ declarations {
 		§§ @returns the reversed List.
 		reversed() -> List<ItemType>
 
-		§ The first builtin with a Protocol-bounded Type Parameter. The bound
-		§ resolves the conforming Namespace at the call site — `Integer` for a
-		§ `List<Integer>`, the covering `Number` for a mixed numeric List — and
-		§ its `compareTo` arrives as a hidden trailing Argument. Its own bounded
-		§ `ItemType` shadows the Namespace's, and because the body below is
-		§ written in Essence, `@` has to be read through that shadowing too —
-		§ a List of the BOUNDED item Type, which is what lets `compareTo` be
-		§ called on an item at all. It is the first Method where that matters.
+		§ The `Comparable` bound works exactly as the `Equatable` one above
+		§ does. It resolves the conforming Namespace at the call site —
+		§ `Integer` for a `List<Integer>`, the covering `Number` for a mixed
+		§ numeric List — and its `compareTo` arrives as a hidden trailing
+		§ Argument. Its own bounded `ItemType` shadows the Namespace's, and
+		§ because the body below is written in Essence, `@` has to be read
+		§ through that shadowing too — a List of the BOUNDED item Type, which is
+		§ what lets `compareTo` be called on an item at all.
 
 		§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use `sortedBy`.
 		§§
@@ -322,11 +374,13 @@ declarations {
 			<- @::anyItem(matches (item) { <- check(item)::negate() })::negate()
 		}
 
-		§§ How many items equal the given one, or are accepted by the given check.
+		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the count.
 		overload countOf {
-			(_ item: ItemType) -> Integer
+			<infer ItemType is Equatable>(_ item: ItemType) -> Integer {
+				<- @::countOf(where (candidate) { <- candidate::is(item) })
+			}
 
 			(where check: (_: ItemType) -> Boolean) -> Integer {
 				§ NOTE: The filtered List is built only to be measured — see the
@@ -362,13 +416,13 @@ declarations {
 			<- @::removeAt(index)::insertAt(index, with item)
 		}
 
-		§§ The position of the last item equal to the given one.
+		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`. See the note above `firstIndexOf` for why this one stays native.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		lastIndexOf(_ item: ItemType) -> Optional<Integer>
+		lastIndexOf<infer ItemType is Equatable>(_ item: ItemType) -> Optional<Integer>
 
-		§ The third bounded Method, and the one whose bound is doing real work
-		§ rather than restating a conformance: joining needs nothing of the
+		§ The one bounded Method whose bound does real work rather than
+		§ restating a conformance of List's own: joining needs nothing of the
 		§ items but that each can say what it is, so the bound is `Printable`
 		§ and the conforming Namespace's `toString` arrives as the hidden
 		§ Argument, exactly as `sorted`'s `compareTo` does. Bounding the METHOD

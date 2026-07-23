@@ -3,7 +3,7 @@ import { createBoolean, negate } from "./Boolean"
 import { getStringRepresentation } from "./functions"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
-import { anyIs, anyIsNot, getInt32 } from "./internalHelpers"
+import { getInt32 } from "./internalHelpers"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import { equal, greater, less, type OrderingType } from "./Ordering"
@@ -23,81 +23,38 @@ export function createList<ItemType extends AnyType>(
 	return { [typeKeySymbol]: "List", value: originalList }
 }
 
+// NOTE: Equality item by item — the item `is` arrives as the hidden conformance
+// Argument (curried by `boundConformance` for a nested List), so two Lists are
+// equal exactly when their items say so with their OWN equality, rather than
+// with the universal structural comparison this used to reach for. Lengths
+// decide first, so nothing is compared for a pair of Lists that can not match.
 export function is<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<ItemType>,
+	conformance: {
+		is: (first: ItemType, second: ItemType) => BooleanType
+	},
 ): BooleanType {
-	if (originalList.value.length === otherList.value.length) {
-		for (let index = 0; index < originalList.value.length; index++) {
-			let originalListItem = originalList.value[index]
-			let otherListItem = otherList.value[index]
-
-			if (anyIsNot(originalListItem, otherListItem)) {
-				return createBoolean(false)
-			}
-		}
-
-		return createBoolean(true)
-	} else {
+	if (originalList.value.length !== otherList.value.length) {
 		return createBoolean(false)
 	}
+
+	for (let index = 0; index < originalList.value.length; index++) {
+		let itemsAreEqual = conformance.is(
+			originalList.value[index],
+			otherList.value[index],
+		)
+
+		if (!itemsAreEqual.value) {
+			return createBoolean(false)
+		}
+	}
+
+	return createBoolean(true)
 }
 
 export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(BigInt(originalList.value.length))
-}
-
-export function contains<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-): BooleanType {
-	for (let listItem of originalList.value) {
-		if (anyIs(listItem, item)) {
-			return createBoolean(true)
-		}
-	}
-
-	return createBoolean(false)
-}
-
-export function removeEvery__overload$1<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	excludedItem: ItemType,
-): ListType<ItemType> {
-	let filteredList: Array<ItemType> = []
-
-	for (let item of originalList.value) {
-		if (excludedItem[typeKeySymbol] === "Nothing") {
-			// Always filtered out
-		} else if (anyIsNot(excludedItem, item)) {
-			filteredList.push(item)
-		}
-	}
-
-	return createList(filteredList)
-}
-
-export function removeDuplicates<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-): ListType<ItemType> {
-	let results: Array<ItemType> = []
-
-	for (let originalValue of originalList.value) {
-		let valueIsInResults = false
-
-		for (let resultsValue of results) {
-			if (anyIs(resultsValue, originalValue)) {
-				valueIsInResults = true
-				break
-			}
-		}
-
-		if (!valueIsInResults) {
-			results.push(originalValue)
-		}
-	}
-
-	return createList(results)
 }
 
 export function append__overload$2<ItemType extends AnyType>(
@@ -161,12 +118,20 @@ export function itemAt<ItemType extends AnyType>(
 	}
 }
 
+// NOTE: Native rather than Essence because the Essence form has to pair every
+// item with its position first, build that whole List of Records and read one
+// member back out, where this walks and stops. The item `is` arrives as the
+// hidden conformance Argument, so which position is found is decided by the
+// items' own equality either way. `lastIndexOf` is the same walk, backwards.
 export function firstIndexOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
+	conformance: {
+		is: (first: ItemType, second: ItemType) => BooleanType
+	},
 ): IntegerType | NothingType {
 	for (let index = 0; index < originalList.value.length; index++) {
-		if (anyIs(originalList.value[index], item)) {
+		if (conformance.is(originalList.value[index], item).value) {
 			return createInteger(BigInt(index))
 		}
 	}
@@ -259,27 +224,15 @@ export function compareTo<ItemType extends AnyType>(
 	return equal
 }
 
-export function countOf__overload$1<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-): IntegerType {
-	let count = 0n
-
-	for (let listItem of originalList.value) {
-		if (anyIs(listItem, item)) {
-			count += 1n
-		}
-	}
-
-	return createInteger(count)
-}
-
 export function lastIndexOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	item: ItemType,
+	conformance: {
+		is: (first: ItemType, second: ItemType) => BooleanType
+	},
 ): IntegerType | NothingType {
 	for (let index = originalList.value.length - 1; index >= 0; index--) {
-		if (anyIs(originalList.value[index], item)) {
+		if (conformance.is(originalList.value[index], item).value) {
 			return createInteger(BigInt(index))
 		}
 	}

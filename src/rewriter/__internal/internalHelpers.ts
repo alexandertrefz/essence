@@ -2,7 +2,6 @@ import type { Fraction } from "bigint-fraction"
 
 import { is as boolIs } from "./Boolean"
 import type { IntegerType } from "./Integer"
-import { is as listIs } from "./List"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { AnyType } from "./type"
@@ -104,7 +103,21 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "List" && //
 		b[typeKeySymbol] === "List"
 	) {
-		return listIs(a, b).value
+		// NOTE: List.is takes a conformance witness now — equality of a List is
+		// its items' own equality — and there is no witness to hand it here.
+		// Recurse through this same universal comparison instead, which is what
+		// the native did before the witness arrived.
+		if (a.value.length !== b.value.length) {
+			return false
+		}
+
+		for (let index = 0; index < a.value.length; index++) {
+			if (!anyIs(a.value[index], b.value[index])) {
+				return false
+			}
+		}
+
+		return true
 	} else if (
 		a[typeKeySymbol].includes("#") &&
 		a[typeKeySymbol] === b[typeKeySymbol]
