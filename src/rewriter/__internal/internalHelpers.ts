@@ -1,13 +1,11 @@
 import type { Fraction } from "bigint-fraction"
 
-import { is as algebraicIs } from "./Algebraic"
 import { is as boolIs } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { is as listIs } from "./List"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import { is as stringIs } from "./String"
-import { is as transcendentalIs } from "./Transcendental"
 import type { AnyType } from "./type"
 import { typeKeySymbol } from "./type"
 
@@ -69,12 +67,31 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "Algebraic" &&
 		b[typeKeySymbol] === "Algebraic"
 	) {
-		return algebraicIs(a, b).value
+		// NOTE: Algebraic.is is written in Essence now — it reads `compareTo`,
+		// which decides the sign of the difference symbolically. Normal forms
+		// make that the same answer as comparing the representation directly,
+		// which is what the deleted native did.
+		return (
+			a.radicand === b.radicand &&
+			a.rationalPartNumerator === b.rationalPartNumerator &&
+			a.rationalPartDenominator === b.rationalPartDenominator &&
+			a.radicalCoefficientNumerator === b.radicalCoefficientNumerator &&
+			a.radicalCoefficientDenominator === b.radicalCoefficientDenominator
+		)
 	} else if (
 		a[typeKeySymbol] === "Transcendental" &&
 		b[typeKeySymbol] === "Transcendental"
 	) {
-		return transcendentalIs(a, b).value
+		// NOTE: Transcendental.is is written in Essence now — it reads the
+		// `Number` Union's `is`, whose Transcendental/Transcendental cell is
+		// exact. Canonical forms make that the same answer as comparing the
+		// representation directly, which is what the deleted native did.
+		return (
+			a.rationalPartNumerator === b.rationalPartNumerator &&
+			a.rationalPartDenominator === b.rationalPartDenominator &&
+			a.piCoefficientNumerator === b.piCoefficientNumerator &&
+			a.piCoefficientDenominator === b.piCoefficientDenominator
+		)
 	} else if (
 		a[typeKeySymbol] === "Record" && //
 		b[typeKeySymbol] === "Record"

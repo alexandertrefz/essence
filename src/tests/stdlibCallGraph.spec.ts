@@ -219,7 +219,12 @@ describe("Stdlib Call Graph", () => {
 		let graph = buildCallGraph(stdlibPrelude())
 
 		expect([...graph.keys()].sort()).toEqual([
+			"Algebraic.absolute",
+			"Algebraic.is",
 			"Algebraic.isNot",
+			"Algebraic.subtract__overload$1",
+			"Algebraic.subtract__overload$2",
+			"Algebraic.subtract__overload$3",
 			"Boolean.isNot",
 			"Integer.absolute",
 			"Integer.clampedBetween",
@@ -290,7 +295,12 @@ describe("Stdlib Call Graph", () => {
 			"String.doesNotStartWith",
 			"String.hasAnyContent",
 			"String.isNot",
+			"Transcendental.absolute",
+			"Transcendental.is",
 			"Transcendental.isNot",
+			"Transcendental.subtract__overload$1",
+			"Transcendental.subtract__overload$2",
+			"Transcendental.subtract__overload$3",
 		])
 	})
 
