@@ -572,7 +572,7 @@ export function flattened<ItemType extends AnyType>(
 export function partitioned<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	matchesFunction: (item: ItemType) => BooleanType,
-): RecordType {
+): RecordType & { matching: ListType<ItemType>; rest: ListType<ItemType> } {
 	let matching: Array<ItemType> = []
 	let rest: Array<ItemType> = []
 
@@ -594,9 +594,9 @@ export function partitioned<ItemType extends AnyType>(
 export function pairedWith<ItemType extends AnyType, Other extends AnyType>(
 	originalList: ListType<ItemType>,
 	otherList: ListType<Other>,
-): ListType<RecordType> {
+): ListType<RecordType & { first: ItemType; second: Other }> {
 	let pairCount = Math.min(originalList.value.length, otherList.value.length)
-	let pairs: Array<RecordType> = []
+	let pairs: Array<RecordType & { first: ItemType; second: Other }> = []
 
 	for (let index = 0; index < pairCount; index++) {
 		pairs.push({
