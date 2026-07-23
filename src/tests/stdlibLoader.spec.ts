@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
+import { builtinMemberOrder } from "../enricher/builtins"
 import {
 	loadStdlib,
 	loadStdlibFrom,
@@ -565,6 +566,47 @@ describe("Standard Library Loader", () => {
 	// NOTE: Enriched once per process — every consumer reads the same object,
 	// so the library is parsed, hoisted and validated exactly once no matter
 	// how many files are compiled.
+	// NOTE: The merged member table is listed in ONE canonical order, not
+	// "legacy half first, source half after". A source declaration is enriched
+	// INTO the Scope and would otherwise land at the end, so every conversion
+	// would move its Namespace to last — reordering the Completion list and
+	// the Enricher's Namespace search for a change meant to be invisible.
+	it("lists the builtin Namespaces in one order, whichever half declares them", () => {
+		expect(
+			loadStdlib().namespaces.map((namespace) => namespace.name),
+		).toEqual([
+			"String",
+			"Boolean",
+			"Integer",
+			"Rational",
+			"Algebraic",
+			"Transcendental",
+			"Number",
+			"Nothing",
+			"Optional",
+			"Ordering",
+			"Record",
+			"List",
+		])
+	})
+
+	// NOTE: The other half of the ordering rule, and the half that matters at
+	// commit 11 — by then `builtinMemberOrder` is the SOLE source of order,
+	// with no legacy table's key order left to fall back on. A name listed
+	// that no longer exists is dead weight that reads as intent; a member that
+	// exists but is unlisted is appended LAST, which is exactly the silent
+	// reordering the list is here to prevent.
+	it("orders every builtin member by name, and names only members that exist", () => {
+		let members = Object.keys(loadStdlib().members)
+
+		expect(
+			members.filter((name) => !builtinMemberOrder.includes(name)),
+		).toEqual([])
+		expect(
+			builtinMemberOrder.filter((name) => !members.includes(name)),
+		).toEqual([])
+	})
+
 	it("caches the loaded standard library", () => {
 		expect(loadStdlib()).toBe(loadStdlib())
 	})

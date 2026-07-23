@@ -246,3 +246,25 @@ describe("Signature Help for bounded Methods", () => {
 		expect(help?.activeParameter).toBe(0)
 	})
 })
+
+// NOTE: Boolean is the first Namespace read from Essence source rather than
+// from a TypeScript table (`src/stdlib/Boolean.es`). Signature Help reads a
+// Parameter's text off the Parameter itself — the `@param other` tag in the
+// source has to land there, which is exactly where the table used to write it
+// by hand.
+describe("Signature Help for a standard library Method", () => {
+	it("should describe the Parameter of a Method declared in Essence", () => {
+		let source = ["implementation {", "\ttrue::is(", "}"].join("\n")
+
+		let help = findSignatureHelp(source, { line: 2, column: 11 })
+		let signature = help?.signatures[0]
+
+		expect(signature?.label).toBe("is(_ Boolean) -> Boolean")
+		expect(signature?.documentation).toBe(
+			"Checks whether the Boolean has the same truth value as another.",
+		)
+		expect(signature?.parameters[0]?.documentation).toBe(
+			"the Boolean to compare against",
+		)
+	})
+})

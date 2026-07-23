@@ -4,10 +4,11 @@ import {
 	namespace as algebraicNamespace,
 	type as algebraicType,
 } from "./types/Algebraic"
-import {
-	namespace as booleanNamespace,
-	type as booleanType,
-} from "./types/Boolean"
+// NOTE: The Boolean NAMESPACE now lives in `src/stdlib/Boolean.es` and is
+// gone from the table below. Its Type tag stays — a `type` is subtracted from
+// the legacy tables only by a source `type` declaration, and Boolean's is a
+// bare primitive tag with no declaration to write.
+import { type as booleanType } from "./types/Boolean"
 import {
 	namespace as integerNamespace,
 	type as integerType,
@@ -77,7 +78,6 @@ const irrationalType: common.UnionType = {
 export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
 	String: stringNamespace,
-	Boolean: booleanNamespace,
 	Integer: integerNamespace,
 	Rational: rationalNamespace,
 	Algebraic: algebraicNamespace,
@@ -89,6 +89,37 @@ export const legacyMembers: Record<string, common.Type> = {
 	Record: recordNamespace,
 	List: listNamespace,
 }
+
+// NOTE: The order the builtin members are listed in, INDEPENDENT of which half
+// of the standard library declares them. Without it the merged table lists the
+// legacy names first and the source-declared ones after, so converting a
+// Namespace would silently move it to the end — and the order is observable:
+// `builtinNamespaces()` derives from it, Completion dedupes members
+// first-Namespace-wins (`lsp/completion.ts`), and the Enricher builds its
+// `matchingNamespaces` in the same order. A conversion must not change what an
+// Editor offers first.
+//
+// NOTE: This is the order BETWEEN Namespaces. The order WITHIN one — its
+// Methods and Properties — is a property of the declaration itself, and is
+// what `stdlibEquivalence.spec.ts` compares as `methodOrder`/`propertyOrder`.
+//
+// A name missing from this list is appended in the order it was declared, so
+// a genuinely new builtin costs nothing until it needs a place of its own.
+export const builtinMemberOrder: Array<string> = [
+	"__print",
+	"String",
+	"Boolean",
+	"Integer",
+	"Rational",
+	"Algebraic",
+	"Transcendental",
+	"Number",
+	"Nothing",
+	"Optional",
+	"Ordering",
+	"Record",
+	"List",
+]
 
 export const legacyTypes: Record<string, common.Type> = {
 	Nothing: nothingType,

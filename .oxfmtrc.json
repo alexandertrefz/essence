@@ -19,6 +19,7 @@
 		"src/parser/grammar.ts",
 		"docs/_layouts/**",
 		"testFiles/**",
+		"**/*.es",
 		"**/__snapshots__/**",
 		"**/*.md",
 		"**/*.yml"
