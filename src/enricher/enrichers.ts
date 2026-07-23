@@ -304,7 +304,12 @@ export function enrichMethodFunctionDefinition(
 	let newScope = scopeWithGenerics(method.value.generics, scope)
 
 	if (selfType !== null) {
-		declareVariableInScope("@", selfType, newScope, true)
+		declareVariableInScope(
+			"@",
+			shadowSelfTypeGenerics(selfType, method.value.generics, newScope),
+			newScope,
+			true,
+		)
 	}
 
 	// NOTE: Read from the signature before the body so that `<-` Expressions can
@@ -334,6 +339,46 @@ export function enrichMethodFunctionDefinition(
 		inferredReturnType: null,
 		parameterListPosition: method.value.parameterListPosition,
 	}
+}
+
+// NOTE: A Method Generic SHADOWS a Namespace Generic of the same name — see
+// `List.sorted<infer ItemType is Comparable>`, declared on a Namespace that
+// already has an unbounded `ItemType`. The Method's Parameter and return Types
+// are resolved in a Scope where the name is the Method's, so `@` has to agree:
+// the receiver of `sorted` is a List of the BOUNDED ItemType, which is what
+// lets `first::compareTo(second)` in the body resolve through the bound and
+// reach the hidden conformance Argument. Left unshadowed, `@` would carry the
+// Namespace's opaque Generic, an item read off it would have no bound, and the
+// body could call nothing on it.
+//
+// This is the same substitution `withInjectedBounds` performs for a conditional
+// conformance's injected Namespace Generics, applied to the Generics a Method
+// declares for itself. Both are needed and neither subsumes the other: the
+// injected ones are Namespace Generics the Method never names, these are names
+// the Method takes over.
+function shadowSelfTypeGenerics(
+	selfType: common.Type,
+	generics: Array<parser.GenericDeclarationNode>,
+	scope: enricher.Scope,
+): common.Type {
+	if (generics.length === 0) {
+		return selfType
+	}
+
+	// NOTE: Read back out of the Scope the Method's Generics were just
+	// registered in, rather than rebuilt here, so the shadowing `@` sees is the
+	// same object its Parameter Types see.
+	let bindings: GenericBindings = new Map(
+		generics.flatMap((generic) => {
+			let shadowing = scope.types[generic.name.content]
+
+			return shadowing === undefined
+				? []
+				: [[generic.name.content, shadowing] as const]
+		}),
+	)
+
+	return applyGenericBindings(selfType, bindings)
 }
 
 export function enrichGenericDeclarationNode(
