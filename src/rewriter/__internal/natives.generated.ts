@@ -426,26 +426,15 @@ export type NumberNatives = {
 }
 
 export type NothingNatives = {
-	// is(_: Nothing) -> Boolean
-	is: (self: NothingType, argument1: NothingType) => BooleanType
-	// isNot(_: Nothing) -> Boolean
-	isNot: (self: NothingType, argument1: NothingType) => BooleanType
-	// toString() -> String
-	toString: (self: NothingType) => StringType
+
 }
 
 export type OptionalNatives = {
-	// otherwise<ItemType>(_: ItemType) -> ItemType
-	otherwise: <ItemType extends AnyType>(self: ItemType | NothingType, argument1: ItemType) => ItemType
+
 }
 
 export type OrderingNatives = {
-	// is(_: Ordering) -> Boolean
-	is: (self: OrderingType, argument1: OrderingType) => BooleanType
-	// isNot(_: Ordering) -> Boolean
-	isNot: (self: OrderingType, argument1: OrderingType) => BooleanType
-	// toString() -> String
-	toString: (self: OrderingType) => StringType
+
 }
 
 export type RecordNatives = {
@@ -584,12 +573,15 @@ export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "i
 
 declare const NothingModule: typeof import("./Nothing")
 export const $Nothing: NothingNatives = NothingModule
+export const $NothingAbsent: AssertNoEssenceExports<typeof import("./Nothing"), "is" | "isNot" | "toString"> = true
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "otherwise"> = true
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
+export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "is" | "isNot" | "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

@@ -221,7 +221,14 @@ describe("Stdlib Call Graph", () => {
 
 		expect([...graph.keys()].sort()).toEqual([
 			"Boolean.isNot",
+			"Nothing.is",
+			"Nothing.isNot",
+			"Nothing.toString",
 			"Number.isBetween",
+			"Optional.otherwise",
+			"Ordering.is",
+			"Ordering.isNot",
+			"Ordering.toString",
 		])
 	})
 
