@@ -3,7 +3,6 @@ import type { Fraction } from "bigint-fraction"
 import { is as algebraicIs } from "./Algebraic"
 import { is as boolIs } from "./Boolean"
 import type { IntegerType } from "./Integer"
-import { is as integerIs } from "./Integer"
 import { is as listIs } from "./List"
 import { is as rationalIs } from "./Rational"
 import type { RecordType } from "./Record"
@@ -51,7 +50,9 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "Integer" &&
 		b[typeKeySymbol] === "Integer"
 	) {
-		return integerIs(a, b).value
+		// NOTE: Integer.is is written in Essence now; compare the runtime
+		// representation directly rather than importing the deleted native.
+		return a.value === b.value
 	} else if (
 		a[typeKeySymbol] === "Rational" &&
 		b[typeKeySymbol] === "Rational"
