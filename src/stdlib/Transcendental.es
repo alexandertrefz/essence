@@ -40,15 +40,15 @@ declarations {
 		§§ Subtracts a number from this Transcendental, exactly. Subtracting an equal π term leaves a Rational.
 		overload subtract {
 			(_ other: Integer) -> Transcendental {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Rational) -> Transcendental {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 
 			(_ other: Transcendental) -> Rational | Transcendental {
-				<- @::add(other::negated())
+				<- @::add(other::negate())
 			}
 		}
 
@@ -71,12 +71,12 @@ declarations {
 
 		§§ The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.
 		absolute() -> Transcendental {
-			if @::<Number>isLessThan(0) { <- @::negated() }
+			if @::<Number>isLessThan(0) { <- @::negate() }
 			<- @
 		}
 
 		§§ The Transcendental with its sign flipped. The π term keeps its non-zero coefficient, so the result is again a Transcendental.
-		negated() -> Transcendental
+		negate() -> Transcendental
 
 		§§ The exact symbolic form — `π`, `2·π` or `1 + π`.
 		toString() -> String

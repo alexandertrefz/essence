@@ -14,7 +14,7 @@ implementation {
 	__print(greeting::contains("lo,"))     § true
 
 	§ Producing new Strings.
-	__print(greeting::reversed())          § "dlroW ,olleH"
+	__print(greeting::reverse())          § "dlroW ,olleH"
 	__print(greeting::replaceEvery("o", with "0")) § "Hell0, W0rld"
 	__print(greeting::slice(from 0, to 5)) § "Hello"
 	__print("ab"::repeated(3))             § "ababab"
@@ -34,7 +34,7 @@ implementation {
 	__print(emoji::length())               § 3
 	__print(emoji::characterAt(1))         § "😀"
 	__print(emoji::firstIndexOf("b"))      § 2
-	__print(emoji::reversed())             § "b😀a"
+	__print(emoji::reverse())             § "b😀a"
 
 	§ String is Comparable now, so a List of Strings sorts with a real
 	§ comparator, and `compareTo` orders by code point.

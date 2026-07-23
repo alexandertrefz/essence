@@ -9,6 +9,8 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
+import type { OrderingType } from "./Ordering"
+import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
 import { createRational } from "./Rational"
 import type { StringType } from "./String"
@@ -18,8 +20,6 @@ import {
 	add as transcendentalAdd,
 	multiplyWith as transcendentalMultiplyWith,
 } from "./Transcendental"
-import type { OrderingType } from "./Ordering"
-import { equal, greater, less } from "./Ordering"
 import { typeKeySymbol } from "./type"
 
 export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
@@ -148,7 +148,7 @@ export function isGreaterThanOrEqualTo__overload$2(
 
 // #region Everyday methods
 
-export function negated(integer: IntegerType): IntegerType {
+export function negate(integer: IntegerType): IntegerType {
 	return createInteger(-integer.value)
 }
 

@@ -30,7 +30,7 @@ export function splitOn(
 	// surrogates, so that one case splits by code point instead. This is the
 	// ONLY place the runtime decides what a character is: `characters()` is
 	// written in Essence as `splitOn("")`, and `length`, `characterAt`,
-	// `slice` and `reversed` are written on top of `characters()`, so an
+	// `slice` and `reverse` are written on top of `characters()`, so an
 	// astral character stays whole for every one of them.
 	let parts =
 		splitterString.value === ""
@@ -109,7 +109,7 @@ export function compareTo(
 // `@::characters()::length()` is correct but makes counting characters build a
 // List of every one of them — turning an O(1) read into an O(n) allocation, and
 // pulling `List` and its whole import graph into any Program that so much as
-// asks whether a String is empty. `characters`, `slice` and `reversed` are
+// asks whether a String is empty. `characters`, `slice` and `reverse` are
 // still written in Essence on top of `splitOn`.
 export function length(originalString: StringType): IntegerType {
 	return createInteger(BigInt(Array.from(originalString.value).length))

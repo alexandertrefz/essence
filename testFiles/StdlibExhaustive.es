@@ -124,8 +124,8 @@ implementation {
 	show("String.repeated(_ Integer)", "ab"::repeated(3))
 	show("String.repeated(_ Integer) [zero]", "ab"::repeated(0))
 	show("String.repeated(_ Integer) [negative]", "ab"::repeated(-1))
-	show("String.reversed()", greeting::reversed())
-	show("String.reversed() [astral]", "a😀b"::reversed())
+	show("String.reverse()", greeting::reverse())
+	show("String.reverse() [astral]", "a😀b"::reverse())
 	show("String.slice(from: Integer, to: Integer)", greeting::slice(from 0, to 5))
 	show("String.slice(from: Integer, to: Integer) [empty range]", greeting::slice(from 3, to 3))
 	show("String.slice(from: Integer, to: Integer) [past the end]", greeting::slice(from 7, to 99))
@@ -200,8 +200,8 @@ implementation {
 	showMaybe("Integer.squareRoot() [negative]", -1::squareRoot())
 	show("Integer.absolute()", -5::absolute())
 	show("Integer.absolute() [positive]", 5::absolute())
-	show("Integer.negated()", 5::negated())
-	show("Integer.negated() [zero]", 0::negated())
+	show("Integer.negate()", 5::negate())
+	show("Integer.negate() [zero]", 0::negate())
 	show("Integer.isEven()", 4::isEven())
 	show("Integer.isEven() [odd]", 3::isEven())
 	show("Integer.isOdd()", -3::isOdd())
@@ -287,19 +287,19 @@ implementation {
 	show("Rational.numerator()", 3/4::numerator())
 	show("Rational.denominator()", 3/4::denominator())
 	show("Rational.absolute()", -3/4::absolute())
-	show("Rational.negated()", 3/4::negated())
+	show("Rational.negate()", 3/4::negate())
 	showMaybe("Rational.reciprocal()", 3/4::reciprocal())
 	showMaybe("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show("Rational.isWholeNumber()", 4/2::isWholeNumber())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
-	show("Rational.rounded()", 7/2::rounded())
-	show("Rational.rounded() [negative]", -7/2::rounded())
-	show("Rational.roundedDown()", 7/2::roundedDown())
-	show("Rational.roundedDown() [negative]", -7/2::roundedDown())
-	show("Rational.roundedUp()", 7/2::roundedUp())
-	show("Rational.roundedUp() [negative]", -7/2::roundedUp())
-	show("Rational.truncated()", 7/2::truncated())
-	show("Rational.truncated() [negative]", -7/2::truncated())
+	show("Rational.round()", 7/2::round())
+	show("Rational.round() [negative]", -7/2::round())
+	show("Rational.roundDown()", 7/2::roundDown())
+	show("Rational.roundDown() [negative]", -7/2::roundDown())
+	show("Rational.roundUp()", 7/2::roundUp())
+	show("Rational.roundUp() [negative]", -7/2::roundUp())
+	show("Rational.truncate()", 7/2::truncate())
+	show("Rational.truncate() [negative]", -7/2::truncate())
 	showMaybe("Rational.toThePowerOf(_ Integer)", 2/3::toThePowerOf(2))
 	showMaybe("Rational.toThePowerOf(_ Integer) [zero exponent]", 2/3::toThePowerOf(0))
 	showMaybe("Rational.toThePowerOf(_ Integer) [negative exponent]", 2/3::toThePowerOf(-2))
@@ -352,8 +352,8 @@ implementation {
 		showMaybe("Algebraic.divideBy(_ Algebraic) [same radical]", rootTwo::divideBy(rootTwo))
 		showMaybe("Algebraic.divideBy(_ Algebraic) [differing radicals]", rootTwo::divideBy(rootThree))
 		show("Algebraic.absolute()", rootTwo::absolute())
-		show("Algebraic.absolute() [negative]", rootTwo::negated()::absolute())
-		show("Algebraic.negated()", rootTwo::negated())
+		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
+		show("Algebraic.negate()", rootTwo::negate())
 		show("Algebraic.toString()", rootTwo::toString())
 		<- nothing
 	})
@@ -379,8 +379,8 @@ implementation {
 	showMaybe("Transcendental.divideBy(_ Rational) [by zero]", Number.PI::divideBy(0/1))
 	showMaybe("Transcendental.divideBy(_ Transcendental) [proportional]", Number.TAU::divideBy(Number.PI))
 	show("Transcendental.absolute()", Number.PI::absolute())
-	show("Transcendental.absolute() [negative]", Number.PI::negated()::absolute())
-	show("Transcendental.negated()", Number.PI::negated())
+	show("Transcendental.absolute() [negative]", Number.PI::negate()::absolute())
+	show("Transcendental.negate()", Number.PI::negate())
 	show("Transcendental.toString()", Number.PI::toString())
 
 	§ ——— Number ———————————————————————————————————————————————————————————
@@ -581,8 +581,8 @@ implementation {
 	show("List.slice<ItemType>(from: Integer, to: Integer)", numbers::slice(from 1, to 3))
 	show("List.slice<ItemType>(from: Integer, to: Integer) [empty range]", numbers::slice(from 2, to 2))
 	show("List.slice<ItemType>(from: Integer, to: Integer) [past the end]", numbers::slice(from 3, to 99))
-	show("List.reversed<ItemType>()", numbers::reversed())
-	show("List.reversed<ItemType>() [empty]", noNumbers::reversed())
+	show("List.reverse<ItemType>()", numbers::reverse())
+	show("List.reverse<ItemType>() [empty]", noNumbers::reverse())
 	show("List.sorted<ItemType is Comparable>()", [3, 1, 2]::sorted())
 	show("List.sorted<ItemType is Comparable>() [Strings]", ["banana", "apple"]::sorted())
 	show("List.sorted<ItemType is Comparable>() [empty]", noNumbers::sorted())
@@ -614,13 +614,13 @@ implementation {
 	show("List.joinWith<ItemType is Printable>(_ String)", ["a", "b", "c"]::joinWith(" + "))
 	show("List.joinWith<ItemType is Printable>(_ String) [empty]", noNumbers::joinWith(", "))
 	show("List.joinWith<ItemType is Printable>(_ String) [single]", singleNumber::joinWith(", "))
-	§ LOAD-BEARING: `partitioned` returns a Record, and its printed form
+	§ LOAD-BEARING: `partition` returns a Record, and its printed form
 	§ `{ matching = [ 2, 4 ], rest = [ 3, 1, 1 ] }` sits at forty-three
 	§ characters — seventeen under the sixty at which `getStringRepresentation`
 	§ trips its field-doubling bug and wraps across lines. A larger `numbers`
 	§ List here would cross that line and break the golden. Keep it short.
-	show("List.partitioned<ItemType>(where: (_ ItemType) -> Boolean)", numbers::partitioned(where (item) { <- item::isEven() }))
-	show("List.partitioned<ItemType>(where: (_ ItemType) -> Boolean) [empty]", noNumbers::partitioned(where (item) { <- item::isEven() }))
+	show("List.partition<ItemType>(where: (_ ItemType) -> Boolean)", numbers::partition(where (item) { <- item::isEven() }))
+	show("List.partition<ItemType>(where: (_ ItemType) -> Boolean) [empty]", noNumbers::partition(where (item) { <- item::isEven() }))
 	§ One pair only: the pretty printer wraps a Record List past sixty
 	§ characters, and every line of this file's output has to stay one line.
 	show("List.pairedWith<ItemType, Other>(_ List<Other>)", ["a"]::pairedWith([1, 2, 3]))
@@ -637,7 +637,7 @@ implementation {
 	show("List.of(integersFrom: Integer, through: Integer) [inverted]", List.of(integersFrom 5, through 1))
 
 	§ ——— NestedList ———————————————————————————————————————————————————————
-	show("NestedList.flattened<ItemType>()", [[1, 2], [3]]::flattened())
-	show("NestedList.flattened<ItemType>() [empty]", noNestedNumbers::flattened())
+	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
+	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
 
 }
