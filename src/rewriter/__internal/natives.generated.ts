@@ -39,12 +39,8 @@ type PrintableConformance<Self extends AnyType> = {
 export type StringNatives = {
 	// isEmpty() -> Boolean
 	isEmpty: (self: StringType) => BooleanType
-	// hasAnyContent() -> Boolean
-	hasAnyContent: (self: StringType) => BooleanType
 	// is(_: String) -> Boolean
 	is: (self: StringType, argument1: StringType) => BooleanType
-	// isNot(_: String) -> Boolean
-	isNot: (self: StringType, argument1: StringType) => BooleanType
 	// prepend(_: String) -> String
 	prepend: (self: StringType, argument1: StringType) => StringType
 	// append(_: String) -> String
@@ -53,8 +49,6 @@ export type StringNatives = {
 	splitOn: (self: StringType, argument1: StringType) => ListType<StringType>
 	// contains(_: String) -> Boolean
 	contains: (self: StringType, argument1: StringType) => BooleanType
-	// doesNotContain(_: String) -> Boolean
-	doesNotContain: (self: StringType, argument1: StringType) => BooleanType
 	// length() -> Integer
 	length: (self: StringType) => IntegerType
 	// characters() -> List<String>
@@ -73,12 +67,8 @@ export type StringNatives = {
 	trimmedAtEnd: (self: StringType) => StringType
 	// startsWith(_: String) -> Boolean
 	startsWith: (self: StringType, argument1: StringType) => BooleanType
-	// doesNotStartWith(_: String) -> Boolean
-	doesNotStartWith: (self: StringType, argument1: StringType) => BooleanType
 	// endsWith(_: String) -> Boolean
 	endsWith: (self: StringType, argument1: StringType) => BooleanType
-	// doesNotEndWith(_: String) -> Boolean
-	doesNotEndWith: (self: StringType, argument1: StringType) => BooleanType
 	// replaceEvery(_: String, with: String) -> String
 	replaceEvery: (self: StringType, argument1: StringType, argument2: StringType) => StringType
 	// repeated(_: Integer) -> String
@@ -117,8 +107,6 @@ export type BooleanNatives = {
 export type IntegerNatives = {
 	// is(_: Integer) -> Boolean
 	is: (self: IntegerType, argument1: IntegerType) => BooleanType
-	// isNot(_: Integer) -> Boolean
-	isNot: (self: IntegerType, argument1: IntegerType) => BooleanType
 	// add(_: Integer) -> Integer
 	add__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// add(_: Rational) -> Rational
@@ -173,8 +161,6 @@ export type IntegerNatives = {
 	negated: (self: IntegerType) => IntegerType
 	// isEven() -> Boolean
 	isEven: (self: IntegerType) => BooleanType
-	// isOdd() -> Boolean
-	isOdd: (self: IntegerType) => BooleanType
 	// isPositive() -> Boolean
 	isPositive: (self: IntegerType) => BooleanType
 	// isNegative() -> Boolean
@@ -200,8 +186,6 @@ export type RationalNatives = {
 	of: (argument0: IntegerType, over: IntegerType) => RationalType | NothingType
 	// is(_: Rational) -> Boolean
 	is: (self: RationalType, argument1: RationalType) => BooleanType
-	// isNot(_: Rational) -> Boolean
-	isNot: (self: RationalType, argument1: RationalType) => BooleanType
 	// add(_: Rational) -> Rational
 	add__overload$1: (self: RationalType, argument1: RationalType) => RationalType
 	// add(_: Integer) -> Rational
@@ -285,8 +269,6 @@ export type RationalNatives = {
 export type AlgebraicNatives = {
 	// is(_: Algebraic) -> Boolean
 	is: (self: AlgebraicType, argument1: AlgebraicType) => BooleanType
-	// isNot(_: Algebraic) -> Boolean
-	isNot: (self: AlgebraicType, argument1: AlgebraicType) => BooleanType
 	// compareTo(_: Algebraic) -> Ordering
 	compareTo: (self: AlgebraicType, argument1: AlgebraicType) => OrderingType
 	// add(_: Integer) -> Algebraic
@@ -324,8 +306,6 @@ export type AlgebraicNatives = {
 export type TranscendentalNatives = {
 	// is(_: Transcendental) -> Boolean
 	is: (self: TranscendentalType, argument1: TranscendentalType) => BooleanType
-	// isNot(_: Transcendental) -> Boolean
-	isNot: (self: TranscendentalType, argument1: TranscendentalType) => BooleanType
 	// add(_: Integer) -> Transcendental
 	add__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
 	// add(_: Rational) -> Transcendental
@@ -440,8 +420,6 @@ export type OrderingNatives = {
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
-	// isNot(_: Record) -> Boolean
-	isNot: (self: RecordType, argument1: RecordType) => BooleanType
 	// keys() -> List<String>
 	keys: (self: RecordType) => ListType<StringType>
 	// toString() -> String
@@ -451,20 +429,14 @@ export type RecordNatives = {
 export type ListNatives = {
 	// is<ItemType>(_: List<ItemType>) -> Boolean
 	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>) => BooleanType
-	// isNot<ItemType>(_: List<ItemType>) -> Boolean
-	isNot: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>) => BooleanType
 	// toString<ItemType>() -> String
 	toString: <ItemType extends AnyType>(self: ListType<ItemType>) => StringType
 	// length<ItemType>() -> Integer
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
-	// hasItems<ItemType>() -> Boolean
-	hasItems: <ItemType extends AnyType>(self: ListType<ItemType>) => BooleanType
 	// isEmpty<ItemType>() -> Boolean
 	isEmpty: <ItemType extends AnyType>(self: ListType<ItemType>) => BooleanType
 	// contains<ItemType>(_: ItemType) -> Boolean
 	contains: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => BooleanType
-	// doesNotContain<ItemType>(_: ItemType) -> Boolean
-	doesNotContain: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType) => BooleanType
 	// firstItem<ItemType>() -> Optional<ItemType>
 	firstItem__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType | NothingType
 	// firstItem<ItemType>(where: (_: ItemType) -> Boolean) -> Optional<ItemType>
@@ -550,6 +522,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "hasAnyContent" | "isNot" | "doesNotContain" | "doesNotStartWith" | "doesNotEndWith"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -557,15 +530,19 @@ export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), 
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
+export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "isNot" | "isOdd"> = true
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "isNot"> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
+export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "isNot"> = true
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
+export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "isNot"> = true
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
@@ -585,9 +562,11 @@ export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering")
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule
+export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "isNot"> = true
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "doesNotContain"> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule

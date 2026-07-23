@@ -70,13 +70,6 @@ export function is(
 	)
 }
 
-export function isNot(
-	originalRational: RationalType,
-	otherRational: RationalType,
-): BooleanType {
-	return negate(is(originalRational, otherRational))
-}
-
 // #region Add
 
 export function add__overload$1(

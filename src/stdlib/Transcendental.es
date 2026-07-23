@@ -21,7 +21,9 @@ declarations {
 		§§
 		§§ @param other the Transcendental to compare with
 		§§ @returns `true` when the canonical forms differ.
-		isNot(_ other: Transcendental) -> Boolean
+		isNot(_ other: Transcendental) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Adds a number to this Transcendental, exactly. Two Transcendentals may cancel their π terms, leaving a Rational.
 		overload add {
