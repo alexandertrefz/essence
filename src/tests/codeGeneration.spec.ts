@@ -16,7 +16,12 @@ import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { reachableMergedNamespaces, rewrite } from "../rewriter/index"
-import { buildStdlibPrelude, stdlibPrelude } from "../rewriter/stdlibPrelude"
+import {
+	buildStdlibPrelude,
+	essenceMethodIdentifier,
+	essenceMethodName,
+	stdlibPrelude,
+} from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
@@ -791,6 +796,38 @@ describe("Code Generation", () => {
 	// module is imported under `$native_<Name>` and spread into a const that
 	// carries the Namespace's own name, with the Essence-implemented Methods on
 	// top. `Boolean.isNot` is the first Method to have made the trip.
+	describe("Essence Method Names", () => {
+		it("names a Method the standard library implements in Essence", () => {
+			// NOTE: `Boolean.isNot` and `Number.isBetween` are the two Methods
+			// with an Essence body today.
+			expect(essenceMethodName("Boolean", "isNot")).toBe(
+				"$es_Boolean_isNot",
+			)
+			expect(essenceMethodName("Number", "isBetween")).toBe(
+				"$es_Number_isBetween",
+			)
+		})
+
+		it("returns null for a native Method", () => {
+			// NOTE: `Boolean.negate` is bound to the runtime module, so it stays
+			// a member read and has no top-level const.
+			expect(essenceMethodName("Boolean", "negate")).toBeNull()
+			expect(essenceMethodName("String", "append")).toBeNull()
+		})
+
+		it("returns null for a native static Property", () => {
+			// NOTE: The lookup keys on Methods only. `Number.PI` is a Property
+			// and reaches a call site through a member read, never a const.
+			expect(essenceMethodName("Number", "PI")).toBeNull()
+		})
+
+		it("keeps an overload's mangled suffix in the name", () => {
+			expect(essenceMethodIdentifier("Number", "sum__overload$2")).toBe(
+				"$es_Number_sum__overload$2",
+			)
+		})
+	})
+
 	describe("Standard Library Prelude", () => {
 		it("merges the Essence-implemented Methods over the runtime module", () => {
 			const code = generate(`implementation {
