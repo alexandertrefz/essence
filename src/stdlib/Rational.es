@@ -16,7 +16,9 @@ declarations {
 		§§
 		§§ @param other the Rational to compare against
 		§§ @returns `true` when both are equal.
-		is(_ other: Rational) -> Boolean
+		is(_ other: Rational) -> Boolean {
+			<- @::compareTo(other)::is(Ordering#Equal)
+		}
 
 		§§ Checks whether the Rational has a different value than another.
 		§§
@@ -39,13 +41,21 @@ declarations {
 
 		§§ Subtracts a number from this Rational, staying exact for every member of the numeric tower.
 		overload subtract {
-			(_ other: Rational) -> Rational
+			(_ other: Rational) -> Rational {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Integer) -> Rational
+			(_ other: Integer) -> Rational {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Algebraic) -> Algebraic
+			(_ other: Algebraic) -> Algebraic {
+				<- @::add(other::negated())
+			}
 
-			(_ other: Transcendental) -> Transcendental
+			(_ other: Transcendental) -> Transcendental {
+				<- @::add(other::negated())
+			}
 		}
 
 		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
@@ -70,28 +80,36 @@ declarations {
 
 		§§ Whether this Rational is strictly below the given number.
 		overload isLessThan {
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- @::compareTo(other)::is(Ordering#Less)
+			}
 
 			(_ other: Integer) -> Boolean
 		}
 
 		§§ Whether this Rational is below the given number, or equal to it.
 		overload isLessThanOrEqualTo {
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- @::isGreaterThan(other)::negate()
+			}
 
 			(_ other: Integer) -> Boolean
 		}
 
 		§§ Whether this Rational is strictly above the given number.
 		overload isGreaterThan {
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- @::compareTo(other)::is(Ordering#Greater)
+			}
 
 			(_ other: Integer) -> Boolean
 		}
 
 		§§ Whether this Rational is above the given number, or equal to it.
 		overload isGreaterThanOrEqualTo {
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- @::isLessThan(other)::negate()
+			}
 
 			(_ other: Integer) -> Boolean
 		}
@@ -106,27 +124,48 @@ declarations {
 		denominator() -> Integer
 
 		§§ The Rational without its sign — its distance from zero.
-		absolute() -> Rational
+		absolute() -> Rational {
+			if @::isLessThan(0/1) { <- @::negated() }
+			<- @
+		}
 
 		§§ The Rational with its sign flipped.
-		negated() -> Rational
+		negated() -> Rational {
+			<- Rational.of(@::numerator()::negated(), over @::denominator())::otherwise(@)
+		}
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.
 		§§
 		§§ @returns the reciprocal, or `Nothing` for zero.
-		reciprocal() -> Optional<Rational>
+		reciprocal() -> Optional<Rational> {
+			<- Rational.of(@::denominator(), over @::numerator())
+		}
 
 		§§ Whether the Rational is a whole number — its denominator in lowest terms is one.
-		isWholeNumber() -> Boolean
+		isWholeNumber() -> Boolean {
+			<- @::denominator()::is(1)
+		}
 
 		§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
 		rounded() -> Integer
 
 		§§ The greatest Integer at or below the Rational — the floor.
-		roundedDown() -> Integer
+		roundedDown() -> Integer {
+			constant truncatedValue = @::truncated()
+			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
+				<- truncatedValue::subtract(1)
+			}
+			<- truncatedValue
+		}
 
 		§§ The lowest Integer at or above the Rational — the ceiling.
-		roundedUp() -> Integer
+		roundedUp() -> Integer {
+			constant truncatedValue = @::truncated()
+			if @::isGreaterThan(0/1)::and(@::isWholeNumber()::negate()) {
+				<- truncatedValue::add(1)
+			}
+			<- truncatedValue
+		}
 
 		§§ The Integer part of the Rational — the fractional part cut off, rounding towards zero.
 		truncated() -> Integer
@@ -154,6 +193,8 @@ declarations {
 		§§
 		§§ @param other the Rational to order against
 		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Rational) -> Ordering
+		compareTo(_ other: Rational) -> Ordering {
+			<- @::<Number>compareTo(other)
+		}
 	}
 }

@@ -7,22 +7,18 @@ import {
 	dividedInto as algebraicDividedInto,
 	multiplyWith as algebraicMultiplyWith,
 	squareRootOfRational,
-	subtractedFrom as algebraicSubtractedFrom,
 } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
-import { createBoolean, negate } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
-import type { OrderingType } from "./Ordering"
-import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import {
 	add as transcendentalAdd,
 	multiplyWith as transcendentalMultiplyWith,
-	subtractedFrom as transcendentalSubtractedFrom,
 } from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
@@ -54,22 +50,6 @@ export function of(
 	return createRational(numerator.value, denominator.value)
 }
 
-export function is(
-	originalRational: RationalType,
-	otherRational: RationalType,
-): BooleanType {
-	let originalRationalClone = originalRational.rational.clone()
-	let otherRationalClone = otherRational.rational.clone()
-
-	originalRationalClone.reduce()
-	otherRationalClone.reduce()
-
-	return createBoolean(
-		originalRationalClone.denominator === otherRationalClone.denominator &&
-			originalRationalClone.numerator === otherRationalClone.numerator,
-	)
-}
-
 // #region Add
 
 export function add__overload$1(
@@ -94,36 +74,6 @@ export function add__overload$2(
 	let clonedRational = rational.rational.clone()
 
 	clonedRational.add(integer.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
-}
-
-// #endregion
-
-// #region Subtract
-
-export function subtract__overload$1(
-	firstRational: RationalType,
-	secondRational: RationalType,
-): RationalType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
-
-	return createRational(
-		numerator1 * denominator2 - numerator2 * denominator1,
-		denominator1 * denominator2,
-	)
-}
-
-export function subtract__overload$2(
-	rational: RationalType,
-	integer: IntegerType,
-): RationalType {
-	let clonedRational = rational.rational.clone()
-
-	clonedRational.subtract(integer.value)
 
 	return { [typeKeySymbol]: "Rational", rational: clonedRational }
 }
@@ -194,21 +144,6 @@ export function multiplyWith__overload$2(
 
 // #region isLessThan
 
-export function isLessThan__overload$1(
-	firstRational: RationalType,
-	secondRational: RationalType,
-): BooleanType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 < rational2)
-}
-
 export function isLessThan__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
@@ -227,21 +162,6 @@ export function isLessThan__overload$2(
 // #endregion
 
 // #region isLessThanOrEqualTo
-
-export function isLessThanOrEqualTo__overload$1(
-	firstRational: RationalType,
-	secondRational: RationalType,
-): BooleanType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 <= rational2)
-}
 
 export function isLessThanOrEqualTo__overload$2(
 	rational: RationalType,
@@ -262,21 +182,6 @@ export function isLessThanOrEqualTo__overload$2(
 
 // #region isGreaterThan
 
-export function isGreaterThan__overload$1(
-	firstRational: RationalType,
-	secondRational: RationalType,
-): BooleanType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 > rational2)
-}
-
 export function isGreaterThan__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
@@ -295,21 +200,6 @@ export function isGreaterThan__overload$2(
 // #endregion
 
 // #region isGreaterThanOrEqualTo
-
-export function isGreaterThanOrEqualTo__overload$1(
-	firstRational: RationalType,
-	secondRational: RationalType,
-): BooleanType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 >= rational2)
-}
 
 export function isGreaterThanOrEqualTo__overload$2(
 	rational: RationalType,
@@ -365,35 +255,6 @@ export function denominator(rational: RationalType): IntegerType {
 	}
 }
 
-export function absolute(rational: RationalType): RationalType {
-	let parts = reducedParts(rational)
-
-	return createRational(
-		parts.numerator < 0n ? -parts.numerator : parts.numerator,
-		parts.denominator,
-	)
-}
-
-export function negated(rational: RationalType): RationalType {
-	let parts = reducedParts(rational)
-
-	return createRational(-parts.numerator, parts.denominator)
-}
-
-export function reciprocal(rational: RationalType): RationalType | NothingType {
-	let parts = reducedParts(rational)
-
-	if (parts.numerator === 0n) {
-		return createNothing()
-	}
-
-	return createRational(parts.denominator, parts.numerator)
-}
-
-export function isWholeNumber(rational: RationalType): BooleanType {
-	return createBoolean(reducedParts(rational).denominator === 1n)
-}
-
 export function rounded(rational: RationalType): IntegerType {
 	let parts = reducedParts(rational)
 	let truncatedQuotient = parts.numerator / parts.denominator
@@ -406,28 +267,6 @@ export function rounded(rational: RationalType): IntegerType {
 	}
 
 	return { [typeKeySymbol]: "Integer", value: truncatedQuotient }
-}
-
-export function roundedDown(rational: RationalType): IntegerType {
-	let parts = reducedParts(rational)
-	let quotient = parts.numerator / parts.denominator
-
-	if (parts.numerator % parts.denominator !== 0n && parts.numerator < 0n) {
-		quotient -= 1n
-	}
-
-	return { [typeKeySymbol]: "Integer", value: quotient }
-}
-
-export function roundedUp(rational: RationalType): IntegerType {
-	let parts = reducedParts(rational)
-	let quotient = parts.numerator / parts.denominator
-
-	if (parts.numerator % parts.denominator !== 0n && parts.numerator > 0n) {
-		quotient += 1n
-	}
-
-	return { [typeKeySymbol]: "Integer", value: quotient }
 }
 
 export function truncated(rational: RationalType): IntegerType {
@@ -521,24 +360,6 @@ export function toString__overload$2(
 
 // #endregion
 
-export function compareTo(
-	originalRational: RationalType,
-	otherRational: RationalType,
-): OrderingType {
-	const lhs =
-		originalRational.rational.numerator * otherRational.rational.denominator
-	const rhs =
-		otherRational.rational.numerator * originalRational.rational.denominator
-
-	if (lhs < rhs) {
-		return less
-	} else if (lhs > rhs) {
-		return greater
-	} else {
-		return equal
-	}
-}
-
 // #region Irrational operands
 
 export function add__overload$3(
@@ -553,20 +374,6 @@ export function add__overload$4(
 	transcendental: TranscendentalType,
 ): TranscendentalType {
 	return transcendentalAdd(transcendental, rational)
-}
-
-export function subtract__overload$3(
-	rational: RationalType,
-	algebraic: AlgebraicType,
-): AlgebraicType {
-	return algebraicSubtractedFrom(algebraic, rational)
-}
-
-export function subtract__overload$4(
-	rational: RationalType,
-	transcendental: TranscendentalType,
-): TranscendentalType {
-	return transcendentalSubtractedFrom(transcendental, rational)
 }
 
 export function multiplyWith__overload$3(

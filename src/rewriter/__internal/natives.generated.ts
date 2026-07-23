@@ -148,8 +148,6 @@ export type IntegerNatives = {
 export type RationalNatives = {
 	// static of(_: Integer, over: Integer) -> Optional<Rational>
 	of: (argument0: IntegerType, over: IntegerType) => RationalType | NothingType
-	// is(_: Rational) -> Boolean
-	is: (self: RationalType, argument1: RationalType) => BooleanType
 	// add(_: Rational) -> Rational
 	add__overload$1: (self: RationalType, argument1: RationalType) => RationalType
 	// add(_: Integer) -> Rational
@@ -158,14 +156,6 @@ export type RationalNatives = {
 	add__overload$3: (self: RationalType, argument1: AlgebraicType) => AlgebraicType
 	// add(_: Transcendental) -> Transcendental
 	add__overload$4: (self: RationalType, argument1: TranscendentalType) => TranscendentalType
-	// subtract(_: Rational) -> Rational
-	subtract__overload$1: (self: RationalType, argument1: RationalType) => RationalType
-	// subtract(_: Integer) -> Rational
-	subtract__overload$2: (self: RationalType, argument1: IntegerType) => RationalType
-	// subtract(_: Algebraic) -> Algebraic
-	subtract__overload$3: (self: RationalType, argument1: AlgebraicType) => AlgebraicType
-	// subtract(_: Transcendental) -> Transcendental
-	subtract__overload$4: (self: RationalType, argument1: TranscendentalType) => TranscendentalType
 	// divideBy(_: Rational) -> Optional<Rational>
 	divideBy__overload$1: (self: RationalType, argument1: RationalType) => RationalType | NothingType
 	// divideBy(_: Integer) -> Optional<Rational>
@@ -180,20 +170,12 @@ export type RationalNatives = {
 	multiplyWith__overload$3: (self: RationalType, argument1: AlgebraicType) => AlgebraicType | RationalType
 	// multiplyWith(_: Transcendental) -> Transcendental | Rational
 	multiplyWith__overload$4: (self: RationalType, argument1: TranscendentalType) => TranscendentalType | RationalType
-	// isLessThan(_: Rational) -> Boolean
-	isLessThan__overload$1: (self: RationalType, argument1: RationalType) => BooleanType
 	// isLessThan(_: Integer) -> Boolean
 	isLessThan__overload$2: (self: RationalType, argument1: IntegerType) => BooleanType
-	// isLessThanOrEqualTo(_: Rational) -> Boolean
-	isLessThanOrEqualTo__overload$1: (self: RationalType, argument1: RationalType) => BooleanType
 	// isLessThanOrEqualTo(_: Integer) -> Boolean
 	isLessThanOrEqualTo__overload$2: (self: RationalType, argument1: IntegerType) => BooleanType
-	// isGreaterThan(_: Rational) -> Boolean
-	isGreaterThan__overload$1: (self: RationalType, argument1: RationalType) => BooleanType
 	// isGreaterThan(_: Integer) -> Boolean
 	isGreaterThan__overload$2: (self: RationalType, argument1: IntegerType) => BooleanType
-	// isGreaterThanOrEqualTo(_: Rational) -> Boolean
-	isGreaterThanOrEqualTo__overload$1: (self: RationalType, argument1: RationalType) => BooleanType
 	// isGreaterThanOrEqualTo(_: Integer) -> Boolean
 	isGreaterThanOrEqualTo__overload$2: (self: RationalType, argument1: IntegerType) => BooleanType
 	// squareRoot() -> Optional<Rational | Algebraic>
@@ -202,20 +184,8 @@ export type RationalNatives = {
 	numerator: (self: RationalType) => IntegerType
 	// denominator() -> Integer
 	denominator: (self: RationalType) => IntegerType
-	// absolute() -> Rational
-	absolute: (self: RationalType) => RationalType
-	// negated() -> Rational
-	negated: (self: RationalType) => RationalType
-	// reciprocal() -> Optional<Rational>
-	reciprocal: (self: RationalType) => RationalType | NothingType
-	// isWholeNumber() -> Boolean
-	isWholeNumber: (self: RationalType) => BooleanType
 	// rounded() -> Integer
 	rounded: (self: RationalType) => IntegerType
-	// roundedDown() -> Integer
-	roundedDown: (self: RationalType) => IntegerType
-	// roundedUp() -> Integer
-	roundedUp: (self: RationalType) => IntegerType
 	// truncated() -> Integer
 	truncated: (self: RationalType) => IntegerType
 	// toThePowerOf(_: Integer) -> Optional<Rational>
@@ -226,8 +196,6 @@ export type RationalNatives = {
 	toString__overload$1: (self: RationalType) => StringType
 	// toString(formatAs: String) -> String
 	toString__overload$2: (self: RationalType, formatAs: StringType) => StringType
-	// compareTo(_: Rational) -> Ordering
-	compareTo: (self: RationalType, argument1: RationalType) => OrderingType
 }
 
 export type AlgebraicNatives = {
@@ -468,7 +436,7 @@ export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), 
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "isNot"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negated" | "reciprocal" | "isWholeNumber" | "roundedDown" | "roundedUp" | "compareTo"> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
