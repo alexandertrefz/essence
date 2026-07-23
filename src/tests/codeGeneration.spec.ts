@@ -709,8 +709,12 @@ describe("Code Generation", () => {
 			}`)
 
 			expect(code).toContain("$type.dispatchMethod")
+			// NOTE: One target per member, and the two are spelled differently
+			// on purpose — `Integer.toString` is native, a member read off the
+			// plain import, while `Boolean.toString` is Essence and so is its
+			// own const. Dispatch does not care which.
 			expect(code).toContain("Integer.toString")
-			expect(code).toContain("Boolean.toString")
+			expect(code).toContain("$es_Boolean_toString")
 		})
 
 		it("should mangle overloaded Method names per dispatch case", () => {
@@ -991,21 +995,24 @@ describe("Code Generation", () => {
 			expect(await run(source)).toEqual(['"true"', '"false"'])
 		})
 
-		// NOTE: A dispatch case names its target as `<Namespace>.<method>`, a
-		// read off the plain import for a native.
-		//
-		// NOTE: `isNot` itself can not be reached this way: every case of a
-		// dispatch is passed the SAME Arguments, and no single value is both an
-		// Integer and a Boolean. What a Union receiver reaches is therefore a
-		// native — the tree-shakeable member read, unaffected by the prelude.
-		it("dispatches a Union receiver to a native member read", async () => {
+		// NOTE: A dispatch case reaches an Essence Method as the bare
+		// `$es_…` Identifier, exactly as a plain call does. `Boolean.toString`
+		// is Essence, so this is the Union-dispatch-to-an-Essence-Method path
+		// end to end: the const has to be emitted off the dispatch triple alone
+		// — nothing else in the Program names it — and then run.
+		it("dispatches a Union receiver to an Essence Method", async () => {
 			const source = `implementation {
 				constant value: Integer | Boolean = true
 
 				__print(value::toString())
 			}`
 
-			expect(generate(source)).toContain("Boolean.toString")
+			const code = generate(source)
+
+			expect(code).toContain("$es_Boolean_toString")
+			expect(code).toContain("const $es_Boolean_toString")
+			// NOTE: The Integer case stays a native member read.
+			expect(code).toContain("Integer.toString")
 			expect(await run(source)).toEqual(['"true"'])
 		})
 

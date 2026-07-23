@@ -490,17 +490,8 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("toString", () => {
-				it("returns the correct strings", () => {
-					expect(boolean.toString(booleanTrue())).toEqual(
-						string.createString("true"),
-					)
-
-					expect(boolean.toString(booleanFalse())).toEqual(
-						string.createString("false"),
-					)
-				})
-			})
+			// NOTE: `toString` and `exclusiveOr` are implemented in Essence now
+			// (`src/stdlib/Boolean.es`); the golden harness covers them.
 		})
 
 		describe("String", () => {

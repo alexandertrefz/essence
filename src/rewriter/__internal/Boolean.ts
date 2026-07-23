@@ -33,14 +33,7 @@ export function or(
 	return createBoolean(originalBoolean.value || other.value)
 }
 
-export function exclusiveOr(
-	originalBoolean: BooleanType,
-	other: BooleanType,
-): BooleanType {
-	return createBoolean(originalBoolean.value !== other.value)
-}
-
-// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
-export function toString(boolean: BooleanType): StringType {
-	return createString(boolean.value.toString())
-}
+// NOTE: `isNot`, `exclusiveOr` and `toString` are implemented in Essence — see
+// `src/stdlib/Boolean.es`. `negate`, `is`, `and` and `or` stay native: they are
+// the anchors the Essence half is built from, and `or` in particular would cost
+// four Method calls through De Morgan where this does one `||`.

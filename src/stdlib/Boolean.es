@@ -24,6 +24,11 @@ declarations {
 		§§ @param other the other Boolean
 		and(_ other: Boolean) -> Boolean
 
+		§ `or` stays native deliberately. De Morgan expresses it —
+		§ `@::negate()::and(other::negate())::negate()` — but that is four
+		§ Method calls where the runtime does one `||`, on the most-used
+		§ primitive in the language. `negate`, `is` and `and` are the anchors
+		§ everything else here is built from, so they stay native too.
 		§§ Logical disjunction — `true` when this Boolean, the given one, or both are `true`.
 		§§
 		§§ @param other the other Boolean
@@ -32,9 +37,17 @@ declarations {
 		§§ Exclusive disjunction — `true` when exactly one of this Boolean and the given one is `true`.
 		§§
 		§§ @param other the other Boolean
-		exclusiveOr(_ other: Boolean) -> Boolean
+		exclusiveOr(_ other: Boolean) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Represents the Boolean as a String — `"true"` or `"false"`.
-		toString() -> String
+		toString() -> String {
+			if @ {
+				<- "true"
+			}
+
+			<- "false"
+		}
 	}
 }
