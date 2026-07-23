@@ -2616,7 +2616,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("sortedBy", () => {
+			describe("sort__overload$2", () => {
 				it("orders by the comparison and is stable", () => {
 					const ascending = (
 						first: integer.IntegerType,
@@ -2624,7 +2624,7 @@ describe("Rewriter", () => {
 					) => number.compareTo(first, second)
 
 					expect(
-						list.sortedBy(
+						list.sort__overload$2(
 							list.createList([
 								integerTwo(),
 								integerHundred(),

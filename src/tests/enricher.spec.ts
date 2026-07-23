@@ -1395,7 +1395,7 @@ describe("Enricher", () => {
 
 		it("should solve a conditional conformance at a use site", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				constant ordered: List<Integer> = [3, 1, 2]::sorted()
+				constant ordered: List<Integer> = [3, 1, 2]::sort()
 			}`)
 
 			expect(diagnostics).toEqual([])
@@ -1416,7 +1416,7 @@ describe("Enricher", () => {
 
 		it("should nest witness conditions ordered by the candidate's Generics", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				constant ordered = [[1, 2], [3]]::sorted()
+				constant ordered = [[1, 2], [3]]::sort()
 			}`)
 
 			expect(diagnostics).toEqual([])
@@ -1444,7 +1444,7 @@ describe("Enricher", () => {
 
 		it("should report a two-level because-chain for a nested failure", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant ordered = [[true], [false]]::sorted()
+				constant ordered = [[true], [false]]::sort()
 			}`)
 
 			let failure = diagnostics.find(
@@ -1482,7 +1482,7 @@ describe("Enricher", () => {
 			// which the plan first named here, in fact conforms to Comparable
 			// through the covering `Number` Namespace, so it is not a negative.)
 			let diagnostics = diagnosticsFor(`implementation {
-				constant sorted = [true, false]::sorted()
+				constant sorted = [true, false]::sort()
 			}`)
 
 			expect(
@@ -2220,12 +2220,12 @@ describe("Enricher", () => {
 		})
 
 		it("should sort a List of Strings, now that String is Comparable", () => {
-			// NOTE: `sortedBy` needs no Protocol bound — the comparator does —
+			// NOTE: `sort__overload$2` needs no Protocol bound — the comparator does —
 			// but the annotation only holds if `compareTo` resolves on a
 			// String, which it does now that String conforms to Comparable.
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordered: List<String> = ["b", "a"]::sortedBy(
+					constant ordered: List<String> = ["b", "a"]::sort(by 
 						(first, second) { <- first::compareTo(second) },
 					)
 				}`),

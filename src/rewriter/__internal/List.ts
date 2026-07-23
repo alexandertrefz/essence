@@ -164,7 +164,22 @@ export function reverse<ItemType extends AnyType>(
 	return createList(originalList.value.slice(0).reverse())
 }
 
-export function sortedBy<ItemType extends AnyType>(
+// NOTE: `sort` is one Method with two Overloads, so both bind by position.
+// `$1` is the no-Argument entry, whose `Comparable` bound hands its
+// conformance in as the trailing Argument; it orders by the items' own
+// `compareTo`. `$2` takes the comparison outright. Both land on the same walk.
+export function sort__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	conformance: {
+		compareTo: (self: ItemType, other: ItemType) => OrderingType
+	},
+): ListType<ItemType> {
+	return sort__overload$2(originalList, (first, second) =>
+		conformance.compareTo(first, second),
+	)
+}
+
+export function sort__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	order: (first: ItemType, second: ItemType) => OrderingType,
 ): ListType<ItemType> {
@@ -243,7 +258,7 @@ export function lastIndex<ItemType extends AnyType>(
 // NOTE: Joining asks nothing of the items but that each can say what it is, so
 // the Method is bounded by `Printable` rather than fixed to a List of Strings —
 // the conforming Namespace's method map arrives as the hidden trailing
-// Argument, exactly as `sorted`'s does, and its `toString` is the whole of the
+// Argument, exactly as `sort`'s does, and its `toString` is the whole of the
 // conversion. For a List of Strings that `toString` is the identity, so the
 // original behaviour is unchanged.
 export function join<ItemType extends AnyType>(

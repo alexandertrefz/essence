@@ -27,9 +27,9 @@ Error: 'Item' is bound twice in this conformance
 Error: List<Boolean> does not conform to 'Comparable'
     ╭─┤ Conformance.es:34:21 │
     │
- 34 │     constant ordered = [[true], [false]]::sorted()
-    │                        ─────────────┬─────────────  
-    │                                     ╰─────────────── this binds a Type Parameter bound to 'Comparable'
+ 34 │     constant ordered = [[true], [false]]::sort()
+    │                        ────────────┬────────────  
+    │                                    ╰────────────── this binds a Type Parameter bound to 'Comparable'
     │ 
     │ Help: Declare a Namespace 'for List<Boolean> is Comparable'.
     │ 
