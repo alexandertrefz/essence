@@ -16,8 +16,11 @@ import {
 // under its own name, and a Namespace no Program references costs nothing —
 // esbuild shakes an unused `import * as <Name>` away entirely. A Method the
 // standard library implements in Essence is NOT a member of one of these; it is
-// its own `$es_<Namespace>_<member>` const, emitted alongside.
-const runtimeNamespaceNames = [
+// its own `$es_<Namespace>_<member>` const, emitted alongside. Exported so the
+// tests cross-check it against the other registration sites — a Namespace here
+// but missing a runtime module, or declared in `src/stdlib` but missing here,
+// emits a call to `undefined`.
+export const runtimeNamespaceNames = [
 	"String",
 	"Integer",
 	"Rational",
