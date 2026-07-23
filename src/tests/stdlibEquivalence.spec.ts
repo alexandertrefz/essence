@@ -20,6 +20,7 @@ import {
 } from "../enricher/types/Ordering"
 import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as recordNamespace } from "../enricher/types/Record"
+import { namespace as stringNamespace } from "../enricher/types/String"
 import type { common, parser } from "../interfaces/index"
 
 // NOTE: TEMPORARY — this whole file is deleted in the commit that removes the
@@ -75,14 +76,15 @@ const converted: Array<Entry> = [
 	// NOTE: A Type and the Namespace that targets it move together — the
 	// loader subtracts PER CATEGORY, so registering only one of the pair would
 	// leave the other half pointing at a table object nothing compares.
-	// `Nothing`, `Boolean` and `Record` have no `typeEntry`: their Types are
-	// bare tags with no declaration to write, so they stay in the legacy Type
-	// table and are not converted at all.
+	// `Nothing`, `Boolean`, `Record` and `String` have no `typeEntry`: their
+	// Types are bare tags with no declaration to write, so they stay in the
+	// legacy Type table and are not converted at all.
 	typeEntry("Optional", optionalType),
 	namespaceEntry("Optional", optionalNamespace),
 	typeEntry("Ordering", orderingType),
 	namespaceEntry("Ordering", orderingNamespace),
 	namespaceEntry("Record", recordNamespace),
+	namespaceEntry("String", stringNamespace),
 ]
 
 // ---------------------------------------------------------------------------

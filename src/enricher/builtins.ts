@@ -39,10 +39,10 @@ import {
 // NOTE: The Record NAMESPACE now lives in `src/stdlib/Record.es`. Its Type is
 // the open Record `{}`, which has no declaration to write either.
 import { type as recordType } from "./types/Record"
-import {
-	namespace as stringNamespace,
-	type as stringType,
-} from "./types/String"
+// NOTE: The String NAMESPACE now lives in `src/stdlib/String.es`. Its Type tag
+// stays for the same reason Boolean's does — a bare primitive tag with no
+// declaration to write.
+import { type as stringType } from "./types/String"
 import {
 	namespace as transcendentalNamespace,
 	type as transcendentalType,
@@ -76,7 +76,6 @@ const irrationalType: common.UnionType = {
 // never both claim a name.
 export const legacyMembers: Record<string, common.Type> = {
 	...nativeFunctions,
-	String: stringNamespace,
 	Integer: integerNamespace,
 	Rational: rationalNamespace,
 	Algebraic: algebraicNamespace,
