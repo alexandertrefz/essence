@@ -256,7 +256,7 @@ export type Parameter = {
 }
 
 // NOTE: `documentation` is optional in the type, but every builtin Namespace
-// Method in `enricher/types` does carry it — the completion gate in
+// Method declared in `src/stdlib/*.es` does carry it — the completion gate in
 // builtins.spec.ts fails on any Method that ships without documentation.
 export type BaseFunction = {
 	parameterTypes: Array<Parameter>

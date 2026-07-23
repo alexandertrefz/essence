@@ -57,10 +57,11 @@ function expectedExportNames(
 	return [name]
 }
 
-// NOTE: Which entries of a Namespace member are native. A Namespace still
-// declared in the TypeScript tables has no entry in `nativeBindings` at all —
-// every one of its Methods is bound to the runtime by definition, so the
-// default is "all native".
+// NOTE: Which entries of a Namespace member are native. Every builtin
+// Namespace is declared in `src/stdlib/*.es` and so has an entry, but the
+// default stays "all native": a Namespace or Method the loader did not record
+// a binding for is one whose declaration carried no body, which is exactly a
+// native.
 function nativeFlagsFor(
 	namespaceName: string,
 	memberName: string,
