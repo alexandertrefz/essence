@@ -265,43 +265,13 @@ describe("Stdlib", () => {
 		})
 	})
 
-	describe("Number isBetween", () => {
-		it("includes both bounds", () => {
-			expect(number.isBetween(int(5n), int(1n), int(10n)).value).toBe(
-				true,
-			)
-			expect(number.isBetween(int(1n), int(1n), int(10n)).value).toBe(
-				true,
-			)
-			expect(number.isBetween(int(10n), int(1n), int(10n)).value).toBe(
-				true,
-			)
-			expect(number.isBetween(int(11n), int(1n), int(10n)).value).toBe(
-				false,
-			)
-			expect(number.isBetween(int(0n), int(1n), int(10n)).value).toBe(
-				false,
-			)
-		})
-
-		it("reads the covering order — the whole tower qualifies", () => {
-			expect(
-				number.isBetween(number.PI, int(3n), rat(22n, 7n)).value,
-			).toBe(true)
-			expect(
-				number.isBetween(number.PI, rat(22n, 7n), int(4n)).value,
-			).toBe(false)
-			expect(number.isBetween(rat(3n, 2n), int(1n), int(2n)).value).toBe(
-				true,
-			)
-		})
-
-		it("answers false for bounds in the wrong order", () => {
-			expect(number.isBetween(int(5n), int(10n), int(1n)).value).toBe(
-				false,
-			)
-		})
-	})
+	// NOTE: `Number.isBetween` used to be tested here, against the runtime
+	// function directly. It is written in Essence now — `src/stdlib/Number.es`
+	// — so there is no runtime function left to call, and the same five cases
+	// are asserted end to end in `codeGeneration.spec.ts` ("runs isBetween from
+	// the merged const" and the two beside it), where they exercise the
+	// compiled Method the way a Program reaches it. The same move was made for
+	// `Boolean.isNot` when it became the first Method to be written in Essence.
 
 	describe("Boolean exclusiveOr", () => {
 		it("is true for exactly one true operand", () => {

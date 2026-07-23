@@ -8,9 +8,17 @@ import {
 	parseStdlibSource,
 	STDLIB_DIRECTORY,
 } from "../enricher/stdlib"
+import {
+	namespace as algebraicNamespace,
+	type as algebraicType,
+} from "../enricher/types/Algebraic"
 import { namespace as booleanNamespace } from "../enricher/types/Boolean"
 import { namespace as integerNamespace } from "../enricher/types/Integer"
 import { namespace as nothingNamespace } from "../enricher/types/Nothing"
+import {
+	namespace as numberNamespace,
+	type as numberType,
+} from "../enricher/types/Number"
 import {
 	namespace as optionalNamespace,
 	type as optionalType,
@@ -23,6 +31,10 @@ import { Comparable, Equatable, Printable } from "../enricher/types/Protocols"
 import { namespace as rationalNamespace } from "../enricher/types/Rational"
 import { namespace as recordNamespace } from "../enricher/types/Record"
 import { namespace as stringNamespace } from "../enricher/types/String"
+import {
+	namespace as transcendentalNamespace,
+	type as transcendentalType,
+} from "../enricher/types/Transcendental"
 import type { common, parser } from "../interfaces/index"
 
 // NOTE: TEMPORARY — this whole file is deleted in the commit that removes the
@@ -69,6 +81,19 @@ function protocolEntry(name: string, legacy: common.ProtocolType): Entry {
 	return { kind: "protocol", name, legacy }
 }
 
+// NOTE: `Irrational` is the one converted name whose "table" was never a table
+// — it was a `const irrationalType` assembled inline in `builtins.ts`, three
+// lines above the Type table it was registered in. `src/stdlib/Number.es`
+// declares it now, so the inline construction is gone and the shape it used to
+// build is written out HERE, verbatim, exactly as `builtins.ts` built it. It is
+// the only legacy shape this file owns rather than imports, and it goes when the
+// rest of them do.
+const legacyIrrationalType: common.UnionType = {
+	type: "UnionType",
+	name: "Irrational",
+	types: [algebraicType, transcendentalType],
+}
+
 const converted: Array<Entry> = [
 	protocolEntry("Equatable", Equatable),
 	protocolEntry("Printable", Printable),
@@ -89,6 +114,16 @@ const converted: Array<Entry> = [
 	namespaceEntry("String", stringNamespace),
 	namespaceEntry("Integer", integerNamespace),
 	namespaceEntry("Rational", rationalNamespace),
+	namespaceEntry("Algebraic", algebraicNamespace),
+	namespaceEntry("Transcendental", transcendentalNamespace),
+	// NOTE: `Number` is the one name that is a Type, a Namespace AND the
+	// carrier of a second Type — `Irrational` — all at once, and all four
+	// pieces move in the one commit. `Algebraic` and `Transcendental` keep no
+	// `typeEntry` for the same reason `Integer` does not: their Types are bare
+	// tags with no declaration to write.
+	typeEntry("Number", numberType),
+	typeEntry("Irrational", legacyIrrationalType),
+	namespaceEntry("Number", numberNamespace),
 ]
 
 // ---------------------------------------------------------------------------
