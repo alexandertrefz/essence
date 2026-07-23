@@ -446,13 +446,6 @@ export function is(
 	)
 }
 
-export function isNot(
-	algebraic: AlgebraicType,
-	other: AlgebraicType,
-): BooleanType {
-	return createBoolean(!is(algebraic, other).value)
-}
-
 export function compareTo(
 	algebraic: AlgebraicType,
 	other: AlgebraicType | IntegerType | RationalType,

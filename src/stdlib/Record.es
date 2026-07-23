@@ -11,7 +11,9 @@ declarations {
 		§§
 		§§ @param other the Record to compare against
 		§§ @returns `true` when the Records are not equal.
-		isNot(_ other: Record) -> Boolean
+		isNot(_ other: Record) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§ `entries` and `values` exist in the runtime but stay undeclared —
 		§ their honest return Types need an `Anything` Type, which arrives with

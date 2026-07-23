@@ -43,21 +43,8 @@ export function is<ItemType extends AnyType>(
 	}
 }
 
-export function isNot<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	otherList: ListType<ItemType>,
-) {
-	return negate(is(originalList, otherList))
-}
-
 export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(BigInt(originalList.value.length))
-}
-
-export function hasItems<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-): BooleanType {
-	return createBoolean(originalList.value.length !== 0)
 }
 
 export function isEmpty<ItemType extends AnyType>(
@@ -77,19 +64,6 @@ export function contains<ItemType extends AnyType>(
 	}
 
 	return createBoolean(false)
-}
-
-export function doesNotContain<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-): BooleanType {
-	for (let listItem of originalList.value) {
-		if (anyIs(listItem, item)) {
-			return createBoolean(false)
-		}
-	}
-
-	return createBoolean(true)
 }
 
 export function firstItem__overload$1<ItemType extends AnyType>(

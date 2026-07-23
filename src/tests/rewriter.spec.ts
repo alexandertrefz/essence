@@ -524,31 +524,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("hasAnyContent", () => {
-				it("returns true when the string is not empty", () => {
-					expect(
-						string.hasAnyContent(string.createString("a")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.hasAnyContent(string.createString("abc")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.hasAnyContent(string.createString(" ")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.hasAnyContent(string.createString("!")),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the string is empty", () => {
-					expect(string.hasAnyContent(stringEmpty())).toEqual(
-						booleanFalse(),
-					)
-				})
-			})
+			// NOTE: hasAnyContent / isNot / doesNotContain / doesNotStartWith / doesNotEndWith are implemented in Essence now (src/stdlib/String.es); the golden harness covers them.
 
 			describe("is", () => {
 				it("returns true when the strings are equal", () => {
@@ -611,71 +587,6 @@ describe("Rewriter", () => {
 
 					expect(
 						string.is(string.createString("abc"), stringEmpty()),
-					).toEqual(booleanFalse())
-				})
-			})
-
-			describe("isNot", () => {
-				it("returns true when the strings are not equal", () => {
-					expect(
-						string.isNot(stringEmpty(), string.createString("a")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.isNot(stringEmpty(), string.createString("abc")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.isNot(stringEmpty(), string.createString("!")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.isNot(stringEmpty(), string.createString(" ")),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.isNot(
-							string.createString("abc"),
-							string.createString(" "),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.isNot(string.createString("abc"), stringEmpty()),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the strings are equal", () => {
-					expect(string.isNot(stringEmpty(), stringEmpty())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(
-						string.isNot(
-							string.createString("a"),
-							string.createString("a"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.isNot(
-							string.createString("abc"),
-							string.createString("abc"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.isNot(
-							string.createString("!"),
-							string.createString("!"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.isNot(
-							string.createString(" "),
-							string.createString(" "),
-						),
 					).toEqual(booleanFalse())
 				})
 			})
@@ -873,81 +784,6 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("doesNotContain", () => {
-				it("returns true when the base string is empty", () => {
-					expect(
-						string.doesNotContain(
-							stringEmpty(),
-							string.createString("a"),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the partial string is empty", () => {
-					expect(
-						string.doesNotContain(
-							string.createString("a"),
-							stringEmpty(),
-						),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns false when the partial string is found", () => {
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("a"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("b"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("ab"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("bc"),
-						),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns false when the string is matched", () => {
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("abc"),
-						),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns true when the partial string is not found", () => {
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("abcd"),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						string.doesNotContain(
-							string.createString("abc"),
-							string.createString("d"),
-						),
-					).toEqual(booleanTrue())
-				})
-			})
-
 			describe("length and characters", () => {
 				it("counts and splits by code point", () => {
 					expect(string.length(string.createString("abc"))).toEqual(
@@ -1025,16 +861,7 @@ describe("Rewriter", () => {
 						string.startsWith(hello, string.createString("he")),
 					).toEqual(booleanTrue())
 					expect(
-						string.doesNotStartWith(
-							hello,
-							string.createString("he"),
-						),
-					).toEqual(booleanFalse())
-					expect(
 						string.endsWith(hello, string.createString("lo")),
-					).toEqual(booleanTrue())
-					expect(
-						string.doesNotEndWith(hello, string.createString("x")),
 					).toEqual(booleanTrue())
 				})
 			})
@@ -1249,47 +1076,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("isNot", () => {
-				it("returns true if the integers are not the same", () => {
-					expect(integer.isNot(integerOne(), integerTwo())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(
-						integer.isNot(integerOne(), integerHundred()),
-					).toEqual(booleanTrue())
-
-					expect(integer.isNot(integerTwo(), integerOne())).toEqual(
-						booleanTrue(),
-					)
-
-					expect(
-						integer.isNot(integerTwo(), integerHundred()),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isNot(integerHundred(), integerOne()),
-					).toEqual(booleanTrue())
-
-					expect(
-						integer.isNot(integerHundred(), integerTwo()),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false if the integers are the same", () => {
-					expect(integer.isNot(integerOne(), integerOne())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(integer.isNot(integerTwo(), integerTwo())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(
-						integer.isNot(integerHundred(), integerHundred()),
-					).toEqual(booleanFalse())
-				})
-			})
+			// NOTE: isNot / isOdd are implemented in Essence now (src/stdlib/Integer.es); the golden harness covers them.
 
 			describe("add", () => {
 				it("adds 2 integers correctly", () => {
@@ -2543,75 +2330,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("isNot", () => {
-				it("returns true if the rationals are not the same", () => {
-					expect(
-						rational.isNot(rationalOne(), rationalOneHalf()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalOne(), rationalTwo()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalOne(), rationalHundred()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalOneHalf(), rationalOne()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalOneHalf(), rationalTwo()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalOneHalf(), rationalHundred()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalTwo(), rationalOneHalf()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalTwo(), rationalOne()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalTwo(), rationalHundred()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalHundred(), rationalOneHalf()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalHundred(), rationalOne()),
-					).toEqual(booleanTrue())
-
-					expect(
-						rational.isNot(rationalHundred(), rationalTwo()),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false if the rationals are the same", () => {
-					expect(
-						rational.isNot(rationalOneHalf(), rationalOneHalf()),
-					).toEqual(booleanFalse())
-
-					expect(
-						rational.isNot(rationalOne(), rationalOne()),
-					).toEqual(booleanFalse())
-
-					expect(
-						rational.isNot(rationalTwo(), rationalTwo()),
-					).toEqual(booleanFalse())
-
-					expect(
-						rational.isNot(rationalHundred(), rationalHundred()),
-					).toEqual(booleanFalse())
-				})
-			})
+			// NOTE: isNot is implemented in Essence now (src/stdlib/Rational.es); the golden harness covers it.
 
 			describe("add", () => {
 				it("adds 2 rationals correctly", () => {
@@ -4450,137 +4169,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("isNot", () => {
-				it("returns false if the lists have the same items in the same order", () => {
-					expect(list.isNot(listEmpty(), listEmpty())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(
-						list.isNot(
-							list.createList([integerOne()]),
-							list.createList([integerOne()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.isNot(
-							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerOne(), integerTwo()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.isNot(
-							list.createList([stringEmpty()]),
-							list.createList([stringEmpty()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.isNot(
-							list.createList([rationalOne()]),
-							list.createList([rationalOne()]),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.isNot(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-						),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns true if the lists have the same items in a different order", () => {
-					expect(
-						list.isNot(
-							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerTwo(), integerOne()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.isNot(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								nothing(),
-								rationalHundred(),
-								booleanFalse(),
-							]),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns true if the lists do not have the same items", () => {
-					expect(
-						list.isNot(
-							list.createList([integerOne()]),
-							list.createList([integerTwo()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.isNot(
-							list.createList([integerOne(), integerTwo()]),
-							list.createList([integerOne(), rationalTwo()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.isNot(
-							list.createList([stringEmpty()]),
-							list.createList([string.createString("not empty")]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.isNot(
-							list.createList([rationalOne()]),
-							list.createList([rationalOneHalf()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.isNot(
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanFalse(),
-							]),
-							list.createList([
-								stringEmpty(),
-								integerOne(),
-								rationalHundred(),
-								nothing(),
-								booleanTrue(),
-							]),
-						),
-					).toEqual(booleanTrue())
-				})
-			})
+			// NOTE: isNot / hasItems / doesNotContain are implemented in Essence now (src/stdlib/List.es); the golden harness covers them.
 
 			describe("length", () => {
 				it("returns the number of items in the list", () => {
@@ -4614,36 +4203,6 @@ describe("Rewriter", () => {
 							]),
 						),
 					).toEqual(integer.createInteger(4n))
-				})
-			})
-
-			describe("hasItems", () => {
-				it("returns true when the list has items", () => {
-					expect(
-						list.hasItems(list.createList([integerOne()])),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.hasItems(
-							list.createList([integerOne(), integerTwo()]),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.hasItems(list.createList([stringEmpty()])),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.hasItems(list.createList([rationalOne()])),
-					).toEqual(booleanTrue())
-
-					expect(
-						list.hasItems(list.createList([listEmpty()])),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false when the list is empty", () => {
-					expect(list.hasItems(listEmpty())).toEqual(booleanFalse())
 				})
 			})
 
@@ -4744,86 +4303,6 @@ describe("Rewriter", () => {
 					expect(
 						list.contains(list.createList([]), integerOne()),
 					).toEqual(booleanFalse())
-				})
-			})
-
-			describe("doesNotContain", () => {
-				it("returns false if the item is in the list", () => {
-					const numbersList = list.createList([
-						integerZero(),
-						integerOne(),
-						integerTwo(),
-					])
-
-					expect(
-						list.doesNotContain(numbersList, integerOne()),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.doesNotContain(numbersList, integerTwo()),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.doesNotContain(numbersList, integerOne()),
-					).toEqual(booleanFalse())
-
-					const stringList = list.createList([
-						string.createString("a"),
-						string.createString("b"),
-						string.createString("c"),
-					])
-
-					expect(
-						list.doesNotContain(
-							stringList,
-							string.createString("a"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.doesNotContain(
-							stringList,
-							string.createString("b"),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						list.doesNotContain(
-							stringList,
-							string.createString("c"),
-						),
-					).toEqual(booleanFalse())
-				})
-
-				it("returns true if the item is not in the list", () => {
-					const numbersList = list.createList([
-						integerZero(),
-						integerOne(),
-						integerTwo(),
-					])
-
-					expect(
-						list.doesNotContain(numbersList, integerHundred()),
-					).toEqual(booleanTrue())
-
-					const stringList = list.createList([
-						string.createString("a"),
-						string.createString("b"),
-						string.createString("c"),
-					])
-
-					expect(
-						list.doesNotContain(
-							stringList,
-							string.createString("d"),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns true if the list is empty", () => {
-					expect(
-						list.doesNotContain(list.createList([]), integerOne()),
-					).toEqual(booleanTrue())
 				})
 			})
 
@@ -6168,69 +5647,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("isNot", () => {
-				it("returns true if the records are different", () => {
-					expect(
-						record.isNot(
-							recordEmpty(),
-							record.createRecord({ a: integerOne() }),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						record.isNot(
-							record.createRecord({ a: integerOne() }),
-							recordEmpty(),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						record.isNot(
-							record.createRecord({ a: integerOne() }),
-							record.createRecord({
-								a: integerOne(),
-								b: stringEmpty(),
-							}),
-						),
-					).toEqual(booleanTrue())
-
-					expect(
-						record.isNot(
-							record.createRecord({
-								a: integerOne(),
-								b: stringEmpty(),
-							}),
-							record.createRecord({ a: integerOne() }),
-						),
-					).toEqual(booleanTrue())
-				})
-
-				it("returns false if the records are identical", () => {
-					expect(record.isNot(recordEmpty(), recordEmpty())).toEqual(
-						booleanFalse(),
-					)
-
-					expect(
-						record.isNot(
-							record.createRecord({ a: integerOne() }),
-							record.createRecord({ a: integerOne() }),
-						),
-					).toEqual(booleanFalse())
-
-					expect(
-						record.isNot(
-							record.createRecord({
-								a: integerOne(),
-								b: stringEmpty(),
-							}),
-							record.createRecord({
-								a: integerOne(),
-								b: stringEmpty(),
-							}),
-						),
-					).toEqual(booleanFalse())
-				})
-			})
+			// NOTE: isNot is implemented in Essence now (src/stdlib/Record.es); the golden harness covers it.
 
 			describe("toString", () => {
 				it("prints correctly", () => {

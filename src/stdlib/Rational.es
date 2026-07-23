@@ -22,7 +22,9 @@ declarations {
 		§§
 		§§ @param other the Rational to compare against
 		§§ @returns `true` when the two differ.
-		isNot(_ other: Rational) -> Boolean
+		isNot(_ other: Rational) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Adds a number to this Rational, staying exact for every member of the numeric tower.
 		overload add {

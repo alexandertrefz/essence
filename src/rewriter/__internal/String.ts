@@ -20,22 +20,11 @@ export function isEmpty(originalString: StringType): BooleanType {
 	return createBoolean(originalString.value.length === 0)
 }
 
-export function hasAnyContent(originalString: StringType): BooleanType {
-	return createBoolean(originalString.value.length !== 0)
-}
-
 export function is(
 	originalString: StringType,
 	otherString: StringType,
 ): BooleanType {
 	return createBoolean(originalString.value === otherString.value)
-}
-
-export function isNot(
-	originalString: StringType,
-	otherString: StringType,
-): BooleanType {
-	return createBoolean(originalString.value !== otherString.value)
 }
 
 export function prepend(
@@ -75,13 +64,6 @@ export function contains(
 	otherString: StringType,
 ): BooleanType {
 	return createBoolean(originalString.value.includes(otherString.value))
-}
-
-export function doesNotContain(
-	originalString: StringType,
-	otherString: StringType,
-): BooleanType {
-	return createBoolean(!originalString.value.includes(otherString.value))
 }
 
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
@@ -147,25 +129,11 @@ export function startsWith(
 	return createBoolean(originalString.value.startsWith(prefix.value))
 }
 
-export function doesNotStartWith(
-	originalString: StringType,
-	prefix: StringType,
-): BooleanType {
-	return createBoolean(!originalString.value.startsWith(prefix.value))
-}
-
 export function endsWith(
 	originalString: StringType,
 	suffix: StringType,
 ): BooleanType {
 	return createBoolean(originalString.value.endsWith(suffix.value))
-}
-
-export function doesNotEndWith(
-	originalString: StringType,
-	suffix: StringType,
-): BooleanType {
-	return createBoolean(!originalString.value.endsWith(suffix.value))
 }
 
 export function replaceEvery(

@@ -15,7 +15,9 @@ declarations {
 		§§
 		§§ @param other the Integer to compare against
 		§§ @returns `true` when the two differ.
-		isNot(_ other: Integer) -> Boolean
+		isNot(_ other: Integer) -> Boolean {
+			<- @::is(other)::negate()
+		}
 
 		§§ Adds a number to this Integer.
 		overload add {
@@ -112,7 +114,9 @@ declarations {
 		isEven() -> Boolean
 
 		§§ Whether the Integer is not divisible by two.
-		isOdd() -> Boolean
+		isOdd() -> Boolean {
+			<- @::isEven()::negate()
+		}
 
 		§§ Whether the Integer is above zero. Zero is neither positive nor negative.
 		isPositive() -> Boolean

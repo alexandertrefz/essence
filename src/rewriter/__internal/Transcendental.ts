@@ -201,13 +201,6 @@ export function is(
 	)
 }
 
-export function isNot(
-	transcendental: TranscendentalType,
-	other: TranscendentalType,
-): BooleanType {
-	return createBoolean(!is(transcendental, other).value)
-}
-
 // NOTE: Exact within the linear grammar: the difference is again
 // `A + B·π`; its sign is B's sign when B ≠ 0 (π-dominance), else A's.
 export function compareTranscendentals(
