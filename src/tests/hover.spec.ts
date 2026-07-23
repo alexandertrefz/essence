@@ -389,10 +389,10 @@ describe("Hover of conformance clauses", () => {
 	})
 })
 
-// NOTE: Boolean is the first Namespace read from Essence source rather than
-// from a TypeScript table (`src/stdlib/Boolean.es`). What an Editor shows for
-// it has to be as complete as it ever was — a Namespace that moved and took
-// its documentation with it is the whole point of the move.
+// NOTE: Boolean stands in for the standard library as a whole here
+// (`src/stdlib/Boolean.es`). What an Editor shows for a builtin comes from the
+// `§§` block in that source and nowhere else — the documentation an Essence
+// declaration carries has to reach Hover intact.
 describe("Hover of a standard library Method", () => {
 	let source = [
 		"implementation {",
@@ -410,13 +410,10 @@ describe("Hover of a standard library Method", () => {
 		)
 	})
 
-	// NOTE: A `@param` reaches Hover as a section of its own, which is more
-	// than the TypeScript table this replaced could show — it recorded a
-	// Parameter's text where only Signature Help would look for it. Signature
-	// Help's own output is unchanged.
+	// NOTE: A `@param` reaches Hover as a section of its own.
 	//
-	// NOTE: A DELIBERATE decision, inherited by every Method still to be
-	// converted. The name in that section is the Parameter's INTERNAL one —
+	// NOTE: A DELIBERATE decision, and the convention for every standard
+	// library Method. The name in that section is the Parameter's INTERNAL one —
 	// `other`, which no call site can write, since `_ other: Boolean` takes
 	// its Argument positionally and Signature Help labels it `_`. Naming it
 	// anyway beats an anonymous section: it is the name the standard library

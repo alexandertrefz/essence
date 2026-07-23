@@ -508,10 +508,11 @@ describe("LSP in a standard library source", () => {
 		expect(hoverAt(14, 4)?.content).toBe("toString() -> String")
 	})
 
-	// NOTE: The regression that matters as the conversion goes on — every real
-	// standard library source, analysed the way the editor analyses it, is
-	// clean. The loader already throws on a Diagnostic; this says the Language
-	// Server agrees with it, which it did not before.
+	// NOTE: Every real standard library source, analysed the way the editor
+	// analyses it, is clean. The loader already throws on a Diagnostic; this
+	// says the Language Server agrees with it, which it did not before — and
+	// since the standard library is where the language is now written, an
+	// editor that could not open it would be an editor nobody can extend it in.
 	it("should report no Diagnostics for any real standard library source", () => {
 		let directory = path.resolve(import.meta.dirname, "../stdlib")
 

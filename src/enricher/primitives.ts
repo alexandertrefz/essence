@@ -3,14 +3,16 @@ import type { common } from "../interfaces/index"
 // NOTE: The bare Type tags — the handful of Types that have no declaration
 // anywhere, because they ARE what a declaration bottoms out in. A standard
 // library file writes `Boolean`, `String`, `Integer` in its signatures; these
-// are what those names resolve to while the Namespaces around them are read
-// from Essence source.
+// are what those names resolve to, and there is nowhere else they could come
+// from: `src/stdlib/Boolean.es` declares the Boolean NAMESPACE, and writes
+// `Boolean` in its own signatures.
 //
-// NOTE: The legacy TypeScript tables in `./types/*.ts` still export their own
-// `type` consts, and stay untouched until the Namespace that owns each one is
-// converted. These are deliberately a second, standalone spelling rather than
-// a re-export: the tables are being deleted Namespace by Namespace, and the
-// primitives have to outlive all of them.
+// NOTE: This is the ONLY TypeScript left that describes a Type of the language.
+// A Type belongs here if and only if no `type`, `choice` or `protocol`
+// declaration could produce it — `Number` and `Irrational` are Unions and live
+// in `src/stdlib/Number.es`, `Optional` and `Ordering` in files of their own.
+// Nothing compares these by identity; a consumer that needs "is this an
+// Integer?" reads the `type` tag.
 
 export const booleanType: common.BooleanType = { type: "Boolean" }
 export const stringType: common.StringType = { type: "String" }

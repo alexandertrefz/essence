@@ -10,7 +10,6 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
-	optionalOf,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
@@ -1900,6 +1899,16 @@ describe("Helpers", () => {
 				type: "UnionType",
 				types: [number, nothing],
 			})
+		})
+
+		// NOTE: The shape the Enricher produces for an `Optional<Rational>`
+		// annotation — the Union `Rational | Nothing` carrying the applied
+		// spelling, which is what makes Hovers and Diagnostics print the alias
+		// and what lets `otherwise` bind a compound payload in one piece.
+		const optionalOf = (itemType: Type): UnionType => ({
+			type: "UnionType",
+			types: [itemType, nothing],
+			alias: { name: "Optional", typeArguments: [itemType] },
 		})
 
 		it("should keep a lone applied Optional as written", () => {
