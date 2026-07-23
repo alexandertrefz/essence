@@ -894,9 +894,11 @@ describe("Code Generation", () => {
 			expect(code).toContain("const Boolean = {")
 		})
 
-		// NOTE: A dotted member name is text, not a reference — a Record with a
-		// member spelled like a merged Namespace must not drag the whole thing
-		// in.
+		// NOTE: A dotted member name is text, not a reference — a Record whose
+		// member is spelled like a Namespace must stay a plain member read, never
+		// be mistaken for an Essence Method and rewritten to a bare `$es_…`
+		// Identifier. `rewriteLookup` routes a Record field through the same
+		// funnel as a static Method, so this is that funnel's guard.
 		it("does not mistake a member name for a reference", () => {
 			const code = generate(`implementation {
 				constant record = { Boolean = "not the Namespace" }
@@ -904,7 +906,8 @@ describe("Code Generation", () => {
 				__print(record.Boolean)
 			}`)
 
-			expect(code).not.toContain("const Boolean = {")
+			expect(code).toContain("record.Boolean")
+			expect(code).not.toContain("$es_")
 		})
 
 		it("runs isNot from the merged const", async () => {
