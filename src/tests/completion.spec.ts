@@ -517,3 +517,27 @@ describe("Completion", () => {
 		})
 	})
 })
+
+// NOTE: What a converted Namespace must NOT change. The standard library is
+// moving out of TypeScript and into Essence one Namespace at a time, and a
+// source declaration is enriched INTO the builtin Scope rather than spread
+// into it — so without `builtinMemberOrder` a conversion moves its Namespace
+// to the end of the member table, and the members another Namespace covers
+// the same receiver with start winning the dedupe. `Boolean` is the first one
+// converted; `otherwise` comes from Optional, which covers every Type.
+describe("Completion of a converted standard library Namespace", () => {
+	it("should offer Boolean's own Methods ahead of the ones it inherits", () => {
+		let source = ["implementation {", "\ttrue::", "}"].join("\n")
+
+		expect(labelsOf(source, { line: 2, column: 8 })).toEqual([
+			"negate",
+			"is",
+			"isNot",
+			"and",
+			"or",
+			"exclusiveOr",
+			"toString",
+			"otherwise",
+		])
+	})
+})

@@ -5,7 +5,12 @@ import { renderDiagnostics } from "../diagnostics/render"
 import type { common, enricher, parser } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
-import { legacyMembers, legacyProtocols, legacyTypes } from "./builtins"
+import {
+	builtinMemberOrder,
+	legacyMembers,
+	legacyProtocols,
+	legacyTypes,
+} from "./builtins"
 import { enrichPrograms } from "./index"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
@@ -15,7 +20,7 @@ import nativeFunctions from "./types/NativeFunctions"
 // module's own location rather than the working directory — the same trick the
 // Rewriter's `internalImport` uses for the runtime modules — so `esc` finds it
 // from any cwd, and a bundle finds it beside itself.
-const STDLIB_DIRECTORY = path.resolve(import.meta.dirname, "../stdlib")
+export const STDLIB_DIRECTORY = path.resolve(import.meta.dirname, "../stdlib")
 
 // NOTE: Which entries of a Namespace member are bound to the runtime rather
 // than implemented in Essence. Methods carry ONE FLAG PER OVERLOAD, in written
@@ -142,7 +147,7 @@ function throwOnAnyDiagnostics(
 // `choice Ordering` alone leaves the legacy `Ordering` Namespace pointing at
 // the old Type object, which is structurally equal to the new one today but is
 // not the same declaration, and nothing here would say so.
-function declaredNames(programs: Array<parser.Program>): {
+export function declaredNames(programs: Array<parser.Program>): {
 	members: Set<string>
 	types: Set<string>
 	protocols: Set<string>
@@ -174,6 +179,35 @@ function declaredNames(programs: Array<parser.Program>): {
 	}
 
 	return { members, types, protocols }
+}
+
+// NOTE: The merged member table, listed in the ONE canonical order rather than
+// in "legacy half first, source half after". A source declaration is enriched
+// INTO the Scope, so it lands wherever insertion put it — at the end — and a
+// converted Namespace would jump from its place to last, reordering the
+// Completion list and the Enricher's Namespace search for a change that is
+// supposed to be invisible. Sorting the finished table against
+// `builtinMemberOrder` makes the position a property of the name, not of which
+// half declared it. Anything unlisted keeps its insertion order, after the
+// listed ones.
+function inBuiltinOrder(
+	members: Record<string, common.Type>,
+): Record<string, common.Type> {
+	let ordered: Record<string, common.Type> = {}
+
+	for (let name of builtinMemberOrder) {
+		if (Object.hasOwn(members, name)) {
+			ordered[name] = members[name]!
+		}
+	}
+
+	for (let [name, member] of Object.entries(members)) {
+		if (!Object.hasOwn(ordered, name)) {
+			ordered[name] = member
+		}
+	}
+
+	return ordered
 }
 
 function withoutNames<Value>(
@@ -356,14 +390,16 @@ export function loadStdlibFrom(
 
 	let validateDuration = performance.now() - validateStarted
 
-	let namespaces = Object.values(scope.members).filter(
+	let orderedMembers = inBuiltinOrder(scope.members)
+
+	let namespaces = Object.values(orderedMembers).filter(
 		(member): member is common.NamespaceType => member.type === "Namespace",
 	)
 
 	stripDeclaredDocumentationPositions(scope, declared)
 
 	return {
-		members: scope.members,
+		members: orderedMembers,
 		types: scope.types,
 		protocols: scope.protocols,
 		namespaces,
