@@ -1,4 +1,4 @@
-import type { common } from "../interfaces/index"
+import type { common, parser } from "../interfaces/index"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
 import {
@@ -7,6 +7,7 @@ import {
 	printSignature,
 	printType,
 	signaturesOf,
+	withoutSelf,
 } from "./printType"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
@@ -30,13 +31,28 @@ type State = {
 	best: HoverInfo | null
 }
 
+// NOTE: `parserProgram` is only ever passed for a standard library source, and
+// only because a body-less native Method signature has NO typed Node. The
+// Enricher drops one deliberately — there is no body to emit, and putting one
+// in the typed tree would make the Simplifier emit a definition under a
+// runtime export's name. So the Method Types are all there (on the typed
+// Namespace's `type`) while every Position that could locate the cursor inside
+// a signature is only in the parsed source. `visitNativeSignatures` pairs the
+// two up. Without it every Hover inside `src/stdlib/*.es` answered with the
+// enclosing Namespace, whatever it was aimed at — and String, Integer and
+// Rational are hundreds of these signatures each.
 export function findHover(
 	program: common.typed.Program,
 	cursor: common.Cursor,
+	parserProgram: parser.Program | null = null,
 ): HoverInfo | null {
 	let state: State = { cursor, best: null }
 
 	visitBody(program.implementation.nodes, state)
+
+	if (parserProgram !== null) {
+		visitNativeSignatures(parserProgram, program, state)
+	}
 
 	return state.best
 }
@@ -538,4 +554,203 @@ function invokedSignatures(
 	}
 
 	return signatures
+}
+
+/**********************************/
+/* Body-less native declarations  */
+/**********************************/
+
+// NOTE: What the pass below can and can not answer for, so the gap is written
+// down rather than discovered:
+//
+//   • the Method NAME — the full signature and its `§§` text. The whole point.
+//   • a Parameter's INTERNAL name (`other` in `_ other: Boolean`) — read back
+//     off the resolved Parameter, so it says what the annotation resolved TO,
+//     not what was typed.
+//   • a Parameter's and the return Type's ANNOTATION — same, resolved.
+//   • a native static PROPERTY's name and its annotation.
+//
+// NOT covered: the Type Parameters of a generic signature (`<Item>`), and the
+// INSIDE of a compound annotation — hovering `Item` within `List<Item>` still
+// answers with `List<Item>`, because the resolved Type is reachable only as a
+// whole and this pass deliberately does not re-resolve anything. Hovering the
+// annotation itself is the common case and it is covered.
+
+function namespaceTypesOf(
+	program: common.typed.Program,
+): Map<string, common.NamespaceType> {
+	let types = new Map<string, common.NamespaceType>()
+
+	for (let node of program.implementation.nodes) {
+		if (node.nodeType === "NamespaceDefinitionStatement") {
+			types.set(node.name.content, node.type)
+		}
+	}
+
+	return types
+}
+
+// NOTE: The signature entries of one parser Method Node, paired index by index
+// with the resolved Overloads. A bodied entry is skipped — it has a typed Node
+// of its own, and the pass above already answered for it.
+function nativeSignatureEntries(
+	member: parser.NamespaceMethods[string],
+	methodType: common.MethodType,
+): Array<{
+	signature: parser.NativeMethodSignatureNode
+	resolved: common.BaseFunction
+}> {
+	let signatures: Array<
+		parser.NativeMethodSignatureNode | parser.FunctionValueNode
+	> = []
+
+	switch (member.nodeType) {
+		case "SimpleMethodSignature":
+		case "StaticMethodSignature":
+			signatures = [member.signature]
+			break
+		case "OverloadedMethodSignatures":
+		case "OverloadedStaticMethodSignatures":
+			signatures = member.methods
+			break
+		default:
+			return []
+	}
+
+	let resolved =
+		methodType.type === "OverloadedMethod" ||
+		methodType.type === "OverloadedStaticMethod"
+			? methodType.overloads
+			: [methodType]
+
+	let entries: Array<{
+		signature: parser.NativeMethodSignatureNode
+		resolved: common.BaseFunction
+	}> = []
+
+	signatures.forEach((signature, index) => {
+		let overload = resolved[index]
+
+		if (signature.nodeType === "NativeMethodSignature" && overload) {
+			entries.push({ signature, resolved: overload })
+		}
+	})
+
+	return entries
+}
+
+function considerType(
+	state: State,
+	node: parser.TypeDeclarationNode | null,
+	type: common.Type | common.GenericUse | undefined,
+	label: string | null = null,
+) {
+	if (node == null || type === undefined) {
+		return
+	}
+
+	consider(state, node.position, type as common.Type, label)
+}
+
+function visitNativeSignatures(
+	parserProgram: parser.Program,
+	program: common.typed.Program,
+	state: State,
+) {
+	let namespaceTypes = namespaceTypesOf(program)
+
+	for (let node of parserProgram.implementation.nodes) {
+		if (node.nodeType !== "NamespaceDefinitionStatement") {
+			continue
+		}
+
+		let namespaceType = namespaceTypes.get(node.name.content)
+
+		if (namespaceType === undefined) {
+			continue
+		}
+
+		for (let [name, property] of Object.entries(node.properties)) {
+			// NOTE: Only the VALUE-less ones — a Property with a value has a
+			// typed Node already.
+			if (property.value !== null) {
+				continue
+			}
+
+			let type = namespaceType.properties[name]
+
+			consider(
+				state,
+				property.name.position,
+				(type ?? { type: "Unknown" }) as common.Type,
+				`static ${name}`,
+				property.documentation,
+			)
+			considerType(state, property.type, type)
+		}
+
+		for (let [name, member] of Object.entries(node.methods)) {
+			let methodType = namespaceType.methods[name]
+
+			if (methodType === undefined) {
+				continue
+			}
+
+			let entries = nativeSignatureEntries(member, methodType)
+
+			if (entries.length === 0) {
+				continue
+			}
+
+			let isStatic =
+				methodType.type === "StaticMethod" ||
+				methodType.type === "OverloadedStaticMethod"
+			let label = isStatic ? `static ${name}` : name
+
+			// NOTE: The name is typed as the Method itself — every Overload at
+			// once, since the name is what they share.
+			consider(state, member.name.position, methodType, label)
+
+			for (let { signature, resolved } of entries) {
+				considerSignatures(
+					state,
+					signature.position,
+					[isStatic ? resolved : withoutSelf(resolved)],
+					label,
+					signature.documentation,
+				)
+
+				// NOTE: The receiver Parameter is injected ahead of the
+				// written ones on a non-static signature, so the resolved list
+				// is one longer than the parsed one.
+				let offset = isStatic ? 0 : 1
+
+				signature.parameters.forEach((parameter, index) => {
+					let parameterType = resolved.parameterTypes[index + offset]
+
+					if (parameterType === undefined) {
+						return
+					}
+
+					considerType(state, parameter.type, parameterType.type)
+
+					for (let identifier of [
+						parameter.externalName,
+						parameter.internalName,
+					]) {
+						if (identifier !== null) {
+							consider(
+								state,
+								identifier.position,
+								parameterType.type as common.Type,
+								identifier.content,
+							)
+						}
+					}
+				})
+
+				considerType(state, signature.returnType, resolved.returnType)
+			}
+		}
+	}
 }

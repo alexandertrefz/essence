@@ -1,6 +1,5 @@
-import { enrich } from "../enricher/index"
+import { enrichDocument, parseDocument } from "../documents"
 import type { common } from "../interfaces/index"
-import { parseWithDiagnostics } from "../parser/index"
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
@@ -60,6 +59,7 @@ const specifierTriggerPattern = /::<[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 export function findCompletions(
 	documentText: string,
 	cursor: common.Cursor,
+	documentPath?: string,
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
@@ -80,18 +80,23 @@ export function findCompletions(
 			beforeCursor.slice(0, match.index),
 		].join("\n")
 
-		let baseType = resolveProbedBaseType(headText)
+		let baseType = resolveProbedBaseType(headText, documentPath)
 
 		if (baseType === null) {
 			return []
 		}
 
 		if (specifierMatch !== null) {
-			return specifierCompletions(documentText, baseType)
+			return specifierCompletions(documentText, baseType, documentPath)
 		}
 
 		return methodMatch !== null
-			? methodCompletions(documentText, baseType, methodMatch[1] ?? null)
+			? methodCompletions(
+					documentText,
+					baseType,
+					methodMatch[1] ?? null,
+					documentPath,
+				)
 			: memberCompletions(baseType)
 	}
 
@@ -99,8 +104,8 @@ export function findCompletions(
 	// the names in Scope — both are valid at those positions, since a member
 	// is written `name = value` and a labelled Argument `label value`.
 	return [
-		...contextualCompletions(lines, cursor),
-		...scopeCompletions(documentText, cursor, beforeCursor),
+		...contextualCompletions(lines, cursor, documentPath),
+		...scopeCompletions(documentText, cursor, beforeCursor, documentPath),
 	]
 }
 
@@ -111,6 +116,7 @@ export function findCompletions(
 function contextualCompletions(
 	lines: Array<string>,
 	cursor: common.Cursor,
+	documentPath?: string,
 ): Array<CompletionEntry> {
 	let headText = [
 		...lines.slice(0, cursor.line - 1),
@@ -120,8 +126,11 @@ function contextualCompletions(
 	let context: ArgumentContext | null = null
 
 	try {
-		let { program } = parseWithDiagnostics(buildProbeSource(headText))
-		let { program: enrichedProgram } = enrich(program)
+		let { program } = parseDocument(
+			buildProbeSource(headText),
+			documentPath,
+		)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
 
 		context = findArgumentContext(enrichedProgram, cursor)
 	} catch {
@@ -159,12 +168,15 @@ function contextualCompletions(
 /* Probing for the receiver Type */
 /*********************************/
 
-function resolveProbedBaseType(headText: string): common.Type | null {
+function resolveProbedBaseType(
+	headText: string,
+	documentPath?: string,
+): common.Type | null {
 	let probeSource = buildProbeSource(headText, `.${probeMemberName}`)
 
 	try {
-		let { program } = parseWithDiagnostics(probeSource)
-		let { program: enrichedProgram } = enrich(program)
+		let { program } = parseDocument(probeSource, documentPath)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
 
 		return (
 			findProbeLookup(enrichedProgram.implementation.nodes)?.base.type ??
@@ -393,8 +405,14 @@ function methodCompletions(
 	documentText: string,
 	baseType: common.Type,
 	specifierName: string | null,
+	documentPath?: string,
 ): Array<CompletionEntry> {
-	let namespaces = matchingNamespaces(documentText, baseType, specifierName)
+	let namespaces = matchingNamespaces(
+		documentText,
+		baseType,
+		specifierName,
+		documentPath,
+	)
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
 
@@ -432,11 +450,17 @@ function methodCompletions(
 function specifierCompletions(
 	documentText: string,
 	baseType: common.Type,
+	documentPath?: string,
 ): Array<CompletionEntry> {
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
 
-	for (let namespace of matchingNamespaces(documentText, baseType, null)) {
+	for (let namespace of matchingNamespaces(
+		documentText,
+		baseType,
+		null,
+		documentPath,
+	)) {
 		if (namespace.name === "" || seen.has(namespace.name)) {
 			continue
 		}
@@ -471,12 +495,13 @@ function scopeCompletions(
 	documentText: string,
 	cursor: common.Cursor,
 	beforeCursor: string,
+	documentPath?: string,
 ): Array<CompletionEntry> {
-	let { program } = parseWithDiagnostics(documentText)
+	let { program } = parseDocument(documentText, documentPath)
 	let enrichedProgram: common.typed.Program | null = null
 
 	try {
-		enrichedProgram = enrich(program).program
+		enrichedProgram = enrichDocument(program, documentPath).program
 	} catch {}
 
 	let { scopes } = indexProgram(program, enrichedProgram)

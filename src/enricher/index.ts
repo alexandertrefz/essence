@@ -13,16 +13,41 @@ import {
 	resolveTypeAliasStatementType,
 } from "./resolvers"
 
+// NOTE: Names to leave OUT of the top level Scope, per table. Exactly one
+// caller needs this: the Language Server, editing a standard library source.
+// That file's declarations are ALREADY in the builtin tables — the loader put
+// them there — so enriching it against the untouched tables reports every one
+// of them as a redeclaration of itself. Subtracting them makes the document
+// the declaration of its own names again, which is what it is.
+export type ShadowedBuiltins = {
+	members: Set<string>
+	types: Set<string>
+	protocols: Set<string>
+}
+
+const withoutShadowed = <Value>(
+	table: Record<string, Value>,
+	names: Set<string> | undefined,
+): Record<string, Value> =>
+	names === undefined || names.size === 0
+		? table
+		: Object.fromEntries(
+				Object.entries(table).filter(([name]) => !names.has(name)),
+			)
+
 export const enrich = (
 	program: parser.Program,
+	options: { shadowedBuiltins?: ShadowedBuiltins } = {},
 ): {
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
 } => {
+	let shadowed = options.shadowedBuiltins
+
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
 			let members: Record<string, common.Type> = {
-				...builtinMembers(),
+				...withoutShadowed(builtinMembers(), shadowed?.members),
 			}
 
 			let topLevelScope: enricher.Scope = {
@@ -33,8 +58,10 @@ export const enrich = (
 				// Diagnostic at.
 				declarations: {},
 				constants: new Set(Object.keys(members)),
-				types: { ...builtinTypes() },
-				protocols: { ...builtinProtocols() },
+				types: { ...withoutShadowed(builtinTypes(), shadowed?.types) },
+				protocols: {
+					...withoutShadowed(builtinProtocols(), shadowed?.protocols),
+				},
 			}
 
 			return {
