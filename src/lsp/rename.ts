@@ -1,3 +1,4 @@
+import { isStdlibDocument } from "../documents"
 import {
 	builtinMembers,
 	builtinProtocols as builtinProtocolTable,
@@ -179,11 +180,41 @@ export function isValidIdentifierName(name: string): boolean {
 	)
 }
 
+// NOTE: REFUSED outright inside a standard library source — and with it
+// Prepare Rename and Linked Editing, which both resolve through here. Not out
+// of caution; a rename there is silently destructive:
+//
+//   • the edit reaches this document only. Every call site of a standard
+//     library Method is in a file a single-document rename never sees, and the
+//     Language Server has no project-wide index to find them with.
+//   • the name IS the runtime binding. A body-less signature is bound to the
+//     export of the same name in `src/rewriter/__internal`, so renaming
+//     `exclusiveOr` to `xor` type-checks, emits ZERO Diagnostics and produces
+//     a call to `undefined` at run time.
+//   • renaming a Method a `is …` clause depends on breaks the conformance, and
+//     the standard library loader then throws for EVERY Program compiled
+//     afterwards — the Editor would have bricked the compiler.
+//
+// The Namespace's own NAME was already protected, since it resolves to a
+// builtin; its Methods, Parameters and local Type names were not.
+//
+// NOTE: What stands between a mis-bound native and a broken build is the
+// runtime-export cross-check in `src/tests/builtins.spec.ts` — it drives
+// `nativeBindings` against the real `__internal` modules in both directions,
+// and it is what fails on the rename above. It is NOT the equivalence gate,
+// which is deleted once the last TypeScript table is gone. That check has to
+// survive commit 11, and it can only speak for Namespaces its `runtimeModules`
+// table names.
 export function findRenameableOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,
 	enrichedProgram: common.typed.Program | null = null,
+	documentPath?: string,
 ): Occurrence | null {
+	if (isStdlibDocument(documentPath)) {
+		return null
+	}
+
 	let occurrence = findOccurrence(program, cursor, enrichedProgram)
 
 	if (occurrence === null || occurrence.declaration.builtin) {
@@ -1136,8 +1167,79 @@ function walkNamespaceDefinition(
 	}
 
 	for (let member of Object.values(node.methods)) {
-		// NOTE: Only bodied Methods have a Function definition to walk — the
-		// body-less native signatures (declarations mode) are skipped.
+		// NOTE: A body-less native signature has no Function definition to
+		// walk, but it still WRITES Type names (`Boolean`, `List<Item>`,
+		// `Ordering`) and Parameter names. Skipping it left every one of them
+		// outside the index — uncoloured by Semantic Tokens, invisible to
+		// Document Highlight and to `go to definition` — which went unnoticed
+		// while no document containing one could be opened at all. The
+		// standard library is nothing but these signatures.
+		//
+		// NOTE: Their names are indexed, NOT made renameable in practice:
+		// `renameableOccurrenceAt` refuses outright inside a standard library
+		// source (see `server.ts`), which is the only place a native signature
+		// can appear. Indexing is what colours and highlights them.
+		let nativeSignatures: Array<parser.NativeMethodSignatureNode> = []
+
+		if (
+			member.nodeType === "SimpleMethodSignature" ||
+			member.nodeType === "StaticMethodSignature"
+		) {
+			nativeSignatures = [member.signature]
+		} else if (
+			member.nodeType === "OverloadedMethodSignatures" ||
+			member.nodeType === "OverloadedStaticMethodSignatures"
+		) {
+			nativeSignatures = member.methods.filter(
+				(entry): entry is parser.NativeMethodSignatureNode =>
+					entry.nodeType === "NativeMethodSignature",
+			)
+		}
+
+		for (let signature of nativeSignatures) {
+			let signatureScope = scopeWithGenerics(
+				signature.generics,
+				genericScope,
+				context,
+			)
+
+			for (let parameter of signature.parameters) {
+				walkTypeDeclaration(parameter.type, signatureScope, context)
+
+				// NOTE: A Parameter of a body-less signature binds nothing —
+				// there is no body to read it — so it is recorded as a
+				// standalone Declaration rather than declared in a Scope,
+				// exactly as a Protocol signature's would be.
+				// NOTE: The Parser reuses ONE Identifier Node when the internal
+				// name doubles as the call site label, so the pair is deduped
+				// by identity rather than by name.
+				let identifiers = new Set(
+					[parameter.externalName, parameter.internalName].filter(
+						(identifier) => identifier !== null,
+					),
+				)
+
+				for (let identifier of identifiers) {
+					record(
+						{
+							builtin: false,
+							kind: "parameter",
+							definition: identifier.position,
+							visibleFrom: null,
+							occurrences: [],
+						},
+						identifier.content,
+						identifier.position,
+						context.index,
+						"write",
+					)
+				}
+			}
+
+			walkTypeDeclaration(signature.returnType, signatureScope, context)
+		}
+
+		// NOTE: Only bodied Methods have a Function definition to walk.
 		let methods: Array<parser.FunctionValueNode> = []
 
 		if (
