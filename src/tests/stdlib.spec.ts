@@ -290,14 +290,9 @@ describe("Stdlib", () => {
 		})
 	})
 
-	describe("Optional otherwise", () => {
-		it("passes a value through and replaces Nothing", () => {
-			expect(optional.otherwise(int(1n), int(0n))).toEqual(int(1n))
-			expect(optional.otherwise(createNothing(), int(0n))).toEqual(
-				int(0n),
-			)
-		})
-	})
+	// NOTE: `Optional.otherwise` is implemented in Essence now
+	// (`src/stdlib/Optional.es`) — the golden harness exercises it end to end,
+	// so the runtime-direct test that lived here is retired.
 
 	describe("List round trips and construction", () => {
 		// NOTE: `joinWith` is bounded by `Printable` rather than fixed to a

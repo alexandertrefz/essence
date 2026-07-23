@@ -10,7 +10,6 @@ import {
 	isFirstRationalBigger,
 } from "../rewriter/__internal/internalHelpers"
 import * as list from "../rewriter/__internal/List"
-import * as nothingModule from "../rewriter/__internal/Nothing"
 import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
 import * as ordering from "../rewriter/__internal/Ordering"
@@ -6252,30 +6251,10 @@ describe("Rewriter", () => {
 		})
 
 		describe("Ordering", () => {
-			it("compares Ordering values with is and isNot", () => {
-				expect(ordering.is(ordering.less, ordering.less)).toEqual(
-					booleanTrue(),
-				)
-				expect(ordering.is(ordering.less, ordering.greater)).toEqual(
-					booleanFalse(),
-				)
-				expect(
-					ordering.isNot(ordering.equal, ordering.greater),
-				).toEqual(booleanTrue())
-			})
-
-			it("represents Ordering values as their variant name", () => {
-				expect(ordering.toString(ordering.less)).toEqual(
-					string.createString("Less"),
-				)
-				expect(ordering.toString(ordering.equal)).toEqual(
-					string.createString("Equal"),
-				)
-				expect(ordering.toString(ordering.greater)).toEqual(
-					string.createString("Greater"),
-				)
-			})
-
+			// NOTE: `Ordering.is`, `isNot` and `toString` are implemented in
+			// Essence now (`src/stdlib/Ordering.es`) — the golden harness
+			// exercises them end to end. Only the runtime `anyIs` and the
+			// numeric `compareTo` remain native and keep their unit tests.
 			it("compares Ordering values with anyIs", () => {
 				expect(anyIs(ordering.less, ordering.less)).toBeTrue()
 				expect(anyIs(ordering.less, ordering.equal)).toBeFalse()
@@ -6322,20 +6301,9 @@ describe("Rewriter", () => {
 				).toEqual(string.createString("[ 1, 2 ]"))
 			})
 
-			it("compares Nothing with is and isNot", () => {
-				expect(nothingModule.is(nothing(), nothing())).toEqual(
-					booleanTrue(),
-				)
-				expect(nothingModule.isNot(nothing(), nothing())).toEqual(
-					booleanFalse(),
-				)
-			})
-
-			it("represents Nothing as the String Nothing", () => {
-				expect(nothingModule.toString(nothing())).toEqual(
-					string.createString("Nothing"),
-				)
-			})
+			// NOTE: `Nothing.is`, `isNot` and `toString` are implemented in
+			// Essence now (`src/stdlib/Nothing.es`) and covered by the golden
+			// harness; only the value constructor stays native.
 		})
 
 		describe("Number", () => {
@@ -6405,10 +6373,14 @@ describe("Rewriter", () => {
 
 		describe("Union Method dispatch", () => {
 			it("runs the first case whose member Type accepts the receiver", () => {
+				// NOTE: `Nothing.toString` is implemented in Essence now, so the
+				// Nothing case supplies a stand-in of the same shape — this tests
+				// that `dispatchMethod` picks the case whose member Type accepts
+				// the receiver, not any particular runtime Method.
 				let cases: Parameters<typeof dispatchMethod>[2] = [
 					[
 						{ type: "Nothing" },
-						nothingModule.toString as (
+						(() => string.createString("Nothing")) as (
 							...args: Array<unknown>
 						) => unknown,
 						[],

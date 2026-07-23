@@ -21,6 +21,11 @@ declarations {
 		§§
 		§§ @param fallback the value to fall back to
 		§§ @returns the value, or the fallback in its place.
-		otherwise(_ fallback: ItemType) -> ItemType
+		otherwise(_ fallback: ItemType) -> ItemType {
+			<- match @ -> ItemType {
+				case Nothing { <- fallback }
+				case _ { <- @ }
+			}
+		}
 	}
 }

@@ -722,18 +722,28 @@ describe("Code Generation", () => {
 			expect(code).toContain("Rational.multiplyWith__overload$")
 		})
 
-		it("should dispatch a bounded Type Parameter member through the conformance parameter", () => {
-			const code = generate(`implementation {
+		// NOTE: `firstItem()` returns `Item | Nothing`, so `toString` dispatches
+		// over a Union — the `Item` case through the conformance witness, the
+		// `Nothing` case to `Nothing.toString`, which is implemented in Essence.
+		// This is the Union-dispatch-to-an-Essence-Method path: the case target
+		// is the bare `$es_Nothing_toString`, and the reachability gate has to
+		// pull that const in off the emitted dispatch triple for the Program to
+		// run.
+		it("should dispatch a bounded Type Parameter member through the conformance parameter", async () => {
+			const source = `implementation {
 				function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
 					<- items::firstItem()::toString()
 				}
 
 				__print(firstText([1, 2]))
-			}`)
+			}`
+			const code = generate(source)
 
 			expect(code).toContain("$type.dispatchMethod")
-			expect(code).toContain("Nothing.toString")
+			expect(code).toContain("$es_Nothing_toString")
+			expect(code).toContain("const $es_Nothing_toString")
 			expect(code).toContain("Item__conformance.toString")
+			expect(await run(source)).toEqual(['"1"'])
 		})
 
 		it("should order the catch-all Type Parameter case last", () => {
@@ -745,8 +755,8 @@ describe("Code Generation", () => {
 				__print(firstText([1, 2]))
 			}`)
 
-			expect(code.indexOf("Nothing.toString")).toBeGreaterThan(-1)
-			expect(code.indexOf("Nothing.toString")).toBeLessThan(
+			expect(code.indexOf("$es_Nothing_toString")).toBeGreaterThan(-1)
+			expect(code.indexOf("$es_Nothing_toString")).toBeLessThan(
 				code.indexOf("Item__conformance.toString"),
 			)
 		})
