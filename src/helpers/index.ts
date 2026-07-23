@@ -963,11 +963,21 @@ function matchTypes(
 		return true
 	}
 
-	// NOTE: A Generic always matches itself, bindable or not.
+	// NOTE: Two opaque Generics of the same name are the same Generic and match.
+	// This must NOT short-circuit a BINDABLE Generic that happens to share a name
+	// with an opaque one: when a Method forwards to another whose `infer` generic
+	// is spelled identically — `List`'s Methods all bind `ItemType`, so
+	// `firstItem` calling `itemAt` is `ItemType` matched against `ItemType` — the
+	// bindable side has to reach `matchGenericUse` below and RECORD the binding
+	// off the receiver's Type argument, not be waved through here with nothing
+	// bound. Generic identity is by name across the compiler, so a bindable name
+	// is the only thing that tells the two apart.
 	if (
 		lhs.type === "GenericUse" &&
 		rhs.type === "GenericUse" &&
-		lhs.name === rhs.name
+		lhs.name === rhs.name &&
+		!context?.bindableNames.has(lhs.name) &&
+		!context?.bindableNames.has(rhs.name)
 	) {
 		return true
 	}
