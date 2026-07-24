@@ -258,6 +258,7 @@ describe("Stdlib Call Graph", () => {
 			"List.doesNotContain",
 			"List.everyItem",
 			"List.firstItem__overload$1",
+			"List.firstItem__overload$2",
 			"List.hasItems",
 			"List.insert",
 			"List.isEmpty",

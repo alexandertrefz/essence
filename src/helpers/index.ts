@@ -1022,6 +1022,34 @@ export function matchesTypeWithBindings(
 // call, so the map is empty between top-level matches.
 const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 
+// NOTE: Whether a Generic name is still OPEN to binding here — bindable AND not
+// already pinned to a use of its own name. A SELF-referential binding
+// (`ItemType := ItemType`) arises when a callee's bindable Generic shares a
+// spelling with the caller's opaque one: a Method generic in `ItemType` calling
+// `List.reduce`, whose namespace Generic is also `ItemType`, binds
+// `ItemType := ItemType` off the receiver. That pins the callee's Generic to the
+// caller's opaque symbol, so from then on it must behave EXACTLY like an opaque
+// Generic — matching only another occurrence of itself, and falling THROUGH the
+// bindable dispatch so an expected Union can still accept it as a member (the
+// `ItemType` arm of a bound `Result` of `ItemType | Nothing`). Left as "open" it
+// would instead be chased through its own binding forever.
+function isOpenBindable(
+	name: string,
+	context: GenericInferenceContext | null,
+): boolean {
+	if (!context?.bindableNames.has(name)) {
+		return false
+	}
+
+	let binding = context.bindings.get(name)
+
+	return !(
+		binding !== undefined &&
+		binding.type === "GenericUse" &&
+		binding.name === name
+	)
+}
+
 function matchTypes(
 	lhs: common.Type,
 	rhs: common.Type,
@@ -1036,20 +1064,20 @@ function matchTypes(
 	}
 
 	// NOTE: Two opaque Generics of the same name are the same Generic and match.
-	// This must NOT short-circuit a BINDABLE Generic that happens to share a name
-	// with an opaque one: when a Method forwards to another whose `infer` generic
-	// is spelled identically — `List`'s Methods all bind `ItemType`, so
-	// `firstItem` calling `item(at:)` is `ItemType` matched against `ItemType` — the
-	// bindable side has to reach `matchGenericUse` below and RECORD the binding
-	// off the receiver's Type argument, not be waved through here with nothing
-	// bound. Generic identity is by name across the compiler, so a bindable name
-	// is the only thing that tells the two apart.
+	// This must NOT short-circuit a Generic still OPEN to binding that happens to
+	// share a name with an opaque one: when a Method forwards to another whose
+	// `infer` generic is spelled identically — `List`'s Methods all bind
+	// `ItemType`, so `firstItem` calling `item(at:)` is `ItemType` matched against
+	// `ItemType` — the open side has to reach `matchGenericUse` below and RECORD
+	// the binding off the receiver's Type argument, not be waved through here with
+	// nothing bound. Once it HAS been bound to its own name it is no longer open,
+	// and this is what recognises the two self-pinned `ItemType`s as identical.
 	if (
 		lhs.type === "GenericUse" &&
 		rhs.type === "GenericUse" &&
 		lhs.name === rhs.name &&
-		!context?.bindableNames.has(lhs.name) &&
-		!context?.bindableNames.has(rhs.name)
+		!isOpenBindable(lhs.name, context) &&
+		!isOpenBindable(rhs.name, context)
 	) {
 		return true
 	}
@@ -1057,13 +1085,13 @@ function matchTypes(
 	// NOTE: Generics can occur on either side — an expected Generic binds the
 	// actual Type, while an actual-side Generic occurs when signatures are
 	// compared (contravariant parameter positions flip the sides).
-	if (lhs.type === "GenericUse" && context?.bindableNames.has(lhs.name)) {
+	if (lhs.type === "GenericUse" && isOpenBindable(lhs.name, context)) {
 		return matchGenericUse(lhs, rhs, context, (binding) =>
 			matchTypes(binding, rhs, context),
 		)
 	}
 
-	if (rhs.type === "GenericUse" && context?.bindableNames.has(rhs.name)) {
+	if (rhs.type === "GenericUse" && isOpenBindable(rhs.name, context)) {
 		return matchGenericUse(rhs, lhs, context, (binding) =>
 			matchTypes(lhs, binding, context),
 		)
