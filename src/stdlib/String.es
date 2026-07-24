@@ -52,16 +52,45 @@ declarations {
 		}
 	}
 
-	§ Indices and character counts are by Unicode code point, not UTF-16 code
-	§ unit — so `character(at:)` never returns a lone surrogate, and `length`
-	§ counts what a reader would call characters. `split` matches its
-	§ separator on the raw String, which is correct regardless of unit, except
-	§ on the empty separator, which splits into code points rather than code
-	§ units; `characters` IS that case, and every Method below that reads
-	§ positions is written on top of it, so the code-point view is the only one
-	§ a Program can observe. The one Method still matching raw code units is
-	§ `replaceEvery`, whose empty-part behaviour no Essence expression can
-	§ spell — see its note.
+	§ Which Unicode normalization form `normalized(as:)` produces. A Choice
+	§ rather than a `String` for the reason every mode here is one: the four
+	§ forms are a fixed, checkable set. Canonical (NFC/NFD) preserves the text;
+	§ Compatibility (NFKC/NFKD) also folds compatibility characters — ligatures,
+	§ superscripts — onto their plain equivalents. Composed joins a base and its
+	§ marks into single characters where it can; Decomposed splits them apart.
+	choice NormalizationForm {
+		ComposedCanonical,
+		DecomposedCanonical,
+		ComposedCompatibility,
+		DecomposedCompatibility,
+	}
+
+	§ The same unit-Case shape again; equality derived, only `toString` written.
+	namespace NormalizationForm for NormalizationForm is Equatable, is Printable {
+		§§ Represents the NormalizationForm by its name.
+		§§
+		§§ @returns the name of the NormalizationForm variant.
+		toString() -> String {
+			<- match @ -> String {
+				case #ComposedCanonical { <- "ComposedCanonical" }
+				case #DecomposedCanonical { <- "DecomposedCanonical" }
+				case #ComposedCompatibility { <- "ComposedCompatibility" }
+				case #DecomposedCompatibility { <- "DecomposedCompatibility" }
+			}
+		}
+	}
+
+	§ A "character" here is a Unicode GRAPHEME CLUSTER — a base and its combining
+	§ marks, a ZWJ emoji sequence, a flag's two regional indicators — each ONE
+	§ character, the way a reader counts them. Indices, `length`, `slice`,
+	§ `reverse` and `character(at:)` are all by grapheme, so none ever splits
+	§ one. The single native `split` decides this (see `graphemesOf` in
+	§ `String.ts`): `characters` IS `split(on "")`, and every position Method is
+	§ written on top of `characters`/`split`, so the grapheme view is the only
+	§ one a Program can observe. Both sides of a comparison are first normalized
+	§ to NFC, so canonically equivalent Strings — an accent composed or
+	§ decomposed — count, order and compare the same; `normalized(as:)` reaches
+	§ the other forms.
 	namespace String for String is Equatable, is Printable, is Comparable {
 		§§ Whether this String has no characters at all.
 		§§
@@ -171,8 +200,8 @@ declarations {
 		§§
 		§§ @returns the List of characters.
 		characters() -> List<String> {
-			§ Splitting on the empty separator is defined to split by code
-			§ point, which is exactly what a character is here.
+			§ Splitting on the empty separator is defined to split into grapheme
+			§ clusters, which is exactly what a character is here.
 			<- @::split(on "")
 		}
 
@@ -188,6 +217,24 @@ declarations {
 
 		§§ The String with every character in lower case.
 		lowercased() -> String
+
+		§ `normalized()` with no Argument is Composed Canonical (NFC), the form
+		§ the rest of the Namespace already works in — `is`, `compareTo` and the
+		§ grapheme view all normalize to it — so it is what a Program wants far
+		§ more often than not. The `as:` entry is the native, naming the form.
+
+		§§ The String in the given Unicode normalization form, or Composed Canonical (NFC) when none is named — so two Strings that look identical can be made to compare and read the same.
+		§§
+		§§ @returns the normalized String.
+		overload normalized {
+			() -> String {
+				<- @::normalized(as NormalizationForm#ComposedCanonical)
+			}
+
+			§§ @param as the normalization form to produce
+			§§ @returns the String in that form.
+			(as form: NormalizationForm) -> String
+		}
 
 		§ One Method, not three. `trim(at:)` is the single native — it reads
 		§ the Case and calls the matching JavaScript intrinsic — and the
