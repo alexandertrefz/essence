@@ -554,6 +554,42 @@ describe("Enricher", () => {
 			})
 		})
 
+		it("terminates inference for a generic reduce-step folding into an Optional", () => {
+			// NOTE: The exact shape `List.firstItem(where:)` is written in — a
+			// Namespace generic in `ItemType` folding with `reduce`'s
+			// early-stopping entry into an `Optional<ItemType>` Result. `reduce`'s
+			// own Namespace Generic is ALSO `ItemType`, so binding it off the
+			// receiver records `ItemType := ItemType`; treated as still open to
+			// binding, matching that self-reference against `Nothing` (or the
+			// `ItemType` arm of the bound `ItemType | Nothing` Result) sent
+			// inference into an endless loop. `isOpenBindable` pins it as opaque,
+			// so this terminates and the fold's Result is `Optional<Integer>`.
+			expect(
+				typeOfFirstConstant(`implementation {
+					namespace Finder<infer ItemType> for List<ItemType> {
+						firstMatch(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
+							constant start: Optional<ItemType> = nothing
+
+							<- @::reduce(startingWith start, step (found, item) {
+								if check(item) { <- #Done(item) }
+
+								<- #Continue(found)
+							})
+						}
+					}
+
+					constant found = [1, 2, 3]::firstMatch(where (n) { <- n::isGreaterThan(1) })
+				}`),
+			).toEqual({
+				type: "UnionType",
+				alias: {
+					name: "Optional",
+					typeArguments: [{ type: "Integer" }],
+				},
+				types: [{ type: "Integer" }, { type: "Nothing" }],
+			})
+		})
+
 		it("should bind Method Generics from Function Argument return Types", () => {
 			expect(
 				typeOfFirstConstant(`implementation {

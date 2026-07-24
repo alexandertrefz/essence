@@ -121,11 +121,27 @@ declarations {
 				<- @::item(at 0)
 			}
 
-			§ NATIVE. Stopping at the first accepted item is the whole of the
-			§ difference from `keepEvery(where:)::firstItem()`, and no Essence
-			§ expression can leave a walk before its end. `anyItem`/`everyItem`
-			§ are written on top of this, so they short circuit too.
-			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>
+			§ Written on `reduce`'s early-stopping entry — the fold `#Done`s at
+			§ the first accepted item and never walks the rest. Stopping at the
+			§ first match is the whole of the difference from
+			§ `keepEvery(where:)::firstItem()`, and leaving a walk before its end is
+			§ what the `Step` Choice made an Essence expression able to do — this
+			§ Method was native until it existed. `anyItem`/`everyItem` are written
+			§ on top of this, so they short circuit through it too.
+			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
+				§ `reduce` binds its `Result` from the `startingWith` value, and a
+				§ bare `nothing` would fix it to `Nothing` alone — so the seed is
+				§ annotated to the `Optional` the accumulator and the answer share.
+				§ The accumulator is only ever `nothing`: it is carried untouched
+				§ until a match `#Done`s the whole fold with the item itself.
+				constant start: Optional<ItemType> = nothing
+
+				<- @::reduce(startingWith start, step (found, item) {
+					if check(item) { <- #Done(item) }
+
+					<- #Continue(found)
+				})
+			}
 		}
 
 		§§ The last item of the List.
