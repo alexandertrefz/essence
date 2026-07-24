@@ -9,7 +9,7 @@ import {
 	buildUnion,
 	closestMatch,
 	countOf,
-	createInferenceContext,
+	createFreshenedInference,
 	describeSignature,
 	describeType,
 	flattenUnionMembers,
@@ -21,6 +21,7 @@ import {
 	matchesTypeWithBindings,
 	mergeUnionMembers,
 	typeMentionsGeneric,
+	unfreshenBindings,
 	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
@@ -2315,17 +2316,21 @@ function inferInvocation(
 		}
 	}
 
-	let context = createInferenceContext(signature.generics)
+	let { parameterTypes, context, freshToOriginal } =
+		createFreshenedInference(signature)
 
 	if (
-		matchArguments(signature.parameterTypes, matchableArguments, {
+		matchArguments(parameterTypes, matchableArguments, {
 			inference: context,
 		}).type !== "Match"
 	) {
 		return undefined
 	}
 
-	return substituteInferredReturnType(signature, context.bindings)
+	return substituteInferredReturnType(
+		signature,
+		unfreshenBindings(context.bindings, freshToOriginal),
+	)
 }
 
 // NOTE: Substitutes the collected bindings into the return Type — Generics
@@ -2434,14 +2439,16 @@ function resolveInferredReturnType(
 		}),
 	)
 
-	let context = createInferenceContext(signature.generics)
-	let matchResult = matchArguments(
-		signature.parameterTypes,
-		matchableArguments,
-		{ inference: context },
-	)
+	let { parameterTypes, context, freshToOriginal } =
+		createFreshenedInference(signature)
+	let matchResult = matchArguments(parameterTypes, matchableArguments, {
+		inference: context,
+	})
 
-	let inferred = substituteInferredReturnType(signature, context.bindings)
+	let inferred = substituteInferredReturnType(
+		signature,
+		unfreshenBindings(context.bindings, freshToOriginal),
+	)
 
 	if (matchResult.type === "Match") {
 		reportUnboundGenerics(inferred.unboundGenerics, position)
@@ -3216,14 +3223,16 @@ function resolveFunctionInvocation(
 			}),
 		)
 
-		let context = createInferenceContext(type.generics)
-		let matchResult = matchArguments(
-			type.parameterTypes,
-			matchableArguments,
-			{ inference: context },
-		)
+		let { parameterTypes, context, freshToOriginal } =
+			createFreshenedInference(type)
+		let matchResult = matchArguments(parameterTypes, matchableArguments, {
+			inference: context,
+		})
 
-		let inferred = substituteInferredReturnType(type, context.bindings)
+		let inferred = substituteInferredReturnType(
+			type,
+			unfreshenBindings(context.bindings, freshToOriginal),
+		)
 		let conformances: Array<common.Conformance> = []
 
 		if (matchResult.type === "Match") {
