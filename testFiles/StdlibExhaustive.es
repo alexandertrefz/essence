@@ -672,6 +672,13 @@ third"::lines())
 	show("List.map<ItemType, Result>(_ (_ ItemType) -> Result) [empty]", noNumbers::map((item) { <- item::toString() }))
 	show("List.reduce<ItemType, Result>(startingWith: Result, _ (_ Result, _ ItemType) -> Result)", numbers::reduce(startingWith 0, (total, item) { <- total::add(item) }))
 	show("List.reduce<ItemType, Result>(startingWith: Result, _ (_ Result, _ ItemType) -> Result) [empty]", noNumbers::reduce(startingWith 0, (total, item) { <- total::add(item) }))
+	show("List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>)", numbers::reduce(startingWith 0, step (total, item) { <- #Continue(total::add(item)) }))
+	show("List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>) [early stop]", numbers::reduce(startingWith 0, step (total, item) {
+		if total::isGreaterThan(3) { <- #Done(total) }
+
+		<- #Continue(total::add(item))
+	}))
+	show("List.reduce<ItemType, Result>(startingWith: Result, step: (_ Result, _ ItemType) -> Step<Result, Result>) [empty]", noNumbers::reduce(startingWith 0, step (total, item) { <- #Continue(total::add(item)) }))
 	show("List.keepEvery<ItemType>(where: (_ ItemType) -> Boolean)", numbers::keepEvery(where (item) { <- item::isGreaterThan(1) }))
 	show("List.keepEvery<ItemType>(where: (_ ItemType) -> Boolean) [no match]", numbers::keepEvery(where (item) { <- item::isGreaterThan(9) }))
 	showMaybe("List.item<ItemType>(at: Integer)", numbers::item(at 2))
@@ -742,5 +749,24 @@ third"::lines())
 	§ ——— NestedList ———————————————————————————————————————————————————————
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
+
+	§ ——— loop ————————————————————————————————————————————————————————————
+	§ The free-Function loop family. `loop` belongs to no Namespace, so its
+	§ labels carry no prefix — the coverage net learns them from the member
+	§ table just as it learns a Namespace's Methods.
+	show("loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State)", loop(from 1, through 5, startingWith 0, step (index, total) { <- total::add(index) }))
+	show("loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [down]", loop(from 3, through 1, startingWith "", step (index, acc) { <- acc::append(index::toString()) }))
+	show("loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State)", loop(startingWith 1, while (n) { <- n::isLessThan(100) }, step (n) { <- n::multiply(with 2) }))
+	show("loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State) [zero turns]", loop(startingWith 500, while (n) { <- n::isLessThan(100) }, step (n) { <- n::multiply(with 2) }))
+	show("loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State)", loop(startingWith 1, until (n) { <- n::isGreaterThanOrEqualTo(100) }, step (n) { <- n::multiply(with 2) }))
+	show("loop<State>(startingWith: State, until: (_ State) -> Boolean, step: (_ State) -> State) [zero turns]", loop(startingWith 500, until (n) { <- n::isGreaterThanOrEqualTo(100) }, step (n) { <- n::multiply(with 2) }))
+	show("loop<State, Result>(startingWith: State, step: (_ State) -> Step<State, Result>)", loop(startingWith { index = 1, total = 0 }, step (state) {
+		if state.index::isGreaterThan(5) { <- #Done(state.total) }
+
+		<- #Continue({ state with
+			index = state.index::add(1),
+			total = state.total::add(state.index),
+		})
+	}))
 
 }

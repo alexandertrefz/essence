@@ -147,6 +147,24 @@ function declaredSignatures(): Array<string> {
 		}
 	}
 
+	// NOTE: The free Functions that belong to no Namespace — `loop` is the one
+	// with several entries. A single `Function` like `__print` reaches the
+	// runtime through its `__` sigil and is never labelled in the harness, so
+	// only the OVERLOADED free Functions are enumerated here: each entry is a
+	// label of its own, exactly as an overloaded Method's entries are, but with
+	// no Namespace to prefix its name.
+	for (let [name, member] of Object.entries(loadStdlib().members)) {
+		if (member.type !== "OverloadedStaticMethod") {
+			continue
+		}
+
+		for (let signature of signaturesOf(member) ?? []) {
+			let label = printSignature(signature, name)
+
+			signatures.push(label.slice(0, label.lastIndexOf(") -> ") + 1))
+		}
+	}
+
 	return signatures
 }
 
@@ -216,6 +234,12 @@ function callTargetsIn(node: unknown): Set<string> {
 				targets.add(
 					`${callee.base.name}.${demangle(callee.member.name)}`,
 				)
+			} else if (callee.nodeType === "Identifier") {
+				// NOTE: A bare free-Function call — `loop(…)` — whose callee is
+				// the Function's own (overload-mangled) name, with no Namespace
+				// to prefix it. This is how the harness's `loop` labels are
+				// checked against the call they sit beside.
+				targets.add(demangle(callee.name))
 			}
 		}
 
