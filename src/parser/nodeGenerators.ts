@@ -543,6 +543,7 @@ export function functionStatement(
 
 export function choiceDeclarationStatement(
 	name: parser.IdentifierNode,
+	generics: Array<parser.GenericDeclarationNode>,
 	cases: Array<parser.ChoiceCaseNode>,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
@@ -550,6 +551,7 @@ export function choiceDeclarationStatement(
 	return {
 		nodeType: "ChoiceDeclarationStatement",
 		name,
+		generics,
 		cases,
 		position,
 		documentation,

@@ -496,6 +496,7 @@ class DescentParser {
 	protected parseChoiceDeclarationStatement(): parser.ChoiceDeclarationStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordChoice)
 		let name = this.parseIdentifier()
+		let generics = this.parseOptionalGenericList()
 
 		this.tokens.expect(TokenType.SymbolLeftBrace)
 
@@ -519,6 +520,7 @@ class DescentParser {
 
 		return generators.choiceDeclarationStatement(
 			name,
+			generics,
 			cases,
 			{ start: keyword.position.start, end: rightBrace.position.end },
 			this.tokens.documentationAbove(keyword.position.start.line),
