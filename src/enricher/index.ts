@@ -3,6 +3,7 @@ import type { common, enricher, parser } from "../interfaces/index"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
 	enrichNode,
+	enrichOverloadedFunctionStatement,
 	type HoistedTypes,
 	resolveNamespaceDefinitionStatementType,
 } from "./enrichers"
@@ -267,19 +268,13 @@ const enrichImplementation = (
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) => {
-			// NOTE: The two `declarations`-mode free-Function forms declare a
-			// name and nothing to emit — a native has no body, and an overload
-			// block's Type is already hoisted into the member table. They carry
-			// no typed Node into the tree, exactly as a native Namespace Method
-			// carries none; the Rewriter reaches them through the runtime
-			// bindings instead. (A bodied entry in an overload block is not
-			// emitted from the standard library either — the prelude is built
-			// from Namespaces alone — which is why the loader records their
-			// nativeness but the tree stays free of them.)
-			if (
-				node.nodeType === "NativeFunctionStatement" ||
-				node.nodeType === "OverloadedFunctionStatement"
-			) {
+			// NOTE: A native free Function declares a name bound to a runtime
+			// export and has nothing to emit — no body — so it carries no typed
+			// Node into the tree, exactly as a native Namespace Method carries
+			// none; the Rewriter reaches it through the runtime bindings. An
+			// `overload function` block is handled inside the try below, because
+			// its BODIED entries DO carry Nodes (its native entries do not).
+			if (node.nodeType === "NativeFunctionStatement") {
 				return []
 			}
 
@@ -289,6 +284,20 @@ const enrichImplementation = (
 			// broken statement can not take down the enrichment of the
 			// remaining Program.
 			try {
+				// NOTE: An `overload function` block is not one Node but one
+				// per BODIED entry — each becomes a top-level Function named
+				// `<name>__overload$N` for its slot in the hoisted Type, the
+				// native entries carrying none. The body enrich sits inside
+				// this try so a broken entry becomes an `internal-error`
+				// Diagnostic like any other, rather than aborting the file.
+				if (node.nodeType === "OverloadedFunctionStatement") {
+					return enrichOverloadedFunctionStatement(
+						node,
+						scope,
+						hoistedTypes.get(node),
+					)
+				}
+
 				return [enrichNode(node, scope, hoistedTypes)]
 			} catch (error) {
 				reportError(

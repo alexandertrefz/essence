@@ -20,6 +20,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	mergeUnionMembers,
+	resolveOverloadedMethodName,
 	typeMentionsGeneric,
 	unfreshenBindings,
 	unionMembersKeepingNames,
@@ -47,6 +48,7 @@ import {
 	resolveIdentifierType,
 	resolveMethodLookupNamespacesForReceiverType,
 	resolveMethodType,
+	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
 	resolveSelfType,
 	resolveType,
@@ -1723,6 +1725,63 @@ export function enrichFunctionStatement(
 		position: node.position,
 		type,
 	}
+}
+
+// NOTE: A bodied entry inside an `overload function` block becomes its own
+// top-level Function, exactly as a bodied `overload` Method becomes one of a
+// Namespace's — the two forms never fork. Only the BODIED entries reach the
+// typed tree; a native entry has no body to emit and survives only in the
+// hoisted `OverloadedStaticMethod` Type, the Rewriter reaching it through the
+// runtime bindings instead. Each survivor is named for its ORIGINAL position in
+// that Type's `overloads` — `loop__overload$N` — so a native sitting between two
+// bodied entries keeps its slot and the emitted name is the one every call site
+// resolves to; naming it by its position among only the bodied entries would
+// define a name nobody calls and clobber the native export that owns the real
+// one. Unlike a source `function`, that name is a synthetic emit target: it is
+// baked into the Node here rather than mangled by the Simplifier (a free
+// `FunctionStatement` passes its name through verbatim), and it is never declared
+// into Scope — the block's base name is already the hoisted member.
+export function enrichOverloadedFunctionStatement(
+	node: parser.OverloadedFunctionStatementNode,
+	scope: enricher.Scope,
+	hoistedType?: common.Type | common.ProtocolType,
+): Array<common.typed.FunctionStatementNode> {
+	let overloadedType =
+		hoistedType !== undefined &&
+		hoistedType.type === "OverloadedStaticMethod"
+			? hoistedType
+			: resolveOverloadedFunctionStatementType(node, scope)
+
+	let statements: Array<common.typed.FunctionStatementNode> = []
+
+	for (let [index, entry] of node.methods.entries()) {
+		if (entry.nodeType === "NativeMethodSignature") {
+			continue
+		}
+
+		// NOTE: The per-entry Function Type is exactly what the call site
+		// resolves against — the hoisted `overloads[index]` lifted to a
+		// `Function` Type, mirroring `resolveNativeFunctionStatementType`.
+		let type: common.FunctionType = {
+			type: "Function",
+			...overloadedType.overloads[index]!,
+		}
+
+		statements.push({
+			nodeType: "FunctionStatement",
+			name: {
+				nodeType: "Identifier",
+				content: resolveOverloadedMethodName(node.name.content, index),
+				position: entry.position,
+				type,
+			},
+			value: enrichFunctionDefinition(entry.value, scope),
+			position: entry.position,
+			type,
+		})
+	}
+
+	return statements
 }
 
 // #endregion
