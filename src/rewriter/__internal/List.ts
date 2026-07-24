@@ -156,26 +156,10 @@ export function item<ItemType extends AnyType>(
 // The eager `keepEvery` beside `reduce` is what it used to be compared against;
 // the `Step` Choice is what let the short-circuiting version leave the native.
 
-// NOTE: Native rather than Essence because the Essence form has to pair every
-// item with its position first, build that whole List of Records and read one
-// member back out, where this walks and stops. The item `is` arrives as the
-// hidden conformance Argument, so which position is found is decided by the
-// items' own equality either way. `lastIndex` is the same walk, backwards.
-export function firstIndex<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-	conformance: {
-		is: (first: ItemType, second: ItemType) => BooleanType
-	},
-): IntegerType | NothingType {
-	for (let index = 0; index < originalList.value.length; index++) {
-		if (conformance.is(originalList.value[index], item).value) {
-			return createInteger(BigInt(index))
-		}
-	}
-
-	return createNothing()
-}
+// NOTE: `firstIndex`/`lastIndex` are no longer here — both are written in
+// Essence now, walking the positions with the general `loop` and `#Done`-ing at
+// the first match. The `Step` Choice is what let that walk-and-stop leave the
+// native; the item `is` arrives as the bound's hidden conformance Argument.
 
 export function slice<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
@@ -275,22 +259,6 @@ export function compareTo<ItemType extends AnyType>(
 	}
 
 	return equal
-}
-
-export function lastIndex<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-	item: ItemType,
-	conformance: {
-		is: (first: ItemType, second: ItemType) => BooleanType
-	},
-): IntegerType | NothingType {
-	for (let index = originalList.value.length - 1; index >= 0; index--) {
-		if (conformance.is(originalList.value[index], item).value) {
-			return createInteger(BigInt(index))
-		}
-	}
-
-	return createNothing()
 }
 
 // NOTE: Joining asks nothing of the items but that each can say what it is, so

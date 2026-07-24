@@ -2499,34 +2499,9 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("firstIndex", () => {
-				// NOTE: Bounded by `Equatable` — the item `is` arrives as the
-				// hidden witness, so which position is found is decided by the
-				// items' own equality rather than by a structural comparison.
-				it("gives the position of the first equal item", () => {
-					expect(
-						list.firstIndex(
-							list.createList([
-								integerTwo(),
-								integerOne(),
-								integerOne(),
-							]),
-							integerOne(),
-							{ is: integerIs },
-						),
-					).toEqual(integerOne())
-				})
-
-				it("gives nothing when the item is absent", () => {
-					expect(
-						list.firstIndex(
-							list.createList([integerOne()]),
-							integerTwo(),
-							{ is: integerIs },
-						),
-					).toEqual(nothing())
-				})
-			})
+			// NOTE: `firstIndex`/`lastIndex` are written in Essence now, walking
+			// the positions with `loop` and stopping at the first match; their
+			// behaviour is covered by the golden harness over every Method.
 
 			describe("slice", () => {
 				const abcd = () =>

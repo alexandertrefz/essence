@@ -301,21 +301,9 @@ describe("Stdlib", () => {
 			).toEqual(ints(1n, 2n, 3n))
 		})
 
-		// NOTE: `lastIndex` is bounded by `Equatable` — which position it
-		// finds is decided by the items' own `is`, handed in as the hidden
-		// witness the way `join` above takes its `toString`.
-		it("finds the last occurrence", () => {
-			expect(
-				list.lastIndex(ints(1n, 2n, 3n, 2n), int(2n), {
-					is: integerIs,
-				}),
-			).toEqual(int(3n))
-			expect(
-				list.lastIndex(ints(1n, 2n), int(9n), { is: integerIs })[
-					typeKeySymbol
-				],
-			).toBe("Nothing")
-		})
+		// NOTE: `lastIndex` (and `firstIndex`) are written in Essence now,
+		// walking the positions with `loop` and stopping at the first match;
+		// their behaviour is covered by the golden harness over every Method.
 
 		// NOTE: The equality counterpart of "sorts nested Lists through a bound
 		// conformance" below. `List is Equatable` is conditional, so the witness
