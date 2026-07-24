@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -41,6 +44,38 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	return validate(enriched.program)
 }
 
+function helpsOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps)
+}
+
+// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// its top-level `__print` calls run — the counterpart of `generate`, mirroring
+// codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
+// rather than only type-checked.
+async function run(source: string): Promise<Array<string>> {
+	let js = generate(source)
+	let directory = mkdtempSync(join(tmpdir(), "essence-choice-"))
+	let file = join(directory, "program.ts")
+
+	writeFileSync(file, js)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((arg) => String(arg)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+		rmSync(directory, { recursive: true, force: true })
+	}
+
+	return output
+}
+
 function messagesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.message)
 }
@@ -73,6 +108,27 @@ function declaredTypeOf(source: string, name: string): common.Type {
 	}
 
 	return node.type
+}
+
+// NOTE: The Type of a Constant's VALUE — a constructed Case carries its
+// instantiated CaseType here, so a test can assert on the members and Type
+// Arguments the construction site inferred.
+function valueTypeOf(source: string, name: string): common.Type {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let node = enrich(parsed.program).program.implementation.nodes.find(
+		(candidate) =>
+			candidate.nodeType === "ConstantDeclarationStatement" &&
+			candidate.name.content === name,
+	) as common.typed.ConstantDeclarationStatementNode | undefined
+
+	if (node === undefined) {
+		throw new Error(`No Constant named '${name}'`)
+	}
+
+	return node.value.type
 }
 
 const stepChoice = `
@@ -950,6 +1006,272 @@ describe("Choices", () => {
 			}`)
 
 			expect(generated).not.toContain("Simple")
+		})
+	})
+
+	// NOTE: A bare or prefixed construction resolves to the DECLARED Case, whose
+	// members are still GenericUses; the construction site instantiates it off
+	// the payload, so the value carries a concrete CaseType. This is the shape
+	// WP4/WP6/WP7 read back.
+	describe("Generic Case Instantiation", () => {
+		it("instantiates a constructed Case off its payload", () => {
+			let type = valueTypeOf(
+				`implementation { ${stepChoice}
+					constant done: Step<Integer, String> = Step#Done({ value = "x" })
+				}`,
+				"done",
+			) as common.CaseType
+
+			expect(type.type).toBe("Case")
+			expect(type.name).toBe("Done")
+			expect(type.members.value).toEqual({ type: "String" })
+			expect(type.typeArguments).toEqual([
+				{ type: "GenericUse", name: "State" },
+				{ type: "String" },
+			])
+			// NOTE: An instantiated Case drops the declared-only `choiceGenerics`.
+			expect(type.choiceGenerics).toBeUndefined()
+		})
+
+		it("leaves a Generic no payload mentions as a GenericUse", () => {
+			let type = valueTypeOf(
+				`implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+					constant empty = Box#Empty
+				}`,
+				"empty",
+			) as common.CaseType
+
+			expect(type.name).toBe("Empty")
+			expect(type.typeArguments).toEqual([
+				{ type: "GenericUse", name: "Value" },
+			])
+			expect(type.choiceGenerics).toBeUndefined()
+		})
+
+		it("accepts a value of the same instantiation", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant a: Step<Integer, String> = #Done("x")
+					constant b: Step<Integer, String> = a
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Plain assignability (null inference context) must REJECT a value
+		// of a different instantiation — the whole reason `matchTypes` recurses
+		// into Case members rather than trusting the shared tag.
+		it("rejects a value of a different instantiation", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant done: Step<Integer, String> = #Done("x")
+					constant wrong: Step<String, Integer> = done
+				}`),
+			).toContain(
+				"This value does not fit the declared Type of Constant 'wrong'",
+			)
+		})
+
+		it("narrows instantiated Cases to their concrete member Types", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant step: Step<Integer, String> = #Continue({ state = 5 })
+
+					__print(match step -> String {
+						case #Continue { <- @.state::toString() }
+						case #Done { <- @.value }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		it("rejects the wrong member Type when narrowing an instantiated Case", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant step: Step<Integer, String> = #Continue({ state = 5 })
+
+					__print(match step -> String {
+						case #Continue { <- @.state::append("!") }
+						case #Done { <- @.value }
+					})
+				}`),
+			).not.toEqual([])
+		})
+	})
+
+	// NOTE: `#Case(value)` on a single-member Case may hand the value directly;
+	// the Enricher wraps it into the one-member Record the rest of the pipeline
+	// expects. A payload that already fits the Record is never rewrapped.
+	describe("Single-member Shorthand", () => {
+		it("wraps a bare value for a single-member Case", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant done: Step<String, Integer> = #Done(5)
+				}`),
+			).toEqual([])
+		})
+
+		it("emits the same Record whether written long or short", () => {
+			let short = generate(`implementation { ${stepChoice}
+				constant done: Step<String, Integer> = #Done(5)
+			}`)
+			let long = generate(`implementation { ${stepChoice}
+				constant done: Step<String, Integer> = #Done({ value = 5 })
+			}`)
+
+			expect(short).toContain('$type.createCase("Step#Done"')
+			expect(short).toContain("value")
+			expect(long).toContain('$type.createCase("Step#Done"')
+		})
+
+		it("reads a Record that fits the shape as the Record, not the value", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Wrap { Only { inner: { a: Integer } } }
+					constant explicit: Wrap = #Only({ inner = { a = 1 } })
+				}`),
+			).toEqual([])
+		})
+
+		it("wraps a Record that only fits the member Type", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Wrap { Only { inner: { a: Integer } } }
+					constant shorthand: Wrap = #Only({ a = 1 })
+				}`),
+			).toEqual([])
+		})
+
+		it("keeps the unit-Case diagnostic for a zero-member Case", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+					constant boxed = Box#Empty({ value = 1 })
+				}`),
+			).toContain("Case '#Empty' does not carry a payload")
+		})
+
+		it("keeps the mismatch diagnostic for a multi-member Case, with the shorthand hint", () => {
+			let source = `implementation {
+				choice Pair { Both { left: Integer, right: Integer } }
+				constant pair = #Both(5)
+			}`
+
+			expect(messagesOf(source)).toContain(
+				"This payload does not fit Case '#Both'",
+			)
+			expect(helpsOf(source)).toContain(
+				"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
+			)
+		})
+
+		it("does not add the shorthand hint to a single-member mismatch", () => {
+			let source = `implementation {
+				choice Wrap { Only { value: Integer } }
+				constant wrong = #Only("text")
+			}`
+
+			expect(messagesOf(source)).toContain(
+				"This payload does not fit Case '#Only'",
+			)
+			expect(helpsOf(source)).not.toContain(
+				"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
+			)
+		})
+	})
+
+	// NOTE: The load-bearing case — a user-defined generic Choice and a user
+	// Namespace static Method shaped like the general loop driver, with the
+	// callback's `Result` inferred through the `#Done` payload.
+	describe("End-to-end Inference", () => {
+		const driver = `${stepChoice}
+			namespace Loop {
+				static run<infer State, infer Result>(
+					startingWith state: State,
+					step advance: (_ state: State) -> Step<State, Result>,
+				) -> Result {
+					<- match advance(state) -> Result {
+						case #Continue { <- Loop.run(startingWith @.state, step advance) }
+						case #Done { <- @.value }
+					}
+				}
+			}
+		`
+
+		it("infers the callback Parameter from startingWith and binds Result through the payload", () => {
+			expect(
+				messagesOf(`implementation { ${driver}
+					constant total: Integer = Loop.run(
+						startingWith { index = 1, total = 0 },
+						step (state) {
+							if state.index::isGreaterThan(3) { <- #Done(state.total) }
+
+							<- #Continue({ state with
+								index = state.index::add(1),
+								total = state.total::add(state.index),
+							})
+						})
+
+					__print(total::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("binds the invocation's return Type to the payload Type of #Done", () => {
+			expect(
+				valueTypeOf(
+					`implementation { ${driver}
+						constant total = Loop.run(
+							startingWith 0,
+							step (state) { <- #Done(state::toString()) })
+					}`,
+					"total",
+				),
+			).toEqual({ type: "String" })
+		})
+
+		it("reports an unbound Result for a callback that never returns #Done", () => {
+			expect(
+				codesOf(`implementation { ${driver}
+					constant looped = Loop.run(
+						startingWith 0,
+						step (state) { <- #Continue({ state = state::add(1) }) })
+				}`),
+			).toContain("uninferable-type-parameter")
+		})
+
+		it("compiles and runs the driver, summing through the threaded State", async () => {
+			expect(
+				await run(`implementation { ${driver}
+					constant total: Integer = Loop.run(
+						startingWith { index = 1, total = 0 },
+						step (state) {
+							if state.index::isGreaterThan(5) { <- #Done(state.total) }
+
+							<- #Continue({ state with
+								index = state.index::add(1),
+								total = state.total::add(state.index),
+							})
+						})
+
+					__print(total::toString())
+				}`),
+			).toEqual(['"15"'])
+		})
+
+		it("compiles and runs testFiles/GenericChoice.es end to end", async () => {
+			let source = readFileSync(
+				join(import.meta.dir, "../..", "testFiles/GenericChoice.es"),
+				{ encoding: "utf-8" },
+			)
+
+			expect(await run(source)).toEqual([
+				"0",
+				'"15"',
+				"42",
+				'"packed"',
+				'"nothing"',
+			])
 		})
 	})
 })

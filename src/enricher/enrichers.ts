@@ -14,10 +14,13 @@ import {
 	describeType,
 	flattenUnionMembers,
 	type GenericBindings,
+	type GenericInferenceContext,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	matchesTypeWithBindings,
 	mergeUnionMembers,
+	typeMentionsGeneric,
 	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
@@ -156,6 +159,20 @@ export function enrichCaseValue(
 ): common.typed.CaseValueNode {
 	let type = resolveCaseValueType(node, scope, expectedType)
 
+	let value = node.value === null ? null : enrichExpression(node.value, scope)
+
+	if (type.type === "Case") {
+		// NOTE: The one-member shorthand rewraps first, so the instantiation
+		// below binds the Choice's Generics from the Record the rest of the
+		// pipeline sees — `#Done(5)` and `#Done({ value = 5 })` reach it
+		// identically.
+		if (value !== null) {
+			value = wrapSingleMemberShorthand(type, value)
+		}
+
+		type = instantiateCaseFromPayload(type, value)
+	}
+
 	return {
 		nodeType: "CaseValue",
 		// NOTE: The Choice's name is a Type name, not a value — it is typed by
@@ -177,10 +194,105 @@ export function enrichCaseValue(
 			position: node.caseName.position,
 			type,
 		},
-		value: node.value === null ? null : enrichExpression(node.value, scope),
+		value,
 		position: node.position,
 		type,
 	}
+}
+
+// NOTE: `#Case(value)` on a single-member Case may hand the member's value
+// directly rather than wrapping it in the one-member Record. When the payload
+// does not already fit the Record shape it IS that value, so it is wrapped
+// into the synthetic Record the Validator and Simplifier expect — the emitted
+// `createCase(tag, { member: value })` is then identical to the explicit form.
+// The fit check binds the Choice's own Generics (`wrapSingleMemberShorthand`'s
+// caller has not instantiated yet), so a Record that fits once they bind reads
+// as the Record: `#Done({ value = 5 })` is left alone and only a bare
+// `#Done(5)` is wrapped. Record interpretation always wins the ambiguity, which
+// keeps every already-explicit construction backwards compatible.
+function wrapSingleMemberShorthand(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode,
+): common.typed.ExpressionNode {
+	let memberNames = Object.keys(caseType.members)
+
+	if (memberNames.length !== 1) {
+		return value
+	}
+
+	let recordShape: common.RecordType = {
+		type: "Record",
+		members: caseType.members,
+	}
+
+	// NOTE: A generic Case's members are still GenericUses here, so a plain
+	// `matchesType` would reject a Record that only fits once they bind. Binding
+	// the Choice's Generics in a throwaway context makes the question "does this
+	// fit AS the Record", independent of any later instantiation. A non-generic
+	// Case has no bindable names, so this is exactly `matchesType` for it.
+	let fitContext: GenericInferenceContext = {
+		bindableNames: new Set(
+			caseType.choiceGenerics?.map((generic) => generic.name) ?? [],
+		),
+		bindings: new Map(),
+	}
+
+	if (matchesTypeWithBindings(recordShape, value.type, fitContext)) {
+		return value
+	}
+
+	let [memberName] = memberNames
+
+	return {
+		nodeType: "RecordValue",
+		declaredType: null,
+		type: { type: "Record", members: { [memberName]: value.type } },
+		members: { [memberName]: value },
+		position: value.position,
+	}
+}
+
+// NOTE: A constructed Case of a generic Choice is instantiated here, off its
+// (already shorthand-wrapped) payload — the bare or prefixed form resolved to
+// the DECLARED Case, whose members are still GenericUses, so this is what makes
+// them concrete. The Choice's Generics bind from the payload Record, then
+// `applyGenericBindings` substitutes the members and stamps the applied
+// `typeArguments`, dropping `choiceGenerics` exactly as an alias application
+// would. A Generic no payload mentions stays a GenericUse — a never-`#Done`
+// callback keeps `Result` open, which surfaces as an unbound Generic at the
+// invocation rather than here. An already instantiated Case (handed back by the
+// contextual path, or a non-generic Choice's Case) carries no `choiceGenerics`
+// and is returned untouched.
+function instantiateCaseFromPayload(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode | null,
+): common.CaseType {
+	let choiceGenerics = caseType.choiceGenerics
+
+	if (choiceGenerics === undefined) {
+		return caseType
+	}
+
+	let context: GenericInferenceContext = {
+		bindableNames: new Set(choiceGenerics.map((generic) => generic.name)),
+		bindings: new Map(),
+	}
+
+	let mentionsGenerics = Object.values(caseType.members).some((member) =>
+		choiceGenerics.some((generic) =>
+			typeMentionsGeneric(member, generic.name),
+		),
+	)
+
+	if (value !== null && mentionsGenerics) {
+		matchesTypeWithBindings(
+			{ type: "Record", members: caseType.members },
+			value.type,
+			context,
+		)
+	}
+
+	return applyGenericBindings(caseType, context.bindings) as common.CaseType
 }
 
 export function enrichNativeFunctionInvocation(
@@ -3595,6 +3707,14 @@ function containsGenericUse(type: common.Type): boolean {
 				) || containsGenericUse(type.returnType)
 			)
 		case "Record":
+			return Object.values(type.members).some(containsGenericUse)
+		case "Case":
+			// NOTE: A generic Choice's Case buries its Generics in its members
+			// (`MyStep<Integer, Result>#Done` still carries `value: Result`), so
+			// a callback whose expected return is such a Union only has its body
+			// consulted when this looks through the Cases — otherwise `Result`
+			// would bind to itself and never reach the payload. `typeArguments`
+			// are display spelling and, like `matchTypes`, are not consulted.
 			return Object.values(type.members).some(containsGenericUse)
 		default:
 			return false
