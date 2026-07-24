@@ -1,6 +1,7 @@
 import type {
 	BooleanType,
 	CaseType,
+	DerivedEquatableDescriptor,
 	ErrorType,
 	RationalType,
 	FunctionType,
@@ -65,6 +66,10 @@ export interface ConformanceValueNode {
 	// Generic declaration order. Empty for an unconditional conformance, which
 	// the Rewriter emits as a plain method-map object literal.
 	conditions: Array<ExpressionNode>
+	// NOTE: Present only when this witness is a *generic* Choice's derived
+	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
+	// for each mapped Method instead of the plain `choiceIs`.
+	derivedDescriptor?: DerivedEquatableDescriptor
 	type: Type
 }
 
@@ -89,6 +94,10 @@ export interface MethodInvocationNode {
 		name: string
 	}
 	arguments: Array<ArgumentNode>
+	// NOTE: Present only when this call is a *generic* Choice's derived
+	// Equatable — the Rewriter then emits `$helpers.boundChoiceIs(<descriptor>)`
+	// in place of the plain `choiceIs` member read.
+	derivedDescriptor?: DerivedEquatableDescriptor
 	type: Type
 }
 
@@ -109,6 +118,10 @@ export type UnionMethodDispatchCase = {
 	namespaceName: string
 	methodName: string
 	conformanceArguments: Array<ArgumentNode>
+	// NOTE: Present only when this branch resolves to a *generic* Choice's
+	// derived Equatable — the Rewriter then emits
+	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.
+	derivedDescriptor?: DerivedEquatableDescriptor
 }
 
 export type ValueNode =

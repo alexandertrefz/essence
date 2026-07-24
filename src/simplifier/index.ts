@@ -163,6 +163,7 @@ function simplifyMethodInvocation(
 			...node.arguments.map((arg) => simplifyArgument(arg)),
 			...simplifyConformanceArguments(node.conformances),
 		],
+		derivedDescriptor: node.derivedDescriptor,
 		type: node.type,
 	}
 }
@@ -191,6 +192,7 @@ function simplifyUnionMethodInvocation(
 			conformanceArguments: simplifyConformanceArguments(
 				dispatchCase.conformances,
 			),
+			derivedDescriptor: dispatchCase.derivedDescriptor,
 		})),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
@@ -264,6 +266,7 @@ function conformanceExpression(
 		namespaceName: conformance.source.name,
 		methodMap: conformance.source.methodMap,
 		conditions: conformance.source.conditions.map(conformanceExpression),
+		derivedDescriptor: conformance.source.derivedDescriptor,
 		type: { type: "Unknown" },
 	}
 }

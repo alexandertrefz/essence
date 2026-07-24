@@ -656,7 +656,11 @@ function rewriteConformanceValue(
 			([protocolMethodName, namespaceMethodName]): estree.Property => ({
 				type: "Property",
 				key: { type: "Identifier", name: protocolMethodName },
-				value: namespaceMember(node.namespaceName, namespaceMethodName),
+				value: namespaceMember(
+					node.namespaceName,
+					namespaceMethodName,
+					node.derivedDescriptor,
+				),
 				kind: "init",
 				method: false,
 				shorthand: false,
@@ -783,6 +787,7 @@ function rewriteFunctionInvocation(
 function namespaceMember(
 	namespaceName: string,
 	memberName: string,
+	derivedDescriptor?: common.DerivedEquatableDescriptor,
 ): estree.Expression {
 	// NOTE: A Choice's derived equality names a Namespace that exists nowhere —
 	// the Enricher fabricates it per receiver and nothing is ever emitted for
@@ -790,6 +795,32 @@ function namespaceMember(
 	// Every emission site (a plain call, a dispatch branch, a conformance
 	// witness) routes through here, so this one redirect covers all three.
 	if (namespaceName === derivedEquatableNamespaceName) {
+		// NOTE: A *generic* Choice widens to the descriptor-driven helper, curried
+		// with the plan its payloads follow — the hidden conformance Arguments
+		// then arrive as its trailing Parameters. A non-generic Choice carries no
+		// descriptor and stays the byte-identical flat helper, so its emission
+		// never churns.
+		if (derivedDescriptor !== undefined) {
+			return {
+				type: "CallExpression",
+				optional: false,
+				callee: {
+					type: "MemberExpression",
+					optional: false,
+					computed: false,
+					object: { type: "Identifier", name: "$helpers" },
+					property: {
+						type: "Identifier",
+						name:
+							memberName === "isNot"
+								? "boundChoiceIsNot"
+								: "boundChoiceIs",
+					},
+				},
+				arguments: [jsonExpression(derivedDescriptor)],
+			}
+		}
+
 		return {
 			type: "MemberExpression",
 			optional: false,
@@ -823,7 +854,11 @@ function rewriteMethodInvocation(
 	return {
 		type: "CallExpression",
 		optional: false,
-		callee: namespaceMember(node.base.name, node.member.name),
+		callee: namespaceMember(
+			node.base.name,
+			node.member.name,
+			node.derivedDescriptor,
+		),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
@@ -865,6 +900,7 @@ function rewriteUnionMethodInvocation(
 							namespaceMember(
 								dispatchCase.namespaceName,
 								dispatchCase.methodName,
+								dispatchCase.derivedDescriptor,
 							),
 							{
 								type: "ArrayExpression",
@@ -1477,6 +1513,38 @@ function convertValueToExpression(value: unknown): estree.Expression {
 
 	if (value !== null && typeof value === "object") {
 		return convertObjectToObjectExpression(value)
+	}
+
+	return { type: "Literal", value } as estree.Literal
+}
+
+// NOTE: A derived-equality descriptor emitted as a plain JSON-shaped literal.
+// Its keys are Case tags like `"Choice#Case"`, which are not valid Identifiers,
+// so every key is a string Literal — the one difference from
+// `convertObjectToObjectExpression`, which names Type fields that always are.
+function jsonExpression(value: unknown): estree.Expression {
+	if (Array.isArray(value)) {
+		return {
+			type: "ArrayExpression",
+			elements: value.map(jsonExpression),
+		}
+	}
+
+	if (value !== null && typeof value === "object") {
+		return {
+			type: "ObjectExpression",
+			properties: Object.entries(value).map<estree.Property>(
+				([key, entry]) => ({
+					type: "Property",
+					key: { type: "Literal", value: key },
+					value: jsonExpression(entry),
+					kind: "init",
+					computed: false,
+					method: false,
+					shorthand: false,
+				}),
+			),
+		}
 	}
 
 	return { type: "Literal", value } as estree.Literal

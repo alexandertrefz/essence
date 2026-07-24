@@ -406,6 +406,32 @@ export type GenericAliasType = {
 	aliasedType: Type
 }
 
+// NOTE: The compile-time plan a *generic* Choice's derived Equatable follows
+// at runtime — one entry per Case tag, mapping each payload member's name to
+// how that member is compared. A member mentioning no Type Parameter compares
+// structurally (`eq`); a bare Type Parameter routes through the witness at
+// index `i` — the payload-mentioned Type Parameters in declaration order, so
+// the index lines up with the hidden conformance Arguments the same order
+// produces; composites recurse. Emitted as a plain object literal the runtime
+// `boundChoiceIs` interprets, so a *non-generic* Choice — which carries none —
+// keeps emitting the byte-identical `choiceIs` with no descriptor at all.
+export type DerivedEquatableDescriptor = Record<
+	string,
+	Record<string, DescriptorNode>
+>
+
+export type DescriptorNode =
+	| { k: "eq" }
+	| { k: "w"; i: number }
+	| { k: "list"; of: DescriptorNode }
+	| { k: "record"; m: Record<string, DescriptorNode> }
+	| { k: "case"; m: Record<string, DescriptorNode> }
+	// NOTE: A Union-typed payload member — its concrete arms are discriminated
+	// at runtime by the value's `typeKeySymbol` tag, and the one generic arm
+	// (`tag: null`) catches everything else, so `T | Nothing` compares a
+	// Nothing structurally and a `T` through its witness.
+	| { k: "union"; arms: Array<{ tag: string | null; node: DescriptorNode }> }
+
 // NOTE: How a bounded Type Parameter's Protocol requirement is fulfilled at
 // one invocation. A `namespace` source packages the conforming Namespace's
 // Methods into a conformance value at the call site; a `parameter` source
@@ -420,6 +446,12 @@ export type ConformanceSource =
 			// so they line up with the fulfilling Methods' hidden trailing
 			// conformance Parameters. Empty for an unconditional conformance.
 			conditions: Array<Conformance>
+			// NOTE: Set only when this source is a *generic* Choice's derived
+			// Equatable — the plan its widened runtime helper interprets to
+			// compare generic payloads through the conditions' witnesses. Absent
+			// for every written Namespace and every non-generic Choice, which
+			// keeps their witness emission byte-identical.
+			derivedDescriptor?: DerivedEquatableDescriptor
 	  }
 	| { kind: "parameter"; name: string }
 
@@ -438,6 +470,11 @@ export type DispatchCase = {
 	namespaceName: string
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: Set only when this branch resolves to a *generic* Choice's derived
+	// Equatable — the plan its widened runtime helper follows. Absent
+	// otherwise, so a non-generic Choice's dispatch branch emits the plain
+	// `choiceIs` unchanged.
+	derivedDescriptor?: DerivedEquatableDescriptor
 }
 
 export type Type =

@@ -922,18 +922,15 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 // of a member read — there is no object anywhere with this name.
 export const derivedEquatableNamespaceName = "Choice_Equatable"
 
-// NOTE: The Choice a receiver belongs to, or null when it belongs to none. A
-// single Case (a receiver narrowed by a Handler) answers with its own Choice,
-// so `is` reads the same inside a `case #Red` as outside it.
-function choiceTypeOf(
-	baseType: common.Type,
-	scope: enricher.Scope,
-): common.Type | null {
-	let choiceName: string | null = null
-
+// NOTE: The name of the Choice a receiver belongs to, or null when it belongs
+// to none — a single Case names its own Choice, and a Union names one only when
+// every member is a Case of it.
+function choiceNameOf(baseType: common.Type): string | null {
 	if (baseType.type === "Case") {
-		choiceName = baseType.choice
-	} else if (baseType.type === "UnionType") {
+		return baseType.choice
+	}
+
+	if (baseType.type === "UnionType") {
 		let members = flattenUnionMembers(baseType)
 		let first = members[0]
 
@@ -950,8 +947,126 @@ function choiceTypeOf(
 			return null
 		}
 
-		choiceName = first.choice
+		return first.choice
 	}
+
+	return null
+}
+
+// NOTE: The Type Arguments a receiver of a generic Choice was instantiated with
+// — declaration order — read off the receiver itself (a single Case carries
+// them, a Union reads its first member's). Empty for a receiver that somehow
+// carries none, which reconstructs the Choice with its defaults.
+function choiceTypeArgumentsOf(baseType: common.Type): Array<common.Type> {
+	if (baseType.type === "Case") {
+		return baseType.typeArguments ?? []
+	}
+
+	if (baseType.type === "UnionType") {
+		let first = flattenUnionMembers(baseType)[0]
+
+		if (first !== undefined && first.type === "Case") {
+			return first.typeArguments ?? []
+		}
+	}
+
+	return []
+}
+
+// NOTE: The whole applied Union of a generic Choice, rebuilt from its Generic
+// Alias and one receiver's Type Arguments — mirrors `applyGenericAlias`'s
+// substitution and display-alias stamping, but never reports (the Arguments
+// came from a receiver the Enricher already accepted).
+function instantiateChoiceAlias(
+	alias: common.GenericAliasType,
+	typeArguments: Array<common.Type>,
+): common.Type {
+	let bindings: GenericBindings = new Map()
+
+	for (let index = 0; index < alias.generics.length; index++) {
+		let generic = alias.generics[index]
+
+		bindings.set(
+			generic.name,
+			typeArguments[index] ??
+				generic.defaultType ??
+				({ type: "Error" } as const),
+		)
+	}
+
+	let applied = applyGenericBindings(alias.aliasedType, bindings)
+
+	if (
+		applied.type === "UnionType" &&
+		applied.name === undefined &&
+		applied.alias === undefined
+	) {
+		return {
+			...applied,
+			alias: {
+				name: alias.name,
+				typeArguments: alias.generics.map(
+					(generic) =>
+						bindings.get(generic.name) ?? { type: "Error" },
+				),
+			},
+		}
+	}
+
+	return applied
+}
+
+// NOTE: The declared Generic Alias a generic Choice's name resolves to, once it
+// is confirmed to name that Choice's own Cases — null for a name that no longer
+// resolves to the Choice (shadowed), or for a non-generic Choice.
+function declaredChoiceAliasOf(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): common.GenericAliasType | null {
+	let choiceName = choiceNameOf(baseType)
+
+	if (choiceName === null) {
+		return null
+	}
+
+	let declared = findTypeInScope(choiceName, scope)
+
+	if (declared === null || declared.type !== "GenericAlias") {
+		return null
+	}
+
+	let body = declared.aliasedType
+
+	if (body.type !== "UnionType") {
+		return null
+	}
+
+	let bodyMembers = flattenUnionMembers(body)
+
+	if (
+		bodyMembers.length === 0 ||
+		!bodyMembers.every(
+			(member) => member.type === "Case" && member.choice === choiceName,
+		)
+	) {
+		return null
+	}
+
+	return declared
+}
+
+// NOTE: The Choice a receiver belongs to, or null when it belongs to none. A
+// single Case (a receiver narrowed by a Handler) answers with its whole Choice,
+// so `is` reads the same inside a `case #Red` as outside it. A *generic*
+// Choice's name resolves to a Generic Alias rather than a Union, so the answer
+// is the receiver's own APPLIED Union — rebuilt from the Alias so a receiver
+// narrowed to one instantiated Case still compares against the whole applied
+// Choice.
+function choiceTypeOf(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): common.Type | null {
+	let choiceName = choiceNameOf(baseType)
 
 	if (choiceName === null) {
 		return null
@@ -964,7 +1079,24 @@ function choiceTypeOf(
 	// would be worse than not deriving, so it answers null.
 	let declared = findTypeInScope(choiceName, scope)
 
-	if (declared === null || declared.type !== "UnionType") {
+	if (declared === null) {
+		return null
+	}
+
+	// NOTE: A generic Choice resolves to a Generic Alias over the anonymous
+	// Union of its Cases — the receiver names its Type Arguments, so the answer
+	// is that Alias applied to them.
+	if (declared.type === "GenericAlias") {
+		let alias = declaredChoiceAliasOf(baseType, scope)
+
+		if (alias === null) {
+			return null
+		}
+
+		return instantiateChoiceAlias(alias, choiceTypeArgumentsOf(baseType))
+	}
+
+	if (declared.type !== "UnionType") {
 		return null
 	}
 
@@ -980,6 +1112,217 @@ function choiceTypeOf(
 	}
 
 	return declared
+}
+
+// NOTE: Whether a Type mentions any of the named Type Parameters — a bare
+// GenericUse of one, or one buried in a List item, Record member, Case payload
+// or Union arm. Decides whether a payload member compares structurally or
+// routes through a witness.
+function typeMentionsGenerics(
+	type: common.Type,
+	generics: Set<string>,
+): boolean {
+	switch (type.type) {
+		case "GenericUse":
+			return generics.has(type.name)
+		case "List":
+			return typeMentionsGenerics(type.itemType, generics)
+		case "Record":
+		case "Case":
+			return Object.values(type.members).some((member) =>
+				typeMentionsGenerics(member, generics),
+			)
+		case "UnionType":
+			return type.types.some((member) =>
+				typeMentionsGenerics(member, generics),
+			)
+		default:
+			return false
+	}
+}
+
+// NOTE: The Cases of a Choice's Generic Alias — its body is the anonymous
+// Union of them, so a non-Union body (never produced for a real Choice) simply
+// has none.
+function choiceAliasCases(alias: common.GenericAliasType): Array<common.Type> {
+	return alias.aliasedType.type === "UnionType"
+		? flattenUnionMembers(alias.aliasedType)
+		: []
+}
+
+// NOTE: The Type Parameters some Case payload of the Choice actually mentions,
+// as a set — a Parameter no payload names needs neither a bound nor a witness.
+function mentionedGenerics(alias: common.GenericAliasType): Set<string> {
+	let genericNames = new Set(alias.generics.map((generic) => generic.name))
+	let mentioned = new Set<string>()
+
+	for (let caseType of choiceAliasCases(alias)) {
+		if (caseType.type !== "Case") {
+			continue
+		}
+
+		for (let member of Object.values(caseType.members)) {
+			for (let name of genericNames) {
+				if (typeMentionsGenerics(member, new Set([name]))) {
+					mentioned.add(name)
+				}
+			}
+		}
+	}
+
+	return mentioned
+}
+
+// NOTE: The Parameters some payload mentions, in Choice declaration order — the
+// order the fabricated Methods take their bounds in and the order
+// `resolveConformances` hands the witnesses over, so a descriptor's `w` index
+// selects the right one.
+function constrainedGenericOrder(
+	alias: common.GenericAliasType,
+): Array<string> {
+	let mentioned = mentionedGenerics(alias)
+
+	return alias.generics
+		.map((generic) => generic.name)
+		.filter((name) => mentioned.has(name))
+}
+
+// NOTE: The runtime `typeKeySymbol` tag a concrete Type's values carry, or null
+// for a Type with no single tag (a bare Union). Lets a `union` descriptor node
+// discriminate a Union payload's concrete arms at runtime.
+function runtimeTagOf(type: common.Type): string | null {
+	switch (type.type) {
+		case "Nothing":
+			return "Nothing"
+		case "Boolean":
+			return "Boolean"
+		case "String":
+			return "String"
+		case "Integer":
+			return "Integer"
+		case "Rational":
+			return "Rational"
+		case "Algebraic":
+			return "Algebraic"
+		case "Transcendental":
+			return "Transcendental"
+		case "Record":
+			return "Record"
+		case "List":
+		case "GenericList":
+			return "List"
+		case "Case":
+			return `${type.choice}#${type.name}`
+		default:
+			return null
+	}
+}
+
+// NOTE: How one payload member is compared — structurally when it names no Type
+// Parameter, through the witness at its declaration-order index when it is a
+// bare Parameter, and recursively for the composites (a List itemwise, a Record
+// or Case member by member, a Union by discriminating its concrete arms and
+// falling back to the generic one).
+function describeMember(
+	type: common.Type,
+	constrainedOrder: Array<string>,
+	generics: Set<string>,
+): common.DescriptorNode {
+	if (!typeMentionsGenerics(type, generics)) {
+		return { k: "eq" }
+	}
+
+	switch (type.type) {
+		case "GenericUse":
+			return { k: "w", i: constrainedOrder.indexOf(type.name) }
+		case "List":
+			return {
+				k: "list",
+				of: describeMember(type.itemType, constrainedOrder, generics),
+			}
+		case "Record":
+			return {
+				k: "record",
+				m: describeMembers(type.members, constrainedOrder, generics),
+			}
+		case "Case":
+			return {
+				k: "case",
+				m: describeMembers(type.members, constrainedOrder, generics),
+			}
+		case "UnionType":
+			return {
+				k: "union",
+				arms: flattenUnionMembers(type).map((arm) => ({
+					// NOTE: An arm mentioning a Parameter is the fallback (`null`)
+					// — it can not be told apart by a fixed tag, so everything the
+					// concrete arms do not claim is compared through its witness.
+					tag: typeMentionsGenerics(arm, generics)
+						? null
+						: runtimeTagOf(arm),
+					node: describeMember(arm, constrainedOrder, generics),
+				})),
+			}
+		default:
+			return { k: "eq" }
+	}
+}
+
+function describeMembers(
+	members: Record<string, common.Type>,
+	constrainedOrder: Array<string>,
+	generics: Set<string>,
+): Record<string, common.DescriptorNode> {
+	let described: Record<string, common.DescriptorNode> = {}
+
+	for (let [name, memberType] of Object.entries(members)) {
+		described[name] = describeMember(memberType, constrainedOrder, generics)
+	}
+
+	return described
+}
+
+// NOTE: The compile-time plan the widened runtime helper follows for a generic
+// Choice — one entry per Case tag mapping each payload member to how it is
+// compared. Pure over the DECLARED Alias (its Cases still carry GenericUse
+// members the applied form erases), so the same plan is reachable at every
+// emission site that has the receiver's Choice in hand.
+export function derivedEquatableDescriptor(
+	alias: common.GenericAliasType,
+): common.DerivedEquatableDescriptor {
+	let generics = new Set(alias.generics.map((generic) => generic.name))
+	let constrainedOrder = constrainedGenericOrder(alias)
+	let descriptor: common.DerivedEquatableDescriptor = {}
+
+	for (let caseType of choiceAliasCases(alias)) {
+		if (caseType.type !== "Case") {
+			continue
+		}
+
+		descriptor[`${caseType.choice}#${caseType.name}`] = describeMembers(
+			caseType.members,
+			constrainedOrder,
+			generics,
+		)
+	}
+
+	return descriptor
+}
+
+// NOTE: The descriptor for a receiver's Choice, or null when the Choice is not
+// generic (a non-generic Choice keeps emitting the plain `choiceIs`). The Scope
+// recovers the DECLARED Alias the applied receiver Type erased.
+export function derivedEquatableDescriptorFor(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): common.DerivedEquatableDescriptor | null {
+	let alias = declaredChoiceAliasOf(baseType, scope)
+
+	if (alias === null || alias.generics.length === 0) {
+		return null
+	}
+
+	return derivedEquatableDescriptor(alias)
 }
 
 // NOTE: Every Choice is Equatable without being written as such — a Case is
@@ -1001,26 +1344,59 @@ export function derivedEquatableNamespace(
 		return null
 	}
 
-	return derivedEquatableNamespaceForChoice(choiceType)
+	return derivedEquatableNamespaceForChoice(
+		choiceType,
+		declaredChoiceAliasOf(baseType, scope),
+	)
 }
 
 // NOTE: The same Namespace, built from a Choice that is already in hand. The
 // Language Server has the Choice but no Scope to look one up in, and building
 // the Methods twice is how the two would drift.
+//
+// NOTE: For a *generic* Choice the Methods are conditional: each takes the
+// payload-mentioned Parameters as `infer … is Equatable` bounds and the
+// UNAPPLIED body Union as its Parameters, so invocation inference binds the
+// Parameters from the receiver and the existing conformance rail produces the
+// per-Parameter witnesses. A non-generic Choice (or a call with no Alias in
+// hand) keeps the flat Methods, whose emission never widens.
 export function derivedEquatableNamespaceForChoice(
 	choiceType: common.Type,
+	declaredAlias: common.GenericAliasType | null = null,
 ): common.NamespaceType {
+	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
+
+	// NOTE: R4 — a fresh bound list per Method, never the singleton Alias'
+	// Declarations. Only the mentioned Parameters are bounded; an unmentioned
+	// one would stay unbound at inference and misreport as uninferable.
+	let boundGenerics: Array<common.GenericDeclaration> =
+		isGeneric && declaredAlias !== null
+			? constrainedGenericOrder(declaredAlias).map((name) => ({
+					name,
+					infer: true,
+					defaultType: null,
+					constraint: "Equatable",
+				}))
+			: []
+
+	// NOTE: The Parameters are the UNAPPLIED body Union for a generic Choice, so
+	// its GenericUse members give inference something to bind the bounds to.
+	let parameterType =
+		isGeneric && declaredAlias !== null
+			? declaredAlias.aliasedType
+			: choiceType
+
 	let method = (
 		description: string,
 		returns: string,
 	): common.SimpleMethodType => ({
 		type: "SimpleMethod",
-		generics: [],
+		generics: boundGenerics.map((generic) => ({ ...generic })),
 		parameterTypes: [
-			{ name: null, type: choiceType },
+			{ name: null, type: parameterType },
 			{
 				name: null,
-				type: choiceType,
+				type: parameterType,
 				documentation: "the Choice to compare with",
 			},
 		],
@@ -1067,10 +1443,23 @@ function derivedConformanceSource(
 	protocolName: string,
 	written: common.NamespaceType | null,
 	scope: enricher.Scope,
+	position: common.Position,
 ): common.ConformanceSource | null {
-	let derived = derivedEquatableNamespace(binding, scope)
+	let choiceType = choiceTypeOf(binding, scope)
 
-	if (derived === null || !derived.conformsTo?.includes(protocolName)) {
+	if (choiceType === null) {
+		return null
+	}
+
+	// NOTE: The conformance is CHECKED against the flat Methods — their
+	// Parameters are the applied Choice, so they line up with the Protocol's
+	// `Self` under plain assignability. The bounded Methods
+	// `derivedEquatableNamespace` builds are for the direct-call rail, where
+	// invocation inference binds their Parameters; here the witnesses are solved
+	// by hand below instead.
+	let derived = derivedEquatableNamespaceForChoice(choiceType)
+
+	if (!derived.conformsTo?.includes(protocolName)) {
 		return null
 	}
 
@@ -1100,11 +1489,57 @@ function derivedConformanceSource(
 		return null
 	}
 
+	// NOTE: A non-generic Choice derives unconditionally — no witnesses, no
+	// descriptor, so its witness emission stays byte-identical to what it was
+	// before generic Choices existed.
+	let alias = declaredChoiceAliasOf(binding, scope)
+
+	if (alias === null || alias.generics.length === 0) {
+		return {
+			kind: "namespace",
+			name: derivedEquatableNamespaceName,
+			methodMap: result.methodMap,
+			conditions: [],
+		}
+	}
+
+	// NOTE: A generic Choice conforms only where each payload-mentioned
+	// Parameter's Type Argument does — solved recursively, in declaration order
+	// (R7) so the witnesses line up with the descriptor's `w` indices. Any
+	// failure withholds the derive, and the caller surfaces the because-chain.
+	let genericNames = alias.generics.map((generic) => generic.name)
+	let typeArguments = choiceTypeArgumentsOf(binding)
+	let conditions: Array<common.Conformance> = []
+
+	for (let name of constrainedGenericOrder(alias)) {
+		let typeArgument = typeArguments[genericNames.indexOf(name)] ?? {
+			type: "Error" as const,
+		}
+
+		let solved = solveConformance(
+			typeArgument,
+			protocolName,
+			scope,
+			position,
+		)
+
+		if (!solved.ok) {
+			return null
+		}
+
+		conditions.push({
+			genericName: name,
+			protocolName,
+			source: solved.source,
+		})
+	}
+
 	return {
 		kind: "namespace",
 		name: derivedEquatableNamespaceName,
 		methodMap: result.methodMap,
-		conditions: [],
+		conditions,
+		derivedDescriptor: derivedEquatableDescriptor(alias),
 	}
 }
 
@@ -1303,6 +1738,7 @@ function solveNamespaceConformance(
 			protocolName,
 			null,
 			scope,
+			position,
 		)
 
 		if (derived !== null) {
@@ -1366,6 +1802,7 @@ function solveNamespaceConformance(
 			protocolName,
 			candidate.type,
 			scope,
+			position,
 		)
 
 		if (derived !== null) {
@@ -1813,6 +2250,7 @@ export function checkProtocolConformance(
 				protocol.name,
 				namespaceType,
 				scope,
+				identifier.position,
 			) !== null
 		) {
 			checked.push({

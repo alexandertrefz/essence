@@ -30,6 +30,7 @@ import {
 	reportReservedTypeName,
 	findTypeInScope,
 	combinationTypeOf,
+	derivedEquatableDescriptorFor,
 	derivedEquatableNamespace,
 	derivedEquatableNamespaceName,
 	invalidateNamespacesInScope,
@@ -327,8 +328,14 @@ export function enrichMethodInvocation(
 	// likewise enriched once, by the typer, and reused for the final Node.
 	let base = enrichExpression(node.base, scope)
 	let typer = makeArgumentTyper(scope)
-	let { namespace, type, overloadedMethodIndex, conformances, dispatch } =
-		resolveMethodInvocation(node, base.type, scope, typer)
+	let {
+		namespace,
+		type,
+		overloadedMethodIndex,
+		conformances,
+		derivedDescriptor,
+		dispatch,
+	} = resolveMethodInvocation(node, base.type, scope, typer)
 
 	return {
 		nodeType: "MethodInvocation",
@@ -345,6 +352,7 @@ export function enrichMethodInvocation(
 		type,
 		overloadedMethodIndex,
 		conformances,
+		derivedDescriptor,
 		dispatch,
 	}
 }
@@ -2550,6 +2558,10 @@ type ResolvedMethodInvocation = {
 	type: common.Type
 	overloadedMethodIndex: number | null
 	conformances: Array<common.Conformance>
+	// NOTE: Set only for a *generic* Choice's derived `is`/`isNot` — the plan
+	// its widened runtime helper interprets. Absent for every other call, so a
+	// non-generic Choice emits the plain `choiceIs`.
+	derivedDescriptor?: common.DerivedEquatableDescriptor
 	dispatch: Array<common.DispatchCase> | null
 }
 
@@ -2866,6 +2878,15 @@ function resolveMethodInvocation(
 				scope,
 				node.position,
 			),
+			// NOTE: A direct `is`/`isNot` on a generic Choice widens at emission
+			// — the descriptor its runtime helper follows is recovered from the
+			// receiver's Choice, whose DECLARED Alias the applied receiver Type
+			// erased.
+			derivedDescriptor:
+				resolvedMethod.namespace.name === derivedEquatableNamespaceName
+					? (derivedEquatableDescriptorFor(baseType, scope) ??
+						undefined)
+					: undefined,
 			dispatch: null,
 		}
 	} else {
@@ -3035,6 +3056,14 @@ function resolveUnionMethodDispatch(
 				scope,
 				node.position,
 			),
+			// NOTE: A branch resolving to a generic Choice's derived `is`/`isNot`
+			// widens the same way a direct call does — the descriptor recovered
+			// from this member's Choice.
+			derivedDescriptor:
+				resolvedMethod.namespaceName === derivedEquatableNamespaceName
+					? (derivedEquatableDescriptorFor(memberType, scope) ??
+						undefined)
+					: undefined,
 		})
 		caseReturnTypes.push(resolvedMethod.returnType)
 	}
