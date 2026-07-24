@@ -9,7 +9,9 @@ import {
 	essenceMethodIdentifier,
 	essenceMethodName,
 	nativeFreeFunctionNames,
+	type PreludeFreeFunction,
 	type PreludeNamespace,
+	stdlibFreeFunctions,
 	stdlibPrelude,
 } from "./stdlibPrelude"
 
@@ -59,8 +61,13 @@ export function rewrite(program: common.typedSimple.Program): string {
 	// by this point, however indirectly it was written. A source-level survey
 	// would have to know about each of those shapes and would silently drop a
 	// Namespace the moment a new one was added.
+	const freeFunctions = stdlibFreeFunctions()
 	const implementation = rewriteImplementationSection(program.implementation)
-	const essenceMethods = reachableEssenceMethods(prelude, implementation)
+	const essenceMethods = reachableEssenceMethods(
+		prelude,
+		implementation,
+		freeFunctions,
+	)
 
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
@@ -261,10 +268,14 @@ function rewriteEssenceMethod(
 export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
-): Map<string, estree.VariableDeclaration> {
-	let reachable = new Map<string, estree.VariableDeclaration>()
+	freeFunctions: Array<PreludeFreeFunction> = [],
+): Map<string, estree.VariableDeclaration | estree.FunctionDeclaration> {
+	let reachable = new Map<
+		string,
+		estree.VariableDeclaration | estree.FunctionDeclaration
+	>()
 
-	if (prelude.length === 0) {
+	if (prelude.length === 0 && freeFunctions.length === 0) {
 		return reachable
 	}
 
@@ -278,6 +289,15 @@ export function reachableEssenceMethods(
 		),
 	)
 
+	// NOTE: The Essence-bodied free Functions this run can emit, by the bare
+	// `<name>__overload$N` name a call site resolves to — the free-Function
+	// analogue of `implemented`. An edge is drawn to one only when it is in
+	// this set, so a native free Function (reached off `$_`) falls out just as
+	// a native Method does.
+	let implementedFreeFunctions = new Set(
+		freeFunctions.map((freeFunction) => freeFunction.name),
+	)
+
 	// NOTE: Each candidate carries its declaration AND the other Essence Methods
 	// its body calls, read off the TYPED body rather than the emitted const.
 	// That matters: `namespaceMember` decides an emitted call's spelling from the
@@ -285,19 +305,15 @@ export function reachableEssenceMethods(
 	// tests do this) would spell its transitive calls as native member reads and
 	// the fixed point would lose the edge. Reading the typed body keeps the
 	// reachability answer a property of the prelude it was handed.
-	let candidates = new Map<
-		string,
-		{ declaration: estree.VariableDeclaration; references: Set<string> }
-	>(
-		prelude.flatMap((namespace) =>
+	type Candidate = {
+		declaration: estree.VariableDeclaration | estree.FunctionDeclaration
+		references: Set<string>
+	}
+
+	let methodCandidates: Array<[string, Candidate]> = prelude.flatMap(
+		(namespace) =>
 			Object.entries(namespace.node.methods).map(
-				([memberName, method]): [
-					string,
-					{
-						declaration: estree.VariableDeclaration
-						references: Set<string>
-					},
-				] => [
+				([memberName, method]): [string, Candidate] => [
 					essenceMethodIdentifier(namespace.name, memberName),
 					{
 						declaration: rewriteEssenceMethod(
@@ -308,12 +324,37 @@ export function reachableEssenceMethods(
 						references: essenceMethodReferences(
 							method.method.value,
 							implemented,
+							implementedFreeFunctions,
 						),
 					},
 				],
 			),
-		),
 	)
+
+	// NOTE: A free Function is a candidate exactly as a Method is — its own
+	// top-level `function <name>__overload$N(…) {…}` and the edges its body
+	// draws — so the two share ONE fixed point. That unity is the point: a
+	// Method body that calls a free Function, or a free Function body that calls
+	// another one or a Method, must pull the callee in, and only a single search
+	// over both kinds can follow an edge that crosses between them.
+	let freeFunctionCandidates: Array<[string, Candidate]> = freeFunctions.map(
+		(freeFunction): [string, Candidate] => [
+			freeFunction.name,
+			{
+				declaration: rewriteFunctionStatement(freeFunction.node),
+				references: essenceMethodReferences(
+					freeFunction.node.value,
+					implemented,
+					implementedFreeFunctions,
+				),
+			},
+		],
+	)
+
+	let candidates = new Map<string, Candidate>([
+		...methodCandidates,
+		...freeFunctionCandidates,
+	])
 
 	let pending: Array<string> = []
 
@@ -360,6 +401,13 @@ export function reachableEssenceMethods(
 //                            methodMap value; a conditional one nests more
 //                            ConformanceValues in `conditions`, reached below
 //
+// One more shape draws a free-Function edge rather than a Method one: a
+// `FunctionInvocation` off a bare Identifier — `loop__overload$2(…)` by the time
+// the Simplifier has mangled it — is an edge to that free Function's own const,
+// filtered by `implementedFreeFunctions` the way the Method shapes are by
+// `implemented`. It is what lets a Method body reach a free Function, and a free
+// Function body reach either kind, inside the one fixed point.
+//
 // Over-collecting stays safe, as everywhere in the search: a pair the prelude
 // does not implement is filtered by `implemented` (so a Record field or a
 // static Property read falls out), and one it does only emits a const that is
@@ -367,6 +415,7 @@ export function reachableEssenceMethods(
 export function essenceMethodReferences(
 	root: unknown,
 	implemented: Set<string>,
+	implementedFreeFunctions: Set<string> = new Set(),
 ): Set<string> {
 	let references = new Set<string>()
 
@@ -425,6 +474,22 @@ export function essenceMethodReferences(
 
 			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
 				consider(record["namespaceName"], namespaceMethodName)
+			}
+		} else if (record["nodeType"] === "FunctionInvocation") {
+			// NOTE: A bare free-Function call — `loop__overload$2(…)` by now,
+			// the Simplifier having mangled the overloaded callee — is an edge
+			// to that Function's const when this run implements it in Essence.
+			// A native free Function is a read off `$_` and is not in the set,
+			// so it falls out exactly as a native Method does. The reference key
+			// IS the bare name, which is the free Function's candidate key.
+			let callee = record["name"] as Record<string, unknown> | undefined
+
+			if (
+				callee?.["nodeType"] === "Identifier" &&
+				typeof callee["name"] === "string" &&
+				implementedFreeFunctions.has(callee["name"])
+			) {
+				references.add(callee["name"])
 			}
 		}
 
