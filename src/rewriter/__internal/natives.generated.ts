@@ -14,6 +14,7 @@ import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
+import type { NormalizationFormType } from "./NormalizationForm"
 import type { NothingType } from "./Nothing"
 import type { NumberType } from "./Number"
 import type { NumberFormatType } from "./NumberFormat"
@@ -58,6 +59,8 @@ export type StringNatives = {
 	uppercased: (self: StringType) => StringType
 	// lowercased() -> String
 	lowercased: (self: StringType) => StringType
+	// normalized(as: NormalizationForm) -> String
+	normalized__overload$2: (self: StringType, as: NormalizationFormType) => StringType
 	// trim(at: Side) -> String
 	trim__overload$2: (self: StringType, at: SideType) => StringType
 	// ends(with: String) -> Boolean
@@ -286,6 +289,10 @@ export type CaseNatives = {
 
 }
 
+export type NormalizationFormNatives = {
+
+}
+
 export type NumberFormatNatives = {
 
 }
@@ -349,7 +356,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -394,6 +401,10 @@ export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "toStr
 declare const CaseModule: typeof import("./Case")
 export const $Case: CaseNatives = CaseModule
 export const $CaseAbsent: AssertNoEssenceExports<typeof import("./Case"), "toString"> = true
+
+declare const NormalizationFormModule: typeof import("./NormalizationForm")
+export const $NormalizationForm: NormalizationFormNatives = NormalizationFormModule
+export const $NormalizationFormAbsent: AssertNoEssenceExports<typeof import("./NormalizationForm"), "toString"> = true
 
 declare const NumberFormatModule: typeof import("./NumberFormat")
 export const $NumberFormat: NumberFormatNatives = NumberFormatModule

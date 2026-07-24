@@ -10,6 +10,7 @@ import * as caseModule from "../rewriter/__internal/Case"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
 import * as nestedList from "../rewriter/__internal/NestedList"
+import * as normalizationForm from "../rewriter/__internal/NormalizationForm"
 import * as nothing from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
 import * as numberFormat from "../rewriter/__internal/NumberFormat"
@@ -39,6 +40,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Ordering: ordering,
 	Side: side,
 	Case: caseModule,
+	NormalizationForm: normalizationForm,
 	NumberFormat: numberFormat,
 	Record: record,
 	List: list,
