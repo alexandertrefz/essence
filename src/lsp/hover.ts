@@ -374,6 +374,21 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitNode(node.value, state)
 
 			for (let handler of node.handlers) {
+				// NOTE: A Case Matcher's payload shape is spelled out the way a
+				// constructed Case value is — for an applied generic Choice its
+				// members are the instantiated ones (`state: Integer`), which the
+				// scrutinee's Type pins down.
+				if (
+					handler.matcher.type === "Case" &&
+					wins(state, handler.matcherPosition)
+				) {
+					state.best = {
+						position: handler.matcherPosition,
+						content: printCaseWithPayload(handler.matcher),
+						documentation: null,
+					}
+				}
+
 				visitBody(handler.body, state)
 			}
 
@@ -442,8 +457,22 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					: `#${caseType.name} { ${members.join(", ")} }`
 			}
 
+			// NOTE: A generic Choice reads back with its Type Parameters —
+			// `choice Step<State, Result>` — the same way a Namespace's
+			// declaration head spells its own. Its Cases then show their payloads
+			// in terms of those Parameters (`state: State`), the abstract shape a
+			// use site instantiates. A non-generic Choice's Union carries no
+			// Parameters, so the head stays bare.
+			let generics =
+				node.type.type === "GenericAlias" &&
+				node.type.generics.length > 0
+					? `<${node.type.generics
+							.map(printGenericDeclaration)
+							.join(", ")}>`
+					: ""
+
 			let content = [
-				`choice ${node.name.content}`,
+				`choice ${node.name.content}${generics}`,
 				...node.cases.map((choiceCase) => caseLine(choiceCase.type)),
 			].join("\n")
 

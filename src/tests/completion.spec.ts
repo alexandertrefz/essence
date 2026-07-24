@@ -391,6 +391,129 @@ describe("Completion", () => {
 		})
 	})
 
+	describe("Case completion after #", () => {
+		let boxChoice = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+		]
+
+		it("should offer an applied Choice's Cases with instantiated payloads under an annotation", () => {
+			let source = [
+				...boxChoice,
+				"\tconstant b: Box<Integer> = #",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 6, column: 30 })
+
+			expect(entries.map((entry) => [entry.label, entry.detail])).toEqual(
+				[
+					["Holding", "Box<Integer>#Holding { value: Integer }"],
+					["Empty", "Box<Integer>#Empty"],
+				],
+			)
+			expect(entries.every((entry) => entry.kind === "case")).toBe(true)
+		})
+
+		it("should complete a partially typed Case name, still instantiated", () => {
+			let source = [
+				...boxChoice,
+				"\tconstant b: Box<Integer> = #Ho",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 6, column: 32 })
+
+			expect(entries.map((entry) => entry.label)).toContain("Holding")
+			expect(
+				entries.find((entry) => entry.label === "Holding")?.detail,
+			).toBe("Box<Integer>#Holding { value: Integer }")
+		})
+
+		// NOTE: With no expectation the scan mirrors the Enricher's
+		// `findCaseTypesInScope` — a generic Choice (a Generic Alias) offers its
+		// declared Cases, their payloads still abstract (`value: Value`).
+		it("should offer a generic Choice's Cases for a bare # with no expectation", () => {
+			let source = [...boxChoice, "\tconstant b = #", "}"].join("\n")
+
+			let entries = findCompletions(source, { line: 6, column: 16 })
+
+			expect(entries.map((entry) => [entry.label, entry.detail])).toEqual(
+				[
+					["Holding", "Box#Holding { value: Value }"],
+					["Empty", "Box#Empty"],
+				],
+			)
+		})
+
+		it("should narrow to one Choice after a written prefix", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Box<Value> {",
+				"\t\tHolding { value: Value },",
+				"\t\tEmpty,",
+				"\t}",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"\tconstant b = Colour#",
+				"}",
+			].join("\n")
+
+			expect(
+				findCompletions(source, { line: 10, column: 22 }).map(
+					(entry) => entry.label,
+				),
+			).toEqual(["Red", "Green"])
+		})
+
+		it("should offer Cases from every Choice in scope for a bare #", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Box<Value> {",
+				"\t\tHolding { value: Value },",
+				"\t\tEmpty,",
+				"\t}",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"\tconstant b = #",
+				"}",
+			].join("\n")
+
+			let labels = findCompletions(source, { line: 10, column: 16 }).map(
+				(entry) => entry.label,
+			)
+
+			expect(labels).toContain("Holding")
+			expect(labels).toContain("Red")
+			expect(labels).toContain("Green")
+		})
+
+		it("should instantiate a non-generic Choice's Cases too", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"\tconstant c: Colour = #",
+				"}",
+			].join("\n")
+
+			expect(
+				findCompletions(source, { line: 6, column: 24 }).map(
+					(entry) => entry.label,
+				),
+			).toEqual(["Red", "Green"])
+		})
+	})
+
 	describe("Argument labels", () => {
 		it("should offer the callee's Parameter labels inside a call", () => {
 			let source = [

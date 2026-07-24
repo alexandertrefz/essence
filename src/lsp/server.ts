@@ -22,7 +22,11 @@ import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
 import { loadStdlib } from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
 import { analyse } from "./analyse"
-import { type CompletionEntry, findCompletions } from "./completion"
+import {
+	type CompletionEntry,
+	type CompletionKind,
+	findCompletions,
+} from "./completion"
 import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"
 import {
 	type DocumentSymbolEntry,
@@ -33,7 +37,6 @@ import { findHover } from "./hover"
 import { findInlayHints } from "./inlayHints"
 import { isSamePosition } from "./positions"
 import {
-	type DeclarationKind,
 	findDefinition,
 	findOccurrence,
 	findOccurrences,
@@ -561,7 +564,7 @@ function toLspDocumentSymbol(entry: DocumentSymbolEntry): DocumentSymbol {
 	}
 }
 
-const completionItemKinds: Record<DeclarationKind, CompletionItemKind> = {
+const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	constant: CompletionItemKind.Constant,
 	variable: CompletionItemKind.Variable,
 	function: CompletionItemKind.Function,
@@ -575,11 +578,12 @@ const completionItemKinds: Record<DeclarationKind, CompletionItemKind> = {
 	property: CompletionItemKind.Property,
 	member: CompletionItemKind.Field,
 	label: CompletionItemKind.Text,
+	case: CompletionItemKind.EnumMember,
 }
 
 // NOTE: The kinds that are invoked rather than referred to — completing one
 // inserts its parentheses and leaves the cursor between them.
-const callableKinds = new Set<DeclarationKind>([
+const callableKinds = new Set<CompletionKind>([
 	"function",
 	"method",
 	"staticMethod",
