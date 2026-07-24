@@ -459,6 +459,7 @@ export interface ChoiceCaseNode {
 export interface ChoiceDeclarationStatementNode {
 	nodeType: "ChoiceDeclarationStatement"
 	name: IdentifierNode
+	generics: Array<GenericDeclarationNode>
 	cases: Array<ChoiceCaseNode>
 	position: Position
 	documentation: Documentation | null
