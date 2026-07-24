@@ -666,12 +666,19 @@ function walkNode(
 		case "ChoiceDeclarationStatement": {
 			declareInScope(scope, "types", node.name, "type", context)
 
+			// NOTE: A generic Choice's Type Parameters bind across every Case's
+			// payload the way a Type Alias's do — `State` in `#Continue { state:
+			// State }` resolves to the header's declaration, so renaming either
+			// end moves both, and `scopeWithGenerics` records the header
+			// occurrences (and any bound or default) for Semantic Tokens too.
+			let choiceScope = scopeWithGenerics(node.generics, scope, context)
+
 			// NOTE: Case names resolve through their Choice, never through a
 			// Scope — only the member Types inside the payload declarations
 			// hold renameable references.
 			for (let choiceCase of node.cases) {
 				if (choiceCase.type !== null) {
-					walkTypeDeclaration(choiceCase.type, scope, context)
+					walkTypeDeclaration(choiceCase.type, choiceScope, context)
 				}
 			}
 

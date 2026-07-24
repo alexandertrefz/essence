@@ -197,6 +197,52 @@ describe("Rename", () => {
 		)
 	})
 
+	it("should rename a generic Choice's Type Parameter from its declaration", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: The header's `Value` and its use in the payload move together;
+		// the member name `value` is a separate symbol and stays put.
+		expect(rename(source, { line: 2, column: 13 }, "Element")).toBe(
+			[
+				"implementation {",
+				"\tchoice Box<Element> {",
+				"\t\tHolding { value: Element },",
+				"\t\tEmpty,",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("should rename a generic Choice's Type Parameter from a payload use", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 3, column: 20 }, "Element")).toBe(
+			[
+				"implementation {",
+				"\tchoice Box<Element> {",
+				"\t\tHolding { value: Element },",
+				"\t\tEmpty,",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
+
 	it("should rename a Namespace including its use as a specifier", () => {
 		let source = [
 			"implementation {",
