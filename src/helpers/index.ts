@@ -1015,6 +1015,13 @@ export function matchesTypeWithBindings(
 	return matchTypes(lhs, rhs, context)
 }
 
+// NOTE: The (lhs, rhs) Case pairs whose members are mid-comparison, keyed by
+// `lhs` identity — a nested Set so a pair is recognised by both halves. Guards
+// the coinductive Case recursion in `matchTypes` against a cyclic payload
+// looping forever; entries are added and removed within a single `matchTypes`
+// call, so the map is empty between top-level matches.
+const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
+
 function matchTypes(
 	lhs: common.Type,
 	rhs: common.Type,
@@ -1177,9 +1184,80 @@ function matchTypes(
 
 	// NOTE: Cases are nominal — a Case only matches its own Choice's Case of
 	// the same name, never a structurally identical Record (and vice versa).
-	// That identity is the entire point of declaring a Choice.
+	// That identity is the entire point of declaring a Choice. Under generics
+	// the tag alone is not enough: two instantiations of the same Case
+	// (`Step<Integer, …>#Done` vs `Step<String, …>#Done`) share a tag but must
+	// not be interchangeable, so once the tags agree the payload members are
+	// recursed. `typeArguments` are ignored — they are display spelling; the
+	// members decide assignability, and recursing them is also what routes a
+	// bindable Generic member through `matchGenericUse` (the whole Result
+	// inference story).
 	if (lhs.type === "Case" && rhs.type === "Case") {
-		return lhs.choice === rhs.choice && lhs.name === rhs.name
+		if (lhs.choice !== rhs.choice || lhs.name !== rhs.name) {
+			return false
+		}
+
+		// NOTE: The same Case object matches itself in O(1) — every non-generic
+		// Choice's Cases keep their identity through `applyGenericBindings`, so
+		// this is the entire cost for them. It runs before any pair-guard
+		// bookkeeping so that path allocates nothing.
+		if (lhs === rhs) {
+			return true
+		}
+
+		// NOTE: Re-entering the same (lhs, rhs) pair while it is already being
+		// compared is the coinductive hypothesis — assume it holds. A genuine
+		// counterexample would differ at some finite member path, which is
+		// checked before the cycle can close, so assuming the cycle is sound.
+		// V1 forbids a Choice naming itself, but a mutually recursive pair is
+		// not caught there, and matching stays terminating either way.
+		let inProgress = activeCasePairs.get(lhs)
+
+		if (inProgress?.has(rhs)) {
+			return true
+		}
+
+		if (inProgress === undefined) {
+			inProgress = new Set()
+			activeCasePairs.set(lhs, inProgress)
+		}
+
+		inProgress.add(rhs)
+
+		try {
+			// NOTE: Cases sharing a tag share a declaration, so their member
+			// name sets are identical — the length check plus the per-name
+			// lookup below assert that strictly rather than trusting it.
+			let lhsMemberNames = Object.keys(lhs.members)
+
+			if (lhsMemberNames.length !== Object.keys(rhs.members).length) {
+				return false
+			}
+
+			for (let memberName of lhsMemberNames) {
+				if (rhs.members[memberName] === undefined) {
+					return false
+				}
+
+				if (
+					!matchTypes(
+						lhs.members[memberName],
+						rhs.members[memberName],
+						context,
+					)
+				) {
+					return false
+				}
+			}
+
+			return true
+		} finally {
+			inProgress.delete(rhs)
+
+			if (inProgress.size === 0) {
+				activeCasePairs.delete(lhs)
+			}
+		}
 	}
 
 	if (lhs.type === "Record" && rhs.type === "Record") {
