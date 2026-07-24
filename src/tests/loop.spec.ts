@@ -13,9 +13,11 @@ import { validate } from "../validator/index"
 
 // NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — the
 // `loop` family and the early-stopping `reduce` are only proven once every stage
-// agrees on them AND the emitted JavaScript runs. Every `Step` here is READ, by
-// the native drivers, and never compared with `::is`: the derived Equatable for
-// a generic Choice is a separate slice, so a `Step` has no equality yet.
+// agrees on them AND the emitted JavaScript runs. In the loop and reduce blocks
+// every `Step` is READ, by the native drivers; the final block compares them
+// with `::is` instead, now that the derived Equatable for a generic Choice has
+// merged and the builtin `Step` earns its equality across the stdlib boundary
+// exactly like a Choice a Program declares for itself.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -234,6 +236,76 @@ describe("reduce(startingWith:step:)", () => {
 				__print(sum::toString())
 			}`),
 		).toEqual(['"42"'])
+	})
+})
+
+// NOTE: The untested combination once WP4 and WP6 both merged — the builtin,
+// generic `Step` compared with its DERIVED Equatable. Every value here is a
+// `Step<State, Result>` instantiation, and every comparison routes through the
+// widened `boundChoiceIs` descriptor computed for a GenericAlias that lives in
+// the stdlib scope rather than the Program's — the one thing neither slice
+// could prove alone, since WP6 deliberately never wrote `::is` on a `Step`.
+describe("a Step compares by its derived Equality", () => {
+	it("holds two #Done payloads equal, and a #Done apart from a #Continue", async () => {
+		expect(
+			await run(`implementation {
+				constant a: Step<Integer, Integer> = #Done(5)
+				constant b: Step<Integer, Integer> = #Done(5)
+				constant c: Step<Integer, Integer> = #Done(6)
+				constant going: Step<Integer, Integer> = #Continue(5)
+
+				__print(a::is(b)::toString())
+				__print(a::is(c)::toString())
+				__print(a::is(going)::toString())
+				__print(a::isNot(going)::toString())
+			}`),
+		).toEqual(['"true"', '"false"', '"false"', '"true"'])
+	})
+
+	it("compares a #Continue that threads a Record State member by member", async () => {
+		expect(
+			await run(`implementation {
+				constant here: Step<{ index: Integer, total: Integer }, Integer> =
+					#Continue({ index = 1, total = 0 })
+				constant same: Step<{ index: Integer, total: Integer }, Integer> =
+					#Continue({ index = 1, total = 0 })
+				constant moved: Step<{ index: Integer, total: Integer }, Integer> =
+					#Continue({ index = 2, total = 0 })
+				constant stopped: Step<{ index: Integer, total: Integer }, Integer> = #Done(9)
+
+				__print(here::is(same)::toString())
+				__print(here::is(moved)::toString())
+				__print(here::is(stopped)::toString())
+			}`),
+		).toEqual(['"true"', '"false"', '"false"'])
+	})
+
+	it("satisfies an Equatable bound, so a List of Steps can be searched", async () => {
+		expect(
+			await run(`implementation {
+				constant steps: List<Step<Integer, Integer>> = [#Continue(1), #Done(2)]
+
+				__print(steps::contains(#Done(2))::toString())
+				__print(steps::contains(#Done(9))::toString())
+				__print(steps::contains(#Continue(1))::toString())
+			}`),
+		).toEqual(['"true"', '"false"', '"true"'])
+	})
+
+	// NOTE: The point of routing a generic payload through a witness rather than
+	// the flat structural comparison — `1/2` and `2/4` are equal by Rational's
+	// own `is`, and only the Rational witness threaded into `Step`'s descriptor
+	// carries that across the stdlib boundary.
+	it("compares a Rational payload by its own equality, not by structure", async () => {
+		expect(
+			await run(`implementation {
+				constant half: Step<Integer, Rational> = #Done(1/2)
+				constant twoQuarters: Step<Integer, Rational> = #Done(2/4)
+
+				__print(half::is(twoQuarters)::toString())
+				__print(half::isNot(twoQuarters)::toString())
+			}`),
+		).toEqual(['"true"', '"false"'])
 	})
 })
 
