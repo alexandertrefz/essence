@@ -42,6 +42,7 @@ export const builtinMemberOrder: Array<string> = [
 	"Optional",
 	"Ordering",
 	"Side",
+	"Case",
 	"NumberFormat",
 	"Record",
 	"List",
@@ -80,6 +81,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Optional",
 	"Ordering",
 	"Side",
+	"Case",
 	"NumberFormat",
 ]
 

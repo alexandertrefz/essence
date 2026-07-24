@@ -48,6 +48,10 @@ export type StringNatives = {
 	append: (self: StringType, argument1: StringType) => StringType
 	// split(on: String) -> List<String>
 	split: (self: StringType, on: StringType) => ListType<StringType>
+	// lines() -> List<String>
+	lines: (self: StringType) => ListType<StringType>
+	// words() -> List<String>
+	words: (self: StringType) => ListType<StringType>
 	// length() -> Integer
 	length: (self: StringType) => IntegerType
 	// uppercased() -> String
@@ -56,10 +60,10 @@ export type StringNatives = {
 	lowercased: (self: StringType) => StringType
 	// trim(at: Side) -> String
 	trim__overload$2: (self: StringType, at: SideType) => StringType
-	// replaceEvery(_: String, with: String) -> String
-	replaceEvery: (self: StringType, argument1: StringType, argument2: StringType) => StringType
+	// ends(with: String) -> Boolean
+	ends: (self: StringType, argument1: StringType) => BooleanType
 	// compareTo(_: String) -> Ordering
-	compareTo: (self: StringType, argument1: StringType) => OrderingType
+	compareTo__overload$1: (self: StringType, argument1: StringType) => OrderingType
 }
 
 export type BooleanNatives = {
@@ -278,6 +282,10 @@ export type SideNatives = {
 
 }
 
+export type CaseNatives = {
+
+}
+
 export type NumberFormatNatives = {
 
 }
@@ -298,6 +306,8 @@ export type ListNatives = {
 	toString: <ItemType extends AnyType>(self: ListType<ItemType>) => StringType
 	// length<ItemType>() -> Integer
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
+	// firstItem<ItemType>(where: (_: ItemType) -> Boolean) -> Optional<ItemType>
+	firstItem__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ItemType | NothingType
 	// append<ItemType>(contentsOf: List<ItemType>) -> List<ItemType>
 	append__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> List<Result>
@@ -339,7 +349,7 @@ export type NestedListNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "ends" | "doesNotEnd" | "repeat" | "reverse" | "slice" | "firstIndex" | "pad__overload$1" | "pad__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
@@ -381,6 +391,10 @@ declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
 export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "toString"> = true
 
+declare const CaseModule: typeof import("./Case")
+export const $Case: CaseNatives = CaseModule
+export const $CaseAbsent: AssertNoEssenceExports<typeof import("./Case"), "toString"> = true
+
 declare const NumberFormatModule: typeof import("./NumberFormat")
 export const $NumberFormat: NumberFormatNatives = NumberFormatModule
 export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "toString"> = true
@@ -391,7 +405,7 @@ export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "i
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "partition" | "repeat"> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule
