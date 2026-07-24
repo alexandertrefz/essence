@@ -252,6 +252,13 @@ A Case that carries no payload was given one.
 
 The payload does not match the Type the Case declares.
 
+### `recursive-generic-choice`
+
+A generic Choice names itself in one of its payloads. A generic Choice's
+payloads are substituted eagerly at each use, so a self-reference would never
+finish substituting. Introduce a separate non-generic Choice or Type for the
+recursive part.
+
 ## Match Expressions
 
 ### `missing-case`

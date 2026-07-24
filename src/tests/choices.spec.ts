@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import type { common, parser } from "../interfaces/index"
+import { printType } from "../lsp/printType"
 import { optimise } from "../optimiser/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -43,6 +44,43 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 function messagesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.message)
 }
+
+function codesOf(source: string): Array<string> {
+	return diagnosticsOf(source).map((diagnostic) => diagnostic.code)
+}
+
+// NOTE: The declared Type of a named Declaration in an enriched Program — the
+// applied Union of a `type Applied = Step<Integer, String>` alias, or the
+// Generic Alias a generic `choice` resolves to — so a test can read a Type off
+// the tree without also constructing a value for it.
+function declaredTypeOf(source: string, name: string): common.Type {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let node = enrich(parsed.program).program.implementation.nodes.find(
+		(candidate) =>
+			(candidate.nodeType === "TypeAliasStatement" ||
+				candidate.nodeType === "ChoiceDeclarationStatement") &&
+			candidate.name.content === name,
+	) as
+		| common.typed.TypeAliasStatementNode
+		| common.typed.ChoiceDeclarationStatementNode
+		| undefined
+
+	if (node === undefined) {
+		throw new Error(`No Declaration named '${name}'`)
+	}
+
+	return node.type
+}
+
+const stepChoice = `
+	choice Step<State, Result> {
+		Continue { state: State },
+		Done { value: Result },
+	}
+`
 
 const calculatorChoice = `
 	choice CalculatorOperation {
@@ -187,6 +225,28 @@ describe("Choices", () => {
 
 			expect(containsErrors(diagnostics)).toBe(false)
 		})
+
+		it("parses a generic clause on a Choice", () => {
+			let program = parse(`implementation { ${stepChoice} }`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(
+				choice.generics.map((generic) => generic.name.content),
+			).toEqual(["State", "Result"])
+			expect(choice.cases.map((c) => c.name.content)).toEqual([
+				"Continue",
+				"Done",
+			])
+		})
+
+		it("leaves a non-generic Choice with an empty generics clause", () => {
+			let program = parse(`implementation { ${calculatorChoice} }`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.generics).toEqual([])
+		})
 	})
 
 	describe("Enricher", () => {
@@ -326,6 +386,171 @@ describe("Choices", () => {
 					type Operation = CalculatorOperation
 
 					constant operation: Operation = Operation#ClearAll
+				}`),
+			).toEqual([])
+		})
+	})
+
+	describe("Generic Choices", () => {
+		it("resolves a generic Choice to a Generic Alias over the anonymous Union of its declared Cases", () => {
+			let type = declaredTypeOf(
+				`implementation { ${stepChoice} }`,
+				"Step",
+			)
+
+			expect(type.type).toBe("GenericAlias")
+
+			let alias = type as common.GenericAliasType
+
+			expect(alias.name).toBe("Step")
+			expect(alias.generics.map((generic) => generic.name)).toEqual([
+				"State",
+				"Result",
+			])
+			expect(alias.aliasedType.type).toBe("UnionType")
+
+			let body = alias.aliasedType as common.UnionType
+
+			// NOTE: The body Union is anonymous so an application heals its
+			// display `alias` onto it.
+			expect(body.name).toBeUndefined()
+			expect(body.alias).toBeUndefined()
+
+			let done = body.types.find(
+				(member): member is common.CaseType =>
+					member.type === "Case" && member.name === "Done",
+			)!
+
+			// NOTE: A declared Case records the Choice's Generics and keeps its
+			// members as GenericUses until a use site binds them — the interface
+			// construction-side instantiation reads back.
+			expect(done.choiceGenerics?.map((generic) => generic.name)).toEqual(
+				["State", "Result"],
+			)
+			expect(done.typeArguments).toBeUndefined()
+			expect(done.members.value).toEqual({
+				type: "GenericUse",
+				name: "Result",
+			})
+		})
+
+		it("applies Type Arguments to concrete member Types carrying the applied spelling", () => {
+			let type = declaredTypeOf(
+				`implementation { ${stepChoice}
+					type Applied = Step<Integer, String>
+				}`,
+				"Applied",
+			)
+
+			expect(type.type).toBe("UnionType")
+
+			let union = type as common.UnionType
+
+			expect(union.alias).toEqual({
+				name: "Step",
+				typeArguments: [{ type: "Integer" }, { type: "String" }],
+			})
+
+			let done = union.types.find(
+				(member): member is common.CaseType =>
+					member.type === "Case" && member.name === "Done",
+			)!
+
+			expect(done.members.value).toEqual({ type: "String" })
+			expect(done.typeArguments).toEqual([
+				{ type: "Integer" },
+				{ type: "String" },
+			])
+
+			let cont = union.types.find(
+				(member): member is common.CaseType =>
+					member.type === "Case" && member.name === "Continue",
+			)!
+
+			expect(cont.members.state).toEqual({ type: "Integer" })
+		})
+
+		it("prints an applied generic Choice as written", () => {
+			let type = declaredTypeOf(
+				`implementation { ${stepChoice}
+					type Applied = Step<Integer, String>
+				}`,
+				"Applied",
+			)
+
+			expect(printType(type)).toBe("Step<Integer, String>")
+		})
+
+		it("hoists a generic Choice so a use may precede its declaration", () => {
+			expect(
+				messagesOf(`implementation {
+					type Applied = Step<Integer, String>
+					${stepChoice}
+				}`),
+			).toEqual([])
+		})
+
+		it("resolves a prefixed unit Case of a generic Choice", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Box<T> { Full { value: T }, Empty }
+					constant empty = Box#Empty
+				}`),
+			).toEqual([])
+		})
+
+		it("resolves a bare Case of a generic Choice through the scope scan", () => {
+			expect(
+				messagesOf(`implementation { ${stepChoice}
+					constant applied: Step<Integer, String> = #Done({ value = "x" })
+				}`),
+			).toEqual([])
+		})
+
+		it("rejects a generic Choice that names itself directly in a payload", () => {
+			expect(
+				codesOf(`implementation {
+					choice Bad<T> { A { next: Bad<T> } }
+				}`),
+			).toContain("recursive-generic-choice")
+		})
+
+		it("rejects a generic Choice that names itself in a nested payload position", () => {
+			expect(
+				codesOf(`implementation {
+					choice Bad<T> { A { items: List<Bad<T>> } }
+				}`),
+			).toContain("recursive-generic-choice")
+		})
+
+		it("rejects too few Type Arguments to a generic Choice", () => {
+			expect(
+				codesOf(`implementation { ${stepChoice}
+					type One = Step<Integer>
+				}`),
+			).toContain("wrong-type-argument-count")
+		})
+
+		it("rejects a bare generic Choice used without Type Arguments", () => {
+			expect(
+				codesOf(`implementation { ${stepChoice}
+					type Zero = Step
+				}`),
+			).toContain("wrong-type-argument-count")
+		})
+
+		// NOTE: The `combinationTypeOf` TODO (resolvers.ts) is about applied
+		// Types in `{ … with … }`. An applied Generic Alias of a Record already
+		// resolves to a plain Record at annotation time, so the update reads its
+		// members straight off — the TODO's remaining work is applied *non*-alias
+		// Types, and this case must keep passing meanwhile.
+		it("updates a value annotated with an applied generic Alias of a Record", () => {
+			expect(
+				messagesOf(`implementation {
+					type Boxed<T> = { value: T }
+					constant b: Boxed<Integer> = { value = 1 }
+					constant updated = { b with value = 2 }
+					__print(updated.value::toString())
 				}`),
 			).toEqual([])
 		})
