@@ -6,6 +6,7 @@ import { resolveOverloadedMethodName } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
+import * as caseModule from "../rewriter/__internal/Case"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
 import * as nestedList from "../rewriter/__internal/NestedList"
@@ -37,6 +38,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Optional: optional,
 	Ordering: ordering,
 	Side: side,
+	Case: caseModule,
 	NumberFormat: numberFormat,
 	Record: record,
 	List: list,

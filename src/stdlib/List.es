@@ -121,13 +121,11 @@ declarations {
 				<- @::item(at 0)
 			}
 
-			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-				§ NOTE: This builds the whole filtered List and then takes its
-				§ first item, where the native stopped at the first match. The
-				§ answer is the same; the work is not. See the note above
-				§ `anyItem`.
-				<- @::keepEvery(where check)::firstItem()
-			}
+			§ NATIVE. Stopping at the first accepted item is the whole of the
+			§ difference from `keepEvery(where:)::firstItem()`, and no Essence
+			§ expression can leave a walk before its end. `anyItem`/`everyItem`
+			§ are written on top of this, so they short circuit too.
+			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>
 		}
 
 		§§ The last item of the List.
@@ -357,20 +355,17 @@ declarations {
 		§ item matches …" — the existential and universal checks over a
 		§ predicate. The no-argument existential is `hasItems`.
 		§
-		§ NOTE: Both COUNT where the natives stopped at the first answer —
-		§ `count(where:)` filters the whole List, so a match in the first
-		§ position costs as much as no match at all, and `everyItem` pays for a
-		§ second predicate closure on top. The answers are identical and the
-		§ cost is linear either way; what is lost is the short circuit, which
-		§ shows on a long List whose answer is decided early. The same is true
-		§ of `firstItem(where:)`. Reverting any of them to a native is a
-		§ one-line change.
+		§ Both are written on `firstItem(where:)`, which stops at the first item
+		§ that decides the answer, so they short circuit: `anyItem` returns on
+		§ the first match, `everyItem` on the first failure. `count(where:)`
+		§ below stays on `keepEvery` — counting has to see every item, so there
+		§ is no walk to leave early.
 
 		§§ Whether the given check accepts at least one item.
 		§§
 		§§ @returns `true` when some item is accepted.
 		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
-			<- @::count(where check)::isPositive()
+			<- @::firstItem(where check)::hasValue()
 		}
 
 		§§ Whether the given check accepts every item.
@@ -391,8 +386,9 @@ declarations {
 			}
 
 			(where check: (_: ItemType) -> Boolean) -> Integer {
-				§ NOTE: The filtered List is built only to be measured — see the
-				§ note above `anyItem`, which is written on top of this.
+				§ The filtered List is built only to be measured. Counting has to
+				§ see every item, so unlike `anyItem`/`everyItem` there is no
+				§ short circuit to keep here.
 				<- @::keepEvery(where check)::length()
 			}
 		}

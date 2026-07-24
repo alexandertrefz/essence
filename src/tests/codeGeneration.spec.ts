@@ -449,7 +449,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("List.sort__overload$2(")
-			expect(generated).toContain("String.compareTo(")
+			expect(generated).toContain("String.compareTo__overload$1(")
 		})
 	})
 

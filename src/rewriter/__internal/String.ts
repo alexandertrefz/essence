@@ -1,3 +1,5 @@
+import type { BooleanType } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import type { ListType } from "./List"
@@ -41,12 +43,44 @@ export function split(
 	return createList(parts.map((chunk) => createString(chunk)))
 }
 
+export function ends(
+	originalString: StringType,
+	suffix: StringType,
+): BooleanType {
+	// NOTE: `String.endsWith` is a single pass, where the Essence body sliced
+	// the last characters and compared them — four traversals. A well-formed
+	// suffix ends on a code-point boundary, so a code-unit `endsWith` can not
+	// report a match that splits an astral character.
+	return createBoolean(originalString.value.endsWith(suffix.value))
+}
+
 export function uppercased(originalString: StringType): StringType {
 	return createString(originalString.value.toUpperCase())
 }
 
 export function lowercased(originalString: StringType): StringType {
 	return createString(originalString.value.toLowerCase())
+}
+
+// NOTE: A line break is `\n`, `\r`, or `\r\n`. Splitting keeps empty lines, so
+// a trailing break leaves a final empty line and the empty String is one empty
+// line — the same shape `split(on:)` gives, over a separator it can not name.
+export function lines(originalString: StringType): ListType<StringType> {
+	return createList(
+		originalString.value
+			.split(/\r\n|\r|\n/)
+			.map((line) => createString(line)),
+	)
+}
+
+// NOTE: Words are the runs of non-whitespace, so the whitespace between them —
+// and the empty pieces a plain split would leave at the ends and between
+// adjacent separators — is dropped. `\s` with the `u` flag is Unicode
+// whitespace; a String of only whitespace has no words.
+export function words(originalString: StringType): ListType<StringType> {
+	let matches = originalString.value.match(/\S+/gu)
+
+	return createList((matches ?? []).map((word) => createString(word)))
 }
 
 // NOTE: The one native behind the whole trim family, where there used to be
@@ -68,24 +102,7 @@ export function trim__overload$2(
 	}
 }
 
-// NOTE: The one Method here that still matches by UTF-16 code unit, and the
-// reason it can not move into Essence: on the EMPTY part `replaceAll` places
-// the replacement at every code-unit boundary — before the first character and
-// after the last one included, and between the two halves of an astral
-// character. `@::split(part)::join(replacement)` joins code points with
-// no outer separators, which is a different String, and Essence has no way to
-// name a code unit. It stays native until that case is respecified.
-export function replaceEvery(
-	originalString: StringType,
-	part: StringType,
-	replacement: StringType,
-): StringType {
-	return createString(
-		originalString.value.replaceAll(part.value, replacement.value),
-	)
-}
-
-export function compareTo(
+export function compareTo__overload$1(
 	originalString: StringType,
 	otherString: StringType,
 ): OrderingType {

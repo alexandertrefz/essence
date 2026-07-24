@@ -625,6 +625,7 @@ describe("Standard Library Loader", () => {
 			"Optional",
 			"Ordering",
 			"Side",
+			"Case",
 			"NumberFormat",
 			"Record",
 			"List",

@@ -82,6 +82,9 @@ implementation {
 	show("String.is(_ String) [both empty]", emptyText::is(""))
 	show("String.isNot(_ String)", greeting::isNot("nope"))
 	show("String.isNot(_ String) [equal]", greeting::isNot("Hello, World"))
+	show("String.is(_ String, comparing: Case) [sensitive]", "Hello"::is("hello", comparing Case#Sensitive))
+	show("String.is(_ String, comparing: Case) [insensitive]", "Hello"::is("hello", comparing Case#Insensitive))
+	show("String.is(_ String, comparing: Case) [insensitive, differing]", "Hello"::is("world", comparing Case#Insensitive))
 	show("String.prepend(_ String)", greeting::prepend(">> "))
 	show("String.prepend(_ String) [empty]", greeting::prepend(emptyText))
 	show("String.append(_ String)", greeting::append("!"))
@@ -90,6 +93,12 @@ implementation {
 	show("String.split(on: String) [no match]", greeting::split(on ";"))
 	show("String.split(on: String) [empty separator]", "abc"::split(on ""))
 	show("String.split(on: String) [empty receiver]", emptyText::split(on ","))
+	show("String.lines()", "first
+second
+third"::lines())
+	show("String.lines() [single line]", greeting::lines())
+	show("String.words()", "  the quick  brown "::words())
+	show("String.words() [only whitespace]", "   "::words())
 	show("String.contains(_ String)", greeting::contains("lo,"))
 	show("String.contains(_ String) [absent]", greeting::contains("zz"))
 	show("String.doesNotContain(_ String)", greeting::doesNotContain("zz"))
@@ -121,6 +130,9 @@ implementation {
 	show("String.doesNotEnd(with: String) [present]", greeting::doesNotEnd(with "World"))
 	show("String.replaceEvery(_ String, with: String)", greeting::replaceEvery("o", with "0"))
 	show("String.replaceEvery(_ String, with: String) [no match]", greeting::replaceEvery("z", with "0"))
+	show("String.replaceEvery(_ String, with: String) [empty part]", greeting::replaceEvery("", with "0"))
+	show("String.replaceFirst(_ String, with: String)", "a-a-a"::replaceFirst("a", with "b"))
+	show("String.replaceFirst(_ String, with: String) [no match]", greeting::replaceFirst("z", with "0"))
 	show("String.repeat(times: Integer)", "ab"::repeat(times 3))
 	show("String.repeat(times: Integer) [zero]", "ab"::repeat(times 0))
 	show("String.repeat(times: Integer) [negative]", "ab"::repeat(times -1))
@@ -131,6 +143,8 @@ implementation {
 	show("String.slice(from: Integer, to: Integer) [past the end]", greeting::slice(from 7, to 99))
 	showMaybe("String.firstIndex(of: String)", greeting::firstIndex(of "World"))
 	showMaybe("String.firstIndex(of: String) [absent]", greeting::firstIndex(of "zz"))
+	showMaybe("String.lastIndex(of: String)", "a-b-a"::lastIndex(of "a"))
+	showMaybe("String.lastIndex(of: String) [absent]", greeting::lastIndex(of "zz"))
 	show("String.pad(to: Integer, with: String)", "7"::pad(to 3, with "0"))
 	show("String.pad(to: Integer, with: String) [already long enough]", greeting::pad(to 3, with "0"))
 	show("String.pad(to: Integer, with: String, at: Side) [end]", "7"::pad(to 3, with ".", at Side#End))
@@ -141,6 +155,9 @@ implementation {
 	show("String.compareTo(_ String)", "app"::compareTo("apple"))
 	show("String.compareTo(_ String) [equal]", greeting::compareTo("Hello, World"))
 	show("String.compareTo(_ String) [greater]", "b"::compareTo("a"))
+	show("String.compareTo(_ String, comparing: Case) [sensitive]", "abc"::compareTo("ABC", comparing Case#Sensitive))
+	show("String.compareTo(_ String, comparing: Case) [insensitive, equal]", "abc"::compareTo("ABC", comparing Case#Insensitive))
+	show("String.compareTo(_ String, comparing: Case) [insensitive, less]", "abc"::compareTo("ABD", comparing Case#Insensitive))
 	show("String.toString()", greeting::toString())
 	show("String.toString() [empty]", emptyText::toString())
 
@@ -521,6 +538,18 @@ implementation {
 	show("Side.toString() [Start]", atStart::toString())
 	show("Side.toString() [End]", atEnd::toString())
 	show("Side.toString() [BothEnds]", atBothEnds::toString())
+
+	§ ——— Case —————————————————————————————————————————————————————————————
+	constant sensitive: Case = #Sensitive
+	constant insensitive: Case = #Insensitive
+
+	show("Choice_Equatable.is(_ Case) [Sensitive]", sensitive::is(#Sensitive))
+	show("Choice_Equatable.is(_ Case) [Insensitive]", insensitive::is(#Insensitive))
+	show("Choice_Equatable.is(_ Case) [differing]", sensitive::is(#Insensitive))
+	show("Choice_Equatable.isNot(_ Case) [differing]", sensitive::isNot(#Insensitive))
+	show("Choice_Equatable.isNot(_ Case) [same]", sensitive::isNot(#Sensitive))
+	show("Case.toString() [Sensitive]", sensitive::toString())
+	show("Case.toString() [Insensitive]", insensitive::toString())
 
 	§ ——— NumberFormat ———————————————————————————————————————————————————————
 	constant asFraction: NumberFormat = #Fraction
