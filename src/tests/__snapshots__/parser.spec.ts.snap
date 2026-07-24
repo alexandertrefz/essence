@@ -21437,3 +21437,217 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
   },
 }
 `;
+
+exports[`Parser Expressions FunctionInvocations should parse a bare Case value as a labelled argument, the space before \`#\` keeping the label distinct from a Choice prefix 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": {
+              "content": "at",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Start",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": null,
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 38,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 32,
+                  "line": 1,
+                },
+              },
+              "value": null,
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 39,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 41,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 41,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choice#Case\` as a prefixed Case value passed positionally 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": null,
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Start",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 39,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 34,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": {
+                "content": "Side",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 33,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 29,
+                    "line": 1,
+                  },
+                },
+              },
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+              "value": null,
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 40,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 42,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 42,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;

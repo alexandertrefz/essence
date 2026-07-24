@@ -497,4 +497,78 @@ describe("Validator", () => {
 			).toBe(true)
 		})
 	})
+
+	describe("Infinite Recursion", () => {
+		it("reports a Method whose only path returns a call to itself", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Looping for Integer {
+					forever() -> Integer { <- @::forever() }
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("infinite-recursion")
+		})
+
+		it("reports a Method that recurses on every branch, with no base case", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Looping for Integer {
+					forever() -> Integer {
+						if @::isNegative() {
+							<- @::forever()
+						} else {
+							<- @::forever()
+						}
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("infinite-recursion")
+		})
+
+		it("accepts a Method whose recursion is guarded by a base case", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Looping for Integer {
+						countDown() -> Integer {
+							if @::isNegative() {
+								<- 0
+							} else {
+								<- @::countDown()
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("accepts a Method that dispatches through a Match, where each Case narrows the receiver to a different Method", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Rendering for Number {
+						render() -> String {
+							<- match @ -> String {
+								case Integer { <- @::toString() }
+								case Rational { <- @::toString() }
+								case Algebraic { <- @::toString() }
+								case Transcendental { <- @::toString() }
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("accepts a Method that delegates to a different Method", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Delegating for Integer {
+						distance() -> Integer { <- @::absolute() }
+					}
+				}`),
+			).toEqual([])
+		})
+	})
 })
