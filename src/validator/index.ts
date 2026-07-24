@@ -7,7 +7,7 @@ import {
 } from "../diagnostics/index"
 import {
 	countOf,
-	createInferenceContext,
+	createFreshenedInference,
 	describeParameter,
 	describeSignature,
 	describeType,
@@ -322,16 +322,13 @@ function validateFunctionInvocation(
 			let index = 0
 
 			for (let overload of functionType.overloads) {
+				let { parameterTypes, context } =
+					createFreshenedInference(overload)
+
 				overloadMatched =
-					matchArguments(
-						overload.parameterTypes,
-						matchableArguments,
-						{
-							inference: createInferenceContext(
-								overload.generics,
-							),
-						},
-					).type === "Match"
+					matchArguments(parameterTypes, matchableArguments, {
+						inference: context,
+					}).type === "Match"
 
 				if (overloadMatched) {
 					break
@@ -362,12 +359,14 @@ function validateFunctionInvocation(
 				node.overloadedMethodIndex = index
 			}
 		} else {
+			let { parameterTypes, context } =
+				createFreshenedInference(functionType)
 			let matchResult = matchArguments(
-				functionType.parameterTypes,
+				parameterTypes,
 				matchableArgumentsFromTypedNodes(node.arguments),
 				{
 					collectAllMismatches: true,
-					inference: createInferenceContext(functionType.generics),
+					inference: context,
 				},
 			)
 
@@ -1155,12 +1154,13 @@ function validateSimpleFunctionInvocation(
 		validateExpression(argumentNode.value)
 	}
 
+	let { parameterTypes, context } = createFreshenedInference(functionType)
 	let matchResult = matchArguments(
-		functionType.parameterTypes,
+		parameterTypes,
 		matchableArgumentsFromTypedNodes(argumentNodes),
 		{
 			collectAllMismatches: true,
-			inference: createInferenceContext(functionType.generics),
+			inference: context,
 		},
 	)
 
