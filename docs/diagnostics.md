@@ -312,6 +312,13 @@ Only a Namespace with a target Type (`for …`) can conform to a Protocol.
 A Function with Protocol-bound Type Parameters can not be passed around as a
 value yet — call it directly.
 
+### `overloaded-function-value`
+
+An overloaded Function (an `overload` block, or an overloaded free Function like
+`loop`) names a set of signatures, not one Function value — a bare reference
+would leave every later invocation unable to tell which overload was meant.
+Invoke it, or wrap the overload you mean in a Function literal.
+
 ### `protocol-bound-namespace-generic`
 
 A Namespace's Type Parameters can not carry Protocol bounds directly — a

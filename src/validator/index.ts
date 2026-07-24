@@ -146,6 +146,37 @@ function validateExpression(
 // bindings. A stored bounded Function would later be invoked without its
 // conformances, so every value position rejects it.
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
+	// NOTE: An overloaded Function is a SET of signatures, not one Function value
+	// — a bare reference (`constant f = someOverloadedFn`) names every overload
+	// at once, and nothing downstream can pick which one a later invocation
+	// meant. Refused in every value position, exactly like a bounded Function,
+	// and for the same reason: resolution only happens at a direct call.
+	if (
+		node.type.type === "OverloadedMethod" ||
+		node.type.type === "OverloadedStaticMethod"
+	) {
+		let count = node.type.overloads.length
+
+		reportError(
+			"An overloaded Function can not be used as a value",
+			node.position,
+			{
+				code: "overloaded-function-value",
+				labels: [
+					primary(
+						node.position,
+						`this names all ${count} overloads at once`,
+					),
+				],
+				helps: [
+					"Invoke it, or wrap the overload you mean in a Function literal.",
+				],
+			},
+		)
+
+		return
+	}
+
 	if (isBoundFunctionType(node.type)) {
 		reportError(
 			"A Function with Protocol-bound Type Parameters can not be used as a value",

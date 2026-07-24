@@ -1963,6 +1963,113 @@ describe("Parser", () => {
 			}
 		})
 
+		// NOTE: The free-Function counterparts of the body-less Method forms —
+		// only a `declarations { … }` Program produces them, and only the
+		// standard library opens one.
+		function declarationsNode(source: string): parser.ImplementationNode {
+			let program = parse(source, { allowDeclarationsHeader: true })
+
+			return program.implementation.nodes[0]
+		}
+
+		it("should parse a body-less native free Function", () => {
+			let node = declarationsNode(
+				`declarations {
+					§§ Answers with the value it was given.
+					function identity <infer Item>(_ value: Item) -> Item
+				}`,
+			)
+
+			expect(node.nodeType).toBe("NativeFunctionStatement")
+
+			if (node.nodeType === "NativeFunctionStatement") {
+				expect(node.name.content).toBe("identity")
+				expect(node.signature.nodeType).toBe("NativeMethodSignature")
+				expect(node.signature.generics).toHaveLength(1)
+				expect(node.signature.parameters).toHaveLength(1)
+				expect(node.documentation?.description).toBe(
+					"Answers with the value it was given.",
+				)
+			}
+		})
+
+		it("should reassemble the __ sigil in a native free Function's name", () => {
+			let node = declarationsNode(
+				`declarations {
+					§§ Prints a value.
+					function __print <infer Item>(_ value: Item) -> Item
+				}`,
+			)
+
+			expect(node.nodeType).toBe("NativeFunctionStatement")
+
+			if (node.nodeType === "NativeFunctionStatement") {
+				expect(node.name.content).toBe("__print")
+			}
+		})
+
+		it("should still parse a bodied free Function in declarations mode", () => {
+			let node = declarationsNode(
+				`declarations {
+					§§ Answers with the value it was given.
+					function identity <Item>(_ value: Item) -> Item {
+						<- value
+					}
+				}`,
+			)
+
+			expect(node.nodeType).toBe("FunctionStatement")
+
+			if (node.nodeType === "FunctionStatement") {
+				expect(node.value.body).toHaveLength(1)
+			}
+		})
+
+		it("should parse a fully body-less overload function block", () => {
+			let node = declarationsNode(
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						(first value: Integer) -> Integer
+						(second value: String) -> String
+					}
+				}`,
+			)
+
+			expect(node.nodeType).toBe("OverloadedFunctionStatement")
+
+			if (node.nodeType === "OverloadedFunctionStatement") {
+				expect(node.name.content).toBe("combine")
+				expect(node.methods).toHaveLength(2)
+				expect(node.methods[0].nodeType).toBe("NativeMethodSignature")
+				expect(node.methods[1].nodeType).toBe("NativeMethodSignature")
+				expect(node.documentation?.description).toBe(
+					"Combines two values.",
+				)
+			}
+		})
+
+		it("should parse an overload function block that mixes a bodied and a body-less entry", () => {
+			let node = declarationsNode(
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						(first value: Integer) -> Integer
+						(second value: String) -> String {
+							<- value
+						}
+					}
+				}`,
+			)
+
+			expect(node.nodeType).toBe("OverloadedFunctionStatement")
+
+			if (node.nodeType === "OverloadedFunctionStatement") {
+				expect(node.methods[0].nodeType).toBe("NativeMethodSignature")
+				expect(node.methods[1].nodeType).toBe("FunctionValue")
+			}
+		})
+
 		it("should reject a declarations block outside the standard library", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
 				`declarations {

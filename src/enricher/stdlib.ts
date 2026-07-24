@@ -9,7 +9,6 @@ import { builtinMemberOrder, builtinTypeOrder } from "./builtins"
 import { enrichPrograms } from "./index"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
-import nativeFunctions from "./types/NativeFunctions"
 
 // NOTE: Where the standard library's Essence sources live. Resolved off this
 // module's own location rather than the working directory — the same trick the
@@ -31,6 +30,16 @@ export type NamespaceNativeBindings = {
 }
 
 export type NativeBindings = Record<string, NamespaceNativeBindings>
+
+// NOTE: Which entries of a free Function — one that belongs to no Namespace —
+// are bound to the runtime rather than implemented in Essence, keyed by the
+// Function's name. ONE FLAG PER ENTRY in written order, exactly as a Method's:
+// a body-less `function` has a single `true`, an `overload function` block has
+// one flag per entry, and the position IS the `__overload$N` index. `__print`
+// is the first inhabitant. The Rewriter reads this to tell a native free
+// Function (a read off the runtime `functions` module) from an Essence-bodied
+// one, and `generateNatives` renders the module's contract from it.
+export type FunctionBindings = Record<string, Array<boolean>>
 
 // NOTE: Milliseconds spent in each stage of the load. The standard library is
 // read once per process and everything downstream waits on it, so what it
@@ -66,6 +75,7 @@ export type Stdlib = {
 	// Only the BODIED members survive into these; a native has no body to emit.
 	typedPrograms: Array<common.typed.Program>
 	nativeBindings: NativeBindings
+	functionBindings: FunctionBindings
 	timing: StdlibTiming
 }
 
@@ -161,6 +171,8 @@ export function declaredNames(programs: Array<parser.Program>): {
 					break
 				case "NamespaceDefinitionStatement":
 				case "FunctionStatement":
+				case "NativeFunctionStatement":
+				case "OverloadedFunctionStatement":
 				case "ConstantDeclarationStatement":
 				case "VariableDeclarationStatement":
 					members.add(node.name.content)
@@ -255,6 +267,15 @@ function stripDeclaredDocumentationPositions(
 			stripMethodDocumentationPositions(member.methods)
 		} else if (member.type === "Function") {
 			stripPosition(member.documentation)
+		} else if (member.type === "OverloadedStaticMethod") {
+			// NOTE: An overloaded free Function documents the set as a whole and
+			// each overload separately — both are handed out, so both are
+			// stripped, exactly as an `overload` Method block's are.
+			stripPosition(member.documentation)
+
+			for (let overload of member.overloads) {
+				stripPosition(overload.documentation)
+			}
 		}
 	}
 
@@ -299,6 +320,34 @@ function collectNativeBindings(
 	return bindings
 }
 
+// NOTE: The nativeness of every free Function the sources declare, in written
+// order — the same record `collectNativeBindings` keeps for a Namespace's
+// Methods, but keyed by the Function's own name because it belongs to no
+// Namespace. A body-less `function` is a single `true`; a bodied one a single
+// `false`; an `overload function` block one flag per entry. The order IS the
+// `__overload$N` index a call site and the runtime module agree on.
+function collectFunctionBindings(
+	programs: Array<parser.Program>,
+): FunctionBindings {
+	let bindings: FunctionBindings = {}
+
+	for (let program of programs) {
+		for (let node of program.implementation.nodes) {
+			if (node.nodeType === "FunctionStatement") {
+				bindings[node.name.content] = [false]
+			} else if (node.nodeType === "NativeFunctionStatement") {
+				bindings[node.name.content] = [true]
+			} else if (node.nodeType === "OverloadedFunctionStatement") {
+				bindings[node.name.content] = node.methods.map(
+					(entry) => entry.nodeType === "NativeMethodSignature",
+				)
+			}
+		}
+	}
+
+	return bindings
+}
+
 // NOTE: The loader's core — everything but the file system. Takes already
 // parsed sources so that a test can drive a synthetic standard library, and a
 // failure case, without a directory to put it in.
@@ -326,12 +375,11 @@ export function loadStdlibFrom(
 	let programs = sources.map((source) => source.program)
 	let declared = declaredNames(programs)
 
-	// NOTE: The whole of what a standard library file starts from — the native
-	// Functions, which have no Namespace to be declared in, and the bare Type
-	// tags, the handful of Types that ARE what a declaration bottoms out in.
-	// Everything else in the language is declared by the sources being loaded
-	// here, into this same Scope.
-	let members: Record<string, common.Type> = { ...nativeFunctions }
+	// NOTE: A standard library file starts from the bare Type tags alone — the
+	// handful of Types a declaration bottoms out in. Everything else in the
+	// language, `__print` and every other free Function included, is declared by
+	// the sources being loaded here, into this same Scope.
+	let members: Record<string, common.Type> = {}
 
 	let scope: enricher.Scope = {
 		parent: null,
@@ -380,6 +428,7 @@ export function loadStdlibFrom(
 		namespaces,
 		typedPrograms: enriched.map((result) => result.program),
 		nativeBindings: collectNativeBindings(programs),
+		functionBindings: collectFunctionBindings(programs),
 		timing: {
 			parse: parseDuration,
 			enrich: enrichDuration,

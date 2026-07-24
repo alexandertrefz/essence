@@ -158,6 +158,7 @@ export type DiagnosticCode =
 	| "nonconforming-namespace"
 	| "conformance-needs-target-type"
 	| "protocol-bound-function-value"
+	| "overloaded-function-value"
 	| "protocol-bound-namespace-generic"
 	| "unknown-where-generic"
 	| "conflicting-where-condition"

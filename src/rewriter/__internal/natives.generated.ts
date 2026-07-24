@@ -354,6 +354,11 @@ export type NestedListNatives = {
 	flatten: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
 
+export type FunctionsNatives = {
+	// static __print<Item>(_: Item) -> Item
+	__print: <Item extends AnyType>(argument0: Item) => Item
+}
+
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
 export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
@@ -420,3 +425,6 @@ export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule
+
+declare const functionsModule: typeof import("./functions")
+export const $functions: FunctionsNatives = functionsModule

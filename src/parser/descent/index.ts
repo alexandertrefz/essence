@@ -409,6 +409,18 @@ class DescentParser {
 			return this.parseChoiceDeclarationStatement()
 		}
 
+		// NOTE: `overload function …` is a free-Function Overload block, only
+		// meaningful in a `declarations { … }` Program — the standard library's
+		// alone. Anywhere else `overload` stays whatever the expression Parser
+		// makes of it, so a user Program's Diagnostics are unchanged.
+		if (
+			this.mode === "declarations" &&
+			token.type === TokenType.KeywordOverload &&
+			this.tokens.peek(1)?.type === TokenType.KeywordFunction
+		) {
+			return this.parseOverloadedFunctionStatement()
+		}
+
 		if (
 			token.type === TokenType.SymbolLeftAngle &&
 			this.tokens.peek(1)?.type === TokenType.SymbolDash
@@ -538,8 +550,46 @@ class DescentParser {
 		return { name, type }
 	}
 
-	protected parseFunctionStatement(): parser.FunctionStatementNode {
+	protected parseFunctionStatement():
+		| parser.FunctionStatementNode
+		| parser.NativeFunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordFunction)
+
+		// NOTE: A `declarations { … }` Program's free `function` may be body-less
+		// — a native signature bound to a runtime export by name — exactly as a
+		// Namespace Method may. `parseMethodBodyOrSignature` decides which by
+		// whether a block follows; the bodied branch it returns is identical to
+		// what `parseOptionallyGenericFunctionLiteral` builds for a user Program.
+		if (this.mode === "declarations") {
+			// NOTE: `__` is the sigil for a native free Function bound to the
+			// runtime — `__print` lexes as `_ _ print`, so the declaration name
+			// is reassembled the same way `parseNativeFunctionInvocation` does at
+			// the call site. It is the one free Function whose name a Program can
+			// not spell as a bare Identifier.
+			let name = this.parseNativeSigilName()
+			let documentation = this.tokens.documentationAbove(
+				keyword.position.start.line,
+			)
+			let result = this.parseMethodBodyOrSignature()
+
+			if (result.nodeType === "NativeMethodSignature") {
+				return generators.nativeFunctionStatement(
+					name,
+					result,
+					{
+						start: keyword.position.start,
+						end: result.position.end,
+					},
+					documentation,
+				)
+			}
+
+			return generators.functionStatement(name, result.value, {
+				start: keyword.position.start,
+				end: result.position.end,
+			})
+		}
+
 		let name = this.parseIdentifier()
 		let value = this.parseOptionallyGenericFunctionLiteral()
 
@@ -547,6 +597,69 @@ class DescentParser {
 			start: keyword.position.start,
 			end: value.position.end,
 		})
+	}
+
+	// NOTE: A free-Function declaration name, allowing the `__` native sigil that
+	// `parseNativeFunctionInvocation` accepts at the call site — `__print` lexes
+	// as two Underscore Symbols and an Identifier, so the `__`-prefixed name is
+	// reassembled here rather than lexed whole. Without the sigil it is an
+	// ordinary Identifier.
+	protected parseNativeSigilName(): parser.IdentifierNode {
+		if (
+			this.tokens.peek()?.type === TokenType.SymbolUnderscore &&
+			this.tokens.peek(1)?.type === TokenType.SymbolUnderscore
+		) {
+			let firstUnderscore = this.tokens.next()
+			this.tokens.next()
+
+			let name = this.parseIdentifier()
+
+			return {
+				nodeType: "Identifier",
+				content: `__${name.content}`,
+				position: {
+					start: firstUnderscore.position.start,
+					end: name.position.end,
+				},
+			}
+		}
+
+		return this.parseIdentifier()
+	}
+
+	// NOTE: An `overload function <name> { … }` block — the free-Function
+	// counterpart of an `overload` Method block, and, like the body-less
+	// signature form, only meaningful in a `declarations { … }` Program. Each
+	// entry is a Function literal or a native signature, mixed freely; the
+	// written order is load-bearing, because the index names the `__overload$N`
+	// export a call site binds to.
+	protected parseOverloadedFunctionStatement(): parser.OverloadedFunctionStatementNode {
+		let keyword = this.tokens.expect(TokenType.KeywordOverload)
+		let documentation = this.tokens.documentationAbove(
+			keyword.position.start.line,
+		)
+
+		this.tokens.expect(TokenType.KeywordFunction)
+
+		let name = this.parseIdentifier()
+
+		let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
+
+		let methods = this.parseStatementList(() =>
+			this.parseMethodBodyOrSignature(),
+		)
+
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		return generators.overloadedFunctionStatement(
+			name,
+			methods,
+			{
+				start: keyword.position.start,
+				end: closingPosition.end,
+			},
+			documentation,
+		)
 	}
 
 	protected parseIfStatement():

@@ -9,6 +9,8 @@ import {
 import {
 	resolveChoiceDeclarationStatementType,
 	resolveFunctionSignatureType,
+	resolveNativeFunctionStatementType,
+	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
 	resolveTypeAliasStatementType,
 } from "./resolvers"
@@ -119,6 +121,8 @@ type HoistableStatementNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
 	| parser.FunctionStatementNode
+	| parser.NativeFunctionStatementNode
+	| parser.OverloadedFunctionStatementNode
 	| parser.NamespaceDefinitionStatementNode
 	| parser.ProtocolDeclarationStatementNode
 
@@ -129,6 +133,8 @@ function isHoistable(
 		node.nodeType === "TypeAliasStatement" ||
 		node.nodeType === "ChoiceDeclarationStatement" ||
 		node.nodeType === "FunctionStatement" ||
+		node.nodeType === "NativeFunctionStatement" ||
+		node.nodeType === "OverloadedFunctionStatement" ||
 		node.nodeType === "NamespaceDefinitionStatement" ||
 		node.nodeType === "ProtocolDeclarationStatement"
 	)
@@ -178,6 +184,20 @@ function hoistDeclarations(
 								scope,
 							)
 						} else if (
+							node.nodeType === "NativeFunctionStatement"
+						) {
+							return resolveNativeFunctionStatementType(
+								node,
+								scope,
+							)
+						} else if (
+							node.nodeType === "OverloadedFunctionStatement"
+						) {
+							return resolveOverloadedFunctionStatementType(
+								node,
+								scope,
+							)
+						} else if (
 							node.nodeType === "ProtocolDeclarationStatement"
 						) {
 							return resolveProtocolDeclarationStatementType(
@@ -213,6 +233,8 @@ function hoistDeclarations(
 
 				if (
 					node.nodeType === "FunctionStatement" ||
+					node.nodeType === "NativeFunctionStatement" ||
+					node.nodeType === "OverloadedFunctionStatement" ||
 					node.nodeType === "NamespaceDefinitionStatement"
 				) {
 					scope.constants.add(node.name.content)
@@ -245,6 +267,22 @@ const enrichImplementation = (
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) => {
+			// NOTE: The two `declarations`-mode free-Function forms declare a
+			// name and nothing to emit — a native has no body, and an overload
+			// block's Type is already hoisted into the member table. They carry
+			// no typed Node into the tree, exactly as a native Namespace Method
+			// carries none; the Rewriter reaches them through the runtime
+			// bindings instead. (A bodied entry in an overload block is not
+			// emitted from the standard library either — the prelude is built
+			// from Namespaces alone — which is why the loader records their
+			// nativeness but the tree stays free of them.)
+			if (
+				node.nodeType === "NativeFunctionStatement" ||
+				node.nodeType === "OverloadedFunctionStatement"
+			) {
+				return []
+			}
+
 			// NOTE: Expected errors are reported as Diagnostics and recovered
 			// from in place — anything thrown past this point is a Compiler
 			// bug. It is reported as a Diagnostic as well, so that a single
