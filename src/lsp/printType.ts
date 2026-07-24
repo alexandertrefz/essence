@@ -21,7 +21,7 @@ export function printType(type: common.Type): string {
 
 			return type.types.map(printType).join(" | ")
 		case "Case":
-			return `${type.choice}#${type.name}`
+			return caseHeader(type)
 		case "List":
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":
@@ -79,6 +79,27 @@ export function printConformanceClauses(
 		.join("")
 }
 
+// NOTE: The `Choice#Case` head a Case prints with. An instantiated Case of a
+// generic Choice carries the applied spelling — `Step<Integer, String>#Done` —
+// so a Hover or Completion detail shows the Type Arguments it was constructed
+// with. A DECLARED Case (`choiceGenerics`, no `typeArguments`) and a fully
+// unbound instantiation (every Argument still its own same-named GenericUse)
+// stay terse as `Step#Done`, where a `<…>` would only echo the header.
+export function caseHeader(caseType: common.CaseType): string {
+	if (
+		caseType.typeArguments !== undefined &&
+		caseType.typeArguments.some(
+			(argument) => argument.type !== "GenericUse",
+		)
+	) {
+		return `${caseType.choice}<${caseType.typeArguments
+			.map(printType)
+			.join(", ")}>#${caseType.name}`
+	}
+
+	return `${caseType.choice}#${caseType.name}`
+}
+
 // NOTE: A Case with its payload shape spelled out — for Hovers where the
 // Case itself is the subject rather than a mention. `printType` deliberately
 // stays terse (`CalculatorOperation#Add`); this is the descriptive form.
@@ -88,8 +109,8 @@ export function printCaseWithPayload(caseType: common.CaseType): string {
 	)
 
 	return members.length === 0
-		? `${caseType.choice}#${caseType.name}`
-		: `${caseType.choice}#${caseType.name} { ${members.join(", ")} }`
+		? caseHeader(caseType)
+		: `${caseHeader(caseType)} { ${members.join(", ")} }`
 }
 
 // NOTE: Non-static Methods carry Self as their first Parameter Type — for

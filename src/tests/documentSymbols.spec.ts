@@ -165,4 +165,29 @@ describe("Document Symbols", () => {
 			["create", "staticMethod"],
 		])
 	})
+
+	// NOTE: The label stays the bare name — a Type Alias's does the same, so a
+	// generic Choice's Type Parameters do not join its outline entry. What
+	// matters is that the generics clause does not break the Cases underneath.
+	it("should list a generic Choice with its Cases as children", () => {
+		let symbols = symbolsOf(
+			[
+				"implementation {",
+				"\tchoice Box<Value> {",
+				"\t\tHolding { value: Value },",
+				"\t\tEmpty,",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+
+		expect(symbols).toHaveLength(1)
+		expect([symbols[0].name, symbols[0].kind]).toEqual(["Box", "choice"])
+		expect(
+			symbols[0].children.map((child) => [child.name, child.kind]),
+		).toEqual([
+			["#Holding", "case"],
+			["#Empty", "case"],
+		])
+	})
 })

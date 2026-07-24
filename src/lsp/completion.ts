@@ -1,10 +1,16 @@
 import { enrichDocument, parseDocument } from "../documents"
+import { flattenUnionMembers } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
-import { printSignatureSummary, printType, signaturesOf } from "./printType"
+import {
+	printCaseWithPayload,
+	printSignatureSummary,
+	printType,
+	signaturesOf,
+} from "./printType"
 import { buildProbeSource } from "./probe"
 import {
 	type Declaration,
@@ -32,9 +38,15 @@ import {
 // carries the receiver's Type in `base.type`, at the Scope the cursor is
 // actually in (its enclosing Function's Parameters, `@`, and so on).
 
+// NOTE: Every rename Declaration kind plus `case` — a Case is not a lexical
+// Declaration (it resolves through its Choice, never a Scope), so it never
+// appears in the rename index, but `#` completion still offers Cases and needs
+// a kind of their own.
+export type CompletionKind = DeclarationKind | "case"
+
 export type CompletionEntry = {
 	label: string
-	kind: DeclarationKind
+	kind: CompletionKind
 	detail: string | null
 	// NOTE: The description alone — a Completion list has no room for the
 	// tagged sections, and Signature Help shows them the moment the call is
@@ -55,6 +67,16 @@ const memberTriggerPattern = /\.[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 // NOTE: A Namespace specifier that is still being typed — the closing `>` is
 // missing, so `methodTriggerPattern` cannot match it yet.
 const specifierTriggerPattern = /::<[^\s"§(){}[\]<>|/@,.:=~_-]*$/
+// NOTE: A Case reference being typed — the `#` sigil, optionally preceded by a
+// Choice name specifier (`Colour#`), and the Case name so far. The character
+// class also excludes `#` itself, so the specifier is a clean Identifier and
+// the trigger locks onto the final `#`.
+const caseTriggerPattern =
+	/([^\s"§(){}[\]<>|/@,.:=~_#-]*)#[^\s"§(){}[\]<>|/@,.:=~_#-]*$/
+// NOTE: A valid Case name that no real Choice is expected to declare — the
+// stand-in a probe writes where the in-progress `#name` was, so the document
+// parses and its expected Type and Choices in scope can be read back.
+const probeCaseName = "LspProbeCase"
 
 export function findCompletions(
 	documentText: string,
@@ -98,6 +120,23 @@ export function findCompletions(
 					documentPath,
 				)
 			: memberCompletions(baseType)
+	}
+
+	// NOTE: A `#` offers Cases rather than Scope names — the two never share a
+	// position, so this is checked before the Scope fallback and only when no
+	// `::` or `.` trigger claimed the cursor first.
+	let caseMatch = caseTriggerPattern.exec(beforeCursor)
+
+	if (caseMatch !== null) {
+		return caseCompletions(
+			lines,
+			cursor,
+			beforeCursor,
+			currentLine,
+			caseMatch.index,
+			caseMatch[1] ?? "",
+			documentPath,
+		)
 	}
 
 	// NOTE: Record member names and Argument labels are offered *alongside*
@@ -485,6 +524,282 @@ function specifierCompletions(
 // and the Hover are where every Overload is spelled out.
 function printInvokedSignature(method: common.MethodType): string {
 	return printSignatureSummary(signaturesOf(method) ?? [])
+}
+
+/*******************/
+/* Case completion */
+/*******************/
+
+// NOTE: `#` completion offers the Cases a Case reference could name at the
+// cursor. An annotated position (`constant step: Step<Integer, String> = #…`, a
+// labelled Argument, a Function's return at `<-`) pins the Choice down to one
+// applied Union — its Cases come back instantiated, so the payload detail shows
+// the concrete Types. With no such expectation the scan mirrors the Enricher's
+// `findCaseTypesInScope`: every Choice in scope offers its declared Cases,
+// generic ones (Generic Aliases) included. A written prefix (`Colour#`) narrows
+// that scan to the one Choice.
+function caseCompletions(
+	lines: Array<string>,
+	cursor: common.Cursor,
+	beforeCursor: string,
+	currentLine: string,
+	matchIndex: number,
+	choicePrefix: string,
+	documentPath?: string,
+): Array<CompletionEntry> {
+	// NOTE: The in-progress `#name` is swapped for a synthetic Case reference so
+	// the whole document parses — later Choice declarations stay in view, and
+	// the expected Type at the `#` and the Choices in scope both read off one
+	// enriched Program.
+	let probeLine =
+		beforeCursor.slice(0, matchIndex) +
+		choicePrefix +
+		`#${probeCaseName}` +
+		currentLine.slice(cursor.column - 1)
+	let probeText = [
+		...lines.slice(0, cursor.line - 1),
+		probeLine,
+		...lines.slice(cursor.line),
+	].join("\n")
+
+	let enrichedProgram: common.typed.Program | null = null
+
+	try {
+		let { program } = parseDocument(probeText, documentPath)
+		enrichedProgram = enrichDocument(program, documentPath).program
+	} catch {
+		return []
+	}
+
+	let { expected, choices } = analyseCaseProbe(enrichedProgram)
+
+	let expectedCases =
+		expected !== null && expected.type === "UnionType"
+			? flattenUnionMembers(expected).filter(
+					(member): member is common.CaseType =>
+						member.type === "Case",
+				)
+			: []
+
+	if (expectedCases.length > 0) {
+		return caseEntries(expectedCases)
+	}
+
+	if (choicePrefix !== "") {
+		return caseEntries(choices.get(choicePrefix) ?? [])
+	}
+
+	return caseEntries([...choices.values()].flat())
+}
+
+function caseEntries(
+	caseTypes: Array<common.CaseType>,
+): Array<CompletionEntry> {
+	let seen = new Set<string>()
+	let entries: Array<CompletionEntry> = []
+
+	for (let caseType of caseTypes) {
+		let key = `${caseType.choice}#${caseType.name}`
+
+		if (seen.has(key)) {
+			continue
+		}
+
+		seen.add(key)
+
+		// NOTE: The `#` is already typed, so the label is the bare Case name —
+		// selecting it completes `#name`. The detail spells the payload out, and
+		// its `Choice#Case` head tells apart two Choices that share a Case name
+		// in the prefix-less scan.
+		entries.push({
+			label: caseType.name,
+			kind: "case",
+			detail: printCaseWithPayload(caseType),
+		})
+	}
+
+	return entries
+}
+
+// NOTE: One pass over the probe's enriched Program: it threads the expected
+// Type down to the synthetic Case reference (mirroring `argumentContext`, plus
+// a Function's return Type at a `<-`) and, along the way, records every Choice
+// declaration's Cases. The expected Type is only meaningful once it reaches the
+// probe, so `expected` stays `undefined` until then.
+function analyseCaseProbe(program: common.typed.Program): {
+	expected: common.Type | null
+	choices: Map<string, Array<common.CaseType>>
+} {
+	let expected: common.Type | null | undefined = undefined
+	let choices = new Map<string, Array<common.CaseType>>()
+
+	function visitBody(
+		nodes: Array<common.typed.ImplementationNode>,
+		expectedType: common.Type | null,
+	) {
+		for (let node of nodes) {
+			visitNode(node, expectedType)
+		}
+	}
+
+	function visitFunction(definition: common.typed.FunctionDefinitionNode) {
+		visitBody(definition.body, definition.returnType)
+	}
+
+	function visitArguments(
+		nodeArguments: Array<common.typed.ArgumentNode>,
+		parameterTypes: common.BaseFunction["parameterTypes"] | null,
+	) {
+		nodeArguments.forEach((argument, index) => {
+			let parameterType = parameterTypes?.[index]?.type ?? null
+
+			visitNode(
+				argument.value,
+				parameterType !== null && parameterType.type !== "GenericUse"
+					? parameterType
+					: null,
+			)
+		})
+	}
+
+	function visitNode(
+		node: common.typed.ImplementationNode,
+		expectedType: common.Type | null,
+	) {
+		switch (node.nodeType) {
+			case "ChoiceDeclarationStatement":
+				if (!choices.has(node.name.content)) {
+					choices.set(
+						node.name.content,
+						node.cases.map((choiceCase) => choiceCase.type),
+					)
+				}
+
+				return
+			case "CaseValue":
+				if (node.caseName.content === probeCaseName) {
+					expected = expectedType
+				}
+
+				if (node.value !== null) {
+					visitNode(
+						node.value,
+						node.type.type === "Case"
+							? { type: "Record", members: node.type.members }
+							: null,
+					)
+				}
+
+				return
+			case "ConstantDeclarationStatement":
+			case "VariableDeclarationStatement":
+				visitNode(node.value, node.declaredType ?? node.type)
+				return
+			case "VariableAssignmentStatement":
+				visitNode(node.value, null)
+				return
+			case "FunctionStatement":
+				visitFunction(node.value)
+				return
+			case "FunctionValue":
+				visitFunction(node.value)
+				return
+			case "NamespaceDefinitionStatement":
+				for (let property of Object.values(node.properties)) {
+					visitNode(property.value, null)
+				}
+
+				for (let member of Object.values(node.methods)) {
+					let methods =
+						member.nodeType === "OverloadedMethod" ||
+						member.nodeType === "OverloadedStaticMethod"
+							? member.methods
+							: [member.method]
+
+					for (let method of methods) {
+						visitFunction(method.value)
+					}
+				}
+
+				return
+			case "IfStatement":
+				visitNode(node.condition, null)
+				visitBody(node.body, null)
+				return
+			case "IfElseStatement":
+				visitNode(node.condition, null)
+				visitBody(node.trueBody, null)
+				visitBody(node.falseBody, null)
+				return
+			case "ReturnStatement":
+				visitNode(node.expression, expectedType)
+				return
+			case "FunctionInvocation": {
+				let calleeType = node.name.type
+
+				visitNode(node.name, null)
+				visitArguments(
+					node.arguments,
+					calleeType.type === "Function"
+						? calleeType.parameterTypes
+						: null,
+				)
+				return
+			}
+			case "MethodInvocation":
+				visitNode(node.base, null)
+				visitArguments(node.arguments, null)
+				return
+			case "NativeFunctionInvocation":
+				visitArguments(node.arguments, null)
+				return
+			case "Lookup":
+				visitNode(node.base, null)
+				return
+			case "Combination":
+				visitNode(node.lhs, expectedType)
+				visitNode(node.rhs, expectedType)
+				return
+			case "Match":
+				visitNode(node.value, null)
+
+				for (let handler of node.handlers) {
+					visitBody(handler.body, expectedType)
+				}
+
+				return
+			case "RecordValue":
+				for (let member of Object.values(node.members)) {
+					visitNode(member, null)
+				}
+
+				return
+			case "ListValue": {
+				let itemType =
+					expectedType?.type === "List" ? expectedType.itemType : null
+
+				for (let value of node.values) {
+					visitNode(value, itemType)
+				}
+
+				return
+			}
+			case "TypeAliasStatement":
+			case "ProtocolDeclarationStatement":
+			case "Identifier":
+			case "Self":
+			case "StringValue":
+			case "IntegerValue":
+			case "RationalValue":
+			case "BooleanValue":
+			case "NothingValue":
+				return
+		}
+	}
+
+	visitBody(program.implementation.nodes, null)
+
+	return { expected: expected ?? null, choices }
 }
 
 /********************/

@@ -34,6 +34,21 @@ describe("Folding Ranges", () => {
 		expect(ranges).toContainEqual({ startLine: 2, endLine: 3 })
 	})
 
+	it("should fold a generic Choice declaration", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ranges = foldingRangesOf(source)
+
+		expect(ranges).toContainEqual({ startLine: 2, endLine: 4 })
+	})
+
 	it("should fold the implementation block and a Function, stopping before the closing brace", () => {
 		let source = [
 			"implementation {",

@@ -71,6 +71,24 @@ describe("Semantic Tokens", () => {
 		expect(tokenAt(source, 8, 17)?.type).toBe("typeParameter")
 	})
 
+	it("should classify a generic Choice's Type Parameters like a Type Alias's", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: `Box` is the Choice's Type; `Value` in the header and in the
+		// payload are its Type Parameter; `value` is a Record member Property.
+		expect(tokenAt(source, 2, 9)?.type).toBe("type")
+		expect(tokenAt(source, 2, 13)?.type).toBe("typeParameter")
+		expect(tokenAt(source, 3, 13)?.type).toBe("property")
+		expect(tokenAt(source, 3, 20)?.type).toBe("typeParameter")
+	})
+
 	it("should classify Parameters and Methods", () => {
 		let source = [
 			"implementation {",

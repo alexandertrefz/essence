@@ -426,4 +426,61 @@ describe("Hover of a standard library Method", () => {
 			].join("\n\n"),
 		)
 	})
+
+	describe("Generic Choices", () => {
+		let step = [
+			"implementation {",
+			"\tchoice Step<State, Result> {",
+			"\t\tContinue { state: State },",
+			"\t\tDone { value: Result },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		it("should spell a generic Choice's declaration head with its Type Parameters", () => {
+			expect(hover(step, { line: 2, column: 9 })).toBe(
+				[
+					"choice Step<State, Result>",
+					"#Continue { state: State }",
+					"#Done { value: Result }",
+				].join("\n"),
+			)
+		})
+
+		let box = [
+			"implementation {",
+			"\tchoice Box<Value> {",
+			"\t\tHolding { value: Value },",
+			"\t\tEmpty,",
+			"\t}",
+			"\tconstant b: Box<Integer> = #Holding({ value = 5 })",
+			"}",
+		].join("\n")
+
+		it("should show a constructed Case value's instantiated payload", () => {
+			expect(hover(box, { line: 6, column: 31 })).toBe(
+				"Box<Integer>#Holding { value: Integer }",
+			)
+		})
+
+		it("should show a Case Matcher's instantiated payload", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Box<Value> {",
+				"\t\tHolding { value: Value },",
+				"\t\tEmpty,",
+				"\t}",
+				"\tconstant b: Box<Integer> = #Empty",
+				"\t__print(match b -> Integer {",
+				"\t\tcase #Holding { <- 0 }",
+				"\t\tcase #Empty { <- 1 }",
+				"\t})",
+				"}",
+			].join("\n")
+
+			expect(hover(source, { line: 8, column: 9 })).toBe(
+				"Box<Integer>#Holding { value: Integer }",
+			)
+		})
+	})
 })
