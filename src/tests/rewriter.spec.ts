@@ -2426,7 +2426,7 @@ describe("Rewriter", () => {
 			describe("reduce", () => {
 				it("combines every item onto the starting value", () => {
 					expect(
-						list.reduce(
+						list.reduce__overload$1(
 							list.createList([
 								integerOne(),
 								integerTwo(),
@@ -2446,7 +2446,7 @@ describe("Rewriter", () => {
 
 				it("returns the starting value for the empty list", () => {
 					expect(
-						list.reduce(
+						list.reduce__overload$1(
 							listEmpty(),
 							integerZero(),
 							(accumulator: integer.IntegerType) => accumulator,

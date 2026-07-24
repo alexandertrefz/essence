@@ -22,6 +22,7 @@ import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import type { SideType } from "./Side"
+import type { StepType } from "./Step"
 import type { StringType } from "./String"
 import type { TranscendentalType } from "./Transcendental"
 import type { AnyType } from "./type"
@@ -320,7 +321,9 @@ export type ListNatives = {
 	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> List<Result>
 	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
 	// reduce<ItemType, Result>(startingWith: Result, _: (_: Result, _: ItemType) -> Result) -> Result
-	reduce: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, argument2: (argument0: Result, argument1: ItemType) => Result) => Result
+	reduce__overload$1: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, argument2: (argument0: Result, argument1: ItemType) => Result) => Result
+	// reduce<ItemType, Result>(startingWith: Result, step: (_: Result, _: ItemType) -> Step<Result, Result>) -> Result
+	reduce__overload$2: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, startingWith: Result, step: (argument0: Result, argument1: ItemType) => StepType<Result, Result>) => Result
 	// keepEvery<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
 	keepEvery: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
@@ -357,6 +360,14 @@ export type NestedListNatives = {
 export type FunctionsNatives = {
 	// static __print<Item>(_: Item) -> Item
 	__print: <Item extends AnyType>(argument0: Item) => Item
+	// static loop<State>(from: Integer, through: Integer, startingWith: State, step: (_: Integer, _: State) -> State) -> State
+	loop__overload$1: <State extends AnyType>(from: IntegerType, through: IntegerType, startingWith: State, step: (argument0: IntegerType, argument1: State) => State) => State
+	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
+	loop__overload$2: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
+	// static loop<State>(startingWith: State, until: (_: State) -> Boolean, step: (_: State) -> State) -> State
+	loop__overload$3: <State extends AnyType>(startingWith: State, until: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
+	// static loop<State, Result>(startingWith: State, step: (_: State) -> Step<State, Result>) -> Result
+	loop__overload$4: <State extends AnyType, Result extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Result>) => Result
 }
 
 declare const StringModule: typeof import("./String")

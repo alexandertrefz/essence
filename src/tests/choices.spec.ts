@@ -85,7 +85,7 @@ function codesOf(source: string): Array<string> {
 }
 
 // NOTE: The declared Type of a named Declaration in an enriched Program — the
-// applied Union of a `type Applied = Step<Integer, String>` alias, or the
+// applied Union of a `type Applied = Progress<Integer, String>` alias, or the
 // Generic Alias a generic `choice` resolves to — so a test can read a Type off
 // the tree without also constructing a value for it.
 function declaredTypeOf(source: string, name: string): common.Type {
@@ -131,10 +131,10 @@ function valueTypeOf(source: string, name: string): common.Type {
 	return node.value.type
 }
 
-const stepChoice = `
-	choice Step<State, Result> {
-		Continue { state: State },
-		Done { value: Result },
+const progressChoice = `
+	choice Progress<State, Result> {
+		Going { state: State },
+		Stopped { value: Result },
 	}
 `
 
@@ -168,9 +168,9 @@ describe("Choices", () => {
 
 		it("parses a Choice Declaration with a Generic clause", () => {
 			let program = parse(`implementation {
-				choice Step<State, Result> {
-					Continue { state: State },
-					Done { value: Result },
+				choice Progress<State, Result> {
+					Going { state: State },
+					Stopped { value: Result },
 				}
 			}`)
 			let choice = program.implementation
@@ -185,8 +185,8 @@ describe("Choices", () => {
 			expect(choice.generics[0].inferred).toBe(false)
 			expect(choice.generics[0].defaultType).toBeNull()
 			expect(choice.cases.map((c) => c.name.content)).toEqual([
-				"Continue",
-				"Done",
+				"Going",
+				"Stopped",
 			])
 		})
 
@@ -283,7 +283,7 @@ describe("Choices", () => {
 		})
 
 		it("parses a generic clause on a Choice", () => {
-			let program = parse(`implementation { ${stepChoice} }`)
+			let program = parse(`implementation { ${progressChoice} }`)
 			let choice = program.implementation
 				.nodes[0] as parser.ChoiceDeclarationStatementNode
 
@@ -291,8 +291,8 @@ describe("Choices", () => {
 				choice.generics.map((generic) => generic.name.content),
 			).toEqual(["State", "Result"])
 			expect(choice.cases.map((c) => c.name.content)).toEqual([
-				"Continue",
-				"Done",
+				"Going",
+				"Stopped",
 			])
 		})
 
@@ -450,15 +450,15 @@ describe("Choices", () => {
 	describe("Generic Choices", () => {
 		it("resolves a generic Choice to a Generic Alias over the anonymous Union of its declared Cases", () => {
 			let type = declaredTypeOf(
-				`implementation { ${stepChoice} }`,
-				"Step",
+				`implementation { ${progressChoice} }`,
+				"Progress",
 			)
 
 			expect(type.type).toBe("GenericAlias")
 
 			let alias = type as common.GenericAliasType
 
-			expect(alias.name).toBe("Step")
+			expect(alias.name).toBe("Progress")
 			expect(alias.generics.map((generic) => generic.name)).toEqual([
 				"State",
 				"Result",
@@ -474,7 +474,7 @@ describe("Choices", () => {
 
 			let done = body.types.find(
 				(member): member is common.CaseType =>
-					member.type === "Case" && member.name === "Done",
+					member.type === "Case" && member.name === "Stopped",
 			)!
 
 			// NOTE: A declared Case records the Choice's Generics and keeps its
@@ -492,8 +492,8 @@ describe("Choices", () => {
 
 		it("applies Type Arguments to concrete member Types carrying the applied spelling", () => {
 			let type = declaredTypeOf(
-				`implementation { ${stepChoice}
-					type Applied = Step<Integer, String>
+				`implementation { ${progressChoice}
+					type Applied = Progress<Integer, String>
 				}`,
 				"Applied",
 			)
@@ -503,13 +503,13 @@ describe("Choices", () => {
 			let union = type as common.UnionType
 
 			expect(union.alias).toEqual({
-				name: "Step",
+				name: "Progress",
 				typeArguments: [{ type: "Integer" }, { type: "String" }],
 			})
 
 			let done = union.types.find(
 				(member): member is common.CaseType =>
-					member.type === "Case" && member.name === "Done",
+					member.type === "Case" && member.name === "Stopped",
 			)!
 
 			expect(done.members.value).toEqual({ type: "String" })
@@ -520,7 +520,7 @@ describe("Choices", () => {
 
 			let cont = union.types.find(
 				(member): member is common.CaseType =>
-					member.type === "Case" && member.name === "Continue",
+					member.type === "Case" && member.name === "Going",
 			)!
 
 			expect(cont.members.state).toEqual({ type: "Integer" })
@@ -528,20 +528,20 @@ describe("Choices", () => {
 
 		it("prints an applied generic Choice as written", () => {
 			let type = declaredTypeOf(
-				`implementation { ${stepChoice}
-					type Applied = Step<Integer, String>
+				`implementation { ${progressChoice}
+					type Applied = Progress<Integer, String>
 				}`,
 				"Applied",
 			)
 
-			expect(printType(type)).toBe("Step<Integer, String>")
+			expect(printType(type)).toBe("Progress<Integer, String>")
 		})
 
 		it("hoists a generic Choice so a use may precede its declaration", () => {
 			expect(
 				messagesOf(`implementation {
-					type Applied = Step<Integer, String>
-					${stepChoice}
+					type Applied = Progress<Integer, String>
+					${progressChoice}
 				}`),
 			).toEqual([])
 		})
@@ -557,8 +557,8 @@ describe("Choices", () => {
 
 		it("resolves a bare Case of a generic Choice through the scope scan", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant applied: Step<Integer, String> = #Done({ value = "x" })
+				messagesOf(`implementation { ${progressChoice}
+					constant applied: Progress<Integer, String> = #Stopped({ value = "x" })
 				}`),
 			).toEqual([])
 		})
@@ -581,16 +581,16 @@ describe("Choices", () => {
 
 		it("rejects too few Type Arguments to a generic Choice", () => {
 			expect(
-				codesOf(`implementation { ${stepChoice}
-					type One = Step<Integer>
+				codesOf(`implementation { ${progressChoice}
+					type One = Progress<Integer>
 				}`),
 			).toContain("wrong-type-argument-count")
 		})
 
 		it("rejects a bare generic Choice used without Type Arguments", () => {
 			expect(
-				codesOf(`implementation { ${stepChoice}
-					type Zero = Step
+				codesOf(`implementation { ${progressChoice}
+					type Zero = Progress
 				}`),
 			).toContain("wrong-type-argument-count")
 		})
@@ -1016,14 +1016,14 @@ describe("Choices", () => {
 	describe("Generic Case Instantiation", () => {
 		it("instantiates a constructed Case off its payload", () => {
 			let type = valueTypeOf(
-				`implementation { ${stepChoice}
-					constant done: Step<Integer, String> = Step#Done({ value = "x" })
+				`implementation { ${progressChoice}
+					constant done: Progress<Integer, String> = Progress#Stopped({ value = "x" })
 				}`,
 				"done",
 			) as common.CaseType
 
 			expect(type.type).toBe("Case")
-			expect(type.name).toBe("Done")
+			expect(type.name).toBe("Stopped")
 			expect(type.members.value).toEqual({ type: "String" })
 			expect(type.typeArguments).toEqual([
 				{ type: "GenericUse", name: "State" },
@@ -1051,9 +1051,9 @@ describe("Choices", () => {
 
 		it("accepts a value of the same instantiation", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant a: Step<Integer, String> = #Done("x")
-					constant b: Step<Integer, String> = a
+				messagesOf(`implementation { ${progressChoice}
+					constant a: Progress<Integer, String> = #Stopped("x")
+					constant b: Progress<Integer, String> = a
 				}`),
 			).toEqual([])
 		})
@@ -1063,9 +1063,9 @@ describe("Choices", () => {
 		// into Case members rather than trusting the shared tag.
 		it("rejects a value of a different instantiation", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant done: Step<Integer, String> = #Done("x")
-					constant wrong: Step<String, Integer> = done
+				messagesOf(`implementation { ${progressChoice}
+					constant done: Progress<Integer, String> = #Stopped("x")
+					constant wrong: Progress<String, Integer> = done
 				}`),
 			).toContain(
 				"This value does not fit the declared Type of Constant 'wrong'",
@@ -1074,12 +1074,12 @@ describe("Choices", () => {
 
 		it("narrows instantiated Cases to their concrete member Types", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant step: Step<Integer, String> = #Continue({ state = 5 })
+				messagesOf(`implementation { ${progressChoice}
+					constant step: Progress<Integer, String> = #Going({ state = 5 })
 
 					__print(match step -> String {
-						case #Continue { <- @.state::toString() }
-						case #Done { <- @.value }
+						case #Going { <- @.state::toString() }
+						case #Stopped { <- @.value }
 					})
 				}`),
 			).toEqual([])
@@ -1087,12 +1087,12 @@ describe("Choices", () => {
 
 		it("rejects the wrong member Type when narrowing an instantiated Case", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant step: Step<Integer, String> = #Continue({ state = 5 })
+				messagesOf(`implementation { ${progressChoice}
+					constant step: Progress<Integer, String> = #Going({ state = 5 })
 
 					__print(match step -> String {
-						case #Continue { <- @.state::append("!") }
-						case #Done { <- @.value }
+						case #Going { <- @.state::append("!") }
+						case #Stopped { <- @.value }
 					})
 				}`),
 			).not.toEqual([])
@@ -1105,23 +1105,23 @@ describe("Choices", () => {
 	describe("Single-member Shorthand", () => {
 		it("wraps a bare value for a single-member Case", () => {
 			expect(
-				messagesOf(`implementation { ${stepChoice}
-					constant done: Step<String, Integer> = #Done(5)
+				messagesOf(`implementation { ${progressChoice}
+					constant done: Progress<String, Integer> = #Stopped(5)
 				}`),
 			).toEqual([])
 		})
 
 		it("emits the same Record whether written long or short", () => {
-			let short = generate(`implementation { ${stepChoice}
-				constant done: Step<String, Integer> = #Done(5)
+			let short = generate(`implementation { ${progressChoice}
+				constant done: Progress<String, Integer> = #Stopped(5)
 			}`)
-			let long = generate(`implementation { ${stepChoice}
-				constant done: Step<String, Integer> = #Done({ value = 5 })
+			let long = generate(`implementation { ${progressChoice}
+				constant done: Progress<String, Integer> = #Stopped({ value = 5 })
 			}`)
 
-			expect(short).toContain('$type.createCase("Step#Done"')
+			expect(short).toContain('$type.createCase("Progress#Stopped"')
 			expect(short).toContain("value")
-			expect(long).toContain('$type.createCase("Step#Done"')
+			expect(long).toContain('$type.createCase("Progress#Stopped"')
 		})
 
 		it("reads a Record that fits the shape as the Record, not the value", () => {
@@ -1182,17 +1182,17 @@ describe("Choices", () => {
 
 	// NOTE: The load-bearing case — a user-defined generic Choice and a user
 	// Namespace static Method shaped like the general loop driver, with the
-	// callback's `Result` inferred through the `#Done` payload.
+	// callback's `Result` inferred through the `#Stopped` payload.
 	describe("End-to-end Inference", () => {
-		const driver = `${stepChoice}
+		const driver = `${progressChoice}
 			namespace Loop {
 				static run<infer State, infer Result>(
 					startingWith state: State,
-					step advance: (_ state: State) -> Step<State, Result>,
+					step advance: (_ state: State) -> Progress<State, Result>,
 				) -> Result {
 					<- match advance(state) -> Result {
-						case #Continue { <- Loop.run(startingWith @.state, step advance) }
-						case #Done { <- @.value }
+						case #Going { <- Loop.run(startingWith @.state, step advance) }
+						case #Stopped { <- @.value }
 					}
 				}
 			}
@@ -1204,9 +1204,9 @@ describe("Choices", () => {
 					constant total: Integer = Loop.run(
 						startingWith { index = 1, total = 0 },
 						step (state) {
-							if state.index::isGreaterThan(3) { <- #Done(state.total) }
+							if state.index::isGreaterThan(3) { <- #Stopped(state.total) }
 
-							<- #Continue({ state with
+							<- #Going({ state with
 								index = state.index::add(1),
 								total = state.total::add(state.index),
 							})
@@ -1217,25 +1217,25 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		it("binds the invocation's return Type to the payload Type of #Done", () => {
+		it("binds the invocation's return Type to the payload Type of #Stopped", () => {
 			expect(
 				valueTypeOf(
 					`implementation { ${driver}
 						constant total = Loop.run(
 							startingWith 0,
-							step (state) { <- #Done(state::toString()) })
+							step (state) { <- #Stopped(state::toString()) })
 					}`,
 					"total",
 				),
 			).toEqual({ type: "String" })
 		})
 
-		it("reports an unbound Result for a callback that never returns #Done", () => {
+		it("reports an unbound Result for a callback that never returns #Stopped", () => {
 			expect(
 				codesOf(`implementation { ${driver}
 					constant looped = Loop.run(
 						startingWith 0,
-						step (state) { <- #Continue({ state = state::add(1) }) })
+						step (state) { <- #Going({ state = state::add(1) }) })
 				}`),
 			).toContain("uninferable-type-parameter")
 		})
@@ -1246,9 +1246,9 @@ describe("Choices", () => {
 					constant total: Integer = Loop.run(
 						startingWith { index = 1, total = 0 },
 						step (state) {
-							if state.index::isGreaterThan(5) { <- #Done(state.total) }
+							if state.index::isGreaterThan(5) { <- #Stopped(state.total) }
 
-							<- #Continue({ state with
+							<- #Going({ state with
 								index = state.index::add(1),
 								total = state.total::add(state.index),
 							})

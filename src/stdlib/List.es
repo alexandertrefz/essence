@@ -260,14 +260,39 @@ declarations {
 		§§ @returns the List of transformed items.
 		map<infer Result>(_ transform: (_: ItemType) -> Result) -> List<Result>
 
-		§§ Combines every item into a single value, starting from the given one.
+		§ `reduce` is one Method with two Overloads. The first folds every item
+		§ in, always to the end; the second may stop early, because its combiner
+		§ answers with a `Step` rather than with the accumulator outright —
+		§ `#Continue` carries the accumulator on, `#Done` finishes at once. It is
+		§ the fold a search or a running total that has already found its answer
+		§ can leave, which no Essence expression walking the List could do on its
+		§ own. Both bind `Result` from the `startingWith` value, so both are
+		§ generic in `[ItemType, Result]` exactly as the single Method was.
+
+		§§ Combines every item into a single value, starting from the given one —
+		§§ folding to the end, or stopping early when the combiner says to.
 		§§
-		§§ @param startingWith the value the first combination builds on.
 		§§ @returns the combined value.
-		reduce<infer Result>(
-			startingWith initial: Result,
-			_ combine: (_: Result, _: ItemType) -> Result,
-		) -> Result
+		overload reduce {
+			§§ Combines every item into a single value, starting from the given one.
+			§§
+			§§ @param startingWith the value the first combination builds on.
+			§§ @returns the combined value.
+			<infer Result>(
+				startingWith initial: Result,
+				_ combine: (_: Result, _: ItemType) -> Result,
+			) -> Result
+
+			§§ Combines the items into a single value, starting from the given one, and may stop before the end: the `step` combiner answers with a `Step` — `#Continue` carries the accumulator forward, `#Done` finishes at once with its value. An empty List returns the starting value untouched.
+			§§
+			§§ @param startingWith the value the first combination builds on.
+			§§ @param step the combiner, handed the accumulator and each item, answering with a `Step` — `#Continue` to fold on, `#Done` to finish now.
+			§§ @returns the accumulated value, or the value the first `#Done` carries.
+			<infer Result>(
+				startingWith initial: Result,
+				step combine: (_: Result, _: ItemType) -> Step<Result, Result>,
+			) -> Result
+		}
 
 		§ The complement of `removeEvery(where:)` — the filter. Only the `where`
 		§ form, since keeping just the items equal to a given value is what

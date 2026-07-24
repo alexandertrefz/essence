@@ -31,6 +31,7 @@ import { loadStdlib } from "./stdlib"
 // a genuinely new builtin costs nothing until it needs a place of its own.
 export const builtinMemberOrder: Array<string> = [
 	"__print",
+	"loop",
 	"String",
 	"Boolean",
 	"Integer",
@@ -83,6 +84,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Ordering",
 	"Side",
 	"Case",
+	"Step",
 	"NormalizationForm",
 	"NumberFormat",
 ]

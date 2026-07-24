@@ -45,6 +45,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	DecomposedCompatibilityType: "./NormalizationForm",
 	RationalType: "./Rational",
 	RecordType: "./Record",
+	StepType: "./Step",
+	ContinueType: "./Step",
+	DoneType: "./Step",
 	StringType: "./String",
 	TranscendentalType: "./Transcendental",
 	AnyType: "./type",
@@ -61,6 +64,26 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	NumberFormat: "NumberFormatType",
 	NormalizationForm: "NormalizationFormType",
 	Number: "NumberType",
+}
+
+// NOTE: The generic siblings of `UNION_NAME_ALIASES`, keyed on `UnionType.alias.name`
+// rather than `.name` — the display alias an APPLIED generic Choice stamps
+// (`Step<Integer, String>` sets `alias: { name: "Step", typeArguments }`). Each
+// renders as its runtime alias applied to the mapped Type Arguments —
+// `StepType<IntegerType, StringType>`. A new generic Choice reaching a signature
+// adds one entry here and its Cases below, nothing more.
+const GENERIC_UNION_ALIASES: Record<string, string> = {
+	Step: "StepType",
+}
+
+// NOTE: The Cases of a generic Choice — keyed `Choice#Case`, the sibling of
+// `CASE_TYPES` for the instantiated Cases that carry `typeArguments`. Only ever
+// reached when a bare Case (rather than the whole Choice Union) appears in a
+// signature; the Union of them is mapped whole through `GENERIC_UNION_ALIASES`
+// before its Cases are visited, exactly as `Ordering`'s is.
+const GENERIC_CASE_TYPES: Record<string, string> = {
+	"Step#Continue": "ContinueType",
+	"Step#Done": "DoneType",
 }
 
 // NOTE: The runtime unit types of the builtin `Ordering` and `Side` Choices — the only
@@ -211,6 +234,24 @@ function mapType(
 				return alias
 			}
 
+			// NOTE: An APPLIED generic Choice — `Step<State, Result>` — carries
+			// its display alias in `.alias`, so its runtime alias is applied to
+			// the mapped Type Arguments rather than spelled out as the union of
+			// its Cases (which would lose the `Step` identity the driver reads).
+			if (
+				type.alias !== undefined &&
+				GENERIC_UNION_ALIASES[type.alias.name] !== undefined
+			) {
+				let runtime = GENERIC_UNION_ALIASES[type.alias.name]!
+				ctx.used.add(runtime)
+
+				let args = type.alias.typeArguments
+					.map((argument) => mapType(argument, ctx, where))
+					.join(", ")
+
+				return `${runtime}<${args}>`
+			}
+
 			// NOTE: Every other Union — an anonymous one (`Integer | Rational`) or
 			// an aliased one (`Optional<Integer>` sets `alias`, not `name`) — is
 			// rendered structurally as the union of its members.
@@ -220,6 +261,25 @@ function mapType(
 		}
 		case "Case": {
 			let key = `${type.choice}#${type.name}`
+
+			// NOTE: An instantiated Case of a generic Choice carries
+			// `typeArguments`, so its runtime alias is applied to them —
+			// `ContinueType<State>`. The non-generic Cases below carry none and
+			// map to a bare unit Type.
+			if (
+				type.typeArguments !== undefined &&
+				GENERIC_CASE_TYPES[key] !== undefined
+			) {
+				let runtime = GENERIC_CASE_TYPES[key]!
+				ctx.used.add(runtime)
+
+				let args = type.typeArguments
+					.map((argument) => mapType(argument, ctx, where))
+					.join(", ")
+
+				return `${runtime}<${args}>`
+			}
+
 			let runtime = CASE_TYPES[key]
 
 			if (runtime === undefined) {

@@ -2274,7 +2274,21 @@ class DescentParser {
 	protected parseGenericType(): parser.TypeDeclarationNode {
 		let baseType = this.parseSimpleType()
 
-		if (this.tokens.peek()?.type === TokenType.SymbolLeftAngle) {
+		let leftAngleToken = this.tokens.peek()
+
+		// NOTE: A `<` continues the base Type as a generic application
+		// (`List<Integer>`) ONLY when it sits on the SAME line as the Type it
+		// applies to. A `<` that opens the NEXT line begins a new declaration —
+		// the next entry of an `overload` block leading with its own `<infer …>`
+		// clause is the case in point: a body-less entry returning a bare Generic
+		// (`… -> Result`) sits directly above the next entry's `<`, and reading
+		// the two as `Result<infer …>` would swallow that clause. A Type
+		// application is always written on one line, so this rejects nothing a
+		// declaration means to say.
+		if (
+			leftAngleToken?.type === TokenType.SymbolLeftAngle &&
+			leftAngleToken.position.start.line === baseType.position.end.line
+		) {
 			let leftAngle = this.tokens.next()
 
 			let generics = [this.parseType()]

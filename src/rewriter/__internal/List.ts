@@ -8,6 +8,7 @@ import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import { equal, greater, less, type OrderingType } from "./Ordering"
 import type { RecordType } from "./Record"
+import type { StepType } from "./Step"
 import type { StringType } from "./String"
 import { createString } from "./String"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -78,7 +79,10 @@ export function map<ItemType extends AnyType, Result extends AnyType>(
 	return createList(originalList.value.map((item) => transform(item)))
 }
 
-export function reduce<ItemType extends AnyType, Result extends AnyType>(
+export function reduce__overload$1<
+	ItemType extends AnyType,
+	Result extends AnyType,
+>(
 	originalList: ListType<ItemType>,
 	startingValue: Result,
 	combine: (accumulator: Result, item: ItemType) => Result,
@@ -87,6 +91,35 @@ export function reduce<ItemType extends AnyType, Result extends AnyType>(
 
 	for (let item of originalList.value) {
 		accumulator = combine(accumulator, item)
+	}
+
+	return accumulator
+}
+
+// NOTE: The early-stopping fold — the sibling Overload of `reduce`. Its combiner
+// answers with a `Step` rather than the accumulator outright, so it can leave
+// the walk before its end: `#Continue` carries the accumulator to the next item,
+// `#Done` finishes the whole fold at once with its value and no later item is
+// visited. Native for the same reason `firstItem(where:)` is — no Essence
+// expression can stop a walk partway, and stopping is the whole point.
+export function reduce__overload$2<
+	ItemType extends AnyType,
+	Result extends AnyType,
+>(
+	originalList: ListType<ItemType>,
+	startingValue: Result,
+	combine: (accumulator: Result, item: ItemType) => StepType<Result, Result>,
+): Result {
+	let accumulator = startingValue
+
+	for (let item of originalList.value) {
+		let step = combine(accumulator, item)
+
+		if (step[typeKeySymbol] === "Step#Done") {
+			return step.value
+		}
+
+		accumulator = step.state
 	}
 
 	return accumulator
