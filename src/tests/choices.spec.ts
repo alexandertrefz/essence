@@ -72,6 +72,62 @@ describe("Choices", () => {
 			expect(choice.cases[2].type).toBeNull()
 		})
 
+		it("parses a Choice Declaration with a Generic clause", () => {
+			let program = parse(`implementation {
+				choice Step<State, Result> {
+					Continue { state: State },
+					Done { value: Result },
+				}
+			}`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.nodeType).toBe("ChoiceDeclarationStatement")
+			expect(choice.generics).toHaveLength(2)
+			expect(choice.generics.map((g) => g.name.content)).toEqual([
+				"State",
+				"Result",
+			])
+			expect(choice.generics[0].inferred).toBe(false)
+			expect(choice.generics[0].defaultType).toBeNull()
+			expect(choice.cases.map((c) => c.name.content)).toEqual([
+				"Continue",
+				"Done",
+			])
+		})
+
+		it("parses a Choice Declaration with a defaulted Generic", () => {
+			let program = parse(`implementation {
+				choice Box<Value = Integer> {
+					Full { value: Value },
+					Empty,
+				}
+			}`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.generics).toHaveLength(1)
+			expect(choice.generics[0].name.content).toBe("Value")
+			expect(choice.generics[0].inferred).toBe(false)
+			expect(choice.generics[0].defaultType).not.toBeNull()
+		})
+
+		it("reports an empty Generic clause on a Choice", () => {
+			let { diagnostics } = parseWithDiagnostics(`implementation {
+				choice Foo<> { A }
+			}`)
+
+			expect(containsErrors(diagnostics)).toBe(true)
+		})
+
+		it("parses a non-generic Choice with an empty Generic list", () => {
+			let program = parse(`implementation { ${calculatorChoice} }`)
+			let choice = program.implementation
+				.nodes[0] as parser.ChoiceDeclarationStatementNode
+
+			expect(choice.generics).toEqual([])
+		})
+
 		it("parses a prefixed Case construction", () => {
 			let program = parse(`implementation {
 				constant operation = CalculatorOperation#Add({ left = 1, right = 1 })
