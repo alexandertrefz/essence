@@ -352,12 +352,8 @@ export type NestedListNatives = {
 }
 
 export type FunctionsNatives = {
-	// static loop<State>(from: Integer, through: Integer, startingWith: State, step: (_: Integer, _: State) -> State) -> State
-	loop__overload$1: <State extends AnyType>(from: IntegerType, through: IntegerType, startingWith: State, step: (argument0: IntegerType, argument1: State) => State) => State
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
-	loop__overload$2: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
-	// static loop<State>(startingWith: State, until: (_: State) -> Boolean, step: (_: State) -> State) -> State
-	loop__overload$3: <State extends AnyType>(startingWith: State, until: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
+	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
 	// static loop<State, Result>(startingWith: State, step: (_: State) -> Step<State, Result>) -> Result
 	loop__overload$4: <State extends AnyType, Result extends AnyType>(startingWith: State, step: (argument0: State) => StepType<State, Result>) => Result
 	// static __print<Item>(_: Item) -> Item
@@ -433,3 +429,4 @@ export const $NestedList: NestedListNatives = NestedListModule
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule
+export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3"> = true

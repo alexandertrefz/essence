@@ -1,10 +1,6 @@
 import { toString as algebraicToString } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
-import {
-	createInteger,
-	type IntegerType,
-	toString as integerToString,
-} from "./Integer"
+import { toString as integerToString } from "./Integer"
 import { toString__overload$1 as rationalToString } from "./Rational"
 import type { StepType } from "./Step"
 import { toString as transcendentalToString } from "./Transcendental"
@@ -115,40 +111,19 @@ export function __print<Item extends AnyType>(message: Item): Item {
 	return message
 }
 
-// NOTE: The `loop` family — the native drivers behind the four `loop` Overloads
+// NOTE: The `loop` family — the native drivers behind the `loop` Overloads
 // declared in `src/stdlib/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
-// is the order the entries are written there. A loop can not be written in
-// Essence — it would need a loop to write — so these stay native, each a plain
-// JavaScript loop threading the State the callback hands back.
+// is the order the entries are written there. Only TWO are native: a loop can
+// not be written in Essence — it would need a loop to write — so the two
+// irreducible drivers stay here, each a plain JavaScript loop threading the
+// State the callback hands back. The `until` and counted entries are written in
+// Essence on `while` (see `Loop.es`), so they have no driver here.
 
-// NOTE: The counted loop — one turn per Integer from `start` through `end`, both
-// included, threading the State. Counts DOWN when `start` is the greater, the
-// same direction `List.of(integersFrom:through:)` counts, so the two agree on
-// what an inverted range means. The index is handed to the callback as an
-// `Integer` value, freshly wrapped from the bigint the loop counts with.
+// NOTE: `$1` is the `while` loop — steps while the condition holds, checked
+// BEFORE each step, so a condition false on the seed returns it unchanged. It is
+// the predicate primitive the Essence `until` and counted entries build on.
 export function loop__overload$1<State extends AnyType>(
-	start: IntegerType,
-	end: IntegerType,
-	state: State,
-	advance: (index: IntegerType, state: State) => State,
-): State {
-	if (start.value <= end.value) {
-		for (let value = start.value; value <= end.value; value++) {
-			state = advance(createInteger(value), state)
-		}
-	} else {
-		for (let value = start.value; value >= end.value; value--) {
-			state = advance(createInteger(value), state)
-		}
-	}
-
-	return state
-}
-
-// NOTE: The `while` loop — steps while the condition holds, checked BEFORE each
-// step, so a condition false on the seed returns it unchanged.
-export function loop__overload$2<State extends AnyType>(
 	state: State,
 	condition: (state: State) => BooleanType,
 	advance: (state: State) => State,
@@ -160,21 +135,7 @@ export function loop__overload$2<State extends AnyType>(
 	return state
 }
 
-// NOTE: The `until` loop — the negation of the `while` loop, stepping while the
-// condition is `false` and stopping the moment it turns `true`.
-export function loop__overload$3<State extends AnyType>(
-	state: State,
-	condition: (state: State) => BooleanType,
-	advance: (state: State) => State,
-): State {
-	while (!condition(state).value) {
-		state = advance(state)
-	}
-
-	return state
-}
-
-// NOTE: The general loop — each step answers with a `Step`. `#Done` stops the
+// NOTE: `$4` is the general loop — each step answers with a `Step`. `#Done` stops the
 // loop and its `value` is the Result; `#Continue` carries the next State and the
 // loop goes again. The tag is read the same way `List.sort` reads an `Ordering`.
 export function loop__overload$4<State extends AnyType, Result extends AnyType>(
