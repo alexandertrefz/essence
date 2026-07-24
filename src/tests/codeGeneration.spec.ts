@@ -847,6 +847,73 @@ describe("Code Generation", () => {
 		})
 	})
 
+	describe("Reserved-word identifiers", () => {
+		// NOTE: A JavaScript reserved word — `new`, `default`, `delete` — is a
+		// legal Essence identifier, so a Constant or Parameter can be named one.
+		// Emitting it verbatim produced invalid JavaScript (`const new = …`,
+		// `function (…, default)`) that died at runtime; it is now escaped with a
+		// `_` prefix, which no Essence identifier can contain.
+
+		it("escapes a reserved word as a Constant, at binding and reference", () => {
+			let generated = generate(`
+				implementation {
+					constant new = 5
+
+					__print(new::toString())
+				}
+			`)
+
+			expect(generated).toContain("_new")
+			// The bare reserved word never appears as a binding or a reference.
+			expect(generated).not.toMatch(/\bconst new\b/)
+			expect(generated).not.toMatch(/\(new\)/)
+		})
+
+		it("compiles and runs a reserved word as a Constant", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant new = 5
+						variable delete = 10
+
+						delete = delete::add(new)
+
+						__print(delete::toString())
+					}
+				`),
+			).toEqual([`"15"`])
+		})
+
+		it("compiles and runs a reserved word as a Parameter — the original bug", async () => {
+			expect(
+				await run(`
+					implementation {
+						function pick(_ default: Integer, or fallback: Integer) -> Integer {
+							<- default::add(fallback)
+						}
+
+						__print(pick(3, or 4)::toString())
+					}
+				`),
+			).toEqual([`"7"`])
+		})
+
+		it("keeps a reserved word verbatim as a Record field", async () => {
+			// NOTE: The counterpart guard — a member/property name is NOT escaped,
+			// because a reserved word is legal as a property key and the read has
+			// to match the key the record literal wrote.
+			expect(
+				await run(`
+					implementation {
+						constant thing = { new = 1, default = 2 }
+
+						__print(thing.new::add(thing.default)::toString())
+					}
+				`),
+			).toEqual([`"3"`])
+		})
+	})
+
 	describe("Standard Library Prelude", () => {
 		it("emits an Essence-implemented Method as its own const", () => {
 			const code = generate(`implementation {

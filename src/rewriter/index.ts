@@ -154,7 +154,7 @@ function rewriteNamespaceDefinitionStatement(
 ): estree.ClassDeclaration {
 	return {
 		type: "ClassDeclaration",
-		id: rewriteIdentifier(node.name),
+		id: rewriteVerbatimIdentifier(node.name),
 		superClass: null,
 		body: {
 			type: "ClassBody",
@@ -1125,12 +1125,99 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		type: "MemberExpression",
 		optional: false,
 		object: rewriteExpression(node.base),
-		property: rewriteIdentifier(node.member),
+		property: rewriteVerbatimIdentifier(node.member),
 		computed: false,
 	}
 }
 
+// NOTE: The JavaScript words that can not be a binding or a bare reference —
+// `case`, `default`, `new`, `class` — but ARE legal Essence identifiers, so a
+// Parameter or Constant can be named one and reach here. `with`, `for`, `if`,
+// `case`, `static` are Essence keywords too, yet the Parser still lets them name
+// a Parameter's internal name, so the full JavaScript set is what matters. The
+// list is the reserved words plus the ones a strict-mode module also forbids
+// (`let`, `static`, `implements`, …, `arguments`, `eval`) — emitted code is an
+// ES module, so it runs strict.
+const reservedJavaScriptWords = new Set([
+	"break",
+	"case",
+	"catch",
+	"class",
+	"const",
+	"continue",
+	"debugger",
+	"default",
+	"delete",
+	"do",
+	"else",
+	"enum",
+	"export",
+	"extends",
+	"false",
+	"finally",
+	"for",
+	"function",
+	"if",
+	"import",
+	"in",
+	"instanceof",
+	"new",
+	"null",
+	"return",
+	"super",
+	"switch",
+	"this",
+	"throw",
+	"true",
+	"try",
+	"typeof",
+	"var",
+	"void",
+	"while",
+	"with",
+	"yield",
+	"let",
+	"static",
+	"implements",
+	"interface",
+	"package",
+	"private",
+	"protected",
+	"public",
+	"await",
+	"arguments",
+	"eval",
+])
+
+// NOTE: A reserved word is escaped by prefixing `_`, which NO Essence identifier
+// can contain — the Lexer reads `_` as a Symbol, so it can never be part of a
+// name — which is what makes the escape collision-proof: `_case` can not be a
+// user's own identifier, and no reserved word starts with `_`, so the map is
+// injective. Member and property positions do NOT come through here: a reserved
+// word is a legal property key (`record.case`, `{ case: … }`), and escaping one
+// would part it from the key the record literal emits.
+function escapeReservedWord(name: string): string {
+	return reservedJavaScriptWords.has(name) ? `_${name}` : name
+}
+
 function rewriteIdentifier(
+	node: common.typedSimple.IdentifierNode,
+): estree.Identifier {
+	return {
+		type: "Identifier",
+		name: escapeReservedWord(node.name),
+	}
+}
+
+// NOTE: A name that has to be emitted VERBATIM, never escaped, because it must
+// match a JavaScript name written elsewhere the same way: a member or property
+// read (`record.case` matches the key `{ case: … }` the record literal wrote),
+// and a Namespace's class Identifier (its references go through
+// `namespaceMember`, which names it raw). `rewriteIdentifier` above escapes, so
+// these positions use this instead. A reserved word is legal in every one of
+// them — a property key, and a Namespace name is a Type, which is never a
+// lower-case JavaScript reserved word in practice.
+function rewriteVerbatimIdentifier(
 	node: common.typedSimple.IdentifierNode,
 ): estree.Identifier {
 	return {
