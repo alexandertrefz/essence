@@ -251,9 +251,10 @@ describe("Builtins", () => {
 			expect(undocumented).toEqual([])
 		})
 
-		// NOTE: `__print` is the sole free Function today — a body-less native
-		// bound to `functions.__print`. It is listed in `builtinMemberOrder` and
-		// resolves to a `Function`, which is what its `__`-sigil invocation reads.
+		// NOTE: `__print` is the one SINGLE-signature free Function — a body-less
+		// native bound to `functions.__print`, beside the overloaded `loop`. It is
+		// listed in `builtinMemberOrder` and resolves to a `Function`, which is
+		// what its `__`-sigil invocation reads.
 		it("declares __print as a native free Function", () => {
 			let stdlib = loadStdlib()
 

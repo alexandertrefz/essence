@@ -107,6 +107,111 @@ Error: { x: Integer, y: Integer } has no member 'z'
 "
 `;
 
+exports[`Diagnostic Showcase GenericChoice.es should render the same report every time 1`] = `
+"[wrong-type-argument-count]
+Error: Type 'Step' was given the wrong number of Type Arguments
+    ╭─┤ GenericChoice.es:19:25 │
+    │
+ 19 │     type OneArgument = Step<Integer>
+    │                            ────┬────  
+    │                                ╰────── 1 Type Argument given
+    │ 
+    │ Note: 'Step' takes 2 Type Parameters.
+────╯
+
+[recursive-generic-choice]
+Error: A generic Choice can not name itself in a payload
+    ╭─┤ GenericChoice.es:24:17 │
+    │
+ 24 │        Wrap { inner: Nested<Item> },
+    │                      ───┬──  
+    │                         ╰──── this names the Choice being declared
+    │ 
+    │ Help: Introduce a separate non-generic Choice or Type for the recursive part.
+    │ 
+    │ Note: A generic Choice's payloads are substituted eagerly at each use, so a self-reference would never finish substituting.
+────╯
+
+[uninferable-type-parameter]
+Error: Type Parameter 'Result' could not be inferred
+    ╭─┤ GenericChoice.es:30:19 │
+    │
+ 30 │ ╭─▶     constant never = loop(startingWith 0,
+ 31 │ ├─▶        step (state) { <- #Continue(state::add(1)) })
+    │ │                                                          
+    │ ╰────────────────────────────────────────────────────────── nothing here determines what it binds to
+    │ 
+    │ Help: Write the Type Argument explicitly.
+────╯
+
+[unsatisfied-bound]
+Error: Function does not conform to 'Equatable'
+    ╭─┤ GenericChoice.es:39:18 │
+    │
+ 39 │     constant same = boxed::is(boxed)
+    │                     ────────┬───────  
+    │                             ╰───────── this binds a Type Parameter bound to 'Equatable'
+    │ 
+    │ Help: Declare a Namespace 'for Function is Equatable'.
+    │ 
+    │ Note: No Namespace in scope makes Function conform to 'Equatable'.
+────╯
+
+─── 4 errors
+"
+`;
+
+exports[`Diagnostic Showcase GenericChoiceValues.es should render the same report every time 1`] = `
+"[assignment-type-mismatch]
+Error: This value does not fit the declared Type of Constant 'swapped'
+    ╭─┤ GenericChoiceValues.es:19:44 │
+    │
+ 19 │     constant swapped: Step<String, Integer> = done
+    │                                               ──┬─  
+    │                                                 ╰─── this is a Step<Integer, String>
+    │ 
+    │ Note: 'swapped' is declared as Step<String, Integer>.
+────╯
+
+[unexpected-payload]
+Error: Case '#Empty' does not carry a payload
+    ╭─┤ GenericChoiceValues.es:28:29 │
+    │
+ 28 │     constant boxed = Box#Empty({ value = 1 })
+    │                                ──────┬──────  
+    │                                      ╰──────── nothing goes here
+    │ 
+    │ Help: Write '#Empty' on its own.
+────╯
+
+[payload-type-mismatch]
+Error: This payload does not fit Case '#Both'
+    ╭─┤ GenericChoiceValues.es:37:24 │
+    │
+ 37 │     constant pair = #Both(5)
+    │                           ▲  
+    │                           ╰── this is an Integer
+    │ 
+    │ Help: The one-member shorthand '#Case(value)' only applies to single-member Cases.
+    │ 
+    │ Note: '#Both' carries a { left: Integer, right: Integer }.
+────╯
+
+[overloaded-function-value]
+Error: An overloaded Function can not be used as a value
+    ╭─┤ GenericChoiceValues.es:41:23 │
+    │
+ 41 │     constant everyLoop = loop
+    │                          ──┬─  
+    │                            ╰─── this names all 4 overloads at once
+    │ 
+    │ Help: Invoke it, or wrap the overload you mean in a Function literal.
+────╯
+
+─── 4 errors
+"
+`;
+
 exports[`Diagnostic Showcase Match.es should render the same report every time 1`] = `
 "[missing-case]
 Error: This Match Expression does not handle every Case
