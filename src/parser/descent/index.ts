@@ -1274,10 +1274,17 @@ class DescentParser {
 
 		// NOTE: `ChoiceName#CaseName` — recognised before the typed-Record
 		// backtrack, since a `#` can never follow the Type of a typed Record
-		// literal.
+		// literal. The `#` must sit directly against the Identifier: a space
+		// between them (`label #Case`) marks a bare Case value passed as a
+		// labelled argument, where the Identifier is the label, not a Choice
+		// prefix — so the prefixed reading requires the two to be adjacent.
+		let followingHash = this.tokens.peek(1)
+
 		if (
 			isIdentifierToken(token) &&
-			this.tokens.peek(1)?.type === TokenType.SymbolHash
+			followingHash?.type === TokenType.SymbolHash &&
+			token.position.end.line === followingHash.position.start.line &&
+			token.position.end.column === followingHash.position.start.column
 		) {
 			return this.parseCaseValue()
 		}

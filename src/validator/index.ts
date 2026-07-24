@@ -788,6 +788,105 @@ function validateVariableAssignmentStatement(
 	return node
 }
 
+// NOTE: A Method whose every returning path hands back a direct call to
+// ITSELF can never produce a value — each call only defers to another call of
+// the same Method, and no branch returns anything else, so the recursion has
+// no base case to stop it. This is the decidable core of infinite recursion:
+// it says nothing about a call that MIGHT recurse (a `match` that dispatches
+// per member Type, a guarded base case), only about one that ALWAYS does.
+// `Number.toString` collapsed to `<- @::toString()` was exactly this — on a
+// `Number` that Method IS `Number.toString`, so every path returned itself.
+type MethodIdentity = {
+	namespaceName: string
+	methodName: string
+	// NOTE: Null for a non-overloaded Method, matching the `null`
+	// `overloadedMethodIndex` its call sites carry; an Overload carries its
+	// index in the Method Type, so a call to a *sibling* Overload (a different
+	// index) is not self-recursion and is left alone.
+	overloadIndex: number | null
+}
+
+// NOTE: The returns reachable at the body's own control-flow level — through
+// `if`/`else`, but NOT into a `match` Case or a nested Function literal, where
+// `@::method()` resolves against a narrowed receiver or a different `@`, and
+// so is a different Method than the one being defined.
+function collectTopLevelReturns(
+	body: Array<common.typed.ImplementationNode>,
+): Array<common.typed.ReturnStatementNode> {
+	let returns: Array<common.typed.ReturnStatementNode> = []
+
+	for (let node of body) {
+		if (node.nodeType === "ReturnStatement") {
+			returns.push(node)
+		} else if (node.nodeType === "IfStatement") {
+			returns.push(...collectTopLevelReturns(node.body))
+		} else if (node.nodeType === "IfElseStatement") {
+			returns.push(...collectTopLevelReturns(node.trueBody))
+			returns.push(...collectTopLevelReturns(node.falseBody))
+		}
+	}
+
+	return returns
+}
+
+function isDirectSelfCall(
+	expression: common.typed.ExpressionNode,
+	identity: MethodIdentity,
+): boolean {
+	return (
+		expression.nodeType === "MethodInvocation" &&
+		expression.base.nodeType === "Self" &&
+		expression.member.name === identity.methodName &&
+		expression.namespace.name === identity.namespaceName &&
+		expression.overloadedMethodIndex === identity.overloadIndex
+	)
+}
+
+function checkInfiniteRecursion(
+	name: common.typed.IdentifierNode,
+	definition: common.typed.FunctionDefinitionNode,
+	identity: MethodIdentity,
+): void {
+	let returns = collectTopLevelReturns(definition.body)
+
+	// NOTE: No return of its own — a native Method, or one that answers only
+	// from inside a `match` — says nothing here.
+	if (returns.length === 0) {
+		return
+	}
+
+	let selfCalls = returns.filter((returnNode) =>
+		isDirectSelfCall(returnNode.expression, identity),
+	)
+
+	if (selfCalls.length !== returns.length) {
+		return
+	}
+
+	reportError(
+		"This Method calls itself on every path, so it can never return",
+		name.position,
+		{
+			code: "infinite-recursion",
+			labels: [
+				primary(name.position, "this Method"),
+				...selfCalls.map((returnNode) =>
+					secondary(
+						returnNode.expression.position,
+						"returns a call to the same Method",
+					),
+				),
+			],
+			notes: [
+				"Every returning path hands back another call to it, so there is no base case to stop the recursion.",
+			],
+			helps: [
+				"Give it a path that returns without calling itself — a 'match' Case that dispatches to a different Method, or a guard that answers a base value.",
+			],
+		},
+	)
+}
+
 function validateNamespaceDefinitionStatement(
 	node: common.typed.NamespaceDefinitionStatementNode,
 ): common.typed.NamespaceDefinitionStatementNode {
@@ -802,12 +901,24 @@ function validateNamespaceDefinitionStatement(
 				method.method.value,
 				method.method.position,
 			)
+			checkInfiniteRecursion(method.name, method.method.value, {
+				namespaceName: node.name.content,
+				methodName: method.name.content,
+				overloadIndex: null,
+			})
 		} else {
-			for (let overloadedMethod of method.methods) {
+			for (let index = 0; index < method.methods.length; index++) {
+				let overloadedMethod = method.methods[index]
+
 				validateFunctionDefinition(
 					overloadedMethod.value,
 					overloadedMethod.position,
 				)
+				checkInfiniteRecursion(method.name, overloadedMethod.value, {
+					namespaceName: node.name.content,
+					methodName: method.name.content,
+					overloadIndex: method.overloadIndices[index],
+				})
 			}
 		}
 	}

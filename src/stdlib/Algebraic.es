@@ -12,7 +12,7 @@ declarations {
 		§§ @param other the Algebraic to compare with
 		§§ @returns `true` when the numbers are equal.
 		is(_ other: Algebraic) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Equal)
+			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Whether the Algebraics are different numbers — exactly, no approximation is consulted.
@@ -75,8 +75,11 @@ declarations {
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
 		absolute() -> Algebraic {
-			if @::<Number>isLessThan(0) { <- @::negate() }
-			<- @
+			if @::<Number>isLessThan(0) {
+				<- @::negate()
+			} else {
+				<- @
+			}
 		}
 
 		§§ The Algebraic with its sign flipped. Negating an irrational leaves it irrational, so the result is again an Algebraic.

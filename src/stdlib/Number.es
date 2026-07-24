@@ -38,7 +38,7 @@ declarations {
 		§§ @param other the Number to compare against
 		§§ @returns `true` when both Numbers have the same numeric value.
 		is(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Equal)
+			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Number has a different numeric value than another Number.
@@ -69,7 +69,7 @@ declarations {
 		§§
 		§§ @param other the Number to compare against
 		isLessThan(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Less)
+			<- @::compareTo(other)::is(#Less)
 		}
 
 		§§ Whether this Number is below the given one, or equal to it.
@@ -83,7 +83,7 @@ declarations {
 		§§
 		§§ @param other the Number to compare against
 		isGreaterThan(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Greater)
+			<- @::compareTo(other)::is(#Greater)
 		}
 
 		§§ Whether this Number is above the given one, or equal to it.
@@ -140,23 +140,35 @@ declarations {
 		§§ @returns the lowest Number — `Nothing` for the empty List, which has none.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
-				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isLessThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
-				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isLessThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
-				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isLessThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
-				if firstNumber::isLessThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isLessThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ integers: List<Integer>) -> Optional<Integer>
@@ -171,23 +183,35 @@ declarations {
 		§§ @returns the greatest Number — `Nothing` for the empty List, which has none.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
-				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Rational, _ secondNumber: Rational) -> Rational {
-				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
-				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
-				if firstNumber::isGreaterThanOrEqualTo(secondNumber) { <- firstNumber }
-				<- secondNumber
+				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
+					<- firstNumber
+				} else {
+					<- secondNumber
+				}
 			}
 
 			(_ integers: List<Integer>) -> Optional<Integer>

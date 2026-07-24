@@ -40,7 +40,7 @@ declarations {
 		§§ @param other the Rational to compare against
 		§§ @returns `true` when both are equal.
 		is(_ other: Rational) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Equal)
+			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Rational has a different value than another.
@@ -110,7 +110,7 @@ declarations {
 		§§ Whether this Rational is strictly below the given number.
 		overload isLessThan {
 			(_ other: Rational) -> Boolean {
-				<- @::compareTo(other)::is(Ordering#Less)
+				<- @::compareTo(other)::is(#Less)
 			}
 
 			(_ other: Integer) -> Boolean
@@ -128,7 +128,7 @@ declarations {
 		§§ Whether this Rational is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Rational) -> Boolean {
-				<- @::compareTo(other)::is(Ordering#Greater)
+				<- @::compareTo(other)::is(#Greater)
 			}
 
 			(_ other: Integer) -> Boolean
@@ -154,8 +154,11 @@ declarations {
 
 		§§ The Rational without its sign — its distance from zero.
 		absolute() -> Rational {
-			if @::isLessThan(0/1) { <- @::negate() }
-			<- @
+			if @::isLessThan(0/1) {
+				<- @::negate()
+			} else {
+				<- @
+			}
 		}
 
 		§§ The Rational with its sign flipped.
@@ -183,8 +186,9 @@ declarations {
 			constant truncatedValue = @::truncate()
 			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
 				<- truncatedValue::subtract(1)
+			} else {
+				<- truncatedValue
 			}
-			<- truncatedValue
 		}
 
 		§§ The lowest Integer at or above the Rational — the ceiling.
@@ -192,8 +196,9 @@ declarations {
 			constant truncatedValue = @::truncate()
 			if @::isGreaterThan(0/1)::and(@::isWholeNumber()::negate()) {
 				<- truncatedValue::add(1)
+			} else {
+				<- truncatedValue
 			}
-			<- truncatedValue
 		}
 
 		§§ The Integer part of the Rational — the fractional part cut off, rounding towards zero.

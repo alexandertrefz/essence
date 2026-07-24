@@ -122,6 +122,7 @@ export type DiagnosticCode =
 	| "condition-not-boolean"
 	| "constant-reassignment"
 	| "missing-return"
+	| "infinite-recursion"
 	| "top-level-return"
 	| "not-a-function"
 	| "record-annotation-not-record"

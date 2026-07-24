@@ -116,7 +116,7 @@ export function __print<Item extends AnyType>(message: Item): Item {
 }
 
 // NOTE: The `loop` family — the native drivers behind the four `loop` Overloads
-// declared in `src/stdlib/Step.es`. Each is a free Function, bound by its
+// declared in `src/stdlib/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
 // is the order the entries are written there. A loop can not be written in
 // Essence — it would need a loop to write — so these stay native, each a plain
