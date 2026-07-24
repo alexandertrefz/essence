@@ -313,16 +313,65 @@ export function applyGenericBindings(
 				([name, memberType]) =>
 					[name, applyGenericBindings(memberType, bindings)] as const,
 			)
+			let typeArguments = type.typeArguments?.map((typeArgument) =>
+				applyGenericBindings(typeArgument, bindings),
+			)
 
-			if (
-				entries.every(
-					([name, memberType]) => memberType === type.members[name],
+			let membersUnchanged = entries.every(
+				([name, memberType]) => memberType === type.members[name],
+			)
+			let typeArgumentsUnchanged =
+				typeArguments === undefined ||
+				typeArguments.every(
+					(typeArgument, index) =>
+						typeArgument === type.typeArguments?.[index],
 				)
-			) {
+
+			// NOTE: A DECLARED Case of a generic Choice (`choiceGenerics` set,
+			// no `typeArguments` yet) is being instantiated — force a fresh
+			// object so the applied spelling can be stamped, mirroring the Union
+			// alias healing above. Everything else (a plain Case, an already
+			// instantiated one whose members and Arguments are untouched) comes
+			// back identical, the identity that keeps matchTypes' `lhs === rhs`
+			// fast path O(1) for every non-generic Choice.
+			let isDeclaredCase =
+				type.choiceGenerics !== undefined &&
+				type.typeArguments === undefined
+
+			if (!isDeclaredCase && membersUnchanged && typeArgumentsUnchanged) {
 				return type
 			}
 
-			return { ...type, members: Object.fromEntries(entries) }
+			let members = membersUnchanged
+				? type.members
+				: Object.fromEntries(entries)
+
+			if (isDeclaredCase) {
+				// NOTE: The applied spelling, in declaration order — an unbound
+				// Generic stays a GenericUse so a later substitution can still
+				// bind it (a never-`#Done` callback keeps `Result` open). The
+				// declared-only `choiceGenerics` is dropped; what survives is an
+				// instantiated Case carrying its `typeArguments`.
+				return {
+					type: "Case",
+					choice: type.choice,
+					name: type.name,
+					members,
+					typeArguments: type.choiceGenerics!.map(
+						(generic) =>
+							bindings.get(generic.name) ?? {
+								type: "GenericUse",
+								name: generic.name,
+							},
+					),
+				}
+			}
+
+			return {
+				...type,
+				members,
+				...(typeArguments !== undefined ? { typeArguments } : {}),
+			}
 		}
 		case "Function":
 		case "SimpleMethod":
