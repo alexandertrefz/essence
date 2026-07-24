@@ -486,6 +486,96 @@ function renderNamespace(
 	return { text, forbiddenKeys: bodiedKeys }
 }
 
+// NOTE: The free Functions' `*Natives` type — every native free Function the
+// sources declare, in member-table order, each Overload its own mangled
+// `__overload$N` key, exactly as `renderNamespace` renders a Namespace's
+// Methods. A free Function belongs to no Namespace, so it is keyed by its own
+// name and rendered static (no receiver Parameter to inject). Returns the export
+// names of any Essence-bodied free Function so the assertion can forbid a runtime
+// export for it — none exist today, so `FunctionsNatives` is every declared free
+// Function and nothing is forbidden. `__print` is the sole inhabitant.
+function renderFunctionsNatives(
+	stdlib: Stdlib,
+	ctx: RenderContext,
+): { text: string; forbiddenKeys: Array<string> } {
+	let nativeEntries: Array<string> = []
+	let bodiedKeys: Array<string> = []
+
+	for (let [name, flags] of Object.entries(stdlib.functionBindings)) {
+		let member = stdlib.members[name]
+
+		if (member === undefined) {
+			continue
+		}
+
+		if (member.type === "OverloadedStaticMethod") {
+			member.overloads.forEach((overload, index) => {
+				let key = resolveOverloadedMethodName(name, index)
+				let isNative = flags[index] ?? true
+
+				if (isNative) {
+					nativeEntries.push(
+						nativeEntry(
+							describeSignature(name, overload, true),
+							key,
+							renderArrow(
+								overload,
+								true,
+								ctx,
+								`functions.${key}`,
+							),
+						),
+					)
+				} else {
+					bodiedKeys.push(key)
+				}
+			})
+		} else if (member.type === "Function") {
+			let isNative = flags[0] ?? true
+
+			if (isNative) {
+				nativeEntries.push(
+					nativeEntry(
+						describeSignature(name, member, true),
+						name,
+						renderArrow(member, true, ctx, `functions.${name}`),
+					),
+				)
+			} else {
+				bodiedKeys.push(name)
+			}
+		}
+	}
+
+	let text = `export type FunctionsNatives = {\n${nativeEntries.join("\n")}\n}`
+
+	return { text, forbiddenKeys: bodiedKeys }
+}
+
+// NOTE: The functions module's half of the contract — the same shape
+// `renderModuleAssertion` builds for a Namespace, but the module is `./functions`
+// rather than the identity of a Namespace name, so it is spelled out here.
+function renderFunctionsAssertion(forbiddenKeys: Array<string>): string {
+	let module = `typeof import("./functions")`
+
+	let lines = [
+		`declare const functionsModule: ${module}`,
+		`export const $functions: FunctionsNatives = functionsModule`,
+	]
+
+	if (forbiddenKeys.length > 0) {
+		let forbidden = forbiddenKeys
+			.map((key) => JSON.stringify(key))
+			.join(" | ")
+
+		lines.push(
+			`export const $functionsAbsent: AssertNoEssenceExports<${module}, ${forbidden}> = true`,
+		)
+	}
+
+	return lines.join("\n")
+}
+
 // NOTE: The witness object a bounded Type Parameter is fulfilled with — the
 // Protocol's Methods with `Self` bound to the Parameter. Throws on the shapes
 // the witness can not transcribe (an overloaded Protocol Method, or a Protocol
@@ -642,6 +732,11 @@ export function renderNativesModule(stdlib: Stdlib): string {
 		...renderNamespace(namespace, stdlib.nativeBindings, ctx),
 	}))
 
+	// NOTE: Rendered alongside the Namespaces and through the same `ctx`, so its
+	// runtime types join the import block. The free Functions belong to no
+	// Namespace, so they are one extra `*Natives` type and one extra assertion.
+	let functions = renderFunctionsNatives(stdlib, ctx)
+
 	let namespaceSections = namespaces.map((entry) => entry.text)
 
 	let conformanceSections = [...ctx.usedProtocols].sort().map((name) => {
@@ -656,13 +751,16 @@ export function renderNativesModule(stdlib: Stdlib): string {
 		return renderConformanceType(protocol, ctx)
 	})
 
-	let assertionSections = namespaces.map((entry) =>
-		renderModuleAssertion(entry.namespace, entry.forbiddenKeys),
-	)
+	let assertionSections = [
+		...namespaces.map((entry) =>
+			renderModuleAssertion(entry.namespace, entry.forbiddenKeys),
+		),
+		renderFunctionsAssertion(functions.forbiddenKeys),
+	]
 
-	let needsAssertHelper = namespaces.some(
-		(entry) => entry.forbiddenKeys.length > 0,
-	)
+	let needsAssertHelper =
+		namespaces.some((entry) => entry.forbiddenKeys.length > 0) ||
+		functions.forbiddenKeys.length > 0
 
 	let parts = [HEADER, renderImports(ctx.used)]
 
@@ -674,7 +772,7 @@ export function renderNativesModule(stdlib: Stdlib): string {
 		parts.push(conformanceSections.join("\n\n"))
 	}
 
-	parts.push(namespaceSections.join("\n\n"))
+	parts.push([...namespaceSections, functions.text].join("\n\n"))
 	parts.push(assertionSections.join("\n\n"))
 
 	return `${parts.join("\n\n")}\n`

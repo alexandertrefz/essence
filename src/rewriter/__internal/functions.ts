@@ -1,12 +1,6 @@
 import { toString as algebraicToString } from "./Algebraic"
-import type { BooleanType } from "./Boolean"
-import type { IntegerType } from "./Integer"
 import { toString as integerToString } from "./Integer"
-import type { ListType } from "./List"
-import type { RationalType } from "./Rational"
 import { toString__overload$1 as rationalToString } from "./Rational"
-import type { RecordType } from "./Record"
-import type { StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
@@ -104,15 +98,12 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	}
 }
 
-export function print(
-	message:
-		| ListType<any>
-		| StringType
-		| IntegerType
-		| RationalType
-		| BooleanType
-		| RecordType,
-) {
+// NOTE: The one native free Function, declared in `src/stdlib/Print.es` as
+// `__print<Item>(_ value: Item) -> Item` and bound here by that name. It is
+// generic — it answers with the very value it was handed — so the runtime
+// signature is generic too, which is also exactly what the generated native
+// contract (`natives.generated.ts`) asserts this export against.
+export function __print<Item extends AnyType>(message: Item): Item {
 	console.log(getStringRepresentation(message))
 
 	return message

@@ -7,6 +7,7 @@ import type { common } from "../interfaces/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as caseModule from "../rewriter/__internal/Case"
+import * as functions from "../rewriter/__internal/functions"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
 import * as nestedList from "../rewriter/__internal/NestedList"
@@ -182,6 +183,84 @@ describe("Builtins", () => {
 				expect(stale).toEqual([])
 			})
 		}
+	})
+
+	// NOTE: The free Functions — the ones that belong to no Namespace, like
+	// `__print` — are held to the same two promises a Namespace Method is: a
+	// native one must have a runtime export under the name the Simplifier will
+	// ask for, and every one must be documented. `natives.generated.ts` checks
+	// the SHAPE of each export under tsc; this gives the friendlier miss-by-name
+	// message and covers the documentation the generated contract does not.
+	describe("free Functions", () => {
+		// NOTE: The emitted name(s) of a free Function — its bare name when it is a
+		// single `Function`, one `__overload$N` per overload otherwise — paired
+		// with whether each is native, so the runtime check asks for exactly the
+		// exports the Rewriter will read off the `functions` module.
+		function nativeExportNames(): Array<string> {
+			let stdlib = loadStdlib()
+			let names: Array<string> = []
+
+			for (let [name, flags] of Object.entries(stdlib.functionBindings)) {
+				let member = stdlib.members[name]
+
+				if (member?.type === "OverloadedStaticMethod") {
+					flags.forEach((native, index) => {
+						if (native) {
+							names.push(resolveOverloadedMethodName(name, index))
+						}
+					})
+				} else if (flags[0]) {
+					names.push(name)
+				}
+			}
+
+			return names
+		}
+
+		it("binds every native free Function to a runtime export", () => {
+			let runtime = functions as Record<string, unknown>
+			let missing = nativeExportNames().filter(
+				(name) => typeof runtime[name] !== "function",
+			)
+
+			expect(missing).toEqual([])
+		})
+
+		it("documents every declared free Function", () => {
+			let stdlib = loadStdlib()
+			let undocumented: Array<string> = []
+
+			for (let name of Object.keys(stdlib.functionBindings)) {
+				let member = stdlib.members[name]
+				let documentation =
+					member?.type === "Function" ||
+					member?.type === "OverloadedStaticMethod"
+						? member.documentation
+						: undefined
+
+				if (
+					documentation === undefined ||
+					documentation === null ||
+					typeof documentation.description !== "string" ||
+					documentation.description.length === 0
+				) {
+					undocumented.push(name)
+				}
+			}
+
+			expect(undocumented).toEqual([])
+		})
+
+		// NOTE: `__print` is the sole free Function today — a body-less native
+		// bound to `functions.__print`. It is listed in `builtinMemberOrder` and
+		// resolves to a `Function`, which is what its `__`-sigil invocation reads.
+		it("declares __print as a native free Function", () => {
+			let stdlib = loadStdlib()
+
+			expect(stdlib.functionBindings["__print"]).toEqual([true])
+			expect(stdlib.members["__print"]?.type).toBe("Function")
+			expect(typeof functions.__print).toBe("function")
+		})
 	})
 
 	// NOTE: "Every stdlib Method is documented" is a completion gate, not an

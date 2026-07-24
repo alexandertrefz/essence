@@ -8,6 +8,7 @@ import type { common } from "../interfaces/index"
 import {
 	essenceMethodIdentifier,
 	essenceMethodName,
+	nativeFreeFunctionNames,
 	type PreludeNamespace,
 	stdlibPrelude,
 } from "./stdlibPrelude"
@@ -706,35 +707,42 @@ function rewriteVariableAssignmentStatement(
 	}
 }
 
+// NOTE: A read off the runtime `functions` module (`$_.<name>`) — the one place
+// a free Function bound to the runtime is reached. The `$_` import is emitted
+// unconditionally at the top of every Program.
+function functionsModuleMember(name: string): estree.MemberExpression {
+	return {
+		type: "MemberExpression",
+		optional: false,
+		object: {
+			type: "Identifier",
+			name: "$_",
+		},
+		property: {
+			type: "Identifier",
+			name,
+		},
+		computed: false,
+	}
+}
+
 function rewriteNativeFunctionInvocation(
 	node: common.typedSimple.NativeFunctionInvocationNode,
 ): estree.CallExpression {
-	let callee: estree.MemberExpression
-
-	if (node.name.nodeType === "Identifier") {
-		callee = {
-			type: "MemberExpression",
-			optional: false,
-			object: {
-				type: "Identifier",
-				name: "$_",
-			},
-			property: {
-				type: "Identifier",
-				name: node.name.name.slice(2),
-			},
-			computed: false,
-		}
-	} else {
+	if (node.name.nodeType !== "Identifier") {
 		throw Error(
 			"Lookups on NativeFunctionIvocations are not implemented yet.",
 		)
 	}
 
+	// NOTE: The `__`-sigil name IS the runtime export name now — `__print` binds
+	// to `functions.__print`. The prefix used to be stripped here, so the runtime
+	// exported a differently-spelled `print`; unifying the two lets `__print`
+	// migrate into `src/stdlib/Print.es` as an ordinary native free Function.
 	return {
 		type: "CallExpression",
 		optional: false,
-		callee,
+		callee: functionsModuleMember(node.name.name),
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
@@ -742,10 +750,22 @@ function rewriteNativeFunctionInvocation(
 function rewriteFunctionInvocation(
 	node: common.typedSimple.FunctionInvocationNode,
 ): estree.CallExpression {
+	// NOTE: A native free Function is a read off the runtime `functions` module,
+	// exactly as a native Method is a read off its Namespace import. Its callee is
+	// a bare Identifier — already `__overload$N`-mangled by the Simplifier when it
+	// was overloaded — so the native set is consulted by that emitted name. Every
+	// other callee (a user Function, an Essence-bodied one, a Function-valued
+	// Expression) stays whatever `rewriteExpression` makes of it.
+	let callee: estree.Expression =
+		node.name.nodeType === "Identifier" &&
+		nativeFreeFunctionNames().has(node.name.name)
+			? functionsModuleMember(node.name.name)
+			: rewriteExpression(node.name)
+
 	return {
 		type: "CallExpression",
 		optional: false,
-		callee: rewriteExpression(node.name),
+		callee,
 		arguments: node.arguments.map((arg) => rewriteArgument(arg)),
 	}
 }
