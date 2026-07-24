@@ -118,6 +118,26 @@ export function item<ItemType extends AnyType>(
 	}
 }
 
+// NOTE: The short-circuiting search primitive, beside the eager `keepEvery`.
+// `firstItem` is one Method with two Overloads: `$1` is the no-Argument entry,
+// written in Essence as `item(at 0)`; `$2` is this one, which stops at the first
+// item the check accepts rather than building the whole filtered List first.
+// `anyItem`/`everyItem` are written on top of it in Essence, so they short
+// circuit too. Native, not Essence, because stopping early is the whole point
+// and no Essence expression can leave a walk before its end.
+export function firstItem__overload$2<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	check: (item: ItemType) => BooleanType,
+): ItemType | NothingType {
+	for (let item of originalList.value) {
+		if (check(item).value) {
+			return item
+		}
+	}
+
+	return createNothing()
+}
+
 // NOTE: Native rather than Essence because the Essence form has to pair every
 // item with its position first, build that whole List of Records and read one
 // member back out, where this walks and stops. The item `is` arrives as the

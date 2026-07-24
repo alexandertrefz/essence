@@ -640,42 +640,11 @@ describe("Rewriter", () => {
 				})
 			})
 
-			describe("replaceEvery", () => {
-				it("replaces every occurrence", () => {
-					expect(
-						string.replaceEvery(
-							string.createString("a-a-a"),
-							string.createString("a"),
-							string.createString("b"),
-						),
-					).toEqual(string.createString("b-b-b"))
-				})
-
-				// NOTE: This is why `replaceEvery` is the one substring Method
-				// still native. On the empty part the replacement lands at
-				// every UTF-16 code UNIT boundary — outside the ends, and
-				// BETWEEN the two halves of an astral character, which is a
-				// position Essence can not name. The obvious Essence body,
-				// `@::split(on part)::join(with replacement)`, would answer
-				// `"a-b-c"` and `"a-\u{1F600}-b"` here instead.
-				it("places the replacement at every code unit for an empty part", () => {
-					expect(
-						string.replaceEvery(
-							string.createString("abc"),
-							stringEmpty(),
-							string.createString("-"),
-						),
-					).toEqual(string.createString("-a-b-c-"))
-
-					expect(
-						string.replaceEvery(
-							string.createString("a\u{1F600}b"),
-							stringEmpty(),
-							string.createString("-"),
-						),
-					).toEqual(string.createString("-a-\uD83D-\uDE00-b-"))
-				})
-			})
+			// NOTE: `replaceEvery` is now written in Essence
+			// (`split(on part)::join(with replacement)`, with the empty part a
+			// no-op), so it is no longer a runtime native to test here — its
+			// behaviour, the empty part included, is covered by the stdlib
+			// golden harness.
 
 			describe("compareTo", () => {
 				it("orders lexicographically by code point", () => {
@@ -683,26 +652,26 @@ describe("Rewriter", () => {
 					// `String.is` is `compareTo(other)::is(Ordering#Equal)` in
 					// Essence.
 					expect(
-						string.compareTo(
+						string.compareTo__overload$1(
 							string.createString("apple"),
 							string.createString("banana"),
 						),
 					).toBe(ordering.less)
 					expect(
-						string.compareTo(
+						string.compareTo__overload$1(
 							string.createString("banana"),
 							string.createString("apple"),
 						),
 					).toBe(ordering.greater)
 					expect(
-						string.compareTo(
+						string.compareTo__overload$1(
 							string.createString("apple"),
 							string.createString("apple"),
 						),
 					).toBe(ordering.equal)
 					// NOTE: A prefix orders before the longer String.
 					expect(
-						string.compareTo(
+						string.compareTo__overload$1(
 							string.createString("app"),
 							string.createString("apple"),
 						),
