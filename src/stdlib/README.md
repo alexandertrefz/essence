@@ -20,16 +20,22 @@ Essence; the rest bind to `src/rewriter/__internal/`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compareTo`), the JavaScript intrinsics Essence has no expression for
-(`String.uppercased`, `String.trim(at:)`, `Record`'s reflective Methods,
-`String.compareTo` — there is no way to name a character's code point), and the
-iteration primitives the rest rest on (`List.reduce`, `item(at:)`, `slice`,
-`keepEvery`, `append(contentsOf:)`, `static of`, `String.split(on:)`).
+(`String.uppercased`, `String.trim(at:)`, `String.normalized(as:)`,
+`String.lines`/`words`, `Record`'s reflective Methods, `String.compareTo` —
+there is no way to name a character's code point), and the iteration primitives
+the rest rest on (`List.reduce`, `item(at:)`, `slice`, `keepEvery`,
+`append(contentsOf:)`, `static of`, `firstItem(where:)` — the short-circuiting
+find beside the eager `keepEvery` — and `String.split(on:)`, which is also the
+one native that decides what a "character" is: it segments into Unicode grapheme
+clusters (see `graphemesOf` in `String.ts`), so `length`, `slice`, `reverse`,
+`firstIndex` and the rest, all written on top of it, count and cut by grapheme).
 
-Two Methods are native for reasons worth reading before assuming otherwise:
-`String.replaceEvery`, because on the EMPTY part `replaceAll` inserts at UTF-16
-code-unit boundaries — between the two surrogate halves of an emoji — a
-position Essence cannot name; and `List.is`, because the pairwise form trips an
-infinite recursion in generic inference (the repro is at the declaration).
+One Method is native for a reason worth reading before assuming otherwise:
+`List.is`, because the pairwise form trips an infinite recursion in generic
+inference (the repro is at the declaration). `String.replaceEvery` used to be
+too — its empty part inserted at UTF-16 code-unit boundaries — but the empty
+part is now a no-op, so it is `split(on part)::join(with replacement)` in
+Essence.
 
 **`src/tests/stdlibGolden.spec.ts` is the net.** `testFiles/StdlibExhaustive.es`
 calls every declared Method across its edge cases and its output is diffed
@@ -197,9 +203,12 @@ Composition is not free, and two costs are easy to miss because no test fails:
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is
-  native again too. `List.anyItem`/`everyItem`/`firstItem(where:)` ARE written
-  on `keepEvery`, which has no early exit, so they lost short-circuiting —
-  measured at ~0 ms to ~180 ms over 2000 calls when the first item decides it.
+  native too. `List.anyItem`/`everyItem` ARE written in Essence, but on the
+  native short-circuiting `firstItem(where:)` rather than the eager `keepEvery`,
+  so they stop at the item that decides the answer — the earlier `keepEvery`
+  form lost that and measured ~0 ms → ~180 ms over 2000 calls when the first
+  item decides it. `count(where:)` is still on `keepEvery`, which is right:
+  counting has to see every item.
 
 Prefer a body that reaches only its own Namespace's primitives. `src/tests/bundleSize.spec.ts`
 guards two files, but it is a floor, not a substitute for measuring.
