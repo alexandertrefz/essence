@@ -38,6 +38,11 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	NumberFormatType: "./NumberFormat",
 	FractionType: "./NumberFormat",
 	DecimalType: "./NumberFormat",
+	NormalizationFormType: "./NormalizationForm",
+	ComposedCanonicalType: "./NormalizationForm",
+	DecomposedCanonicalType: "./NormalizationForm",
+	ComposedCompatibilityType: "./NormalizationForm",
+	DecomposedCompatibilityType: "./NormalizationForm",
 	RationalType: "./Rational",
 	RecordType: "./Record",
 	StringType: "./String",
@@ -54,6 +59,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	Ordering: "OrderingType",
 	Side: "SideType",
 	NumberFormat: "NumberFormatType",
+	NormalizationForm: "NormalizationFormType",
 	Number: "NumberType",
 }
 
@@ -69,6 +75,10 @@ const CASE_TYPES: Record<string, string> = {
 	"Side#BothEnds": "BothEndsType",
 	"NumberFormat#Fraction": "FractionType",
 	"NumberFormat#Decimal": "DecimalType",
+	"NormalizationForm#ComposedCanonical": "ComposedCanonicalType",
+	"NormalizationForm#DecomposedCanonical": "DecomposedCanonicalType",
+	"NormalizationForm#ComposedCompatibility": "ComposedCompatibilityType",
+	"NormalizationForm#DecomposedCompatibility": "DecomposedCompatibilityType",
 }
 
 // NOTE: The mutable state threaded through one render — every runtime type name

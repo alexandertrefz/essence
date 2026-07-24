@@ -161,6 +161,21 @@ third"::lines())
 	show("String.toString()", greeting::toString())
 	show("String.toString() [empty]", emptyText::toString())
 
+	§ Grapheme & normalization. The decomposed forms are derived with
+	§ `normalized(as:)` rather than typed as literal combining marks, so the
+	§ test does not depend on how the source file was saved.
+	constant accented = "café"
+	constant flag = "🇩🇪"
+	constant decomposed = accented::normalized(as NormalizationForm#DecomposedCanonical)
+
+	show("String.length() [decomposed grapheme]", decomposed::length())
+	show("String.length() [flag is one grapheme]", flag::length())
+	show("String.characters() [decomposed stays whole]", decomposed::characters())
+	show("String.reverse() [flag not torn]", flag::append("!")::reverse())
+	show("String.is(_ String) [NFC equals NFD]", accented::is(decomposed))
+	show("String.normalized()", accented::normalized())
+	show("String.normalized(as: NormalizationForm) [compatibility folds ligature]", "ﬁle"::normalized(as NormalizationForm#ComposedCompatibility))
+
 	§ ——— Boolean ——————————————————————————————————————————————————————————
 	show("Boolean.negate()", true::negate())
 	show("Boolean.negate() [false]", false::negate())
@@ -550,6 +565,17 @@ third"::lines())
 	show("Choice_Equatable.isNot(_ Case) [same]", sensitive::isNot(#Sensitive))
 	show("Case.toString() [Sensitive]", sensitive::toString())
 	show("Case.toString() [Insensitive]", insensitive::toString())
+
+	§ ——— NormalizationForm ————————————————————————————————————————————————
+	constant composedCanonical: NormalizationForm = #ComposedCanonical
+	constant decomposedCanonical: NormalizationForm = #DecomposedCanonical
+
+	show("Choice_Equatable.is(_ NormalizationForm)", composedCanonical::is(#ComposedCanonical))
+	show("Choice_Equatable.is(_ NormalizationForm) [differing]", composedCanonical::is(#DecomposedCanonical))
+	show("Choice_Equatable.isNot(_ NormalizationForm)", composedCanonical::isNot(#DecomposedCanonical))
+	show("Choice_Equatable.isNot(_ NormalizationForm) [same]", decomposedCanonical::isNot(#DecomposedCanonical))
+	show("NormalizationForm.toString() [ComposedCanonical]", composedCanonical::toString())
+	show("NormalizationForm.toString() [DecomposedCanonical]", decomposedCanonical::toString())
 
 	§ ——— NumberFormat ———————————————————————————————————————————————————————
 	constant asFraction: NumberFormat = #Fraction
