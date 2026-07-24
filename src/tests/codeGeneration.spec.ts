@@ -98,6 +98,38 @@ function hasCode(
 }
 
 describe("Code Generation", () => {
+	// NOTE: `__print` migrated from a TypeScript table to `src/stdlib/Print.es`
+	// as an ordinary native free Function. Its emission is a read off the runtime
+	// `functions` module under its OWN name now — the `__` prefix used to be
+	// stripped so the runtime exported a differently-spelled `print`. The
+	// observable behavior is unchanged: it prints the value and answers with it.
+	describe("__print", () => {
+		it("emits a read off the functions module under its own name", () => {
+			let generated = generate(`
+				implementation {
+					__print("hello")
+				}
+			`)
+
+			expect(generated).toContain("$_.__print(")
+			// NOTE: The old prefix-stripping spelling must be gone.
+			expect(generated).not.toContain("$_.print(")
+		})
+
+		it("prints the value and is unchanged at runtime", async () => {
+			let output = await run(`
+				implementation {
+					__print("hello")
+					__print(42)
+				}
+			`)
+
+			// NOTE: A String prints quoted, an Integer bare — the same
+			// representation `getStringRepresentation` always produced.
+			expect(output).toEqual(['"hello"', "42"])
+		})
+	})
+
 	describe("Match", () => {
 		// NOTE: Regression test — the Handlers used to be folded into the
 		// if/else cascade in a way that only kept the first and the last, so

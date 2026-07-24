@@ -541,6 +541,36 @@ export function functionStatement(
 	return { nodeType: "FunctionStatement", name, value, position }
 }
 
+export function nativeFunctionStatement(
+	name: parser.IdentifierNode,
+	signature: parser.NativeMethodSignatureNode,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.NativeFunctionStatementNode {
+	return {
+		nodeType: "NativeFunctionStatement",
+		name,
+		signature,
+		position,
+		documentation,
+	}
+}
+
+export function overloadedFunctionStatement(
+	name: parser.IdentifierNode,
+	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
+	position: common.Position,
+	documentation: common.Documentation | null = null,
+): parser.OverloadedFunctionStatementNode {
+	return {
+		nodeType: "OverloadedFunctionStatement",
+		name,
+		methods,
+		position,
+		documentation,
+	}
+}
+
 export function choiceDeclarationStatement(
 	name: parser.IdentifierNode,
 	generics: Array<parser.GenericDeclarationNode>,

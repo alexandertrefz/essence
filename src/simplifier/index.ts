@@ -200,14 +200,23 @@ function simplifyUnionMethodInvocation(
 function simplifyFunctionInvocation(
 	node: common.typed.FunctionInvocationNode,
 ): common.typedSimple.FunctionInvocationNode {
-	if (
-		node.overloadedMethodIndex !== null &&
-		node.name.nodeType === "Lookup"
-	) {
-		node.name.member.content = resolveOverloadedMethodName(
-			node.name.member.content,
-			node.overloadedMethodIndex,
-		)
+	if (node.overloadedMethodIndex !== null) {
+		if (node.name.nodeType === "Lookup") {
+			// NOTE: A `Namespace.method(…)` call whose Method is overloaded — the
+			// index names which Overload the Enricher picked.
+			node.name.member.content = resolveOverloadedMethodName(
+				node.name.member.content,
+				node.overloadedMethodIndex,
+			)
+		} else if (node.name.nodeType === "Identifier") {
+			// NOTE: A bare `loop(…)` call whose callee is an overloaded free
+			// Function — same numbering, on the Identifier itself. The Rewriter
+			// then reads `loop__overload$N` off the runtime `functions` module.
+			node.name.content = resolveOverloadedMethodName(
+				node.name.content,
+				node.overloadedMethodIndex,
+			)
+		}
 	}
 
 	return {

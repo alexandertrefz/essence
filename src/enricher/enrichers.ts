@@ -99,6 +99,8 @@ export function enrichNode(
 		case "IfStatement":
 		case "ReturnStatement":
 		case "FunctionStatement":
+		case "NativeFunctionStatement":
+		case "OverloadedFunctionStatement":
 			return enrichStatement(node, scope, hoistedTypes)
 	}
 }
@@ -355,12 +357,8 @@ export function enrichFunctionInvocation(
 	// resolution and the same typed Nodes build the final Invocation.
 	let name = enrichExpression(node.name, scope)
 	let typer = makeArgumentTyper(scope)
-	let { type, conformances } = resolveFunctionInvocation(
-		node,
-		name.type,
-		scope,
-		typer,
-	)
+	let { type, conformances, overloadedMethodIndex } =
+		resolveFunctionInvocation(node, name.type, scope, typer)
 
 	return {
 		nodeType: "FunctionInvocation",
@@ -370,7 +368,7 @@ export function enrichFunctionInvocation(
 		),
 		position: node.position,
 		type,
-		overloadedMethodIndex: null,
+		overloadedMethodIndex,
 		conformances,
 	}
 }
@@ -1057,6 +1055,16 @@ export function enrichStatement(
 				node,
 				scope,
 				hoistedType as common.FunctionType | undefined,
+			)
+		case "NativeFunctionStatement":
+		case "OverloadedFunctionStatement":
+			// NOTE: These declare a name and nothing to emit, and are dropped
+			// before enrichment by `enrichImplementation` — the top level is the
+			// only place they are valid. Reaching here means one was nested in a
+			// body (a `declarations`-mode Program only), which the Compiler has
+			// no typed Node to represent.
+			throw new Error(
+				`A '${node.nodeType}' may only appear at the top level of a 'declarations { … }' Program`,
 			)
 	}
 }
@@ -3142,7 +3150,15 @@ function resolveFunctionInvocation(
 	nameType: common.Type,
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
-): { type: common.Type; conformances: Array<common.Conformance> } {
+): {
+	type: common.Type
+	conformances: Array<common.Conformance>
+	// NOTE: Which overload the Arguments picked, or null when the callee is not
+	// overloaded. The Simplifier reads it to mangle the callee to `__overload$N`
+	// — for an Identifier callee (an overloaded free Function) as much as for a
+	// `Namespace.method` Lookup.
+	overloadedMethodIndex: number | null
+} {
 	const type = nameType
 
 	if (
@@ -3151,7 +3167,11 @@ function resolveFunctionInvocation(
 		type.type === "StaticMethod"
 	) {
 		if (type.generics.length === 0) {
-			return { type: type.returnType, conformances: [] }
+			return {
+				type: type.returnType,
+				conformances: [],
+				overloadedMethodIndex: null,
+			}
 		}
 
 		// NOTE: Mirrors resolveInferredReturnType, additionally keeping the
@@ -3188,7 +3208,11 @@ function resolveFunctionInvocation(
 			)
 		}
 
-		return { type: inferred.returnType, conformances }
+		return {
+			type: inferred.returnType,
+			conformances,
+			overloadedMethodIndex: null,
+		}
 	} else if (
 		type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
@@ -3201,7 +3225,12 @@ function resolveFunctionInvocation(
 			}),
 		)
 
-		for (let overload of type.overloads) {
+		for (
+			let overloadIndex = 0;
+			overloadIndex < type.overloads.length;
+			overloadIndex++
+		) {
+			let overload = type.overloads[overloadIndex]!
 			let inferred = inferInvocation(overload, matchableArguments)
 
 			if (inferred !== undefined) {
@@ -3215,6 +3244,7 @@ function resolveFunctionInvocation(
 						scope,
 						node.position,
 					),
+					overloadedMethodIndex: overloadIndex,
 				}
 			}
 		}
@@ -3229,7 +3259,11 @@ function resolveFunctionInvocation(
 			],
 		})
 
-		return { type: { type: "Error" }, conformances: [] }
+		return {
+			type: { type: "Error" },
+			conformances: [],
+			overloadedMethodIndex: null,
+		}
 	} else {
 		if (type.type !== "Error") {
 			reportError(
@@ -3247,7 +3281,11 @@ function resolveFunctionInvocation(
 			)
 		}
 
-		return { type: { type: "Error" }, conformances: [] }
+		return {
+			type: { type: "Error" },
+			conformances: [],
+			overloadedMethodIndex: null,
+		}
 	}
 }
 

@@ -1,14 +1,18 @@
 import { describe, expect, it } from "bun:test"
 
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
+import { enrichPrograms } from "../enricher/index"
+import { primitiveTypes } from "../enricher/primitives"
 import {
 	loadStdlib,
 	loadStdlibFrom,
 	parseStdlibSource,
 	type Stdlib,
 } from "../enricher/stdlib"
-import type { common } from "../interfaces/index"
+import type { common, enricher } from "../interfaces/index"
+import { parseWithDiagnostics } from "../parser/index"
 import { simplify } from "../simplifier/index"
+import { validate } from "../validator/index"
 
 function load(...files: Array<[string, string]>): Stdlib {
 	return loadStdlibFrom(
@@ -696,6 +700,256 @@ describe("Standard Library Loader", () => {
 		expect(namespaceNamed(stdlib, "Ordering").targetType).toBe(
 			stdlib.types["Ordering"]!,
 		)
+	})
+
+	// NOTE: A free Function belongs to no Namespace, so its nativeness is kept in
+	// `functionBindings` rather than `nativeBindings` — one flag per entry in
+	// written order, the same shape a Method's overloads carry, and the same
+	// `__overload$N` index. `__print` is the one the real library ships.
+	describe("free Functions", () => {
+		// NOTE: A user Program enriched against a scope that holds one synthetic
+		// free Function and the primitive Type tags — enough for the call sites
+		// below to resolve against the declared member without pulling in the real
+		// standard library.
+		function enrichAgainst(
+			member: common.Type,
+			source: string,
+		): common.typed.Program {
+			let members: Record<string, common.Type> = { combine: member }
+			let scope: enricher.Scope = {
+				parent: null,
+				members,
+				declarations: {},
+				constants: new Set(Object.keys(members)),
+				types: { ...primitiveTypes },
+				protocols: {},
+			}
+
+			let user = parseWithDiagnostics(source)
+			let [result] = enrichPrograms([user.program], scope)
+
+			expect(result!.diagnostics).toEqual([])
+
+			return result!.program
+		}
+
+		// NOTE: Every FunctionInvocation Node anywhere in a Program, typed or
+		// simplified — walked structurally so the same helper reads the callee's
+		// `content` (typed) or `name` (simplified) off whatever it finds.
+		function functionInvocations(program: {
+			implementation: { nodes: Array<unknown> }
+		}): Array<{
+			name: { content?: string; name?: string }
+			overloadedMethodIndex: number | null
+		}> {
+			let found: Array<{
+				name: { content?: string; name?: string }
+				overloadedMethodIndex: number | null
+			}> = []
+
+			let walk = (node: unknown): void => {
+				if (node === null || typeof node !== "object") {
+					return
+				}
+
+				if (
+					(node as { nodeType?: string }).nodeType ===
+					"FunctionInvocation"
+				) {
+					found.push(node as (typeof found)[number])
+				}
+
+				for (let value of Object.values(node)) {
+					if (Array.isArray(value)) {
+						value.forEach(walk)
+					} else {
+						walk(value)
+					}
+				}
+			}
+
+			program.implementation.nodes.forEach(walk)
+
+			return found
+		}
+
+		// NOTE: A body-less `function` is a single native flag and resolves to a
+		// `Function` — exactly what `__print`'s `__`-sigil invocation reads. It
+		// carries no typed Node: a native has no body to emit.
+		it("collects a body-less free Function as one native flag", () => {
+			let stdlib = load([
+				"Identity.es",
+				`declarations {
+					§§ Answers with the value it was given.
+					function identity <Item>(_ value: Item) -> Item
+				}`,
+			])
+
+			expect(stdlib.functionBindings["identity"]).toEqual([true])
+			expect(stdlib.members["identity"]?.type).toBe("Function")
+			expect(stdlib.typedPrograms[0]!.implementation.nodes).toEqual([])
+		})
+
+		// NOTE: A bodied free Function is a single `false` — Essence-implemented,
+		// not bound to the runtime.
+		it("collects a bodied free Function as one non-native flag", () => {
+			let stdlib = load([
+				"Identity.es",
+				`declarations {
+					§§ Answers with the value it was given.
+					function identity <Item>(_ value: Item) -> Item {
+						<- value
+					}
+				}`,
+			])
+
+			expect(stdlib.functionBindings["identity"]).toEqual([false])
+		})
+
+		// NOTE: An `overload function` block keeps its entries in written order,
+		// one native flag each, resolving to an `OverloadedStaticMethod` — the
+		// same Type a Namespace's static overload set resolves to, which is why
+		// `resolveFunctionInvocation` already picks the overload for it.
+		it("collects an overloaded free Function's entries in written order", () => {
+			let stdlib = load([
+				"Combine.es",
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						§§ From an Integer.
+						(first value: Integer) -> Integer
+						§§ From a String.
+						(second value: String) -> String
+					}
+				}`,
+			])
+
+			expect(stdlib.functionBindings["combine"]).toEqual([true, true])
+
+			let combine = stdlib.members["combine"]!
+
+			expect(combine.type).toBe("OverloadedStaticMethod")
+
+			if (combine.type === "OverloadedStaticMethod") {
+				expect(combine.overloads).toHaveLength(2)
+				expect(combine.overloads[0]!.returnType).toEqual({
+					type: "Integer",
+				})
+				expect(combine.overloads[1]!.returnType).toEqual({
+					type: "String",
+				})
+			}
+
+			// NOTE: Nothing is emitted for it — the block is all native.
+			expect(stdlib.typedPrograms[0]!.implementation.nodes).toEqual([])
+		})
+
+		// NOTE: The two halves the mechanism exists for. The Enricher picks the
+		// overload from the Argument LABEL — `first` against the Integer entry,
+		// `second` against the String — and the Simplifier mangles the bare
+		// Identifier callee to the `__overload$N` name that overload's index gives
+		// it, exactly as it does a `Namespace.method` Lookup.
+		it("resolves an overloaded free Function by label and numbers the emission", () => {
+			let stdlib = load([
+				"Combine.es",
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						§§ From an Integer.
+						(first value: Integer) -> Integer
+						§§ From a String.
+						(second value: String) -> String
+					}
+				}`,
+			])
+
+			let program = enrichAgainst(
+				stdlib.members["combine"]!,
+				`implementation {
+					constant a = combine(first 5)
+					constant b = combine(second "hi")
+				}`,
+			)
+
+			expect(
+				functionInvocations(program).map(
+					(node) => node.overloadedMethodIndex,
+				),
+			).toEqual([0, 1])
+
+			let simplified = simplify(program)
+
+			expect(
+				functionInvocations(simplified).map((node) => node.name.name),
+			).toEqual(["combine__overload$1", "combine__overload$2"])
+		})
+
+		// NOTE: A bare reference to an overloaded free Function names every
+		// overload at once, which no later invocation could disambiguate — the
+		// Validator refuses it in value position.
+		it("refuses an overloaded free Function used as a value", () => {
+			let stdlib = load([
+				"Combine.es",
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						§§ From an Integer.
+						(first value: Integer) -> Integer
+						§§ From a String.
+						(second value: String) -> String
+					}
+				}`,
+			])
+
+			let program = enrichAgainst(
+				stdlib.members["combine"]!,
+				`implementation {
+					constant f = combine
+				}`,
+			)
+
+			let diagnostics = validate(program)
+
+			expect(
+				diagnostics.some(
+					(diagnostic) =>
+						diagnostic.code === "overloaded-function-value",
+				),
+			).toBe(true)
+		})
+
+		// NOTE: Every Documentation a consumer reaches must be sourceless — an
+		// overloaded free Function's set-level and per-overload Documentation
+		// alike, exactly as an `overload` Method block's are.
+		it("strips the Documentation Positions off an overloaded free Function", () => {
+			let stdlib = load([
+				"Combine.es",
+				`declarations {
+					§§ Combines two values.
+					overload function combine {
+						§§ From an Integer.
+						(first value: Integer) -> Integer
+						§§ From a String.
+						(second value: String) -> String
+					}
+				}`,
+			])
+
+			let combine = stdlib.members["combine"]!
+
+			expect(combine.type).toBe("OverloadedStaticMethod")
+
+			if (combine.type === "OverloadedStaticMethod") {
+				expect(combine.documentation?.description).toBe(
+					"Combines two values.",
+				)
+				expect(combine.documentation?.position).toBeNull()
+
+				for (let overload of combine.overloads) {
+					expect(overload.documentation?.position).toBeNull()
+				}
+			}
+		})
 	})
 
 	it("caches the loaded standard library", () => {
