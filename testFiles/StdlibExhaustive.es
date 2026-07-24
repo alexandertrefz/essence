@@ -496,13 +496,13 @@ implementation {
 	constant equal: Ordering = #Equal
 	constant greater: Ordering = #Greater
 
-	show("Ordering.is(_ Ordering) [Less]", less::is(#Less))
-	show("Ordering.is(_ Ordering) [Equal]", equal::is(#Equal))
-	show("Ordering.is(_ Ordering) [Greater]", greater::is(#Greater))
-	show("Ordering.is(_ Ordering) [differing]", less::is(#Greater))
-	show("Ordering.isNot(_ Ordering) [Less]", less::isNot(#Equal))
-	show("Ordering.isNot(_ Ordering) [Equal]", equal::isNot(#Equal))
-	show("Ordering.isNot(_ Ordering) [Greater]", greater::isNot(#Less))
+	show("Choice_Equatable.is(_ Ordering) [Less]", less::is(#Less))
+	show("Choice_Equatable.is(_ Ordering) [Equal]", equal::is(#Equal))
+	show("Choice_Equatable.is(_ Ordering) [Greater]", greater::is(#Greater))
+	show("Choice_Equatable.is(_ Ordering) [differing]", less::is(#Greater))
+	show("Choice_Equatable.isNot(_ Ordering) [Less]", less::isNot(#Equal))
+	show("Choice_Equatable.isNot(_ Ordering) [Equal]", equal::isNot(#Equal))
+	show("Choice_Equatable.isNot(_ Ordering) [Greater]", greater::isNot(#Less))
 	show("Ordering.toString() [Less]", less::toString())
 	show("Ordering.toString() [Equal]", equal::toString())
 	show("Ordering.toString() [Greater]", greater::toString())
@@ -512,12 +512,12 @@ implementation {
 	constant atEnd: Side = #End
 	constant atBothEnds: Side = #BothEnds
 
-	show("Side.is(_ Side) [Start]", atStart::is(#Start))
-	show("Side.is(_ Side) [End]", atEnd::is(#End))
-	show("Side.is(_ Side) [BothEnds]", atBothEnds::is(#BothEnds))
-	show("Side.is(_ Side) [differing]", atStart::is(#End))
-	show("Side.isNot(_ Side) [differing]", atStart::isNot(#End))
-	show("Side.isNot(_ Side) [same]", atStart::isNot(#Start))
+	show("Choice_Equatable.is(_ Side) [Start]", atStart::is(#Start))
+	show("Choice_Equatable.is(_ Side) [End]", atEnd::is(#End))
+	show("Choice_Equatable.is(_ Side) [BothEnds]", atBothEnds::is(#BothEnds))
+	show("Choice_Equatable.is(_ Side) [differing]", atStart::is(#End))
+	show("Choice_Equatable.isNot(_ Side) [differing]", atStart::isNot(#End))
+	show("Choice_Equatable.isNot(_ Side) [same]", atStart::isNot(#Start))
 	show("Side.toString() [Start]", atStart::toString())
 	show("Side.toString() [End]", atEnd::toString())
 	show("Side.toString() [BothEnds]", atBothEnds::toString())
@@ -526,10 +526,10 @@ implementation {
 	constant asFraction: NumberFormat = #Fraction
 	constant asDecimal: NumberFormat = #Decimal
 
-	show("NumberFormat.is(_ NumberFormat)", asFraction::is(#Fraction))
-	show("NumberFormat.is(_ NumberFormat) [differing]", asFraction::is(#Decimal))
-	show("NumberFormat.isNot(_ NumberFormat)", asFraction::isNot(#Decimal))
-	show("NumberFormat.isNot(_ NumberFormat) [same]", asDecimal::isNot(#Decimal))
+	show("Choice_Equatable.is(_ NumberFormat)", asFraction::is(#Fraction))
+	show("Choice_Equatable.is(_ NumberFormat) [differing]", asFraction::is(#Decimal))
+	show("Choice_Equatable.isNot(_ NumberFormat)", asFraction::isNot(#Decimal))
+	show("Choice_Equatable.isNot(_ NumberFormat) [same]", asDecimal::isNot(#Decimal))
 	show("NumberFormat.toString() [Fraction]", asFraction::toString())
 	show("NumberFormat.toString() [Decimal]", asDecimal::toString())
 
@@ -546,6 +546,17 @@ implementation {
 	show("Record.is(_ {}) [differing]", point::is({ x = 1, y = 3 }))
 	show("Record.isNot(_ {})", point::isNot({ x = 1, y = 3 }))
 	show("Record.isNot(_ {}) [equal]", point::isNot({ x = 1, y = 2 }))
+
+	§ A Function is the one value with no Type tag on it, and reading that
+	§ missing tag used to THROW here rather than answer — a Record holding a
+	§ Function could not be compared with itself at all. Equality of Functions
+	§ is identity: the same Function is equal to itself, two separately written
+	§ ones are not, which is the most that is decidable.
+	constant double = (_ value: Integer) -> Integer { <- value::multiply(with 2) }
+	constant holdingDouble = { fn = double }
+
+	show("Record.is(_ {}) [holding a Function]", holdingDouble::is(holdingDouble))
+	show("Record.is(_ {}) [differing Functions]", holdingDouble::is({ fn = (_ value: Integer) -> Integer { <- value } }))
 	show("Record.keys()", point::keys())
 	show("Record.toString()", point::toString())
 

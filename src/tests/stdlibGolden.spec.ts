@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import { derivedEquatableNamespace } from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
 import { printSignature, signaturesOf } from "../lsp/printType"
@@ -109,6 +110,39 @@ function declaredSignatures(): Array<string> {
 				)
 
 				signatures.push(label.slice(0, label.lastIndexOf(") -> ") + 1))
+			}
+		}
+
+		// NOTE: A Choice's `is` and `isNot` are DERIVED — no Namespace declares
+		// them, so the loop above never sees them, and without this the harness
+		// could quietly stop calling them. They are listed under the Namespace
+		// that answers at runtime, which is the one the labels name. The Scope
+		// only has to resolve the Choice's name back to the Choice, which the
+		// target Type already is.
+		let derived =
+			member.targetType === null
+				? null
+				: derivedEquatableNamespace(member.targetType, {
+						parent: null,
+						members: {},
+						declarations: {},
+						constants: new Set(),
+						types: { [namespaceName]: member.targetType },
+						protocols: {},
+					})
+
+		if (derived !== null && !Object.hasOwn(member.methods, "is")) {
+			for (let [methodName, method] of Object.entries(derived.methods)) {
+				for (let signature of signaturesOf(method) ?? []) {
+					let label = printSignature(
+						signature,
+						`${derived.name}.${methodName}`,
+					)
+
+					signatures.push(
+						label.slice(0, label.lastIndexOf(") -> ") + 1),
+					)
+				}
 			}
 		}
 	}

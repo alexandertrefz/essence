@@ -375,15 +375,15 @@ export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional")
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule
-export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "is" | "isNot" | "toString"> = true
+export const $OrderingAbsent: AssertNoEssenceExports<typeof import("./Ordering"), "toString"> = true
 
 declare const SideModule: typeof import("./Side")
 export const $Side: SideNatives = SideModule
-export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "is" | "isNot" | "toString"> = true
+export const $SideAbsent: AssertNoEssenceExports<typeof import("./Side"), "toString"> = true
 
 declare const NumberFormatModule: typeof import("./NumberFormat")
 export const $NumberFormat: NumberFormatNatives = NumberFormatModule
-export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "is" | "isNot" | "toString"> = true
+export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

@@ -198,11 +198,13 @@ function preludeOf(source: string): Array<PreludeNamespace> {
 }
 
 describe("Stdlib Call Graph", () => {
-	// NOTE: This now guards real edges — `Ordering.isNot` calls `Ordering.is`,
-	// `String.isNot` calls `String.is`, and the conversion adds more Methods
-	// written in terms of each other every commit. An accidental cycle among
-	// them is a stack overflow at run time with no Diagnostic, which is exactly
-	// what this catches before it ships.
+	// NOTE: This now guards real edges — `String.isNot` calls `String.is`,
+	// `Rational.isNot` calls `Rational.is`, and the conversion adds more
+	// Methods written in terms of each other every commit. An accidental cycle
+	// among them is a stack overflow at run time with no Diagnostic, which is
+	// exactly what this catches before it ships. A Choice's `is`/`isNot` are
+	// no longer among them: they are derived, so they are not written in
+	// Essence and have no edges to cycle through.
 	it("has no cycle among the Essence-implemented Methods", () => {
 		let cycle = findCycle(buildCallGraph(stdlibPrelude()))
 
@@ -293,14 +295,10 @@ describe("Stdlib Call Graph", () => {
 			"Number.lowestNumber__overload$3",
 			"Number.lowestNumber__overload$4",
 			"Number.toString",
-			"NumberFormat.is",
-			"NumberFormat.isNot",
 			"NumberFormat.toString",
 			"Optional.hasValue",
 			"Optional.isNothing",
 			"Optional.otherwise",
-			"Ordering.is",
-			"Ordering.isNot",
 			"Ordering.toString",
 			"Rational.absolute",
 			"Rational.is",
@@ -319,8 +317,6 @@ describe("Stdlib Call Graph", () => {
 			"Rational.subtract__overload$3",
 			"Rational.subtract__overload$4",
 			"Record.isNot",
-			"Side.is",
-			"Side.isNot",
 			"Side.toString",
 			"String.character",
 			"String.characters",

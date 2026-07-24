@@ -3,6 +3,7 @@ import * as path from "node:path"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
+import { derivedEquatableNamespaceName } from "../enricher/resolvers"
 import type { common } from "../interfaces/index"
 import {
 	essenceMethodIdentifier,
@@ -761,6 +762,24 @@ function namespaceMember(
 	namespaceName: string,
 	memberName: string,
 ): estree.Expression {
+	// NOTE: A Choice's derived equality names a Namespace that exists nowhere —
+	// the Enricher fabricates it per receiver and nothing is ever emitted for
+	// it — so the one reference to it becomes the runtime helper directly.
+	// Every emission site (a plain call, a dispatch branch, a conformance
+	// witness) routes through here, so this one redirect covers all three.
+	if (namespaceName === derivedEquatableNamespaceName) {
+		return {
+			type: "MemberExpression",
+			optional: false,
+			computed: false,
+			object: { type: "Identifier", name: "$helpers" },
+			property: {
+				type: "Identifier",
+				name: memberName === "isNot" ? "choiceIsNot" : "choiceIs",
+			},
+		}
+	}
+
 	let essenceName = essenceMethodName(namespaceName, memberName)
 
 	if (essenceName !== null) {

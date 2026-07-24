@@ -493,7 +493,147 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: Every Choice is Equatable without anyone writing it — a Case is
+	// decided by its tag and its payload is a Record, which the language
+	// already compares. These cover the four things that has to mean: the
+	// Methods resolve, the conformance solves, a written Namespace still wins,
+	// and a Type that is not a Choice derives nothing.
+	describe("Derived Equality", () => {
+		const colourChoice = `
+			choice Colour {
+				Red,
+				Green,
+			}
+		`
+
+		it("answers 'is' and 'isNot' with no Namespace in sight", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					constant red: Colour = #Red
+					constant green: Colour = #Green
+
+					__print(red::is(green))
+					__print(red::isNot(green))
+				}`),
+			).toEqual([])
+		})
+
+		it("answers for a receiver narrowed to a single Case", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					constant red: Colour = #Red
+
+					__print(match red -> Boolean {
+						case #Red { <- @::is(#Green) }
+						case _ { <- false }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		it("satisfies an Equatable bound, so a List of Choices compares", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					constant red: Colour = #Red
+
+					__print([red]::contains(#Green))
+					__print([red]::is([red]))
+				}`),
+			).toEqual([])
+		})
+
+		it("compares payload Cases by tag and then by payload", () => {
+			expect(
+				messagesOf(`implementation { ${calculatorChoice}
+					constant one: CalculatorOperation = #Add({ left = 1, right = 1 })
+					constant two: CalculatorOperation = #Negate({ number = 1 })
+
+					__print(one::is(two))
+				}`),
+			).toEqual([])
+		})
+
+		it("accepts a declared 'is Equatable' that writes neither Method", () => {
+			expect(
+				messagesOf(`implementation { ${colourChoice}
+					namespace Colour for Colour is Equatable { }
+
+					constant red: Colour = #Red
+
+					__print(red::is(#Green))
+				}`),
+			).toEqual([])
+		})
+
+		it("derives nothing for a Union that is not a Choice", () => {
+			expect(
+				messagesOf(`implementation {
+					constant value: Integer | Boolean = 5
+
+					__print(value::is(5))
+				}`),
+			).not.toEqual([])
+		})
+	})
+
 	describe("Code Generation", () => {
+		it("emits the runtime helper for a derived 'is'", () => {
+			let generated = generate(`implementation {
+				choice Colour { Red, Green }
+
+				constant red: Colour = #Red
+
+				__print(red::is(#Green))
+				__print(red::isNot(#Green))
+			}`)
+
+			expect(generated).toContain("$helpers.choiceIs(")
+			expect(generated).toContain("$helpers.choiceIsNot(")
+		})
+
+		// NOTE: A written Namespace is not merely PREFERRED over the derive at
+		// the call — the WITNESS has to be the written Method too, or a bounded
+		// Method would compare by tag while a direct call compared the
+		// Namespace's way, and the same two values would be both equal and not.
+		// Both spellings are asserted for exactly that reason.
+		//
+		// NOTE: Asserted by what the Colour call sites emit rather than by the
+		// absence of `choiceIs` anywhere: the standard library's own Choices
+		// derive their equality now, so an inlined `List.contains` drags
+		// `Ordering`'s derived `is` into this Program no matter what Colour does.
+		it("emits the written Method at the call AND in the witness", () => {
+			let generated = generate(`implementation {
+				choice Colour { Red, Green }
+
+				namespace Colour for Colour is Equatable {
+					§§ Every Colour is the same Colour.
+					§§
+					§§ @param other the Colour to compare with
+					§§ @returns always true.
+					is(_ other: Colour) -> Boolean {
+						<- true
+					}
+
+					§§ The negation.
+					§§
+					§§ @param other the Colour to compare with
+					§§ @returns always false.
+					isNot(_ other: Colour) -> Boolean {
+						<- @::is(other)::negate()
+					}
+				}
+
+				constant red: Colour = #Red
+
+				__print(red::is(#Green))
+				__print([red]::contains(#Green))
+			}`)
+
+			expect(generated).toContain("Colour.is(red,")
+			expect(generated).toContain("is: Colour.is")
+			expect(generated).toContain("isNot: Colour.isNot")
+		})
+
 		it("emits tagged Case constructions", () => {
 			let generated = generate(`implementation { ${calculatorChoice}
 				constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
