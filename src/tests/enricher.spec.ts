@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { builtinNamespaces, builtinProtocols } from "../enricher/builtins"
 import { enrich } from "../enricher/index"
+import { derivedEquatableNamespace } from "../enricher/resolvers"
 import { computeConformanceMethodMap } from "../helpers/index"
 import type { common } from "../interfaces/index"
 import { parse } from "../parser/index"
@@ -2156,12 +2157,44 @@ describe("Enricher", () => {
 							]),
 						)
 
-						const result = computeConformanceMethodMap(
+						let result = computeConformanceMethodMap(
 							protocol,
 							namespace,
 							namespace.targetType!,
 							assumptions,
 						)
+
+						// NOTE: A Choice DECLARES `is Equatable` and writes
+						// neither Method — the derive fulfills it. Checking the
+						// derived Namespace instead of accepting the miss is
+						// the point: the conformance still has to hold, it just
+						// holds through Methods nobody wrote. The Scope only
+						// has to resolve the Choice's name back to the Choice,
+						// which is the target Type itself.
+						if (result.kind !== "conforms") {
+							const derived = derivedEquatableNamespace(
+								namespace.targetType!,
+								{
+									parent: null,
+									members: {},
+									declarations: {},
+									constants: new Set(),
+									types: {
+										[namespace.name]: namespace.targetType!,
+									},
+									protocols: {},
+								},
+							)
+
+							expect(derived).not.toBeNull()
+
+							result = computeConformanceMethodMap(
+								protocol,
+								derived!,
+								namespace.targetType!,
+								assumptions,
+							)
+						}
 
 						expect(result.kind).toBe("conforms")
 					}
@@ -2442,15 +2475,19 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
+		// NOTE: `toString` rather than `is` — `Ordering` no longer WRITES an
+		// `is`, it derives one, and a derived Method would make this pass for
+		// the wrong reason. `toString` is a Method the covering Namespace
+		// actually declares, which is what this is about.
 		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
 			let invocation = lastConstantValue(`implementation {
 				constant ordering = 5::compareTo(7)
-				constant same = ordering::is(Ordering#Less)
+				constant text = ordering::toString()
 			}`)
 
 			expect(invocation.namespace.name).toBe("Ordering")
 			expect(invocation.dispatch).toBeNull()
-			expect(invocation.type).toEqual({ type: "Boolean" })
+			expect(invocation.type).toEqual({ type: "String" })
 		})
 
 		it("should dispatch across unrelated member Namespaces", () => {

@@ -3,6 +3,7 @@ import {
 	builtinNamespaces,
 	builtinProtocols as builtinProtocolTable,
 } from "../enricher/builtins"
+import { derivedEquatableNamespaceForChoice } from "../enricher/resolvers"
 import {
 	applyGenericBindings,
 	createInferenceContext,
@@ -124,9 +125,75 @@ export function matchingNamespaces(
 					targetTypeMatches(namespace, baseType),
 				)
 
+	// NOTE: A Choice's `is` and `isNot` are derived — no Namespace declares
+	// them, so nothing above finds them, and without this they would work
+	// everywhere but never be OFFERED. Appended on the same terms the Enricher
+	// resolves them on: only when no listed Namespace already declares one.
+	let derived = derivedNamespaceFor(baseType, namespaces, allNamespaces)
+
+	if (derived !== null) {
+		namespaces = [...namespaces, derived]
+	}
+
 	return specifierName === null
 		? namespaces
 		: namespaces.filter((namespace) => namespace.name === specifierName)
+}
+
+// NOTE: The Language Server's mirror of the Enricher's derived equality. It
+// has no Scope to resolve a Case's Choice in, so the Choice is recovered from
+// the Namespaces already gathered — every Choice with a Namespace is reachable
+// that way, and a Choice with none is only ever met as the whole Union, which
+// IS the Choice.
+function derivedNamespaceFor(
+	baseType: common.Type,
+	listed: Array<common.NamespaceType>,
+	allNamespaces: Array<common.NamespaceType>,
+): common.NamespaceType | null {
+	if (
+		listed.some(
+			(namespace) =>
+				Object.hasOwn(namespace.methods, "is") ||
+				Object.hasOwn(namespace.methods, "isNot"),
+		)
+	) {
+		return null
+	}
+
+	let isChoiceOf = (type: common.Type, choiceName: string): boolean =>
+		type.type === "UnionType" &&
+		type.types.length > 0 &&
+		type.types.every(
+			(member) => member.type === "Case" && member.choice === choiceName,
+		)
+
+	if (baseType.type === "UnionType") {
+		let first = baseType.types[0]
+
+		if (first === undefined || first.type !== "Case") {
+			return null
+		}
+
+		return isChoiceOf(baseType, first.choice)
+			? derivedEquatableNamespaceForChoice(baseType)
+			: null
+	}
+
+	if (baseType.type !== "Case") {
+		return null
+	}
+
+	let choiceName = baseType.choice
+	let choiceType = allNamespaces
+		.map((namespace) => namespace.targetType)
+		.find(
+			(targetType): targetType is common.Type =>
+				targetType != null && isChoiceOf(targetType, choiceName),
+		)
+
+	return choiceType === undefined
+		? null
+		: derivedEquatableNamespaceForChoice(choiceType)
 }
 
 // NOTE: A Union-typed receiver reaches a Method either through a Namespace

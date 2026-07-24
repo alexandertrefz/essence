@@ -134,6 +134,52 @@ describe("Completion", () => {
 			expect(labelsOf(source, { line: 2, column: 6 })).toContain("string")
 		})
 
+		// NOTE: Nobody declares these — the Choice derives them — so without
+		// the Language Server mirroring that rule they would work at every call
+		// site and be offered at none.
+		it("should list a Choice's derived 'is' and 'isNot'", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"",
+				"\tconstant red: Colour = #Red",
+				"\tred::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 8, column: 7 })
+
+			expect(labels).toContain("is")
+			expect(labels).toContain("isNot")
+		})
+
+		it("should list a written 'is' once, not beside the derived one", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"",
+				"\tnamespace Colour for Colour {",
+				"\t\tis(_ other: Colour) -> Boolean {",
+				"\t\t\t<- true",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant red: Colour = #Red",
+				"\tred::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 14, column: 7 })
+
+			expect(labels.filter((label) => label === "is")).toEqual(["is"])
+		})
+
 		it("should list Protocol Methods on a bounded Type Parameter", () => {
 			let source = [
 				"implementation {",

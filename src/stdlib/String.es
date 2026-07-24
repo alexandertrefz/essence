@@ -12,28 +12,11 @@ declarations {
 	}
 
 	§ The same shape as `Ordering`'s Namespace — unit Cases compared and
-	§ printed by tag, with nothing else to say about them.
+	§ printed by tag, with nothing else to say about them. The `Equatable`
+	§ conformance is DECLARED and not written: every Choice derives equality
+	§ from its tags, so `is` and `isNot` would be the same nested match here
+	§ that they were for every other Choice.
 	namespace Side for Side is Equatable, is Printable {
-		§§ Answers whether both Sides are the same variant.
-		§§
-		§§ @param other the Side to compare with
-		§§ @returns `true` when both Sides are the same variant.
-		is(_ other: Side) -> Boolean {
-			<- match @ -> Boolean {
-				case #Start { <- match other -> Boolean { case #Start { <- true } case _ { <- false } } }
-				case #End { <- match other -> Boolean { case #End { <- true } case _ { <- false } } }
-				case #BothEnds { <- match other -> Boolean { case #BothEnds { <- true } case _ { <- false } } }
-			}
-		}
-
-		§§ Answers whether the Sides are different variants.
-		§§
-		§§ @param other the Side to compare with
-		§§ @returns `true` when the Sides are different variants.
-		isNot(_ other: Side) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Represents the Side as `Start`, `End` or `BothEnds`.
 		§§
 		§§ @returns the name of the Side variant.
