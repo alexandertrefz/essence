@@ -10,7 +10,7 @@ declarations {
 		§§ @param other the Integer to compare against
 		§§ @returns `true` when both are equal.
 		is(_ other: Integer) -> Boolean {
-			<- @::compareTo(other)::is(Ordering#Equal)
+			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Integer has a different value than another.
@@ -112,7 +112,7 @@ declarations {
 		§§ Whether this Integer is strictly below the given number.
 		overload isLessThan {
 			(_ other: Integer) -> Boolean {
-				<- @::compareTo(other)::is(Ordering#Less)
+				<- @::compareTo(other)::is(#Less)
 			}
 
 			(_ other: Rational) -> Boolean
@@ -130,7 +130,7 @@ declarations {
 		§§ Whether this Integer is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Integer) -> Boolean {
-				<- @::compareTo(other)::is(Ordering#Greater)
+				<- @::compareTo(other)::is(#Greater)
 			}
 
 			(_ other: Rational) -> Boolean
@@ -150,8 +150,11 @@ declarations {
 
 		§§ The Integer without its sign — its distance from zero.
 		absolute() -> Integer {
-			if @::isNegative() { <- @::negate() }
-			<- @
+			if @::isNegative() {
+				<- @::negate()
+			} else {
+				<- @
+			}
 		}
 
 		§§ The Integer with its sign flipped.
@@ -209,10 +212,15 @@ declarations {
 		§§ @param and the highest allowed value
 		§§ @returns the clamped Integer, or `Nothing` when the bounds are in the wrong order.
 		clamp(between lowest: Integer, and highest: Integer) -> Optional<Integer> {
-			if lowest::isGreaterThan(highest) { <- nothing }
-			if @::isLessThan(lowest) { <- lowest }
-			if @::isGreaterThan(highest) { <- highest }
-			<- @
+			if lowest::isGreaterThan(highest) {
+				<- nothing
+			} else if @::isLessThan(lowest) {
+				<- lowest
+			} else if @::isGreaterThan(highest) {
+				<- highest
+			} else {
+				<- @
+			}
 		}
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.

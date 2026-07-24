@@ -123,6 +123,22 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
+			it("should parse a bare Case value as a labelled argument, the space before `#` keeping the label distinct from a Choice prefix", () => {
+				let input: parser.Program = parse(
+					"implementation { invocation(at #Start) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should parse an adjacent `Choice#Case` as a prefixed Case value passed positionally", () => {
+				let input: parser.Program = parse(
+					"implementation { invocation(Side#Start) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
 			it("should parse Identifier FunctionInvocations with one argument and a trailing comma", () => {
 				let input: parser.Program = parse(
 					"implementation { invocation(argument,) }",

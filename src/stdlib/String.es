@@ -4,7 +4,7 @@ declarations {
 	§ its users do — `trim(at:)` and `pad(…, at:)` — and it is what keeps each
 	§ of them ONE Method instead of the three and two they used to be. A fixed
 	§ set of modes is a Choice, never a String: `trim(at "start")` would be a
-	§ typo waiting to happen, and `trim(at Side#Start)` is exhaustively checked.
+	§ typo waiting to happen, and `trim(at #Start)` is exhaustively checked.
 	choice Side {
 		Start,
 		End,
@@ -115,14 +115,14 @@ declarations {
 			§§ @param other the String to compare against
 			§§ @returns `true` when the Strings are equal.
 			(_ other: String) -> Boolean {
-				<- @::compareTo(other)::is(Ordering#Equal)
+				<- @::compareTo(other)::is(#Equal)
 			}
 
 			§§ @param other the String to compare against
 			§§ @param comparing whether case is significant
 			§§ @returns `true` when the Strings are equal under the given `Case`.
 			(_ other: String, comparing sensitivity: Case) -> Boolean {
-				<- @::compareTo(other, comparing sensitivity)::is(Ordering#Equal)
+				<- @::compareTo(other, comparing sensitivity)::is(#Equal)
 			}
 		}
 
@@ -228,7 +228,7 @@ declarations {
 		§§ @returns the normalized String.
 		overload normalized {
 			() -> String {
-				<- @::normalized(as NormalizationForm#ComposedCanonical)
+				<- @::normalized(as #ComposedCanonical)
 			}
 
 			§§ @param as the normalization form to produce
@@ -246,7 +246,7 @@ declarations {
 		§§ @returns the trimmed String.
 		overload trim {
 			() -> String {
-				<- @::trim(at Side#BothEnds)
+				<- @::trim(at #BothEnds)
 			}
 
 			§§ @param at the end to trim
@@ -291,9 +291,11 @@ declarations {
 			§ replacement between them, which is a different String and used to
 			§ be why this Method was native. Answering the String unchanged is
 			§ the one behaviour that needs no code-unit view.
-			if part::isEmpty() { <- @ }
-
-			<- @::split(on part)::join(with replacement)
+			if part::isEmpty() {
+				<- @
+			} else {
+				<- @::split(on part)::join(with replacement)
+			}
 		}
 
 		§§ The String with the first occurrence of one part replaced by another. An empty part, or a part that does not occur, leaves the String unchanged.
@@ -303,19 +305,23 @@ declarations {
 		§§ @returns the String with the first replacement made.
 		replaceFirst(_ part: String, with replacement: String) -> String {
 			§ The empty part is a no-op, as in `replaceEvery`.
-			if part::isEmpty() { <- @ }
+			if part::isEmpty() {
+				<- @
+			} else {
+				constant pieces = @::split(on part)
 
-			constant pieces = @::split(on part)
+				§ One piece means the part never occurs — nothing to replace.
+				if pieces::length()::is(1) {
+					<- @
+				} else {
+					§ The first piece is everything before the first occurrence;
+					§ the rest rejoin on the ORIGINAL part, so only the first
+					§ separator is the one that becomes the replacement.
+					constant head = pieces::firstItem()::otherwise("")
 
-			§ One piece means the part never occurs — nothing to replace.
-			if pieces::length()::is(1) { <- @ }
-
-			§ The first piece is everything before the first occurrence; the
-			§ rest rejoin on the ORIGINAL part, so only the first separator is
-			§ the one that becomes the replacement.
-			constant head = pieces::firstItem()::otherwise("")
-
-			<- head::append(replacement)::append(pieces::removeFirst()::join(with part))
+					<- head::append(replacement)::append(pieces::removeFirst()::join(with part))
+				}
+			}
 		}
 
 		§§ The String joined to itself the given number of times.
@@ -351,17 +357,22 @@ declarations {
 			§ The empty part occurs at the very start of every String, the
 			§ empty String included — and splitting on it would answer the
 			§ length of the first CHARACTER instead, so it is answered here.
-			if part::isEmpty() { <- 0 }
+			if part::isEmpty() {
+				<- 0
+			} else {
+				constant pieces = @::split(on part)
 
-			constant pieces = @::split(on part)
-
-			§ One piece means the separator was never found.
-			if pieces::length()::is(1) { <- nothing }
-
-			§ Splitting always yields at least one piece, so the fallback is
-			§ unreachable; the first piece is everything before the first
-			§ occurrence, and its length is that occurrence's position.
-			<- pieces::firstItem()::otherwise("")::length()
+				§ One piece means the separator was never found.
+				if pieces::length()::is(1) {
+					<- nothing
+				} else {
+					§ Splitting always yields at least one piece, so the
+					§ fallback is unreachable; the first piece is everything
+					§ before the first occurrence, and its length is that
+					§ occurrence's position.
+					<- pieces::firstItem()::otherwise("")::length()
+				}
+			}
 		}
 
 		§§ The position of the last occurrence of the given String.
@@ -371,19 +382,23 @@ declarations {
 			§ The empty part occurs after the very last character too, so its
 			§ last position is the length — the mirror of `firstIndex`, whose
 			§ empty part is at position zero.
-			if part::isEmpty() { <- @::length() }
+			if part::isEmpty() {
+				<- @::length()
+			} else {
+				constant pieces = @::split(on part)
 
-			constant pieces = @::split(on part)
+				§ One piece means the separator was never found.
+				if pieces::length()::is(1) {
+					<- nothing
+				} else {
+					§ The last piece is everything after the last occurrence, so
+					§ the occurrence begins one part-length before it — the whole
+					§ String less the last piece and the part itself.
+					constant lastPieceLength = pieces::lastItem()::otherwise("")::length()
 
-			§ One piece means the separator was never found.
-			if pieces::length()::is(1) { <- nothing }
-
-			§ The last piece is everything after the last occurrence, so the
-			§ occurrence begins one part-length before it — the whole String
-			§ less the last piece and the part itself.
-			constant lastPieceLength = pieces::lastItem()::otherwise("")::length()
-
-			<- @::length()::subtract(lastPieceLength)::subtract(part::length())
+					<- @::length()::subtract(lastPieceLength)::subtract(part::length())
+				}
+			}
 		}
 
 		§ The same collapse the trim family got, and for the same reason. The
@@ -399,7 +414,7 @@ declarations {
 		§§ @returns the padded String; unchanged when it is already that long.
 		overload pad {
 			(to length: Integer, with padding: String) -> String {
-				<- @::pad(to length, with padding, at Side#Start)
+				<- @::pad(to length, with padding, at #Start)
 			}
 
 			§§ @param at the end to pad

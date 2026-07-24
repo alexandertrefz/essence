@@ -215,9 +215,11 @@ declarations {
 			constant kept: List<ItemType> = []
 
 			<- @::reduce(startingWith kept, (accumulated, item) {
-				if accumulated::contains(item) { <- accumulated }
-
-				<- accumulated::append(item)
+				if accumulated::contains(item) {
+					<- accumulated
+				} else {
+					<- accumulated::append(item)
+				}
 			})
 		}
 
@@ -439,10 +441,13 @@ declarations {
 			§ A position outside the List leaves it unchanged. The guard is
 			§ needed: `remove(at:)` would ignore such a position but `insert(_:at:)`
 			§ clamps it, so without this the item would be added at an end.
-			if index::isLessThan(0) { <- @ }
-			if index::isGreaterThanOrEqualTo(@::length()) { <- @ }
-
-			<- @::remove(at index)::insert(item, at index)
+			if index::isLessThan(0) {
+				<- @
+			} else if index::isGreaterThanOrEqualTo(@::length()) {
+				<- @
+			} else {
+				<- @::remove(at index)::insert(item, at index)
+			}
 		}
 
 		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`. See the note above `firstIndex` for why this one stays native.
@@ -505,10 +510,12 @@ declarations {
 		static repeat(_ item: ItemType, times count: Integer) -> List<ItemType> {
 			§ `of` counts DOWN when the first Integer is the greater, so a count
 			§ below one would give `[1]` rather than nothing — hence the guard.
-			if count::isLessThan(1) { <- [] }
-
-			§ The Integers are only the tally; each is replaced by the item.
-			<- List.of(integersFrom 1, through count)::map((_) { <- item })
+			if count::isLessThan(1) {
+				<- []
+			} else {
+				§ The Integers are only the tally; each is replaced by the item.
+				<- List.of(integersFrom 1, through count)::map((_) { <- item })
+			}
 		}
 
 		§ The loop-fuel constructor — Essence has no Range Type by design, so

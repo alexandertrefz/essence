@@ -71,8 +71,11 @@ declarations {
 
 		§§ The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.
 		absolute() -> Transcendental {
-			if @::<Number>isLessThan(0) { <- @::negate() }
-			<- @
+			if @::<Number>isLessThan(0) {
+				<- @::negate()
+			} else {
+				<- @
+			}
 		}
 
 		§§ The Transcendental with its sign flipped. The π term keeps its non-zero coefficient, so the result is again a Transcendental.

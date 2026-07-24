@@ -155,6 +155,13 @@ with `variable` if it needs to change.
 A Function that declares a return Type has a path through it that returns
 nothing.
 
+### `infinite-recursion`
+
+A Method whose every returning path hands back a direct call to itself, so it
+has no base case and can never return. Reported only when the recursion is
+unconditional — a call reached through a `match` that narrows the receiver, or
+guarded by a branch that returns a base value, is left alone.
+
 ### `top-level-return`
 
 A `<-` outside of any Function.

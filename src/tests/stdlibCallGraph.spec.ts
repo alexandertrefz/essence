@@ -537,8 +537,11 @@ describe("Stdlib Call Graph", () => {
 	})
 
 	// NOTE: A Method that calls itself is a recursive Method, not a mistake —
-	// the standard library will have them, and reporting one would make the
-	// check something a developer learns to ignore.
+	// the standard library will have them, and a cycle among DIFFERENT Methods
+	// is what this walker is for. The self-call here sits behind a base case on
+	// purpose: an UNCONDITIONAL self-call never returns, and that is caught by
+	// the `infinite-recursion` Diagnostic — which `preludeOf` runs through
+	// validation, so the fixture has to be a Method that actually terminates.
 	it("leaves direct self-recursion alone", () => {
 		let cycle = findCycle(
 			buildCallGraph(
@@ -549,7 +552,11 @@ describe("Stdlib Call Graph", () => {
 		§§ @param other the Boolean to compare with
 		§§ @returns whether they match.
 		is(_ other: Boolean) -> Boolean {
-			<- @::is(other)
+			if @ {
+				<- other
+			} else {
+				<- @::is(other)
+			}
 		}
 	}
 }`),
