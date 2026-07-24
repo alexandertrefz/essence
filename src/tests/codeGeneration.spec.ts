@@ -511,7 +511,7 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			expect(generated).toContain("List.reduce(")
+			expect(generated).toContain("List.reduce__overload$1(")
 			expect(generated).toContain("Integer.add__overload$1(")
 		})
 	})
