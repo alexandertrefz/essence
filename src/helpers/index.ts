@@ -237,6 +237,110 @@ export function createInferenceContext(
 	return { bindableNames, bindings }
 }
 
+// NOTE: A per-instantiation counter for `createFreshenedInference`. Only its
+// uniqueness matters, never its value — it never reaches a Type a Program can
+// observe, so it does not compromise the determinism the Enricher otherwise
+// keeps (unlike `Date.now`/`Math.random`, which are banned for that reason).
+let freshGenericCounter = 0
+
+// NOTE: Alpha-renames a signature's own Generics to fresh, collision-proof names
+// for the span of one invocation's Argument matching. A caller may declare a
+// Generic under the SAME spelling as the callee's — a Method generic in
+// `ItemType` calling `List.reduce`, whose Namespace Generic is also `ItemType`;
+// a `loop` entry generic in `State` calling another `loop` entry, also `State`
+// — and Generic identity is by name across the compiler, so without this the
+// callee's bindable `ItemType` and the caller's opaque `ItemType` are the same
+// symbol: the bindable one binds to a Type mentioning the opaque one, then
+// substitutes the name into itself until the stack dies. A fresh name carries a
+// zero-width space, which no source Generic can, plus the counter, so it
+// collides with nothing. ONLY the Parameter Types matched here are renamed; the
+// bindings that come back are translated to the original names by
+// `unfreshenBindings`, so the return Type, conformances and every Diagnostic
+// still read in the Generics the source wrote.
+export function createFreshenedInference(signature: common.BaseFunction): {
+	parameterTypes: common.BaseFunction["parameterTypes"]
+	context: GenericInferenceContext
+	freshToOriginal: Map<common.GenericName, common.GenericName>
+} {
+	if (signature.generics.length === 0) {
+		return {
+			parameterTypes: signature.parameterTypes,
+			context: {
+				bindableNames: new Set(),
+				bindings: new Map(),
+			},
+			freshToOriginal: new Map(),
+		}
+	}
+
+	let rename: GenericBindings = new Map()
+	let freshToOriginal = new Map<common.GenericName, common.GenericName>()
+
+	for (let generic of signature.generics) {
+		let freshName = `${generic.name}\u200B${(freshGenericCounter += 1)}`
+
+		freshToOriginal.set(freshName, generic.name)
+		rename.set(generic.name, { type: "GenericUse", name: freshName })
+	}
+
+	let bindableNames = new Set<common.GenericName>()
+	let bindings: GenericBindings = new Map()
+
+	for (let generic of signature.generics) {
+		let freshName = (rename.get(generic.name) as common.GenericUse).name
+
+		if (generic.infer) {
+			bindableNames.add(freshName)
+		} else if (generic.defaultType !== null) {
+			bindableNames.add(freshName)
+			bindings.set(freshName, applyGenericBindings(generic.defaultType, rename))
+		}
+	}
+
+	let parameterTypes = signature.parameterTypes.map((parameter) => ({
+		...parameter,
+		type: applyGenericBindings(parameter.type, rename),
+	}))
+
+	return {
+		parameterTypes,
+		context: { bindableNames, bindings },
+		freshToOriginal,
+	}
+}
+
+// NOTE: Translates the bindings collected against freshened Generic names back
+// to the Generics the signature declares, so the return-Type substitution and
+// conformance resolution downstream read in the original names. Binding VALUES
+// come from the Arguments, which never mention the callee's fresh names — but a
+// `defaultType` that referenced a sibling Generic could, so they are
+// un-freshened too.
+export function unfreshenBindings(
+	bindings: GenericBindings,
+	freshToOriginal: Map<common.GenericName, common.GenericName>,
+): GenericBindings {
+	if (freshToOriginal.size === 0) {
+		return bindings
+	}
+
+	let reverse: GenericBindings = new Map()
+
+	for (let [fresh, original] of freshToOriginal) {
+		reverse.set(fresh, { type: "GenericUse", name: original })
+	}
+
+	let result: GenericBindings = new Map()
+
+	for (let [name, type] of bindings) {
+		result.set(
+			freshToOriginal.get(name) ?? name,
+			applyGenericBindings(type, reverse),
+		)
+	}
+
+	return result
+}
+
 // NOTE: Substitutes bound Generics in `type` — unbound bindable Generics are
 // left untouched, opaque Generics always are.
 export function applyGenericBindings(

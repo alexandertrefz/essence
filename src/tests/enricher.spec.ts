@@ -590,6 +590,29 @@ describe("Enricher", () => {
 			})
 		})
 
+		it("freshens callee Generics so a same-named caller Generic can not collide", () => {
+			// NOTE: `myCount`'s `State` and the general `loop`'s own `State` share a
+			// spelling, and the Record threaded as the loop's State MENTIONS it. By
+			// name alone the callee's bindable `State` and the caller's opaque
+			// `State` are one symbol, so binding `State := { carried: State }` used
+			// to substitute the name into itself until the stack died — a caught
+			// `internal-error`, a crash uncaught. Freshening the callee's Generics
+			// to unique names for the match keeps the two distinct, so this resolves
+			// cleanly with no Diagnostics at all.
+			expect(
+				diagnosticsFor(`implementation {
+					function myCount<State>(
+						startingWith state: State,
+						step advance: (_: State) -> State,
+					) -> State {
+						<- loop(startingWith { carried = state }, step (current) {
+							<- #Done(current.carried)
+						})
+					}
+				}`),
+			).toEqual([])
+		})
+
 		it("should bind Method Generics from Function Argument return Types", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
