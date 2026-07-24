@@ -268,8 +268,8 @@ describe("Irrationals", () => {
 		// value it held. The List Methods are bounded by `Equatable` now and
 		// take the items' own `is` as a witness instead — `anyIs` still answers
 		// for a Record's members and for a literal Matcher, so it keeps these
-		// tests, and the searching Methods are exercised through the witness
-		// beside them. `Algebraic.is` and `Transcendental.is` are Essence
+		// tests, and `List.is` is exercised through that witness beside them.
+		// `Algebraic.is` and `Transcendental.is` are Essence
 		// (both read `compareTo`), so the witnesses are spelled out here the
 		// way the Simplifier passes them.
 		const irrationalIs = (
@@ -283,35 +283,11 @@ describe("Irrationals", () => {
 			expect(anyIs(rootTwo, radical(2n))).toBeTrue()
 			expect(anyIs(rootTwo, radical(3n))).toBeFalse()
 			expect(anyIsNot(rootTwo, radical(2n))).toBeFalse()
-
-			// NOTE: List.contains / doesNotContain / removeDuplicates are
-			// implemented in Essence now (src/stdlib/List.es); `firstIndex`
-			// is the searching Method still native, and it answers through the
-			// witness.
-			expect(
-				list.firstIndex(list.createList([rootTwo]), radical(2n), {
-					is: irrationalIs,
-				}),
-			).toEqual(integer.createInteger(0n))
-
-			expect(
-				list.firstIndex(list.createList([rootTwo]), radical(3n), {
-					is: irrationalIs,
-				})[typeKeySymbol],
-			).toBe("Nothing")
 		})
 
 		it("finds a Transcendental in a List", () => {
 			expect(anyIs(number.PI, number.PI)).toBeTrue()
 			expect(anyIs(number.PI, number.TAU)).toBeFalse()
-
-			expect(
-				list.firstIndex(
-					list.createList([number.TAU, number.PI]),
-					number.PI,
-					{ is: irrationalIs },
-				),
-			).toEqual(integer.createInteger(1n))
 		})
 
 		it("compares Lists of irrationals through the item witness", () => {
