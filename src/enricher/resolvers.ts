@@ -10,6 +10,7 @@ import {
 	countOf,
 	createInferenceContext,
 	describeType,
+	flattenUnionMembers,
 	type GenericBindings,
 	matchesType,
 	matchesTypeWithBindings,
@@ -703,6 +704,199 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 	return state
 }
 
+// NOTE: The Namespace name the derived equality answers to. It contains a `_`,
+// which the Lexer reads as a Symbol rather than an Identifier character, so no
+// Essence source can spell this name and it can never collide with a written
+// Namespace. The Rewriter recognises it and emits the runtime helpers instead
+// of a member read — there is no object anywhere with this name.
+export const derivedEquatableNamespaceName = "Choice_Equatable"
+
+// NOTE: The Choice a receiver belongs to, or null when it belongs to none. A
+// single Case (a receiver narrowed by a Handler) answers with its own Choice,
+// so `is` reads the same inside a `case #Red` as outside it.
+function choiceTypeOf(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): common.Type | null {
+	let choiceName: string | null = null
+
+	if (baseType.type === "Case") {
+		choiceName = baseType.choice
+	} else if (baseType.type === "UnionType") {
+		let members = flattenUnionMembers(baseType)
+		let first = members[0]
+
+		if (first === undefined || first.type !== "Case") {
+			return null
+		}
+
+		if (
+			!members.every(
+				(member) =>
+					member.type === "Case" && member.choice === first.choice,
+			)
+		) {
+			return null
+		}
+
+		choiceName = first.choice
+	}
+
+	if (choiceName === null) {
+		return null
+	}
+
+	// NOTE: The DECLARED Choice, not the receiver — a receiver narrowed to one
+	// Case still compares against the whole Choice, so `case #Red { @::is(c) }`
+	// takes any Colour rather than only another `#Red`. A Choice whose name no
+	// longer resolves to it has been shadowed; deriving off the wrong Type
+	// would be worse than not deriving, so it answers null.
+	let declared = findTypeInScope(choiceName, scope)
+
+	if (declared === null || declared.type !== "UnionType") {
+		return null
+	}
+
+	let declaredMembers = flattenUnionMembers(declared)
+
+	if (
+		declaredMembers.length === 0 ||
+		!declaredMembers.every(
+			(member) => member.type === "Case" && member.choice === choiceName,
+		)
+	) {
+		return null
+	}
+
+	return declared
+}
+
+// NOTE: Every Choice is Equatable without being written as such — a Case is
+// decided by its tag, and its payload is a Record, which the language already
+// compares structurally. This is the Namespace that says so: fabricated on
+// demand for a Choice receiver, exactly like the `T__conformance` pseudo
+// Namespace below is fabricated for a Protocol-bounded one.
+//
+// NOTE: It is a FALLBACK, never an override. Both callers reach for it only
+// once no written Namespace has answered, so a Namespace with its own `is`
+// keeps deciding equality for its own Choice.
+export function derivedEquatableNamespace(
+	baseType: common.Type,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	let choiceType = choiceTypeOf(baseType, scope)
+
+	if (choiceType === null) {
+		return null
+	}
+
+	return derivedEquatableNamespaceForChoice(choiceType)
+}
+
+// NOTE: The same Namespace, built from a Choice that is already in hand. The
+// Language Server has the Choice but no Scope to look one up in, and building
+// the Methods twice is how the two would drift.
+export function derivedEquatableNamespaceForChoice(
+	choiceType: common.Type,
+): common.NamespaceType {
+	let method = (
+		description: string,
+		returns: string,
+	): common.SimpleMethodType => ({
+		type: "SimpleMethod",
+		generics: [],
+		parameterTypes: [
+			{ name: null, type: choiceType },
+			{
+				name: null,
+				type: choiceType,
+				documentation: "the Choice to compare with",
+			},
+		],
+		returnType: { type: "Boolean" },
+		documentation: {
+			description,
+			parameters: { other: "the Choice to compare with" },
+			returns,
+			position: null,
+		},
+	})
+
+	return {
+		type: "Namespace",
+		name: derivedEquatableNamespaceName,
+		targetType: choiceType,
+		generics: [],
+		properties: {},
+		methods: {
+			is: method(
+				"Answers whether both are the same Case, carrying equal payloads.",
+				"`true` when both are the same Case and their payloads are equal.",
+			),
+			isNot: method(
+				"Answers whether the two are different Cases, or carry differing payloads.",
+				"`true` when the Cases differ, or their payloads do.",
+			),
+		},
+		conformsTo: ["Equatable"],
+	}
+}
+
+// NOTE: The witness the derived equality provides for a Choice, or null when
+// it provides none. `written` is the Namespace that claimed the conformance, if
+// one did — the derive fills in for it only when it declares NONE of the
+// Protocol's Methods. All or nothing, because a witness names ONE Namespace:
+// half-written equality can not be half-derived, and a Namespace writing its
+// own `is` beside a derived `isNot` would answer the same question two
+// different ways. Written through the same method map as any other candidate,
+// so the derived Methods are checked against the Protocol rather than assumed
+// to fit it.
+function derivedConformanceSource(
+	binding: common.Type,
+	protocolName: string,
+	written: common.NamespaceType | null,
+	scope: enricher.Scope,
+): common.ConformanceSource | null {
+	let derived = derivedEquatableNamespace(binding, scope)
+
+	if (derived === null || !derived.conformsTo?.includes(protocolName)) {
+		return null
+	}
+
+	let protocol = findProtocolInScope(protocolName, scope)
+
+	if (protocol === null) {
+		return null
+	}
+
+	if (
+		written !== null &&
+		Object.keys(protocol.methods).some((methodName) =>
+			Object.hasOwn(written.methods, methodName),
+		)
+	) {
+		return null
+	}
+
+	let result = computeConformanceMethodMap(
+		protocol,
+		derived,
+		binding,
+		new Map(),
+	)
+
+	if (result.kind !== "conforms") {
+		return null
+	}
+
+	return {
+		kind: "namespace",
+		name: derivedEquatableNamespaceName,
+		methodMap: result.methodMap,
+		conditions: [],
+	}
+}
+
 // NOTE: Solves whether `binding` conforms to `protocolName` in `scope`,
 // producing the witness the codegen needs. A GenericUse forwards the enclosing
 // bounded Function's own conformance parameter; a concrete Type selects the one
@@ -891,6 +1085,19 @@ function solveNamespaceConformance(
 	}
 
 	if (candidates.length === 0) {
+		// NOTE: No written Namespace conforms — a Choice still does, through
+		// the derived equality.
+		let derived = derivedConformanceSource(
+			binding,
+			protocolName,
+			null,
+			scope,
+		)
+
+		if (derived !== null) {
+			return { ok: true, source: derived }
+		}
+
 		return {
 			ok: false,
 			chain: [
@@ -939,6 +1146,21 @@ function solveNamespaceConformance(
 	)
 
 	if (result.kind !== "conforms") {
+		// NOTE: The Namespace DECLARED the conformance and wrote none of it —
+		// for a Choice that is not a mistake, it is a statement of intent the
+		// derived equality fulfills. The declaration site accepts the same
+		// pairing, so the two agree on which Namespaces conform.
+		let derived = derivedConformanceSource(
+			binding,
+			protocolName,
+			candidate.type,
+			scope,
+		)
+
+		if (derived !== null) {
+			return { ok: true, source: derived }
+		}
+
 		// NOTE: Reachable when the Namespace covers the binding through a wider
 		// target Type (a Union) but a `Self` position makes the signatures
 		// incompatible for this narrower binding, or a fulfilling Method still
@@ -966,7 +1188,9 @@ function solveNamespaceConformance(
 	let conditions: Array<common.Conformance> = []
 
 	for (let condition of candidate.conditions) {
-		let conditionBinding = candidate.conditionBindings.get(condition.generic)
+		let conditionBinding = candidate.conditionBindings.get(
+			condition.generic,
+		)
 
 		if (conditionBinding === undefined) {
 			continue
@@ -1364,6 +1588,30 @@ export function checkProtocolConformance(
 			namespaceType.targetType,
 			assumptions,
 		)
+
+		// NOTE: `namespace Colour for Colour is Equatable { }` writes no `is`
+		// and is still right — the Choice derives one. Accepted here rather
+		// than diagnosed, with the same all-or-nothing rule the use site
+		// applies, so declaring the conformance a Choice already has is a way
+		// of SAYING so rather than an error to work around by deleting the
+		// clause.
+		if (
+			result.kind !== "conforms" &&
+			derivedConformanceSource(
+				namespaceType.targetType,
+				protocol.name,
+				namespaceType,
+				scope,
+			) !== null
+		) {
+			checked.push({
+				protocolName: protocol.name,
+				conditions,
+				methodMap: {},
+			})
+
+			continue
+		}
 
 		if (result.kind === "needs-condition") {
 			reportError(

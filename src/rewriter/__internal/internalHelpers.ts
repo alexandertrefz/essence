@@ -1,6 +1,7 @@
 import type { Fraction } from "bigint-fraction"
 
-import { is as boolIs } from "./Boolean"
+import type { BooleanType } from "./Boolean"
+import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
@@ -26,6 +27,19 @@ export function isFirstRationalBigger(
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {
+	// NOTE: A Function is the one runtime value carrying no Type key — it is
+	// emitted as a bare JavaScript function, not a tagged object — so it is
+	// answered before anything reads that key. Without this, comparing a
+	// Record that merely HOLDS a Function threw on the missing key rather than
+	// answering, which made `value is value` a crash instead of `true`.
+	//
+	// NOTE: Identity, not structure. Two Functions written the same are still
+	// two Functions, and deciding otherwise is not decidable — but a Function
+	// IS equal to itself, which is the promise `is` makes everywhere else.
+	if (typeof a === "function" || typeof b === "function") {
+		return a === b
+	}
+
 	if (
 		a[typeKeySymbol] === "Nothing" && //
 		b[typeKeySymbol] === "Nothing"
@@ -134,4 +148,19 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 
 export function anyIsNot(a: AnyType, b: AnyType): boolean {
 	return !anyIs(a, b)
+}
+
+// NOTE: The runtime half of a Choice's derived `Equatable` conformance — what
+// `Colour::is` compiles to when no Namespace writes one. `anyIs` already
+// answers exactly what a derived equality should: the tag decides the Case
+// nominally, and a payload compares as the Record it is. These two exist so
+// the derived Methods have something with a Method's shape to bind to —
+// `anyIs` answers a raw JavaScript boolean, and an Essence `-> Boolean` has to
+// hand back a Boolean value.
+export function choiceIs(a: AnyType, b: AnyType): BooleanType {
+	return createBoolean(anyIs(a, b))
+}
+
+export function choiceIsNot(a: AnyType, b: AnyType): BooleanType {
+	return createBoolean(!anyIs(a, b))
 }

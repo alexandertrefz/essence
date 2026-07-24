@@ -9,27 +9,9 @@ declarations {
 	}
 
 	§ The same shape as `Ordering`'s and `Side`'s Namespaces — unit Cases
-	§ compared and printed by tag.
+	§ compared and printed by tag, with the `Equatable` conformance declared
+	§ and derived rather than written.
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {
-		§§ Answers whether both NumberFormats are the same variant.
-		§§
-		§§ @param other the NumberFormat to compare with
-		§§ @returns `true` when both NumberFormats are the same variant.
-		is(_ other: NumberFormat) -> Boolean {
-			<- match @ -> Boolean {
-				case #Fraction { <- match other -> Boolean { case #Fraction { <- true } case _ { <- false } } }
-				case #Decimal { <- match other -> Boolean { case #Decimal { <- true } case _ { <- false } } }
-			}
-		}
-
-		§§ Answers whether the NumberFormats are different variants.
-		§§
-		§§ @param other the NumberFormat to compare with
-		§§ @returns `true` when the NumberFormats are different variants.
-		isNot(_ other: NumberFormat) -> Boolean {
-			<- @::is(other)::negate()
-		}
-
 		§§ Represents the NumberFormat as `Fraction` or `Decimal`.
 		§§
 		§§ @returns the name of the NumberFormat variant.

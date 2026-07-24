@@ -27,6 +27,8 @@ import {
 	reportReservedTypeName,
 	findTypeInScope,
 	combinationTypeOf,
+	derivedEquatableNamespace,
+	derivedEquatableNamespaceName,
 	invalidateNamespacesInScope,
 	listItemTypeOf,
 	lookupTypeOf,
@@ -2572,6 +2574,39 @@ function reportAmbiguousNamespace(
 	)
 }
 
+// NOTE: Which of the Namespaces found for a receiver actually declare the
+// Method — and the ONE door the derived Equatable Namespace comes through, for
+// both the whole-Union lookup and the per-member one. It is consulted only when
+// the written Namespaces have already come up empty, which is what makes the
+// derived equality a fallback rather than a competitor: a Namespace that writes
+// its own `is` is never tied against it, so it can not be made ambiguous by it.
+function namespacesDeclaringMethod(
+	methodName: string,
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+	scope: enricher.Scope,
+): Map<string, common.NamespaceType> {
+	let matchingNamespaces = new Map<string, common.NamespaceType>()
+
+	for (let [name, namespace] of namespaces) {
+		if (Object.hasOwn(namespace.methods, methodName)) {
+			matchingNamespaces.set(name, namespace)
+		}
+	}
+
+	if (matchingNamespaces.size > 0) {
+		return matchingNamespaces
+	}
+
+	let derived = derivedEquatableNamespace(baseType, scope)
+
+	if (derived !== null && Object.hasOwn(derived.methods, methodName)) {
+		matchingNamespaces.set(derivedEquatableNamespaceName, derived)
+	}
+
+	return matchingNamespaces
+}
+
 function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -2584,53 +2619,50 @@ function resolveMethodInvocation(
 		scope,
 	)
 
+	let matchingNamespaces = namespacesDeclaringMethod(
+		node.member.content,
+		namespaces,
+		baseType,
+		scope,
+	)
+
 	// NOTE: A Union-typed receiver falls back to per-member dispatch whenever
 	// no Namespace covering the whole Union can resolve the Method — a
 	// covering Namespace that can (`Ordering`) keeps taking precedence.
-	if (namespaces.size === 0) {
-		if (baseType.type === "UnionType") {
-			return resolveUnionMethodDispatch(node, baseType, scope, typer)
-		}
-
-		if (baseType.type !== "Error") {
-			reportError(
-				`No Namespace provides Methods for this value`,
-				node.base.position,
-				{
-					code: "no-namespace-for-value",
-					labels: [
-						primary(
-							node.base.position,
-							`this is ${withArticle(describeType(baseType))}`,
-						),
-						secondary(
-							node.member.position,
-							`'${node.member.content}' is looked up in its Namespaces`,
-						),
-					],
-					notes: [
-						`No Namespace in scope targets ${describeType(baseType)}.`,
-					],
-				},
-			)
-		}
-
-		return resolveFailedMethodInvocation()
-	}
-
-	let matchingNamespaces = new Map<string, common.NamespaceType>()
-	for (let [name, namespace] of namespaces) {
-		if (Object.hasOwn(namespace.methods, node.member.content)) {
-			matchingNamespaces.set(name, namespace)
-		}
-	}
-
 	if (matchingNamespaces.size === 0) {
 		if (baseType.type === "UnionType") {
 			return resolveUnionMethodDispatch(node, baseType, scope, typer)
 		}
 
-		reportUnknownMethod(node, baseType, namespaces)
+		// NOTE: Nothing targets the value at all, versus something does but
+		// has no Method of this name — two different mistakes, so they keep
+		// two different Diagnostics.
+		if (namespaces.size === 0) {
+			if (baseType.type !== "Error") {
+				reportError(
+					`No Namespace provides Methods for this value`,
+					node.base.position,
+					{
+						code: "no-namespace-for-value",
+						labels: [
+							primary(
+								node.base.position,
+								`this is ${withArticle(describeType(baseType))}`,
+							),
+							secondary(
+								node.member.position,
+								`'${node.member.content}' is looked up in its Namespaces`,
+							),
+						],
+						notes: [
+							`No Namespace in scope targets ${describeType(baseType)}.`,
+						],
+					},
+				)
+			}
+		} else {
+			reportUnknownMethod(node, baseType, namespaces)
+		}
 
 		return resolveFailedMethodInvocation()
 	}
@@ -2739,12 +2771,12 @@ function resolveUnionMethodDispatch(
 			scope,
 		)
 
-		let matchingNamespaces = new Map<string, common.NamespaceType>()
-		for (let [name, namespace] of namespaces) {
-			if (Object.hasOwn(namespace.methods, node.member.content)) {
-				matchingNamespaces.set(name, namespace)
-			}
-		}
+		let matchingNamespaces = namespacesDeclaringMethod(
+			node.member.content,
+			namespaces,
+			memberType,
+			scope,
+		)
 
 		if (matchingNamespaces.size === 0) {
 			reportError(
