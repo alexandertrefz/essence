@@ -7,6 +7,7 @@ import type {
 	ErrorType,
 	RationalType,
 	FunctionType,
+	GenericAliasType,
 	IntegerType,
 	ListType,
 	NamespaceType,
@@ -361,13 +362,15 @@ export interface TypeAliasStatementNode {
 }
 
 // NOTE: Each Case keeps its name as a typed Identifier of its own (typed as
-// its CaseType), so the cursor can land on it. `type` is the named Union of
-// all Cases — what the Choice's name resolves to in Type position.
+// its CaseType), so the cursor can land on it. `type` is what the Choice's name
+// resolves to in Type position — the named Union of all Cases for a plain
+// Choice, or the Generic Alias over the anonymous Union of them for a generic
+// one.
 export interface ChoiceDeclarationStatementNode {
 	nodeType: "ChoiceDeclarationStatement"
 	name: IdentifierNode
 	cases: Array<{ name: IdentifierNode; type: CaseType }>
-	type: UnionType
+	type: UnionType | GenericAliasType
 	position: Position
 	documentation: Documentation | null
 }

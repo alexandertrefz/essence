@@ -198,19 +198,155 @@ export function combinationTypeOf(
 	}
 }
 
-// NOTE: Each Case becomes a nominal Record Type, and the Choice's name is
-// declared as the *named* Union of them — every existing Union mechanism
-// (exhaustiveness, dispatch, `|` composition) applies to a Choice unchanged.
+// NOTE: A syntactic scan for the recursion restriction below — it walks a
+// payload's Type declaration Nodes (before any of them is resolved) for a bare
+// mention of `choiceName`, recursing through Records, Lists / applications,
+// Unions and Functions. Returns the offending Identifier Node so the Diagnostic
+// can point at it, or null when the payload does not name the Choice.
+function typeDeclarationNamesChoice(
+	node: parser.TypeDeclarationNode,
+	choiceName: string,
+): parser.IdentifierNode | null {
+	switch (node.nodeType) {
+		case "IdentifierTypeDeclaration":
+			return node.type.content === choiceName ? node.type : null
+		case "GenericTypeDeclaration": {
+			let inBase = typeDeclarationNamesChoice(node.baseType, choiceName)
+
+			if (inBase !== null) {
+				return inBase
+			}
+
+			for (let argument of node.generics) {
+				let found = typeDeclarationNamesChoice(argument, choiceName)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
+		case "UnionTypeDeclaration": {
+			for (let member of node.types) {
+				let found = typeDeclarationNamesChoice(member, choiceName)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
+		case "RecordTypeDeclaration": {
+			for (let member of Object.values(node.members)) {
+				let found = typeDeclarationNamesChoice(member.type, choiceName)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
+		case "FunctionTypeDeclaration": {
+			for (let parameter of node.parameterTypes) {
+				let found = typeDeclarationNamesChoice(
+					parameter.type,
+					choiceName,
+				)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return typeDeclarationNamesChoice(node.returnType, choiceName)
+		}
+	}
+}
+
+// NOTE: A generic Choice's Case payload, resolved with the Choice's Type
+// Parameters in scope so a member may mention them (`Done { value: Result }`).
+// The recursion restriction (decision e) is applied member by member and
+// syntactically: a member that names the Choice being declared would, when
+// substituted eagerly at a use site, never finish substituting, so it is
+// diagnosed and resolved to Error rather than to a real Type. The check must be
+// syntactic because during speculative hoisting the Choice's own name is not
+// yet in scope, so a resolved-Type check could not see the self-reference. V1
+// forbids direct self-naming only.
+function resolveGenericCaseMembers(
+	payload: parser.RecordTypeDeclarationNode | null,
+	choiceName: string,
+	genericScope: enricher.Scope,
+): Record<string, common.Type> {
+	if (payload === null) {
+		return {}
+	}
+
+	let members: Record<string, common.Type> = {}
+
+	for (let [name, member] of Object.entries(payload.members)) {
+		let selfReference = typeDeclarationNamesChoice(member.type, choiceName)
+
+		if (selfReference !== null) {
+			reportError(
+				"A generic Choice can not name itself in a payload",
+				selfReference.position,
+				{
+					code: "recursive-generic-choice",
+					labels: [
+						primary(
+							selfReference.position,
+							"this names the Choice being declared",
+						),
+					],
+					notes: [
+						"A generic Choice's payloads are substituted eagerly at each use, so a self-reference would never finish substituting.",
+					],
+					helps: [
+						"Introduce a separate non-generic Choice or Type for the recursive part.",
+					],
+				},
+			)
+
+			members[name] = { type: "Error" }
+		} else {
+			members[name] = resolveType(member.type, genericScope)
+		}
+	}
+
+	return members
+}
+
+// NOTE: Each Case becomes a nominal Record Type, and a plain Choice is declared
+// as the *named* Union of them — every existing Union mechanism
+// (exhaustiveness, dispatch, `|` composition) applies to a Choice unchanged. A
+// *generic* Choice instead becomes a Generic Alias over the ANONYMOUS Union of
+// its Cases (mirroring `resolveTypeAliasStatementType`): the body stays
+// anonymous so an application heals `alias: { name, typeArguments }` onto it and
+// `printType` renders `Step<Integer, String>` for free, the Generics stay
+// GenericUses in the Cases' members until a use site binds them, and every Case
+// records the Choice's Generics so an application can substitute and stamp the
+// applied spelling.
 export function resolveChoiceDeclarationStatementType(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
-): common.UnionType {
+): common.UnionType | common.GenericAliasType {
 	if (node.cases.length === 0) {
 		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
 			labels: [primary(node.position, "this Choice declares none")],
 		})
 	}
+
+	let isGeneric = node.generics.length > 0
+	let genericScope = isGeneric
+		? scopeWithGenerics(node.generics, scope)
+		: scope
+	let generics = isGeneric
+		? resolveGenericDeclarations(node.generics, scope)
+		: []
 
 	let caseTypes: Array<common.CaseType> = []
 
@@ -237,16 +373,41 @@ export function resolveChoiceDeclarationStatementType(
 			continue
 		}
 
-		caseTypes.push({
-			type: "Case",
-			choice: node.name.content,
-			name: choiceCase.name.content,
-			members:
-				choiceCase.type === null
-					? {}
-					: resolveRecordTypeDeclarationType(choiceCase.type, scope)
-							.members,
-		})
+		if (isGeneric) {
+			caseTypes.push({
+				type: "Case",
+				choice: node.name.content,
+				name: choiceCase.name.content,
+				members: resolveGenericCaseMembers(
+					choiceCase.type,
+					node.name.content,
+					genericScope,
+				),
+				choiceGenerics: generics,
+			})
+		} else {
+			caseTypes.push({
+				type: "Case",
+				choice: node.name.content,
+				name: choiceCase.name.content,
+				members:
+					choiceCase.type === null
+						? {}
+						: resolveRecordTypeDeclarationType(
+								choiceCase.type,
+								scope,
+							).members,
+			})
+		}
+	}
+
+	if (isGeneric) {
+		return {
+			type: "GenericAlias",
+			name: node.name.content,
+			generics,
+			aliasedType: { type: "UnionType", types: caseTypes },
+		}
 	}
 
 	return { type: "UnionType", name: node.name.content, types: caseTypes }

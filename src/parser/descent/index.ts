@@ -674,7 +674,9 @@ class DescentParser {
 	protected parseOptionalWhereClause(): Array<parser.WhereConditionNode> {
 		let token = this.tokens.peek()
 
-		if (!(token?.type === TokenType.Identifier && token.value === "where")) {
+		if (
+			!(token?.type === TokenType.Identifier && token.value === "where")
+		) {
 			return []
 		}
 
@@ -721,7 +723,9 @@ class DescentParser {
 
 		let isToken = this.tokens.peek()
 
-		if (!(isToken?.type === TokenType.Identifier && isToken.value === "is")) {
+		if (
+			!(isToken?.type === TokenType.Identifier && isToken.value === "is")
+		) {
 			fail(
 				"A 'where' condition reads 'Generic is Protocol'",
 				isToken?.position,

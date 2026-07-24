@@ -145,6 +145,7 @@ export type DiagnosticCode =
 	| "missing-payload"
 	| "unexpected-payload"
 	| "payload-type-mismatch"
+	| "recursive-generic-choice"
 	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"
@@ -234,6 +235,17 @@ export type CaseType = {
 	choice: string
 	name: string
 	members: Record<string, Type>
+	// NOTE: Set on the declared Cases of a *generic* Choice — the Type
+	// Parameters the Choice abstracts over, so an application can substitute
+	// them into `members` and stamp the applied spelling. Absent on every
+	// non-generic Choice's Cases, which keeps their identity through
+	// substitution and matchTypes' `lhs === rhs` fast path.
+	choiceGenerics?: Array<GenericDeclaration>
+	// NOTE: Set on an *instantiated* Case — the Type Arguments an application
+	// bound, in declaration order — so the Case prints its `<Integer, String>`
+	// and later substitutions rewrite the spelling alongside the members. The
+	// mirror of a Union alias' `typeArguments`.
+	typeArguments?: Array<Type>
 }
 
 export type GenericListType = {

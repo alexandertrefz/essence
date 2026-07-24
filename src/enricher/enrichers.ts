@@ -929,7 +929,10 @@ export function enrichStatement(
 			return enrichChoiceDeclarationStatement(
 				node,
 				scope,
-				hoistedType as common.UnionType | undefined,
+				hoistedType as
+					| common.UnionType
+					| common.GenericAliasType
+					| undefined,
 			)
 		case "IfElseStatement":
 			return enrichIfElseStatementNode(node, scope)
@@ -1461,7 +1464,7 @@ export function enrichTypeAliasStatement(
 export function enrichChoiceDeclarationStatement(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
-	hoistedType?: common.UnionType,
+	hoistedType?: common.UnionType | common.GenericAliasType,
 ): common.typed.ChoiceDeclarationStatementNode {
 	let type = hoistedType ?? resolveChoiceDeclarationStatementType(node, scope)
 
@@ -1469,9 +1472,16 @@ export function enrichChoiceDeclarationStatement(
 		declareTypeInScope(node.name, type, scope)
 	}
 
-	let caseTypes = type.types.filter(
-		(member): member is common.CaseType => member.type === "Case",
-	)
+	// NOTE: A generic Choice resolves to a Generic Alias over the anonymous
+	// Union of its Cases — the Cases to describe are that body Union's members.
+	let bodyUnion = type.type === "GenericAlias" ? type.aliasedType : type
+	let caseTypes =
+		bodyUnion.type === "UnionType"
+			? bodyUnion.types.filter(
+					(member): member is common.CaseType =>
+						member.type === "Case",
+				)
+			: []
 
 	return {
 		nodeType: "ChoiceDeclarationStatement",
@@ -3157,10 +3167,16 @@ export function resolveCaseReference(
 		return { type: "Error" }
 	}
 
+	// NOTE: A generic Choice is a Generic Alias over the anonymous Union of its
+	// Cases — `Step#Done` resolves the DECLARED (still GenericUse-membered)
+	// Case out of that body Union, the way a use site would then instantiate it.
 	let members =
 		choiceType.type === "UnionType"
 			? flattenUnionMembers(choiceType)
-			: [choiceType]
+			: choiceType.type === "GenericAlias" &&
+				  choiceType.aliasedType.type === "UnionType"
+				? flattenUnionMembers(choiceType.aliasedType)
+				: [choiceType]
 
 	let caseType = members.find(
 		(member): member is common.CaseType =>
@@ -3202,8 +3218,16 @@ function findCaseTypesInScope(
 
 			seenTypeNames.add(typeName)
 
+			// NOTE: A generic Choice is a Generic Alias over the anonymous
+			// Union of its Cases — a bare `#Continue` scans that body Union too,
+			// finding the DECLARED Case the way it finds a plain Choice's.
 			let members =
-				type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+				type.type === "UnionType"
+					? flattenUnionMembers(type)
+					: type.type === "GenericAlias" &&
+						  type.aliasedType.type === "UnionType"
+						? flattenUnionMembers(type.aliasedType)
+						: [type]
 
 			for (let member of members) {
 				if (member.type === "Case" && member.name === name) {
