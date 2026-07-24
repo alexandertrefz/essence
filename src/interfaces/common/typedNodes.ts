@@ -2,6 +2,7 @@ import type {
 	BooleanType,
 	CaseType,
 	Conformance,
+	DerivedEquatableDescriptor,
 	DispatchCase,
 	Documentation,
 	ErrorType,
@@ -89,6 +90,11 @@ export interface MethodInvocationNode {
 	type: Type
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: Set only when this call resolves to a *generic* Choice's derived
+	// Equatable — the plan its widened runtime helper follows to compare
+	// generic payloads through the hidden conformance Arguments. Absent
+	// otherwise, so a non-generic Choice's call emits the plain `choiceIs`.
+	derivedDescriptor?: DerivedEquatableDescriptor
 	// NOTE: Set for Union-typed receivers whose Method resolves per member
 	// Type — `namespace` and `overloadedMethodIndex` then hold placeholders,
 	// and each case carries its own statically resolved target.

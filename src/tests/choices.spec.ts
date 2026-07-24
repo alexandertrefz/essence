@@ -913,6 +913,169 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: A *generic* Choice can only derive Equatable CONDITIONALLY — its
+	// payloads may be Type Parameters, which are equal exactly when the Types
+	// they bind to say so. The derive gains a `where <each payload Parameter> is
+	// Equatable` bound, compares each generic payload through that Parameter's
+	// witness, and is withheld entirely when a Type Argument brings no equality.
+	// Non-generic Choices keep emitting the flat `choiceIs`, byte for byte.
+	describe("Generic Derived Equality", () => {
+		const maybe = `choice Maybe<T> { Some { value: T }, None }`
+		const bag = `choice Bag<T> { Full { items: List<T> } }`
+		const opt = `choice Opt<T> { Holding { value: T | Nothing } }`
+		const wrap = `choice Wrap<T> { It { value: T } }`
+
+		it("compares two instantiated Cases through their payload's equality", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					__print(#Some({ value = 1 })::is(#Some({ value = 1 }))::toString())
+					__print(#Some({ value = 1 })::is(#Some({ value = 2 }))::toString())
+					__print(#Some({ value = 1 })::is(#None)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"false"'])
+		})
+
+		it("answers 'isNot' as the negation", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					__print(#Some({ value = 1 })::isNot(#Some({ value = 2 }))::toString())
+					__print(#Some({ value = 1 })::isNot(#Some({ value = 1 }))::toString())
+				}`),
+			).toEqual(['"true"', '"false"'])
+		})
+
+		it("compares a composite payload through composed witnesses", async () => {
+			expect(
+				await run(`implementation { ${bag}
+					constant a: Bag<Integer> = #Full({ items = [1, 2, 3] })
+					constant b: Bag<Integer> = #Full({ items = [1, 2, 3] })
+					constant c: Bag<Integer> = #Full({ items = [1, 2] })
+
+					__print(a::is(b)::toString())
+					__print(a::is(c)::toString())
+				}`),
+			).toEqual(['"true"', '"false"'])
+		})
+
+		it("discriminates a Union payload's Nothing from its generic arm", async () => {
+			expect(
+				await run(`implementation { ${opt}
+					constant a: Opt<Integer> = #Holding({ value = 1 })
+					constant b: Opt<Integer> = #Holding({ value = 2 })
+					constant n: Opt<Integer> = #Holding({ value = nothing })
+
+					__print(a::is(a)::toString())
+					__print(a::is(b)::toString())
+					__print(a::is(n)::toString())
+					__print(n::is(n)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"false"', '"true"'])
+		})
+
+		it("solves as a nested witness inside List's Equatable", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					constant items: List<Maybe<Integer>> = [#Some({ value = 1 }), #None]
+
+					__print(items::contains(#Some({ value = 1 }))::toString())
+					__print(items::contains(#Some({ value = 9 }))::toString())
+					__print(items::contains(#None)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"'])
+		})
+
+		// NOTE: The whole point of routing generic payloads through witnesses
+		// rather than the flat structural comparison — `1/2` and `2/4` are equal
+		// by Rational's own `is`, and the witness is what carries that here.
+		it("compares a Rational payload by its own equality, not by structure", async () => {
+			expect(
+				await run(`implementation { ${wrap}
+					constant a: Wrap<Rational> = #It(1/2)
+					constant b: Wrap<Rational> = #It(2/4)
+
+					__print(a::is(b)::toString())
+				}`),
+			).toEqual(['"true"'])
+		})
+
+		it("holds no diagnostics for any of the derived comparisons", () => {
+			expect(
+				messagesOf(`implementation { ${maybe} ${bag} ${opt}
+					constant m: Maybe<Integer> = #Some({ value = 1 })
+					constant g: Bag<Integer> = #Full({ items = [1] })
+					constant o: Opt<Integer> = #Holding({ value = 1 })
+
+					__print(m::is(#None))
+					__print(g::isNot(g))
+					__print(o::is(o))
+					__print([m]::contains(#None))
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A payload whose Type carries no equality withholds the derive
+		// rather than crashing — the conformance Diagnostic surfaces instead.
+		it("withholds the derive when a payload is not Equatable", () => {
+			let diagnostics = diagnosticsOf(`implementation { ${maybe}
+				constant f: Maybe<(_ x: Integer) -> Integer> =
+					#Some({ value = (_ x: Integer) -> Integer { <- x } })
+
+				__print(f::is(f))
+			}`)
+
+			expect(diagnostics).not.toEqual([])
+			expect(
+				codesOf(`implementation { ${maybe}
+				constant f: Maybe<(_ x: Integer) -> Integer> =
+					#Some({ value = (_ x: Integer) -> Integer { <- x } })
+
+				__print(f::is(f))
+			}`),
+			).toContain("unsatisfied-bound")
+		})
+
+		it("emits the widened helper and descriptor for a generic Choice", () => {
+			let generated = generate(`implementation { ${maybe}
+				__print(#Some({ value = 1 })::is(#Some({ value = 1 })))
+				__print(#Some({ value = 1 })::isNot(#Some({ value = 1 })))
+			}`)
+
+			expect(generated).toContain("$helpers.boundChoiceIs(")
+			expect(generated).toContain("$helpers.boundChoiceIsNot(")
+			expect(generated).toContain('"Maybe#Some"')
+			expect(generated).toContain('"k": "w"')
+		})
+
+		// NOTE: The nested witness for `List<Maybe<Integer>>` is the derive
+		// curried with the Integer equality it compares payloads through.
+		it("wraps the nested derive witness in boundConformance", () => {
+			let generated = generate(`implementation { ${maybe}
+				constant items: List<Maybe<Integer>> = [#Some({ value = 1 })]
+
+				__print(items::contains(#None))
+			}`)
+
+			expect(generated).toContain("$type.boundConformance(")
+			expect(generated).toContain("$helpers.boundChoiceIs(")
+		})
+
+		// NOTE: A non-generic Choice carries no descriptor, so it keeps emitting
+		// the flat helper — the guarantee that this whole feature adds nothing to
+		// the code a non-generic Choice already generated.
+		it("leaves a non-generic Choice emitting the flat helper", () => {
+			let generated = generate(`implementation {
+				choice Colour { Red, Green }
+
+				constant red: Colour = #Red
+
+				__print(red::is(#Green))
+			}`)
+
+			expect(generated).toContain("$helpers.choiceIs(red,")
+			expect(generated).not.toContain("boundChoiceIs")
+		})
+	})
+
 	describe("Code Generation", () => {
 		it("emits the runtime helper for a derived 'is'", () => {
 			let generated = generate(`implementation {

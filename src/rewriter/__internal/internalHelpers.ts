@@ -3,6 +3,7 @@ import type { Fraction } from "bigint-fraction"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
+import type { ListType } from "./List"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { AnyType } from "./type"
@@ -163,4 +164,160 @@ export function choiceIs(a: AnyType, b: AnyType): BooleanType {
 
 export function choiceIsNot(a: AnyType, b: AnyType): BooleanType {
 	return createBoolean(!anyIs(a, b))
+}
+
+// NOTE: The compile-time plan a *generic* Choice's derived equality follows —
+// one entry per Case tag mapping each payload member's name to how it compares.
+// A member naming no Type Parameter compares structurally (`eq`); a bare
+// Parameter routes through the witness at index `i`; the composites recurse.
+type DescriptorNode =
+	| { k: "eq" }
+	| { k: "w"; i: number }
+	| { k: "list"; of: DescriptorNode }
+	| { k: "record"; m: Record<string, DescriptorNode> }
+	| { k: "case"; m: Record<string, DescriptorNode> }
+	| { k: "union"; arms: Array<{ tag: string | null; node: DescriptorNode }> }
+
+type DerivedEquatableDescriptor = Record<string, Record<string, DescriptorNode>>
+
+// NOTE: A conformance witness as it arrives at runtime — a method map whose
+// `is` answers a Boolean. When the Type it stands for is itself conditional,
+// `boundConformance` has already curried its own nested witnesses onto `is`, so
+// it is called through plainly, exactly as `List.is` calls its witness.
+type EquatableWitness = { is: (a: AnyType, b: AnyType) => BooleanType }
+
+// NOTE: The runtime half of a *generic* Choice's derived `Equatable` — the flat
+// `choiceIs` compares every payload structurally, which is wrong once a payload
+// is a Type Parameter with its own equality (a `1/2` that must equal `2/4`
+// through Rational's `is`, not field by field). `boundChoiceIs(descriptor)`
+// returns a function of `(a, b, …witnesses)` because the hidden conformance
+// Arguments arrive as trailing Parameters — appended directly at a plain call,
+// or curried on by `boundConformance` at a bounded one.
+export function boundChoiceIs(descriptor: DerivedEquatableDescriptor) {
+	return (
+		a: AnyType,
+		b: AnyType,
+		...witnesses: Array<EquatableWitness>
+	): BooleanType => createBoolean(casesEqual(a, b, descriptor, witnesses))
+}
+
+export function boundChoiceIsNot(descriptor: DerivedEquatableDescriptor) {
+	return (
+		a: AnyType,
+		b: AnyType,
+		...witnesses: Array<EquatableWitness>
+	): BooleanType => createBoolean(!casesEqual(a, b, descriptor, witnesses))
+}
+
+// NOTE: The tag decides the Case first (nominal), then each payload member is
+// compared as the descriptor says. A tag the descriptor does not name carries
+// no generic payload, so it falls back to the universal structural comparison.
+function casesEqual(
+	a: AnyType,
+	b: AnyType,
+	descriptor: DerivedEquatableDescriptor,
+	witnesses: Array<EquatableWitness>,
+): boolean {
+	if (a[typeKeySymbol] !== b[typeKeySymbol]) {
+		return false
+	}
+
+	let members = descriptor[a[typeKeySymbol]]
+
+	if (members === undefined) {
+		return anyIs(a, b)
+	}
+
+	return membersEqual(a, b, members, witnesses)
+}
+
+function membersEqual(
+	a: AnyType,
+	b: AnyType,
+	members: Record<string, DescriptorNode>,
+	witnesses: Array<EquatableWitness>,
+): boolean {
+	for (let [name, node] of Object.entries(members)) {
+		if (
+			!memberEqual(
+				(a as Record<string, AnyType>)[name],
+				(b as Record<string, AnyType>)[name],
+				node,
+				witnesses,
+			)
+		) {
+			return false
+		}
+	}
+
+	return true
+}
+
+function memberEqual(
+	a: AnyType,
+	b: AnyType,
+	node: DescriptorNode,
+	witnesses: Array<EquatableWitness>,
+): boolean {
+	switch (node.k) {
+		case "eq":
+			return anyIs(a, b)
+		case "w":
+			return witnesses[node.i].is(a, b).value
+		case "list": {
+			let aList = a as ListType<AnyType>
+			let bList = b as ListType<AnyType>
+
+			if (aList.value.length !== bList.value.length) {
+				return false
+			}
+
+			for (let index = 0; index < aList.value.length; index++) {
+				if (
+					!memberEqual(
+						aList.value[index],
+						bList.value[index],
+						node.of,
+						witnesses,
+					)
+				) {
+					return false
+				}
+			}
+
+			return true
+		}
+		case "record":
+			return membersEqual(a, b, node.m, witnesses)
+		case "case":
+			if (a[typeKeySymbol] !== b[typeKeySymbol]) {
+				return false
+			}
+
+			return membersEqual(a, b, node.m, witnesses)
+		case "union": {
+			// NOTE: A concrete arm claims a value by its `typeKeySymbol` tag —
+			// both sides must land on the same arm, so a Nothing and a `T` value
+			// are unequal. Anything no concrete arm claims falls to the one
+			// generic arm (`tag: null`) and compares through its witness.
+			let aArm = node.arms.find(
+				(arm) => arm.tag !== null && arm.tag === a[typeKeySymbol],
+			)
+			let bArm = node.arms.find(
+				(arm) => arm.tag !== null && arm.tag === b[typeKeySymbol],
+			)
+
+			if (aArm !== undefined || bArm !== undefined) {
+				return aArm === bArm
+					? memberEqual(a, b, aArm!.node, witnesses)
+					: false
+			}
+
+			let fallback = node.arms.find((arm) => arm.tag === null)
+
+			return fallback === undefined
+				? anyIs(a, b)
+				: memberEqual(a, b, fallback.node, witnesses)
+		}
+	}
 }
