@@ -326,8 +326,6 @@ export type ListNatives = {
 	keepEvery: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
 	item: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => ItemType | NothingType
-	// firstIndex<ItemType is Equatable>(of: ItemType) -> Optional<Integer>
-	firstIndex: <ItemType extends AnyType>(self: ListType<ItemType>, of: ItemType, ItemType__conformance: EquatableConformance<ItemType>) => IntegerType | NothingType
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
 	// reverse<ItemType>() -> List<ItemType>
@@ -338,8 +336,6 @@ export type ListNatives = {
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// compareTo<ItemType is Comparable>(_: List<ItemType>) -> Ordering
 	compareTo: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
-	// lastIndex<ItemType is Equatable>(of: ItemType) -> Optional<Integer>
-	lastIndex: <ItemType extends AnyType>(self: ListType<ItemType>, of: ItemType, ItemType__conformance: EquatableConformance<ItemType>) => IntegerType | NothingType
 	// join<ItemType is Printable>(with: String) -> String
 	join: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// pair<ItemType, Other>(with: List<Other>) -> List<{ first: ItemType, second: Other }>
@@ -430,7 +426,7 @@ export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "i
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule

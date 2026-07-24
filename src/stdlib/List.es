@@ -326,17 +326,46 @@ declarations {
 		§§ @returns the item, or `Nothing` when the position is outside the List.
 		item(at index: Integer) -> Optional<ItemType>
 
-		§ NOTE: `firstIndex` and `lastIndex` stay native and take the
-		§ witness. Written in Essence each would have to pair every item with
-		§ its position first — `List.of(integersFrom …)::pair(with @)` — build
-		§ that whole List of Records, filter it and read one member back out,
-		§ where the native walks and stops. The bound buys the same thing either
-		§ way: the item Type's own `is` decides which position is found.
+		§ `firstIndex` and `lastIndex` walk the positions with the general `loop`,
+		§ stopping at the first match — the walk-and-stop the native did, now that
+		§ the `Step` Choice lets an Essence expression leave a walk before its end.
+		§ The old objection — that Essence would have to pair every item with its
+		§ position, build that whole List of Records and read one member back out —
+		§ was about a `pair(with:)` formulation; the loop threads the position as
+		§ its State and never builds a List. The bound is the whole of the search:
+		§ the item Type's own `is` decides which position is found, arriving as the
+		§ hidden conformance Argument exactly as `contains` hands it to `anyItem`.
 
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		firstIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer>
+		firstIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
+			constant length = @::length()
+			constant list = @
+
+			§ State is the position under test, Result the answer. `item(at:)`
+			§ answers `Nothing` only past the end, which the length guard has
+			§ already stopped on, so the `Nothing` Case is the unreachable arm.
+			<- loop(startingWith 0, step (index) -> Step<Integer, Optional<Integer>> {
+				if index::isGreaterThanOrEqualTo(length) {
+					<- #Done(nothing)
+				}
+
+				<- match list::item(at index) -> Step<Integer, Optional<Integer>> {
+					case Nothing {
+						<- #Continue(index::add(1))
+					}
+
+					case _ {
+						if @::is(item) {
+							<- #Done(index)
+						} else {
+							<- #Continue(index::add(1))
+						}
+					}
+				}
+			})
+		}
 
 		§§ A new List of the items from one position up to, but not including, another.
 		§§
@@ -466,10 +495,35 @@ declarations {
 			}
 		}
 
-		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`. See the note above `firstIndex` for why this one stays native.
+		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		lastIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer>
+		lastIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
+			constant list = @
+
+			§ The mirror of `firstIndex` — the same walk-and-stop, from the last
+			§ position down. The empty List seeds the loop at -1, already below
+			§ zero, so it stops with `Nothing` before reading anything.
+			<- loop(startingWith @::length()::subtract(1), step (index) -> Step<Integer, Optional<Integer>> {
+				if index::isLessThan(0) {
+					<- #Done(nothing)
+				}
+
+				<- match list::item(at index) -> Step<Integer, Optional<Integer>> {
+					case Nothing {
+						<- #Continue(index::subtract(1))
+					}
+
+					case _ {
+						if @::is(item) {
+							<- #Done(index)
+						} else {
+							<- #Continue(index::subtract(1))
+						}
+					}
+				}
+			})
+		}
 
 		§ The one bounded Method whose bound does real work rather than
 		§ restating a conformance of List's own: joining needs nothing of the
