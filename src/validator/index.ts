@@ -576,6 +576,15 @@ function validateCaseValue(
 				notes: [
 					`'#${node.type.name}' carries ${withArticle(describeType(payloadType))}.`,
 				],
+				// NOTE: A single-member Case would have accepted the value
+				// through the shorthand, so the hint only helps where it can not:
+				// a multi-member Case needs the whole Record spelled out.
+				helps:
+					Object.keys(node.type.members).length > 1
+						? [
+								"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
+							]
+						: [],
 			},
 		)
 	}
