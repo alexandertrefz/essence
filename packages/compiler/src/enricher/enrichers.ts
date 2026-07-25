@@ -220,9 +220,20 @@ export function enrichCaseValue(
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
 ): common.typed.CaseValueNode {
-	let type = resolveCaseValueType(node, scope, expectedType)
+	// NOTE: An Argument carries no expected Type of its own — the Invocation
+	// matched it against each candidate's Parameter Type and committed the
+	// winner's, which is what this reads back. Everywhere else the surrounding
+	// position hands one down directly.
+	let context = expectedType ?? recordedContextualCaseValueType(node) ?? null
 
+	// NOTE: The payload is enriched BEFORE the Case is resolved, because a
+	// prefixed construction whose expected Type offers several instantiations of
+	// the one Case — `Box<Integer> | Box<String>` — picks the arm its payload
+	// fits, the way any value picks the arm of a Union annotation it fits. It
+	// never DECIDES a Type Argument; it only chooses among the ones the context
+	// already decided.
 	let value = node.value === null ? null : enrichExpression(node.value, scope)
+	let type = resolveCaseValueType(node, scope, context, value?.type ?? null)
 
 	if (type.type === "Case") {
 		// NOTE: The one-member shorthand rewraps first, so the instantiation
@@ -2652,6 +2663,66 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		return cached
 	}
 
+	// NOTE: The payload of a prefixed Case Argument, enriched once per Invocation
+	// resolution and SILENTLY — the probes below need its Type to pick which
+	// instantiation of a Case a Parameter offers, and the real enrichment further
+	// down reports whatever it has to say about it. Reported twice, it would be
+	// said twice.
+	let probedPayloadTypes = new Map<parser.CaseValueNode, common.Type | null>()
+
+	function probedPayloadTypeOf(
+		node: parser.CaseValueNode,
+	): common.Type | null {
+		if (!probedPayloadTypes.has(node)) {
+			let { result } = collectDiagnostics(() =>
+				node.value === null
+					? null
+					: enrichExpression(node.value, scope).type,
+			)
+
+			probedPayloadTypes.set(node, result)
+		}
+
+		return probedPayloadTypes.get(node) ?? null
+	}
+
+	// NOTE: An Argument's position is the Parameter Type of whichever candidate
+	// wins, and that is not known while the candidates are still being probed. A
+	// prefixed Case construction reads its Choice's Type Arguments off exactly
+	// that position, so each probe asks silently and RECORDS the Parameter Type
+	// that decided — the winner's recording is committed, and the one real
+	// enrichment below runs under it and reports what is left to report. A probe
+	// nothing decides answers with the DECLARED Case, which matches a Parameter of
+	// that Choice and nothing else: exactly what a candidate probe needs it to
+	// say, and what it said before this rail existed.
+	function probedCaseValueType(
+		node: parser.CaseValueNode,
+		expectedType: common.Type,
+	): common.Type {
+		let { result } = collectDiagnostics(() =>
+			resolveCaseValueType(
+				node,
+				scope,
+				expectedType,
+				probedPayloadTypeOf(node),
+			),
+		)
+
+		if (result.type === "Case") {
+			recordContextualCaseValueType(node, expectedType)
+
+			return result
+		}
+
+		let { result: declared } = collectDiagnostics(() =>
+			node.choice === null
+				? { type: "Error" as const }
+				: resolveCaseReference(node.choice, node.caseName, scope),
+		)
+
+		return declared
+	}
+
 	return {
 		getType(value, expectedType) {
 			// NOTE: Only a Function literal with omitted annotations reacts to
@@ -2667,6 +2738,13 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				return noteErrors(
 					resolveFunctionValueType(value, scope, expectedType),
 				)
+			}
+
+			// NOTE: The other Expression that reacts — a prefixed Case
+			// construction of a generic Choice. The bare form resolves through the
+			// scope scan and needs nothing from here.
+			if (value.nodeType === "CaseValue" && value.choice !== null) {
+				return noteErrors(probedCaseValueType(value, expectedType))
 			}
 
 			return noteErrors(enrichOnce(value).type)
@@ -4289,6 +4367,7 @@ export function resolveCaseValueType(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	payloadType: common.Type | null = null,
 ): common.CaseType | common.ErrorType {
 	if (node.choice === null) {
 		if (expectedType !== null) {
@@ -4305,7 +4384,157 @@ export function resolveCaseValueType(
 		return resolveBareCaseReference(node.caseName, scope)
 	}
 
-	return resolveCaseReference(node.choice, node.caseName, scope)
+	return resolvePrefixedCaseValueType(
+		node,
+		node.choice,
+		scope,
+		expectedType,
+		payloadType,
+	)
+}
+
+// NOTE: A Choice's Type Parameters are APPLIED, never inferred. A prefixed
+// construction is therefore decided by exactly two things: the position it
+// stands in — the same annotation, declared return Type or Parameter Type a
+// bare `#Bare` already resolves against — and, failing that, nothing at all,
+// which is what `undecided-type-arguments` says. The payload is CHECKED against
+// whatever was decided (the Validator's `payload-type-mismatch`), and where a
+// context offers several instantiations of the one Case it picks which of them
+// is meant, but it never decides an Argument of its own: `Holder#Full({ value =
+// 1 })` written where nothing expects a Holder is as undecided as `Holder#Bare`
+// is, and used to quietly become a `Holder<Integer>` because its payload
+// happened to be one.
+//
+// A Choice with no Type Parameters has nothing to decide and is never asked —
+// `Ordering#Equal` stands anywhere, as does every Case of every plain Choice.
+function resolvePrefixedCaseValueType(
+	node: parser.CaseValueNode,
+	choice: parser.IdentifierNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null,
+	payloadType: common.Type | null,
+): common.CaseType | common.ErrorType {
+	let declaredCase = resolveCaseReference(choice, node.caseName, scope)
+
+	if (
+		declaredCase.type === "Error" ||
+		declaredCase.choiceGenerics === undefined
+	) {
+		return declaredCase
+	}
+
+	if (expectedType !== null) {
+		let decided = decideCaseFromExpectedType(
+			declaredCase,
+			expectedType,
+			payloadType,
+		)
+
+		if (decided !== null) {
+			return decided
+		}
+	}
+
+	// NOTE: The Choice's own Parameter names stand in for the Arguments in both
+	// helps — they are what the declaration calls them, so the reader has a name
+	// to replace rather than an ellipsis to decode.
+	let parameterNames = declaredCase.choiceGenerics.map(
+		(generic) => generic.name,
+	)
+	let construction = `${choice.content}#${node.caseName.content}`
+	let application = `${choice.content}<${parameterNames.join(", ")}>`
+
+	reportError(
+		`Nothing decides the Type Arguments of '${construction}'`,
+		node.position,
+		{
+			code: "undecided-type-arguments",
+			labels: [
+				primary(
+					node.position,
+					"no Type Arguments here, and nothing around it decides them",
+				),
+			],
+			notes: [
+				`'${choice.content}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${parameterNames.map((name) => `'${name}'`).join(", ")}.`,
+				"A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.",
+			],
+			helps: [
+				`Annotate the declaration: 'constant left: ${application} = ${construction}'.`,
+			],
+		},
+	)
+
+	return { type: "Error" }
+}
+
+// NOTE: The instantiation the surrounding position decides for a prefixed
+// construction — `constant left: Holder<String> = Holder#Bare` is the `Bare` of
+// `Holder<String>`, exactly what the bare `#Bare` resolves to there. `null` when
+// the position says nothing about this Choice at all, which is the undecided
+// state its caller reports.
+//
+// A Union can offer SEVERAL instantiations of the one Case (`Box<Integer> |
+// Box<String>` carries `Box#Full` twice), and then the payload picks which of
+// them is meant, the way any value picks the arm of a Union annotation it fits.
+// A payload that fits none leaves the first standing, so the mismatch is
+// reported against a concrete instantiation rather than swallowed here; a unit
+// Case fits every one of them and takes the first, which is the same value under
+// every arm.
+function decideCaseFromExpectedType(
+	declaredCase: common.CaseType,
+	expectedType: common.Type,
+	payloadType: common.Type | null,
+): common.CaseType | null {
+	let candidates = caseMatcherCandidates(expectedType).filter(
+		(member): member is common.CaseType =>
+			member.type === "Case" &&
+			member.name === declaredCase.name &&
+			member.choice === declaredCase.choice,
+	)
+
+	if (candidates.length === 0) {
+		return null
+	}
+
+	if (candidates.length === 1 || payloadType === null) {
+		return candidates[0]
+	}
+
+	return (
+		candidates.find((candidate) =>
+			payloadFitsCase(candidate, payloadType),
+		) ?? candidates[0]
+	)
+}
+
+// NOTE: Whether a payload can stand for an instantiated Case's Record — either
+// as written, or through the one-member shorthand `wrapSingleMemberShorthand`
+// applies afterwards, so that `Box#Full("hello")` picks `Box<String>` out of a
+// `Box<Integer> | Box<String>` rather than being read against Integer first.
+function payloadFitsCase(
+	caseType: common.CaseType,
+	payloadType: common.Type,
+): boolean {
+	let recordShape: common.RecordType = {
+		type: "Record",
+		members: caseType.members,
+	}
+
+	if (matchesType(recordShape, payloadType)) {
+		return true
+	}
+
+	let memberNames = Object.keys(caseType.members)
+
+	if (memberNames.length !== 1) {
+		return false
+	}
+
+	return matchesType(recordShape, {
+		type: "Record",
+		members: { [memberNames[0]]: payloadType },
+	})
 }
 
 // NOTE: The Cases a Matcher can pick from — the scrutinee's own members, with
@@ -4550,10 +4779,24 @@ const contextualFunctionTypes = new WeakMap<
 	common.FunctionType
 >()
 
-type ContextualFunctionTypeRecording = Map<
-	parser.FunctionDefinitionNode,
-	common.FunctionType
->
+// NOTE: The Parameter Type an Argument was matched against, for the prefixed
+// Case constructions that read their Choice's Type Arguments off it — the
+// Argument counterpart of an annotation, and the reason `take(Holder#Bare)`
+// needs no application of its own.
+const contextualCaseValueTypes = new WeakMap<
+	parser.CaseValueNode,
+	common.Type
+>()
+
+// NOTE: What ONE probe of a candidate resolved for the Nodes that react to an
+// expected Type — a contextually typed Function literal's signature, and the
+// Parameter Type a prefixed Case construction reads its Type Arguments off.
+// Both are only right for the candidate that wins, so both are held aside
+// together and committed together.
+type ContextualFunctionTypeRecording = {
+	functions: Map<parser.FunctionDefinitionNode, common.FunctionType>
+	cases: Map<parser.CaseValueNode, common.Type>
+}
 
 // NOTE: The recordings of the probes currently running, innermost last. An
 // Invocation probes EVERY candidate — that is how an ambiguity is found — and
@@ -4578,7 +4821,7 @@ function recordContextualFunctionType(
 	if (innermost === undefined) {
 		contextualFunctionTypes.set(node, resolved)
 	} else {
-		innermost.set(node, resolved)
+		innermost.functions.set(node, resolved)
 	}
 }
 
@@ -4588,7 +4831,7 @@ function recordedContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
 ): common.FunctionType | undefined {
 	for (let index = probeRecordings.length - 1; index >= 0; index--) {
-		let recorded = probeRecordings[index].get(node)
+		let recorded = probeRecordings[index].functions.get(node)
 
 		if (recorded !== undefined) {
 			return recorded
@@ -4598,11 +4841,41 @@ function recordedContextualFunctionType(
 	return contextualFunctionTypes.get(node)
 }
 
+function recordContextualCaseValueType(
+	node: parser.CaseValueNode,
+	expectedType: common.Type,
+): void {
+	let innermost = probeRecordings[probeRecordings.length - 1]
+
+	if (innermost === undefined) {
+		contextualCaseValueTypes.set(node, expectedType)
+	} else {
+		innermost.cases.set(node, expectedType)
+	}
+}
+
+export function recordedContextualCaseValueType(
+	node: parser.CaseValueNode,
+): common.Type | undefined {
+	for (let index = probeRecordings.length - 1; index >= 0; index--) {
+		let recorded = probeRecordings[index].cases.get(node)
+
+		if (recorded !== undefined) {
+			return recorded
+		}
+	}
+
+	return contextualCaseValueTypes.get(node)
+}
+
 function probeContextualFunctionTypes<Result>(probe: () => Result): {
 	result: Result
 	recording: ContextualFunctionTypeRecording
 } {
-	let recording: ContextualFunctionTypeRecording = new Map()
+	let recording: ContextualFunctionTypeRecording = {
+		functions: new Map(),
+		cases: new Map(),
+	}
 
 	probeRecordings.push(recording)
 
@@ -4620,8 +4893,12 @@ function commitContextualFunctionTypes(
 		return
 	}
 
-	for (let [node, resolved] of recording) {
+	for (let [node, resolved] of recording.functions) {
 		recordContextualFunctionType(node, resolved)
+	}
+
+	for (let [node, expectedType] of recording.cases) {
+		recordContextualCaseValueType(node, expectedType)
 	}
 }
 
@@ -4635,7 +4912,10 @@ function withContextualFunctionTypes<Result>(
 	recording: ContextualFunctionTypeRecording,
 	work: () => Result,
 ): Result {
-	probeRecordings.push(new Map(recording))
+	probeRecordings.push({
+		functions: new Map(recording.functions),
+		cases: new Map(recording.cases),
+	})
 
 	try {
 		return work()

@@ -194,6 +194,7 @@ export type DiagnosticCode =
 	| "payload-type-mismatch"
 	| "recursive-generic-choice"
 	| "indistinguishable-union-arms"
+	| "undecided-type-arguments"
 	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"

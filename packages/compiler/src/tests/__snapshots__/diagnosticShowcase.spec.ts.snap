@@ -234,20 +234,20 @@ Error: This value does not fit the declared Type of Constant 'swapped'
 
 [unexpected-payload]
 Error: Case '#Empty' does not carry a payload
-    ╭─┤ GenericChoiceValues.es:28:29 │
+    ╭─┤ GenericChoiceValues.es:31:43 │
     │
- 28 │     constant boxed = Box#Empty({ value = 1 })
-    │                                ──────┬──────  
-    │                                      ╰──────── nothing goes here
+ 31 │     constant boxed: Box<Integer> = Box#Empty({ value = 1 })
+    │                                              ──────┬──────  
+    │                                                    ╰──────── nothing goes here
     │ 
     │ Help: Write '#Empty' on its own.
 ────╯
 
 [payload-type-mismatch]
 Error: This payload does not fit Case '#Both'
-    ╭─┤ GenericChoiceValues.es:37:24 │
+    ╭─┤ GenericChoiceValues.es:40:24 │
     │
- 37 │     constant pair = #Both(5)
+ 40 │     constant pair = #Both(5)
     │                           ▲  
     │                           ╰── this is an Integer
     │ 
@@ -258,9 +258,9 @@ Error: This payload does not fit Case '#Both'
 
 [overloaded-function-value]
 Error: An overloaded Function can not be used as a value
-    ╭─┤ GenericChoiceValues.es:41:23 │
+    ╭─┤ GenericChoiceValues.es:44:23 │
     │
- 41 │     constant everyLoop = loop
+ 44 │     constant everyLoop = loop
     │                          ──┬─  
     │                            ╰─── this names all 4 overloads at once
     │ 
