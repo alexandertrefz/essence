@@ -26,6 +26,16 @@ export type Documentation = {
 	position: Position | null
 }
 
+// NOTE: One written Type annotation, paired with what it resolved to. The
+// typed AST ERASES annotations — a resolved Type carries no Position — so
+// this is the only record that a Type was written at a particular place, and
+// the only way the Language Server can answer for the cursor sitting on one.
+// Collected by the Enricher on request; see `src/enricher/annotations.ts`.
+export type TypeAnnotation = {
+	position: Position
+	type: Type
+}
+
 export type DiagnosticSeverity = "error" | "warning"
 
 // NOTE: `unnecessary` renders the code greyed out rather than underlined —

@@ -654,6 +654,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			returnType: node.type,
 			inferredReturnType: null,
 			parameterListPosition: node.position,
+			headPosition: node.position,
 		}
 
 		for (let bodyNode of handler.body) {

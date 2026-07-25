@@ -579,10 +579,14 @@ describe("LSP in a standard library source", () => {
 	// signatures.
 	it("should describe a body-less signature, its Parameters and its annotations", () => {
 		let { program } = parseDocument(source, stdlibPath)
-		let { program: enrichedProgram } = enrichDocument(program, stdlibPath)
+		let { program: enrichedProgram, annotations } = enrichDocument(
+			program,
+			stdlibPath,
+			{ annotations: true },
+		)
 
 		let hoverAt = (line: number, column: number) =>
-			findHover(enrichedProgram, { line, column }, program)
+			findHover(enrichedProgram, { line, column }, program, annotations)
 
 		expect(hoverAt(8, 4)?.content).toBe("is(_ Boolean) -> Boolean")
 		expect(hoverAt(8, 4)?.documentation).toBe("Whether the two are equal.")
@@ -591,6 +595,36 @@ describe("LSP in a standard library source", () => {
 		expect(hoverAt(8, 16)?.content).toBe("Boolean")
 		expect(hoverAt(8, 28)?.content).toBe("Boolean")
 		expect(hoverAt(14, 4)?.content).toBe("toString() -> String")
+	})
+
+	// NOTE: What the pass above could never answer — it pairs a parsed
+	// annotation with the Type it resolved to as a WHOLE, so the cursor inside
+	// one got the whole thing back. The annotation index records each nested
+	// Type against its own span, so `Boolean` within `List<Boolean>` is its own
+	// answer.
+	it("should describe the Type inside a native signature's compound annotation", () => {
+		let compoundSource = [
+			"declarations {",
+			"\tnamespace Boolean for Boolean {",
+			"\t\t§§ As a single element List.",
+			"\t\ttoList() -> List<Boolean>",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let { program } = parseDocument(compoundSource, stdlibPath)
+		let { program: enrichedProgram, annotations } = enrichDocument(
+			program,
+			stdlibPath,
+			{ annotations: true },
+		)
+
+		let hoverAt = (line: number, column: number) =>
+			findHover(enrichedProgram, { line, column }, program, annotations)
+
+		expect(hoverAt(4, 4)?.content).toBe("toList() -> List<Boolean>")
+		expect(hoverAt(4, 15)?.content).toBe("List<Boolean>")
+		expect(hoverAt(4, 21)?.content).toBe("Boolean")
 	})
 
 	// NOTE: Every real standard library source, analysed the way the editor

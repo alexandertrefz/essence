@@ -5,21 +5,26 @@ import type { common } from "../interfaces/index"
 import { findHover } from "../lsp/hover"
 import { parseWithDiagnostics } from "../parser/index"
 
-function hover(source: string, cursor: common.Cursor): string | null {
+// NOTE: Both Programs and the annotation index, which is what the Language
+// Server hands `findHover` for every document — see `connection.onHover`.
+function hoverInfo(source: string, cursor: common.Cursor) {
 	let { program } = parseWithDiagnostics(source)
-	let { program: enrichedProgram } = enrich(program)
+	let { program: enrichedProgram, annotations } = enrich(program, {
+		annotations: true,
+	})
 
-	return findHover(enrichedProgram, cursor)?.content ?? null
+	return findHover(enrichedProgram, cursor, program, annotations)
+}
+
+function hover(source: string, cursor: common.Cursor): string | null {
+	return hoverInfo(source, cursor)?.content ?? null
 }
 
 function hoverDocumentation(
 	source: string,
 	cursor: common.Cursor,
 ): string | null {
-	let { program } = parseWithDiagnostics(source)
-	let { program: enrichedProgram } = enrich(program)
-
-	return findHover(enrichedProgram, cursor)?.documentation ?? null
+	return hoverInfo(source, cursor)?.documentation ?? null
 }
 
 describe("Hover", () => {
@@ -376,6 +381,297 @@ describe("Hover", () => {
 		let source = ["implementation {", "\tconstant a = 1", "}"].join("\n")
 
 		expect(hover(source, { line: 1, column: 1 })).toBeNull()
+	})
+})
+
+// NOTE: The typed AST erases annotations — a resolved Type carries no Position
+// — so before the annotation index every one of these answered with the
+// enclosing declaration, whatever it was aimed at.
+describe("Hover of Type annotations", () => {
+	it("should describe a Function's Parameter and return annotations", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet (subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 27 })).toBe("String")
+		expect(hover(source, { line: 2, column: 38 })).toBe("String")
+		// NOTE: The Parameter's own name still wins over the annotation beside
+		// it — the index adds candidates, it does not outrank the typed tree.
+		expect(hover(source, { line: 2, column: 20 })).toBe("subject: String")
+	})
+
+	it("should describe a Constant's annotation, and the Type inside it", () => {
+		let source = [
+			"implementation {",
+			"\tconstant xs: List<Integer> = [1]",
+			"\t__print(xs)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 16 })).toBe("List<Integer>")
+		expect(hover(source, { line: 2, column: 22 })).toBe("Integer")
+	})
+
+	it("should describe a Namespace's target Type and its Methods' annotations", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Boxes<infer Item> for List<Item> {",
+			"\t\tfirst(fallback: Item) -> Item {",
+			"\t\t\t<- fallback",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 35 })).toBe("List<Item>")
+		expect(hover(source, { line: 2, column: 40 })).toBe("Item")
+		expect(hover(source, { line: 3, column: 20 })).toBe("Item")
+		expect(hover(source, { line: 3, column: 29 })).toBe("Item")
+	})
+
+	it("should describe a Record annotation and the Types within it", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Box<infer Item> for { value: Item }",
+			"\t\tis Comparable where Item is Comparable",
+			"\t{",
+			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 33 })).toBe("{ value: Item }")
+		expect(hover(source, { line: 5, column: 23 })).toBe("{ value: Item }")
+		expect(hover(source, { line: 5, column: 32 })).toBe("Item")
+		expect(hover(source, { line: 5, column: 42 })).toBe("Ordering")
+	})
+
+	// NOTE: These four are the reason the collector is opened ONCE around the
+	// whole enrichment rather than per speculative hoisting round. `enrichStatement`
+	// reuses the hoisted Type for every one of these declarations, so their
+	// annotations are resolved ONLY inside a speculation and a per-round
+	// collector would throw all of them away.
+	it("should describe annotations that are only ever resolved while hoisting", () => {
+		let source = [
+			"implementation {",
+			"\ttype Value = Integer | String",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"\tchoice Box<Item> {",
+			"\t\tHolding { value: Item },",
+			"\t\tEmpty,",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: A Union annotation, and each of its members on its own.
+		expect(hover(source, { line: 2, column: 16 })).toBe("Integer")
+		expect(hover(source, { line: 2, column: 26 })).toBe("String")
+		expect(hover(source, { line: 2, column: 23 })).toBe("Integer | String")
+		// NOTE: A Protocol requirement's return Type — the Protocol's body is
+		// otherwise entirely opaque to Hover.
+		expect(hover(source, { line: 4, column: 14 })).toBe("Integer")
+		// NOTE: A generic Choice's payload member.
+		expect(hover(source, { line: 7, column: 21 })).toBe("Item")
+	})
+})
+
+// NOTE: All of these had a Position in the typed AST already — Hover simply
+// never offered them as candidates, so the enclosing declaration answered.
+describe("Hover of declaration parts", () => {
+	it("should describe a Type Parameter as it was declared", () => {
+		let source = [
+			"implementation {",
+			"\tfunction firstOr <infer Item is Printable>(_ items: List<Item>) -> String {",
+			'\t\t<- "x"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 25 })).toBe(
+			"infer Item is Printable",
+		)
+	})
+
+	it("should describe a Parameter the cursor sits on but not inside", () => {
+		let source = [
+			"implementation {",
+			"\tfunction firstOr <infer Item is Printable>(_ items: List<Item>) -> String {",
+			'\t\t<- "x"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: The bare `_` binds no name, so there is no Identifier under the
+		// cursor — the Parameter itself is what answers.
+		expect(hover(source, { line: 2, column: 45 })).toBe("List<Item>")
+	})
+
+	it("should describe a conformance clause as the Protocol it names", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Box<infer Item> for { value: Item }",
+			"\t\tis Comparable where Item is Comparable",
+			"\t{",
+			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 10 })).toBe(
+			"protocol Comparable\ncompareTo(_ Self) -> Ordering",
+		)
+	})
+
+	it("should describe what a Return Statement returns", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet (subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 4 })).toBe("String")
+	})
+
+	it("should describe both halves of a where condition", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Box<infer Item> for { value: Item }",
+			"\t\tis Comparable where Item is Comparable",
+			"\t{",
+			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 24 })).toBe("infer Item")
+		expect(hover(source, { line: 3, column: 33 })).toBe(
+			"protocol Comparable\ncompareTo(_ Self) -> Ordering",
+		)
+	})
+})
+
+// NOTE: A declaration is anchored to its HEAD, not to its whole Position. Every
+// one of these used to answer with the enclosing declaration, so moving the
+// mouse across the indentation of a long Namespace popped its whole head up.
+describe("Hover inside a declaration's body", () => {
+	it("should answer nothing on blank lines and body indentation", () => {
+		let source = [
+			"implementation {",
+			"\tfunction f (n: Integer) -> Integer {",
+			"",
+			"\t\tif n::isGreaterThan(1) {",
+			"\t\t\t__print(nothing)",
+			"\t\t}",
+			"",
+			"\t\t<- n",
+			"\t}",
+			"}",
+		].join("\n")
+
+		// NOTE: A blank line inside the body, at any column.
+		expect(hover(source, { line: 3, column: 1 })).toBeNull()
+		expect(hover(source, { line: 7, column: 4 })).toBeNull()
+		// NOTE: The indentation before a Statement, and a nested block's own
+		// closing brace — neither of which the Function should answer for.
+		expect(hover(source, { line: 4, column: 2 })).toBeNull()
+		expect(hover(source, { line: 6, column: 3 })).toBeNull()
+		// NOTE: The head itself still answers, which is the point of keeping one.
+		expect(hover(source, { line: 2, column: 3 })).toBe(
+			"function f(n: Integer) -> Integer",
+		)
+	})
+
+	it("should answer nothing between a Namespace's Methods", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"",
+			"\t\tstatic show(value: Integer) -> String {",
+			'\t\t\t<- "42"',
+			"\t\t}",
+			"",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 1 })).toBeNull()
+		expect(hover(source, { line: 7, column: 2 })).toBeNull()
+		expect(hover(source, { line: 2, column: 3 })).toBe("Thing: Thing")
+	})
+})
+
+// NOTE: A Protocol's requirements and a Choice's payload members survive
+// enrichment as plain Type Records with no Position in them, so every name
+// inside either declaration used to answer with the declaration itself. Inside
+// a Protocol that was EVERY column.
+describe("Hover inside a Protocol or Choice declaration", () => {
+	it("should describe each of a Protocol's requirements", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sizable {",
+			"\t\tsize() -> Integer",
+			"",
+			"\t\tresize(_ to: Integer) -> Self",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 3, column: 4 })).toBe("size() -> Integer")
+		expect(hover(source, { line: 3, column: 14 })).toBe("Integer")
+		expect(hover(source, { line: 5, column: 4 })).toBe(
+			"resize(_ Integer) -> Self",
+		)
+		expect(hover(source, { line: 5, column: 13 })).toBe("to: Integer")
+		expect(hover(source, { line: 5, column: 17 })).toBe("Integer")
+		expect(hover(source, { line: 5, column: 29 })).toBe("Self")
+		// NOTE: The declaration itself still reads back whole, on its head.
+		expect(hover(source, { line: 2, column: 3 })).toBe(
+			"protocol Sizable\nsize() -> Integer\nresize(_ Integer) -> Self",
+		)
+	})
+
+	it("should describe a Choice's Type Parameters and payload members", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Step<State, Result> {",
+			"\t\tContinue { state: State },",
+			"\t\tDone { value: Result },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 14 })).toBe("State")
+		expect(hover(source, { line: 2, column: 21 })).toBe("Result")
+		expect(hover(source, { line: 3, column: 15 })).toBe("state: State")
+		expect(hover(source, { line: 3, column: 22 })).toBe("State")
+		expect(hover(source, { line: 4, column: 11 })).toBe("value: Result")
+		expect(hover(source, { line: 4, column: 18 })).toBe("Result")
+	})
+
+	it("should describe a Type Alias's Type Parameter", () => {
+		let source = [
+			"implementation {",
+			"\ttype Fallible<Result> = Result | String",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 17 })).toBe("Result")
+		expect(hover(source, { line: 2, column: 27 })).toBe("Result")
+		expect(hover(source, { line: 2, column: 36 })).toBe("String")
 	})
 })
 
