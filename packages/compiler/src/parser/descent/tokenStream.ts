@@ -1,8 +1,12 @@
 import { type common, lexer } from "@essence/interfaces"
 
-import { primary, reportError } from "../../diagnostics/index"
+import { primary, reportError, reportWarning } from "../../diagnostics/index"
 import { Lexer } from "../../lexer/index"
-import { type DocumentationLine, parseDocumentation } from "../documentation"
+import {
+	type DocumentationLine,
+	type DocumentationProblem,
+	parseDocumentation,
+} from "../documentation"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -115,6 +119,29 @@ export function describeToken(token: Token): string {
 	}
 
 	return `'${token.value}'`
+}
+
+// NOTE: Reported here rather than by `parseDocumentation`, which stays a pure
+// function of the lines it is handed. This is the point where a Diagnostic
+// collection exists to report into, and where `backtrack` will rewind anything
+// a speculative parse reported — a Declaration that turned out to be something
+// else takes its Documentation's Diagnostics with it.
+function reportMissingSeparator(problem: DocumentationProblem): void {
+	let head = problem.name === null ? "@returns" : `@param ${problem.name}`
+
+	reportWarning(
+		`This '@${problem.tag}' tag is not separated from its text`,
+		problem.position,
+		{
+			code: "missing-documentation-separator",
+			labels: [primary(problem.position, "an em-dash belongs here")],
+			notes: [
+				"A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.",
+				"The text is lifted onto the Parameter either way; what is missing is the separator, not the description.",
+			],
+			helps: [`Write '${head} —' before the text.`],
+		},
+	)
 }
 
 export type TokenStreamState = {
@@ -245,7 +272,16 @@ export class TokenStream {
 			return null
 		}
 
-		return parseDocumentation(lines, { start, end }).documentation
+		let { documentation, problems } = parseDocumentation(lines, {
+			start,
+			end,
+		})
+
+		for (let problem of problems) {
+			reportMissingSeparator(problem)
+		}
+
+		return documentation
 	}
 
 	peek(offset = 0): Token | undefined {
