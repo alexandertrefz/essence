@@ -418,6 +418,71 @@ describe("Resolvers", () => {
 		})
 	})
 
+	// NOTE: An empty List Literal's item Type is Unknown, and `List<ItemType>`
+	// accepts a `List<Unknown>` receiver without binding `ItemType` to anything.
+	// The `where ItemType is Comparable` condition then had no Type to solve, and
+	// was silently dropped: the emitted call handed the fulfilling Method a plain
+	// method map where it expects a curried one. Programs that got away with it
+	// are rejected now — there is no witness to emit for a Type nothing has
+	// pinned down yet.
+	describe("Witness conditions over an unpinned item Type", () => {
+		it("should report sorting a List of empty Lists", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				__print([[], []]::sort())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe(
+				"unsatisfied-conformance-condition",
+			)
+			expect(diagnostics[0].notes).toContain(
+				"Its 'ItemType' is not determined here — an empty List Literal leaves the item Type unknown until something pins it down.",
+			)
+		})
+
+		it("should report searching one by value", () => {
+			expect(
+				codesFor(`implementation {
+					__print([[], []]::contains([]))
+				}`),
+			).toEqual(["unsatisfied-conformance-condition"])
+		})
+
+		// NOTE: This one used to compile clean and die reading `compareTo` off
+		// `undefined` — the Variable's declared Type stays `List<Unknown>`, so
+		// the items the Program actually sorts are Lists of Integers whose
+		// witness was never curried.
+		it("should report it for a Variable that was only assigned later", () => {
+			expect(
+				codesFor(`implementation {
+					variable items = []
+
+					items = [1, 2]
+
+					__print([items, items]::sort())
+				}`),
+			).toEqual(["unsatisfied-conformance-condition"])
+		})
+
+		it("should keep sorting Lists one of which pins the item Type", async () => {
+			expect(
+				await run(`implementation {
+					__print([[], [1]]::sort())
+				}`),
+			).toEqual(["[ [], [ 1 ] ]"])
+		})
+
+		it("should keep sorting an annotated empty List", async () => {
+			expect(
+				await run(`implementation {
+					constant items: List<Integer> = []
+
+					__print([items, [1]]::sort())
+				}`),
+			).toEqual(["[ [], [ 1 ] ]"])
+		})
+	})
+
 	describe("Derived Equality of a generic Choice", () => {
 		let pace = `choice Pace<A, B> {
 			First { a: A },

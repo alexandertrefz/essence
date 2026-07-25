@@ -857,6 +857,33 @@ function typeMentionsAnyGeneric(
 	return walk(type)
 }
 
+// NOTE: Whether an Error Type sits anywhere in this one — the same structural
+// walk, for the same reason it does not enumerate shapes. An Error was already
+// reported where it came from, so a Type carrying one buried in a List's items
+// or a Record's members must not be diagnosed a second time for whatever it
+// then fails to do.
+export function typeContainsError(type: common.Type): boolean {
+	let walk = (value: unknown): boolean => {
+		if (value === null || typeof value !== "object") {
+			return false
+		}
+
+		if (Array.isArray(value)) {
+			return value.some(walk)
+		}
+
+		let record = value as Record<string, unknown>
+
+		if (record.type === "Error") {
+			return true
+		}
+
+		return Object.values(record).some(walk)
+	}
+
+	return walk(type)
+}
+
 export type ConformanceCheckResult =
 	| { kind: "conforms"; methodMap: ConformanceMethodMap }
 	| { kind: "missing"; methodName: string }
