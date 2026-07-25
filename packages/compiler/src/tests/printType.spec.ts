@@ -9,7 +9,7 @@ import {
 	printSignatureSummary,
 	printType,
 	signaturesOf,
-} from "../lsp/printType"
+} from "../printType"
 
 let integer: common.Type = { type: "Integer" }
 let string: common.Type = { type: "String" }

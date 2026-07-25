@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
 
-import { findFoldingRanges } from "../lsp/foldingRanges"
-import { findSelectionRanges } from "../lsp/selectionRanges"
-import { parseWithDiagnostics } from "../parser/index"
+import { parseWithDiagnostics } from "@essence/compiler/parser"
+
+import { findFoldingRanges } from "../foldingRanges"
+import { findSelectionRanges } from "../selectionRanges"
 
 function foldingRangesOf(source: string) {
 	let { program } = parseWithDiagnostics(source)

@@ -1,17 +1,17 @@
-import type { common } from "@essence/interfaces"
-
-import { enrichDocument, parseDocument } from "../documents"
-import { flattenUnionMembers } from "../helpers/index"
-import { type ArgumentContext, findArgumentContext } from "./argumentContext"
-import { describe, documentationOf } from "./documentation"
-import { matchingNamespaces } from "./namespaces"
-import { contains, isAtOrBefore, isSmaller } from "./positions"
+import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import { flattenUnionMembers } from "@essence/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
 	printType,
 	signaturesOf,
-} from "./printType"
+} from "@essence/compiler/printType"
+import type { common } from "@essence/interfaces"
+
+import { type ArgumentContext, findArgumentContext } from "./argumentContext"
+import { describe, documentationOf } from "./documentation"
+import { matchingNamespaces } from "./namespaces"
+import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { buildProbeSource } from "./probe"
 import {
 	type Declaration,

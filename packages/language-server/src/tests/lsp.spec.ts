@@ -12,18 +12,22 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import {
+	enrichDocument,
+	isStdlibDocument,
+	parseDocument,
+} from "@essence/compiler/documents"
+import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence/fixtures"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
-import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
-import { analyse } from "../lsp/analyse"
-import { findCompletions } from "../lsp/completion"
-import { toLspDiagnostic, toLspRange } from "../lsp/conversion"
-import { findHover } from "../lsp/hover"
-import { matchingNamespaces } from "../lsp/namespaces"
-import { findRenameableOccurrence } from "../lsp/rename"
-import { testDiagnostic } from "./diagnosticFactory"
+import { analyse } from "../analyse"
+import { findCompletions } from "../completion"
+import { toLspDiagnostic, toLspRange } from "../conversion"
+import { findHover } from "../hover"
+import { matchingNamespaces } from "../namespaces"
+import { findRenameableOccurrence } from "../rename"
 
 describe("LSP", () => {
 	describe("analyse", () => {

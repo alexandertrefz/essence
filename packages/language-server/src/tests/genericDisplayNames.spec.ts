@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher/index"
-import { describeType, displayGenericName } from "../helpers/index"
-import { findInlayHints } from "../lsp/inlayHints"
-import { printType } from "../lsp/printType"
-import { parseWithDiagnostics } from "../parser/index"
+import { enrich } from "@essence/compiler/enricher"
+import { describeType, displayGenericName } from "@essence/compiler/helpers"
+import { parseWithDiagnostics } from "@essence/compiler/parser"
+import { printType } from "@essence/compiler/printType"
+
+import { findInlayHints } from "../inlayHints"
 
 function hintsOf(source: string) {
 	let { program } = parseWithDiagnostics(source)

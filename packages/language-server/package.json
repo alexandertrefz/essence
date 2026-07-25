@@ -1,0 +1,26 @@
+{
+	"name": "@essence/language-server",
+	"version": "0.0.1",
+	"description": "The Essence Language Server, spoken over stdio by esls.",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"esls": "bin/esls"
+	},
+	"exports": {
+		".": "./src/server.ts",
+		"./*": "./src/*.ts"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"dependencies": {
+		"@essence/compiler": "workspace:*",
+		"@essence/interfaces": "workspace:*",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12"
+	},
+	"devDependencies": {
+		"@essence/fixtures": "workspace:*",
+		"@essence/stdlib": "workspace:*"
+	}
+}

@@ -1,14 +1,14 @@
-import type { common } from "@essence/interfaces"
-
-import { enrichDocument, parseDocument } from "../documents"
-import { describe, documentationOf } from "./documentation"
-import { matchingNamespaces } from "./namespaces"
-import { contains, isSmaller } from "./positions"
+import { enrichDocument, parseDocument } from "@essence/compiler/documents"
 import {
 	describeSignature,
 	type ParameterRange,
 	signaturesOf,
-} from "./printType"
+} from "@essence/compiler/printType"
+import type { common } from "@essence/interfaces"
+
+import { describe, documentationOf } from "./documentation"
+import { matchingNamespaces } from "./namespaces"
+import { contains, isSmaller } from "./positions"
 import { buildProbeSource, stripNoise } from "./probe"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
