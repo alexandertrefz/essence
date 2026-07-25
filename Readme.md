@@ -105,6 +105,10 @@ bun run check     # lint and format
 bun run typecheck # type-check every package, as one program
 ```
 
+Every push and every pull request runs the last two of those on GitHub Actions, against the Bun named in
+`.bun-version` — the one this repository is developed against, so a failure there is a failure that
+reproduces here.
+
 The Language Server is started by the `esls` executable in
 [packages/language-server/bin](packages/language-server/bin). To develop the VS Code extension against a live
 server, point its `essence.server.path` setting at that file — it runs the server's TypeScript directly, so
