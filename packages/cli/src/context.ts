@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs"
-import * as path from "node:path"
-
+import manifest from "../package.json" with { type: "json" }
 import type { OptionValues } from "./args"
 import type { HelpContext } from "./help"
 import type { ReportContext } from "./report"
@@ -22,22 +20,14 @@ import {
 
 // NOTE: Read from package.json rather than duplicated here, so that
 // `esc --version` can not drift away from the version that was published.
-export const version = readVersion()
-
-function readVersion(): string {
-	try {
-		let manifest = readFileSync(
-			path.resolve(import.meta.dirname, "../../package.json"),
-			"utf8",
-		)
-
-		return (
-			(JSON.parse(manifest) as { version?: string }).version ?? "unknown"
-		)
-	} catch {
-		return "unknown"
-	}
-}
+//
+// NOTE: IMPORTED rather than read off a path counted out from this module.
+// It was read, and the path was `../../package.json` — correct while this
+// file sat one directory deeper, and silently wrong the moment it moved: the
+// read failed, the `catch` answered "unknown", and `esc --version` said so to
+// everyone who asked. An import is resolved by the module loader, so the same
+// mistake is a build error rather than a string nobody notices.
+export const version: string = manifest.version
 
 export type CLIContext = {
 	terminal: Terminal

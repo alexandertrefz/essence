@@ -1,15 +1,17 @@
 import { readFile } from "node:fs/promises"
 import { gzipSync } from "node:zlib"
 
+import { bundle, writeOutputs } from "@essence/compiler/bundler"
+import {
+	containsErrors,
+	placelessDiagnostic,
+} from "@essence/compiler/diagnostics"
+import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import { optimise } from "@essence/compiler/optimiser"
+import { rewrite } from "@essence/compiler/rewriter"
+import { simplify } from "@essence/compiler/simplifier"
+import { validate } from "@essence/compiler/validator"
 import type { common } from "@essence/interfaces"
-
-import { bundle, writeOutputs } from "../bundler/index"
-import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
-import { enrichDocument, parseDocument } from "../documents"
-import { optimise } from "../optimiser/index"
-import { rewrite } from "../rewriter/index"
-import { simplify } from "../simplifier/index"
-import { validate } from "../validator/index"
 
 // NOTE: One description of the Compiler pipeline, used by both the in-process
 // path and the worker path. Everything the CLI reports — stage timings, output
