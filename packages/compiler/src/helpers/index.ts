@@ -1,4 +1,4 @@
-import type { common, lexer } from "../interfaces/index"
+import type { common, lexer } from "@essence/interfaces"
 
 function editDistance(left: string, right: string): number {
 	let previous = Array.from({ length: right.length + 1 }, (_, i) => i)

@@ -1,4 +1,5 @@
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
+
 import { printType } from "./printType"
 
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type

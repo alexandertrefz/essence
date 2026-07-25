@@ -1,3 +1,5 @@
+import { type common, lexer, type parser } from "@essence/interfaces"
+
 // NOTE: Hand-written recursive descent parser — the compiler's parser,
 // re-exported through src/parser. It builds its ASTs through the shared
 // node generators in ../nodeGenerators.
@@ -9,7 +11,6 @@ import {
 	rewindDiagnostics,
 	secondary,
 } from "../../diagnostics/index"
-import { type common, lexer, type parser } from "../../interfaces/index"
 import * as generators from "../nodeGenerators"
 import {
 	describeToken,

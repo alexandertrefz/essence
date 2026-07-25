@@ -1,4 +1,5 @@
-import type { common, parser } from "../interfaces/index"
+import type { common, parser } from "@essence/interfaces"
+
 import { isAtOrBefore } from "./positions"
 
 // NOTE: The outline is built from the Parser AST alone — it must work while

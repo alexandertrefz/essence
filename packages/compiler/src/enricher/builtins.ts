@@ -1,4 +1,5 @@
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
+
 import { loadStdlib } from "./stdlib"
 
 // NOTE: The single source of truth for what exists before the first line of a

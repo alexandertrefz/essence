@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence/interfaces"
+
 import {
 	collectDiagnostics,
 	containsErrors,
@@ -9,7 +11,6 @@ import {
 	reportError,
 	reportWarning,
 } from "../diagnostics/index"
-import type { common } from "../interfaces/index"
 
 const position: common.Position = {
 	start: { line: 1, column: 1 },

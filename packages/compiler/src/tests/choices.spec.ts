@@ -4,10 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
+import type { common, parser } from "@essence/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import type { common, parser } from "../interfaces/index"
 import { printType } from "../lsp/printType"
 import { optimise } from "../optimiser/index"
 import { parse, parseWithDiagnostics } from "../parser/index"

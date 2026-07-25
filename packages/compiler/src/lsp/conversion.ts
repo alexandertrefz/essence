@@ -1,3 +1,4 @@
+import type { common } from "@essence/interfaces"
 import {
 	type Diagnostic,
 	DiagnosticSeverity,
@@ -5,8 +6,6 @@ import {
 	type Position,
 	type Range,
 } from "vscode-languageserver"
-
-import type { common } from "../interfaces/index"
 
 export function toCursor(position: Position): common.Cursor {
 	return { line: position.line + 1, column: position.character + 1 }

@@ -1,4 +1,4 @@
-import type { common, parser } from "../interfaces/index"
+import type { common, parser } from "@essence/interfaces"
 
 // NOTE: The Types written down in a source, paired with what each one resolved
 // to. Module state, exactly as the Diagnostic list is — `resolveType` would

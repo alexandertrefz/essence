@@ -1,4 +1,4 @@
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
 
 // TODO: Implement Optimisation
 export const optimise = (
