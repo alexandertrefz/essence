@@ -779,6 +779,124 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: Regression tests — a Case's runtime tag is shared by every
+	// instantiation of it, so `Box<Integer>#Full` and `Box<String>#Full` are
+	// both "Box#Full" and no Matcher and no dispatch branch can tell them apart
+	// by tag. The Enricher typed a Matcher by the FIRST instantiation the Union
+	// happened to name, so `@.value::add(1)` compiled clean over a payload that
+	// was a String at runtime and printed "hello1", and a dispatch on such a
+	// Union sent every value to the first branch.
+	describe("Cases of Several Instantiations", () => {
+		const box = `choice Box<Value> {
+			Full { value: Value },
+			Empty,
+		}`
+
+		const describeBox = (
+			fullMatcher: string,
+			emptyMatcher: string,
+		) => `implementation { ${box}
+			function describe(_ boxed: Box<Integer> | Box<String>) -> String {
+				<- match boxed -> String {
+					case ${fullMatcher} {
+						<- match @.value -> String {
+							case Integer { <- @::toString() }
+							case String { <- @ }
+						}
+					}
+					case ${emptyMatcher} { <- "empty" }
+				}
+			}
+
+			constant text: Box<Integer> | Box<String> = Box#Full("hello")
+			constant number: Box<Integer> | Box<String> = Box#Full(5)
+			constant nothingInside: Box<Integer> | Box<String> = Box#Empty
+
+			__print(describe(text))
+			__print(describe(number))
+			__print(describe(nothingInside))
+		}`
+
+		it("narrows the payload to what every instantiation carries", () => {
+			expect(
+				messagesOf(`implementation { ${box}
+					constant boxed: Box<Integer> | Box<String> = Box#Full("hello")
+
+					__print(match boxed -> Integer {
+						case Box#Full { <- @.value::add(1) }
+						case Box#Empty { <- 0 }
+					})
+				}`),
+			).toEqual(["No Method named 'add' for String"])
+		})
+
+		it("routes every instantiation through the one Matcher", async () => {
+			expect(await run(describeBox("Box#Full", "Box#Empty"))).toEqual([
+				'"hello"',
+				'"5"',
+				'"empty"',
+			])
+		})
+
+		// NOTE: The bare form used to call these an ambiguity and name one
+		// Choice twice — an ambiguity a prefix could not have resolved, since
+		// the prefix says which CHOICE is meant and both candidates are its.
+		it("takes a bare Matcher for the instantiations of one Choice", async () => {
+			expect(await run(describeBox("#Full", "#Empty"))).toEqual([
+				'"hello"',
+				'"5"',
+				'"empty"',
+			])
+		})
+
+		it("still reports a bare Matcher two Choices declare", () => {
+			expect(
+				codesOf(`implementation { ${box}
+					choice Crate { Full { weight: Integer } }
+
+					constant thing: Box<Integer> | Crate = Crate#Full({ weight = 2 })
+
+					__print(match thing -> String {
+						case #Full { <- "full" }
+						case #Empty { <- "empty" }
+					})
+				}`),
+			).toContain("ambiguous-case")
+		})
+
+		it("picks each instantiation's own dispatch branch", async () => {
+			expect(
+				await run(`implementation {
+					choice Box<Value> {
+						Full { value: Value },
+					}
+
+					namespace IntegerBox for Box<Integer> {
+						describe() -> String {
+							<- match @ -> String {
+								case #Full { <- "Integer box" }
+							}
+						}
+					}
+
+					namespace StringBox for Box<String> {
+						describe() -> String {
+							<- match @ -> String {
+								case #Full { <- "String box" }
+							}
+						}
+					}
+
+					constant text: Box<Integer> | Box<String> = Box#Full("hello")
+					constant number: Box<Integer> | Box<String> = Box#Full(5)
+
+					__print(text::describe())
+					__print(number::describe())
+				}`),
+			).toEqual(['"String box"', '"Integer box"'])
+		})
+	})
+
 	// NOTE: A bound on a Choice's Type Parameter is a promise the APPLICATION
 	// has to keep — nothing downstream asks again, so `Box<Function>` used to
 	// substitute a Type with no equality into a payload declared Equatable and

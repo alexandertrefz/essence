@@ -130,9 +130,32 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 
 		return true
 	} else if (type.type === "Case") {
-		// NOTE: Nominal — only the tag decides, the payload's structure never
-		// does. A structurally identical plain Record is not this Case.
-		return value[typeKeySymbol] === `${type.choice}#${type.name}`
+		// NOTE: Nominal first — the tag says which Case, and a structurally
+		// identical plain Record is not this Case however its members line up.
+		if (value[typeKeySymbol] !== `${type.choice}#${type.name}`) {
+			return false
+		}
+
+		// NOTE: Then the payload, because one tag is carried by every
+		// instantiation of a generic Case: `Box<Integer>#Full` and
+		// `Box<String>#Full` are both "Box#Full", and the tag alone let a
+		// Matcher for one accept values of the other — a String payload
+		// arrived where the Handler had been told it was an Integer. A payload
+		// is CLOSED (the Case declares every member it has), so unlike a
+		// Record this asks about all of it.
+		//
+		// NOTE: Inside generic code the members are still Type Parameters, and
+		// a GenericUse answers true below, so the check degrades to the tag
+		// alone exactly where nothing more is known about the payload.
+		//
+		// NOTE: Cast because `CaseInstanceType` is deliberately kept out of
+		// `AnyType` — the tag matched above is what says this value is one.
+		let instance = value as unknown as CaseInstanceType
+
+		return Object.entries(type.members).every(
+			([name, memberType]) =>
+				name in instance && isValueOfType(instance[name], memberType),
+		)
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))
 	} else if (type.type === "Function") {

@@ -1604,10 +1604,15 @@ function orderClaims<Claim extends { tag: string | null; shape?: common.Type }>(
 
 // NOTE: The part of a Type the runtime can actually check — what `isValueOfType`
 // consults and nothing more, which is why a descriptor carries a SHAPE rather
-// than a Type. A Case is decided by its tag alone, so its payload is dropped; a
-// Union's alias spelling and Type Arguments say nothing about a value either.
-// Every one of these is emitted into the Program that needs it, so what is left
-// out is bytes no Program pays for.
+// than a Type. A Union's alias spelling and Type Arguments say nothing about a
+// value, so they go. Every one of these is emitted into the Program that needs
+// it, so what is left out is bytes no Program pays for.
+//
+// NOTE: A Case keeps its payload — its tag is shared by every instantiation of
+// it, so `Box<Integer>#Full` and `Box<String>#Full` are told apart by their
+// members or not at all. The members are shaped in turn, and the ones that are
+// still Type Parameters answer true at runtime, which is the tag-only check
+// back again where nothing more is known.
 function runtimeShapeOf(type: common.Type): common.Type {
 	switch (type.type) {
 		case "Record":
@@ -1627,7 +1632,12 @@ function runtimeShapeOf(type: common.Type): common.Type {
 				type: "Case",
 				choice: type.choice,
 				name: type.name,
-				members: {},
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, memberType]) => [
+						name,
+						runtimeShapeOf(memberType),
+					]),
+				),
 			}
 		case "UnionType":
 			return { type: "UnionType", types: type.types.map(runtimeShapeOf) }
