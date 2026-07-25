@@ -244,6 +244,15 @@ export function enrichCaseValue(
 		silentPayloadTypeOf(node, scope, expected),
 	)
 
+	if (context !== null) {
+		reportUncarriedTypeArgumentDisagreement(
+			node,
+			type,
+			context,
+			expectedType === null,
+		)
+	}
+
 	let value =
 		node.value === null
 			? null
@@ -285,6 +294,101 @@ export function enrichCaseValue(
 		value,
 		position: node.position,
 		type,
+	}
+}
+
+// NOTE: The Type Arguments written at a construction win over the position, and
+// the two disagreeing is the ordinary mismatch of a value that does not fit
+// where it is put — `Holder<Integer>#Full(1)` under a `Holder<String>`
+// annotation is the assignment's to report, exactly as for any other value. It
+// can only report what the Types SHOW it, though, and a Case whose members
+// mention none of the Choice's Type Parameters is the same Record under every
+// instantiation: `matchesType` reads `Box<String>#Tag` and `Box<Integer>#Tag` as
+// the one Type, deliberately, because Type Arguments are display spelling there
+// and a Case joined across instantiations keeps none at all to compare.
+//
+// So the two spellings of the identical program disagreed: `Box<String>#Tag("x")`
+// bound to a `Box<Integer>` Constant was accepted, while the payload-carrying
+// `Box<String>#Full("x")` beside it was not. This is what closes that — the
+// written Arguments are compared against the position's directly, and only where
+// nothing downstream can see the disagreement, under the code the rail it stands
+// in would have used.
+//
+// Agreement is assignability rather than sameness, for the same reason the
+// members are: `Box<Integer>#Empty` stands under a `Box<Integer | String>` just
+// as its payload-carrying twin does.
+function reportUncarriedTypeArgumentDisagreement(
+	node: parser.CaseValueNode,
+	written: common.CaseType | common.ErrorType,
+	expectedType: common.Type,
+	inArgumentPosition: boolean,
+): void {
+	if (node.typeArguments === null || written.type !== "Case") {
+		return
+	}
+
+	let writtenArguments = written.typeArguments
+
+	if (writtenArguments === undefined) {
+		return
+	}
+
+	// NOTE: An instantiation the position offers that keeps no Type Arguments of
+	// its own is one joined across several, which agrees with nothing and
+	// disagrees with nothing — there is no spelling left in it to compare.
+	let offered = unionArmsOf(expectedType).flatMap((member) =>
+		member.type === "Case" &&
+		member.name === written.name &&
+		member.choice === written.choice &&
+		member.typeArguments !== undefined
+			? [member as common.CaseType & { typeArguments: Array<common.Type> }]
+			: [],
+	)
+
+	if (offered.length === 0) {
+		return
+	}
+
+	let agrees = offered.some(
+		(candidate) =>
+			candidate.typeArguments.length === writtenArguments.length &&
+			candidate.typeArguments.every((argument, index) =>
+				matchesType(argument, writtenArguments[index]),
+			),
+	)
+
+	if (agrees) {
+		return
+	}
+
+	// NOTE: Where the value's own Type carries the disagreement, the position it
+	// is put in is what reports — one Diagnostic, at the site that knows what it
+	// wanted and what it got.
+	if (offered.some((candidate) => matchesType(candidate, written))) {
+		let spell = (typeArguments: Array<common.Type>) =>
+			`${written.choice}<${typeArguments.map(describeType).join(", ")}>`
+
+		reportError(
+			"These Type Arguments are not the ones this position decided",
+			node.position,
+			{
+				code: inArgumentPosition
+					? "argument-type-mismatch"
+					: "assignment-type-mismatch",
+				labels: [
+					primary(node.position, `this is ${spell(writtenArguments)}`),
+				],
+				notes: [
+					`The position decided ${offered
+						.map((candidate) => spell(candidate.typeArguments))
+						.join(" or ")}.`,
+				],
+				helps: [
+					`Write '${spell(offered[0].typeArguments)}#${node.caseName.content}'.`,
+					"Or leave the Type Arguments out, and let the position decide them.",
+				],
+			},
+		)
 	}
 }
 

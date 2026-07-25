@@ -1648,6 +1648,70 @@ describe("Choices", () => {
 				).toEqual(["argument-type-mismatch"])
 			})
 
+			// NOTE: Both of those are seen because the Case's members differ
+			// under the two instantiations. A Case that carries nothing the Type
+			// Parameters reach is the same Record under all of them — which
+			// `matchesType` reads as one Type on purpose — so nothing downstream
+			// could say a word, and the identical mistake was accepted one Case
+			// over from where it was reported. The written Arguments are compared
+			// against the position's own here, under the code the rail it stands
+			// in would have used.
+			const tagged = `choice Box<Value> {
+				Full { value: Value },
+				Tag { name: String },
+			}`
+
+			it("reports a disagreement the Case's members can not carry", () => {
+				let source = `implementation { ${tagged}
+					constant left: Box<Integer> = Box<String>#Tag("x")
+				}`
+
+				expect(codesOf(source)).toEqual(["assignment-type-mismatch"])
+				expect(messagesOf(source)).toEqual([
+					"These Type Arguments are not the ones this position decided",
+				])
+				expect(helpsOf(source)).toEqual([
+					"Write 'Box<Integer>#Tag'.",
+					"Or leave the Type Arguments out, and let the position decide them.",
+				])
+			})
+
+			it("reports one at an Argument as the Argument check would", () => {
+				expect(
+					codesOf(`implementation { ${tagged}
+						function take(_ b: Box<String>) -> Integer { <- 1 }
+
+						__print(take(Box<Integer>#Tag("x"))::toString())
+					}`),
+				).toEqual(["argument-type-mismatch"])
+			})
+
+			it("reports one in a List's item position", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant items: List<Box<String>> = [Box<Integer>#Empty]
+					}`),
+				).toEqual(["assignment-type-mismatch"])
+			})
+
+			// NOTE: Agreement is assignability, not sameness — a `Box<Integer>`
+			// stands under a `Box<Integer | String>` for the same reason its
+			// payload-carrying twin does, and a Union position offering several
+			// instantiations is answered by matching any one of them.
+			it("takes Arguments the position's own accept", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant wider: Box<Integer | String> = Box<Integer>#Empty
+						constant offered: Box<Integer> | Box<String> =
+							Box<String>#Empty
+					}`),
+				).toEqual([])
+			})
+
 			it("applies a Type Parameter of the enclosing Function", async () => {
 				expect(
 					await run(`implementation {
