@@ -180,11 +180,16 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
+	// NOTE: The callback writes its return Type here, where the bare-sigil
+	// version above leaves it out. A Choice's Type Parameters are applied, never
+	// inferred: the bare `#Done` is read off whatever the position expects and,
+	// where nothing expects anything, off the body — but the PREFIXED spelling
+	// asks for a decision, and an unannotated callback has none to give.
 	it("uses the prefixed #Continue / #Done spelling in the general loop", async () => {
 		expect(
 			await run(`implementation {
 				constant total = loop(startingWith { index = 1, total = 0 },
-					step (state) {
+					step (state) -> Step<{ index: Integer, total: Integer }, Integer> {
 						if state.index::isGreaterThan(3) { <- Step#Done(state.total) }
 
 						<- Step#Continue({ state = { index = state.index::add(1), total = state.total::add(state.index) } })

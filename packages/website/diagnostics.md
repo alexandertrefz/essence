@@ -358,6 +358,17 @@ one Type and no descriptor can be right about the payload. Compare the value
 where its Type Arguments are known, or write the arms so that something other
 than a Type Parameter tells them apart.
 
+### `undecided-type-arguments`
+
+A Case of a generic Choice was constructed through its Choice's name —
+`Holder#Bare`, `Holder#Full({ value = 1 })` — where nothing says which
+`Holder` it is. A Choice's Type Parameters are APPLIED, never inferred: the
+payload is checked against the instantiation, it does not pick one. So either
+the surrounding position decides, the way it does for the bare `#Bare` form —
+`constant left: Holder<Integer> = Holder#Bare` — or the construction applies
+them itself, `Holder<Integer>#Bare`. A Choice with no Type Parameters at all
+is never asked: `Ordering#Equal` is legal anywhere.
+
 ## Match Expressions
 
 ### `missing-case`

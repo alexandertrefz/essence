@@ -552,7 +552,7 @@ describe("Choices", () => {
 			expect(
 				messagesOf(`implementation {
 					choice Box<T> { Full { value: T }, Empty }
-					constant empty = Box#Empty
+					constant empty: Box<Integer> = Box#Empty
 				}`),
 			).toEqual([])
 		})
@@ -705,6 +705,33 @@ describe("Choices", () => {
 					__print(smaller::is(1::compareTo(2)))
 				}`),
 			).toEqual([])
+		})
+
+		// NOTE: The bare form is untouched by the applied-Type-Arguments rule, and
+		// deliberately so — it is the form a Function literal with no written
+		// return Type answers with, where there is no position to read a decision
+		// off and the body is the only thing that can say what it returns. The
+		// standard library's `List.firstItem(where:)` is written on exactly this,
+		// and `#Done`/`#Continue` in a `loop`'s callback are the same shape. The
+		// PREFIXED form is what asks to be decided.
+		it("still reads a bare Case's Type Arguments off its payload", () => {
+			expect(
+				valueTypeOf(
+					`implementation { ${progressChoice}
+						constant done = #Stopped({ value = "x" })
+					}`,
+					"done",
+				),
+			).toEqual({
+				type: "Case",
+				choice: "Progress",
+				name: "Stopped",
+				members: { value: { type: "String" } },
+				typeArguments: [
+					{ type: "GenericUse", name: "State" },
+					{ type: "String" },
+				],
+			})
 		})
 	})
 
@@ -931,12 +958,37 @@ describe("Choices", () => {
 			])
 		})
 
-		it("rejects a construction whose payload does not conform", () => {
+		// NOTE: The Type Argument the annotation decides is what answers for the
+		// bound — the payload never decides one, so a construction whose payload
+		// is a Function is a `Box<Function>` only where something said so.
+		it("rejects a construction whose Type Argument does not conform", () => {
 			expect(
 				codesOf(`implementation { ${boundedBox}
-					constant b = Box#Full({ value = (_ x: Integer) -> Integer { <- x } })
+					constant b: Box<(_ x: Integer) -> Integer> =
+						Box#Full({ value = (_ x: Integer) -> Integer { <- x } })
 				}`),
 			).toEqual(["unsatisfied-bound"])
+		})
+
+		// NOTE: The bare form is the one place a payload still decides, so it is
+		// the one place a payload can still decide BADLY — and it answers for the
+		// bound where it does. A payload that mentions no Generic at all decides
+		// none and is asked nothing, which is what keeps every `#Empty` of a
+		// bounded Choice from being an error on sight.
+		it("holds a bare construction's payload to the bound it decides", () => {
+			expect(
+				codesOf(`implementation { ${boundedBox}
+					constant b = #Full({ value = (_ x: Integer) -> Integer { <- x } })
+				}`),
+			).toEqual(["unsatisfied-bound"])
+		})
+
+		it("asks a bare unit construction for no bound at all", () => {
+			expect(
+				codesOf(`implementation { ${boundedBox}
+					constant b = #Empty
+				}`),
+			).toEqual([])
 		})
 
 		it("leaves a conforming Type Argument alone", async () => {
@@ -963,50 +1015,56 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: A Case carrying no payload binds nothing, and a `Holder#Bare` is
-		// not a Holder OF anything yet — so the construction deliberately does
-		// not hold the Choice's bound against a Type Argument nobody has written.
-		// Whichever later site decides the Argument answers for the bound
-		// instead, and a site that needs it decided and finds nobody ever did
-		// says so there. Asking at the construction would make every unit Case of
-		// a bounded Choice an error on sight, `#Bare` included. These pin both
-		// halves: what the construction leaves alone, and what every rail that
-		// can consume the undecided value does about it.
-		describe("A Type Argument the construction leaves undecided", () => {
+		// NOTE: A Choice's Type Parameters are APPLIED, never inferred — so an
+		// undecided construction is no longer a state a Program can reach. It used
+		// to be: `Holder#Bare` bound nothing at all and stood as a Holder of its
+		// own Type Parameter, and `Holder#Full(f)` let its payload decide, which
+		// is the one place a plain Generic behaved as if it were marked `infer`.
+		// Both are `undecided-type-arguments` now, and the rails that used to
+		// consume the undecided value can not be reached from a construction at
+		// all. What is still reachable is a value typed BY a Type Parameter inside
+		// generic code, which is a different thing and out of scope here — the
+		// annotation that names `Holder<Item>` is what answers for the bound, and
+		// the last two of these pin that it still does.
+		describe("The decision a prefixed construction asks for", () => {
 			const holder = `choice Holder<Item is Equatable> {
 				Bare,
 				Full { value: Item },
 			}`
 
-			it("constructs an unannotated unit Case of a bounded Choice", () => {
+			it("reports a prefixed unit construction nothing decides", () => {
+				let source = `implementation { ${holder}
+					constant left = Holder#Bare
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+				expect(messagesOf(source)).toEqual([
+					"Nothing decides the Type Arguments of 'Holder#Bare'",
+				])
+			})
+
+			// NOTE: Identically — the payload is checked against the instantiation,
+			// it never picks one, so carrying one changes nothing about whether
+			// this construction is decided.
+			it("reports a prefixed construction with a payload identically", () => {
 				expect(
 					codesOf(`implementation { ${holder}
+						constant full = Holder#Full({ value = 1 })
+					}`),
+				).toEqual(["undecided-type-arguments"])
+			})
+
+			it("names the Choice's own Type Parameters in the way out", () => {
+				expect(
+					helpsOf(`implementation { ${holder}
 						constant left = Holder#Bare
 					}`),
-				).toEqual([])
+				).toEqual([
+					"Annotate the declaration: 'constant left: Holder<Item> = Holder#Bare'.",
+				])
 			})
 
-			// NOTE: Undecided, not decided-as-something — the Type Argument stays
-			// the Choice's own Type Parameter, which is what lets a later
-			// annotation, Parameter or inference decide it.
-			it("leaves the Type Argument standing as the Type Parameter", () => {
-				expect(
-					valueTypeOf(
-						`implementation { ${holder}
-							constant left = Holder#Bare
-						}`,
-						"left",
-					),
-				).toEqual({
-					type: "Case",
-					choice: "Holder",
-					name: "Bare",
-					members: {},
-					typeArguments: [{ type: "GenericUse", name: "Item" }],
-				})
-			})
-
-			it("still answers for a Type Argument an annotation decides", async () => {
+			it("takes the decision from an annotation", async () => {
 				expect(
 					await run(`implementation { ${holder}
 						constant ok: Holder<String> = Holder#Bare
@@ -1016,18 +1074,56 @@ describe("Choices", () => {
 				).toEqual(["true"])
 			})
 
-			it("still answers for a Type Argument the payload decides", () => {
+			it("takes the decision from a declared return Type", async () => {
 				expect(
-					codesOf(`implementation { ${holder}
-						constant full =
-							Holder#Full({ value = (_ x: Integer) -> Integer { <- x } })
+					await run(`implementation { ${holder}
+						function bare() -> Holder<Integer> { <- Holder#Bare }
+
+						__print(match bare() -> String {
+							case Holder#Full { <- "full" }
+							case Holder#Bare { <- "bare" }
+						})
 					}`),
-				).toEqual(["unsatisfied-bound"])
+				).toEqual(['"bare"'])
 			})
 
-			// NOTE: Only the construction rail relaxes. Writing the Choice's Type
-			// Argument out is an Alias application like any other, and it keeps
-			// the bound exactly as strictly as it did before.
+			it("takes the decision from the Parameter it is passed to", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						function describe(_ holder: Holder<Integer>) -> String {
+							<- match holder -> String {
+								case Holder#Full { <- "full" }
+								case Holder#Bare { <- "bare" }
+							}
+						}
+
+						__print(describe(Holder#Bare))
+						__print(describe(Holder#Full(5)))
+					}`),
+				).toEqual(['"bare"', '"full"'])
+			})
+
+			// NOTE: A partially generic decision is still a decision — `Item` is
+			// the enclosing Function's Type Parameter, and the construction is a
+			// Holder OF it rather than of nothing.
+			it("takes a partially generic decision inside generic code", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						function wrap <infer Item is Equatable>(_ value: Item) -> Holder<Item> {
+							<- Holder#Full({ value = value })
+						}
+
+						__print(match wrap(5) -> String {
+							case Holder#Full { <- "full" }
+							case Holder#Bare { <- "bare" }
+						})
+					}`),
+				).toEqual(['"full"'])
+			})
+
+			// NOTE: The Alias application rail is where the bound is kept, and the
+			// construction reads its instantiation off exactly that — so writing
+			// the Type Argument out is as strict here as in any annotation.
 			it("holds the Choice's own application as strictly as ever", () => {
 				let source = `implementation { ${holder}
 					function take(_ holder: Holder<(_ x: Integer) -> Integer>) -> Integer {
@@ -1041,11 +1137,14 @@ describe("Choices", () => {
 				])
 			})
 
-			it("reports the bound at a derived comparison that needs it", () => {
+			// NOTE: What is left of the "Type Parameter does not conform" rail: a
+			// value typed by a Type Parameter inside generic code, where the
+			// annotation naming `Holder<Item>` is the site that answers. No
+			// construction can reach it any more, because no construction can
+			// leave an Argument undecided.
+			it("still reports an unbounded Type Parameter at the annotation", () => {
 				let source = `implementation { ${holder}
-					constant left = Holder#Bare
-
-					__print(left::is(Holder#Bare))
+					function bare<Item>() -> Holder<Item> { <- Holder#Bare }
 				}`
 
 				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
@@ -1054,86 +1153,10 @@ describe("Choices", () => {
 				])
 			})
 
-			it("reports it at the negated comparison too", () => {
-				expect(
-					codesOf(`implementation { ${holder}
-						constant left = Holder#Bare
-
-						__print(left::isNot(Holder#Bare))
-					}`),
-				).toEqual(["unsatisfied-bound"])
-			})
-
-			it("reports it at a List Method that compares the items", () => {
-				let source = `implementation { ${holder}
-					constant left = Holder#Bare
-
-					__print([left, left]::contains(left))
-				}`
-
-				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
-				expect(messagesOf(source)).toEqual([
-					"Holder#Bare does not conform to 'Equatable'",
-				])
-			})
-
-			it("reports it where a bounded Parameter has nothing to infer from", () => {
-				expect(
-					codesOf(`implementation { ${holder}
-						function take <infer T is Equatable>(_ holder: Holder<T>) -> Integer {
-							<- 1
-						}
-
-						constant left = Holder#Bare
-
-						__print(take(left))
-					}`),
-				).toEqual(["uninferable-type-parameter"])
-			})
-
-			// NOTE: The Parameter is what decides the Argument here, so the value
-			// that carried none arrives as a `Holder<Integer>` and every rail
-			// inside runs against Integer's equality.
-			it("fits a Parameter that decides the Type Argument itself", async () => {
+			it("prints a decided unit Case", async () => {
 				expect(
 					await run(`implementation { ${holder}
-						function describe(_ holder: Holder<Integer>) -> String {
-							<- match holder -> String {
-								case Holder#Full { <- "full" }
-								case Holder#Bare { <- "bare" }
-							}
-						}
-
-						constant left = Holder#Bare
-
-						__print(describe(left))
-					}`),
-				).toEqual(['"bare"'])
-			})
-
-			// NOTE: The undecided value is the CASE, not the Choice's Union — a
-			// Matcher for a Case it can not be is the `unknown-case` any other
-			// impossible Matcher is, rather than a Handler typed by a Type
-			// Parameter nothing binds.
-			it("reports a Matcher for a Case the undecided value can not be", () => {
-				expect(
-					codesOf(`implementation { ${holder}
-						constant left = Holder#Bare
-
-						__print(match left -> Integer {
-							case Holder#Full { <- @.value }
-							case Holder#Bare { <- 0 }
-						})
-					}`),
-				).toEqual(["unknown-case"])
-			})
-
-			// NOTE: Printing reaches for no witness at all, so the undecided Type
-			// Argument costs it nothing.
-			it("prints an undecided unit Case", async () => {
-				expect(
-					await run(`implementation { ${holder}
-						constant left = Holder#Bare
+						constant left: Holder<Integer> = Holder#Bare
 
 						__print(left)
 					}`),
@@ -1527,19 +1550,21 @@ describe("Choices", () => {
 			// descriptor can be right about that, so the comparison is refused
 			// rather than emitted wrong.
 			//
-			// NOTE: The whole set, not just the refusal — the two `Wrapped#None`
-			// are an unannotated unit construction, which the construction
-			// deliberately lets by with its Type Argument undecided, and the
-			// bound is the comparison's to report. A `toContain` here would
-			// equally have passed if the construction had started reporting it,
-			// which is the reading this pins shut.
+			// NOTE: Written inside generic code, because that is the only place
+			// left where a Choice's Type Argument IS a Type Parameter — a
+			// construction can not leave one undecided any more. The whole set is
+			// asserted, not just the refusal: the `unsatisfied-bound` beside it is
+			// the derived witness finding the Matcher's `@` carrying `T` without
+			// the bound its declaration wrote, which a `toContain` would have hidden.
 			it("refuses the comparison where no Type Argument tells them apart", () => {
 				expect(
 					codesOf(`implementation { ${wrapped}
-						constant a = Wrapped#None
-						constant b = Wrapped#None
-
-						__print(a::is(b))
+						function same <infer T is Equatable>(_ w: Wrapped<T>) -> Boolean {
+							<- match w -> Boolean {
+								case #Val  { <- true }
+								case #None { <- @::is(@) }
+							}
+						}
 					}`),
 				).toEqual(["unsatisfied-bound", "indistinguishable-union-arms"])
 			})
@@ -1674,11 +1699,11 @@ describe("Choices", () => {
 	})
 
 	// NOTE: A bare or prefixed construction resolves to the DECLARED Case, whose
-	// members are still GenericUses; the construction site instantiates it off
-	// the payload, so the value carries a concrete CaseType. This is the shape
-	// WP4/WP6/WP7 read back.
+	// members are still GenericUses; the position it stands in instantiates it,
+	// so the value carries a concrete CaseType. This is the shape WP4/WP6/WP7
+	// read back.
 	describe("Generic Case Instantiation", () => {
-		it("instantiates a constructed Case off its payload", () => {
+		it("instantiates a constructed Case from the position it stands in", () => {
 			let type = valueTypeOf(
 				`implementation { ${progressChoice}
 					constant done: Progress<Integer, String> = Progress#Stopped({ value = "x" })
@@ -1690,26 +1715,28 @@ describe("Choices", () => {
 			expect(type.name).toBe("Stopped")
 			expect(type.members.value).toEqual({ type: "String" })
 			expect(type.typeArguments).toEqual([
-				{ type: "GenericUse", name: "State" },
+				{ type: "Integer" },
 				{ type: "String" },
 			])
 			// NOTE: An instantiated Case drops the declared-only `choiceGenerics`.
 			expect(type.choiceGenerics).toBeUndefined()
 		})
 
-		it("leaves a Generic no payload mentions as a GenericUse", () => {
+		// NOTE: A payload that mentions ONE of the Choice's Generics used to leave
+		// the others standing as their own Type Parameters, because it was the
+		// payload that decided them. The annotation decides every one of them now,
+		// the ones no member mentions included.
+		it("decides a Generic no payload mentions", () => {
 			let type = valueTypeOf(
 				`implementation {
 					choice Box<Value> { Full { value: Value }, Empty }
-					constant empty = Box#Empty
+					constant empty: Box<Integer> = Box#Empty
 				}`,
 				"empty",
 			) as common.CaseType
 
 			expect(type.name).toBe("Empty")
-			expect(type.typeArguments).toEqual([
-				{ type: "GenericUse", name: "Value" },
-			])
+			expect(type.typeArguments).toEqual([{ type: "Integer" }])
 			expect(type.choiceGenerics).toBeUndefined()
 		})
 
@@ -1810,7 +1837,7 @@ describe("Choices", () => {
 			expect(
 				messagesOf(`implementation {
 					choice Box<Value> { Full { value: Value }, Empty }
-					constant boxed = Box#Empty({ value = 1 })
+					constant boxed: Box<Integer> = Box#Empty({ value = 1 })
 				}`),
 			).toContain("Case '#Empty' does not carry a payload")
 		})

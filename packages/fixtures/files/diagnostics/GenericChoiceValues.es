@@ -19,13 +19,16 @@ implementation {
 	constant swapped: Step<String, Integer> = done
 
 	§ unexpected-payload — the one-member shorthand does not reach a zero-member
-	§ Case; `#Empty` carries nothing.
+	§ Case; `#Empty` carries nothing. The annotation is load-bearing: a Choice's
+	§ Type Parameters are applied, never inferred, so an unannotated
+	§ `Box#Empty(…)` would be `undecided-type-arguments` in the Enricher and this
+	§ file would never reach the Validator at all.
 	choice Box<Value> {
 		Full { value: Value },
 		Empty,
 	}
 
-	constant boxed = Box#Empty({ value = 1 })
+	constant boxed: Box<Integer> = Box#Empty({ value = 1 })
 
 	§ payload-type-mismatch — the one-member shorthand only reaches single-member
 	§ Cases, so a bare value can not stand in for a two-member Record. The help
