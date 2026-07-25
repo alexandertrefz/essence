@@ -13,10 +13,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
+import { STDLIB_DIRECTORY } from "@essence/stdlib"
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
 import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
-import { STDLIB_DIRECTORY } from "../enricher/stdlib"
 import { analyse } from "../lsp/analyse"
 import { findCompletions } from "../lsp/completion"
 import { toLspDiagnostic, toLspRange } from "../lsp/conversion"
@@ -383,10 +383,20 @@ describe("LSP in a standard library source", () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-symlink-"))
 		let checkout = path.join(directory, "essence")
 
-		symlinkSync(path.resolve(STDLIB_DIRECTORY, "../.."), checkout, "dir")
+		// NOTE: The link and the path through it are derived from
+		// `STDLIB_DIRECTORY` rather than spelled out, so this stays a test
+		// about symlink resolution instead of a second, silent assertion about
+		// where the sources happen to sit. Written out, the two halves have to
+		// be kept agreeing by hand — and a mismatch does not fail loudly, it
+		// just stops reaching the standard library and passes anyway.
+		symlinkSync(path.dirname(STDLIB_DIRECTORY), checkout, "dir")
 
 		try {
-			let linkedPath = path.join(checkout, "src", "stdlib", "Boolean.es")
+			let linkedPath = path.join(
+				checkout,
+				path.basename(STDLIB_DIRECTORY),
+				"Boolean.es",
+			)
 
 			expect(isStdlibDocument(linkedPath)).toBe(true)
 			expect(analyse(source, linkedPath)).toEqual([])
@@ -634,16 +644,14 @@ describe("LSP in a standard library source", () => {
 	// since the standard library is where the language is now written, an
 	// editor that could not open it would be an editor nobody can extend it in.
 	it("should report no Diagnostics for any real standard library source", () => {
-		let directory = path.resolve(import.meta.dirname, "../stdlib")
-
-		let fileNames = readdirSync(directory).filter((fileName) =>
+		let fileNames = readdirSync(STDLIB_DIRECTORY).filter((fileName) =>
 			fileName.endsWith(".es"),
 		)
 
 		expect(fileNames.length).toBeGreaterThan(0)
 
 		for (let fileName of fileNames) {
-			let filePath = path.resolve(directory, fileName)
+			let filePath = path.resolve(STDLIB_DIRECTORY, fileName)
 
 			expect([
 				fileName,

@@ -1,7 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
-import path from "node:path"
-
 import type { common, enricher, parser } from "@essence/interfaces"
+import { readStdlibFiles } from "@essence/stdlib"
 
 import { renderDiagnostics } from "../diagnostics/render"
 import { parseWithDiagnostics } from "../parser/index"
@@ -11,12 +9,6 @@ import { enrichPrograms } from "./index"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
 import { scopeMap } from "./scope"
-
-// NOTE: Where the standard library's Essence sources live. Resolved off this
-// module's own location rather than the working directory — the same trick the
-// Rewriter's `internalImport` uses for the runtime modules — so `esc` finds it
-// from any cwd, and a bundle finds it beside itself.
-export const STDLIB_DIRECTORY = path.resolve(import.meta.dirname, "../stdlib")
 
 // NOTE: Which entries of a Namespace member are bound to the runtime rather
 // than implemented in Essence. Methods carry ONE FLAG PER OVERLOAD, in written
@@ -451,28 +443,18 @@ export function parseStdlibSource(
 	return { fileName, sourceText, program, diagnostics }
 }
 
-// NOTE: Sorted, so that the order files are hoisted and enriched in is the
-// same on every machine — hoisting is order-independent by design, but a
-// Diagnostic's file attribution should not depend on directory iteration order.
+// NOTE: `@essence/stdlib` finds and reads the files — it owns them, so it is
+// the one that knows where they are, and it hands them over already sorted.
+// Parsing is what stays here, because parsing is the Compiler's half.
 function readStdlibSources(): {
 	sources: Array<StdlibSource>
 	parseDuration: number
 } {
 	let started = performance.now()
 
-	if (!existsSync(STDLIB_DIRECTORY)) {
-		return { sources: [], parseDuration: performance.now() - started }
-	}
-
-	let fileNames = readdirSync(STDLIB_DIRECTORY)
-		.filter((fileName) => fileName.endsWith(".es"))
-		.sort()
-
-	let sources = fileNames.map((fileName) => {
-		let filePath = path.resolve(STDLIB_DIRECTORY, fileName)
-
-		return parseStdlibSource(filePath, readFileSync(filePath, "utf-8"))
-	})
+	let sources = readStdlibFiles().map(({ filePath, sourceText }) =>
+		parseStdlibSource(filePath, sourceText),
+	)
 
 	return { sources, parseDuration: performance.now() - started }
 }
