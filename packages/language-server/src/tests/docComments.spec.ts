@@ -87,8 +87,8 @@ describe("Documentation Comments", () => {
 		let source = [
 			"implementation {",
 			"\t§§ Greets a subject.",
-			"\t§§ @param subject who to greet",
-			"\t§§ @returns the greeting",
+			"\t§§ @param subject — who to greet",
+			"\t§§ @returns — the greeting",
 			"\tfunction greet (subject: String) -> String {",
 			"\t\t<- subject",
 			"\t}",
@@ -104,7 +104,7 @@ describe("Documentation Comments", () => {
 		let source = [
 			"implementation {",
 			"\t§§ Greets a subject.",
-			"\t§§ @param subject who to greet",
+			"\t§§ @param subject — who to greet",
 			"\tfunction greet (subject: String) -> String {",
 			"\t\t<- subject",
 			"\t}",

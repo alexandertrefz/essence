@@ -35,16 +35,16 @@ declarations {
 
 		§§ Checks whether the Number has the same numeric value as another Number — an Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds.
 		§§
-		§§ @param other the Number to compare against
-		§§ @returns `true` when both Numbers have the same numeric value.
+		§§ @param other — the Number to compare against
+		§§ @returns — `true` when both Numbers have the same numeric value.
 		is(_ other: Number) -> Boolean {
 			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Number has a different numeric value than another Number.
 		§§
-		§§ @param other the Number to compare against
-		§§ @returns `true` when the Numbers have different numeric values.
+		§§ @param other — the Number to compare against
+		§§ @returns — `true` when the Numbers have different numeric values.
 		isNot(_ other: Number) -> Boolean {
 			<- @::is(other)::negate()
 		}
@@ -61,43 +61,43 @@ declarations {
 
 		§§ Orders the Number against another Number by numeric value, across Integers and Rationals.
 		§§
-		§§ @param other the Number to order against
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the Number to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo(_ other: Number) -> Ordering
 
 		§§ Whether this Number is strictly below the given one.
 		§§
-		§§ @param other the Number to compare against
+		§§ @param other — the Number to compare against
 		isLessThan(_ other: Number) -> Boolean {
 			<- @::compareTo(other)::is(#Less)
 		}
 
 		§§ Whether this Number is below the given one, or equal to it.
 		§§
-		§§ @param other the Number to compare against
+		§§ @param other — the Number to compare against
 		isLessThanOrEqualTo(_ other: Number) -> Boolean {
 			<- @::isGreaterThan(other)::negate()
 		}
 
 		§§ Whether this Number is strictly above the given one.
 		§§
-		§§ @param other the Number to compare against
+		§§ @param other — the Number to compare against
 		isGreaterThan(_ other: Number) -> Boolean {
 			<- @::compareTo(other)::is(#Greater)
 		}
 
 		§§ Whether this Number is above the given one, or equal to it.
 		§§
-		§§ @param other the Number to compare against
+		§§ @param other — the Number to compare against
 		isGreaterThanOrEqualTo(_ other: Number) -> Boolean {
 			<- @::isLessThan(other)::negate()
 		}
 
 		§§ Whether this Number lies between the two given ones, both included — across every member of the numeric tower, so `Number.PI::isBetween(3, and 22/7)` holds. Bounds in the wrong order enclose no Number, so the answer is `false`.
 		§§
-		§§ @param lower the lower bound, included
-		§§ @param and the upper bound, included
-		§§ @returns `true` when the Number is within the bounds.
+		§§ @param lower — the lower bound, included
+		§§ @param and — the upper bound, included
+		§§ @returns — `true` when the Number is within the bounds.
 		isBetween(_ lower: Number, and upper: Number) -> Boolean {
 			<- @
 				::isGreaterThanOrEqualTo(lower)
@@ -106,7 +106,7 @@ declarations {
 
 		§§ Adds up every Number in the List. The empty List sums to zero.
 		§§
-		§§ @returns the exact total.
+		§§ @returns — the exact total.
 		overload static sum {
 			(_ integers: List<Integer>) -> Integer
 
@@ -117,7 +117,7 @@ declarations {
 
 		§§ Multiplies every Number in the List together. The empty List multiplies to one.
 		§§
-		§§ @returns the exact product.
+		§§ @returns — the exact product.
 		overload static product {
 			(_ integers: List<Integer>) -> Integer
 
@@ -128,7 +128,7 @@ declarations {
 
 		§§ The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational.
 		§§
-		§§ @returns the mean, or `Nothing` for the empty List — no Numbers have no mean.
+		§§ @returns — the mean, or `Nothing` for the empty List — no Numbers have no mean.
 		overload static average {
 			(_ integers: List<Integer>) -> Optional<Rational>
 
@@ -139,7 +139,7 @@ declarations {
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ @returns the lowest Number — `Nothing` for the empty List, which has none.
+		§§ @returns — the lowest Number — `Nothing` for the empty List, which has none.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
@@ -185,7 +185,7 @@ declarations {
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
 		§§
-		§§ @returns the greatest Number — `Nothing` for the empty List, which has none.
+		§§ @returns — the greatest Number — `Nothing` for the empty List, which has none.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {

@@ -19,8 +19,8 @@ declarations {
 	namespace Optional<infer ItemType> for Optional<ItemType> {
 		§§ The value itself — or, when it is `Nothing`, the given fallback. Collapses a `… | Nothing` Union back to a bare value: `list::firstItem()::otherwise(0)`.
 		§§
-		§§ @param fallback the value to fall back to
-		§§ @returns the value, or the fallback in its place.
+		§§ @param fallback — the value to fall back to
+		§§ @returns — the value, or the fallback in its place.
 		otherwise(_ fallback: ItemType) -> ItemType {
 			<- match @ -> ItemType {
 				case Nothing { <- fallback }
@@ -38,7 +38,7 @@ declarations {
 
 		§§ Whether the Optional holds a value rather than `Nothing`.
 		§§
-		§§ @returns `true` when there is a value.
+		§§ @returns — `true` when there is a value.
 		hasValue() -> Boolean {
 			<- match @ -> Boolean {
 				case Nothing { <- false }
@@ -48,7 +48,7 @@ declarations {
 
 		§§ Whether the Optional is `Nothing` — the opposite of `hasValue`.
 		§§
-		§§ @returns `true` when there is no value.
+		§§ @returns — `true` when there is no value.
 		isNothing() -> Boolean {
 			<- @::hasValue()::negate()
 		}

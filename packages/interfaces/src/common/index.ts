@@ -24,6 +24,14 @@ export type Documentation = {
 	// themselves in TypeScript rather than in a `§§` block, so there is no
 	// Essence source to point back at.
 	position: Position | null
+	// NOTE: The `§§` line each `@param` was written on, keyed by the name it
+	// wrote — what lets the Enricher underline the tag itself rather than the
+	// whole block when the name matches no Parameter. Absent when the block
+	// writes no `@param`, and stripped for the standard library exactly as
+	// `position` is. The Position is nested under a field of that name so that
+	// the Formatter's AST comparison, which drops every `position`, keeps
+	// dropping this one too.
+	parameterTags?: Record<string, { position: Position }>
 }
 
 // NOTE: One written Type annotation, paired with what it resolved to. The
@@ -186,6 +194,9 @@ export type DiagnosticCode =
 	| "uninferable-parameter-type"
 	| "uninferable-return-type"
 	| "missing-return-type"
+	// Documentation — the `§§` blocks above Declarations.
+	| "missing-documentation-separator"
+	| "unknown-documentation-parameter"
 	// The Compiler as a program — reading files, bundling the output.
 	| "file-not-found"
 	| "not-a-file"

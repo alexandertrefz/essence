@@ -16,8 +16,8 @@ implementation {
 	§§
 	§§ Supports **Markdown** — the text reaches the Editor unchanged.
 	§§
-	§§ @param subject who to greet
-	§§ @returns the finished greeting
+	§§ @param subject — who to greet
+	§§ @returns — the finished greeting
 	function greet(subject: String) -> String {
 		<- "Hello, "::append(subject)::append("!")
 	}
@@ -43,7 +43,7 @@ implementation {
 	namespace Readable for Integer {
 		§§ Spells this Integer out as text.
 		§§
-		§§ @returns the Integer written as a String
+		§§ @returns — the Integer written as a String
 		text() -> String {
 			<- @::toString()
 		}
@@ -73,7 +73,7 @@ implementation {
 
 		§§ Greets a whole room at once.
 		§§
-		§§ @param count how many people are present
+		§§ @param count — how many people are present
 		static forCrowd(count: Integer) -> String {
 			<- "Hello, all "::append(count::text())::append(" of you!")
 		}

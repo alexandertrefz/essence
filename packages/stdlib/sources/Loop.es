@@ -56,19 +56,19 @@ declarations {
 	§§ `#Done` and finishing with a Result of its own Type. Pick the overload by
 	§§ the labels it reads, exactly as with an overloaded Method.
 	§§
-	§§ @param startingWith the State the first step builds on.
-	§§ @param step the body that advances the running State each turn.
-	§§ @returns the State the walk settles on, or the Result a `#Done` carries.
+	§§ @param startingWith — the State the first step builds on.
+	§§ @param step — the body that advances the running State each turn.
+	§§ @returns — the State the walk settles on, or the Result a `#Done` carries.
 	overload function loop {
 		§§ Steps a State while a condition holds — the `while` loop, one of the
 		§§ family's two native primitives. The condition is checked BEFORE each
 		§§ step, so a condition false on the seed returns it unchanged, and the
 		§§ loop runs zero times.
 		§§
-		§§ @param startingWith the State the loop begins from.
-		§§ @param while the condition, checked against the State before each step; the loop continues while it is `true`.
-		§§ @param step the body, handed the running State and answering with the next.
-		§§ @returns the first State the condition rejects.
+		§§ @param startingWith — the State the loop begins from.
+		§§ @param while — the condition, checked against the State before each step; the loop continues while it is `true`.
+		§§ @param step — the body, handed the running State and answering with the next.
+		§§ @returns — the first State the condition rejects.
 		<infer State>(
 			startingWith state: State,
 			while condition: (_: State) -> Boolean,
@@ -80,10 +80,10 @@ declarations {
 		§§ each step, so a condition already `true` on the seed returns it
 		§§ unchanged, and the loop runs zero times.
 		§§
-		§§ @param startingWith the State the loop begins from.
-		§§ @param until the condition, checked against the State before each step; the loop continues while it is `false`.
-		§§ @param step the body, handed the running State and answering with the next.
-		§§ @returns the first State the condition accepts.
+		§§ @param startingWith — the State the loop begins from.
+		§§ @param until — the condition, checked against the State before each step; the loop continues while it is `false`.
+		§§ @param step — the body, handed the running State and answering with the next.
+		§§ @returns — the first State the condition accepts.
 		<infer State>(
 			startingWith state: State,
 			until condition: (_: State) -> Boolean,
@@ -105,11 +105,11 @@ declarations {
 		§§ through 1, …)` visits 3, 2, 1. Always finishes: the range is fixed
 		§§ before the first step.
 		§§
-		§§ @param from the first Integer the body sees.
-		§§ @param through the last Integer the body sees, included.
-		§§ @param startingWith the State the first step builds on.
-		§§ @param step the body, handed each Integer and the running State, answering with the next State.
-		§§ @returns the State after the last step.
+		§§ @param from — the first Integer the body sees.
+		§§ @param through — the last Integer the body sees, included.
+		§§ @param startingWith — the State the first step builds on.
+		§§ @param step — the body, handed each Integer and the running State, answering with the next State.
+		§§ @returns — the State after the last step.
 		<infer State>(
 			from start: Integer,
 			through end: Integer,
@@ -160,9 +160,9 @@ declarations {
 		§§ fixed predicate, and the one that finishes with a Result of its own
 		§§ Type rather than with the State.
 		§§
-		§§ @param startingWith the State the loop begins from.
-		§§ @param step the body, handed the running State and answering with a `Step` — `#Continue` to go again, `#Done` to stop.
-		§§ @returns the Result the first `#Done` carries.
+		§§ @param startingWith — the State the loop begins from.
+		§§ @param step — the body, handed the running State and answering with a `Step` — `#Continue` to go again, `#Done` to stop.
+		§§ @returns — the Result the first `#Done` carries.
 		<infer State, infer Result>(
 			startingWith state: State,
 			step advance: (_: State) -> Step<State, Result>,

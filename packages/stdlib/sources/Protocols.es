@@ -7,14 +7,14 @@ declarations {
 	protocol Equatable {
 		§§ Answers whether both values are equal.
 		§§
-		§§ @param other the value to compare with
-		§§ @returns `true` when the values are equal.
+		§§ @param other — the value to compare with
+		§§ @returns — `true` when the values are equal.
 		is(_ other: Self) -> Boolean
 
 		§§ Answers whether the values differ.
 		§§
-		§§ @param other the value to compare with
-		§§ @returns `true` when the values differ.
+		§§ @param other — the value to compare with
+		§§ @returns — `true` when the values differ.
 		isNot(_ other: Self) -> Boolean
 	}
 
@@ -22,7 +22,7 @@ declarations {
 	protocol Printable {
 		§§ Represents the value as a String.
 		§§
-		§§ @returns the String representation of the value.
+		§§ @returns — the String representation of the value.
 		toString() -> String
 	}
 
@@ -30,8 +30,8 @@ declarations {
 	protocol Comparable {
 		§§ Orders the value against another one of the same Type.
 		§§
-		§§ @param other the value to compare with
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the value to compare with
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo(_ other: Self) -> Ordering
 	}
 }

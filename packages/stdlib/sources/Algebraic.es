@@ -12,24 +12,24 @@ declarations {
 		§§
 		§§ Normal forms make this exact — no approximation is consulted.
 		§§
-		§§ @param other the Algebraic to compare with
-		§§ @returns `true` when the numbers are equal.
+		§§ @param other — the Algebraic to compare with
+		§§ @returns — `true` when the numbers are equal.
 		is(_ other: Algebraic) -> Boolean {
 			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Whether the Algebraics are different numbers — exactly, no approximation is consulted.
 		§§
-		§§ @param other the Algebraic to compare with
-		§§ @returns `true` when the numbers differ.
+		§§ @param other — the Algebraic to compare with
+		§§ @returns — `true` when the numbers differ.
 		isNot(_ other: Algebraic) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
 		§§ Orders the Algebraic against another Algebraic — exactly, by symbolic comparison.
 		§§
-		§§ @param other the Algebraic to order against
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the Algebraic to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo(_ other: Algebraic) -> Ordering
 
 		§§ Adds a number to this Algebraic, exactly. Two Algebraics over the same radical stay in the slice; the radical parts may also cancel, leaving a Rational.

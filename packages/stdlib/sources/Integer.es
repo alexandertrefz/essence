@@ -7,16 +7,16 @@ declarations {
 	namespace Integer for Integer is Equatable, is Printable, is Comparable {
 		§§ Checks whether the Integer has the same value as another.
 		§§
-		§§ @param other the Integer to compare against
-		§§ @returns `true` when both are equal.
+		§§ @param other — the Integer to compare against
+		§§ @returns — `true` when both are equal.
 		is(_ other: Integer) -> Boolean {
 			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Integer has a different value than another.
 		§§
-		§§ @param other the Integer to compare against
-		§§ @returns `true` when the two differ.
+		§§ @param other — the Integer to compare against
+		§§ @returns — `true` when the two differ.
 		isNot(_ other: Integer) -> Boolean {
 			<- @::is(other)::negate()
 		}
@@ -25,22 +25,22 @@ declarations {
 		overload add {
 			§§ Adds two Integers, giving an Integer.
 			§§
-			§§ @param other the Integer to add
+			§§ @param other — the Integer to add
 			(_ other: Integer) -> Integer
 
 			§§ Adds a Rational to an Integer. The result is a Rational, since the sum need not be whole.
 			§§
-			§§ @param other the Rational to add
+			§§ @param other — the Rational to add
 			(_ other: Rational) -> Rational
 
 			§§ Adds an Algebraic to an Integer. Shifting the rational part of `a + b·√d` leaves the radical untouched, so the sum is exact.
 			§§
-			§§ @param other the Algebraic to add
+			§§ @param other — the Algebraic to add
 			(_ other: Algebraic) -> Algebraic
 
 			§§ Adds a Transcendental to an Integer. Shifting the rational part of `a + b·π` leaves the π term untouched, so the sum is exact.
 			§§
-			§§ @param other the Transcendental to add
+			§§ @param other — the Transcendental to add
 			(_ other: Transcendental) -> Transcendental
 		}
 
@@ -190,27 +190,27 @@ declarations {
 
 		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainder(dividingBy 3)` is `2`.
 		§§
-		§§ @param dividingBy the divisor
-		§§ @returns the remainder, or `Nothing` when dividing by zero.
+		§§ @param dividingBy — the divisor
+		§§ @returns — the remainder, or `Nothing` when dividing by zero.
 		remainder(dividingBy divisor: Integer) -> Optional<Integer>
 
 		§§ The whole part of Euclidean division — the count of whole divisors, paired with `remainder` so that `quotient · divisor + remainder` is the original Integer. `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, since the remainder is never negative.
 		§§
-		§§ @param dividingBy the divisor
-		§§ @returns the quotient, or `Nothing` when dividing by zero.
+		§§ @param dividingBy — the divisor
+		§§ @returns — the quotient, or `Nothing` when dividing by zero.
 		quotient(dividingBy divisor: Integer) -> Optional<Integer>
 
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
 		§§
-		§§ @param exponent the exponent
-		§§ @returns the power, or `Nothing` when raising zero to a negative power.
+		§§ @param exponent — the exponent
+		§§ @returns — the power, or `Nothing` when raising zero to a negative power.
 		raise(to exponent: Integer) -> Optional<Integer | Rational>
 
 		§§ The Integer, pulled into the given bounds — the lower bound when below it, the upper when above it, itself otherwise.
 		§§
-		§§ @param lowest the lowest allowed value
-		§§ @param and the highest allowed value
-		§§ @returns the clamped Integer, or `Nothing` when the bounds are in the wrong order.
+		§§ @param lowest — the lowest allowed value
+		§§ @param and — the highest allowed value
+		§§ @returns — the clamped Integer, or `Nothing` when the bounds are in the wrong order.
 		clamp(
 			between lowest: Integer,
 			and highest: Integer,
@@ -228,8 +228,8 @@ declarations {
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.
 		§§
-		§§ @param text the text to read
-		§§ @returns the Integer, or `Nothing` when the text has any other shape.
+		§§ @param text — the text to read
+		§§ @returns — the Integer, or `Nothing` when the text has any other shape.
 		static parse(_ text: String) -> Optional<Integer>
 
 		§§ Represents the Integer as a String, in decimal digits.
@@ -237,8 +237,8 @@ declarations {
 
 		§§ Orders the Integer against another Integer.
 		§§
-		§§ @param other the Integer to order against
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the Integer to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo(_ other: Integer) -> Ordering
 	}
 }
