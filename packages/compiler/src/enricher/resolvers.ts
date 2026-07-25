@@ -3703,7 +3703,9 @@ export function reportUnknownDocumentationParameters(
 
 		let suggestion = closestMatch(written, names)
 		let notes = [
-			"A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.",
+			names.length === 0
+				? "A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal."
+				: "A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.",
 		]
 
 		if (signatures.length > 1) {

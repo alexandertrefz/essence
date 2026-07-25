@@ -61,7 +61,12 @@ describe("Diagnostic Showcase", () => {
 			it("should stay broken", () => {
 				// NOTE: The file exists to produce Diagnostics. A clean run
 				// means the showcase quietly stopped showcasing anything.
-				expect(containsErrors(diagnostics)).toBe(true)
+				// Diagnostics rather than errors, because a showcase may be
+				// Warnings throughout — `Documentation.es` is, since a `§§`
+				// block that describes the wrong thing still compiles. The
+				// snapshot below pins each severity, so a file that decays
+				// from an error to a Warning is still a diff.
+				expect(diagnostics.length).toBeGreaterThan(0)
 			})
 
 			it("should give every Diagnostic a code and a labelled span", () => {
