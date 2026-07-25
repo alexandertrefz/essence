@@ -1,6 +1,7 @@
 import { parseArgs, type ParseArgsConfig } from "node:util"
 
-import { closestMatch } from "../helpers/index"
+import { closestMatch } from "@essence/compiler/helpers"
+
 import {
 	type CommandSpec,
 	commands,

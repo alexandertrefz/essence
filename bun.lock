@@ -15,12 +15,25 @@
       "name": "@essence/ariadne",
       "version": "0.0.1",
     },
-    "packages/compiler": {
-      "name": "@essence/compiler",
+    "packages/cli": {
+      "name": "@essence/cli",
       "version": "0.0.1",
       "bin": {
         "esc": "bin/esc",
       },
+      "dependencies": {
+        "@essence/ariadne": "workspace:*",
+        "@essence/compiler": "workspace:*",
+        "@essence/interfaces": "workspace:*",
+      },
+      "devDependencies": {
+        "@essence/fixtures": "workspace:*",
+        "@essence/stdlib": "workspace:*",
+      },
+    },
+    "packages/compiler": {
+      "name": "@essence/compiler",
+      "version": "0.0.1",
       "dependencies": {
         "@essence/ariadne": "workspace:*",
         "@essence/interfaces": "workspace:*",
@@ -142,6 +155,8 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A=="],
 
     "@essence/ariadne": ["@essence/ariadne@workspace:packages/ariadne"],
+
+    "@essence/cli": ["@essence/cli@workspace:packages/cli"],
 
     "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
 

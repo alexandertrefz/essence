@@ -1,31 +1,34 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, rmSync, writeFileSync } from "node:fs"
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
+import { closestMatch } from "@essence/compiler/helpers"
+import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence/fixtures"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
-import { parseArguments, UsageError } from "../cli/args"
-import { commands, findCommand, globalOptions } from "../cli/commands"
-import { colorChoiceFor } from "../cli/context"
-import { renderCommandHelp, renderOverview, wrap } from "../cli/help"
+import { parseArguments, UsageError } from "../args"
+import { commands, findCommand, globalOptions } from "../commands"
+import { colorChoiceFor, version } from "../context"
+import { renderCommandHelp, renderOverview, wrap } from "../help"
 import {
 	defaultOutputFor,
 	looksLikeGlob,
 	resolveInputFiles,
 	resolveOutputFiles,
-} from "../cli/inputs"
-import { toJSONReport } from "../cli/json"
-import { type CompileOutcome, compileFile } from "../cli/pipeline"
-import { defaultWorkerCount, shouldUseWorkers } from "../cli/pool"
+} from "../inputs"
+import { toJSONReport } from "../json"
+import { type CompileOutcome, compileFile } from "../pipeline"
+import { defaultWorkerCount, shouldUseWorkers } from "../pool"
 import {
 	countDiagnostics,
 	formatBytes,
 	formatDuration,
 	pluralise,
-} from "../cli/report"
-import { isInteractive, truncate } from "../cli/terminal"
+} from "../report"
+import { isInteractive, truncate } from "../terminal"
 import {
 	createPalette,
 	createTheme,
@@ -33,9 +36,7 @@ import {
 	supportsColor,
 	supportsUnicode,
 	visibleLength,
-} from "../cli/theme"
-import { closestMatch } from "../helpers/index"
-import { testDiagnostic } from "./diagnosticFactory"
+} from "../theme"
 
 const buildCommand = findCommand("build") as NonNullable<
 	ReturnType<typeof findCommand>
@@ -57,6 +58,27 @@ function outcome(overrides: Partial<CompileOutcome> = {}): CompileOutcome {
 		...overrides,
 	}
 }
+
+// NOTE: `esc --version` answered "unknown" for as long as it took to notice.
+// The version was read from a path counted out from `context.ts`, that module
+// moved one directory up when the CLI became its own package, and the `catch`
+// around the read turned a wrong path into a plausible-looking answer instead
+// of a failure. It is an import now, so the path can not be wrong — and this
+// says the value reaching `--version` is the manifest's, which is the part an
+// import alone does not promise.
+describe("esc --version", () => {
+	it("reports the version the manifest declares", () => {
+		let manifest = JSON.parse(
+			readFileSync(
+				fileURLToPath(import.meta.resolve("../../package.json")),
+				"utf8",
+			),
+		) as { version: string }
+
+		expect(version).toBe(manifest.version)
+		expect(version).toMatch(/^\d+\.\d+\.\d+/)
+	})
+})
 
 describe("CLI", () => {
 	describe("parseArguments", () => {

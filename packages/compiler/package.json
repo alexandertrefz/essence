@@ -4,9 +4,6 @@
 	"description": "The Essence compiler: source text in, JavaScript out.",
 	"private": true,
 	"type": "module",
-	"bin": {
-		"esc": "bin/esc"
-	},
 	"scripts": {
 		"generate:natives": "bun run src/tools/generateNatives.ts"
 	},

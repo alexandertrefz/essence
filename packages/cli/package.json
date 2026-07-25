@@ -1,0 +1,21 @@
+{
+	"name": "@essence/cli",
+	"version": "0.0.1",
+	"description": "esc — the Essence command line.",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"esc": "bin/esc"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"dependencies": {
+		"@essence/ariadne": "workspace:*",
+		"@essence/compiler": "workspace:*",
+		"@essence/interfaces": "workspace:*"
+	},
+	"devDependencies": {
+		"@essence/fixtures": "workspace:*",
+		"@essence/stdlib": "workspace:*"
+	}
+}

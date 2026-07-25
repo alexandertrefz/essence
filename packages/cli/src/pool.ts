@@ -1,7 +1,8 @@
 import { availableParallelism } from "node:os"
 import { Worker } from "node:worker_threads"
 
-import { placelessDiagnostic } from "../diagnostics/index"
+import { placelessDiagnostic } from "@essence/compiler/diagnostics"
+
 import {
 	type CompileOutcome,
 	type CompileRequest,
