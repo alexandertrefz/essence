@@ -1,8 +1,4 @@
-import type { common, parser } from "@essence/interfaces"
-
-import { builtinProtocols } from "../enricher/builtins"
-import { documentationOf, renderDocumentation } from "./documentation"
-import { contains, isSmaller } from "./positions"
+import { builtinProtocols } from "@essence/compiler/enricher/builtins"
 import {
 	printCaseWithPayload,
 	printConformanceClauses,
@@ -10,7 +6,11 @@ import {
 	printType,
 	signaturesOf,
 	withoutSelf,
-} from "./printType"
+} from "@essence/compiler/printType"
+import type { common, parser } from "@essence/interfaces"
+
+import { documentationOf, renderDocumentation } from "./documentation"
+import { contains, isSmaller } from "./positions"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
 // its inferred Type there. The smallest typed node containing the cursor

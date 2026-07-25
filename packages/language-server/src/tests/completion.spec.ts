@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { findCompletions } from "../lsp/completion"
+import { findCompletions } from "../completion"
 
 function labelsOf(source: string, cursor: { line: number; column: number }) {
 	return findCompletions(source, cursor).map((entry) => entry.label)

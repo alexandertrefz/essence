@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
+import { enrich } from "@essence/compiler/enricher"
+import { parseWithDiagnostics } from "@essence/compiler/parser"
 import type { common } from "@essence/interfaces"
 
-import { enrich } from "../enricher/index"
-import { findCompletions } from "../lsp/completion"
-import { findHover } from "../lsp/hover"
-import { findSignatureHelp } from "../lsp/signatureHelp"
-import { parseWithDiagnostics } from "../parser/index"
+import { findCompletions } from "../completion"
+import { findHover } from "../hover"
+import { findSignatureHelp } from "../signatureHelp"
 
 function hover(source: string, cursor: common.Cursor) {
 	let { program } = parseWithDiagnostics(source)

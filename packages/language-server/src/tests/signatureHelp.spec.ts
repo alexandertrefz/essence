@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { findSignatureHelp } from "../lsp/signatureHelp"
+import { findSignatureHelp } from "../signatureHelp"
 
 describe("Signature Help", () => {
 	it("should show a Function's signature right after the opening paren", () => {

@@ -1,6 +1,5 @@
+import { printType } from "@essence/compiler/printType"
 import type { common } from "@essence/interfaces"
-
-import { printType } from "./printType"
 
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters

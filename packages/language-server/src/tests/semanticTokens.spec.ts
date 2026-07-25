@@ -1,12 +1,13 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "../enricher/index"
+import { enrich } from "@essence/compiler/enricher"
+import { parseWithDiagnostics } from "@essence/compiler/parser"
+
 import {
 	encodeSemanticTokens,
 	findSemanticTokens,
 	semanticTokenTypes,
-} from "../lsp/semanticTokens"
-import { parseWithDiagnostics } from "../parser/index"
+} from "../semanticTokens"
 
 function tokensOf(source: string) {
 	let { program } = parseWithDiagnostics(source)

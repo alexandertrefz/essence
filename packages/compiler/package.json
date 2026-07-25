@@ -1,15 +1,34 @@
 {
 	"name": "@essence/compiler",
 	"version": "0.0.1",
-	"description": "The Essence compiler, its Language Server and the esc command line.",
+	"description": "The Essence compiler: source text in, JavaScript out.",
 	"private": true,
 	"type": "module",
 	"bin": {
-		"esc": "bin/esc",
-		"esls": "bin/esls"
+		"esc": "bin/esc"
 	},
 	"scripts": {
 		"generate:natives": "bun run src/tools/generateNatives.ts"
+	},
+	"exports": {
+		"./lexer": "./src/lexer/index.ts",
+		"./parser": "./src/parser/index.ts",
+		"./enricher": "./src/enricher/index.ts",
+		"./enricher/builtins": "./src/enricher/builtins.ts",
+		"./enricher/resolvers": "./src/enricher/resolvers.ts",
+		"./enricher/stdlib": "./src/enricher/stdlib.ts",
+		"./validator": "./src/validator/index.ts",
+		"./simplifier": "./src/simplifier/index.ts",
+		"./optimiser": "./src/optimiser/index.ts",
+		"./rewriter": "./src/rewriter/index.ts",
+		"./rewriter/stdlibPrelude": "./src/rewriter/stdlibPrelude.ts",
+		"./bundler": "./src/bundler/index.ts",
+		"./diagnostics": "./src/diagnostics/index.ts",
+		"./diagnostics/render": "./src/diagnostics/render.ts",
+		"./documents": "./src/documents.ts",
+		"./helpers": "./src/helpers/index.ts",
+		"./printType": "./src/printType.ts",
+		"./tests/diagnosticFactory": "./src/tests/diagnosticFactory.ts"
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
@@ -19,9 +38,7 @@
 		"@essence/runtime": "workspace:*",
 		"@essence/stdlib": "workspace:*",
 		"esbuild": "0.28.1",
-		"escodegen": "workspace:*",
-		"vscode-languageserver": "10.1.0",
-		"vscode-languageserver-textdocument": "1.0.12"
+		"escodegen": "workspace:*"
 	},
 	"devDependencies": {
 		"@essence/fixtures": "workspace:*",

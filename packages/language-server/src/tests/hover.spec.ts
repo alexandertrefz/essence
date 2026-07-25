@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
+import { enrich } from "@essence/compiler/enricher"
+import { parseWithDiagnostics } from "@essence/compiler/parser"
 import type { common } from "@essence/interfaces"
 
-import { enrich } from "../enricher/index"
-import { findHover } from "../lsp/hover"
-import { parseWithDiagnostics } from "../parser/index"
+import { findHover } from "../hover"
 
 // NOTE: Both Programs and the annotation index, which is what the Language
 // Server hands `findHover` for every document — see `connection.onHover`.
