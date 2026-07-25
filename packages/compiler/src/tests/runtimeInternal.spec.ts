@@ -1,25 +1,21 @@
 import { describe, expect, it } from "bun:test"
 
-import * as algebraic from "../rewriter/__internal/Algebraic"
-import { getStringRepresentation } from "../rewriter/__internal/functions"
-import * as integer from "../rewriter/__internal/Integer"
+import * as algebraic from "@essence/runtime/Algebraic"
+import { getStringRepresentation } from "@essence/runtime/functions"
+import * as integer from "@essence/runtime/Integer"
 import {
 	anyIs,
 	anyIsNot,
 	boundChoiceIs,
 	choiceIs,
-} from "../rewriter/__internal/internalHelpers"
-import * as list from "../rewriter/__internal/List"
-import { createNothing } from "../rewriter/__internal/Nothing"
-import * as number from "../rewriter/__internal/Number"
-import * as rational from "../rewriter/__internal/Rational"
-import * as record from "../rewriter/__internal/Record"
-import * as string from "../rewriter/__internal/String"
-import {
-	type AnyType,
-	createCase,
-	typeKeySymbol,
-} from "../rewriter/__internal/type"
+} from "@essence/runtime/internalHelpers"
+import * as list from "@essence/runtime/List"
+import { createNothing } from "@essence/runtime/Nothing"
+import * as number from "@essence/runtime/Number"
+import * as rational from "@essence/runtime/Rational"
+import * as record from "@essence/runtime/Record"
+import * as string from "@essence/runtime/String"
+import { type AnyType, createCase, typeKeySymbol } from "@essence/runtime/type"
 
 // NOTE: The runtime is handed values, never Types — so these are built the way
 // the emitted JavaScript builds them, with the `create…` constructors.
