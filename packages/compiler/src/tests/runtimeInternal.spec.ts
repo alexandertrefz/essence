@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import * as algebraic from "@essence/runtime/Algebraic"
+import { createBoolean } from "@essence/runtime/Boolean"
 import { getStringRepresentation } from "@essence/runtime/functions"
 import * as integer from "@essence/runtime/Integer"
 import {
@@ -353,6 +354,44 @@ describe("Runtime Internals", () => {
 					}) as unknown as AnyType,
 				).value,
 			).toBeTrue()
+		})
+
+		// NOTE: The Enricher shapes every Parameter-naming arm but one, so a
+		// descriptor reaching the runtime with two arms carrying neither a tag
+		// nor a shape is a Compiler bug. It used to be a silent wrong answer:
+		// the first of the two answered for the other's values as well, which
+		// compared a `List<T>` through T's own witness — `[2] is [10]` came
+		// back true. The throw is built by hand here, because the Compiler no
+		// longer emits one.
+		it("refuses a Union descriptor with two arms it can not tell apart", () => {
+			let isEqual = boundChoiceIs({
+				"Wrapper#Val": {
+					v: {
+						k: "union",
+						arms: [
+							{ tag: null, node: { k: "w", i: 0 } },
+							{
+								tag: null,
+								node: { k: "list", of: { k: "w", i: 0 } },
+							},
+						],
+					},
+				},
+			})
+
+			expect(() =>
+				isEqual(
+					createCase("Wrapper#Val", {
+						v: list.createList([whole(2n)]),
+					}) as unknown as AnyType,
+					createCase("Wrapper#Val", {
+						v: list.createList([whole(10n)]),
+					}) as unknown as AnyType,
+					// NOTE: The witness the descriptor's `w` node would reach
+					// for — never consulted here, since the throw comes first.
+					{ is: (a, b) => createBoolean(anyIs(a, b)) },
+				),
+			).toThrow("This is a bug in the Compiler.")
 		})
 	})
 })

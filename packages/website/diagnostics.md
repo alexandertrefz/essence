@@ -347,6 +347,17 @@ payloads are substituted eagerly at each use, so a self-reference would never
 finish substituting. Introduce a separate non-generic Choice or Type for the
 recursive part.
 
+### `indistinguishable-union-arms`
+
+A generic Choice's payload names a Union with two or more arms mentioning a Type
+Parameter — `Val { v: T | List<T> }` — and the comparison is written where the
+Type Arguments are Parameters themselves. Equality for a Choice is derived, and
+which arm a value belongs to is decided at runtime by what the receiver's Type
+Arguments made of the arms; where they made nothing of them, the two arms are
+one Type and no descriptor can be right about the payload. Compare the value
+where its Type Arguments are known, or write the arms so that something other
+than a Type Parameter tells them apart.
+
 ## Match Expressions
 
 ### `missing-case`

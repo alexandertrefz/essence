@@ -1353,6 +1353,7 @@ function describeMember(
 	constrainedOrder: Array<string>,
 	generics: Set<string>,
 	bindings: GenericBindings,
+	position: common.Position | null,
 ): common.DescriptorNode {
 	if (!typeMentionsGenerics(type, generics)) {
 		return { k: "eq" }
@@ -1369,6 +1370,7 @@ function describeMember(
 					constrainedOrder,
 					generics,
 					bindings,
+					position,
 				),
 			}
 		case "Record":
@@ -1379,6 +1381,7 @@ function describeMember(
 					constrainedOrder,
 					generics,
 					bindings,
+					position,
 				),
 			}
 		case "Case":
@@ -1389,10 +1392,17 @@ function describeMember(
 					constrainedOrder,
 					generics,
 					bindings,
+					position,
 				),
 			}
 		case "UnionType":
-			return describeUnion(type, constrainedOrder, generics, bindings)
+			return describeUnion(
+				type,
+				constrainedOrder,
+				generics,
+				bindings,
+				position,
+			)
 		default:
 			return { k: "eq" }
 	}
@@ -1434,12 +1444,59 @@ function describeUnion(
 	constrainedOrder: Array<string>,
 	generics: Set<string>,
 	bindings: GenericBindings,
+	position: common.Position | null,
 ): common.DescriptorNode {
 	let arms: Array<UnionArm> = flattenUnionMembers(type).map((armType) => ({
 		type: armType,
 		applied: appliedArmType(armType, generics, bindings),
 		claim: null,
 	}))
+
+	// NOTE: The arms that stand for a Type Parameter's values. ONE of them is
+	// the fallback the rest of this function is written around; two of them
+	// are two fallbacks, and the runtime takes the first it finds — a
+	// `T | List<T>` payload compared every List through T's witness, so
+	// `#Val([2]) is #Val([10])` answered true and `#Val([2]) is #Val(2)`
+	// answered true as well. What tells them apart is what this receiver's
+	// Type Arguments made of them, which is what they are shaped by below.
+	let parameterArms = arms.filter((arm) =>
+		typeMentionsGenerics(arm.type, generics),
+	)
+
+	// NOTE: And where the receiver is generic over the very Parameters its
+	// payload names, there are no Type Arguments to shape them with and both
+	// arms are whatever the eventual Argument turns out to be. No descriptor
+	// can be right about that, so the comparison is refused instead of being
+	// emitted wrong.
+	if (
+		position !== null &&
+		parameterArms.length > 1 &&
+		parameterArms.some((arm) => arm.applied === null)
+	) {
+		reportError(
+			"This Choice's payload can not be compared here",
+			position,
+			{
+				code: "indistinguishable-union-arms",
+				labels: [
+					primary(
+						position,
+						"two arms of a payload Union are one Type at runtime",
+					),
+				],
+				notes: [
+					`'${describeType(type)}' names ${countOf(parameterArms.length, "arm")} standing for a Type Parameter's values: ${parameterArms
+						.map((arm) => `'${describeType(arm.type)}'`)
+						.join(", ")}.`,
+					"Type Parameters erase, so which arm a value belongs to is decided by the Type Arguments the receiver was applied to — and here they are Parameters themselves.",
+				],
+				helps: [
+					"Compare the value where its Type Arguments are known, or write the arms so that something other than a Type Parameter tells them apart.",
+				],
+			},
+		)
+	}
+
 	// NOTE: What the Parameter-naming arms' values look like at this receiver —
 	// the values a concrete arm must not claim. A Union Argument is flattened:
 	// each of its members carries its own tag.
@@ -1457,13 +1514,24 @@ function describeUnion(
 			constrainedOrder,
 			generics,
 			bindings,
+			position,
 		)
 
 		// NOTE: An arm mentioning a Parameter is the fallback (`null`) — no
 		// fixed tag is its own, so everything no arm claims is compared through
-		// its witness.
+		// its witness. Where there are several, only the one the receiver could
+		// not apply stays the fallback; the rest take the shape their Type
+		// Argument gave them, which is what the runtime tells them apart by.
 		if (typeMentionsGenerics(arm.type, generics)) {
-			arm.claim = { tag: null, node }
+			arm.claim =
+				parameterArms.length === 1 || arm.applied === null
+					? { tag: null, node }
+					: {
+							tag: null,
+							shape: runtimeShapeOf(arm.applied),
+							node,
+						}
+
 			continue
 		}
 
@@ -1651,6 +1719,7 @@ function describeMembers(
 	constrainedOrder: Array<string>,
 	generics: Set<string>,
 	bindings: GenericBindings,
+	position: common.Position | null,
 ): Record<string, common.DescriptorNode> {
 	let described: Record<string, common.DescriptorNode> = {}
 
@@ -1660,6 +1729,7 @@ function describeMembers(
 			constrainedOrder,
 			generics,
 			bindings,
+			position,
 		)
 	}
 
@@ -1674,9 +1744,15 @@ function describeMembers(
 // receiver's, and only decide which arms of a Union payload can still be told
 // apart from the Parameter's own values — how a member is compared is decided by
 // the Alias alone.
+//
+// NOTE: `position` is where a payload no descriptor can be right about is
+// reported, and null says to build it silently. Only a settled call site passes
+// one: a conformance solve reaches here speculatively and memoised, and the
+// Diagnostic it would report belongs to whatever call the witness is for.
 export function derivedEquatableDescriptor(
 	alias: common.GenericAliasType,
-	typeArguments: Array<common.Type> = [],
+	typeArguments: Array<common.Type>,
+	position: common.Position | null,
 ): common.DerivedEquatableDescriptor {
 	let generics = new Set(alias.generics.map((generic) => generic.name))
 	let constrainedOrder = constrainedGenericOrder(alias)
@@ -1701,6 +1777,7 @@ export function derivedEquatableDescriptor(
 			constrainedOrder,
 			generics,
 			bindings,
+			position,
 		)
 	}
 
@@ -1713,6 +1790,7 @@ export function derivedEquatableDescriptor(
 export function derivedEquatableDescriptorFor(
 	baseType: common.Type,
 	scope: enricher.Scope,
+	position: common.Position,
 ): common.DerivedEquatableDescriptor | null {
 	let alias = declaredChoiceAliasOf(baseType, scope)
 
@@ -1720,7 +1798,11 @@ export function derivedEquatableDescriptorFor(
 		return null
 	}
 
-	return derivedEquatableDescriptor(alias, choiceTypeArgumentsOf(baseType))
+	return derivedEquatableDescriptor(
+		alias,
+		choiceTypeArgumentsOf(baseType),
+		position,
+	)
 }
 
 // NOTE: Every Choice is Equatable without being written as such — a Case is
@@ -1961,7 +2043,14 @@ function derivedConformanceSource(
 		name: derivedEquatableNamespaceName,
 		methodMap: result.methodMap,
 		conditions,
-		derivedDescriptor: derivedEquatableDescriptor(alias, typeArguments),
+		// NOTE: Silent — this is the witness a bounded call is handed, solved
+		// speculatively and memoised, so the call site is where a payload that
+		// can not be compared is reported.
+		derivedDescriptor: derivedEquatableDescriptor(
+			alias,
+			typeArguments,
+			null,
+		),
 	}
 }
 
