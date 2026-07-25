@@ -1,29 +1,28 @@
 import { describe, expect, it } from "bun:test"
 
 import type { common } from "@essence/interfaces"
-import { Fraction } from "bigint-fraction"
-
-import * as boolean from "../rewriter/__internal/Boolean"
-import * as integer from "../rewriter/__internal/Integer"
+import * as boolean from "@essence/runtime/Boolean"
+import * as integer from "@essence/runtime/Integer"
 import {
 	anyIs,
 	anyIsNot,
 	isFirstRationalBigger,
-} from "../rewriter/__internal/internalHelpers"
-import * as list from "../rewriter/__internal/List"
-import { createNothing } from "../rewriter/__internal/Nothing"
-import * as number from "../rewriter/__internal/Number"
-import * as numberFormat from "../rewriter/__internal/NumberFormat"
-import * as ordering from "../rewriter/__internal/Ordering"
-import * as rational from "../rewriter/__internal/Rational"
-import * as record from "../rewriter/__internal/Record"
-import * as side from "../rewriter/__internal/Side"
-import * as string from "../rewriter/__internal/String"
+} from "@essence/runtime/internalHelpers"
+import * as list from "@essence/runtime/List"
+import { createNothing } from "@essence/runtime/Nothing"
+import * as number from "@essence/runtime/Number"
+import * as numberFormat from "@essence/runtime/NumberFormat"
+import * as ordering from "@essence/runtime/Ordering"
+import * as rational from "@essence/runtime/Rational"
+import * as record from "@essence/runtime/Record"
+import * as side from "@essence/runtime/Side"
+import * as string from "@essence/runtime/String"
 import {
 	dispatchMethod,
 	isValueOfType,
 	noCaseMatched,
-} from "../rewriter/__internal/type"
+} from "@essence/runtime/type"
+import { Fraction } from "bigint-fraction"
 
 const booleanTrue = () => boolean.createBoolean(true)
 const booleanFalse = () => boolean.createBoolean(false)

@@ -60,11 +60,11 @@ describe("Bundle Size", () => {
 	// back to 55,163 when List's equality Methods took an `Equatable` bound:
 	// `contains`, `removeDuplicates` and the by-value `count`/`removeEvery`
 	// lost their natives, and what replaced them is written on chains the
-	// Program already carried. It now measures 55,578: anchoring esbuild's
+	// Program already carried. It now measures 55,407: anchoring esbuild's
 	// working directory to the runtime took the checkout's path back out of
-	// every inlined module's label, which is worth about 200 bytes here and
+	// every inlined module's label, which is worth about 370 bytes here and
 	// over a kilobyte to anyone whose checkout sits deeper. Still below the
-	// spread figure, so the guard holds — the headroom is ~400 bytes, so the
+	// spread figure, so the guard holds — the headroom is ~590 bytes, so the
 	// next conversion that touches List will want this ceiling raised with it.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(56_000)
@@ -77,7 +77,7 @@ describe("Bundle Size", () => {
 	// — like the rest of the runtime's Type Module — is carried by every
 	// Program. The ceiling moved with it, keeping the same order of headroom;
 	// it is still eleven kB below the spread figure this guard is about. It now
-	// measures 44,011, for the same reason Everyday's figure fell.
+	// measures 43,851, for the same reason Everyday's figure fell.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(45_500)
 	})
