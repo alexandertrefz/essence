@@ -9,11 +9,15 @@ import * as path from "node:path"
 // read from source because a union of string literals leaves nothing behind
 // at runtime to iterate.
 
-const ROOT = path.join(import.meta.dir, "..", "..")
+// NOTE: The documentation is the one thing this spec reads that no package
+// owns yet — `docs/` is still a Jekyll site at the repository root. This hop
+// goes away when the documentation gets a package of its own and this spec
+// moves into it; until then it is the only path here that counts directories.
+const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
 
 function declaredCodes(): Array<string> {
 	let source = readFileSync(
-		path.join(ROOT, "src", "interfaces", "common", "index.ts"),
+		path.resolve(import.meta.dirname, "../interfaces/common/index.ts"),
 		"utf8",
 	)
 	let union = source.match(
@@ -29,7 +33,7 @@ function declaredCodes(): Array<string> {
 
 function documentedCodes(): Array<string> {
 	let documentation = readFileSync(
-		path.join(ROOT, "docs", "diagnostics.md"),
+		path.join(REPOSITORY_ROOT, "docs", "diagnostics.md"),
 		"utf8",
 	)
 

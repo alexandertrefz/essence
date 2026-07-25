@@ -15,7 +15,7 @@
 	"sortPackageJson": false,
 	"ignorePatterns": [
 		"coverage/**/*",
-		"src/rewriter/__internal/natives.generated.ts",
+		"packages/compiler/src/rewriter/__internal/natives.generated.ts",
 		"docs/_layouts/**",
 		"packages/fixtures/files/**",
 		"**/*.es",
