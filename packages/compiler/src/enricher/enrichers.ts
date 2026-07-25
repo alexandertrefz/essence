@@ -30,6 +30,7 @@ import {
 } from "../helpers/index"
 import {
 	checkProtocolConformance,
+	type CheckedConformance,
 	reportReservedTypeName,
 	findTypeInScope,
 	combinationTypeOf,
@@ -56,6 +57,7 @@ import {
 	resolveType,
 	resolveTypeAliasStatementType,
 	scopeWithGenerics,
+	silentCheckedConformances,
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
@@ -1399,6 +1401,80 @@ export function enrichNamespaceDefinitionStatement(
 		}
 	}
 
+	// NOTE: Idempotent, and run a second time on purpose: the hoist already wove
+	// these bounds into the Namespace Type so that use sites ABOVE this
+	// Statement see the same Type the ones below it do. What is only available
+	// here is the typed half — the Generic Declarations the Rewriter emits the
+	// hidden conformance Parameters from.
+	let injectedGenerics = weaveMethodBounds(
+		node,
+		type,
+		checkedConformances,
+		scope,
+		true,
+	)
+
+	// NOTE: Namespace Generics are visible in every Method — bodies reference
+	// them as opaque GenericUses.
+	let methodScope = scopeWithGenerics(node.generics, scope)
+
+	return {
+		nodeType: "NamespaceDefinitionStatement",
+		targetType: type.targetType,
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
+		conformsTo: node.conformsTo.map((clause) => ({
+			name: clause.protocol.content,
+			position: clause.protocol.position,
+			conditions: clause.conditions.map((condition) => ({
+				generic: condition.generic.content,
+				genericPosition: condition.generic.position,
+				protocol: condition.protocol.content,
+				protocolPosition: condition.protocol.position,
+			})),
+		})),
+		name: enrichIdentifier(node.name, scope),
+		properties: enrichProperties(node.properties, scope),
+		methods: enrichMethods(
+			node.methods,
+			methodScope,
+			type.targetType,
+			type.methods,
+			injectedGenerics,
+		),
+		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			...node.generics.map((generic) => generic.position),
+			node.targetType?.position,
+			// NOTE: A clause's Position covers its `where` conditions too.
+			...node.conformsTo.map((clause) => clause.position),
+		]),
+		type,
+		documentation: node.documentation,
+	}
+}
+
+// NOTE: Threads each conditional conformance's bounds into the Methods that
+// fulfil it, in place on the Namespace Type, and answers the Generic
+// Declarations to inject into their typed Nodes. Run TWICE for every hoisted
+// Namespace — once speculatively while it hoists, so a use site above the
+// Statement solves against the bounded Type, and once from the Statement, which
+// is the only pass with typed Nodes to inject into. Idempotent on the Type:
+// `retainNamespaceBounds` retains and bounds the same set every time.
+//
+// `report` is off for the speculative pass: a Diagnostic during hoisting keeps
+// the Namespace out of Scope entirely. The injected Declarations are built in
+// the reporting pass alone — resolving a Generic's default Type can report as
+// well, and they have nowhere to go until there are typed Nodes.
+function weaveMethodBounds(
+	node: parser.NamespaceDefinitionStatementNode,
+	type: common.NamespaceType,
+	checkedConformances: Array<CheckedConformance>,
+	scope: enricher.Scope,
+	report: boolean,
+): Map<string, Array<Array<common.typed.GenericDeclarationNode>>> {
 	// NOTE: Which Namespace Generic each fulfilling Method must treat as bound,
 	// gathered from every conditional conformance clause. A Method fulfilling
 	// two clauses that bound the same Generic to different Protocols is a
@@ -1431,25 +1507,27 @@ export function enrichNamespaceDefinitionStatement(
 				let existing = bounds.get(condition.generic)
 
 				if (existing !== undefined && existing !== condition.protocol) {
-					let clause = node.conformsTo.find(
-						(candidate) =>
-							candidate.protocol.content ===
-							conformance.protocolName,
-					)
+					if (report) {
+						let clause = node.conformsTo.find(
+							(candidate) =>
+								candidate.protocol.content ===
+								conformance.protocolName,
+						)
 
-					reportError(
-						`Method '${methodName}' can not satisfy conflicting conformance conditions`,
-						clause?.position ?? node.name.position,
-						{
-							code: "conflicting-where-condition",
-							labels: [
-								primary(
-									clause?.position ?? node.name.position,
-									`Method '${methodName}' would need both '${condition.generic} is ${existing}' and '${condition.generic} is ${condition.protocol}'`,
-								),
-							],
-						},
-					)
+						reportError(
+							`Method '${methodName}' can not satisfy conflicting conformance conditions`,
+							clause?.position ?? node.name.position,
+							{
+								code: "conflicting-where-condition",
+								labels: [
+									primary(
+										clause?.position ?? node.name.position,
+										`Method '${methodName}' would need both '${condition.generic} is ${existing}' and '${condition.generic} is ${condition.protocol}'`,
+									),
+								],
+							},
+						)
+					}
 
 					continue
 				}
@@ -1518,6 +1596,10 @@ export function enrichNamespaceDefinitionStatement(
 
 		type.methods[methodName] = methodType
 
+		if (!report) {
+			continue
+		}
+
 		// NOTE: The typed Node's Generics are READ BACK OFF the retained Type,
 		// per Overload, rather than derived a second way — that is what keeps
 		// the two views in step by construction.
@@ -1559,46 +1641,7 @@ export function enrichNamespaceDefinitionStatement(
 		}
 	}
 
-	// NOTE: Namespace Generics are visible in every Method — bodies reference
-	// them as opaque GenericUses.
-	let methodScope = scopeWithGenerics(node.generics, scope)
-
-	return {
-		nodeType: "NamespaceDefinitionStatement",
-		targetType: type.targetType,
-		generics: node.generics.map((generic) =>
-			enrichGenericDeclarationNode(generic, scope),
-		),
-		conformsTo: node.conformsTo.map((clause) => ({
-			name: clause.protocol.content,
-			position: clause.protocol.position,
-			conditions: clause.conditions.map((condition) => ({
-				generic: condition.generic.content,
-				genericPosition: condition.generic.position,
-				protocol: condition.protocol.content,
-				protocolPosition: condition.protocol.position,
-			})),
-		})),
-		name: enrichIdentifier(node.name, scope),
-		properties: enrichProperties(node.properties, scope),
-		methods: enrichMethods(
-			node.methods,
-			methodScope,
-			type.targetType,
-			type.methods,
-			injectedGenerics,
-		),
-		position: node.position,
-		headPosition: headPositionOf(node.position, [
-			node.name.position,
-			...node.generics.map((generic) => generic.position),
-			node.targetType?.position,
-			// NOTE: A clause's Position covers its `where` conditions too.
-			...node.conformsTo.map((clause) => clause.position),
-		]),
-		type,
-		documentation: node.documentation,
-	}
+	return injectedGenerics
 }
 
 // NOTE: The Type Parameter names each form of a Namespace Method declares for
@@ -4476,6 +4519,13 @@ function containsGenericUse(type: common.Type): boolean {
 export function resolveNamespaceDefinitionStatementType(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
+	// NOTE: Set by hoisting alone, to the Protocol names that have not hoisted
+	// yet. It turns on the speculative bound weave — the Type this pass registers
+	// is what every use site ABOVE the Namespace's Statement solves against, so
+	// it has to carry the conditional conformances' bounds already — and lets a
+	// clause naming a Protocol still on its way throw, which the hoist loop reads
+	// as "not this round".
+	options: { deferOnPendingConformance?: ReadonlySet<string> } = {},
 ): common.NamespaceType {
 	// NOTE: Namespace Generics are visible in the target Type and in every
 	// Method signature — `namespace Boxes<infer Item> for List<Item>`.
@@ -4572,6 +4622,21 @@ export function resolveNamespaceDefinitionStatementType(
 
 	resultType.properties = properties
 	resultType.methods = methods
+
+	if (options.deferOnPendingConformance !== undefined) {
+		weaveMethodBounds(
+			node,
+			resultType,
+			silentCheckedConformances(
+				node,
+				resultType,
+				scope,
+				options.deferOnPendingConformance,
+			),
+			scope,
+			false,
+		)
+	}
 
 	return resultType
 }

@@ -27,10 +27,11 @@ function codesFor(source: string): Array<string> {
 	return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// NOTE: Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `__print` calls run — the same harness `codeGeneration.spec.ts`
-// uses, because the same faults only show up in what the Program prints.
-async function run(source: string): Promise<Array<string>> {
+// NOTE: The JavaScript a clean Program compiles to. Read directly where the
+// question is what the emitted call SAYS — a witness that never reaches a
+// hidden conformance Parameter is a missing Argument, and the text is where an
+// Argument is either there or not.
+function emitted(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -40,7 +41,14 @@ async function run(source: string): Promise<Array<string>> {
 	expect(enriched.diagnostics).toEqual([])
 	expect(validate(enriched.program)).toEqual([])
 
-	let javascript = rewrite(optimise(simplify(enriched.program)))
+	return rewrite(optimise(simplify(enriched.program)))
+}
+
+// NOTE: Emits the Program, writes it to a throwaway module and imports it so
+// its top-level `__print` calls run — the same harness `codeGeneration.spec.ts`
+// uses, because the same faults only show up in what the Program prints.
+async function run(source: string): Promise<Array<string>> {
+	let javascript = emitted(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-resolvers-"))
 	let file = join(directory, "program.ts")
 
@@ -309,6 +317,104 @@ describe("Resolvers", () => {
 					<- first::append(second)`),
 				),
 			).toEqual(['"AA"'])
+		})
+	})
+
+	// NOTE: A conditional conformance bounds the Methods that fulfil it, and
+	// hoisting is what puts the Namespace Type into Scope. Until the bounds were
+	// woven while it hoisted, WHERE a use site sat decided which Type it solved
+	// against: one above the Namespace's Statement saw unbounded Methods and
+	// emitted calls that curried no witness, one below saw the bounded ones.
+	describe("Conditional Conformance and Declaration Order", () => {
+		let boxes = (order: "above" | "below") => {
+			let use = `function rankBoxes(
+				_ a: { value: Integer },
+				_ b: { value: Integer },
+			) -> String {
+				<- rank(a, b)
+			}`
+
+			let namespace = `namespace Boxes<infer Item> for { value: Item }
+				is Rankable,
+				is Comparable where Item is Comparable {
+				compareTo(_ other: { value: Item }) -> Ordering {
+					<- @.value::compareTo(other.value)
+				}
+			}`
+
+			return `implementation {
+				protocol Rankable {
+					compareTo(_ other: Self) -> Ordering
+				}
+
+				function rank<infer Item is Rankable>(_ a: Item, _ b: Item) -> String {
+					<- a::compareTo(b)::toString()
+				}
+
+				${order === "above" ? `${use}\n\n${namespace}` : `${namespace}\n\n${use}`}
+
+				__print(rankBoxes({ value = 1 }, { value = 2 }))
+			}`
+		}
+
+		// NOTE: `compareTo` can not fulfil `Rankable` unconditionally AND carry
+		// the `Comparable` clause's bound — the Method the Protocol promises
+		// takes no witness. Both orders have to say so; the "above" one used to
+		// compile clean and die with `Item__conformance` undefined.
+		it("should reject an unconditional clause the bound Method can not fulfil", () => {
+			expect(codesFor(boxes("above"))).toEqual([
+				"nonconforming-namespace",
+				"nonconforming-namespace",
+			])
+		})
+
+		it("should reject it the same way from below the Namespace", () => {
+			expect(codesFor(boxes("below"))).toEqual(codesFor(boxes("above")))
+		})
+
+		let sortable = (namespaceFirst: boolean) => {
+			let use = `function rankBoxes(
+				_ a: { value: Integer },
+				_ b: { value: Integer },
+			) -> String {
+				<- a::rank(b)
+			}`
+
+			let namespace = `namespace Boxes<infer Item> for { value: Item }
+				is Rankable where Item is Comparable {
+				rank(_ other: { value: Item }) -> String {
+					<- @.value::compareTo(other.value)::toString()
+				}
+			}`
+
+			return `implementation {
+				${namespaceFirst ? `${namespace}\n\n${use}` : `${use}\n\n${namespace}`}
+
+				protocol Rankable {
+					rank(_ other: Self) -> String
+				}
+
+				__print(rankBoxes({ value = 1 }, { value = 2 }))
+				__print(rankBoxes({ value = 5 }, { value = 2 }))
+			}`
+		}
+
+		// NOTE: The Protocol is declared BELOW the Namespace here, so the
+		// Namespace can not be checked in the hoist round that reaches it first
+		// — it defers to the next one rather than hoisting a Type whose Methods
+		// have lost their bound.
+		it("should weave the bound when the Protocol hoists after the Namespace", async () => {
+			expect(await run(sortable(true))).toEqual(['"Less"', '"Greater"'])
+		})
+
+		it("should weave it for a use site above the Namespace too", async () => {
+			expect(await run(sortable(false))).toEqual(['"Less"', '"Greater"'])
+		})
+
+		it("should curry the Item witness onto the call above the Namespace", () => {
+			expect(emitted(sortable(false))).toContain(
+				"Boxes.rank(a, b, { compareTo: Integer.compareTo })",
+			)
 		})
 	})
 

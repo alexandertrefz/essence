@@ -2456,9 +2456,145 @@ export type CheckedConformance = {
 	methodMap: Record<string, string>
 }
 
-// NOTE: Called from the Enricher, never from speculative hoisting — a
-// Namespace with a broken conformance clause is still a perfectly usable
-// Namespace and must hoist; only the clause itself is diagnosed.
+// NOTE: Why a `where` condition can not become an assumption, or null when it
+// can. The two conformance checks — the reporting one below and the silent twin
+// hoisting runs — share this so they can not drift into disagreeing about which
+// conditions a clause carries: the bounds woven into the fulfilling Methods are
+// read off exactly that list, and a Method bound in one pass and not the other
+// would emit a hidden conformance Parameter its call sites do not fill.
+type WhereConditionRejection =
+	| { kind: "unknown-generic" }
+	| { kind: "unwitnessable" }
+	| { kind: "unknown-protocol" }
+	| { kind: "already-bound"; protocol: string }
+
+function whereConditionRejection(
+	condition: parser.WhereConditionNode,
+	targetType: common.Type,
+	declaredGenerics: ReadonlySet<string>,
+	assumptions: ReadonlyMap<string, string>,
+	scope: enricher.Scope,
+): WhereConditionRejection | null {
+	if (!declaredGenerics.has(condition.generic.content)) {
+		return { kind: "unknown-generic" }
+	}
+
+	// NOTE: A condition is proven at the use site by unifying the target Type
+	// against the receiver — a Generic the target never mentions can never be
+	// bound there, so its witness could never be produced and the hidden
+	// conformance Parameter would arrive as `undefined` at runtime.
+	if (!typeMentionsGeneric(targetType, condition.generic.content)) {
+		return { kind: "unwitnessable" }
+	}
+
+	if (findProtocolInScope(condition.protocol.content, scope) === null) {
+		return { kind: "unknown-protocol" }
+	}
+
+	let existing = assumptions.get(condition.generic.content)
+
+	if (existing !== undefined) {
+		return { kind: "already-bound", protocol: existing }
+	}
+
+	return null
+}
+
+// NOTE: What `checkProtocolConformance` would find, with nothing reported and
+// nothing derived. Hoisting needs the clauses that HOLD — they are what says
+// which Methods carry a conditional conformance's bound — and can not report
+// while it looks: a Diagnostic during speculative resolution keeps the whole
+// Namespace out of Scope. A clause a Choice's derived equality fulfils names no
+// Namespace Method, so leaving the derive out costs no bound.
+// `computeConformanceMethodMap` is pure, so running it here declares nothing.
+export function silentCheckedConformances(
+	node: parser.NamespaceDefinitionStatementNode,
+	namespaceType: common.NamespaceType,
+	scope: enricher.Scope,
+	// NOTE: The Protocol names still waiting to hoist. A clause naming one can
+	// not be checked yet, and checking it anyway would silently drop its bounds
+	// — so the Namespace is thrown back to the hoist loop, which retries it a
+	// round later, the same way a Type Alias naming a later declaration waits.
+	pendingProtocols: ReadonlySet<string>,
+): Array<CheckedConformance> {
+	let checked: Array<CheckedConformance> = []
+	let declaredGenerics = new Set(
+		node.generics.map((generic) => generic.name.content),
+	)
+
+	for (let clause of node.conformsTo) {
+		for (let name of [
+			clause.protocol.content,
+			...clause.conditions.map((condition) => condition.protocol.content),
+		]) {
+			if (
+				findProtocolInScope(name, scope) === null &&
+				pendingProtocols.has(name)
+			) {
+				throw new Error(
+					`Protocol '${name}' has not been hoisted yet — deferring Namespace '${node.name.content}'`,
+				)
+			}
+		}
+
+		let protocol = findProtocolInScope(clause.protocol.content, scope)
+
+		if (protocol === null || namespaceType.targetType === null) {
+			continue
+		}
+
+		let conditions: Array<{ generic: string; protocol: string }> = []
+		let assumptions = new Map<string, string>()
+
+		for (let condition of clause.conditions) {
+			if (
+				whereConditionRejection(
+					condition,
+					namespaceType.targetType,
+					declaredGenerics,
+					assumptions,
+					scope,
+				) !== null
+			) {
+				continue
+			}
+
+			assumptions.set(
+				condition.generic.content,
+				condition.protocol.content,
+			)
+			conditions.push({
+				generic: condition.generic.content,
+				protocol: condition.protocol.content,
+			})
+		}
+
+		let result = computeConformanceMethodMap(
+			protocol,
+			namespaceType,
+			namespaceType.targetType,
+			assumptions,
+		)
+
+		if (result.kind === "conforms") {
+			checked.push({
+				protocolName: protocol.name,
+				conditions,
+				methodMap: result.methodMap,
+			})
+		}
+	}
+
+	return checked
+}
+
+// NOTE: The reporting check, called from the Enricher and never from
+// speculative hoisting — a Namespace with a broken conformance clause is still a
+// perfectly usable Namespace and must hoist, so hoisting reads the silent twin
+// above and leaves every Diagnostic to this pass. The Namespace Type checked
+// here is the one the hoist already wove its bounds into, which is what makes an
+// unconditional clause fulfilled by a Method a conditional clause bounds the
+// error it always was, wherever the use sites happen to sit.
 export function checkProtocolConformance(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
@@ -2525,126 +2661,102 @@ export function checkProtocolConformance(
 		// twice in one clause.
 		let conditions: Array<{ generic: string; protocol: string }> = []
 		let assumptions = new Map<string, string>()
-		let boundGenerics = new Map<string, string>()
 
 		for (let condition of clause.conditions) {
-			if (!declaredGenerics.has(condition.generic.content)) {
-				reportError(
-					`'${condition.generic.content}' is not a Type Parameter of this Namespace`,
-					condition.generic.position,
-					{
-						code: "unknown-where-generic",
-						labels: [
-							primary(
-								condition.generic.position,
-								"no such Type Parameter",
-							),
-						],
-						helps: [
-							`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
-						],
-					},
-				)
-
-				continue
-			}
-
-			// NOTE: A condition is proven at the use site by unifying the
-			// target Type against the receiver — a Generic the target never
-			// mentions can never be bound there, so its witness could never
-			// be produced and the hidden conformance Parameter would arrive
-			// as `undefined` at runtime.
-			if (
-				!typeMentionsGeneric(
-					namespaceType.targetType,
-					condition.generic.content,
-				)
-			) {
-				reportError(
-					`'${condition.generic.content}' does not appear in this Namespace's target Type`,
-					condition.generic.position,
-					{
-						code: "unwitnessable-where-condition",
-						labels: [
-							primary(
-								condition.generic.position,
-								"not part of the target Type",
-							),
-						],
-						notes: [
-							"A condition is proven by the target Type at each use site — a Type Parameter the target never mentions has nothing to prove it with.",
-						],
-						helps: [
-							`Mention '${condition.generic.content}' in the target Type, or drop the condition.`,
-						],
-					},
-				)
-
-				continue
-			}
-
-			let conditionProtocol = findProtocolInScope(
-				condition.protocol.content,
+			let rejection = whereConditionRejection(
+				condition,
+				namespaceType.targetType,
+				declaredGenerics,
+				assumptions,
 				scope,
 			)
 
-			if (conditionProtocol === null) {
-				reportError(
-					`Protocol '${condition.protocol.content}' is not declared`,
-					condition.protocol.position,
-					{
-						code: "unknown-protocol",
-						labels: [
-							primary(
-								condition.protocol.position,
-								"no such Protocol",
-							),
-						],
-						helps: suggestionHelps(
-							condition.protocol.content,
-							scope,
-							"protocols",
-						),
-						...suggestionData(
-							suggestionInScope(
+			if (rejection !== null) {
+				if (rejection.kind === "unknown-generic") {
+					reportError(
+						`'${condition.generic.content}' is not a Type Parameter of this Namespace`,
+						condition.generic.position,
+						{
+							code: "unknown-where-generic",
+							labels: [
+								primary(
+									condition.generic.position,
+									"no such Type Parameter",
+								),
+							],
+							helps: [
+								`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
+							],
+						},
+					)
+				} else if (rejection.kind === "unwitnessable") {
+					reportError(
+						`'${condition.generic.content}' does not appear in this Namespace's target Type`,
+						condition.generic.position,
+						{
+							code: "unwitnessable-where-condition",
+							labels: [
+								primary(
+									condition.generic.position,
+									"not part of the target Type",
+								),
+							],
+							notes: [
+								"A condition is proven by the target Type at each use site — a Type Parameter the target never mentions has nothing to prove it with.",
+							],
+							helps: [
+								`Mention '${condition.generic.content}' in the target Type, or drop the condition.`,
+							],
+						},
+					)
+				} else if (rejection.kind === "unknown-protocol") {
+					reportError(
+						`Protocol '${condition.protocol.content}' is not declared`,
+						condition.protocol.position,
+						{
+							code: "unknown-protocol",
+							labels: [
+								primary(
+									condition.protocol.position,
+									"no such Protocol",
+								),
+							],
+							helps: suggestionHelps(
 								condition.protocol.content,
 								scope,
 								"protocols",
 							),
-						),
-					},
-				)
-
-				continue
-			}
-
-			let existing = boundGenerics.get(condition.generic.content)
-
-			if (existing !== undefined) {
-				reportError(
-					`'${condition.generic.content}' is bound twice in this conformance`,
-					condition.generic.position,
-					{
-						code: "conflicting-where-condition",
-						labels: [
-							primary(
-								condition.generic.position,
-								`already bound to '${existing}'`,
+							...suggestionData(
+								suggestionInScope(
+									condition.protocol.content,
+									scope,
+									"protocols",
+								),
 							),
-						],
-						notes: [
-							`'${condition.generic.content}' is already required to conform to '${existing}'.`,
-						],
-					},
-				)
+						},
+					)
+				} else {
+					reportError(
+						`'${condition.generic.content}' is bound twice in this conformance`,
+						condition.generic.position,
+						{
+							code: "conflicting-where-condition",
+							labels: [
+								primary(
+									condition.generic.position,
+									`already bound to '${rejection.protocol}'`,
+								),
+							],
+							notes: [
+								`'${condition.generic.content}' is already required to conform to '${rejection.protocol}'.`,
+							],
+						},
+					)
+				}
 
 				continue
 			}
 
-			boundGenerics.set(
-				condition.generic.content,
-				condition.protocol.content,
-			)
 			assumptions.set(
 				condition.generic.content,
 				condition.protocol.content,

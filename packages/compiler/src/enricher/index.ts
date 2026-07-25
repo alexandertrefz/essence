@@ -196,6 +196,18 @@ function hoistDeclarations(
 
 	while (pendingNodes.length > 0) {
 		let remainingNodes: Array<HoistableStatementNode> = []
+		// NOTE: The Protocols this round can still hoist. A Namespace conforming
+		// to one of them can not have its conditional bounds woven yet — and a
+		// Namespace Type reaching Scope without them is exactly what let a use
+		// site above the declaration solve against an unbounded Method — so it
+		// throws instead and lands in `remainingNodes` for the next round.
+		let pendingProtocols = new Set(
+			pendingNodes
+				.filter(
+					(node) => node.nodeType === "ProtocolDeclarationStatement",
+				)
+				.map((node) => node.name.content),
+		)
 
 		for (let node of pendingNodes) {
 			let speculation: {
@@ -245,6 +257,9 @@ function hoistDeclarations(
 							return resolveNamespaceDefinitionStatementType(
 								node,
 								scope,
+								{
+									deferOnPendingConformance: pendingProtocols,
+								},
 							)
 						}
 					},
