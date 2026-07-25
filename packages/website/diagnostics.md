@@ -379,10 +379,23 @@ that swallows it. A Case that can decline the values it accepts by Type (one
 with a literal Matcher, a value-constrained Record member, or a Guard) takes
 nothing away from the Cases below it.
 
+Such a Case is dead code — the Diagnostic is tagged `unnecessary`, so clients
+grey it out instead of underlining it. A Case an earlier one covers through
+ERASURE rather than through its Type is `erased-case-conflict` below, and an
+Error.
+
+### `erased-case-conflict`
+
+An earlier `case` answers for every value of this one through something that
+does not survive to runtime. The Program takes the earlier branch and answers
+with a value of a Type nothing in the source connects to it, which is why this
+is an Error where plain dead code is a Warning.
+
 A Generic Case (`case Value`, inside `<infer Value>`) swallows the rest the same
 way `case _` does, even though it names a Type of its own: Types erase before a
 Match runs, so it narrows nothing and accepts every value that reaches it. It
-can therefore only ever be written last.
+can therefore only ever be written last — written above `case Nothing`, it
+answered the Nothing where the Signature promised a `Value`.
 
 **Quick Fix — "Remove unreachable Case":** deletes the whole Handler, taking
 the line break and the indentation before it along.
@@ -393,6 +406,24 @@ carrying a callable `fn`, whatever that callback was declared as. Two Cases
 telling themselves apart by nothing but a callback's Signature can not be told
 apart at all — reordering does not help, and one of them has to name a member
 that survives to runtime, or carry a Guard.
+
+Both erasures reach a Method Invocation on a Union-typed receiver too, whose
+branches are the Cases nobody wrote. They are ordered most specific first, so a
+branch still covering the one below it covers it through erasure, and the
+Diagnostic names the branch that can never run.
+
+### `empty-list-overlap`
+
+A Warning: an earlier `case` — or an earlier dispatch branch — answers for this
+one's EMPTY Lists. Item Types erase before a Match runs, so a List Matcher asks
+about the items the value holds, and an empty List holds none, which makes it a
+value of every List Type there is. `case List<String>` above `case
+List<Integer>` therefore runs for an empty `List<Integer>`.
+
+Only the empty List crosses over; every List with items still reaches the Case
+its items belong to. Guard the Cases with `where @::hasItems()` and answer for
+the empty List in a Case of its own, or, for a Method Invocation, narrow the
+receiver with a Match before calling the Method.
 
 ### `match-on-non-union`
 

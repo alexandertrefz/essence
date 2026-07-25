@@ -639,8 +639,10 @@ describe("Validator", () => {
 		// Case below it is dead. Assignability says `Value` matches nothing but
 		// `Value`, so this Match used to pass every check without a Diagnostic:
 		// `unwrap(nothing, fallback 7)` answered the Nothing where the
-		// Signature promised a `Value`, and the wrong value flowed on.
-		it("should warn about a Case shadowed by an earlier Generic Case", () => {
+		// Signature promised a `Value`, and the wrong value flowed on. It is an
+		// Error rather than the Warning dead code gets: nothing is greyed out
+		// here, a Program is answering with the wrong value.
+		it("should reject a Case shadowed by an earlier Generic Case", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				function unwrap <infer Value>(
 					_ maybe: Value | Nothing,
@@ -656,9 +658,11 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].code).toBe("unreachable-case")
-			expect(diagnostics[0].tags).toEqual(["unnecessary"])
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
+			// NOTE: Untagged — `unnecessary` greys a Case out, and this one is
+			// not something to remove but something to reorder.
+			expect(diagnostics[0].tags).toBeUndefined()
 			// NOTE: On `case Nothing`, the Case that never runs — pointing back
 			// at the Generic Case above it.
 			expect(diagnostics[0].position?.start.line).toBe(8)
@@ -693,8 +697,8 @@ describe("Validator", () => {
 		// emitted for a Function-typed member asks only whether the value is
 		// callable — so of two Cases naming differently-signed callbacks, the
 		// first swallows the second whichever way round they are written. That
-		// is not something reordering can fix, and the Warning says so.
-		it("should warn about a Case a differently-signed callback Case swallows", () => {
+		// is not something reordering can fix, and the Error says so.
+		it("should reject a Case a differently-signed callback Case swallows", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type IntHandler = { fn: (_ n: Integer) -> Integer }
 				type StringHandler = { fn: (_ s: String) -> String }
@@ -712,8 +716,8 @@ describe("Validator", () => {
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
 			expect(diagnostics[0].position?.start.line).toBe(11)
 			expect(diagnostics[0].notes[1]).toBe(
 				"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
@@ -762,6 +766,159 @@ describe("Validator", () => {
 					}
 
 					__print(unwrap(nothing, fallback 7))
+				}`),
+			).toEqual([])
+		})
+	})
+
+	// NOTE: Regression tests — item Types erase before a Match runs, so a List
+	// Matcher is answered by the items the value holds, and an empty List holds
+	// none. `case List<String>` therefore accepts an empty `List<Integer>`,
+	// which assignability calls impossible: the Validator reported NOTHING at
+	// all while the Program took the String arm for an Integer List.
+	describe("Empty List Overlap", () => {
+		it("should warn about the Case an empty List reaches first", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant empty: List<Integer> = []
+				constant scrutinee: List<Integer> | List<String> = empty
+
+				__print(match scrutinee -> String {
+					case List<String>  { <- "took the String arm" }
+					case List<Integer> { <- "took the Integer arm" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("empty-list-overlap")
+			// NOTE: On `case List<Integer>`, the Case that misses the empty
+			// Lists — pointing back at the Case above that takes them.
+			expect(diagnostics[0].position?.start.line).toBe(7)
+			expect(diagnostics[0].labels[1]?.position.start.line).toBe(6)
+		})
+
+		// NOTE: The Case is not dead — every List with items still reaches it —
+		// so it is neither greyed out nor reported twice.
+		it("should not tag the Case as unnecessary", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant scrutinee: List<Integer> | List<String> = [1]
+
+				__print(match scrutinee -> String {
+					case List<String>  { <- "strings" }
+					case List<Integer> { <- "integers" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].tags).toBeUndefined()
+		})
+
+		it("should stay silent where no empty List can cross over", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant scrutinee: List<Integer> | Nothing = [1]
+
+					__print(match scrutinee -> String {
+						case Nothing       { <- "nothing" }
+						case List<Integer> { <- "integers" }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Guarded Cases take nothing away from the Cases below them, so
+		// the fix the Diagnostic asks for is a Match nobody has to warn about.
+		it("should stay silent once the Cases are Guarded", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant scrutinee: List<Integer> | List<String> = [1]
+
+					__print(match scrutinee -> String {
+						case List<String> where @::hasItems()  { <- "strings" }
+						case List<Integer> where @::hasItems() { <- "integers" }
+						case _ { <- "empty" }
+					})
+				}`),
+			).toEqual([])
+		})
+	})
+
+	// NOTE: The dispatch branches of a Method Invocation on a Union-typed
+	// receiver are the Cases nobody wrote — the receiver's runtime Type picks
+	// one, and the first that fits wins, so the two ways a Case can swallow the
+	// Case below it are two ways a branch can swallow the branch below it.
+	describe("Dispatch Branches", () => {
+		it("should reject a branch a callback-typed member Type swallows", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type IntHandler = { fn: (_ n: Integer) -> Integer }
+				type StringHandler = { fn: (_ s: String) -> String }
+
+				namespace Ints for IntHandler {
+					describe() -> String {
+						<- "ints"
+					}
+				}
+
+				namespace Strings for StringHandler {
+					describe() -> String {
+						<- "strings"
+					}
+				}
+
+				constant input: IntHandler | StringHandler = {
+					fn = (_ s: String) -> String { <- s }
+				}
+
+				__print(input::describe())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
+		})
+
+		it("should warn about the branch an empty List never reaches", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace IntegerList for List<Integer> {
+					describe() -> String {
+						<- "integers"
+					}
+				}
+
+				namespace StringList for List<String> {
+					describe() -> String {
+						<- "strings"
+					}
+				}
+
+				constant items: List<Integer> | List<String> = [1]
+
+				__print(items::describe())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("empty-list-overlap")
+		})
+
+		it("should stay silent for branches a runtime check tells apart", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace IntegerList for List<Integer> {
+						describe() -> String {
+							<- "integers"
+						}
+					}
+
+					namespace Words for String {
+						describe() -> String {
+							<- "a word"
+						}
+					}
+
+					constant thing: List<Integer> | String = "hi"
+
+					__print(thing::describe())
 				}`),
 			).toEqual([])
 		})

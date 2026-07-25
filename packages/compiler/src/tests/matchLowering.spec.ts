@@ -287,15 +287,15 @@ describe("Match Lowering", () => {
 			__print(unwrap(3, fallback 7))
 		}`
 
-		it("reports the Case a Generic Case above it swallows", () => {
+		it("refuses the Case a Generic Case above it swallows", () => {
 			let diagnostics = diagnosticsOf(
 				unwrap(`case Value { <- @ }
 					case Nothing { <- fallbackValue }`),
 			)
 
 			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
 		})
 
 		it("answers with the fallback once the Generic Case is written last", async () => {
@@ -305,6 +305,49 @@ describe("Match Lowering", () => {
 						case Value { <- @ }`),
 				),
 			).toEqual(["7", "3"])
+		})
+	})
+
+	// NOTE: Regression tests — item Types erase before a Match runs, so a List
+	// Matcher asks about the items the value HOLDS. An empty List holds none
+	// and fits every List Matcher there is, so an empty `List<Integer>` takes
+	// the `case List<String>` written above it. The Program compiled without a
+	// single Diagnostic while doing it; it is a Warning now, and this pins the
+	// behaviour the Warning is about.
+	describe("Empty List Cases", () => {
+		let arms = `implementation {
+			constant empty: List<Integer> = []
+			constant scrutinee: List<Integer> | List<String> = empty
+
+			__print(match scrutinee -> String {
+				case List<String>  { <- "took the String arm" }
+				case List<Integer> { <- "took the Integer arm" }
+			})
+		}`
+
+		it("reports the Case an empty List never reaches, once", () => {
+			let diagnostics = diagnosticsOf(arms)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("empty-list-overlap")
+		})
+
+		it("takes the first List Case for the empty List", async () => {
+			expect(await run(arms)).toEqual(['"took the String arm"'])
+		})
+
+		it("takes the Case its items belong to for every other List", async () => {
+			expect(
+				await run(`implementation {
+					constant scrutinee: List<Integer> | List<String> = [1, 2]
+
+					__print(match scrutinee -> String {
+						case List<String>  { <- "took the String arm" }
+						case List<Integer> { <- "took the Integer arm" }
+					})
+				}`),
+			).toEqual(['"took the Integer arm"'])
 		})
 	})
 })
