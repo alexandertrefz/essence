@@ -107,6 +107,65 @@ Error: { x: Integer, y: Integer } has no member 'z'
 "
 `;
 
+exports[`Diagnostic Showcase Documentation.es should render the same report every time 1`] = `
+"[missing-documentation-separator]
+Warning: This '@param' tag is not separated from its text
+   ╭─┤ Documentation.es:7:20 │
+   │
+ 7 │     §§ @param subject who to greet
+   │                       ──────┬─────  
+   │                             ╰─────── an em-dash belongs here
+   │ 
+   │ Help: Write '@param subject —' before the text.
+   │ 
+   │ Note 1: A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.
+   │ Note 2: The text is lifted into the Documentation either way; what is missing is the separator, not the description.
+───╯
+
+[missing-documentation-separator]
+Warning: This '@returns' tag is not separated from its text
+   ╭─┤ Documentation.es:8:14 │
+   │
+ 8 │     §§ @returns the finished greeting
+   │                 ──────────┬──────────  
+   │                           ╰──────────── an em-dash belongs here
+   │ 
+   │ Help: Write '@returns —' before the text.
+   │ 
+   │ Note 1: A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.
+   │ Note 2: The text is lifted into the Documentation either way; what is missing is the separator, not the description.
+───╯
+
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
+    ╭─┤ Documentation.es:15:12 │
+    │
+ 15 │     §§ @param lft — the text to put first
+    │               ─┬─  
+    │                ╰─── no Parameter is named 'lft'
+    │ 
+    │ Help: Did you mean 'left'?
+    │ 
+    │ Note: A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.
+────╯
+
+[unknown-documentation-parameter]
+Warning: This '@param' names a Parameter that does not exist
+    ╭─┤ Documentation.es:24:12 │
+    │
+ 24 │     §§ @param subject — who to greet
+    │               ───┬───  
+    │                  ╰───── what this documents takes no Parameters
+    │ 
+    │ Help: Remove the tag — there is no Parameter for it to describe.
+    │ 
+    │ Note: A '§§' block documents whatever is declared below it. A '@param' belongs above something that takes Parameters — a Function, a Method, or a Declaration holding a Function literal.
+────╯
+
+─── 4 warnings
+"
+`;
+
 exports[`Diagnostic Showcase GenericChoice.es should render the same report every time 1`] = `
 "[wrong-type-argument-count]
 Error: Type 'Step' was given the wrong number of Type Arguments

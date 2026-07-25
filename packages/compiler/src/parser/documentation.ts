@@ -28,6 +28,11 @@ const tagPattern = /^@(param|returns)\b[ \t]*(.*)$/
 
 const namePattern = /^([^ \t—]*)(.*)$/
 
+// NOTE: The one piece of Markdown the grammar has to know. A fenced block is
+// where an `@param` is being SHOWN rather than written, and lifting it out of
+// the prose leaves the fence unclosed and invents a Parameter nobody declared.
+const fencePattern = /^\s*(?:```|~~~)/
+
 // NOTE: A `§§` Comment paired with the span it occupies, so that a Diagnostic
 // about one tag can underline that tag rather than the whole block.
 export type DocumentationLine = {
@@ -53,17 +58,32 @@ export function parseDocumentation(
 	position: common.Position,
 ): ParsedDocumentation {
 	let description: Array<string> = []
-	let parameters: Record<string, Array<string>> = {}
-	let parameterTags: Record<string, { position: common.Position }> = {}
+	// NOTE: Maps rather than Objects, because a Parameter may perfectly well be
+	// named after a member of `Object.prototype` — `toString`, `constructor`,
+	// `valueOf`. Looked up in an Object literal, `@param toString` finds the
+	// inherited function instead of nothing, and the section its text is
+	// appended to becomes that function. They are drained through
+	// `Object.fromEntries`, which defines rather than assigns, so what is handed
+	// out is an ordinary Object even for a Parameter named `__proto__`.
+	let parameters = new Map<string, Array<string>>()
+	let parameterTags = new Map<string, { position: common.Position }>()
 	let returns: Array<string> | null = null
 	let problems: Array<DocumentationProblem> = []
+	let fenced = false
 	// NOTE: Lines following a tag continue it until the next tag starts, so a
 	// Parameter can be described across as many lines as it needs.
 	let section = description
 
 	for (let line of lines) {
 		let body = stripPrefix(line.text)
-		let tag = tagPattern.exec(body)
+
+		if (fencePattern.test(body)) {
+			fenced = !fenced
+			section.push(body)
+			continue
+		}
+
+		let tag = fenced ? null : tagPattern.exec(body)
 
 		if (tag === null) {
 			section.push(body)
@@ -84,11 +104,20 @@ export function parseDocumentation(
 			}
 
 			parameterName = tagged
-			parameters[parameterName] ??= []
-			parameterTags[parameterName] ??= {
-				position: spanIn(line, rest, tagged.length),
+
+			let texts = parameters.get(parameterName)
+
+			// NOTE: A name written twice continues the section it opened, and
+			// keeps the Position of the tag that opened it.
+			if (texts === undefined) {
+				texts = []
+				parameters.set(parameterName, texts)
+				parameterTags.set(parameterName, {
+					position: spanIn(line, rest, tagged.length),
+				})
 			}
-			section = parameters[parameterName]
+
+			section = texts
 			rest = afterName
 		} else {
 			returns = []
@@ -117,7 +146,7 @@ export function parseDocumentation(
 		documentation: {
 			description: joinSection(description),
 			parameters: Object.fromEntries(
-				Object.entries(parameters).map(([name, text]) => [
+				[...parameters].map(([name, text]) => [
 					name,
 					joinSection(text),
 				]),
@@ -127,9 +156,9 @@ export function parseDocumentation(
 			// NOTE: Left off entirely when the block writes no `@param`, so
 			// that the overwhelming majority of Documentation carries no empty
 			// Record around with it.
-			...(Object.keys(parameterTags).length === 0
+			...(parameterTags.size === 0
 				? {}
-				: { parameterTags }),
+				: { parameterTags: Object.fromEntries(parameterTags) }),
 		},
 		problems,
 	}

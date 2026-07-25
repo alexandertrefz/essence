@@ -204,6 +204,54 @@ describe("Documentation", () => {
 		).not.toHaveProperty("parameterTags")
 	})
 
+	it("should take a Parameter named after a member of Object.prototype", () => {
+		// NOTE: Read out of an Object literal rather than a Map, '@param
+		// toString' finds the inherited function and the Parser dies on it —
+		// taking `esfmt` and the Language Server down with it.
+		let documentation = parse([
+			"§§ @param toString — what to append",
+			"§§ @param constructor — and this",
+			"§§ @param __proto__ — and this too",
+		])
+
+		// NOTE: Compared as entries, because writing `__proto__` in the
+		// expected literal would set its prototype rather than name a key —
+		// the same hazard on the reading side that this is here to pin.
+		expect(Object.entries(documentation.parameters)).toEqual([
+			["toString", "what to append"],
+			["constructor", "and this"],
+			["__proto__", "and this too"],
+		])
+		expect(Object.keys(documentation.parameterTags ?? {})).toEqual([
+			"toString",
+			"constructor",
+			"__proto__",
+		])
+	})
+
+	it("should leave a tag inside a fenced code block in the prose", () => {
+		// NOTE: A fence is where a tag is being SHOWN rather than written.
+		// Lifting it invents a Parameter and leaves the fence unclosed.
+		let documentation = parse([
+			"§§ Shows how to document:",
+			"§§",
+			"§§ ```",
+			"§§ @param x — the thing",
+			"§§ ```",
+			"§§",
+			"§§ @returns — the greeting",
+		])
+
+		expect(documentation.parameters).toEqual({})
+		expect(documentation.returns).toBe("the greeting")
+		expect(documentation.description).toBe(
+			"Shows how to document:\n\n```\n@param x — the thing\n```",
+		)
+		expect(
+			problemsOf(["§§ ```", "§§ @param x the thing", "§§ ```"]),
+		).toEqual([])
+	})
+
 	it("should trim the blank lines around a section but not inside it", () => {
 		let documentation = parse(["§§", "§§ First.", "§§", "§§ Second.", "§§"])
 

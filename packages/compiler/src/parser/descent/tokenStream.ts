@@ -137,7 +137,7 @@ function reportMissingSeparator(problem: DocumentationProblem): void {
 			labels: [primary(problem.position, "an em-dash belongs here")],
 			notes: [
 				"A tag carrying its text on its own line separates the two with an em-dash — that is where the description begins, and how an Editor renders the tag back. A tag that leaves its text to the lines below it needs no separator.",
-				"The text is lifted onto the Parameter either way; what is missing is the separator, not the description.",
+				"The text is lifted into the Documentation either way; what is missing is the separator, not the description.",
 			],
 			helps: [`Write '${head} —' before the text.`],
 		},

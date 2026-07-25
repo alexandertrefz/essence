@@ -1,6 +1,12 @@
 import type { common, enricher, parser } from "@essence/interfaces"
 
-import { collectDiagnostics, primary, reportError } from "../diagnostics/index"
+import {
+	collectDiagnostics,
+	containsErrors,
+	primary,
+	report,
+	reportError,
+} from "../diagnostics/index"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
@@ -256,10 +262,27 @@ function hoistDeclarations(
 						? scope.protocols
 						: scope.members
 
+			// NOTE: Errors are what disqualify a speculative resolution —
+			// a Declaration that could not be typed yet is one to retry in a
+			// later round, once whatever it names has been hoisted. A Warning
+			// says nothing about whether the Type resolved, and rejecting on
+			// one would let a Warning about the Documentation above a Function
+			// keep that Function out of Scope, so every call ABOVE it would
+			// report `unknown-name` — a typo in a Comment breaking the Program
+			// underneath it.
+			//
+			// The Warnings the kept reading found are reported here, since a
+			// hoisted Type is reused rather than resolved a second time and
+			// they would otherwise be dropped with the collection. `report`
+			// deduplicates, so the paths that DO resolve again cost nothing.
 			if (
-				speculation.diagnostics.length === 0 &&
+				!containsErrors(speculation.diagnostics) &&
 				targetMap[node.name.content] == null
 			) {
+				for (let diagnostic of speculation.diagnostics) {
+					report(diagnostic)
+				}
+
 				targetMap[node.name.content] = speculation.result
 
 				if (

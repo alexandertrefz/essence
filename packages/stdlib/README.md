@@ -227,9 +227,18 @@ guards two files, but it is a floor, not a substitute for measuring.
 - **Wrap Documentation lines only where the text should wrap.** The lines of a
   `§§` block are joined with a newline, so re-flowing a description to fit the
   margin changes the string an Editor renders.
+- **A tag carrying its text on its own line separates the two with an
+  em-dash.** `@param other — the String to add`, `@returns — the joined
+  String`. A tag head alone takes its text from the lines below it and needs no
+  separator; one that runs its text on without either is reported as
+  `missing-documentation-separator`, and still lifted.
 - **A `@param` is matched against the Parameter's external and then internal
-  name.** One naming neither attaches to nothing and is rendered into every
-  Hover regardless.
+  name.** One naming neither attaches to nothing, and is rendered into every
+  Hover regardless — a description of a Parameter the reader cannot find. It is
+  now reported as `unknown-documentation-parameter`, which is what caught
+  `split(intoGroupsOf size:)` being documented as `@param groupsOf`. A
+  `§§` block above an `overload` keyword may name a Parameter of any Overload
+  in the set.
 - **Every Method of a Namespace answers for the Namespace's target Type.**
   There is no per-Method receiver, and a Method that only some values of the
   target Type can answer does not belong there. Reach for a **bounded Method

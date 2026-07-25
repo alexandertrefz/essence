@@ -16,10 +16,28 @@ implementation {
 	§§
 	§§ Supports **Markdown** — the text reaches the Editor unchanged.
 	§§
+	§§ A tag carrying its text on its own line separates the two with an
+	§§ em-dash, which is where the description begins and how an Editor renders
+	§§ the tag back.
+	§§
 	§§ @param subject — who to greet
 	§§ @returns — the finished greeting
 	function greet(subject: String) -> String {
 		<- "Hello, "::append(subject)::append("!")
+	}
+
+	§§ Leaves the description of each tag to the lines below it, which is the
+	§§ other way to write one — a tag head alone needs no separator, and the
+	§§ lines under it run on until the next tag starts.
+	§§
+	§§ @param first
+	§§ the greeting to say first
+	§§ @param second
+	§§ the greeting to say after it
+	§§ @returns
+	§§ both greetings, one after the other
+	function greetTwice(first: String, second: String) -> String {
+		<- first::append(" ")::append(second)
 	}
 
 	§ An ordinary Comment stays a private note. Nothing below it is
@@ -80,6 +98,7 @@ implementation {
 	}
 
 	__print(greet(subject defaultSubject))
+	__print(greetTwice(first "Hello!", second "Hello again!"))
 	__print(shout("Look"))
 	__print(join(left "Hello, ", right "Essence!"))
 	__print(1::combine(2)::text())
