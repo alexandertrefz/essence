@@ -10,11 +10,10 @@ import { fileURLToPath } from "node:url"
 // read from source because a union of string literals leaves nothing behind
 // at runtime to iterate.
 
-// NOTE: The documentation is the one thing this spec reads that no package
-// owns yet — `docs/` is still a Jekyll site at the repository root. This hop
-// goes away when the documentation gets a package of its own and this spec
-// moves into it; until then it is the only path here that counts directories.
-const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
+// NOTE: This spec lives in the documentation's own package, beside the file it
+// holds to account — so the page is a sibling rather than something reached for
+// across the repository, and moving the site means moving them together.
+const DIAGNOSTICS_PAGE = path.resolve(import.meta.dirname, "../diagnostics.md")
 
 function declaredCodes(): Array<string> {
 	// NOTE: Asked of the module resolver rather than counted out in `../`s.
@@ -36,10 +35,7 @@ function declaredCodes(): Array<string> {
 }
 
 function documentedCodes(): Array<string> {
-	let documentation = readFileSync(
-		path.join(REPOSITORY_ROOT, "docs", "diagnostics.md"),
-		"utf8",
-	)
+	let documentation = readFileSync(DIAGNOSTICS_PAGE, "utf8")
 
 	return [...documentation.matchAll(/^### `([^`]+)`$/gm)].map(
 		(match) => match[1],

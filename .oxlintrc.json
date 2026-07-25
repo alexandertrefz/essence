@@ -17,6 +17,6 @@
 		"packages/runtime/src/natives.generated.ts",
 		"packages/escodegen/**",
 		"packages/fixtures/files/**",
-		"docs/**"
+		"packages/website/**"
 	]
 }

@@ -1,0 +1,54 @@
+# NOTE: The site used to be served straight off `master` by GitHub Pages'
+# "deploy from a branch" mode, which can only publish the repository root or a
+# directory called `docs/`. The site is `packages/website/` now, which is
+# neither, so it is built and deployed here instead. The published URLs are
+# unchanged — the pages kept their names, only the directory holding them moved.
+#
+# NOTE: This needs Settings → Pages → Source set to "GitHub Actions". It is a
+# one-time change in the repository's settings, and until it is made this
+# workflow builds and deploys nothing.
+name: Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "packages/website/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# NOTE: What `deploy-pages` needs, and no more: read the checkout, write the
+# Pages deployment, and mint the token that authenticates it.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# NOTE: One deployment at a time, and a push that lands mid-run wins rather than
+# queues — but `cancel-in-progress` is false so a deploy already talking to
+# Pages is never interrupted half-way.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./packages/website
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -107,6 +107,13 @@
         "@essence/language-server": "workspace:*",
       },
     },
+    "packages/website": {
+      "name": "@essence/website",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@essence/interfaces": "workspace:*",
+      },
+    },
   },
   "trustedDependencies": [
     "esbuild",
@@ -179,6 +186,8 @@
     "@essence/runtime": ["@essence/runtime@workspace:packages/runtime"],
 
     "@essence/stdlib": ["@essence/stdlib@workspace:packages/stdlib"],
+
+    "@essence/website": ["@essence/website@workspace:packages/website"],
 
     "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.59.0", "", { "os": "android", "cpu": "arm" }, "sha512-bNTnfbuG7sAwb2PakMNaDukx5kXeW9duXOBeWtTOiLz3fXz3q2DlWguufPZ+c2IHEVrRXHD+M4aUgEWm841LDA=="],
 
