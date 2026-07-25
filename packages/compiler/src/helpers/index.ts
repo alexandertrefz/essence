@@ -207,6 +207,19 @@ export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}__overload$${index + 1}`
 }
 
+// NOTE: The hidden trailing Parameter a Protocol-bounded Type Parameter adds to
+// an emitted Function, and the name a call site inside that Function forwards
+// as its own witness. Four stages spell it — the Enricher when it solves a
+// witness, the Simplifier when it emits the Parameter, the Validator when it
+// checks that the one resolves to the other, and the native-table generator —
+// and a Program only runs while all four agree, so they say it once.
+//
+// NOTE: `_` is a Symbol to the Lexer, so no user identifier can contain one and
+// this name can not collide with anything written in a Program.
+export function conformanceParameterName(genericName: string): string {
+	return `${genericName}__conformance`
+}
+
 // NOTE: Whether every path through a body reaches a `<-`. Two stages need the
 // same answer and must never disagree: the Validator refuses a body that
 // promises a value and can fall off its end, and the Simplifier gives the

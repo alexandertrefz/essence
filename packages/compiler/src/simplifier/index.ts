@@ -2,6 +2,7 @@ import type { common } from "@essence/interfaces"
 
 import {
 	bodyDefinitelyReturns,
+	conformanceParameterName,
 	resolveOverloadedMethodName,
 } from "../helpers/index"
 
@@ -830,7 +831,7 @@ function simplifyFunctionDefinition(
 				externalName: null,
 				internalName: {
 					nodeType: "Identifier",
-					name: `${generic.name}__conformance`,
+					name: conformanceParameterName(generic.name),
 					type: { type: "Unknown" },
 				},
 			}))
