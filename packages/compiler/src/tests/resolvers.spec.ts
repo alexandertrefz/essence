@@ -449,19 +449,21 @@ describe("Resolvers", () => {
 		})
 
 		// NOTE: This one used to compile clean and die reading `compareTo` off
-		// `undefined` — the Variable's declared Type stays `List<Unknown>`, so
-		// the items the Program actually sorts are Lists of Integers whose
-		// witness was never curried.
-		it("should report it for a Variable that was only assigned later", () => {
+		// `undefined` — the items the Program actually sorted were Lists of
+		// Integers whose witness was never curried. The assignment now DECIDES
+		// the Variable's item Type, so the receiver is a List of Lists of
+		// Integers by the time the witness is solved and there is nothing left
+		// unpinned to report.
+		it("should sort a Variable that was only assigned later", async () => {
 			expect(
-				codesFor(`implementation {
+				await run(`implementation {
 					variable items = []
 
 					items = [1, 2]
 
 					__print([items, items]::sort())
 				}`),
-			).toEqual(["unsatisfied-conformance-condition"])
+			).toEqual(["[ [ 1, 2 ], [ 1, 2 ] ]"])
 		})
 
 		it("should keep sorting Lists one of which pins the item Type", async () => {
