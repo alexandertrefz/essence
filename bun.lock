@@ -26,7 +26,7 @@
         "@essence/ariadne": "workspace:*",
         "bigint-fraction": "1.0.6",
         "esbuild": "0.28.1",
-        "escodegen": "alexandertrefz/escodegen#b4cb6d12aa3eb4082d001e0900ec30379ee79a63",
+        "escodegen": "workspace:*",
         "vscode-languageserver": "10.1.0",
         "vscode-languageserver-textdocument": "1.0.12",
       },
@@ -34,6 +34,17 @@
         "@essence/fixtures": "workspace:*",
         "@types/escodegen": "0.0.10",
         "@types/estree": "1.0.9",
+      },
+    },
+    "packages/escodegen": {
+      "name": "escodegen",
+      "version": "2.1.0-essence.1",
+      "dependencies": {
+        "estraverse": "^5.2.0",
+        "esutils": "^2.0.2",
+      },
+      "optionalDependencies": {
+        "source-map": "~0.6.1",
       },
     },
     "packages/fixtures": {
@@ -233,9 +244,7 @@
 
     "esbuild": ["esbuild@0.28.1", "", { "optionalDependencies": { "@esbuild/aix-ppc64": "0.28.1", "@esbuild/android-arm": "0.28.1", "@esbuild/android-arm64": "0.28.1", "@esbuild/android-x64": "0.28.1", "@esbuild/darwin-arm64": "0.28.1", "@esbuild/darwin-x64": "0.28.1", "@esbuild/freebsd-arm64": "0.28.1", "@esbuild/freebsd-x64": "0.28.1", "@esbuild/linux-arm": "0.28.1", "@esbuild/linux-arm64": "0.28.1", "@esbuild/linux-ia32": "0.28.1", "@esbuild/linux-loong64": "0.28.1", "@esbuild/linux-mips64el": "0.28.1", "@esbuild/linux-ppc64": "0.28.1", "@esbuild/linux-riscv64": "0.28.1", "@esbuild/linux-s390x": "0.28.1", "@esbuild/linux-x64": "0.28.1", "@esbuild/netbsd-arm64": "0.28.1", "@esbuild/netbsd-x64": "0.28.1", "@esbuild/openbsd-arm64": "0.28.1", "@esbuild/openbsd-x64": "0.28.1", "@esbuild/openharmony-arm64": "0.28.1", "@esbuild/sunos-x64": "0.28.1", "@esbuild/win32-arm64": "0.28.1", "@esbuild/win32-ia32": "0.28.1", "@esbuild/win32-x64": "0.28.1" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw=="],
 
-    "escodegen": ["escodegen@github:alexandertrefz/escodegen#b4cb6d1", { "dependencies": { "esprima": "^4.0.1", "estraverse": "^5.2.0", "esutils": "^2.0.2" }, "optionalDependencies": { "source-map": "~0.6.1" }, "bin": { "esgenerate": "./bin/esgenerate.js", "escodegen": "./bin/escodegen.js" } }, "alexandertrefz-escodegen-b4cb6d1", "sha512-Hxn7ZQOGR/7M1HvPeLZz4BurI8ygIpMa4OtWPoJUof90glsubj5hrRQeL2fddgxlVitF+9vNdRGvtjmlpjhcJw=="],
-
-    "esprima": ["esprima@4.0.1", "", { "bin": { "esparse": "./bin/esparse.js", "esvalidate": "./bin/esvalidate.js" } }, "sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A=="],
+    "escodegen": ["escodegen@workspace:packages/escodegen"],
 
     "estraverse": ["estraverse@5.3.0", "", {}, "sha512-MMdARuVEQziNTeJD8DgMqmhwR11BRQ/cBP+pLtYdSTnf3MIO8fFeiINEbX36ZdNlfU/7A9f3gUw49B3oQsvwBA=="],
 

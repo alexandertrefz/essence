@@ -99,6 +99,47 @@ function hasCode(
 }
 
 describe("Code Generation", () => {
+	// NOTE: A Namespace's static Property is the one node the code generator
+	// cannot emit on its own. `escodegen` has no `PropertyDefinition` case
+	// upstream and throws on a node type it does not know, so the vendored copy
+	// in `packages/escodegen` carries a twelve-line patch that adds one — see
+	// its `PATCHES.md`. Nothing else in this suite reaches that node: a
+	// Namespace's Methods are `MethodDefinition`s, which upstream handles, so
+	// the whole suite stays green with the patch removed and every Program with
+	// a `static` Property fails at `esc build` with an opaque
+	// "this[type] is not a function". While the patch was pinned by commit SHA
+	// that could not silently happen; vendored, it is a file someone can
+	// re-vendor over, so it needs a test that goes red when they do.
+	describe("a Namespace's static Property", () => {
+		it("emits a class field", () => {
+			let generated = generate(`
+				implementation {
+					namespace Config {
+						static version = "1.0"
+					}
+
+					__print(Config.version)
+				}
+			`)
+
+			expect(generated).toContain("static version =")
+		})
+
+		it("reads back the value at runtime", async () => {
+			expect(
+				await run(`
+					implementation {
+						namespace Config {
+							static version = "1.0"
+						}
+
+						__print(Config.version)
+					}
+				`),
+			).toEqual(['"1.0"'])
+		})
+	})
+
 	// NOTE: `__print` migrated from a TypeScript table to `src/stdlib/Print.es`
 	// as an ordinary native free Function. Its emission is a read off the runtime
 	// `functions` module under its OWN name now — the `__` prefix used to be
