@@ -24,7 +24,8 @@
 	],
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
-		"build:server": "bun build ../essence/src/lsp/serverEntry.ts --target=node --format=esm --outfile=server/server.js",
+		"build:server": "bun build ../language-server/src/serverEntry.ts --target=node --format=esm --outfile=server/server.js && bun run copy:stdlib",
+		"copy:stdlib": "rm -rf server/stdlib && cp -R ../stdlib/sources server/stdlib",
 		"build:extension": "bun build extension.js --target=node --format=esm --external vscode --outfile=dist/extension.js",
 		"package": "bun run build && bunx @vscode/vsce package"
 	},
@@ -61,7 +62,7 @@
 				"essence.server.path": {
 					"type": "string",
 					"default": "",
-					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else — a `.ts` entry point, or the compiler's `bin/esls` — is run with `bun`. Useful for developing against a compiler checkout without rebuilding the bundle."
+					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else \u2014 a `.ts` entry point, or the compiler's `bin/esls` \u2014 is run with `bun`. Useful for developing against a compiler checkout without rebuilding the bundle."
 				},
 				"essence.trace.server": {
 					"type": "string",
@@ -84,5 +85,8 @@
 	},
 	"dependencies": {
 		"vscode-languageclient": "9.0.1"
+	},
+	"devDependencies": {
+		"@essence/language-server": "workspace:*"
 	}
 }

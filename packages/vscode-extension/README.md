@@ -61,30 +61,33 @@ VS Code.
 
 ## Development
 
-The Language Server lives in the [compiler
-repository](https://github.com/atrefz/essence) and is bundled into this one.
-Check both out side by side:
+The extension is one package of the [Essence
+monorepo](https://github.com/atrefz/essence). The Language Server it bundles is
+another, `@essence/language-server`, a few directories away:
 
 ```
-Projects/
-  essence/            ← the compiler, containing src/lsp
-  vscode-extension/   ← this repository
+essence/
+  packages/
+    language-server/    ← what `build:server` bundles
+    compiler/
+    vscode-extension/   ← this package
 ```
 
-Then build the server bundle and launch the extension:
+From the repository root, `bun install` links the whole workspace. Then, here:
 
 ```sh
-bun install
-bun run build      # bundles ../essence into server/server.js
+bun run build      # bundles @essence/language-server into server/server.js
 ```
 
 Press `F5` ("Extension") to open an Extension Development Host.
 
 `server/server.js` is generated and not committed — rebuild it after changing
-the compiler. To skip the bundling step entirely while working on the server,
-point `essence.server.path` at the compiler's `bin/esls`: a built `.js` bundle
-is run with Node, and anything else is treated as source and run with Bun.
-`Essence: Restart Language Server` picks up a change without reloading the
+the Language Server. To skip the bundling step entirely while working on the
+server, point `essence.server.path` at `packages/language-server/bin/esls`: a
+built `.js` bundle is run with Node, and anything else is treated as source and
+run with Bun. That is the better loop of the two — `esls` runs the server's
+TypeScript directly, so a change needs no rebuild at all, just
+`Essence: Restart Language Server`, which picks it up without reloading the
 window.
 
 ## Packaging
