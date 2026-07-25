@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
+import type { common } from "@essence/interfaces"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"
@@ -13,7 +14,6 @@ import {
 	loadStdlibFrom,
 	parseStdlibSource,
 } from "../enricher/stdlib"
-import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {

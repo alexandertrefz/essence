@@ -8,9 +8,9 @@ import {
 	Report,
 	Source,
 } from "@essence/ariadne"
+import type { common } from "@essence/interfaces"
 
 import { countOf } from "../helpers/index"
-import type { common } from "../interfaces/index"
 
 export interface RenderOptions {
 	color?: boolean

@@ -1,4 +1,4 @@
-import type { enricher } from "../interfaces/index"
+import type { enricher } from "@essence/interfaces"
 
 // NOTE: A Scope map with NO prototype — `Object.create(null)` rather than `{}`.
 // The maps are keyed by names a Program writes, and `{}` inherits

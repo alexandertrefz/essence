@@ -1,8 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
+import type { common } from "@essence/interfaces"
+
 import { placelessDiagnostic } from "../diagnostics/index"
-import type { common } from "../interfaces/index"
 
 // NOTE: The Rewriter emits a module whose imports of the Essence runtime are
 // absolute paths into `src/rewriter/__internal`. Bundling resolves and inlines

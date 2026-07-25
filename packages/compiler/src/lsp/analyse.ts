@@ -1,6 +1,7 @@
+import type { common } from "@essence/interfaces"
+
 import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
 import { enrichDocument, parseDocument } from "../documents"
-import type { common } from "../interfaces/index"
 import { validate } from "../validator/index"
 
 // NOTE: The pipeline stages are fault-tolerant, so parsing and enrichment

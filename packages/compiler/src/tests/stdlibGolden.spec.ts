@@ -4,12 +4,12 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
+import type { common } from "@essence/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { derivedEquatableNamespace } from "../enricher/resolvers"
 import { loadStdlib } from "../enricher/stdlib"
-import type { common } from "../interfaces/index"
 import { printSignature, signaturesOf } from "../lsp/printType"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"

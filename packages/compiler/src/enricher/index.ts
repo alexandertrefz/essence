@@ -1,5 +1,6 @@
+import type { common, enricher, parser } from "@essence/interfaces"
+
 import { collectDiagnostics, primary, reportError } from "../diagnostics/index"
-import type { common, enricher, parser } from "../interfaces/index"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {

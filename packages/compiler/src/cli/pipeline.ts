@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises"
 import { gzipSync } from "node:zlib"
 
+import type { common } from "@essence/interfaces"
+
 import { bundle, writeOutputs } from "../bundler/index"
 import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
 import { enrichDocument, parseDocument } from "../documents"
-import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"

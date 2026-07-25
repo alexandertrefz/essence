@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util"
 
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
 
 // NOTE: The active Diagnostic list is module state so that the Enricher and
 // Validator do not have to thread a collector through every function. Both

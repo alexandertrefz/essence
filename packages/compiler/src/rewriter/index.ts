@@ -1,10 +1,10 @@
 import * as path from "node:path"
 
+import type { common } from "@essence/interfaces"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
-import type { common } from "../interfaces/index"
 import {
 	essenceMethodIdentifier,
 	essenceMethodName,

@@ -1,9 +1,10 @@
 import { writeFileSync } from "node:fs"
 import path from "node:path"
 
+import type { common } from "@essence/interfaces"
+
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
-import type { common } from "../interfaces/index"
 
 // NOTE: The renderer that turns the loaded standard library into a checked-in
 // TypeScript contract for the runtime bindings — `src/rewriter/__internal/*.ts`.

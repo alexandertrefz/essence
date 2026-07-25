@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common, enricher } from "@essence/interfaces"
+
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
 import { enrichPrograms } from "../enricher/index"
 import { primitiveTypes } from "../enricher/primitives"
@@ -9,7 +11,6 @@ import {
 	parseStdlibSource,
 	type Stdlib,
 } from "../enricher/stdlib"
-import type { common, enricher } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"

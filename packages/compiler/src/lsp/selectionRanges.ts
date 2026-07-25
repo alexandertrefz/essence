@@ -1,4 +1,5 @@
-import type { common, parser } from "../interfaces/index"
+import type { common, parser } from "@essence/interfaces"
+
 import { contains } from "./positions"
 
 // NOTE: "Expand selection" wants the chain of ever-larger constructs

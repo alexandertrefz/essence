@@ -1,6 +1,6 @@
+import type { common } from "@essence/interfaces"
 import type { Fraction } from "bigint-fraction"
 
-import type { common } from "../../interfaces/index"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { Source } from "@essence/ariadne"
+import type { common } from "@essence/interfaces"
 
 import { primary } from "../diagnostics/index"
 import { renderDiagnostic, renderDiagnostics } from "../diagnostics/render"
-import type { common } from "../interfaces/index"
 import { testDiagnostic } from "./diagnosticFactory"
 
 function removeTrailing(text: string): string {

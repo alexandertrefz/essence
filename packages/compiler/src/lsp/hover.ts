@@ -1,5 +1,6 @@
+import type { common, parser } from "@essence/interfaces"
+
 import { builtinProtocols } from "../enricher/builtins"
-import type { common, parser } from "../interfaces/index"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
 import {

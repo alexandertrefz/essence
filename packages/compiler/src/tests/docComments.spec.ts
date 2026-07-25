@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence/interfaces"
+
 import { enrich } from "../enricher/index"
-import type { common } from "../interfaces/index"
 import { findCompletions } from "../lsp/completion"
 import { findHover } from "../lsp/hover"
 import { findSignatureHelp } from "../lsp/signatureHelp"

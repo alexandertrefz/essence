@@ -1,5 +1,24 @@
 import { describe, expect, it } from "bun:test"
 
+import { lexer } from "@essence/interfaces"
+import type {
+	ErrorType,
+	FunctionType,
+	GenericUse,
+	ListType,
+	MethodType,
+	NamespaceType,
+	OverloadedMethodType,
+	OverloadedStaticMethodType,
+	PrimitiveType,
+	ProtocolType,
+	RecordType,
+	StaticMethodType,
+	Type,
+	UnionType,
+	UnknownType,
+} from "@essence/interfaces/common"
+
 import {
 	applyGenericBindings,
 	buildUnion,
@@ -17,24 +36,6 @@ import {
 	symbol,
 	third,
 } from "../helpers/index"
-import type {
-	ErrorType,
-	FunctionType,
-	GenericUse,
-	ListType,
-	MethodType,
-	NamespaceType,
-	OverloadedMethodType,
-	OverloadedStaticMethodType,
-	PrimitiveType,
-	ProtocolType,
-	RecordType,
-	StaticMethodType,
-	Type,
-	UnionType,
-	UnknownType,
-} from "../interfaces/common/index"
-import { lexer } from "../interfaces/index"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token

@@ -1,6 +1,7 @@
+import type { common } from "@essence/interfaces"
+
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
-import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { simplify } from "../simplifier/index"
 

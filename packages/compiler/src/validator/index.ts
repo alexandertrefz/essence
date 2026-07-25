@@ -1,3 +1,5 @@
+import type { common } from "@essence/interfaces"
+
 import {
 	collectDiagnostics,
 	primary,
@@ -17,7 +19,6 @@ import {
 	matchesType,
 	withArticle,
 } from "../helpers/index"
-import type { common } from "../interfaces/index"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 

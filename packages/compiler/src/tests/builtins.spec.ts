@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence/interfaces"
+
 import { builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
-import type { common } from "../interfaces/index"
 import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as caseModule from "../rewriter/__internal/Case"

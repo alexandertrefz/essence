@@ -1,4 +1,4 @@
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
 
 // NOTE: `common.Diagnostic` requires a code, a labelled span and explicit
 // notes and helps — deliberately, so that no Diagnostic in the Compiler can

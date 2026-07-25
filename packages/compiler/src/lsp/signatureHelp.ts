@@ -1,5 +1,6 @@
+import type { common } from "@essence/interfaces"
+
 import { enrichDocument, parseDocument } from "../documents"
-import type { common } from "../interfaces/index"
 import { describe, documentationOf } from "./documentation"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isSmaller } from "./positions"

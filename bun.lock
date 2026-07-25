@@ -24,6 +24,7 @@
       },
       "dependencies": {
         "@essence/ariadne": "workspace:*",
+        "@essence/interfaces": "workspace:*",
         "bigint-fraction": "1.0.6",
         "esbuild": "0.28.1",
         "escodegen": "workspace:*",
@@ -49,6 +50,10 @@
     },
     "packages/fixtures": {
       "name": "@essence/fixtures",
+      "version": "0.0.1",
+    },
+    "packages/interfaces": {
+      "name": "@essence/interfaces",
       "version": "0.0.1",
     },
   },
@@ -113,6 +118,8 @@
     "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
 
     "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
+
+    "@essence/interfaces": ["@essence/interfaces@workspace:packages/interfaces"],
 
     "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.59.0", "", { "os": "android", "cpu": "arm" }, "sha512-bNTnfbuG7sAwb2PakMNaDukx5kXeW9duXOBeWtTOiLz3fXz3q2DlWguufPZ+c2IHEVrRXHD+M4aUgEWm841LDA=="],
 

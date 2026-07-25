@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
+import type { common, enricher, parser } from "@essence/interfaces"
+
 import { renderDiagnostics } from "../diagnostics/render"
-import type { common, enricher, parser } from "../interfaces/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 import { builtinMemberOrder, builtinTypeOrder } from "./builtins"

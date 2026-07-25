@@ -1,7 +1,8 @@
 import * as path from "node:path"
 
+import type { common } from "@essence/interfaces"
+
 import { renderDiagnostics } from "../diagnostics/render"
-import type { common } from "../interfaces/index"
 import type { CompileOutcome, StageName } from "./pipeline"
 import type { Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"

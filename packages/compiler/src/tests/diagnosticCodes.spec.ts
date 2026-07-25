@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
 import * as path from "node:path"
+import { fileURLToPath } from "node:url"
 
 // NOTE: "Every DiagnosticCode is documented" is a completion gate, not an
 // aspiration — the code is printed in every terminal report and handed to
@@ -16,8 +17,11 @@ import * as path from "node:path"
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
 
 function declaredCodes(): Array<string> {
+	// NOTE: Asked of the module resolver rather than counted out in `../`s.
+	// The union lives in another package now, and the number of directories
+	// between here and there is not something this spec should know.
 	let source = readFileSync(
-		path.resolve(import.meta.dirname, "../interfaces/common/index.ts"),
+		fileURLToPath(import.meta.resolve("@essence/interfaces/common")),
 		"utf8",
 	)
 	let union = source.match(

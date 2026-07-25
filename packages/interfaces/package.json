@@ -1,0 +1,18 @@
+{
+	"name": "@essence/interfaces",
+	"version": "0.0.1",
+	"description": "The types every stage of the Essence compiler agrees on.",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./common": "./src/common/index.ts",
+		"./enricher": "./src/enricher.ts",
+		"./lexer": "./src/lexer.ts",
+		"./parser": "./src/parser.ts"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT"
+}

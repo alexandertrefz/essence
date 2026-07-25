@@ -1,3 +1,4 @@
+import type { common } from "@essence/interfaces"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import {
 	type CompletionItem,
@@ -20,7 +21,6 @@ import {
 
 import { enrichDocument, parseDocument } from "../documents"
 import { loadStdlib } from "../enricher/stdlib"
-import type { common } from "../interfaces/index"
 import { analyse } from "./analyse"
 import {
 	type CompletionEntry,
