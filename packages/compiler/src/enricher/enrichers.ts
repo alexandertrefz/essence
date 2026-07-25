@@ -41,6 +41,7 @@ import {
 	lookupTypeOf,
 	recordValueTypeOf,
 	parameterDocumentation,
+	reportUnknownDocumentationParameters,
 	resolveChoiceDeclarationStatementType,
 	resolveConformances,
 	resolveDeclaredType,
@@ -1148,10 +1149,25 @@ export function enrichStatement(
 	}
 }
 
+// NOTE: A Declaration takes no Parameters of its own, but the value it holds
+// may — `constant greet = (subject: String) -> …` is documented above the
+// `constant`, and a `@param` there names a Parameter of the Function below it.
+// Anything else holds no Parameters at all, and a `@param` on it describes
+// nothing.
+function heldParameters(
+	value: parser.ExpressionNode | null,
+): Array<parser.ParameterNode> {
+	return value?.nodeType === "FunctionValue" ? value.value.parameters : []
+}
+
 export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
+	reportUnknownDocumentationParameters(node.documentation, [
+		heldParameters(node.value),
+	])
+
 	// NOTE: The annotation is the value's expected Type — a bare Case in the
 	// value resolves against it before the scope scan.
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
@@ -1178,6 +1194,10 @@ export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
+	reportUnknownDocumentationParameters(node.documentation, [
+		heldParameters(node.value),
+	])
+
 	// NOTE: The annotation is the value's expected Type — a bare Case in the
 	// value resolves against it before the scope scan.
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
@@ -1251,6 +1271,10 @@ export function enrichNamespaceDefinitionStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.NamespaceType,
 ): common.typed.NamespaceDefinitionStatementNode {
+	// NOTE: The Namespace's own block. Its Methods and Properties each check
+	// their own, so this is only about a `@param` written above `namespace`.
+	reportUnknownDocumentationParameters(node.documentation, [])
+
 	function enrichProperties(
 		properties: Record<string, parser.NamespacePropertyNode>,
 		scope: enricher.Scope,
@@ -1265,6 +1289,10 @@ export function enrichNamespaceDefinitionStatement(
 			if (propertyValue.value === null) {
 				continue
 			}
+
+			reportUnknownDocumentationParameters(propertyValue.documentation, [
+				heldParameters(propertyValue.value),
+			])
 
 			let type: common.Type
 			let value: common.typed.ExpressionNode = enrichExpression(
@@ -1642,6 +1670,10 @@ export function enrichProtocolDeclarationStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.ProtocolType,
 ): common.typed.ProtocolDeclarationStatementNode {
+	// NOTE: The Protocol's own block. Each Method signature it holds checks
+	// its own as its Parameter Types are resolved.
+	reportUnknownDocumentationParameters(node.documentation, [])
+
 	let protocolType =
 		hoistedType ?? resolveProtocolDeclarationStatementType(node, scope)
 
@@ -1666,6 +1698,8 @@ export function enrichTypeAliasStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.Type,
 ): common.typed.TypeAliasStatementNode {
+	reportUnknownDocumentationParameters(node.documentation, [])
+
 	let type = hoistedType ?? resolveTypeAliasStatementType(node, scope)
 
 	if (hoistedType === undefined) {
@@ -1689,6 +1723,8 @@ export function enrichChoiceDeclarationStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.UnionType | common.GenericAliasType,
 ): common.typed.ChoiceDeclarationStatementNode {
+	reportUnknownDocumentationParameters(node.documentation, [])
+
 	let type = hoistedType ?? resolveChoiceDeclarationStatementType(node, scope)
 
 	if (hoistedType === undefined) {
@@ -4184,6 +4220,8 @@ function resolveContextualParameterTypes(
 	scope: enricher.Scope,
 	expectedFunction: common.FunctionType | null,
 ): Array<common.Parameter> {
+	reportUnknownDocumentationParameters(node.documentation, [node.parameters])
+
 	return node.parameters.map((parameter, index) => {
 		let documentation = parameterDocumentation(
 			parameter,

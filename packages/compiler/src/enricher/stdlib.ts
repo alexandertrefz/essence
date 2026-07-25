@@ -220,6 +220,10 @@ function inBuiltinOrder(
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null
+		// NOTE: Every `@param` line carries a Position of its own, for the
+		// same reason and with the same problem — it points into a file no
+		// consumer of these tables has opened.
+		delete documentation.parameterTags
 	}
 }
 

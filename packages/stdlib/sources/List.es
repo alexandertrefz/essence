@@ -609,7 +609,7 @@ declarations {
 
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§
-		§§ @param groupsOf — how many items each group holds
+		§§ @param intoGroupsOf — how many items each group holds
 		§§ @returns — the List of groups, or `Nothing` when the group size is below one.
 		split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
 
