@@ -3663,9 +3663,13 @@ function resolveUnionMethodDispatch(
 		let resolvedMethod = resolvedMethods[0]
 
 		// NOTE: One recording per member, each committed as its branch is
-		// settled. A literal Argument shared by every branch ends up typed by
-		// the LAST branch that resolved it, which is the same literal the
-		// Rewriter passes to all of them.
+		// settled — so the Invocation's own Argument Nodes, enriched once when
+		// this returns, are typed by the LAST branch that resolved them. That is
+		// a choice about the shared Nodes only: a contextually typed literal
+		// means whatever the branch it is passed to says it means, and the copy
+		// each branch keeps below is what the emitted dispatch actually hands
+		// it. The last branch's typing stands for the shared Node because it has
+		// to stand for something and every branch that cares carries its own.
 		commitContextualFunctionTypes(resolvedMethod.recording)
 
 		// NOTE: Unbound Type Parameters depend on the Arguments, which every
@@ -3688,6 +3692,11 @@ function resolveUnionMethodDispatch(
 				resolvedMethod.bindings,
 				scope,
 				node.position,
+			),
+			contextualArguments: contextualArgumentsForBranch(
+				node,
+				scope,
+				resolvedMethod.recording,
 			),
 			// NOTE: A branch resolving to a generic Choice's derived `is`/`isNot`
 			// widens the same way a direct call does — the descriptor recovered
@@ -3743,6 +3752,57 @@ function resolveUnionMethodDispatch(
 		conformances: [],
 		dispatch: orderDispatchCasesBySpecificity(dispatchCases),
 	}
+}
+
+// NOTE: The Arguments a dispatch branch needs a copy of its own — a Function
+// literal that omitted its annotations, which is the only Expression whose Type
+// the Method it is passed to decides. Each is enriched again under the branch's
+// own recording, so its Parameters are the Types THIS branch's Method declared
+// and its body resolves against them: the same `(item) { <- item::label() }`
+// compiles to a call on one Namespace's `label` for one branch and on another's
+// for the next, and the runtime hands each branch the copy that was compiled
+// for it. Nothing else in the Invocation reads its context, so nothing else is
+// copied — a literal nested inside another Argument is typed by the Function
+// IT is passed to, which no branch changes.
+//
+// NOTE: Enriching a body per branch is what lets a Diagnostic that holds for one
+// branch only be reported at all: until now a literal was compiled against one
+// Method and passed to every branch, so what its body meant to the other
+// branches was never asked. Every member of a Union must provide what is asked
+// of it, so a body that does not compile against a member's Method is an error
+// about the call. Diagnostics deduplicate, so a fault every branch shares is
+// still reported once.
+function contextualArgumentsForBranch(
+	node: parser.MethodInvocationNode,
+	scope: enricher.Scope,
+	recording: ContextualFunctionTypeRecording,
+): common.DispatchCase["contextualArguments"] {
+	let contextualArguments: common.DispatchCase["contextualArguments"] = []
+
+	for (let [index, argument] of node.arguments.entries()) {
+		if (
+			argument.value.nodeType !== "FunctionValue" ||
+			!needsContext(argument.value.value)
+		) {
+			continue
+		}
+
+		let value = withContextualFunctionTypes(recording, () =>
+			enrichExpression(argument.value, scope),
+		)
+
+		contextualArguments.push({
+			index,
+			argument: {
+				nodeType: "Argument",
+				name: argument.name ? argument.name.content : null,
+				value,
+				type: value.type,
+			},
+		})
+	}
+
+	return contextualArguments
 }
 
 // NOTE: Is `dispatchCase` the branch that has to be tried FIRST of the two —
@@ -4549,6 +4609,25 @@ function commitContextualFunctionTypes(
 
 	for (let [node, resolved] of recording) {
 		recordContextualFunctionType(node, resolved)
+	}
+}
+
+// NOTE: Enriches under a recording that is NOT the committed one — how a
+// dispatch branch builds its own typed copy of a shared Function literal, which
+// only exists as long as the copy is being built. A COPY of the recording is
+// pushed, so what the copy's own body records while it is enriched (a nested
+// Invocation's literal, resolved against the copy's Parameter Types) is dropped
+// with it rather than added to the branch recording the caller also commits.
+function withContextualFunctionTypes<Result>(
+	recording: ContextualFunctionTypeRecording,
+	work: () => Result,
+): Result {
+	probeRecordings.push(new Map(recording))
+
+	try {
+		return work()
+	} finally {
+		probeRecordings.pop()
 	}
 }
 

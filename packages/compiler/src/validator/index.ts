@@ -261,6 +261,18 @@ function validateMethodInvocation(
 	validateExpression(node.base)
 
 	if (node.dispatch !== null) {
+		// NOTE: A dispatch branch's own copy of a contextually typed Argument is
+		// a whole Expression that reaches the emitted Program, and the shared
+		// Argument walked above is a DIFFERENT compilation of the same source —
+		// so every check the shared one gets, each copy has to get too, or a
+		// fault the copies alone carry would be emitted unexamined.
+		for (let dispatchCase of node.dispatch) {
+			for (let { argument } of dispatchCase.contextualArguments) {
+				validateExpression(argument.value)
+				validateNoBoundFunctionValue(argument.value)
+			}
+		}
+
 		validateDispatchCases(node, node.dispatch)
 	}
 

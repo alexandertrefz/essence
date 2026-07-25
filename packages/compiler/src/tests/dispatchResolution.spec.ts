@@ -23,11 +23,22 @@ import { validate } from "../validator/index"
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `__print` calls run — the same harness `codeGeneration.spec.ts`
 // and `resolvers.spec.ts` use.
-async function run(source: string): Promise<Array<string>> {
+//
+// NOTE: `expectedWarnings` names the Diagnostics a Program is SUPPOSED to carry.
+// A Union of two List member Types overlaps for the empty List — the Validator
+// warns that the second branch never sees one — and a Program below is about
+// which branch's compiled Argument runs rather than about that Warning. Every
+// other Program here compiles silent, which is what the empty default asserts.
+async function run(
+	source: string,
+	expectedWarnings: Array<common.DiagnosticCode> = [],
+): Promise<Array<string>> {
 	let enriched = enrich(parse(source))
 
 	expect(enriched.diagnostics).toEqual([])
-	expect(validate(enriched.program)).toEqual([])
+	expect(
+		validate(enriched.program).map((diagnostic) => diagnostic.code),
+	).toEqual(expectedWarnings)
 
 	let javascript = rewrite(optimise(simplify(enriched.program)))
 	let directory = mkdtempSync(join(tmpdir(), "essence-dispatch-"))
@@ -102,6 +113,217 @@ describe("Dispatch and Resolution", () => {
 					__print(1::apply((item) { <- item::toString() }))
 				}`),
 			).toEqual(['"1"'])
+		})
+	})
+
+	// NOTE: Regression tests — a dispatched Invocation passes the SAME Arguments
+	// to every branch, and a Function literal that omitted its annotations was
+	// compiled once, against whichever member Type resolved last. Every other
+	// branch was then handed a body compiled for somebody else: the callback of
+	// a `List<{ a: Integer }> | List<{ b: Integer }>` map called Beta's `label`
+	// on Alpha's Records, and the Program printed "BETA" for a value that was
+	// nothing of the sort — no Diagnostic anywhere. Each branch carries its own
+	// compiled copy now, and these pin what each one does.
+	describe("Contextual Function literal Arguments in a dispatch", () => {
+		let labels = `namespace Alpha for { a: Integer } {
+				label() -> String {
+					<- "ALPHA"
+				}
+			}
+
+			namespace Beta for { b: Integer } {
+				label() -> String {
+					<- "BETA"
+				}
+			}`
+
+		it("compiles the literal against the branch that is given it", async () => {
+			expect(
+				await run(
+					`implementation {
+						${labels}
+
+						variable values: List<{ a: Integer }> | List<{ b: Integer }> = [{ a = 1 }]
+
+						__print(values::map((item) { <- item::label() }))
+					}`,
+					["empty-list-overlap"],
+				),
+			).toEqual(['[ "ALPHA" ]'])
+		})
+
+		// NOTE: The member the value actually has decides, so how the Union is
+		// written may not — least of all which member happens to be written
+		// last, which is precisely what used to decide it.
+		it("compiles it the same way however the Union is spelled", async () => {
+			expect(
+				await run(
+					`implementation {
+						${labels}
+
+						variable values: List<{ b: Integer }> | List<{ a: Integer }> = [{ a = 1 }]
+
+						__print(values::map((item) { <- item::label() }))
+					}`,
+					["empty-list-overlap"],
+				),
+			).toEqual(['[ "ALPHA" ]'])
+		})
+
+		// NOTE: The same fault with the Namespaces the Standard Library
+		// provides, which is where it is likeliest to be met: `String.toString`
+		// answers with its receiver unchanged, so the Integer List compiled
+		// against the String branch printed `[ 1, 2 ]` — Integers in a
+		// `List<String>` — while the String List looked perfectly fine.
+		it("reaches each branch's own Method", async () => {
+			expect(
+				await run(
+					`implementation {
+						variable numbers: List<Integer> | List<String> = [1, 2]
+						variable words: List<Integer> | List<String> = ["a", "b"]
+
+						__print(numbers::map((item) { <- item::toString() }))
+						__print(words::map((item) { <- item::toString() }))
+					}`,
+					["empty-list-overlap", "empty-list-overlap"],
+				),
+			).toEqual(['[ "1", "2" ]', '[ "a", "b" ]'])
+		})
+
+		// NOTE: A Standard Library Method reached ONLY from a branch's own copy
+		// still has to be emitted with the Program. The search that decides
+		// which of them a Program carries recurses into whatever it is given,
+		// and a copy is an ordinary Expression hanging off the dispatch — but a
+		// Method it missed would be NAMED by an emitted body and never declared,
+		// which is a `ReferenceError` out of a Program that compiled green. Here
+		// the shared literal is compiled against the Integer branch, whose
+		// `toString` is native, so the String branch's copy is the only thing
+		// asking for `String.toString`.
+		it("emits a Method only a branch's own copy reaches", async () => {
+			expect(
+				await run(
+					`implementation {
+						variable words: List<String> | List<Integer> = ["a", "b"]
+
+						__print(words::map((item) { <- item::toString() }))
+					}`,
+					["empty-list-overlap"],
+				),
+			).toEqual(['[ "a", "b" ]'])
+		})
+
+		it("copies every literal the branch is passed", async () => {
+			expect(
+				await run(`implementation {
+					namespace Alpha for { a: Integer } {
+						label() -> String {
+							<- "ALPHA"
+						}
+
+						pair(
+							_ first: (_ item: { a: Integer }) -> String,
+							second: (_ item: { a: Integer }) -> String,
+						) -> String {
+							<- first(@)::append(second(@))
+						}
+					}
+
+					namespace Beta for { b: Integer } {
+						label() -> String {
+							<- "BETA"
+						}
+
+						pair(
+							_ first: (_ item: { b: Integer }) -> String,
+							second: (_ item: { b: Integer }) -> String,
+						) -> String {
+							<- first(@)::append(second(@))
+						}
+					}
+
+					variable value: { a: Integer } | { b: Integer } = { a = 1 }
+
+					__print(value::pair((item) { <- item::label() }, second (item) { <- item::label()::append("!") }))
+				}`),
+			).toEqual(['"ALPHAALPHA!"'])
+		})
+
+		// NOTE: The copies are per branch, the rest of the Arguments are not:
+		// they are evaluated once, at the call site, before any branch is
+		// picked. An Argument that prints would print once per branch if the
+		// Arguments were emitted per branch instead — which is the obvious way
+		// to hand each branch its own and the reason this is pinned.
+		it("evaluates a shared Argument exactly once", async () => {
+			expect(
+				await run(`implementation {
+					namespace Alpha for { a: Integer } {
+						label() -> String {
+							<- "ALPHA"
+						}
+
+						combine(
+							_ transform: (_ item: { a: Integer }) -> String,
+							with extra: String,
+						) -> String {
+							<- transform(@)::append(extra)
+						}
+					}
+
+					namespace Beta for { b: Integer } {
+						label() -> String {
+							<- "BETA"
+						}
+
+						combine(
+							_ transform: (_ item: { b: Integer }) -> String,
+							with extra: String,
+						) -> String {
+							<- transform(@)::append(extra)
+						}
+					}
+
+					function noisy() -> String {
+						__print("evaluated")
+
+						<- "!"
+					}
+
+					variable value: { a: Integer } | { b: Integer } = { a = 1 }
+
+					__print(value::combine((item) { <- item::label() }, with noisy()))
+				}`),
+			).toEqual(['"evaluated"', '"ALPHA!"'])
+		})
+
+		// NOTE: Every member of a Union must provide what is asked of it, and a
+		// literal's body is part of what is asked. Compiling it against one
+		// branch hid what it meant to the others: this Program used to compile
+		// without a Diagnostic and die reading `.b` off a Record that has an
+		// `a`.
+		it("reports a body a branch's Method can not compile", () => {
+			let { diagnostics } = enrich(
+				parse(`implementation {
+					namespace Alpha for { a: Integer } {
+						apply(_ transform: (_ item: { a: Integer }) -> String) -> String {
+							<- transform(@)
+						}
+					}
+
+					namespace Beta for { b: Integer } {
+						apply(_ transform: (_ item: { b: Integer }) -> String) -> String {
+							<- transform(@)
+						}
+					}
+
+					variable value: { a: Integer } | { b: Integer } = { a = 1 }
+
+					__print(value::apply((item) { <- item.b::toString() }))
+				}`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("unknown-member")
 		})
 	})
 

@@ -174,8 +174,9 @@ function simplifyMethodInvocation(
 
 // NOTE: A dispatched Invocation flattens into one statically resolved target
 // per member Type — the receiver and the shared Arguments are emitted once,
-// and each case carries its overload-mangled Method name plus the hidden
-// conformance Arguments that target requires.
+// and each case carries its overload-mangled Method name, the hidden
+// conformance Arguments that target requires, and any Argument that was
+// compiled for this branch alone and stands in for a shared one.
 function simplifyUnionMethodInvocation(
 	node: common.typed.MethodInvocationNode,
 	dispatch: Array<common.DispatchCase>,
@@ -195,6 +196,12 @@ function simplifyUnionMethodInvocation(
 					: node.member.name,
 			conformanceArguments: simplifyConformanceArguments(
 				dispatchCase.conformances,
+			),
+			contextualArguments: dispatchCase.contextualArguments.map(
+				(contextualArgument) => ({
+					index: contextualArgument.index,
+					argument: simplifyArgument(contextualArgument.argument),
+				}),
 			),
 			derivedDescriptor: dispatchCase.derivedDescriptor,
 		})),

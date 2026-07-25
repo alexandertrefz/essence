@@ -118,6 +118,12 @@ export type UnionMethodDispatchCase = {
 	namespaceName: string
 	methodName: string
 	conformanceArguments: Array<ArgumentNode>
+	// NOTE: The Arguments this branch alone is given — a contextually typed
+	// Function literal compiled against THIS branch's Method — each under the
+	// position in the shared Argument list it stands in for. The Rewriter emits
+	// them as `dispatchMethod`'s fourth case element, and only when there are
+	// any, so a dispatch passing no such literal emits what it always did.
+	contextualArguments: Array<{ index: number; argument: ArgumentNode }>
 	// NOTE: Present only when this branch resolves to a *generic* Choice's
 	// derived Equatable — the Rewriter then emits
 	// `$helpers.boundChoiceIs(<descriptor>)` for the branch's Method.

@@ -542,6 +542,15 @@ export type DispatchCase = {
 	namespaceName: string
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// NOTE: The Arguments this branch alone is given, each under the position
+	// in the Invocation's own Argument list it stands in for. A Function
+	// literal that omitted its annotations takes them from the Method it is
+	// passed to, and every branch passes it to a different Method, so ONE
+	// compiled literal can not be what all of them meant — the Enricher builds
+	// a typed copy per branch instead. Empty for every Argument that does not
+	// react to its context, which is every Argument but such a literal, so a
+	// dispatch that passes none is emitted exactly as it was before.
+	contextualArguments: Array<{ index: number; argument: typed.ArgumentNode }>
 	// NOTE: Set only when this branch resolves to a *generic* Choice's derived
 	// Equatable — the plan its widened runtime helper follows. Absent
 	// otherwise, so a non-generic Choice's dispatch branch emits the plain
