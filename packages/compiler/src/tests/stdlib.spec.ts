@@ -20,7 +20,7 @@ const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 
-// NOTE: `Rational.is` is written in Essence now (src/stdlib/Rational.es), so
+// NOTE: `Rational.is` is written in Essence now (packages/stdlib/sources/Rational.es), so
 // there is no runtime function left to compare two Rationals with. The
 // assertions below that reach for it are about OTHER natives — `parse`,
 // `raise`, the Number aggregates — and only need value equality, so
@@ -32,13 +32,13 @@ const ratIs = (
 	first.rational.numerator * second.rational.denominator ===
 	second.rational.numerator * first.rational.denominator
 
-// NOTE: `String.toString` is written in Essence now (src/stdlib/String.es) —
+// NOTE: `String.toString` is written in Essence now (packages/stdlib/sources/String.es) —
 // `<- @`, the identity — so there is no runtime export left to hand `join`
 // as its `Printable` witness. This spells the identity out, which is exactly
 // what the Simplifier now passes.
 const stringToString = (value: string.StringType) => value
 
-// NOTE: The same story for `Integer.is` (src/stdlib/Integer.es), which the
+// NOTE: The same story for `Integer.is` (packages/stdlib/sources/Integer.es), which the
 // List Methods bounded by `Equatable` now take as their hidden witness. The
 // Essence body reads `compareTo(other)::is(Ordering#Equal)`; two Integers
 // answer that exactly when their values match, so this is what the Simplifier
@@ -82,7 +82,7 @@ describe("Stdlib", () => {
 		it("negates a value", () => {
 			// NOTE: absolute, parity (isEven/isOdd), sign (isPositive/
 			// isNegative/isZero) and clamp are implemented in Essence
-			// now (src/stdlib/Integer.es); the golden harness covers them. Only
+			// now (packages/stdlib/sources/Integer.es); the golden harness covers them. Only
 			// negate stays native here.
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
 		})
@@ -107,7 +107,7 @@ describe("Stdlib", () => {
 
 		// NOTE: `absolute`, `negate`, `reciprocal` and `isWholeNumber` used to
 		// be tested here against the runtime functions directly. They are
-		// written in Essence now — `src/stdlib/Rational.es` — so there is no
+		// written in Essence now — `packages/stdlib/sources/Rational.es` — so there is no
 		// runtime function left to call, and the golden harness
 		// (`testFiles/StdlibExhaustive.es`) covers every one of them, including
 		// the reciprocal of zero. The same move was made for the Integer
@@ -163,8 +163,8 @@ describe("Stdlib", () => {
 	})
 
 	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
-	// (src/stdlib/Algebraic.es) and Transcendental
-	// (src/stdlib/Transcendental.es), so only `negate` is still native here.
+	// (packages/stdlib/sources/Algebraic.es) and Transcendental
+	// (packages/stdlib/sources/Transcendental.es), so only `negate` is still native here.
 	// Their behaviour is covered through the language by
 	// testFiles/Irrational.es and the golden output.
 	describe("Irrational sign Methods", () => {
@@ -237,7 +237,7 @@ describe("Stdlib", () => {
 	})
 
 	// NOTE: `Number.isBetween` used to be tested here, against the runtime
-	// function directly. It is written in Essence now — `src/stdlib/Number.es`
+	// function directly. It is written in Essence now — `packages/stdlib/sources/Number.es`
 	// — so there is no runtime function left to call, and the same five cases
 	// are asserted end to end in `codeGeneration.spec.ts` ("runs isBetween from
 	// the merged const" and the two beside it), where they exercise the
@@ -245,11 +245,11 @@ describe("Stdlib", () => {
 	// `Boolean.isNot` when it became the first Method to be written in Essence.
 
 	// NOTE: `Boolean.exclusiveOr` is implemented in Essence now
-	// (`src/stdlib/Boolean.es`) — the golden harness exercises it end to end,
+	// (`packages/stdlib/sources/Boolean.es`) — the golden harness exercises it end to end,
 	// so the runtime-direct test that lived here is retired.
 
 	// NOTE: `Optional.otherwise` is implemented in Essence now
-	// (`src/stdlib/Optional.es`) — the golden harness exercises it end to end,
+	// (`packages/stdlib/sources/Optional.es`) — the golden harness exercises it end to end,
 	// so the runtime-direct test that lived here is retired.
 
 	describe("List round trips and construction", () => {
@@ -281,7 +281,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.repeat` is implemented in Essence now
-		// (`src/stdlib/List.es`), on top of the `List.of` below — the golden
+		// (`packages/stdlib/sources/List.es`), on top of the `List.of` below — the golden
 		// harness covers a count of three, zero and minus one, so the
 		// runtime-direct test that lived here is retired.
 
@@ -343,7 +343,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.partition` is implemented in Essence now
-		// (`src/stdlib/List.es`), as `keepEvery` beside `removeEvery(where:)`
+		// (`packages/stdlib/sources/List.es`), as `keepEvery` beside `removeEvery(where:)`
 		// — the golden harness covers both halves and the empty List, so the
 		// runtime-direct test that lived here is retired.
 
@@ -370,7 +370,7 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `List.sorted` is implemented in Essence now
-		// (`src/stdlib/List.es`) — it hands its hidden conformance Argument's
+		// (`packages/stdlib/sources/List.es`) — it hands its hidden conformance Argument's
 		// `compareTo` straight to `sort__overload$2`, and the golden harness covers the
 		// flat case. What is NOT covered there, and what the two tests below
 		// keep, is the WITNESS a nested List is sorted through: the Essence

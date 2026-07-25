@@ -65,7 +65,7 @@ function protocolsOf(
 //     name. So the Method Types are all there (on the typed Namespace's `type`)
 //     while every Position that could locate the cursor inside a signature is
 //     only in the parsed source. Without `visitNativeSignatures` every Hover
-//     inside `src/stdlib/*.es` answered with the enclosing Namespace, whatever
+//     inside `packages/stdlib/sources/*.es` answered with the enclosing Namespace, whatever
 //     it was aimed at — and String, Integer and Rational are hundreds of these
 //     signatures each.
 //   • a Protocol's requirements and a Choice's payload members survive

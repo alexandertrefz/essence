@@ -175,7 +175,7 @@ export async function compileFile(
 		}
 
 		// NOTE: Routed through the same seam the Language Server uses, so that
-		// `esc check src/stdlib/List.es` and the Editor agree about the file
+		// `esc check packages/stdlib/sources/List.es` and the Editor agree about the file
 		// in front of them. Without it the CLI rejected the `declarations { … }`
 		// header of the very sources it loads at startup — the exact inversion
 		// of the invariant, and a compiler developer could not check their own

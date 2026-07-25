@@ -24,7 +24,7 @@ type CallGraph = Map<string, Set<string>>
 // NOTE: Only the BODIED Methods are Nodes. A native has no body to walk and
 // can not begin a cycle of Essence Methods — the cycle this test is planted to
 // catch is `Boolean.isNot` -> `Boolean.is` -> `Boolean.isNot`, where every step
-// is a Method someone wrote in `src/stdlib`.
+// is a Method someone wrote in `packages/stdlib/sources`.
 function buildCallGraph(prelude: Array<PreludeNamespace>): CallGraph {
 	let graph: CallGraph = new Map()
 

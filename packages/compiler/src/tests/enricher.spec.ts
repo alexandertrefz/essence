@@ -45,7 +45,7 @@ function lastConstantMethodInvocation(
 	return value
 }
 
-// NOTE: The LIVE Namespace of that name — the one read from `src/stdlib/*.es`
+// NOTE: The LIVE Namespace of that name — the one read from `packages/stdlib/sources/*.es`
 // and handed to every Program's top level Scope. Asserting against this rather
 // than against a declaration read straight out of a source file is the point:
 // a test about which Namespace declares a Method has to ask what a Program can

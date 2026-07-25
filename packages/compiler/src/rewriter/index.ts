@@ -22,7 +22,7 @@ import {
 // standard library implements in Essence is NOT a member of one of these; it is
 // its own `$es_<Namespace>_<member>` const, emitted alongside. Exported so the
 // tests cross-check it against the other registration sites — a Namespace here
-// but missing a runtime module, or declared in `src/stdlib` but missing here,
+// but missing a runtime module, or declared in `packages/stdlib/sources` but missing here,
 // emits a call to `undefined`.
 export const runtimeNamespaceNames = [
 	"String",
@@ -822,7 +822,7 @@ function rewriteNativeFunctionInvocation(
 	// NOTE: The `__`-sigil name IS the runtime export name now — `__print` binds
 	// to `functions.__print`. The prefix used to be stripped here, so the runtime
 	// exported a differently-spelled `print`; unifying the two lets `__print`
-	// migrate into `src/stdlib/Print.es` as an ordinary native free Function.
+	// migrate into `packages/stdlib/sources/Print.es` as an ordinary native free Function.
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -862,7 +862,7 @@ function rewriteFunctionInvocation(
 // a bare `$es_<Namespace>_<member>` Identifier, so nothing has to materialise
 // the module namespace object to get at it. The literal constructors
 // (`String.createString`, `List.createList`, …) do NOT come through here: they
-// name their Namespace directly and are not declared in `src/stdlib`, so they
+// name their Namespace directly and are not declared in `packages/stdlib/sources`, so they
 // can never be Essence-implemented.
 function namespaceMember(
 	namespaceName: string,

@@ -140,7 +140,7 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: `__print` migrated from a TypeScript table to `src/stdlib/Print.es`
+	// NOTE: `__print` migrated from a TypeScript table to `packages/stdlib/sources/Print.es`
 	// as an ordinary native free Function. Its emission is a read off the runtime
 	// `functions` module under its OWN name now — the `__` prefix used to be
 	// stripped so the runtime exported a differently-spelled `print`. The

@@ -58,7 +58,7 @@ export type StdlibSource = {
 
 export type Stdlib = {
 	// NOTE: The three Scope tables the Enricher and the Language Server start
-	// from — everything `src/stdlib/*.es` declared, listed in
+	// from — everything `packages/stdlib/sources/*.es` declared, listed in
 	// `builtinMemberOrder`/`builtinTypeOrder`. `members` also carries the
 	// native Functions, which have no Namespace to be declared in.
 	members: Record<string, common.Type>
@@ -211,12 +211,12 @@ function inBuiltinOrder(
 // NOTE: A Documentation Position read out of a standard library file points
 // into a file no consumer of these tables has opened — Hover, Signature Help
 // and `go to definition` all treat a builtin as SOURCELESS, and would otherwise
-// offer to jump into `src/stdlib/List.es` from a user's project. Stripping it
+// offer to jump into `packages/stdlib/sources/List.es` from a user's project. Stripping it
 // here makes it impossible to hand out a Position with no file attached.
 //
 // NOTE: The Language Server DOES open the standard library sources — as
 // ordinary documents, enriched in their own right. That path never goes through
-// this loader, so `go to definition` inside `src/stdlib` keeps working.
+// this loader, so `go to definition` inside `packages/stdlib/sources` keeps working.
 function stripPosition(documentation: common.Documentation | undefined): void {
 	if (documentation != null) {
 		documentation.position = null

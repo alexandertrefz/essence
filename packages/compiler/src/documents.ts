@@ -73,9 +73,10 @@ function canonicalPath(filePath: string): string {
 // Resolved once: the standard library does not move while the process runs.
 const CANONICAL_STDLIB_DIRECTORY = canonicalPath(STDLIB_DIRECTORY)
 
-// NOTE: The Language Server is handed URIs (`file:///…/src/stdlib/List.es`)
-// and the tests plain paths; both are matched, and a `%20` or the like is
-// decoded first so a path with a space is not missed.
+// NOTE: The Language Server is handed URIs
+// (`file:///…/packages/stdlib/sources/List.es`) and the tests plain paths;
+// both are matched, and a `%20` or the like is decoded first so a path with a
+// space is not missed.
 //
 // The document has to live in THE standard library — the one this compiler
 // loads, resolved off the loader's own module — not merely in a directory
