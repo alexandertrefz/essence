@@ -22,11 +22,11 @@ implementation {
 	}
 
 	§§ Works for any Type with a Measurable conformance in scope.
-	function describeArea <infer Shape is Measurable>(_ shape: Shape) -> String {
+	function describeArea<infer Shape is Measurable>(_ shape: Shape) -> String {
 		<- match shape::area() -> String {
-			case Integer  { <- @::toString() }
-			case Rational { <- @::toString() }
-			case Algebraic { <- @::toString() }
+			case Integer        { <- @::toString() }
+			case Rational       { <- @::toString() }
+			case Algebraic      { <- @::toString() }
 			case Transcendental { <- @::toString() }
 		}
 	}
@@ -39,7 +39,7 @@ implementation {
 	§ Integer, Rational, Algebraic and String. (Transcendentals order only
 	§ through Number, so they carry no Comparable conformance of their own.)
 
-	function smallerOf <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
+	function smallerOf<infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
 		<- match a::compareTo(b) -> Item {
 			case #Less    { <- a }
 			case #Equal   { <- a }

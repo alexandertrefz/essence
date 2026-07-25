@@ -9,26 +9,29 @@ implementation {
 		) -> TargetType {
 			<- match @::firstItem() -> TargetType {
 				case Nothing { <- fallbackValue }
-				case Item { <- transform(@) }
+				case Item    { <- transform(@) }
 			}
 		}
 
 		firstOr(fallback fallbackValue: Item) -> Item {
 			<- match @::firstItem() -> Item {
 				case Nothing { <- fallbackValue }
-				case Item { <- @ }
+				case Item    { <- @ }
 			}
 		}
 	}
 
-	function wrap <infer Value>(_ value: Value) -> Maybe<Value> {
+	function wrap<infer Value>(_ value: Value) -> Maybe<Value> {
 		<- value
 	}
 
-	function unwrap <infer Value>(_ maybe: Maybe<Value>, fallback fallbackValue: Value) -> Value {
+	function unwrap<infer Value>(
+		_ maybe: Maybe<Value>,
+		fallback fallbackValue: Value,
+	) -> Value {
 		<- match maybe -> Value {
 			case Nothing { <- fallbackValue }
-			case Value { <- @ }
+			case Value   { <- @ }
 		}
 	}
 
@@ -41,10 +44,9 @@ implementation {
 
 	constant wrapped: Maybe<String> = wrap("hello")
 
-	__print(firstAsString)                          § "1"
-	__print(numbers::firstOr(fallback 0))           § 1
-	__print([]::firstOr(fallback 42))               § 42
-	__print(unwrap(wrapped, fallback "empty"))      § "hello"
-	__print(unwrap(nothing, fallback 7))            § 7
-
+	__print(firstAsString) § "1"
+	__print(numbers::firstOr(fallback 0)) § 1
+	__print([]::firstOr(fallback 42)) § 42
+	__print(unwrap(wrapped, fallback "empty")) § "hello"
+	__print(unwrap(nothing, fallback 7)) § 7
 }

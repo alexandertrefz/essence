@@ -1,27 +1,27 @@
 implementation {
 
 	type Event = {
-		eventName:            String,
-		namespaces:           List<String>,
-		isDefaultPrevented:   Boolean,
-		isCancelled:          Boolean,
+		eventName: String,
+		namespaces: List<String>,
+		isDefaultPrevented: Boolean,
+		isCancelled: Boolean,
 		isPropagationStopped: Boolean,
 	}
 
 	namespace Event for Event {
-		preventDefault () -> Event {
+		preventDefault() -> Event {
 			<- { @ with isDefaultPrevented = true }
 		}
 
-		cancel () -> Event {
+		cancel() -> Event {
 			<- { @ with isCancelled = true }
 		}
 
-		stopPropagation () -> Event {
+		stopPropagation() -> Event {
 			<- { @ with isPropagationStopped = true }
 		}
 
-		hasNamespaces () -> Boolean {
+		hasNamespaces() -> Boolean {
 			<- @.namespaces::hasItems()
 		}
 
@@ -44,7 +44,9 @@ implementation {
 					case String  { <- @ }
 				}
 
-				constant namespaces = splitEvent::removeFirst()::removeDuplicates()
+				constant namespaces = splitEvent
+					::removeFirst()
+					::removeDuplicates()
 
 				<- {
 					eventName = eventName,

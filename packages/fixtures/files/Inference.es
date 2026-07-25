@@ -12,13 +12,17 @@ implementation {
 	__print(numbers::removeEvery(where (_ item) { <- item::isGreaterThan(2) }))
 
 	§ Annotations are still accepted, and still win where they are written.
-	__print(numbers::removeEvery(where (item) -> Boolean {
-		<- item::isGreaterThan(2)
-	}))
+	__print(
+		numbers::removeEvery(where (item) -> Boolean {
+			<- item::isGreaterThan(2)
+		}),
+	)
 
-	__print(numbers::removeEvery(where (_ item: Integer) -> Boolean {
-		<- item::isGreaterThan(2)
-	}))
+	__print(
+		numbers::removeEvery(where (_ item: Integer) -> Boolean {
+			<- item::isGreaterThan(2)
+		}),
+	)
 
 	§ The inferred Type reaches the body: `item` is an Integer here, which is
 	§ the only reason `toString` resolves at all.
@@ -35,7 +39,7 @@ implementation {
 		) -> Target {
 			<- match @::firstItem() -> Target {
 				case Nothing { <- fallbackValue }
-				case Item { <- transform(@) }
+				case Item    { <- transform(@) }
 			}
 		}
 	}
@@ -43,17 +47,34 @@ implementation {
 	§ `Item` is bound by the receiver, which types the Parameter. `Target` is
 	§ bound by nothing but this literal's own body — so the body is what it is
 	§ read off, and it decides the Type of the whole invocation.
-	__print(numbers::transformFirst((item) { <- item::toString() }, fallback "none"))
+	__print(
+		numbers::transformFirst(
+			(item) { <- item::toString() },
+			fallback "none",
+		),
+	)
 
 	§ The same call with a body returning a Boolean binds `Target` to Boolean.
-	__print(numbers::transformFirst((item) { <- item::isGreaterThan(0) }, fallback false))
+	__print(
+		numbers::transformFirst(
+			(item) { <- item::isGreaterThan(0) },
+			fallback false,
+		),
+	)
 
 	§ Several `<-` Statements give the Union of what they return.
-	__print(numbers::transformFirst((item) {
-		if item::isGreaterThan(0) { <- item::multiply(with 2) }
+	__print(
+		numbers::transformFirst(
+			(item) {
+				if item::isGreaterThan(0) {
+					<- item::multiply(with 2)
+				}
 
-		<- nothing
-	}, fallback nothing))
+				<- nothing
+			},
+			fallback nothing,
+		),
+	)
 
 	§ A literal that is not an Argument has no expected signature anywhere, so
 	§ it writes its annotations in full — inferring a whole signature from a
@@ -63,5 +84,4 @@ implementation {
 	}
 
 	__print(halve(9))
-
 }

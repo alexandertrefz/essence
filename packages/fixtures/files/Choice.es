@@ -17,36 +17,24 @@ implementation {
 	constant operation: CalculatorOperation = #Add({ left = 1, right = 1 })
 
 	constant result = match operation -> Number | Nothing {
-		case #Add {
-			<- @.left::add(@.right)
-		}
+		case #Add        { <- @.left::add(@.right) }
 
-		case #Subtract {
-			<- @.left::subtract(@.right)
-		}
+		case #Subtract   { <- @.left::subtract(@.right) }
 
-		case #Divide {
-			<- @.left::divide(by @.right)
-		}
+		case #Divide     { <- @.left::divide(by @.right) }
 
-		case #Multiply {
-			<- @.left::multiply(with @.right)
-		}
+		case #Multiply   { <- @.left::multiply(with @.right) }
 
-		case #SquareRoot {
-			<- @.number::squareRoot()
-		}
+		case #SquareRoot { <- @.number::squareRoot() }
 
-		case _ {
-			<- nothing
-		}
+		case _           { <- nothing }
 	}
 
 	__print(match result -> String {
-		case Nothing { <- "nothing" }
-		case Integer { <- @::toString() }
-		case Rational { <- @::toString() }
-		case Algebraic { <- @::toString() }
+		case Nothing        { <- "nothing" }
+		case Integer        { <- @::toString() }
+		case Rational       { <- @::toString() }
+		case Algebraic      { <- @::toString() }
 		case Transcendental { <- @::toString() }
 	})
 
@@ -54,7 +42,7 @@ implementation {
 
 	__print(match cleared -> String {
 		case #ClearAll { <- "cleared" }
-		case _ { <- "not cleared" }
+		case _         { <- "not cleared" }
 	})
 
 	§ `EditorCommand` also declares `ClearAll` — the annotations above pick
@@ -69,9 +57,8 @@ implementation {
 	constant undone: EditorCommand = #Undo
 
 	__print(match undone -> String {
-		case #Undo { <- "undone" }
-		case #Redo { <- "redone" }
+		case #Undo     { <- "undone" }
+		case #Redo     { <- "redone" }
 		case #ClearAll { <- "cleared everything" }
 	})
-
 }

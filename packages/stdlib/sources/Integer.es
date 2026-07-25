@@ -73,7 +73,7 @@ declarations {
 				constant dividend = @
 				<- match other::reciprocal() -> Optional<Rational> {
 					case Rational { <- dividend::multiply(with @) }
-					case Nothing { <- nothing }
+					case Nothing  { <- nothing }
 				}
 			}
 
@@ -211,7 +211,10 @@ declarations {
 		§§ @param lowest the lowest allowed value
 		§§ @param and the highest allowed value
 		§§ @returns the clamped Integer, or `Nothing` when the bounds are in the wrong order.
-		clamp(between lowest: Integer, and highest: Integer) -> Optional<Integer> {
+		clamp(
+			between lowest: Integer,
+			and highest: Integer,
+		) -> Optional<Integer> {
 			if lowest::isGreaterThan(highest) {
 				<- nothing
 			} else if @::isLessThan(lowest) {

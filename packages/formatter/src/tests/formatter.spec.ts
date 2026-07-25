@@ -79,6 +79,33 @@ describe("formatter", () => {
 		}
 	})
 
+	// NOTE: This is the gate that replaces forcing a formatting pass on every
+	// successful compile. The corpus stays canonically formatted because it is
+	// checked here, not because the compiler writes to anybody's source tree.
+	//
+	// The Diagnostic showcase files are exempt: their rendered output is
+	// snapshotted line and column exact by `diagnosticShowcase.spec.ts`, so
+	// they are shaped for the Diagnostics they produce rather than for style.
+	describe("the repository is formatted", () => {
+		for (let file of CORPUS) {
+			if (
+				UNPARSEABLE.has(file.name) ||
+				file.name.startsWith("diagnostics/")
+			) {
+				continue
+			}
+
+			it(`${file.name} is already formatted`, () => {
+				let result = format(file.source, {
+					documentPath: file.filePath,
+				})
+
+				expect(result.refusal).toBeNull()
+				expect(result.changed).toBe(false)
+			})
+		}
+	})
+
 	describe("refuses what it cannot format", () => {
 		it("leaves a file with syntax errors byte for byte alone", () => {
 			let source = "implementation {\n\tconstant = = =\n}\n"

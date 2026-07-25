@@ -1,5 +1,7 @@
 § Doubling the Comment sigil turns a private note into Documentation of
+
 § whatever is declared below it. A `§§` block is Markdown, and an Editor shows
+
 § it on Hover, in Signature Help and next to a Completion.
 
 implementation {
@@ -16,19 +18,19 @@ implementation {
 	§§
 	§§ @param subject who to greet
 	§§ @returns the finished greeting
-	function greet (subject: String) -> String {
+	function greet(subject: String) -> String {
 		<- "Hello, "::append(subject)::append("!")
 	}
 
 	§ An ordinary Comment stays a private note. Nothing below it is
 	§ documented, and no Editor ever shows this text.
-	function shout (_ message: String) -> String {
+	function shout(_ message: String) -> String {
 		<- message::append("!!!")
 	}
 
 	§§ A Parameter written on a line of its own carries a block of its own,
 	§§ which reads better than an `@param` tag once there are several.
-	function join (
+	function join(
 		§§ the text to put first
 		left: String,
 		§§ the text to put after it
@@ -84,5 +86,4 @@ implementation {
 	__print(1::combine(2, 3)::text())
 	__print(Greetings.fallback)
 	__print(Greetings.forCrowd(count 3))
-
 }
