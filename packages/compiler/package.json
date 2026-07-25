@@ -16,6 +16,7 @@
 	"dependencies": {
 		"@essence/ariadne": "workspace:*",
 		"@essence/interfaces": "workspace:*",
+		"@essence/stdlib": "workspace:*",
 		"bigint-fraction": "1.0.6",
 		"esbuild": "0.28.1",
 		"escodegen": "workspace:*",
