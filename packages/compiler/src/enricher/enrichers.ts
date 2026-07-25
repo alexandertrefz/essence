@@ -361,10 +361,23 @@ function instantiateCaseFromPayload(
 	// annotation checks what it names, and an unannotated `#Full(f)` names
 	// nothing, so the Types the payload bound here are what has to answer for
 	// the Choice's bounds. Solved for the Diagnostic alone, as at an Alias
-	// application; a Generic the payload never mentions stays unbound and
-	// silent, the way an unbound Generic always surfaces at the use that needs
-	// it rather than here.
-	resolveConformances(choiceGenerics, context.bindings, scope, position)
+	// application; the witnesses a call needs are solved at the call.
+	//
+	// NOTE: Only what the payload BOUND is asked, never the whole declaration.
+	// A Case whose payload never mentions a Generic — `Bare` of a `Holder<Item
+	// is Equatable>` — leaves it undetermined on purpose: nothing here decides
+	// what a value carrying no Item is a Holder OF, and the bound surfaces at
+	// whatever later site does decide, or at the comparison that finds out
+	// nothing ever did. Written as a filter rather than left to
+	// `resolveConformances` passing over an absent binding, because that pass is
+	// there to stop a cascade behind a Diagnostic something else already
+	// reported — this one has nothing behind it, and asking for it would make
+	// every `Holder#Bare` an error.
+	let boundGenerics = choiceGenerics.filter(
+		(generic) => context.bindings.get(generic.name) !== undefined,
+	)
+
+	resolveConformances(boundGenerics, context.bindings, scope, position)
 
 	return applyGenericBindings(caseType, context.bindings) as common.CaseType
 }

@@ -962,6 +962,184 @@ describe("Choices", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// NOTE: A Case carrying no payload binds nothing, and a `Holder#Bare` is
+		// not a Holder OF anything yet — so the construction deliberately does
+		// not hold the Choice's bound against a Type Argument nobody has written.
+		// Whichever later site decides the Argument answers for the bound
+		// instead, and a site that needs it decided and finds nobody ever did
+		// says so there. Asking at the construction would make every unit Case of
+		// a bounded Choice an error on sight, `#Bare` included. These pin both
+		// halves: what the construction leaves alone, and what every rail that
+		// can consume the undecided value does about it.
+		describe("A Type Argument the construction leaves undecided", () => {
+			const holder = `choice Holder<Item is Equatable> {
+				Bare,
+				Full { value: Item },
+			}`
+
+			it("constructs an unannotated unit Case of a bounded Choice", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						constant left = Holder#Bare
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: Undecided, not decided-as-something — the Type Argument stays
+			// the Choice's own Type Parameter, which is what lets a later
+			// annotation, Parameter or inference decide it.
+			it("leaves the Type Argument standing as the Type Parameter", () => {
+				expect(
+					valueTypeOf(
+						`implementation { ${holder}
+							constant left = Holder#Bare
+						}`,
+						"left",
+					),
+				).toEqual({
+					type: "Case",
+					choice: "Holder",
+					name: "Bare",
+					members: {},
+					typeArguments: [{ type: "GenericUse", name: "Item" }],
+				})
+			})
+
+			it("still answers for a Type Argument an annotation decides", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant ok: Holder<String> = Holder#Bare
+
+						__print(ok::is(Holder#Bare))
+					}`),
+				).toEqual(["true"])
+			})
+
+			it("still answers for a Type Argument the payload decides", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						constant full =
+							Holder#Full({ value = (_ x: Integer) -> Integer { <- x } })
+					}`),
+				).toEqual(["unsatisfied-bound"])
+			})
+
+			// NOTE: Only the construction rail relaxes. Writing the Choice's Type
+			// Argument out is an Alias application like any other, and it keeps
+			// the bound exactly as strictly as it did before.
+			it("holds the Choice's own application as strictly as ever", () => {
+				let source = `implementation { ${holder}
+					function take(_ holder: Holder<(_ x: Integer) -> Integer>) -> Integer {
+						<- 1
+					}
+				}`
+
+				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+				expect(messagesOf(source)).toEqual([
+					"Function does not conform to 'Equatable'",
+				])
+			})
+
+			it("reports the bound at a derived comparison that needs it", () => {
+				let source = `implementation { ${holder}
+					constant left = Holder#Bare
+
+					__print(left::is(Holder#Bare))
+				}`
+
+				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+				expect(messagesOf(source)).toEqual([
+					"Type Parameter 'Item' does not conform to 'Equatable'",
+				])
+			})
+
+			it("reports it at the negated comparison too", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						constant left = Holder#Bare
+
+						__print(left::isNot(Holder#Bare))
+					}`),
+				).toEqual(["unsatisfied-bound"])
+			})
+
+			it("reports it at a List Method that compares the items", () => {
+				let source = `implementation { ${holder}
+					constant left = Holder#Bare
+
+					__print([left, left]::contains(left))
+				}`
+
+				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+				expect(messagesOf(source)).toEqual([
+					"Holder#Bare does not conform to 'Equatable'",
+				])
+			})
+
+			it("reports it where a bounded Parameter has nothing to infer from", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						function take <infer T is Equatable>(_ holder: Holder<T>) -> Integer {
+							<- 1
+						}
+
+						constant left = Holder#Bare
+
+						__print(take(left))
+					}`),
+				).toEqual(["uninferable-type-parameter"])
+			})
+
+			// NOTE: The Parameter is what decides the Argument here, so the value
+			// that carried none arrives as a `Holder<Integer>` and every rail
+			// inside runs against Integer's equality.
+			it("fits a Parameter that decides the Type Argument itself", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						function describe(_ holder: Holder<Integer>) -> String {
+							<- match holder -> String {
+								case Holder#Full { <- "full" }
+								case Holder#Bare { <- "bare" }
+							}
+						}
+
+						constant left = Holder#Bare
+
+						__print(describe(left))
+					}`),
+				).toEqual(['"bare"'])
+			})
+
+			// NOTE: The undecided value is the CASE, not the Choice's Union — a
+			// Matcher for a Case it can not be is the `unknown-case` any other
+			// impossible Matcher is, rather than a Handler typed by a Type
+			// Parameter nothing binds.
+			it("reports a Matcher for a Case the undecided value can not be", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						constant left = Holder#Bare
+
+						__print(match left -> Integer {
+							case Holder#Full { <- @.value }
+							case Holder#Bare { <- 0 }
+						})
+					}`),
+				).toEqual(["unknown-case"])
+			})
+
+			// NOTE: Printing reaches for no witness at all, so the undecided Type
+			// Argument costs it nothing.
+			it("prints an undecided unit Case", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant left = Holder#Bare
+
+						__print(left)
+					}`),
+				).toEqual(["Holder#Bare"])
+			})
+		})
 	})
 
 	describe("Contextual Case Resolution", () => {
@@ -1348,6 +1526,13 @@ describe("Choices", () => {
 			// for whatever the eventual Argument turns out to be — no
 			// descriptor can be right about that, so the comparison is refused
 			// rather than emitted wrong.
+			//
+			// NOTE: The whole set, not just the refusal — the two `Wrapped#None`
+			// are an unannotated unit construction, which the construction
+			// deliberately lets by with its Type Argument undecided, and the
+			// bound is the comparison's to report. A `toContain` here would
+			// equally have passed if the construction had started reporting it,
+			// which is the reading this pins shut.
 			it("refuses the comparison where no Type Argument tells them apart", () => {
 				expect(
 					codesOf(`implementation { ${wrapped}
@@ -1356,7 +1541,7 @@ describe("Choices", () => {
 
 						__print(a::is(b))
 					}`),
-				).toContain("indistinguishable-union-arms")
+				).toEqual(["unsatisfied-bound", "indistinguishable-union-arms"])
 			})
 
 			// NOTE: One generic arm is the fallback it always was, and the
