@@ -25,8 +25,8 @@
       "dependencies": {
         "@essence/ariadne": "workspace:*",
         "@essence/interfaces": "workspace:*",
+        "@essence/runtime": "workspace:*",
         "@essence/stdlib": "workspace:*",
-        "bigint-fraction": "1.0.6",
         "esbuild": "0.28.1",
         "escodegen": "workspace:*",
         "vscode-languageserver": "10.1.0",
@@ -36,6 +36,7 @@
         "@essence/fixtures": "workspace:*",
         "@types/escodegen": "0.0.10",
         "@types/estree": "1.0.9",
+        "bigint-fraction": "1.0.6",
       },
     },
     "packages/escodegen": {
@@ -56,6 +57,14 @@
     "packages/interfaces": {
       "name": "@essence/interfaces",
       "version": "0.0.1",
+    },
+    "packages/runtime": {
+      "name": "@essence/runtime",
+      "version": "0.0.1",
+      "dependencies": {
+        "@essence/interfaces": "workspace:*",
+        "bigint-fraction": "1.0.6",
+      },
     },
     "packages/stdlib": {
       "name": "@essence/stdlib",
@@ -125,6 +134,8 @@
     "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
 
     "@essence/interfaces": ["@essence/interfaces@workspace:packages/interfaces"],
+
+    "@essence/runtime": ["@essence/runtime@workspace:packages/runtime"],
 
     "@essence/stdlib": ["@essence/stdlib@workspace:packages/stdlib"],
 

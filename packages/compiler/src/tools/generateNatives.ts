@@ -2,12 +2,13 @@ import { writeFileSync } from "node:fs"
 import path from "node:path"
 
 import type { common } from "@essence/interfaces"
+import { RUNTIME_DIRECTORY } from "@essence/runtime"
 
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 
 // NOTE: The renderer that turns the loaded standard library into a checked-in
-// TypeScript contract for the runtime bindings — `src/rewriter/__internal/*.ts`.
+// TypeScript contract for the runtime bindings — `@essence/runtime`.
 // A body-less Method signature in `packages/stdlib/sources/*.es` declares a NATIVE bound by
 // NAME ONLY to a runtime export; nothing between the Enricher's tables and the
 // runtime module checks that the export has the RIGHT SHAPE. This module emits
@@ -839,10 +840,7 @@ export function renderNativesModule(stdlib: Stdlib): string {
 	return `${parts.join("\n\n")}\n`
 }
 
-const OUTPUT_PATH = path.resolve(
-	import.meta.dirname,
-	"../rewriter/__internal/natives.generated.ts",
-)
+const OUTPUT_PATH = path.join(RUNTIME_DIRECTORY, "natives.generated.ts")
 
 if (import.meta.main) {
 	writeFileSync(OUTPUT_PATH, renderNativesModule(loadStdlib()), "utf-8")

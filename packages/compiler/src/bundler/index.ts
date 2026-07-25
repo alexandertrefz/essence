@@ -2,15 +2,15 @@ import { mkdir, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
 import type { common } from "@essence/interfaces"
+import { RUNTIME_DIRECTORY, RUNTIME_TSCONFIG } from "@essence/runtime"
 
 import { placelessDiagnostic } from "../diagnostics/index"
 
 // NOTE: The Rewriter emits a module whose imports of the Essence runtime are
-// absolute paths into `src/rewriter/__internal`. Bundling resolves and inlines
-// them, tree-shaking away everything the Program does not touch, so that a
-// compiled file is standalone — runnable by Bun or Node, or loadable in a
-// browser, with no dependency on the Compiler being installed.
-const runtimeDirectory = path.resolve(import.meta.dirname, "../rewriter")
+// absolute paths into `@essence/runtime`. Bundling resolves and inlines them,
+// tree-shaking away everything the Program does not touch, so that a compiled
+// file is standalone — runnable by Bun or Node, or loadable in a browser, with
+// no dependency on the Compiler being installed.
 
 export type BundleOptions = {
 	sourceFileName: string
@@ -49,23 +49,26 @@ export async function bundle(
 			stdin: {
 				contents: code,
 				loader: "ts",
-				resolveDir: runtimeDirectory,
+				// NOTE: The runtime's own directory, because the bare
+				// specifiers to resolve from here are the runtime modules' —
+				// `bigint-fraction` is imported by `Number.ts` and `Rational.ts`
+				// and by nothing the user wrote.
+				resolveDir: RUNTIME_DIRECTORY,
 				sourcefile: options.sourceFileName,
 			},
-			tsconfig: path.join(runtimeDirectory, "__internal/tsconfig.json"),
+			tsconfig: RUNTIME_TSCONFIG,
 			// NOTE: esbuild labels every module it inlines with that module's
 			// path relative to its working directory, and those labels are part
 			// of the emitted file. Left at the process's working directory they
 			// spell out wherever the Compiler happens to be installed, as seen
 			// from wherever the user happened to run it — in practice a line
-			// like `// ../../../../../Users/someone/…/__internal/Number.ts`
+			// like `// ../../../../../Users/someone/…/runtime/src/Number.ts`
 			// above each one. That leaks the building machine's layout into
 			// every shipped bundle, costs a kilobyte and a half of nothing, and
 			// makes the same Program compile to different bytes from two
 			// different directories. Anchored here the labels read
-			// `__internal/Number.ts`, and the output depends on the Program
-			// alone.
-			absWorkingDir: runtimeDirectory,
+			// `Number.ts`, and the output depends on the Program alone.
+			absWorkingDir: RUNTIME_DIRECTORY,
 			minify: options.minify ?? false,
 			sourcemap: options.sourcemap === true ? "linked" : false,
 			treeShaking: true,

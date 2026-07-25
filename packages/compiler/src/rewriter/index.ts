@@ -1,6 +1,7 @@
 import * as path from "node:path"
 
 import type { common } from "@essence/interfaces"
+import { RUNTIME_DIRECTORY } from "@essence/runtime"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
@@ -15,7 +16,7 @@ import {
 	stdlibPrelude,
 } from "./stdlibPrelude"
 
-// NOTE: The builtin Namespaces that have a runtime module in `__internal/`, in
+// NOTE: The builtin Namespaces that have a runtime module in `@essence/runtime`, in
 // the order their imports are emitted. Every one is imported unconditionally,
 // under its own name, and a Namespace no Program references costs nothing —
 // esbuild shakes an unused `import * as <Name>` away entirely. A Method the
@@ -1773,7 +1774,11 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	const __dirname = import.meta.dirname
+	// NOTE: An absolute path rather than `@essence/runtime/<Name>`, because the
+	// emitted module is written to the user's directory and handed to esbuild
+	// from there — a package specifier would have to resolve against wherever
+	// that is. The Bundler inlines these and they never reach the output.
+	const specifier = path.join(RUNTIME_DIRECTORY, `${fileName}.ts`)
 
 	return {
 		type: "ImportDeclaration",
@@ -1781,8 +1786,8 @@ function internalImport(
 		attributes: [],
 		source: {
 			type: "Literal",
-			value: `${path.resolve(__dirname, "./__internal", fileName)}.ts`,
-			raw: `"${path.resolve(__dirname, "./__internal", fileName)}.ts"`,
+			value: specifier,
+			raw: `"${specifier}"`,
 		},
 	}
 }

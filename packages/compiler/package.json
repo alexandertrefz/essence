@@ -16,8 +16,8 @@
 	"dependencies": {
 		"@essence/ariadne": "workspace:*",
 		"@essence/interfaces": "workspace:*",
+		"@essence/runtime": "workspace:*",
 		"@essence/stdlib": "workspace:*",
-		"bigint-fraction": "1.0.6",
 		"esbuild": "0.28.1",
 		"escodegen": "workspace:*",
 		"vscode-languageserver": "10.1.0",
@@ -26,6 +26,7 @@
 	"devDependencies": {
 		"@essence/fixtures": "workspace:*",
 		"@types/escodegen": "0.0.10",
-		"@types/estree": "1.0.9"
+		"@types/estree": "1.0.9",
+		"bigint-fraction": "1.0.6"
 	}
 }

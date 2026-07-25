@@ -1,16 +1,17 @@
 import { describe, expect, it } from "bun:test"
 
+import * as algebraic from "@essence/runtime/Algebraic"
+import * as boolean from "@essence/runtime/Boolean"
+import * as integer from "@essence/runtime/Integer"
+import * as list from "@essence/runtime/List"
+import * as number from "@essence/runtime/Number"
+import * as rational from "@essence/runtime/Rational"
+import * as string from "@essence/runtime/String"
+import * as transcendental from "@essence/runtime/Transcendental"
+import { boundConformance, typeKeySymbol } from "@essence/runtime/type"
+
 import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
-import * as algebraic from "../rewriter/__internal/Algebraic"
-import * as boolean from "../rewriter/__internal/Boolean"
-import * as integer from "../rewriter/__internal/Integer"
-import * as list from "../rewriter/__internal/List"
-import * as number from "../rewriter/__internal/Number"
-import * as rational from "../rewriter/__internal/Rational"
-import * as string from "../rewriter/__internal/String"
-import * as transcendental from "../rewriter/__internal/Transcendental"
-import { boundConformance, typeKeySymbol } from "../rewriter/__internal/type"
 import { validate } from "../validator/index"
 
 const int = (value: bigint) => integer.createInteger(value)

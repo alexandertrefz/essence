@@ -189,7 +189,7 @@ export function isValidIdentifierName(name: string): boolean {
 //     library Method is in a file a single-document rename never sees, and the
 //     Language Server has no project-wide index to find them with.
 //   • the name IS the runtime binding. A body-less signature is bound to the
-//     export of the same name in `src/rewriter/__internal`, so renaming
+//     export of the same name in `@essence/runtime`, so renaming
 //     `exclusiveOr` to `xor` type-checks, emits ZERO Diagnostics and produces
 //     a call to `undefined` at run time.
 //   • renaming a Method a `is …` clause depends on breaks the conformance, and
@@ -201,7 +201,7 @@ export function isValidIdentifierName(name: string): boolean {
 //
 // NOTE: What stands between a mis-bound native and a broken build is the
 // runtime-export cross-check in `src/tests/builtins.spec.ts` — it drives
-// `nativeBindings` against the real `__internal` modules in both directions,
+// `nativeBindings` against the real `@essence/runtime` modules in both directions,
 // and it is what fails on the rename above. It is the LAST line of defence now
 // that the standard library is only Essence source, and it can only speak for
 // Namespaces its `runtimeModules` table names.
