@@ -254,6 +254,7 @@ export interface ConstantDeclarationStatementNode {
 	name: IdentifierNode
 	value: ExpressionNode
 	position: Position
+	headPosition: Position
 	declaredType: Type | null
 	type: Type
 	documentation: Documentation | null
@@ -264,6 +265,7 @@ export interface VariableDeclarationStatementNode {
 	name: IdentifierNode
 	value: ExpressionNode
 	position: Position
+	headPosition: Position
 	declaredType: Type | null
 	type: Type
 	documentation: Documentation | null
@@ -339,14 +341,24 @@ export interface NamespaceDefinitionStatementNode {
 	nodeType: "NamespaceDefinitionStatement"
 	name: IdentifierNode
 	targetType: Type | null
+	// NOTE: The Namespace's own Type Parameters, carried as typed Nodes so that
+	// the cursor can land on one. `type.generics` says the same thing without
+	// Positions, which is why both exist.
+	generics: Array<GenericDeclarationNode>
 	conformsTo: Array<{
 		name: string
 		position: Position
-		conditions: Array<{ generic: string; protocol: string }>
+		conditions: Array<{
+			generic: string
+			genericPosition: Position
+			protocol: string
+			protocolPosition: Position
+		}>
 	}>
 	properties: Record<string, NamespaceProperty>
 	methods: Methods
 	position: Position
+	headPosition: Position
 	type: NamespaceType
 	documentation: Documentation | null
 }
@@ -356,12 +368,14 @@ export interface ProtocolDeclarationStatementNode {
 	name: IdentifierNode
 	protocolType: ProtocolType
 	position: Position
+	headPosition: Position
 	documentation: Documentation | null
 }
 
 export interface TypeAliasStatementNode {
 	nodeType: "TypeAliasStatement"
 	name: IdentifierNode
+	generics: Array<GenericDeclarationNode>
 	type: Type
 	position: Position
 	documentation: Documentation | null
@@ -375,9 +389,13 @@ export interface TypeAliasStatementNode {
 export interface ChoiceDeclarationStatementNode {
 	nodeType: "ChoiceDeclarationStatement"
 	name: IdentifierNode
+	// NOTE: As on a Namespace — the Type Parameters as typed Nodes, so the
+	// cursor can land on one. `type` carries them without Positions.
+	generics: Array<GenericDeclarationNode>
 	cases: Array<{ name: IdentifierNode; type: CaseType }>
 	type: UnionType | GenericAliasType
 	position: Position
+	headPosition: Position
 	documentation: Documentation | null
 }
 
@@ -407,6 +425,7 @@ export interface FunctionStatementNode {
 	name: IdentifierNode
 	value: FunctionDefinitionNode
 	position: Position
+	headPosition: Position
 	type: Type
 }
 
@@ -450,6 +469,11 @@ export interface FunctionDefinitionNode {
 	inferredReturnType: Type | null
 	// NOTE: Where an omitted `-> Type` would have gone, for the Inlay Hint.
 	parameterListPosition: Position
+	// NOTE: The signature as written — from the Type Parameter list, or the `(`
+	// where there is none, to the end of the return annotation. What Hover
+	// anchors a Method or a Function literal to, so that the cursor on a blank
+	// line in its body is answered by nothing rather than by the whole thing.
+	headPosition: Position
 }
 
 export interface ArgumentNode {

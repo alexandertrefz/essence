@@ -1,3 +1,4 @@
+import { builtinProtocols } from "../enricher/builtins"
 import type { common, parser } from "../interfaces/index"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { contains, isSmaller } from "./positions"
@@ -29,32 +30,93 @@ export type HoverInfo = {
 type State = {
 	cursor: common.Cursor
 	best: HoverInfo | null
+	// NOTE: Every Protocol in scope, so a conformance clause can read back as
+	// the Protocol it names. Built once per request rather than per clause.
+	protocols: Record<string, common.ProtocolType>
 }
 
-// NOTE: `parserProgram` is only ever passed for a standard library source, and
-// only because a body-less native Method signature has NO typed Node. The
-// Enricher drops one deliberately — there is no body to emit, and putting one
-// in the typed tree would make the Simplifier emit a definition under a
-// runtime export's name. So the Method Types are all there (on the typed
-// Namespace's `type`) while every Position that could locate the cursor inside
-// a signature is only in the parsed source. `visitNativeSignatures` pairs the
-// two up. Without it every Hover inside `src/stdlib/*.es` answered with the
-// enclosing Namespace, whatever it was aimed at — and String, Integer and
-// Rational are hundreds of these signatures each.
+// NOTE: The Protocols this document declares, over the ones it inherits — a
+// standard library source declares the very Protocols the builtin tables
+// already hold, and the document's own is the one whose Positions belong to it.
+function protocolsOf(
+	program: common.typed.Program,
+): Record<string, common.ProtocolType> {
+	let protocols: Record<string, common.ProtocolType> = {
+		...builtinProtocols(),
+	}
+
+	for (let node of program.implementation.nodes) {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocols[node.name.content] = node.protocolType
+		}
+	}
+
+	return protocols
+}
+
+// NOTE: `parserProgram` is what the passes below pair the typed tree against,
+// for the declarations whose parts the typed tree does not carry Positions for
+// at all:
+//
+//   • a body-less native Method signature has NO typed Node. The Enricher drops
+//     one deliberately — there is no body to emit, and putting one in the typed
+//     tree would make the Simplifier emit a definition under a runtime export's
+//     name. So the Method Types are all there (on the typed Namespace's `type`)
+//     while every Position that could locate the cursor inside a signature is
+//     only in the parsed source. Without `visitNativeSignatures` every Hover
+//     inside `src/stdlib/*.es` answered with the enclosing Namespace, whatever
+//     it was aimed at — and String, Integer and Rational are hundreds of these
+//     signatures each.
+//   • a Protocol's requirements and a Choice's payload members survive
+//     enrichment as plain Type Records, with no Position in them anywhere.
+//
+// Passing it is therefore worth it for EVERY document, not only a standard
+// library one: a native signature can not occur outside a declarations file, so
+// that pass simply finds nothing in an ordinary Program.
 export function findHover(
 	program: common.typed.Program,
 	cursor: common.Cursor,
 	parserProgram: parser.Program | null = null,
+	annotations: Array<common.TypeAnnotation> = [],
 ): HoverInfo | null {
-	let state: State = { cursor, best: null }
+	let state: State = {
+		cursor,
+		best: null,
+		protocols: protocolsOf(program),
+	}
 
 	visitBody(program.implementation.nodes, state)
 
 	if (parserProgram !== null) {
 		visitNativeSignatures(parserProgram, program, state)
+		visitProtocolBodies(parserProgram, program, state)
+		visitChoicePayloads(parserProgram, program, state)
 	}
 
+	visitAnnotations(annotations, state)
+
 	return state.best
+}
+
+// NOTE: Every Type annotation the Enricher resolved, paired with what it
+// resolved TO. The typed AST erases annotations — a resolved Type carries no
+// Position — so without this there is no candidate at an annotation's Position
+// at all, and the enclosing declaration, which spans its whole body, answers
+// for the cursor instead.
+//
+// A FLAT list, and no walker: an annotation's Position already says where it
+// sits, and `wins` picks the smallest candidate containing the cursor. Nesting
+// takes care of itself, because no annotation ever spans exactly what the
+// annotation containing it spans — every compound form needs a bracket or an
+// operator. Offered LAST so that an exact-span tie resolves to the annotation,
+// which is the most specific thing that can be said about its own span.
+function visitAnnotations(
+	annotations: Array<common.TypeAnnotation>,
+	state: State,
+) {
+	for (let annotation of annotations) {
+		consider(state, annotation.position, annotation.type, null)
+	}
 }
 
 function consider(
@@ -163,7 +225,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "VariableDeclarationStatement":
 			consider(
 				state,
-				node.position,
+				node.headPosition,
 				node.type,
 				node.name.content,
 				node.documentation,
@@ -180,7 +242,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "FunctionStatement":
 			consider(
 				state,
-				node.position,
+				node.headPosition,
 				node.type,
 				`function ${node.name.content}`,
 			)
@@ -210,7 +272,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					node.conformsTo,
 				)}`
 
-				for (let position of [node.position, node.name.position]) {
+				for (let position of [node.headPosition, node.name.position]) {
 					if (wins(state, position)) {
 						state.best = {
 							position,
@@ -224,12 +286,49 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			} else {
 				consider(
 					state,
-					node.position,
+					node.headPosition,
 					node.type,
 					node.name.content,
 					node.documentation,
 				)
 				visitIdentifier(node.name, state, undefined, node.documentation)
+			}
+
+			// NOTE: A Method sees the Namespace's Generics injected into its
+			// own list, so this is what a Namespace with no Methods would
+			// otherwise lose.
+			visitGenericDeclarations(node.generics, state)
+
+			// NOTE: `is Comparable` names a Protocol, so it reads back as that
+			// Protocol — the same Hover its declaration gives. Its Position is
+			// the Protocol Identifier's alone, not the whole clause. A `where`
+			// condition names one of each: the Generic it bounds and the
+			// Protocol it bounds it by.
+			for (let clause of node.conformsTo) {
+				visitProtocolReference(clause.name, clause.position, state)
+
+				for (let condition of clause.conditions) {
+					let generic = node.generics.find(
+						(candidate) => candidate.name === condition.generic,
+					)
+
+					if (
+						generic !== undefined &&
+						wins(state, condition.genericPosition)
+					) {
+						state.best = {
+							position: condition.genericPosition,
+							content: printTypedGenericDeclaration(generic),
+							documentation: null,
+						}
+					}
+
+					visitProtocolReference(
+						condition.protocol,
+						condition.protocolPosition,
+						state,
+					)
+				}
 			}
 
 			for (let property of Object.values(node.properties)) {
@@ -261,7 +360,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				visitIdentifier(member.name, state, label)
 
 				for (let method of methods) {
-					consider(state, method.position, method.type, label)
+					consider(
+						state,
+						method.value.headPosition,
+						method.type,
+						label,
+					)
 					visitFunctionDefinition(method.value, state)
 				}
 			}
@@ -276,32 +380,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				node.documentation,
 			)
 			visitIdentifier(node.name, state, undefined, node.documentation)
+			visitGenericDeclarations(node.generics, state)
 			return
 		case "ProtocolDeclarationStatement": {
-			// NOTE: A Protocol is not a Type, so its Hover is spelled by hand —
-			// the declaration keyword, the name, and each required signature.
-			let requirements = Object.entries(node.protocolType.methods)
-				.flatMap(([name, method]) => {
-					let signatures = signaturesOf(method) ?? []
-					let isStatic =
-						method.type === "StaticMethod" ||
-						method.type === "OverloadedStaticMethod"
+			let content = describeProtocol(node.name.content, node.protocolType)
 
-					return signatures.map((signature) =>
-						printSignature(
-							signature,
-							isStatic ? `static ${name}` : name,
-						),
-					)
-				})
-				.join("\n")
-
-			let content =
-				requirements === ""
-					? `protocol ${node.name.content}`
-					: `protocol ${node.name.content}\n${requirements}`
-
-			for (let position of [node.position, node.name.position]) {
+			for (let position of [node.headPosition, node.name.position]) {
 				if (wins(state, position)) {
 					state.best = {
 						position,
@@ -322,7 +406,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			visitBody(node.trueBody, state)
 			visitBody(node.falseBody, state)
 			return
+		// NOTE: The `<-` says what the Statement returns. `IfStatement` and
+		// `IfElseStatement` stay candidate-less on purpose — there is nothing
+		// useful to say about the keyword, and offering the condition's Boolean
+		// under it would be worse than saying nothing.
 		case "ReturnStatement":
+			consider(state, node.position, node.expression.type, null)
 			visitNode(node.expression, state)
 			return
 		case "Identifier":
@@ -412,7 +501,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 
 			return
 		case "FunctionValue":
-			consider(state, node.position, node.type, null)
+			consider(state, node.value.headPosition, node.type, null)
 			visitFunctionDefinition(node.value, state)
 			return
 		case "Self":
@@ -478,7 +567,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				...node.cases.map((choiceCase) => caseLine(choiceCase.type)),
 			].join("\n")
 
-			for (let position of [node.position, node.name.position]) {
+			for (let position of [node.headPosition, node.name.position]) {
 				if (wins(state, position)) {
 					state.best = {
 						position,
@@ -487,6 +576,8 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 					}
 				}
 			}
+
+			visitGenericDeclarations(node.generics, state)
 
 			for (let choiceCase of node.cases) {
 				if (wins(state, choiceCase.name.position)) {
@@ -521,6 +612,68 @@ function printGenericDeclaration(generic: common.GenericDeclaration): string {
 	return `${inferKeyword}${generic.name}${constraint}`
 }
 
+// NOTE: The typed Node spells the field `inferred` where the resolved Type
+// spells it `infer`. One adapter rather than a cast, so the day the two are
+// reconciled this stops compiling instead of quietly reading `undefined`.
+function printTypedGenericDeclaration(
+	generic: common.typed.GenericDeclarationNode,
+): string {
+	return printGenericDeclaration({
+		name: generic.name,
+		infer: generic.inferred,
+		constraint: generic.constraint,
+		defaultType: generic.defaultType,
+	})
+}
+
+// NOTE: A Protocol is not a Type, so its Hover is spelled by hand — the
+// declaration keyword, the name, and each required signature. Shared with the
+// conformance clauses that NAME a Protocol (`is Comparable`), which should read
+// back as the Protocol they point at rather than as the Namespace around them.
+function describeProtocol(
+	name: string,
+	protocolType: common.ProtocolType,
+): string {
+	let requirements = Object.entries(protocolType.methods)
+		.flatMap(([methodName, method]) => {
+			let signatures = signaturesOf(method) ?? []
+			let isStatic =
+				method.type === "StaticMethod" ||
+				method.type === "OverloadedStaticMethod"
+
+			return signatures.map((signature) =>
+				printSignature(
+					signature,
+					isStatic ? `static ${methodName}` : methodName,
+				),
+			)
+		})
+		.join("\n")
+
+	return requirements === ""
+		? `protocol ${name}`
+		: `protocol ${name}\n${requirements}`
+}
+
+// NOTE: A Type Parameter reads back as it was declared — `infer Item is
+// Comparable`. Only ever the declaration as a WHOLE: the typed Node keeps its
+// name and its bound as plain strings, so `Item` and `Comparable` within it can
+// not be told apart, and the whole clause already answers the question.
+function visitGenericDeclarations(
+	generics: Array<common.typed.GenericDeclarationNode>,
+	state: State,
+) {
+	for (let generic of generics) {
+		if (wins(state, generic.position)) {
+			state.best = {
+				position: generic.position,
+				content: printTypedGenericDeclaration(generic),
+				documentation: null,
+			}
+		}
+	}
+}
+
 function visitIdentifier(
 	node: common.typed.IdentifierNode,
 	state: State,
@@ -528,6 +681,27 @@ function visitIdentifier(
 	declared: common.Documentation | null = null,
 ) {
 	consider(state, node.position, node.type, label, declared)
+}
+
+// NOTE: A place that NAMES a Protocol rather than declaring one. An unknown
+// name offers nothing, so a clause naming a Protocol that does not resolve
+// keeps whatever the declaration around it was already saying.
+function visitProtocolReference(
+	name: string,
+	position: common.Position,
+	state: State,
+) {
+	let protocolType = state.protocols[name]
+
+	if (protocolType === undefined || !wins(state, position)) {
+		return
+	}
+
+	state.best = {
+		position,
+		content: describeProtocol(name, protocolType),
+		documentation: renderDocumentation(protocolType.documentation ?? null),
+	}
 }
 
 function visitArguments(
@@ -543,7 +717,20 @@ function visitFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	state: State,
 ) {
+	visitGenericDeclarations(definition.generics, state)
+
 	for (let parameter of definition.parameters) {
+		// NOTE: The Parameter as written, so that the cursor on a bare `_` — or
+		// on the `:` between a name and its annotation — is answered by the
+		// Parameter rather than by the signature around it. Offered BEFORE the
+		// names it contains, which are narrower and win on their own spans.
+		let declaredType =
+			parameter.internalName?.type ?? parameter.externalName?.type ?? null
+
+		if (declaredType !== null) {
+			consider(state, parameter.position, declaredType, null)
+		}
+
 		if (
 			parameter.externalName !== null &&
 			parameter.externalName !== parameter.internalName
@@ -591,21 +778,19 @@ function invokedSignatures(
 /* Body-less native declarations  */
 /**********************************/
 
-// NOTE: What the pass below can and can not answer for, so the gap is written
+// NOTE: What the pass below answers for, so the division of labour is written
 // down rather than discovered:
 //
 //   • the Method NAME — the full signature and its `§§` text. The whole point.
-//   • a Parameter's INTERNAL name (`other` in `_ other: Boolean`) — read back
-//     off the resolved Parameter, so it says what the annotation resolved TO,
-//     not what was typed.
-//   • a Parameter's and the return Type's ANNOTATION — same, resolved.
-//   • a native static PROPERTY's name and its annotation.
+//   • the signature itself, for the cursor anywhere along it.
+//   • a Parameter's EXTERNAL and INTERNAL names (`other` in `_ other: Boolean`)
+//     — read back off the resolved Parameter, so each says what the annotation
+//     resolved TO, not what was typed.
+//   • a native static PROPERTY's name.
 //
-// NOT covered: the Type Parameters of a generic signature (`<Item>`), and the
-// INSIDE of a compound annotation — hovering `Item` within `List<Item>` still
-// answers with `List<Item>`, because the resolved Type is reachable only as a
-// whole and this pass deliberately does not re-resolve anything. Hovering the
-// annotation itself is the common case and it is covered.
+// The annotations either side of those names are NOT its business: the
+// annotation index records every one of them, nested ones included, so
+// `visitAnnotations` answers for them in every document rather than only here.
 
 function namespaceTypesOf(
 	program: common.typed.Program,
@@ -670,19 +855,6 @@ function nativeSignatureEntries(
 	return entries
 }
 
-function considerType(
-	state: State,
-	node: parser.TypeDeclarationNode | null,
-	type: common.Type | common.GenericUse | undefined,
-	label: string | null = null,
-) {
-	if (node == null || type === undefined) {
-		return
-	}
-
-	consider(state, node.position, type as common.Type, label)
-}
-
 function visitNativeSignatures(
 	parserProgram: parser.Program,
 	program: common.typed.Program,
@@ -717,7 +889,6 @@ function visitNativeSignatures(
 				`static ${name}`,
 				property.documentation,
 			)
-			considerType(state, property.type, type)
 		}
 
 		for (let [name, member] of Object.entries(node.methods)) {
@@ -763,8 +934,6 @@ function visitNativeSignatures(
 						return
 					}
 
-					considerType(state, parameter.type, parameterType.type)
-
 					for (let identifier of [
 						parameter.externalName,
 						parameter.internalName,
@@ -779,8 +948,194 @@ function visitNativeSignatures(
 						}
 					}
 				})
+			}
+		}
+	}
+}
 
-				considerType(state, signature.returnType, resolved.returnType)
+/*************************************************/
+/* Declarations whose parts the typed tree drops */
+/*************************************************/
+
+// NOTE: A Protocol's requirements and a Choice's payload members exist in the
+// typed tree only as Types — `protocolType.methods` and `caseType.members` are
+// plain Records, with no Position anywhere in them. Every name inside either
+// declaration therefore had NO candidate at all, and the declaration around it
+// answered: hovering `size`, `resize`, `to` or `Self` inside a Protocol gave
+// back the whole Protocol, every time.
+//
+// Both are paired BY NAME with the parsed declaration, the same way
+// `visitNativeSignatures` pairs a native Method with its resolved Overloads.
+// The annotations either side of these names are not handled here — the
+// annotation index already records every one of them.
+
+function protocolSignatureEntries(
+	member: parser.ProtocolMethods[string],
+	methodType: common.MethodType,
+): Array<{
+	signature: parser.ProtocolMethodSignatureNode
+	resolved: common.BaseFunction
+}> {
+	let signatures =
+		member.nodeType === "OverloadedProtocolMethod" ||
+		member.nodeType === "OverloadedStaticProtocolMethod"
+			? member.signatures
+			: [member.signature]
+
+	let resolved =
+		methodType.type === "OverloadedMethod" ||
+		methodType.type === "OverloadedStaticMethod"
+			? methodType.overloads
+			: [methodType]
+
+	let entries: Array<{
+		signature: parser.ProtocolMethodSignatureNode
+		resolved: common.BaseFunction
+	}> = []
+
+	signatures.forEach((signature, index) => {
+		let overload = resolved[index]
+
+		if (overload !== undefined) {
+			entries.push({ signature, resolved: overload })
+		}
+	})
+
+	return entries
+}
+
+function visitProtocolBodies(
+	parserProgram: parser.Program,
+	program: common.typed.Program,
+	state: State,
+) {
+	let protocolTypes = new Map<string, common.ProtocolType>()
+
+	for (let node of program.implementation.nodes) {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocolTypes.set(node.name.content, node.protocolType)
+		}
+	}
+
+	for (let node of parserProgram.implementation.nodes) {
+		if (node.nodeType !== "ProtocolDeclarationStatement") {
+			continue
+		}
+
+		let protocolType = protocolTypes.get(node.name.content)
+
+		if (protocolType === undefined) {
+			continue
+		}
+
+		for (let [name, member] of Object.entries(node.methods)) {
+			let methodType = protocolType.methods[name]
+
+			if (methodType === undefined) {
+				continue
+			}
+
+			let isStatic =
+				methodType.type === "StaticMethod" ||
+				methodType.type === "OverloadedStaticMethod"
+			let label = isStatic ? `static ${name}` : name
+
+			// NOTE: The name is the requirement itself — every Overload at
+			// once, since the name is what they share.
+			consider(state, member.name.position, methodType, label)
+
+			for (let { signature, resolved } of protocolSignatureEntries(
+				member,
+				methodType,
+			)) {
+				considerSignatures(
+					state,
+					signature.position,
+					[isStatic ? resolved : withoutSelf(resolved)],
+					label,
+					signature.documentation,
+				)
+
+				// NOTE: The receiver is injected ahead of the written
+				// Parameters on a non-static requirement, exactly as it is on a
+				// native Method signature.
+				let offset = isStatic ? 0 : 1
+
+				signature.parameters.forEach((parameter, index) => {
+					let parameterType = resolved.parameterTypes[index + offset]
+
+					if (parameterType === undefined) {
+						return
+					}
+
+					for (let identifier of [
+						parameter.externalName,
+						parameter.internalName,
+					]) {
+						if (identifier !== null) {
+							consider(
+								state,
+								identifier.position,
+								parameterType.type,
+								identifier.content,
+							)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+function visitChoicePayloads(
+	parserProgram: parser.Program,
+	program: common.typed.Program,
+	state: State,
+) {
+	let choiceCases = new Map<string, Map<string, common.CaseType>>()
+
+	for (let node of program.implementation.nodes) {
+		if (node.nodeType === "ChoiceDeclarationStatement") {
+			choiceCases.set(
+				node.name.content,
+				new Map(
+					node.cases.map((choiceCase) => [
+						choiceCase.name.content,
+						choiceCase.type,
+					]),
+				),
+			)
+		}
+	}
+
+	for (let node of parserProgram.implementation.nodes) {
+		if (node.nodeType !== "ChoiceDeclarationStatement") {
+			continue
+		}
+
+		let cases = choiceCases.get(node.name.content)
+
+		if (cases === undefined) {
+			continue
+		}
+
+		for (let choiceCase of node.cases) {
+			let caseType = cases.get(choiceCase.name.content)
+
+			if (caseType === undefined || choiceCase.type === null) {
+				continue
+			}
+
+			for (let [memberName, member] of Object.entries(
+				choiceCase.type.members,
+			)) {
+				let memberType = caseType.members[memberName]
+
+				if (memberType === undefined) {
+					continue
+				}
+
+				consider(state, member.name.position, memberType, memberName)
 			}
 		}
 	}

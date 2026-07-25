@@ -1,5 +1,6 @@
 import { collectDiagnostics, primary, reportError } from "../diagnostics/index"
 import type { common, enricher, parser } from "../interfaces/index"
+import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
 	enrichNode,
@@ -41,12 +42,19 @@ const withoutShadowed = <Value>(
 
 export const enrich = (
 	program: parser.Program,
-	options: { shadowedBuiltins?: ShadowedBuiltins } = {},
+	options: {
+		shadowedBuiltins?: ShadowedBuiltins
+		// NOTE: Only the Language Server sets this, for Hovers over a written
+		// Type. A compile leaves it off and the collector stays null.
+		annotations?: boolean
+	} = {},
 ): {
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
+	annotations: Array<common.TypeAnnotation>
 } => {
 	let shadowed = options.shadowedBuiltins
+	let annotations: Array<common.TypeAnnotation> = []
 
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
@@ -70,18 +78,36 @@ export const enrich = (
 				),
 			}
 
+			let enrichSection = () =>
+				enrichImplementation(program.implementation, topLevelScope)
+
+			if (options.annotations !== true) {
+				return {
+					nodeType: "Program",
+					implementation: enrichSection(),
+					position: program.position,
+				}
+			}
+
+			// NOTE: The collector opens AFTER the builtin tables are built, and
+			// that is not a matter of taste either. Building them is what loads
+			// the standard library on the first call of a process, and that
+			// load enriches ~20 OTHER files — every annotation in every one of
+			// them would land in THIS document's index, at Positions that mean
+			// nothing here.
+			let collected = collectAnnotations(enrichSection)
+
+			annotations = collected.annotations
+
 			return {
 				nodeType: "Program",
-				implementation: enrichImplementation(
-					program.implementation,
-					topLevelScope,
-				),
+				implementation: collected.result,
 				position: program.position,
 			}
 		},
 	)
 
-	return { program: result, diagnostics }
+	return { program: result, diagnostics, annotations }
 }
 
 // NOTE: Several Programs enriched into ONE shared Scope, which is how the

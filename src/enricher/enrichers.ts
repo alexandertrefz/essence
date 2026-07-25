@@ -68,6 +68,54 @@ export type HoistedTypes = Map<
 	common.Type | common.ProtocolType
 >
 
+// NOTE: A declaration's HEAD — from where it starts to the end of the last
+// thing it says about ITSELF, stopping before whatever body follows. The
+// Language Server anchors a declaration's Hover here instead of on its whole
+// Position, so that the cursor on a blank line inside a forty-line Namespace is
+// answered by nothing rather than by the Namespace. `parts` is every piece the
+// head may end on, in any order; the one reaching furthest wins, and absent
+// ones are skipped — an unannotated Constant ends on its name, an annotated one
+// on its annotation.
+export function headPositionOf(
+	position: common.Position,
+	parts: Array<common.Position | null | undefined>,
+): common.Position {
+	let end = position.start
+
+	for (let part of parts) {
+		if (part == null) {
+			continue
+		}
+
+		if (
+			part.end.line > end.line ||
+			(part.end.line === end.line && part.end.column > end.column)
+		) {
+			end = part.end
+		}
+	}
+
+	return { start: position.start, end }
+}
+
+// NOTE: A signature's own span — `<infer Item>(a: Integer) -> String` — which
+// NO parser Node covers: a FunctionValue starts at its `(`, leaving a leading
+// Type Parameter list outside it, and a FunctionDefinition carries no Position
+// at all. Hover needs it to anchor a Method or a Function literal to what it
+// declares rather than to what it contains.
+export function signatureHeadPositionOf(
+	definition: parser.FunctionDefinitionNode,
+): common.Position {
+	let start = (
+		definition.generics[0]?.position ?? definition.parameterListPosition
+	).start
+
+	return headPositionOf({ start, end: start }, [
+		definition.parameterListPosition,
+		definition.returnType?.position,
+	])
+}
+
 export function enrichNode(
 	node: parser.ImplementationNode,
 	scope: enricher.Scope,
@@ -471,6 +519,7 @@ export function enrichMethodFunctionDefinition(
 		// allows omitting them for a literal in expression position.
 		inferredReturnType: null,
 		parameterListPosition: method.value.parameterListPosition,
+		headPosition: signatureHeadPositionOf(method.value),
 	}
 }
 
@@ -572,6 +621,7 @@ export function enrichFunctionDefinition(
 		returnType,
 		inferredReturnType: node.returnType === null ? returnType : null,
 		parameterListPosition: node.parameterListPosition,
+		headPosition: signatureHeadPositionOf(node),
 	}
 }
 
@@ -1113,6 +1163,10 @@ export function enrichConstantDeclarationStatement(
 		name: enrichIdentifier(node.name, scope),
 		value,
 		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			node.type?.position,
+		]),
 		type: value.type,
 		declaredType,
 		documentation: node.documentation,
@@ -1135,6 +1189,10 @@ export function enrichVariableDeclarationStatement(
 		name: enrichIdentifier(node.name, scope, value.type),
 		value,
 		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			node.type?.position,
+		]),
 		type: value.type,
 		declaredType,
 		documentation: node.documentation,
@@ -1442,12 +1500,17 @@ export function enrichNamespaceDefinitionStatement(
 	return {
 		nodeType: "NamespaceDefinitionStatement",
 		targetType: type.targetType,
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		conformsTo: node.conformsTo.map((clause) => ({
 			name: clause.protocol.content,
 			position: clause.protocol.position,
 			conditions: clause.conditions.map((condition) => ({
 				generic: condition.generic.content,
+				genericPosition: condition.generic.position,
 				protocol: condition.protocol.content,
+				protocolPosition: condition.protocol.position,
 			})),
 		})),
 		name: enrichIdentifier(node.name, scope),
@@ -1460,6 +1523,13 @@ export function enrichNamespaceDefinitionStatement(
 			injectedGenerics,
 		),
 		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			...node.generics.map((generic) => generic.position),
+			node.targetType?.position,
+			// NOTE: A clause's Position covers its `where` conditions too.
+			...node.conformsTo.map((clause) => clause.position),
+		]),
 		type,
 		documentation: node.documentation,
 	}
@@ -1585,6 +1655,7 @@ export function enrichProtocolDeclarationStatement(
 		name: enrichIdentifier(node.name, scope, { type: "Unknown" }),
 		protocolType,
 		position: node.position,
+		headPosition: headPositionOf(node.position, [node.name.position]),
 		documentation: node.documentation,
 	}
 }
@@ -1603,6 +1674,9 @@ export function enrichTypeAliasStatement(
 	return {
 		nodeType: "TypeAliasStatement",
 		name: enrichIdentifier(node.name, scope, type),
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		type,
 		position: node.position,
 		documentation: node.documentation,
@@ -1634,6 +1708,9 @@ export function enrichChoiceDeclarationStatement(
 	return {
 		nodeType: "ChoiceDeclarationStatement",
 		name: enrichIdentifier(node.name, scope, type),
+		generics: node.generics.map((generic) =>
+			enrichGenericDeclarationNode(generic, scope),
+		),
 		// NOTE: A duplicate Case was already diagnosed and dropped from the
 		// Union — its name Identifier borrows the surviving Case's Type so the
 		// typed tree stays complete.
@@ -1659,6 +1736,10 @@ export function enrichChoiceDeclarationStatement(
 		}),
 		type,
 		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			...node.generics.map((generic) => generic.position),
+		]),
 		documentation: node.documentation,
 	}
 }
@@ -1740,6 +1821,12 @@ export function enrichFunctionStatement(
 		name: enrichIdentifier(node.name, scope, type),
 		value: enrichFunctionDefinition(node.value, scope),
 		position: node.position,
+		headPosition: headPositionOf(node.position, [
+			node.name.position,
+			...node.value.generics.map((generic) => generic.position),
+			node.value.parameterListPosition,
+			node.value.returnType?.position,
+		]),
 		type,
 	}
 }
@@ -1794,6 +1881,11 @@ export function enrichOverloadedFunctionStatement(
 			},
 			value: enrichFunctionDefinition(entry.value, scope),
 			position: entry.position,
+			headPosition: headPositionOf(entry.position, [
+				...entry.value.generics.map((generic) => generic.position),
+				entry.value.parameterListPosition,
+				entry.value.returnType?.position,
+			]),
 			type,
 		})
 	}

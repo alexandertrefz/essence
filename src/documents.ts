@@ -117,17 +117,22 @@ export function parseDocument(
 export function enrichDocument(
 	program: parser.Program,
 	documentPath?: string,
+	options: { annotations?: boolean } = {},
 ): {
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
+	annotations: Array<common.TypeAnnotation>
 } {
 	if (!isStdlibDocument(documentPath)) {
-		return enrich(program)
+		return enrich(program, options)
 	}
 
 	// NOTE: Only the names THIS document declares are subtracted. A Namespace
 	// another standard library file declares is a genuine builtin as far as
 	// this one is concerned — the loader hoists them all into one Scope, and
 	// the editor's view of a single file should agree.
-	return enrich(program, { shadowedBuiltins: declaredNames([program]) })
+	return enrich(program, {
+		...options,
+		shadowedBuiltins: declaredNames([program]),
+	})
 }
