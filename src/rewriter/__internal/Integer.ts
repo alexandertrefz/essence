@@ -42,7 +42,8 @@ export function add__overload$2(
 	other: RationalType,
 ): RationalType {
 	return createRational(
-		other.rational.numerator + originalNumber.value * other.rational.denominator,
+		other.rational.numerator +
+			originalNumber.value * other.rational.denominator,
 		other.rational.denominator,
 	)
 }
