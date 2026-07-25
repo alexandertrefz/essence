@@ -1299,6 +1299,82 @@ describe("Choices", () => {
 			expect(generated).toContain("$helpers.boundChoiceIs(")
 		})
 
+		// NOTE: Regression tests — a payload Union with SEVERAL arms mentioning
+		// the Type Parameter emitted several fallback arms (`tag: null`), and
+		// the runtime took the first one it found for everything no arm
+		// claimed. A `T | List<T>` payload therefore compared every List
+		// through T's own witness: `#Val([2]) is #Val([10])` answered true, and
+		// so did `#Val([2]) is #Val(2)`. What tells the arms apart is what the
+		// receiver's Type Arguments made of them.
+		describe("Several generic arms in one payload", () => {
+			const wrapped = `choice Wrapped<T is Equatable> {
+				Val { v: T | List<T> },
+				None,
+			}`
+
+			it("tells a Parameter's values from a List of them", async () => {
+				expect(
+					await run(`implementation { ${wrapped}
+						constant listA: Wrapped<Integer> = #Val({ v = [2] })
+						constant listB: Wrapped<Integer> = #Val({ v = [10] })
+						constant listC: Wrapped<Integer> = #Val({ v = [2] })
+						constant plain: Wrapped<Integer> = #Val({ v = 2 })
+
+						__print(listA::is(listB)::toString())
+						__print(listA::is(listC)::toString())
+						__print(listA::is(plain)::toString())
+						__print(plain::is(listA)::toString())
+					}`),
+				).toEqual(['"false"', '"true"', '"false"', '"false"'])
+			})
+
+			it("compares each arm by the equality its own Type has", async () => {
+				expect(
+					await run(`implementation {
+						choice Wrapped<T is Equatable> {
+							Val { v: T | List<T> },
+							None,
+						}
+
+						constant a: Wrapped<Rational> = #Val({ v = [1/2] })
+						constant b: Wrapped<Rational> = #Val({ v = [2/4] })
+
+						__print(a::is(b)::toString())
+					}`),
+				).toEqual(['"true"'])
+			})
+
+			// NOTE: With no Type Arguments to shape the arms with, both stand
+			// for whatever the eventual Argument turns out to be — no
+			// descriptor can be right about that, so the comparison is refused
+			// rather than emitted wrong.
+			it("refuses the comparison where no Type Argument tells them apart", () => {
+				expect(
+					codesOf(`implementation { ${wrapped}
+						constant a = Wrapped#None
+						constant b = Wrapped#None
+
+						__print(a::is(b))
+					}`),
+				).toContain("indistinguishable-union-arms")
+			})
+
+			// NOTE: One generic arm is the fallback it always was, and the
+			// descriptor it emits is the one it always emitted.
+			it("leaves a single generic arm carrying no shape", () => {
+				let generated = generate(`implementation {
+					choice Opt<T is Equatable> { Holding { value: T | Nothing } }
+
+					constant a: Opt<Integer> = #Holding({ value = 1 })
+
+					__print(a::is(a))
+				}`)
+
+				expect(generated).toContain('"tag": null')
+				expect(generated).not.toContain('"shape"')
+			})
+		})
+
 		// NOTE: A non-generic Choice carries no descriptor, so it keeps emitting
 		// the flat helper — the guarantee that this whole feature adds nothing to
 		// the code a non-generic Choice already generated.

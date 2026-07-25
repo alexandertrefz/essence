@@ -366,6 +366,22 @@ function memberEqual(
 					: false
 			}
 
+			// NOTE: The fallback is ONE arm — the Enricher shapes every other
+			// Parameter-naming arm with what the receiver's Type Arguments made
+			// of it, precisely so that only one is left with nothing to be told
+			// apart by. Two of them means the descriptor is wrong rather than
+			// the Program: whichever came first would answer for the other's
+			// values, which is a `List<T>` compared through T's own witness.
+			if (
+				node.arms.filter(
+					(arm) => arm.tag === null && arm.shape === undefined,
+				).length > 1
+			) {
+				throw new Error(
+					"A Union payload descriptor leaves several arms with nothing to tell them apart. This is a bug in the Compiler.",
+				)
+			}
+
 			let fallback = node.arms.find((arm) => arm.tag === null)
 
 			return fallback === undefined

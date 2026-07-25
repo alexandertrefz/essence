@@ -3467,8 +3467,11 @@ function resolveMethodInvocation(
 			// erased.
 			derivedDescriptor:
 				resolvedMethod.namespace.name === derivedEquatableNamespaceName
-					? (derivedEquatableDescriptorFor(baseType, scope) ??
-						undefined)
+					? (derivedEquatableDescriptorFor(
+							baseType,
+							scope,
+							node.position,
+						) ?? undefined)
 					: undefined,
 			dispatch: null,
 		}
@@ -3691,8 +3694,11 @@ function resolveUnionMethodDispatch(
 			// from this member's Choice.
 			derivedDescriptor:
 				resolvedMethod.namespaceName === derivedEquatableNamespaceName
-					? (derivedEquatableDescriptorFor(memberType, scope) ??
-						undefined)
+					? (derivedEquatableDescriptorFor(
+							memberType,
+							scope,
+							node.position,
+						) ?? undefined)
 					: undefined,
 		})
 		caseReturnTypes.push(resolvedMethod.returnType)

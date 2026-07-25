@@ -193,6 +193,7 @@ export type DiagnosticCode =
 	| "unexpected-payload"
 	| "payload-type-mismatch"
 	| "recursive-generic-choice"
+	| "indistinguishable-union-arms"
 	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"
