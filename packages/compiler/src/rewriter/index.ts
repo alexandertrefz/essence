@@ -403,7 +403,9 @@ export function reachableEssenceMethods(
 //   MethodInvocation        `@::m(…)`            — base.name, member.name
 //   UnionMethodInvocation    a Union receiver    — each case's namespaceName +
 //                            methodName (the case's conformance Arguments are
-//                            ConformanceValues, reached by the recursion below)
+//                            ConformanceValues and its own Arguments are
+//                            ordinary Expressions, both reached by the
+//                            recursion below)
 //   Lookup (Identifier base) a static call OR a bare static reference —
 //                            base.name, member.name
 //   ConformanceValue         a witness `{ m: X.m }` — namespaceName + each
@@ -951,10 +953,14 @@ function rewriteMethodInvocation(
 
 // NOTE: A Method Invocation on a Union-typed receiver — emitted as
 // `$type.dispatchMethod(receiver, [args…], [[descriptor, Namespace.method,
-// [conformances…]], …])`. The helper evaluates receiver and Arguments once
-// and runs the first case whose member Type descriptor accepts the receiver;
-// the Enricher ordered the cases most specific first and guarantees one
-// matches.
+// [conformances…], [[index, argument], …]], …])`. The helper evaluates receiver
+// and Arguments once and runs the first case whose member Type descriptor
+// accepts the receiver; the Enricher ordered the cases most specific first and
+// guarantees one matches.
+//
+// NOTE: The fourth element is omitted where a branch has no Argument of its own
+// — which is every dispatch that passes no contextually typed Function literal
+// — so what such a call emits is unchanged, byte for byte.
 function rewriteUnionMethodInvocation(
 	node: common.typedSimple.UnionMethodInvocationNode,
 ): estree.CallExpression {
@@ -994,11 +1000,39 @@ function rewriteUnionMethodInvocation(
 									(arg) => rewriteArgument(arg),
 								),
 							},
+							...(dispatchCase.contextualArguments.length === 0
+								? []
+								: [
+										contextualArgumentOverrides(
+											dispatchCase.contextualArguments,
+										),
+									]),
 						],
 					}),
 				),
 			},
 		],
+	}
+}
+
+// NOTE: The Arguments one dispatch branch is given in place of the shared ones,
+// as the runtime takes them: a pair per Argument, naming the position it stands
+// in for. The position is the Argument's own index in the Invocation, which the
+// receiver — passed separately — is not part of.
+function contextualArgumentOverrides(
+	contextualArguments: common.typedSimple.UnionMethodDispatchCase["contextualArguments"],
+): estree.ArrayExpression {
+	return {
+		type: "ArrayExpression",
+		elements: contextualArguments.map(
+			(contextualArgument): estree.ArrayExpression => ({
+				type: "ArrayExpression",
+				elements: [
+					{ type: "Literal", value: contextualArgument.index },
+					rewriteArgument(contextualArgument.argument),
+				],
+			}),
+		),
 	}
 }
 
