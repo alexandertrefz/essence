@@ -62,6 +62,35 @@ describe("Type matching", () => {
 		})
 	})
 
+	// NOTE: A bare `List` demands nothing of the items, so it accepts every
+	// List. The reverse used to hold too, and that direction PROMISES something
+	// a bare `List` never said: a List of Integers arrived where a
+	// `List<String>` was declared, and every String Method then ran on
+	// Integers. An empty List Literal is the case the loose direction was there
+	// for, and it has a rule of its own — an undecided item Type is a slot
+	// nothing has filled, not a claim to hold anything at all.
+	describe("Bare List annotations", () => {
+		it("should accept a List of anything", () => {
+			expect(
+				errorsFor(`implementation {
+					constant integers: List = [1, 2]
+					constant copied: List = integers
+					constant empty: List = []
+				}`),
+			).toEqual([])
+		})
+
+		it("should not satisfy a List of something", () => {
+			let errors = errorsFor(`implementation {
+				constant integers: List = [1, 2]
+				constant strings: List<String> = integers
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("assignment-type-mismatch")
+		})
+	})
+
 	describe("Union member inference", () => {
 		// NOTE: Matching the Argument against the first member binds
 		// `T := String` off `left` and THEN fails on `right`. That binding is

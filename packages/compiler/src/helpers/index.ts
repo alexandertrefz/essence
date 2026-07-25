@@ -1384,14 +1384,17 @@ function matchTypes(
 		return true
 	}
 
+	// NOTE: A bare `List` demands nothing of the items, so it accepts every
+	// List. The reverse does NOT hold: a bare `List` PROMISES nothing about
+	// them either, and letting one satisfy a `List<Integer>` would hand a List
+	// of Strings to everything reading Integers out of it. That direction is
+	// what an empty List Literal needs, and it has its own rule below — an
+	// Unknown item Type is a slot nothing has decided, not a decision to hold
+	// anything at all.
 	if (
-		(lhs.type === "GenericList" || lhs.type === "List") &&
-		rhs.type === "GenericList"
+		lhs.type === "GenericList" &&
+		(rhs.type === "GenericList" || rhs.type === "List")
 	) {
-		return true
-	}
-
-	if (lhs.type === "GenericList" && rhs.type === "List") {
 		return true
 	}
 
