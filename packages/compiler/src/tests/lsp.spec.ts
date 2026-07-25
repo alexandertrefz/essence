@@ -364,7 +364,7 @@ describe("LSP in a standard library source", () => {
 	// a user's own project may well have one of those.
 	const stdlibPath = path.join(STDLIB_DIRECTORY, "Boolean.es")
 
-	it("should report no Diagnostics for a document under src/stdlib", () => {
+	it("should report no Diagnostics for a document in the standard library", () => {
 		expect(analyse(source, stdlibPath)).toEqual([])
 	})
 
@@ -409,8 +409,8 @@ describe("LSP in a standard library source", () => {
 		}
 	})
 
-	// NOTE: On a case-insensitive filesystem — macOS' default — `src/stdlib`
-	// and `src/STDLIB` are one directory and an Editor may hand over either
+	// NOTE: On a case-insensitive filesystem — macOS' default — `sources`
+	// and `SOURCES` are one directory and an Editor may hand over either
 	// spelling; on a case-sensitive one they are two, and the variant is
 	// genuinely not the standard library. Which of the two it is, is the
 	// filesystem's answer to give rather than this comparison's to guess, so
@@ -426,9 +426,10 @@ describe("LSP in a standard library source", () => {
 	})
 
 	// NOTE: A standard library source that has never been saved is still a
-	// standard library source — the Editor opens `src/stdlib/Ordering.es` as a
-	// new file and the `declarations` header has to be allowed while it is
-	// typed. Canonicalising must therefore not require the file to exist.
+	// standard library source — the Editor opens
+	// `packages/stdlib/sources/Ordering.es` as a new file and the
+	// `declarations` header has to be allowed while it is typed.
+	// Canonicalising must therefore not require the file to exist.
 	it("should recognise a standard library document that is not on disk yet", () => {
 		expect(
 			isStdlibDocument(path.join(STDLIB_DIRECTORY, "NotWrittenYet.es")),

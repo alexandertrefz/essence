@@ -8,7 +8,7 @@ import { loadStdlib } from "./stdlib"
 // builtin registered here reaches resolution, completion, rename and
 // semantic tokens in one step, and can not be half-wired again.
 //
-// NOTE: The standard library itself is written in Essence, under `src/stdlib`.
+// NOTE: The standard library itself is written in Essence, under `packages/stdlib/sources`.
 // Nothing a Program starts with is declared in TypeScript any more: `loadStdlib`
 // reads those sources once per process and the accessors at the foot of this
 // file hand out what it produced. What is left in this file is the ORDER those
@@ -18,7 +18,7 @@ import { loadStdlib } from "./stdlib"
 // NOTE: The order the builtin members are listed in. A source declaration is
 // enriched INTO the Scope, so it lands where insertion put it — which is the
 // order `readStdlibSources` happened to sort the file names in, and nothing an
-// editor of `src/stdlib` would think to control. The order is observable:
+// editor of `packages/stdlib/sources` would think to control. The order is observable:
 // `builtinNamespaces()` derives from it, Completion dedupes members
 // first-Namespace-wins (`lsp/completion.ts`), and the Enricher builds its
 // `matchingNamespaces` in the same order — so it is stated here, once, rather
@@ -92,7 +92,7 @@ export const builtinTypeOrder: Array<string> = [
 
 // NOTE: Accessors rather than consts, because what they answer with is read
 // from Essence source at first call. `loadStdlib` parses, enriches and
-// validates `src/stdlib/*.es`, caches the result for the process, and hands
+// validates `packages/stdlib/sources/*.es`, caches the result for the process, and hands
 // back the SAME object every time — so these stay as cheap as the consts they
 // replaced after the first call.
 export function builtinMembers(): Record<string, common.Type> {

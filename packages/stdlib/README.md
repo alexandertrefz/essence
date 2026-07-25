@@ -12,11 +12,12 @@ with `NestedList`.
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
 `Transcendental`, `Nothing`, the open Record and the unapplied `List` — which
-live in `src/enricher/primitives.ts`, and `__print`, the one native Function
-with no Namespace to live in, in `src/enricher/types/NativeFunctions.ts`.
+live in `packages/compiler/src/enricher/primitives.ts`. `__print` — the one
+native Function with no Namespace to live in — is declared here after all, in
+`Print.es`, as an ordinary body-less free Function.
 
 About half of the declared Method entries are also IMPLEMENTED here, in
-Essence; the rest bind to `src/rewriter/__internal/`. What stays native is a
+Essence; the rest bind to `packages/compiler/src/rewriter/__internal/`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compareTo`), the JavaScript intrinsics Essence has no expression for
@@ -37,7 +38,7 @@ too — its empty part inserted at UTF-16 code-unit boundaries — but the empty
 part is now a no-op, so it is `split(on part)::join(with replacement)` in
 Essence.
 
-**`src/tests/stdlibGolden.spec.ts` is the net.** `testFiles/StdlibExhaustive.es`
+**`packages/compiler/src/tests/stdlibGolden.spec.ts` is the net.** `packages/fixtures/files/StdlibExhaustive.es`
 calls every declared Method across its edge cases and its output is diffed
 against a checked-in capture. Never regenerate that capture to make a test
 pass — a changed value means a body is wrong.
@@ -87,7 +88,7 @@ same-kind entry is written on the member's own `compareTo`; `Number`'s is the
 sixteen-cell cross-kind table that reaches `bigint-fraction` and the whole
 tower. Deleting the member entries would route two Integers through it and
 nearly double a Program that only prints a greeting. The reasoning is written
-above `Integer::isLessThan`, and `src/tests/bundleSize.spec.ts` is the guard.
+above `Integer::isLessThan`, and `packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
 Before collapsing anything that looks repeated here, check whether the repeat
 is what keeps a body reaching only its own Namespace's primitives.
 
@@ -134,7 +135,7 @@ missing exactly the Methods the file was written to add.
 
 ## How it is loaded
 
-`src/enricher/stdlib.ts` reads every `.es` file in this directory, in sorted
+`packages/compiler/src/enricher/stdlib.ts` reads every `.es` file in this directory, in sorted
 order, hoists them into ONE shared Scope — so a Protocol declared in one file
 and a Namespace conforming to it in another resolve across the file boundary —
 and then enriches and validates them. A single Diagnostic anywhere in here is a
@@ -147,7 +148,7 @@ listings, the test suite — the same object. It costs on the order of 15 ms.
 
 The ORDER the builtins are listed in is the one thing a source file can not say
 about itself, because each declares only its own name. It is stated in
-`builtinMemberOrder` and `builtinTypeOrder` (`src/enricher/builtins.ts`), and it
+`builtinMemberOrder` and `builtinTypeOrder` (`packages/compiler/src/enricher/builtins.ts`), and it
 is observable: Completion dedupes members first-Namespace-wins, the Enricher
 searches `matchingNamespaces` in that order, and `closestMatch` breaks a "did
 you mean …?" tie on the first candidate.
@@ -156,13 +157,13 @@ Documentation Positions read out of these files are stripped before the tables
 are handed out — a builtin is sourceless to Hover, Signature Help and `go to
 definition` in a USER's Program. The Language Server opens these files as
 ordinary documents when you edit them, which is a different path, so navigation
-inside `src/stdlib` works normally.
+inside `packages/stdlib/sources` works normally.
 
 ## Native and Essence in one Namespace
 
 Every Namespace here is half native and half Essence — about half of all
 declared Method entries are written in Essence — and emitted user code can not
-tell the two apart. `src/rewriter/stdlibPrelude.ts` simplifies the enriched
+tell the two apart. `packages/compiler/src/rewriter/stdlibPrelude.ts` simplifies the enriched
 sources once per process, and the Rewriter emits each Essence-implemented
 Method as its OWN top-level const:
 
@@ -176,11 +177,11 @@ A native stays a member read off the plain import (`Boolean.negate(…)`), which
 esbuild rewrites to a direct symbol reference and can tree-shake; an
 Essence-implemented Method is not a member of anything, so nothing has to
 materialise the module namespace object. `namespaceMember` in
-`src/rewriter/index.ts` picks the spelling, and all four emission sites — a
+`packages/compiler/src/rewriter/index.ts` picks the spelling, and all four emission sites — a
 plain call, a conformance witness, a Union dispatch target, a static Lookup —
 go through it, so every one works for both kinds.
 
-`src/tests/builtins.spec.ts` and the generated contract both fail on a Method
+`packages/compiler/src/tests/builtins.spec.ts` and the generated contract both fail on a Method
 implemented in BOTH — delete the TypeScript in the same commit that writes the
 Essence.
 
@@ -210,7 +211,7 @@ Composition is not free, and two costs are easy to miss because no test fails:
   item decides it. `count(where:)` is still on `keepEvery`, which is right:
   counting has to see every item.
 
-Prefer a body that reaches only its own Namespace's primitives. `src/tests/bundleSize.spec.ts`
+Prefer a body that reaches only its own Namespace's primitives. `packages/compiler/src/tests/bundleSize.spec.ts`
 guards two files, but it is a floor, not a substitute for measuring.
 
 ## Editing hazards
@@ -257,10 +258,10 @@ guards two files, but it is a floor, not a substitute for measuring.
 A new Namespace is a new runtime module. The Simplifier emits
 `<Namespace>.<method>(…)`, so each name needs
 
-1. an entry in `runtimeNamespaceNames` (`src/rewriter/index.ts`),
-2. a `src/rewriter/__internal/<Name>.ts` — a re-export of the implementation is
+1. an entry in `runtimeNamespaceNames` (`packages/compiler/src/rewriter/index.ts`),
+2. a `packages/compiler/src/rewriter/__internal/<Name>.ts` — a re-export of the implementation is
    enough,
-3. a place in `builtinMemberOrder` (`src/enricher/builtins.ts`), and
+3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`), and
 4. a row in `builtins.spec.ts`'s `runtimeModules`.
 
 A Namespace that also declares a **Type** — a `choice`, as `Ordering` and `Side`
@@ -271,7 +272,7 @@ and against the Namespaces declared here, so a missing registration is a failing
 test rather than a call to `undefined`.
 
 One more site is easy to miss because it is not a registration list: the native
-contract generator (`src/tools/generateNatives.ts`) maps each Essence Type to
+contract generator (`packages/compiler/src/tools/generateNatives.ts`) maps each Essence Type to
 the runtime type that stands for it. A new `choice` whose Cases appear in ANY
 native signature needs its Union alias in `UNION_NAME_ALIASES`, its Case types
 in `CASE_TYPES`, and each of those names in `RUNTIME_TYPE_MODULES` — otherwise
@@ -281,7 +282,7 @@ rather than rendering the contract. `Side` needed all three, because
 
 ## The native contract
 
-`src/rewriter/__internal/natives.generated.ts` is generated from these
+`packages/compiler/src/rewriter/__internal/natives.generated.ts` is generated from these
 declarations by `bun run generate:natives` and checked in. It spells the calling
 convention every native binding must keep as TypeScript, so `tsc` rejects a
 native whose signature has drifted:
@@ -295,7 +296,7 @@ native whose signature has drifted:
 
 A missing native, a wrong receiver, a wrong arity, a wrong parameter or return
 Type, a misplaced witness, and a runtime export left behind for a Method that
-moved to Essence are all compile errors. `src/tests/natives.spec.ts` fails, without
+moved to Essence are all compile errors. `packages/compiler/src/tests/natives.spec.ts` fails, without
 ever writing, when the checked-in file drifts from the renderer — regenerate and
 commit it in the same change as the signature. It is in both `.oxlintrc.json` and
 `.oxfmtrc.json` `ignorePatterns`, like the generated parser grammar.

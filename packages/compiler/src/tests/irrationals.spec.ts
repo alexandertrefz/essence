@@ -167,14 +167,14 @@ describe("Irrationals", () => {
 
 			expect(doubled[typeKeySymbol]).toBe("Transcendental")
 			// NOTE: `Transcendental.is` is written in Essence now
-			// (src/stdlib/Transcendental.es) — `anyIs` compares the canonical
+			// (packages/stdlib/sources/Transcendental.es) — `anyIs` compares the canonical
 			// form the same way the deleted native did.
 			expect(anyIs(doubled, number.TAU)).toBeTrue()
 		})
 
 		it("collapses cancelling π-parts to a Rational", () => {
 			// NOTE: `Transcendental.subtract` is written in Essence now
-			// (src/stdlib/Transcendental.es) as `add(other::negate())` — this
+			// (packages/stdlib/sources/Transcendental.es) as `add(other::negate())` — this
 			// is that composition, and the still-native gateway is what
 			// collapses the cancelled π-part.
 			const difference = transcendental.addTranscendental(
@@ -241,7 +241,7 @@ describe("Irrationals", () => {
 	})
 
 	describe("Number cross-kind semantics", () => {
-		// NOTE: cross-kind `Number.is` is Essence now (`src/stdlib/Number.es`) and covered by the golden harness.
+		// NOTE: cross-kind `Number.is` is Essence now (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
 
 		it("crashes no longer on empty lists — lowestNumber gives Nothing", () => {
 			expect(
@@ -257,8 +257,8 @@ describe("Irrationals", () => {
 				}),
 			).toEqual(createNothing())
 		})
-		// NOTE: the `isLessThan` family is Essence now (`src/stdlib/Number.es`) — its agreement with `compareTo` is covered by the golden harness.
-		// NOTE: the `isLessThan` family is Essence now (`src/stdlib/Number.es`); its symmetry with itself is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compareTo` is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`); its symmetry with itself is covered by the golden harness.
 	})
 
 	describe("Structural equality", () => {
