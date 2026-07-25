@@ -1412,16 +1412,17 @@ describe("Choices", () => {
 			// Namespace named after the Compiler's own conformance Parameter.
 			it("says so once, and lets nothing carry the Parameter onward", () => {
 				let source = `implementation {
-					choice Result<Value is Equatable> { Ok { value: Value }, Err }
+					choice Result<Value is Equatable> { Ok { value: Value } }
 
-					function orElse<infer Value is Equatable>(
+					function unwrap<infer Value is Equatable>(
 						_ r: Result<Value>,
-						_ fallback: Value,
 					) -> Value {
-						<- fallback
+						<- match r -> Value {
+							case #Ok { <- @.value }
+						}
 					}
 
-					__print(orElse(Result#Ok(1), 0)::toString())
+					__print(unwrap(Result#Ok(1))::toString())
 				}`
 
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
@@ -1445,6 +1446,37 @@ describe("Choices", () => {
 						__print(take(bound))
 					}`),
 				).toEqual(['"took"', '"took"', '"took"'])
+			})
+
+			// NOTE: And an Argument beside it that DOES decide the Parameter is
+			// waited for, the way a callback's Argument is: a construction binds
+			// nothing, so matching it before the Arguments that can bind only
+			// reads a Parameter Type nothing has decided yet. Which of the two is
+			// written first decides nothing at all.
+			it("waits for an Argument that decides the Parameter", async () => {
+				let orElse = `
+					choice Result<Value is Equatable> {
+						Ok { value: Value },
+						Err,
+					}
+
+					function orElse<infer Value is Equatable>(
+						_ r: Result<Value>,
+						_ fallback: Value,
+					) -> Value {
+						<- match r -> Value {
+							case #Ok { <- @.value }
+							case #Err { <- fallback }
+						}
+					}
+				`
+
+				expect(
+					await run(`implementation { ${orElse}
+						__print(orElse(Result#Ok(1), 0)::toString())
+						__print(orElse(Result#Err, 7)::toString())
+					}`),
+				).toEqual(['"1"', '"7"'])
 			})
 
 			// NOTE: A receiver is not a position that decides, and deliberately

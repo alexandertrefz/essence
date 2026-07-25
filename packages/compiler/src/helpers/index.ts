@@ -1815,6 +1815,13 @@ function matchTypes(
 export type MatchableArgument = {
 	name: string | null
 	getType: (expectedType: common.Type) => common.Type
+	// NOTE: Set on an Argument that can bind no Type Parameter of the call it
+	// stands in — a prefixed Case construction with no Type Arguments of its own,
+	// which is DECIDED by the Parameter it is matched against and decides nothing
+	// itself. Said by the Argument rather than read off the Parameter, because a
+	// `Box<Item>` Parameter is a Parameter like any other: what can not decide is
+	// this way of writing the value, not the place it is written in.
+	bindsNothing?: boolean
 }
 
 export type ArgumentMatchResult =
@@ -1889,6 +1896,28 @@ function callbackWaitsOnUnboundGeneric(
 	return false
 }
 
+// NOTE: Whether a Parameter Type mentions a Type Parameter of this call that
+// nothing has bound yet — asked of the Parameter an Argument that binds nothing
+// stands at, where the whole Type is what the Argument reads, not just the
+// Parameters of a callback.
+function parameterWaitsOnUnboundGeneric(
+	parameterType: common.Type,
+	boundSoFar: ReadonlySet<common.GenericName>,
+	context: GenericInferenceContext,
+): boolean {
+	let needed = new Set<common.GenericName>()
+
+	collectBindableGenerics(parameterType, context, needed)
+
+	for (let name of needed) {
+		if (!boundSoFar.has(name)) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NOTE: The order the Arguments are matched in — their own, except that a
 // callback Parameter still waiting on an unbound `infer` Generic is held back
 // to the end. An unannotated Function literal is typed FROM the Parameter it
@@ -1911,24 +1940,32 @@ function callbackWaitsOnUnboundGeneric(
 // invocation whose callbacks already come last — every one in the stdlib,
 // where `map`'s transform is the final Parameter — so the overwhelmingly
 // common case allocates nothing and the loop counts as it always did.
+// A prefixed Case construction waits for the same reason and is held back the
+// same way: it reads its Choice's Type Arguments off the Parameter it is matched
+// against, so a Parameter still mentioning an unbound Generic hands it nothing to
+// read and it has to refuse. `unwrap(Box#Empty, 7)` said as much while `7` named
+// the very Type one Parameter over — the same order-dependence, on the other kind
+// of Argument that is typed BY its position rather than binding it.
 function deferredArgumentOrder(
 	parameters: common.BaseFunction["parameterTypes"],
 	context: GenericInferenceContext | null,
+	matchableArguments: Array<MatchableArgument>,
 ): Array<number> | null {
 	if (context === null || parameters.length < 2) {
 		return null
 	}
 
-	// NOTE: Only a Parameter that FOLLOWS a callback has anything to gain from
-	// being matched first, so an invocation without a callback — or with none
-	// but a trailing one, which is every Method in the stdlib, `map`'s
-	// transform being its last Parameter — is answered here, by a walk over the
-	// Parameter kinds that allocates nothing.
-	let firstCallback = parameters.findIndex(
-		(parameter) => parameter.type.type === "Function",
+	// NOTE: Only a Parameter that FOLLOWS one that waits has anything to gain
+	// from being matched first, so an invocation whose waiting Arguments already
+	// come last — every Method in the stdlib, `map`'s transform being its final
+	// Parameter — is answered here, by a walk that allocates nothing.
+	let firstWaiting = parameters.findIndex(
+		(parameter, index) =>
+			parameter.type.type === "Function" ||
+			matchableArguments[index]?.bindsNothing === true,
 	)
 
-	if (firstCallback === -1 || firstCallback === parameters.length - 1) {
+	if (firstWaiting === -1 || firstWaiting === parameters.length - 1) {
 		return null
 	}
 
@@ -1947,6 +1984,15 @@ function deferredArgumentOrder(
 		if (
 			parameter.type.type === "Function" &&
 			callbackWaitsOnUnboundGeneric(parameter.type, boundSoFar, context)
+		) {
+			deferred.push(index)
+
+			continue
+		}
+
+		if (
+			matchableArguments[index]?.bindsNothing === true &&
+			parameterWaitsOnUnboundGeneric(parameter.type, boundSoFar, context)
 		) {
 			deferred.push(index)
 
@@ -1998,7 +2044,11 @@ export function matchArguments(
 
 	let inferenceContext = options.inference ?? null
 	let mismatchedArgumentIndices: Array<number> = []
-	let order = deferredArgumentOrder(parameters, inferenceContext)
+	let order = deferredArgumentOrder(
+		parameters,
+		inferenceContext,
+		matchableArguments,
+	)
 
 	for (let position = 0; position < parameters.length; position++) {
 		let i = order === null ? position : order[position]
