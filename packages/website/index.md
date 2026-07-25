@@ -1,5 +1,3 @@
-![Codecov](https://img.shields.io/codecov/c/github/alexandertrefz/essence/master.svg?style=for-the-badge)
-
 # Goals
 The main goal for Essence is to allow the authoring of bug-free maintainable code, in a fast and pleasant manner.
 Essence features a strong type system combined with a mixture of functional and object oriented concepts, enabling code that is easy to understand & maintain.
@@ -36,11 +34,13 @@ Essence compiles to modern ECMAScript, allowing execution in Bun, Node.js as wel
 
 
 # Example Code
-You can find the most recent and working example of syntax in the [HelloWorld.es](testFiles/HelloWorld.es)
-as well as the other files in [testFiles](testFiles). It also should be noted that the syntax is meant to
+You can find the most recent and working example of syntax in the [HelloWorld.es](https://github.com/atrefz/essence/blob/master/packages/fixtures/files/HelloWorld.es)
+as well as the other files in [packages/fixtures/files](https://github.com/atrefz/essence/tree/master/packages/fixtures/files). It also should be noted that the syntax is meant to
 be viewed with a font with code ligatures, like FiraCode.
 
-You can compile the testFiles with the `esc` executable in `bin` (after compiling the grammar with `bun compile-grammar`). This will create a .js file with the same name in the same directory. These files can be executed via Bun, node or in a browser.
+You can compile any of them with the `esc` executable in `packages/cli/bin`. This produces a self-contained ES
+module of the same name beside the source — the parts of the runtime the program actually uses are bundled in,
+so it runs under Bun or Node, or in a browser, with nothing else installed.
 
 The current runtime implementation is rudimentary however. There are many features missing from the standard library. Various langauge features are only partially implemented.
 

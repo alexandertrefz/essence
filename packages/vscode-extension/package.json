@@ -62,7 +62,7 @@
 				"essence.server.path": {
 					"type": "string",
 					"default": "",
-					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else \u2014 a `.ts` entry point, or the compiler's `bin/esls` \u2014 is run with `bun`. Useful for developing against a compiler checkout without rebuilding the bundle."
+					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else — a `.ts` entry point, or `packages/language-server/bin/esls` — is run with `bun`. Useful for developing against a checkout of the Essence monorepo without rebuilding the bundle."
 				},
 				"essence.trace.server": {
 					"type": "string",
