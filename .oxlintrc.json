@@ -6,7 +6,7 @@
 	},
 	"overrides": [
 		{
-			"files": ["packages/*/src/ariadne/**"],
+			"files": ["packages/ariadne/src/**"],
 			"rules": {
 				"no-control-regex": "off"
 			}
