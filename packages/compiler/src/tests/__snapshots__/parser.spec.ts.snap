@@ -1160,6 +1160,7 @@ exports[`Parser Expressions FunctionInvocations should parse a bare Case value a
                   "line": 1,
                 },
               },
+              "typeArguments": null,
               "value": null,
             },
           },
@@ -1267,6 +1268,7 @@ exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choic
                   "line": 1,
                 },
               },
+              "typeArguments": null,
               "value": null,
             },
           },
@@ -21643,6 +21645,155 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
     "end": {
       "column": 7,
       "line": 5,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions FunctionInvocations should parse a Case value with its Choice's Type Arguments applied 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": null,
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Full",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 46,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 42,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": {
+                "content": "Box",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 32,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 29,
+                    "line": 1,
+                  },
+                },
+              },
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 49,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+              "typeArguments": [
+                {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 40,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 33,
+                      "line": 1,
+                    },
+                  },
+                  "type": {
+                    "content": "Integer",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 40,
+                        "line": 1,
+                      },
+                      "start": {
+                        "column": 33,
+                        "line": 1,
+                      },
+                    },
+                  },
+                },
+              ],
+              "value": {
+                "nodeType": "IntegerValue",
+                "position": {
+                  "end": {
+                    "column": 48,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 47,
+                    "line": 1,
+                  },
+                },
+                "value": "1",
+              },
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 50,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 52,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 52,
+      "line": 1,
     },
     "start": {
       "column": 1,

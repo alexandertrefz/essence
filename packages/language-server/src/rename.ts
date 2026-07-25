@@ -771,9 +771,14 @@ function walkNode(
 			return
 		case "CaseValue":
 			// NOTE: The Case's name resolves through the Choice — only the
-			// (optional) Choice prefix is a Type reference of its own.
+			// (optional) Choice prefix is a Type reference of its own, along with
+			// the Type Arguments a value-position application writes.
 			if (node.choice !== null) {
 				reference(scope, "types", node.choice, context)
+			}
+
+			for (let argument of node.typeArguments ?? []) {
+				walkTypeDeclaration(argument, scope, context)
 			}
 
 			if (node.value !== null) {

@@ -52,6 +52,7 @@ import {
 	resolveFunctionSignatureType,
 	resolveGenericDeclarations,
 	resolveIdentifierType,
+	applyTypeArguments,
 	resolveMethodLookupNamespacesForReceiverType,
 	resolveMethodType,
 	resolveOverloadedFunctionStatementType,
@@ -4394,19 +4395,25 @@ export function resolveCaseValueType(
 }
 
 // NOTE: A Choice's Type Parameters are APPLIED, never inferred. A prefixed
-// construction is therefore decided by exactly two things: the position it
+// construction is therefore decided by exactly two things: the Arguments it
+// writes itself (`Holder<Integer>#Bare`) and, failing those, the position it
 // stands in — the same annotation, declared return Type or Parameter Type a
-// bare `#Bare` already resolves against — and, failing that, nothing at all,
-// which is what `undecided-type-arguments` says. The payload is CHECKED against
-// whatever was decided (the Validator's `payload-type-mismatch`), and where a
-// context offers several instantiations of the one Case it picks which of them
-// is meant, but it never decides an Argument of its own: `Holder#Full({ value =
-// 1 })` written where nothing expects a Holder is as undecided as `Holder#Bare`
-// is, and used to quietly become a `Holder<Integer>` because its payload
-// happened to be one.
+// bare `#Bare` already resolves against. Neither is `undecided-type-arguments`.
+// The payload is CHECKED against whatever was decided (the Validator's
+// `payload-type-mismatch`), and where a position offers several instantiations
+// of the one Case it picks which of them is meant, but it never decides an
+// Argument of its own: `Holder#Full({ value = 1 })` written where nothing
+// expects a Holder is as undecided as `Holder#Bare` is, and used to quietly
+// become a `Holder<Integer>` because its payload happened to be one.
+//
+// The written Arguments win over the position, and the two disagreeing is the
+// ordinary mismatch of a value that does not fit where it is put — the
+// construction IS a `Holder<Integer>#Bare` and the annotation says otherwise, so
+// the assignment is what reports, exactly as for any other value.
 //
 // A Choice with no Type Parameters has nothing to decide and is never asked —
 // `Ordering#Equal` stands anywhere, as does every Case of every plain Choice.
+// Writing Arguments at one is still refused, by the application rail itself.
 function resolvePrefixedCaseValueType(
 	node: parser.CaseValueNode,
 	choice: parser.IdentifierNode,
@@ -4416,10 +4423,20 @@ function resolvePrefixedCaseValueType(
 ): common.CaseType | common.ErrorType {
 	let declaredCase = resolveCaseReference(choice, node.caseName, scope)
 
-	if (
-		declaredCase.type === "Error" ||
-		declaredCase.choiceGenerics === undefined
-	) {
+	if (declaredCase.type === "Error") {
+		return declaredCase
+	}
+
+	if (node.typeArguments !== null) {
+		return resolveAppliedCase(
+			node.typeArguments,
+			declaredCase,
+			choice,
+			scope,
+		)
+	}
+
+	if (declaredCase.choiceGenerics === undefined) {
 		return declaredCase
 	}
 
@@ -4461,11 +4478,43 @@ function resolvePrefixedCaseValueType(
 			],
 			helps: [
 				`Annotate the declaration: 'constant left: ${application} = ${construction}'.`,
+				`Or apply the Type Arguments: '${application}#${node.caseName.content}'.`,
 			],
 		},
 	)
 
 	return { type: "Error" }
+}
+
+// NOTE: `Holder<Integer>#Full(…)` — the Type Arguments written at the value.
+// Applied through the rail an annotation's `Holder<Integer>` takes, so the arity
+// check, the bounds and the refusal of a Type that takes no Arguments are the
+// SAME ones, and then the Case is picked out of what came back. A Case the
+// applied Choice does not carry is impossible here — the declared Case was found
+// in that same Choice — so `null` from the lookup only ever means the application
+// itself failed and has already reported.
+function resolveAppliedCase(
+	typeArguments: Array<parser.TypeDeclarationNode>,
+	declaredCase: common.CaseType,
+	choice: parser.IdentifierNode,
+	scope: enricher.Scope,
+): common.CaseType | common.ErrorType {
+	// NOTE: Looked up raw rather than resolved, so a Generic Alias does not apply
+	// its defaults before these Arguments get a chance to — the same reason
+	// `resolveGenericTypeDeclarationType` looks its own base Type up this way. The
+	// name is in scope: `resolveCaseReference` just found the Case in it.
+	let baseType = findTypeInScope(choice.content, scope) ?? {
+		type: "Error" as const,
+	}
+
+	let applied = applyTypeArguments(
+		baseType,
+		typeArguments,
+		scope,
+		choice.position,
+	)
+
+	return instantiatedCaseOf(declaredCase, applied) ?? { type: "Error" }
 }
 
 // NOTE: The instantiation the surrounding position decides for a prefixed

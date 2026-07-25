@@ -316,6 +316,17 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: The Type Arguments applied at a construction sit between the
+		// Choice's name and its `#`, and every piece of that has to stay flush —
+		// a `<` on its own line reads as a new declaration, and a `#` off the `>`
+		// is not a construction at all.
+		it("keeps an applied Case flush through its Type Arguments", () => {
+			roundTrips(
+				"implementation {\n\tchoice C<T> {\n\t\tA { value: T },\n\t}\n\n\tconstant a = C<Integer>#A(1)\n}\n",
+				"C<Integer>#A(1)",
+			)
+		})
+
 		// NOTE: FunctionTypeParameter records only the external name, so an
 		// internal one exists in the source and nowhere else.
 		it("keeps the internal name of a Function Type's parameter", () => {

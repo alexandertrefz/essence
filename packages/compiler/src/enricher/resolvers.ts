@@ -3209,6 +3209,21 @@ export function resolveGenericTypeDeclarationType(
 		baseType = resolveType(node.baseType, scope)
 	}
 
+	return applyTypeArguments(baseType, node.generics, scope, node.position)
+}
+
+// NOTE: The whole of what applying Type Arguments to a base Type means — the
+// arity check, the bounds, the List normalisation and the refusal of a Type
+// that takes none. An annotation's `Holder<Integer>` and a value's
+// `Holder<Integer>#Full` are the same application, and reaching this from both
+// is what keeps them held to the same promises rather than to two
+// implementations that drift.
+export function applyTypeArguments(
+	baseType: common.Type,
+	typeArguments: Array<parser.TypeDeclarationNode>,
+	scope: enricher.Scope,
+	position: common.Position,
+): common.Type {
 	if (baseType.type === "Error") {
 		return baseType
 	}
@@ -3216,13 +3231,13 @@ export function resolveGenericTypeDeclarationType(
 	// NOTE: Applied Lists are normalized into plain List Types right away, so
 	// that inferred and declared List Types share a single representation.
 	if (baseType.type === "GenericList") {
-		if (node.generics.length !== 1) {
-			reportError("List takes exactly 1 Type Argument", node.position, {
+		if (typeArguments.length !== 1) {
+			reportError("List takes exactly 1 Type Argument", position, {
 				code: "wrong-type-argument-count",
 				labels: [
 					primary(
-						node.position,
-						`${countOf(node.generics.length, "Type Argument")} given`,
+						position,
+						`${countOf(typeArguments.length, "Type Argument")} given`,
 					),
 				],
 			})
@@ -3230,32 +3245,30 @@ export function resolveGenericTypeDeclarationType(
 			return {
 				type: "List",
 				itemType:
-					node.generics.length > 0
-						? resolveType(node.generics[0], scope)
+					typeArguments.length > 0
+						? resolveType(typeArguments[0], scope)
 						: { type: "Error" },
 			}
 		}
 
 		return {
 			type: "List",
-			itemType: resolveType(node.generics[0], scope),
+			itemType: resolveType(typeArguments[0], scope),
 		}
 	}
 
 	if (baseType.type === "GenericAlias") {
 		return applyGenericAlias(
 			baseType,
-			node.generics.map((generic) => resolveType(generic, scope)),
+			typeArguments.map((argument) => resolveType(argument, scope)),
 			scope,
-			node.position,
+			position,
 		)
 	}
 
-	reportError("This Type takes no Type Arguments", node.position, {
+	reportError("This Type takes no Type Arguments", position, {
 		code: "type-not-generic",
-		labels: [
-			primary(node.position, "the Type Arguments have nowhere to go"),
-		],
+		labels: [primary(position, "the Type Arguments have nowhere to go")],
 	})
 
 	return { type: "Error" }

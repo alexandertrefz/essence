@@ -140,6 +140,14 @@ describe("Parser", () => {
 				expect(input).toMatchSnapshot()
 			})
 
+			it("should parse a Case value with its Choice's Type Arguments applied", () => {
+				let input: parser.Program = parse(
+					"implementation { invocation(Box<Integer>#Full(1)) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
 			it("should parse Identifier FunctionInvocations with one argument and a trailing comma", () => {
 				let input: parser.Program = parse(
 					"implementation { invocation(argument,) }",
