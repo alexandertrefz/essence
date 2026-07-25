@@ -25,6 +25,7 @@
       "dependencies": {
         "@essence/ariadne": "workspace:*",
         "@essence/interfaces": "workspace:*",
+        "@essence/stdlib": "workspace:*",
         "bigint-fraction": "1.0.6",
         "esbuild": "0.28.1",
         "escodegen": "workspace:*",
@@ -54,6 +55,10 @@
     },
     "packages/interfaces": {
       "name": "@essence/interfaces",
+      "version": "0.0.1",
+    },
+    "packages/stdlib": {
+      "name": "@essence/stdlib",
       "version": "0.0.1",
     },
   },
@@ -120,6 +125,8 @@
     "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
 
     "@essence/interfaces": ["@essence/interfaces@workspace:packages/interfaces"],
+
+    "@essence/stdlib": ["@essence/stdlib@workspace:packages/stdlib"],
 
     "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.59.0", "", { "os": "android", "cpu": "arm" }, "sha512-bNTnfbuG7sAwb2PakMNaDukx5kXeW9duXOBeWtTOiLz3fXz3q2DlWguufPZ+c2IHEVrRXHD+M4aUgEWm841LDA=="],
 

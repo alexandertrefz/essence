@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
+import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
 import { parseArguments, UsageError } from "../cli/args"
 import { commands, findCommand, globalOptions } from "../cli/commands"
@@ -33,7 +34,6 @@ import {
 	supportsUnicode,
 	visibleLength,
 } from "../cli/theme"
-import { STDLIB_DIRECTORY } from "../enricher/stdlib"
 import { closestMatch } from "../helpers/index"
 import { testDiagnostic } from "./diagnosticFactory"
 
