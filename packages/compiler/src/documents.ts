@@ -1,9 +1,10 @@
 import { realpathSync } from "node:fs"
 import path from "node:path"
 
+import type { common, parser } from "@essence/interfaces"
+
 import { enrich } from "./enricher/index"
 import { declaredNames, STDLIB_DIRECTORY } from "./enricher/stdlib"
-import type { common, parser } from "./interfaces/index"
 import { parseWithDiagnostics } from "./parser/index"
 
 // NOTE: A standard library source is an ordinary `.es` file that two rules do

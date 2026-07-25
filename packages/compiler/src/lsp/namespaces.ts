@@ -1,3 +1,5 @@
+import type { common } from "@essence/interfaces"
+
 import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
 import {
 	builtinNamespaces,
@@ -11,7 +13,6 @@ import {
 	type GenericBindings,
 	matchesTypeWithBindings,
 } from "../helpers/index"
-import type { common } from "../interfaces/index"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type

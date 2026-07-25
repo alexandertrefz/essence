@@ -1,5 +1,6 @@
+import type { common } from "@essence/interfaces"
+
 import { displayGenericName } from "../helpers/index"
-import type { common } from "../interfaces/index"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one

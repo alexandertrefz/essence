@@ -1,5 +1,6 @@
+import { type common, lexer } from "@essence/interfaces"
+
 import { primary, reportError } from "../../diagnostics/index"
-import { type common, lexer } from "../../interfaces/index"
 import { Lexer } from "../../lexer/index"
 import { parseDocumentation } from "../documentation"
 

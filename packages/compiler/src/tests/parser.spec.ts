@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
+import type { parser } from "@essence/interfaces"
+
 import { containsErrors } from "../diagnostics/index"
-import type { parser } from "../interfaces/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
 describe("Parser", () => {

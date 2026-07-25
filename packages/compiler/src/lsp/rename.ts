@@ -1,10 +1,11 @@
+import type { common, parser } from "@essence/interfaces"
+
 import { isStdlibDocument } from "../documents"
 import {
 	builtinMembers,
 	builtinProtocols as builtinProtocolTable,
 	builtinTypes as builtinTypeTable,
 } from "../enricher/builtins"
-import type { common, parser } from "../interfaces/index"
 
 // NOTE: Renaming is resolved on the Parser AST with a lexical Scope model
 // that mirrors the Enricher's binding rules — `values` corresponds to the

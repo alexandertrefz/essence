@@ -1,3 +1,5 @@
+import type { common, enricher, parser } from "@essence/interfaces"
+
 import {
 	collectDiagnostics,
 	primary,
@@ -26,7 +28,6 @@ import {
 	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
-import type { common, enricher, parser } from "../interfaces/index"
 import {
 	checkProtocolConformance,
 	reportReservedTypeName,

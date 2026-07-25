@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import type { common } from "@essence/interfaces"
+
 import { enrich } from "../enricher/index"
-import type { common } from "../interfaces/index"
 import { optimise } from "../optimiser/index"
 import { parse } from "../parser/index"
 import { rewrite } from "../rewriter/index"

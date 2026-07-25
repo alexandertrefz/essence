@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from "node:util"
 
+import type { common, enricher, parser } from "@essence/interfaces"
+
 import { primary, reportError, secondary } from "../diagnostics/index"
 import {
 	applyGenericBindings,
@@ -17,7 +19,6 @@ import {
 	typeMentionsGeneric,
 	withArticle,
 } from "../helpers/index"
-import type { common, enricher, parser } from "../interfaces/index"
 import { recordAnnotation } from "./annotations"
 import { childScope } from "./scope"
 

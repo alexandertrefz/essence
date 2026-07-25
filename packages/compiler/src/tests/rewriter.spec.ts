@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence/interfaces"
 import { Fraction } from "bigint-fraction"
 
-import type { common } from "../interfaces/index"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
 import {

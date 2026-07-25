@@ -1,4 +1,5 @@
-import type { common } from "../interfaces/index"
+import type { common } from "@essence/interfaces"
+
 import { contains, isSmaller } from "./positions"
 
 // NOTE: Two completion contexts need to know what is *expected* at the
