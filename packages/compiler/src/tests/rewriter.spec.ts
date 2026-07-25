@@ -2977,6 +2977,77 @@ describe("Rewriter", () => {
 				)
 			})
 
+			// NOTE: The order the cases are walked in IS the dispatch's meaning
+			// — the Enricher writes them most specific first and the runtime
+			// answers with the first one that accepts, so a receiver two cases
+			// both accept belongs to the earlier of them. Pinned with cases
+			// that deliberately overlap (the Union case accepts every Integer
+			// the Integer case does) and then with the same two swapped: a
+			// chain that answered by specificity, or with the last match
+			// instead of the first, would still pass a test whose cases can
+			// not both accept anything.
+			it("runs the earlier of two cases that both accept the receiver", () => {
+				let integerCase: Parameters<typeof dispatchMethod>[2][number] =
+					[
+						{ type: "Integer" },
+						(() => string.createString("Integer")) as (
+							...args: Array<unknown>
+						) => unknown,
+						[],
+					]
+				let unionCase: Parameters<typeof dispatchMethod>[2][number] = [
+					{
+						type: "UnionType",
+						types: [{ type: "Integer" }, { type: "String" }],
+					},
+					(() => string.createString("Union")) as (
+						...args: Array<unknown>
+					) => unknown,
+					[],
+				]
+
+				expect(
+					dispatchMethod(integerTwo(), [], [integerCase, unionCase]),
+				).toEqual(string.createString("Integer"))
+
+				expect(
+					dispatchMethod(integerTwo(), [], [unionCase, integerCase]),
+				).toEqual(string.createString("Union"))
+			})
+
+			// NOTE: The end of the emitted dispatch chain, and the counterpart
+			// to a Match's `noCaseMatched`. The Enricher only emits a dispatch
+			// when some case is guaranteed to accept the receiver, so reaching
+			// here means a case's runtime check disagrees with the Type the
+			// Enricher gave it — a Compiler bug, which the throw says out loud
+			// rather than letting `undefined` flow on as if it were a result.
+			it("throws when no case accepts the receiver", () => {
+				let cases: Parameters<typeof dispatchMethod>[2] = [
+					[
+						{ type: "Integer" },
+						integer.toString as (
+							...args: Array<unknown>
+						) => unknown,
+						[],
+					],
+					[
+						{ type: "Nothing" },
+						(() => string.createString("Nothing")) as (
+							...args: Array<unknown>
+						) => unknown,
+						[],
+					],
+				]
+
+				expect(() => dispatchMethod(stringEmpty(), [], cases)).toThrow(
+					"No dispatch case matched the receiver.",
+				)
+
+				expect(() => dispatchMethod(integerTwo(), [], [])).toThrow(
+					"No dispatch case matched the receiver.",
+				)
+			})
+
 			it("appends the matched case's conformance Arguments", () => {
 				let receivedArguments: Array<unknown> = []
 				let method = (...args: Array<unknown>) => {
