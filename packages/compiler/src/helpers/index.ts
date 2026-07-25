@@ -299,6 +299,46 @@ export function createInferenceContext(
 // keeps (unlike `Date.now`/`Math.random`, which are banned for that reason).
 let freshGenericCounter = 0
 
+// NOTE: What separates a freshened Generic's name from its counter. A source
+// Generic can not carry it, which is the whole assumption the alpha-renaming
+// below rests on.
+const freshGenericSeparator = "\u200B"
+
+// NOTE: Whether a Type still carries a Type Parameter of the call it is being
+// matched against — one `createFreshenedInference` renamed for the span of this
+// match and that the match has not solved. Every Parameter it DID solve was
+// substituted away by `applyGenericBindings` before the Type got here, so a
+// fresh name still standing in it is exactly a slot this call has not decided.
+// Asked where a decision has to be committed rather than merely checked: an
+// enclosing Function's own Type Parameter is a decision (a generic one), and it
+// reads as a source name, while a callee's unsolved one is no decision at all
+// and must never be recorded as one.
+export function mentionsUnsolvedTypeParameter(type: common.Type): boolean {
+	let walk = (value: unknown): boolean => {
+		if (value === null || typeof value !== "object") {
+			return false
+		}
+
+		if (Array.isArray(value)) {
+			return value.some(walk)
+		}
+
+		let record = value as Record<string, unknown>
+
+		if (
+			record.type === "GenericUse" &&
+			typeof record.name === "string" &&
+			record.name.includes(freshGenericSeparator)
+		) {
+			return true
+		}
+
+		return Object.values(record).some(walk)
+	}
+
+	return walk(type)
+}
+
 // NOTE: Alpha-renames a signature's own Generics to fresh, collision-proof names
 // for the span of one invocation's Argument matching. A caller may declare a
 // Generic under the SAME spelling as the callee's — a Method generic in
@@ -333,7 +373,7 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	let freshToOriginal = new Map<common.GenericName, common.GenericName>()
 
 	for (let generic of signature.generics) {
-		let freshName = `${generic.name}\u200B${(freshGenericCounter += 1)}`
+		let freshName = `${generic.name}${freshGenericSeparator}${(freshGenericCounter += 1)}`
 
 		freshToOriginal.set(freshName, generic.name)
 		rename.set(generic.name, { type: "GenericUse", name: freshName })
