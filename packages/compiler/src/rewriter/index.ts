@@ -7,6 +7,7 @@ import type * as estree from "estree"
 
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
 import {
+	ESSENCE_METHOD_PREFIX,
 	essenceMethodIdentifier,
 	essenceMethodName,
 	nativeFreeFunctionNames,
@@ -96,6 +97,11 @@ export function rewrite(program: common.typedSimple.Program): string {
 			...implementation,
 		],
 	}
+
+	checkEssenceMethodsAreDeclared(
+		rewrittenProgram,
+		new Set(essenceMethods.keys()),
+	)
 
 	return generate(rewrittenProgram, {
 		format: {
@@ -569,6 +575,34 @@ function referencedNames(root: unknown): Set<string> {
 	visit(root)
 
 	return names
+}
+
+// NOTE: The last word on the fixed point above, read off the FINISHED tree: a
+// `$es_…` name is emitted only where a standard library Method is called, and
+// every one of them must have had its const pulled in. The two answers are
+// arrived at differently on purpose — the fixed point follows the TYPED bodies,
+// this reads the emitted JavaScript — so a shape `essenceMethodReferences` does
+// not know about shows up here as a Diagnostic instead of as a `ReferenceError`
+// out of a Program that compiled green.
+//
+// NOTE: Only `$es_…` names can be answered for. A free Function's const is
+// emitted under its bare name, which is indistinguishable from a user's own
+// binding, and the prefix is what makes this sweep safe: `_` is a Symbol to the
+// Lexer, so no name a Program can write ever starts with one.
+//
+// NOTE: Exported for a unit test, which is the only way to see it fire — while
+// the Rewriter is right, no Program reaches it.
+export function checkEssenceMethodsAreDeclared(
+	program: estree.Program,
+	declared: ReadonlySet<string>,
+): void {
+	for (let name of referencedNames(program.body)) {
+		if (name.startsWith(ESSENCE_METHOD_PREFIX) && !declared.has(name)) {
+			throw new Error(
+				`The emitted Program names '${name}', but no const was emitted for it. This is a bug in the Compiler.`,
+			)
+		}
+	}
 }
 
 function rewriteTypeAliasStatement(

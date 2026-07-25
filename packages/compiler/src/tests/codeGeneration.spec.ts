@@ -17,6 +17,7 @@ import {
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {
+	checkEssenceMethodsAreDeclared,
 	essenceMethodReferences,
 	reachableEssenceMethods,
 	rewrite,
@@ -1470,6 +1471,107 @@ describe("Code Generation", () => {
 				])
 
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
+			})
+
+			// NOTE: The sweep the emitted Program is held to after every rewrite
+			// — the net under the fixed point above, and the reason a shape the
+			// edge finder does not know about can not reach a user again. Driven
+			// with a hand-built tree, because while the Rewriter is right the
+			// only way to see it fire is to hand it a Program that names a const
+			// nobody emitted.
+			describe("the emitted-name sweep", () => {
+				function programOf(
+					body: Array<estree.Statement>,
+				): estree.Program {
+					return { type: "Program", sourceType: "module", body }
+				}
+
+				it("accepts a Program whose every named Method was emitted", () => {
+					expect(() =>
+						checkEssenceMethodsAreDeclared(
+							programOf([callOf("Inner", "double")]),
+							new Set(["$es_Inner_double"]),
+						),
+					).not.toThrow()
+				})
+
+				it("throws on a Method named with no const emitted for it", () => {
+					expect(() =>
+						checkEssenceMethodsAreDeclared(
+							programOf([callOf("Inner", "double")]),
+							new Set(["$es_Outer_quadruple"]),
+						),
+					).toThrow(
+						"The emitted Program names '$es_Inner_double', but no const was emitted for it. This is a bug in the Compiler.",
+					)
+				})
+
+				// NOTE: The sweep reads REFERENCES, so an object literal's key
+				// and a dotted member — text, both of them — are none of its
+				// business. `{ $es_Inner_double: … }` is a witness's method map,
+				// which names a Method it does not call.
+				it("leaves a member and a key that are only spelled that way alone", () => {
+					expect(() =>
+						checkEssenceMethodsAreDeclared(
+							programOf([
+								{
+									type: "ExpressionStatement",
+									expression: {
+										type: "ObjectExpression",
+										properties: [
+											{
+												type: "Property",
+												kind: "init",
+												method: false,
+												shorthand: false,
+												computed: false,
+												key: {
+													type: "Identifier",
+													name: "$es_Inner_double",
+												},
+												value: {
+													type: "MemberExpression",
+													optional: false,
+													computed: false,
+													object: {
+														type: "Identifier",
+														name: "Inner",
+													},
+													property: {
+														type: "Identifier",
+														name: "$es_Inner_double",
+													},
+												},
+											},
+										],
+									},
+								},
+							]),
+							new Set(),
+						),
+					).not.toThrow()
+				})
+
+				// NOTE: A free Function's const is emitted under its bare name,
+				// which a user's own binding can be spelled exactly like — the
+				// prefix is what makes the sweep safe, so everything without it
+				// is left to the fixed point.
+				it("says nothing about a name that carries no prefix", () => {
+					expect(() =>
+						checkEssenceMethodsAreDeclared(
+							programOf([
+								{
+									type: "ExpressionStatement",
+									expression: {
+										type: "Identifier",
+										name: "loop__overload$2",
+									},
+								},
+							]),
+							new Set(),
+						),
+					).not.toThrow()
+				})
 			})
 
 			// NOTE: The edge finder must recognise EVERY shape `namespaceMember`

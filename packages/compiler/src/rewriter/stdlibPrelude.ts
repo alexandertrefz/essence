@@ -155,6 +155,11 @@ export function stdlibFreeFunctions(): Array<PreludeFreeFunction> {
 	return stdlibArtifacts().freeFunctions
 }
 
+// NOTE: The prefix on its own, so that a finished tree can be swept for the
+// names spelled with it — the Rewriter checks that every one it emitted has a
+// const, which only holds because nothing a user writes can wear this prefix.
+export const ESSENCE_METHOD_PREFIX = "$es_"
+
 // NOTE: The emitted name of an Essence-implemented standard library Method. A
 // native Method stays a read off the plain `import * as <Namespace>`, which
 // esbuild can rewrite to a direct symbol reference and therefore tree-shake; an
@@ -172,7 +177,7 @@ export function essenceMethodIdentifier(
 	namespaceName: string,
 	memberName: string,
 ): string {
-	return `$es_${namespaceName}_${memberName}`
+	return `${ESSENCE_METHOD_PREFIX}${namespaceName}_${memberName}`
 }
 
 // NOTE: The set of `(Namespace, member)` pairs the prelude implements in
