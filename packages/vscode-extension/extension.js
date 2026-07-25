@@ -1,11 +1,11 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import * as vscode from "vscode"
 // NOTE: The explicit `.js` is required — under native ESM resolution an
 // extensionless specifier is not resolved, and vscode-languageclient ships no
 // `exports` map that would map one.
 import { LanguageClient } from "vscode-languageclient/node.js"
-import * as vscode from "vscode"
 
 let client
 
