@@ -598,40 +598,34 @@ describe("Parser", () => {
 
 			describe("RationalLiterals", () => {
 				it("should parse RationalLiterals", () => {
-					let input: parser.Program = parse(
-						"implementation { 3 / 2 }",
-					)
+					let input: parser.Program = parse("implementation { 3/2 }")
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse RationalLiterals with underscores", () => {
 					let input: parser.Program = parse(
-						"implementation { 1_000 / 9 }",
+						"implementation { 1_000/9 }",
 					)
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse negative numerator RationalLiterals", () => {
-					let input: parser.Program = parse(
-						"implementation { -3 / 2 }",
-					)
+					let input: parser.Program = parse("implementation { -3/2 }")
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse negative denominator RationalLiterals", () => {
-					let input: parser.Program = parse(
-						"implementation { 3 / -2 }",
-					)
+					let input: parser.Program = parse("implementation { 3/-2 }")
 
 					expect(input).toMatchSnapshot()
 				})
 
 				it("should parse fully negative RationalLiterals", () => {
 					let input: parser.Program = parse(
-						"implementation { -3 / -2 }",
+						"implementation { -3/-2 }",
 					)
 
 					expect(input).toMatchSnapshot()

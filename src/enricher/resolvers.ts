@@ -114,7 +114,13 @@ export function combinationTypeOf(
 		rhs: common.RecordType,
 	): boolean {
 		for (let [rhsName, rhsMemberType] of Object.entries(rhs.members)) {
-			if (!isDeepStrictEqual(lhs.members[rhsName], rhsMemberType)) {
+			// NOTE: `Object.hasOwn` before the read — a member named after one
+			// of `Object.prototype`'s would otherwise be compared against a
+			// JavaScript function the Record does not have.
+			if (
+				!Object.hasOwn(lhs.members, rhsName) ||
+				!isDeepStrictEqual(lhs.members[rhsName], rhsMemberType)
+			) {
 				return false
 			}
 		}
@@ -587,11 +593,58 @@ export function resolveIdentifierType(
 	}
 }
 
+// NOTE: What `@` refers to at this point in the Program, walking outwards: the
+// nearest binding wins, and a static Method's body stops the walk. The barrier
+// is the whole point — a static Method is declared inside a `namespace … for
+// Type` whose instance Methods bind `@` all around it, and letting one of those
+// answer would type-check a body the Rewriter emits without a receiver.
+function findSelfBinding(
+	scope: enricher.Scope,
+): { type: common.Type } | "static" | null {
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		if (Object.hasOwn(searchScope.members, "@")) {
+			return { type: searchScope.members["@"] }
+		}
+
+		if (searchScope.isStaticMethodBody) {
+			return "static"
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return null
+}
+
 export function resolveSelfType(
 	node: parser.SelfNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let result = findVariableInScope("@", scope)
+	let binding = findSelfBinding(scope)
+
+	if (binding === "static") {
+		reportError("There is no '@' in a static Method", node.position, {
+			code: "at-in-static-method",
+			labels: [
+				primary(
+					node.position,
+					"this Method is called on the Namespace",
+				),
+			],
+			notes: [
+				"'@' is the receiver of an instance Method, and a static Method is called without one.",
+			],
+			helps: [
+				"Take the value as a Parameter, or drop 'static' to make this an instance Method.",
+			],
+		})
+
+		return { type: "Error" }
+	}
+
+	let result = binding === null ? null : binding.type
 
 	if (result === null) {
 		reportError("There is no '@' here to refer to", node.position, {
@@ -894,6 +947,9 @@ export type ConformanceSolveResult =
 type ScopeConformanceState = {
 	memo: Map<string, ConformanceSolveResult>
 	inProgress: Set<string>
+	// NOTE: The Scope versions the memo was filled under — the same snapshot
+	// `getAllNamespacesInScope` validates its own answer against.
+	versions: Array<{ scope: enricher.Scope; version: number }>
 }
 
 // NOTE: Memoised per exact Scope, not per root Scope (R3): `where` conditions
@@ -904,12 +960,28 @@ type ScopeConformanceState = {
 // recursion tree, so the `inProgress` set still guards cycles within it.
 let conformanceStates = new WeakMap<enricher.Scope, ScopeConformanceState>()
 
+// NOTE: One Scope's visible Namespaces change over the course of enrichment as
+// its own Statements declare them — a Namespace written half way down a
+// Function body is not visible to the Statements above it and IS to the ones
+// below. The memo is therefore version-guarded exactly like the Namespace
+// enumeration cache: a declaration that adds or shadows a Namespace anywhere on
+// the chain bumps a version, and the memo is dropped rather than answering a
+// later solve with what an earlier one could see. Without this, a first
+// invocation's witness is reused after a second Namespace joins the ambiguity.
 function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 	let state = conformanceStates.get(scope)
 
 	if (state === undefined) {
-		state = { memo: new Map(), inProgress: new Set() }
+		state = {
+			memo: new Map(),
+			inProgress: new Set(),
+			versions: scopeVersionSnapshot(scope),
+		}
+
 		conformanceStates.set(scope, state)
+	} else if (!namespaceCacheIsCurrent(state, scope)) {
+		state.memo.clear()
+		state.versions = scopeVersionSnapshot(scope)
 	}
 
 	return state
@@ -1221,12 +1293,15 @@ function runtimeTagOf(type: common.Type): string | null {
 // NOTE: How one payload member is compared — structurally when it names no Type
 // Parameter, through the witness at its declaration-order index when it is a
 // bare Parameter, and recursively for the composites (a List itemwise, a Record
-// or Case member by member, a Union by discriminating its concrete arms and
-// falling back to the generic one).
+// or Case member by member, a Union by claiming each arm's values and falling
+// back to the generic one). `bindings` are the receiver's Type Arguments, which
+// the Union case needs to see which arms have to be told apart from a
+// Parameter's values, and by what.
 function describeMember(
 	type: common.Type,
 	constrainedOrder: Array<string>,
 	generics: Set<string>,
+	bindings: GenericBindings,
 ): common.DescriptorNode {
 	if (!typeMentionsGenerics(type, generics)) {
 		return { k: "eq" }
@@ -1238,33 +1313,275 @@ function describeMember(
 		case "List":
 			return {
 				k: "list",
-				of: describeMember(type.itemType, constrainedOrder, generics),
+				of: describeMember(
+					type.itemType,
+					constrainedOrder,
+					generics,
+					bindings,
+				),
 			}
 		case "Record":
 			return {
 				k: "record",
-				m: describeMembers(type.members, constrainedOrder, generics),
+				m: describeMembers(
+					type.members,
+					constrainedOrder,
+					generics,
+					bindings,
+				),
 			}
 		case "Case":
 			return {
 				k: "case",
-				m: describeMembers(type.members, constrainedOrder, generics),
+				m: describeMembers(
+					type.members,
+					constrainedOrder,
+					generics,
+					bindings,
+				),
 			}
 		case "UnionType":
-			return {
-				k: "union",
-				arms: flattenUnionMembers(type).map((arm) => ({
-					// NOTE: An arm mentioning a Parameter is the fallback (`null`)
-					// — it can not be told apart by a fixed tag, so everything the
-					// concrete arms do not claim is compared through its witness.
-					tag: typeMentionsGenerics(arm, generics)
-						? null
-						: runtimeTagOf(arm),
-					node: describeMember(arm, constrainedOrder, generics),
-				})),
-			}
+			return describeUnion(type, constrainedOrder, generics, bindings)
 		default:
 			return { k: "eq" }
+	}
+}
+
+// NOTE: One arm of a `union` descriptor node while it is being built — the
+// claim it makes at runtime, alongside the Type that claim is read off.
+type UnionArm = {
+	// NOTE: The arm as written. For a Parameter-naming arm this still mentions
+	// the Parameter; `applied` is what it stands for at this receiver.
+	type: common.Type
+	// NOTE: The Type a Parameter-naming arm stands for once the receiver's Type
+	// Arguments are substituted in, and null for every other arm — a concrete
+	// one, and one whose Parameters this receiver does not bind.
+	applied: common.Type | null
+	claim: {
+		tag: string | null
+		shape?: common.Type
+		node: common.DescriptorNode
+	} | null
+}
+
+// NOTE: A Union-typed payload member. Which arm a value belongs to is a runtime
+// question, and the descriptor answers it with the two checks the runtime has:
+// the value's `typeKeySymbol` tag, and — for the arms one tag can not tell apart
+// — the structural `isValueOfType` a Match narrows with.
+//
+// NOTE: A tag says which KIND a value is, not which Type: every Record carries
+// "Record", every List "List". So a concrete `{ code: Integer }` arm and a `T`
+// bound to `{ name: String }` claim the same tag, and left at that the concrete
+// arm claims the Parameter's values too and compares them structurally,
+// overruling the witness the conformance solve chose for them. Both arms keep
+// claiming — the concrete one only for the values its SHAPE accepts, which the
+// Parameter's do not fit, so they fall through to the witness. Dropping either
+// arm is not a resolution: dropping the concrete one sends its own values to a
+// witness written for a Type they are not.
+function describeUnion(
+	type: common.UnionType,
+	constrainedOrder: Array<string>,
+	generics: Set<string>,
+	bindings: GenericBindings,
+): common.DescriptorNode {
+	let arms: Array<UnionArm> = flattenUnionMembers(type).map((armType) => ({
+		type: armType,
+		applied: appliedArmType(armType, generics, bindings),
+		claim: null,
+	}))
+	// NOTE: What the Parameter-naming arms' values look like at this receiver —
+	// the values a concrete arm must not claim. A Union Argument is flattened:
+	// each of its members carries its own tag.
+	let witnessTypes = arms.flatMap((arm) =>
+		arm.applied === null
+			? []
+			: arm.applied.type === "UnionType"
+				? flattenUnionMembers(arm.applied)
+				: [arm.applied],
+	)
+
+	for (let arm of arms) {
+		let node = describeMember(
+			arm.type,
+			constrainedOrder,
+			generics,
+			bindings,
+		)
+
+		// NOTE: An arm mentioning a Parameter is the fallback (`null`) — no
+		// fixed tag is its own, so everything no arm claims is compared through
+		// its witness.
+		if (typeMentionsGenerics(arm.type, generics)) {
+			arm.claim = { tag: null, node }
+			continue
+		}
+
+		let tag = runtimeTagOf(arm.type)
+		let collisions =
+			tag === null
+				? []
+				: witnessTypes.filter(
+						(witnessType) => runtimeTagOf(witnessType) === tag,
+					)
+
+		if (collisions.length === 0) {
+			arm.claim = { tag, node }
+			continue
+		}
+
+		// NOTE: Mutually assignable — the arm and the Argument accept exactly
+		// the same values, so no runtime check tells them apart. The witness is
+		// the more specific of the two answers, and it also answers for this
+		// arm's own values (they are values of its Type too), so the arm stops
+		// claiming altogether.
+		if (
+			collisions.some(
+				(witnessType) =>
+					matchesType(arm.type, witnessType) &&
+					matchesType(witnessType, arm.type),
+			)
+		) {
+			continue
+		}
+
+		arm.claim = { tag, shape: runtimeShapeOf(arm.type), node }
+	}
+
+	// NOTE: An Argument that is a strict REFINEMENT of a concrete arm — every
+	// one of its values fits that arm's shape, while the arm has values it does
+	// not — is the one case where a shape alone still claims wrongly. The
+	// Parameter's arm takes a shape of its own, and the ordering below puts the
+	// more specific claim first, so its values reach its witness and the arm
+	// keeps the rest.
+	for (let arm of arms) {
+		let applied = arm.applied
+
+		if (applied === null || arm.claim === null) {
+			continue
+		}
+
+		let refinesAnArm = arms.some(
+			(other) =>
+				other.applied === null &&
+				other.claim?.shape !== undefined &&
+				matchesType(other.type, applied),
+		)
+
+		if (refinesAnArm) {
+			arm.claim.shape = runtimeShapeOf(applied)
+		}
+	}
+
+	return {
+		k: "union",
+		arms: orderClaims(
+			arms.flatMap((arm) => (arm.claim === null ? [] : [arm.claim])),
+		),
+	}
+}
+
+// NOTE: The Type a Parameter-naming arm stands for once the receiver's Type
+// Arguments are substituted in — null for a concrete arm, for a descriptor built
+// without a receiver, and for an arm whose Parameters this receiver leaves
+// unbound: those values carry whatever tag the eventual Argument does, which is
+// unknown here.
+function appliedArmType(
+	arm: common.Type,
+	generics: Set<string>,
+	bindings: GenericBindings,
+): common.Type | null {
+	if (bindings.size === 0 || !typeMentionsGenerics(arm, generics)) {
+		return null
+	}
+
+	let applied = applyGenericBindings(arm, bindings)
+
+	return typeMentionsGenerics(applied, generics) ? null : applied
+}
+
+// NOTE: Most specific claim first, so an arm whose values are all values of
+// another claims them before that other one does — Record shapes are OPEN, so
+// `{ code: Integer }` accepts a `{ name: String, code: Integer }` too, and only
+// the order keeps the more specific arm's values off it. Ties go to the
+// Parameter's arm, whose witness is the more specific answer. Only the shaped
+// arms are ordered, and they never compete with the rest: a shape is carried by
+// exactly the arms of one colliding tag, so every other claim is decided by a
+// tag none of them can answer to.
+function orderClaims<Claim extends { tag: string | null; shape?: common.Type }>(
+	claims: Array<Claim>,
+): Array<Claim> {
+	let shaped = claims.flatMap((claim, position) =>
+		claim.shape === undefined
+			? []
+			: [{ claim, shape: claim.shape, position }],
+	)
+
+	if (shaped.length < 2) {
+		return claims
+	}
+
+	let ordered = [...shaped].sort((left, right) => {
+		let leftFitsRight = matchesType(right.shape, left.shape)
+		let rightFitsLeft = matchesType(left.shape, right.shape)
+
+		if (leftFitsRight !== rightFitsLeft) {
+			return leftFitsRight ? -1 : 1
+		}
+
+		// NOTE: Two shapes accepting exactly each other's values — only reached
+		// between two concrete arms, since an arm tied with a Parameter's
+		// Argument stopped claiming above.
+		if (leftFitsRight) {
+			return left.claim.tag === null
+				? -1
+				: right.claim.tag === null
+					? 1
+					: 0
+		}
+
+		return 0
+	})
+
+	let claimed = [...claims]
+
+	for (let [index, entry] of ordered.entries()) {
+		claimed[shaped[index]!.position] = entry.claim
+	}
+
+	return claimed
+}
+
+// NOTE: The part of a Type the runtime can actually check — what `isValueOfType`
+// consults and nothing more, which is why a descriptor carries a SHAPE rather
+// than a Type. A Case is decided by its tag alone, so its payload is dropped; a
+// Union's alias spelling and Type Arguments say nothing about a value either.
+// Every one of these is emitted into the Program that needs it, so what is left
+// out is bytes no Program pays for.
+function runtimeShapeOf(type: common.Type): common.Type {
+	switch (type.type) {
+		case "Record":
+			return {
+				type: "Record",
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, memberType]) => [
+						name,
+						runtimeShapeOf(memberType),
+					]),
+				),
+			}
+		case "List":
+			return { type: "List", itemType: runtimeShapeOf(type.itemType) }
+		case "Case":
+			return {
+				type: "Case",
+				choice: type.choice,
+				name: type.name,
+				members: {},
+			}
+		case "UnionType":
+			return { type: "UnionType", types: type.types.map(runtimeShapeOf) }
+		default:
+			return type
 	}
 }
 
@@ -1272,11 +1589,17 @@ function describeMembers(
 	members: Record<string, common.Type>,
 	constrainedOrder: Array<string>,
 	generics: Set<string>,
+	bindings: GenericBindings,
 ): Record<string, common.DescriptorNode> {
 	let described: Record<string, common.DescriptorNode> = {}
 
 	for (let [name, memberType] of Object.entries(members)) {
-		described[name] = describeMember(memberType, constrainedOrder, generics)
+		described[name] = describeMember(
+			memberType,
+			constrainedOrder,
+			generics,
+			bindings,
+		)
 	}
 
 	return described
@@ -1284,15 +1607,28 @@ function describeMembers(
 
 // NOTE: The compile-time plan the widened runtime helper follows for a generic
 // Choice — one entry per Case tag mapping each payload member to how it is
-// compared. Pure over the DECLARED Alias (its Cases still carry GenericUse
+// compared. Read off the DECLARED Alias (its Cases still carry GenericUse
 // members the applied form erases), so the same plan is reachable at every
-// emission site that has the receiver's Choice in hand.
+// emission site that has the receiver's Choice in hand. `typeArguments` are the
+// receiver's, and only decide which arms of a Union payload can still be told
+// apart from the Parameter's own values — how a member is compared is decided by
+// the Alias alone.
 export function derivedEquatableDescriptor(
 	alias: common.GenericAliasType,
+	typeArguments: Array<common.Type> = [],
 ): common.DerivedEquatableDescriptor {
 	let generics = new Set(alias.generics.map((generic) => generic.name))
 	let constrainedOrder = constrainedGenericOrder(alias)
+	let bindings: GenericBindings = new Map()
 	let descriptor: common.DerivedEquatableDescriptor = {}
+
+	for (let [index, generic] of alias.generics.entries()) {
+		let typeArgument = typeArguments[index]
+
+		if (typeArgument !== undefined) {
+			bindings.set(generic.name, typeArgument)
+		}
+	}
 
 	for (let caseType of choiceAliasCases(alias)) {
 		if (caseType.type !== "Case") {
@@ -1303,6 +1639,7 @@ export function derivedEquatableDescriptor(
 			caseType.members,
 			constrainedOrder,
 			generics,
+			bindings,
 		)
 	}
 
@@ -1322,7 +1659,7 @@ export function derivedEquatableDescriptorFor(
 		return null
 	}
 
-	return derivedEquatableDescriptor(alias)
+	return derivedEquatableDescriptor(alias, choiceTypeArgumentsOf(baseType))
 }
 
 // NOTE: Every Choice is Equatable without being written as such — a Case is
@@ -1347,6 +1684,7 @@ export function derivedEquatableNamespace(
 	return derivedEquatableNamespaceForChoice(
 		choiceType,
 		declaredChoiceAliasOf(baseType, scope),
+		choiceTypeArgumentsOf(baseType),
 	)
 }
 
@@ -1360,9 +1698,19 @@ export function derivedEquatableNamespace(
 // Parameters from the receiver and the existing conformance rail produces the
 // per-Parameter witnesses. A non-generic Choice (or a call with no Alias in
 // hand) keeps the flat Methods, whose emission never widens.
+//
+// NOTE: `typeArguments` are the receiver's own, when the caller has a receiver
+// — they PIN the Parameters instead of leaving them to be inferred. A receiver
+// narrowed to one Case (`case #First { @::is(@) }`) only matches that Case's arm
+// of the body Union, which mentions the Parameters ITS payload names and no
+// others, so inference alone would leave the rest unbound and misreport them as
+// uninferable — even though the receiver spells every one of them out. Pinned
+// Parameters are still checked against the Arguments: a pin is a binding made
+// up front, not a Parameter withdrawn from matching.
 export function derivedEquatableNamespaceForChoice(
 	choiceType: common.Type,
 	declaredAlias: common.GenericAliasType | null = null,
+	typeArguments: Array<common.Type> = [],
 ): common.NamespaceType {
 	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
 
@@ -1371,12 +1719,25 @@ export function derivedEquatableNamespaceForChoice(
 	// one would stay unbound at inference and misreport as uninferable.
 	let boundGenerics: Array<common.GenericDeclaration> =
 		isGeneric && declaredAlias !== null
-			? constrainedGenericOrder(declaredAlias).map((name) => ({
-					name,
-					infer: true,
-					defaultType: null,
-					constraint: "Equatable",
-				}))
+			? constrainedGenericOrder(declaredAlias).map((name) => {
+					// NOTE: A Parameter the receiver spells out is declared as a
+					// default rather than as `infer`, which is what pre-binds it
+					// — inference seeds the defaults of the Parameters it is not
+					// asked to infer, and checks the Arguments against them.
+					let pinned =
+						typeArguments[
+							declaredAlias.generics.findIndex(
+								(generic) => generic.name === name,
+							)
+						]
+
+					return {
+						name,
+						infer: pinned === undefined,
+						defaultType: pinned ?? null,
+						constraint: "Equatable",
+					}
+				})
 			: []
 
 	// NOTE: The Parameters are the UNAPPLIED body Union for a generic Choice, so
@@ -1539,7 +1900,7 @@ function derivedConformanceSource(
 		name: derivedEquatableNamespaceName,
 		methodMap: result.methodMap,
 		conditions,
-		derivedDescriptor: derivedEquatableDescriptor(alias),
+		derivedDescriptor: derivedEquatableDescriptor(alias, typeArguments),
 	}
 }
 
@@ -2682,6 +3043,10 @@ export function suggestionHelps(
 		: [`Did you mean '${suggestion}'?`]
 }
 
+// NOTE: `Object.hasOwn`, not a plain index — as in `findTypeInScope` below.
+// A name that happens to spell a member of `Object.prototype` (`toString`,
+// `valueOf`, `constructor`) would otherwise resolve to a JavaScript function
+// nobody declared, and an undeclared `toString` would type-check.
 export function findVariableInScope(
 	name: string,
 	scope: enricher.Scope,
@@ -2693,7 +3058,7 @@ export function findVariableInScope(
 			return null
 		}
 
-		if (searchScope.members[name] != null) {
+		if (Object.hasOwn(searchScope.members, name)) {
 			return searchScope.members[name]
 		} else {
 			searchScope = searchScope.parent
@@ -2774,6 +3139,27 @@ export function invalidateNamespacesInScope(
 	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
 }
 
+// NOTE: The version of every Scope on the chain, innermost first — what a
+// memoised answer records so that `namespaceCacheIsCurrent` can revalidate it
+// by comparing numbers instead of enumerating members.
+function scopeVersionSnapshot(
+	scope: enricher.Scope,
+): Array<{ scope: enricher.Scope; version: number }> {
+	let versions: Array<{ scope: enricher.Scope; version: number }> = []
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		versions.push({
+			scope: searchScope,
+			version: scopeVersions.get(searchScope) ?? 0,
+		})
+
+		searchScope = searchScope.parent
+	}
+
+	return versions
+}
+
 function namespaceCacheIsCurrent(
 	cached: { versions: Array<{ scope: enricher.Scope; version: number }> },
 	scope: enricher.Scope,
@@ -2799,23 +3185,71 @@ function namespaceCacheIsCurrent(
 	return index === cached.versions.length
 }
 
+// NOTE: `::<Name>method()` where `Name` means something other than a Namespace
+// here. Reported rather than skipped past: the call site named ONE Namespace,
+// and answering with a Namespace of that name from further out would type-check
+// the call against something the emitted code can not reach — the nearer
+// binding is what the name compiles to.
+function reportSpecifierIsNotANamespace(
+	identifier: parser.IdentifierNode,
+	value: common.Type,
+	declarationPosition: common.Position | null,
+): void {
+	reportError(
+		`'${identifier.content}' is not a Namespace`,
+		identifier.position,
+		{
+			code: "not-a-namespace",
+			labels: [
+				primary(
+					identifier.position,
+					`this is ${withArticle(describeType(value))}`,
+				),
+				...(declarationPosition === null
+					? []
+					: [secondary(declarationPosition, "declared here")]),
+			],
+			notes: [
+				`A Method can only be looked up in a Namespace, and '${identifier.content}' names ${withArticle(describeType(value))} here.`,
+			],
+			helps: [
+				"Drop the Namespace specifier, or rename whatever shadows the Namespace.",
+			],
+		},
+	)
+}
+
 export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
 ): Map<string, common.NamespaceType> {
-	let searchScope: enricher.Scope | null = scope
-	let namespaces: Map<string, common.NamespaceType> = new Map()
-
 	// NOTE: A named lookup only ever wants one Namespace, so it walks the
 	// Scope chain asking for that one name instead of enumerating members.
+	// It stops at the NEAREST binding of the name, whatever that binding is —
+	// the same shadowing rule the enumeration below implements ("a member that
+	// is anything else shadows one away"). Walking past a Constant to a
+	// Namespace of the same name further out would validate the call against a
+	// Namespace that is not what the name means where the call is emitted.
 	if (identifier) {
+		let namespaces: Map<string, common.NamespaceType> = new Map()
 		let name = identifier.content
+		let searchScope: enricher.Scope | null = scope
 
 		while (searchScope !== null) {
-			let value = searchScope.members[name]
+			if (Object.hasOwn(searchScope.members, name)) {
+				let value = searchScope.members[name]
 
-			if (value !== undefined && value.type === "Namespace") {
-				namespaces.set(name, value)
+				if (value.type === "Namespace") {
+					namespaces.set(name, value)
+				} else {
+					reportSpecifierIsNotANamespace(
+						identifier,
+						value,
+						Object.hasOwn(searchScope.declarations, name)
+							? searchScope.declarations[name]
+							: null,
+					)
+				}
 
 				break
 			}
@@ -2873,18 +3307,10 @@ export function getAllNamespacesInScope(
 		}
 	}
 
-	let versions: Array<{ scope: enricher.Scope; version: number }> = []
-
-	while (searchScope !== null) {
-		versions.push({
-			scope: searchScope,
-			version: scopeVersions.get(searchScope) ?? 0,
-		})
-
-		searchScope = searchScope.parent
-	}
-
-	namespacesInScopeCache.set(scope, { versions, namespaces: result })
+	namespacesInScopeCache.set(scope, {
+		versions: scopeVersionSnapshot(scope),
+		namespaces: result,
+	})
 
 	return result
 }

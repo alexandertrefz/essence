@@ -383,9 +383,22 @@ function simplifyIdentifier(
 	}
 }
 
+// NOTE: `@` lowers to the receiver Parameter every INSTANCE Method is emitted
+// with — `simplifyMethods` unshifts `_self` for exactly those. A static Method
+// is emitted without one, so an `@` reaching here from a static body would name
+// a Variable nothing declares and the emitted Program would throw on first
+// call. The Enricher refuses `@` there (`at-in-static-method`) and the Rewriter
+// never runs on a Program with Errors, so this can only be a Compiler bug —
+// which is worth a throw rather than JavaScript that dies at runtime.
 function simplifySelf(
 	node: common.typed.SelfNode,
 ): common.typedSimple.IdentifierNode {
+	if (staticMethodDepth > 0) {
+		throw new Error(
+			"'@' reached the Simplifier inside a static Method, which is emitted without a receiver",
+		)
+	}
+
 	return {
 		nodeType: "Identifier",
 		name: "_self",
@@ -393,37 +406,77 @@ function simplifySelf(
 	}
 }
 
+// NOTE: Module state rather than a parameter threaded through every simplify
+// function — the check above is an invariant guard, and paying for it at each
+// of the ~40 hand-offs between a Method and the Expressions in its body would
+// cost more than the guard is worth. Counted rather than set, so that nesting
+// restores the outer state exactly.
+let staticMethodDepth = 0
+
+function withinStaticMethod<Result>(run: () => Result): Result {
+	staticMethodDepth += 1
+
+	try {
+		return run()
+	} finally {
+		staticMethodDepth -= 1
+	}
+}
+
+function withoutStaticMethodBarrier<Result>(run: () => Result): Result {
+	let outerDepth = staticMethodDepth
+	staticMethodDepth = 0
+
+	try {
+		return run()
+	} finally {
+		staticMethodDepth = outerDepth
+	}
+}
+
 function simplifyMatch(
 	node: common.typed.MatchNode,
 ): common.typedSimple.MatchNode {
+	// NOTE: The matched value is still the enclosing Method's business — `@`
+	// written there is the receiver — so it is simplified before the Handlers
+	// lift the static barrier.
+	let value = simplifyExpression(node.value)
+
 	return {
 		nodeType: "Match",
-		value: simplifyExpression(node.value),
-		handlers: node.handlers.map((handler) => {
-			return {
-				matcher: handler.matcher,
-				literal:
-					handler.literal === null
-						? null
-						: simplifyExpression(handler.literal),
-				memberLiterals:
-					handler.memberLiterals === null
-						? null
-						: Object.fromEntries(
-								Object.entries(handler.memberLiterals).map(
-									([name, literal]) => [
-										name,
-										simplifyExpression(literal),
-									],
+		value,
+		// NOTE: A Handler is emitted as a Function of its own taking `_self`,
+		// the value that matched, so `@` inside one is bound however the
+		// Handler was reached — including inside a static Method, where the
+		// receiver `@` is refused. The barrier is lifted for the Handlers and
+		// restored afterwards, exactly as the Enricher's Scope does it.
+		handlers: withoutStaticMethodBarrier(() =>
+			node.handlers.map((handler) => {
+				return {
+					matcher: handler.matcher,
+					literal:
+						handler.literal === null
+							? null
+							: simplifyExpression(handler.literal),
+					memberLiterals:
+						handler.memberLiterals === null
+							? null
+							: Object.fromEntries(
+									Object.entries(handler.memberLiterals).map(
+										([name, literal]) => [
+											name,
+											simplifyExpression(literal),
+										],
+									),
 								),
-							),
-				guard:
-					handler.guard === null
-						? null
-						: simplifyExpression(handler.guard),
-				body: handler.body.map(simplifyImplementationNode),
-			}
-		}),
+					guard:
+						handler.guard === null
+							? null
+							: simplifyExpression(handler.guard),
+					body: handler.body.map(simplifyImplementationNode),
+				}
+			}),
+		),
 		type: node.type,
 	}
 }
@@ -643,7 +696,12 @@ function simplifyMethods(
 				// lengths are checked above rather than falling back to
 				// `index`, which would quietly reinstate exactly that bug.
 				let overloadIndex = memberValue.overloadIndices[index]!
-				let newMethod = simplifyFunctionValue(method)
+				let newMethod =
+					memberValue.nodeType === "OverloadedStaticMethod"
+						? withinStaticMethod(() =>
+								simplifyFunctionValue(method),
+							)
+						: simplifyFunctionValue(method)
 
 				if (memberValue.nodeType === "OverloadedMethod") {
 					newMethod.value.parameters.unshift({
@@ -665,7 +723,12 @@ function simplifyMethods(
 					}
 			})
 		} else {
-			let method = simplifyFunctionValue(memberValue.method)
+			let method =
+				memberValue.nodeType === "StaticMethod"
+					? withinStaticMethod(() =>
+							simplifyFunctionValue(memberValue.method),
+						)
+					: simplifyFunctionValue(memberValue.method)
 
 			if (memberValue.nodeType === "SimpleMethod") {
 				method.value.parameters.unshift({

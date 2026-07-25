@@ -144,6 +144,20 @@ export function containsErrors(diagnostics: Array<common.Diagnostic>): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === "error")
 }
 
+// NOTE: A savepoint in the active collection, for speculative work that is
+// abandoned far more often than it is kept — the parser backtracks on nearly
+// every Expression, and a fresh collection per attempt is a per-Expression
+// allocation. Marking costs a length read; rewinding drops exactly the
+// Diagnostics reported since the mark, which are the ones that belong to a
+// reading the caller decided against.
+export function markDiagnostics(): number {
+	return activeDiagnostics.length
+}
+
+export function rewindDiagnostics(mark: number): void {
+	activeDiagnostics.length = mark
+}
+
 // NOTE: Collections nest — Diagnostics reported inside `work` are captured
 // into a fresh list and do not leak into the surrounding collection. This
 // allows speculative resolution whose Diagnostics are only committed (via

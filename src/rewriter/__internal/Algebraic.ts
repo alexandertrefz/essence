@@ -162,7 +162,18 @@ export function createAlgebraic(
 		denominator: 1n,
 	})
 
-	if (squarefree === 1n || coefficient.numerator === 0n) {
+	// NOTE: `squarefree` is 0 for exactly one radicand — 0 itself, which
+	// `extractSquarePart` leaves whole because its trial division starts above
+	// it. √0 is 0, not an irrational, so the radical contributes nothing and
+	// the value is its rational part. Collapsing it here is what upholds
+	// "the radicand is squarefree and at least 2": without it a `√0` escapes
+	// with a non-zero radical coefficient and every sign routine reads it as
+	// strictly positive.
+	if (
+		squarefree === 0n ||
+		squarefree === 1n ||
+		coefficient.numerator === 0n
+	) {
 		// NOTE: The radical collapsed — the value is rational after all.
 		return rationalValueOf(
 			addRationals(
@@ -206,6 +217,13 @@ export function squareRootOfRational(
 ): AlgebraicType | RationalType | NothingType {
 	if (value.numerator < 0n) {
 		return createNothing()
+	}
+
+	// NOTE: √0 is exactly 0 — the one non-negative root that leaves no radical
+	// at all. Said here rather than left to `createAlgebraic` so the answer is
+	// the canonical zero and not `0/q`.
+	if (value.numerator === 0n) {
+		return createRational(0n, 1n)
 	}
 
 	return createAlgebraic(

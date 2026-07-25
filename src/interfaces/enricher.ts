@@ -20,4 +20,11 @@ export type Scope = {
 	// Function bodies and Match Handler bodies. Bare Case Expressions
 	// (`<- #Less`) consult it before falling back to the scope scan.
 	expectedReturnType?: common.Type
+	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
+	// static Method is called on the Namespace and is emitted without the
+	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere
+	// absence of a binding — an enclosing `@` must not answer through it —
+	// while a Match Handler nested inside still binds its own `@` and wins,
+	// because that binding sits closer to the use.
+	isStaticMethodBody?: boolean
 }

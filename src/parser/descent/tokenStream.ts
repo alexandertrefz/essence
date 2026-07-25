@@ -177,6 +177,23 @@ export class TokenStream {
 
 			this.hadLexerError = true
 		}
+
+		// NOTE: A malformed Number Literal does not truncate the stream — the
+		// Token is there, it just can not hold the text that was written — so
+		// it is reported without setting `hadLexerError`: every Diagnostic
+		// after it is about a Statement that was read in full.
+		for (let error of sourceLexer.errors) {
+			reportError(error.message, error.position, {
+				code: "invalid-number",
+				labels: [primary(error.position, "this is not a Number")],
+				notes: [
+					"A Number is written in decimal digits, grouped with '_' where that helps — 1_000_000.",
+				],
+				helps: [
+					"Essence has no hexadecimal, binary or exponent form; write the value in digits.",
+				],
+			})
+		}
 	}
 
 	get depth(): number {
