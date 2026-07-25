@@ -1,0 +1,40 @@
+# NOTE: The suite is this repository's only gate — there is nothing to build, so
+# a green run means exactly what a contributor's own two commands mean: the
+# checkout type-checks, and every spec passes. Both are run, in that order,
+# because a type error is the cheaper failure to read and there is no reason to
+# wait for the specs to hear about it.
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # NOTE: `.bun-version` holds the Bun this repository is developed against,
+      # so CI runs the one a contributor does rather than whatever the runner
+      # ships this week. Bun is not merely the task runner here: the packages
+      # are TypeScript executed straight through it with no build step, the
+      # specs are written against `bun:test` down to its snapshot format, and
+      # several of them import an emitted Program as a module. A version drift
+      # would surface as a failure nobody could reproduce locally. It is the
+      # version `@types/bun` is pinned to as well — the types the checkout is
+      # checked against are that Bun's, so the two move together.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      # NOTE: `bun.lock` decides the dependency versions, and `--frozen-lockfile`
+      # is what makes that binding rather than advisory — an install that would
+      # have to change the lockfile fails here instead of quietly resolving
+      # something newer than what the versions were pinned to.
+      - run: bun install --frozen-lockfile
+
+      - run: bun run typecheck
+      - run: bun test
