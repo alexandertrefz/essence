@@ -379,6 +379,18 @@ the surrounding position decides, the way it does for the bare `#Bare` form —
 them itself, `Holder<Integer>#Bare`. A Choice with no Type Parameters at all
 is never asked: `Ordering#Equal` is legal anywhere.
 
+A Parameter Type that mentions the CALL's own Type Parameters decides nothing
+either, because nothing has decided them: `take(Holder#Full(1))` against
+`take<infer Item is Equatable>(_ h: Holder<Item>)` is undecided, and the three
+spellings that do decide it are `take(Holder<Integer>#Full(1))`, the bare
+`take(#Full(1))`, and a Constant annotated on the way in.
+
+Written Type Arguments that disagree with what the position decided are the
+ordinary mismatch of a value that does not fit where it is put, and are reported
+as one — `assignment-type-mismatch` in a Declaration, `argument-type-mismatch` at
+an Argument — including where the Case carries nothing that could differ, as
+`Box<String>#Tag("x")` under a `Box<Integer>` does.
+
 ## Match Expressions
 
 ### `missing-case`
