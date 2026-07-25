@@ -15,6 +15,7 @@
 	"ignorePatterns": [
 		"coverage/**",
 		"packages/compiler/src/rewriter/__internal/natives.generated.ts",
+		"packages/escodegen/**",
 		"packages/fixtures/files/**",
 		"docs/**"
 	]

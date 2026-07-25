@@ -17,7 +17,7 @@
 		"@essence/ariadne": "workspace:*",
 		"bigint-fraction": "1.0.6",
 		"esbuild": "0.28.1",
-		"escodegen": "alexandertrefz/escodegen#b4cb6d12aa3eb4082d001e0900ec30379ee79a63",
+		"escodegen": "workspace:*",
 		"vscode-languageserver": "10.1.0",
 		"vscode-languageserver-textdocument": "1.0.12"
 	},
