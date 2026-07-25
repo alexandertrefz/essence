@@ -1,0 +1,13 @@
+{
+	"name": "@essence/fixtures",
+	"version": "0.0.1",
+	"description": "Essence sources the test suite compiles, and the paths to reach them.",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"license": "MIT"
+}

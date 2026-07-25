@@ -13,12 +13,17 @@
         "vscode-languageserver-textdocument": "1.0.12",
       },
       "devDependencies": {
+        "@essence/fixtures": "workspace:*",
         "@types/bun": "1.3.14",
         "@types/escodegen": "0.0.10",
         "@types/estree": "1.0.9",
         "oxfmt": "0.59.0",
         "oxlint": "1.74.0",
       },
+    },
+    "packages/fixtures": {
+      "name": "@essence/fixtures",
+      "version": "0.0.1",
     },
   },
   "trustedDependencies": [
@@ -76,6 +81,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.28.1", "", { "os": "win32", "cpu": "ia32" }, "sha512-zvb/mB2bSCoJOpoCBgYKKpX6YM6mJBlBUVUtVj41DlZJVEB6/0CKlRYxP5wWl1C1ILiCoAU5wZZ4q1P3qeS6Eg=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A=="],
+
+    "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
 
     "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.59.0", "", { "os": "android", "cpu": "arm" }, "sha512-bNTnfbuG7sAwb2PakMNaDukx5kXeW9duXOBeWtTOiLz3fXz3q2DlWguufPZ+c2IHEVrRXHD+M4aUgEWm841LDA=="],
 

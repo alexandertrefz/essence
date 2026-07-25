@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+
+import { fixturePath } from "@essence/fixtures"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -15,8 +17,14 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-const harnessFile = "testFiles/StdlibExhaustive.es"
-const goldenFile = "src/tests/__golden__/stdlibExhaustive.txt"
+// NOTE: The names are what the failure message prints; the paths are what is
+// read. Keeping them apart means the message stays the short, greppable thing a
+// reader can act on rather than two absolute paths into a checkout.
+const harnessFile = "StdlibExhaustive.es"
+const goldenFile = "__golden__/stdlibExhaustive.txt"
+
+const harnessPath = fixturePath(harnessFile)
+const goldenPath = resolve(import.meta.dirname, goldenFile)
 
 type CompiledProgram = {
 	output: Array<string>
@@ -419,7 +427,7 @@ function describeDifferences(
 }
 
 describe("Stdlib Golden", () => {
-	let { output, program } = compileProgram(readFileSync(harnessFile, "utf8"))
+	let { output, program } = compileProgram(readFileSync(harnessPath, "utf8"))
 
 	// NOTE: The golden file was produced by RUNNING this harness against the
 	// TypeScript standard library, never written by hand. It is the record of
@@ -428,7 +436,7 @@ describe("Stdlib Golden", () => {
 	// — which is the whole reason this file exists. Re-capture it only when a
 	// change of behaviour is the intent, and never to make this test pass.
 	it("prints what the golden file records", () => {
-		let golden = readFileSync(goldenFile, "utf8").split("\n")
+		let golden = readFileSync(goldenPath, "utf8").split("\n")
 
 		// NOTE: The file ends with a newline, as a text file should.
 		if (golden.at(-1) === "") {

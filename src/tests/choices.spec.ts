@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
+
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import type { common, parser } from "../interfaces/index"
@@ -1422,11 +1424,10 @@ describe("Choices", () => {
 			).toEqual(['"15"'])
 		})
 
-		it("compiles and runs testFiles/GenericChoice.es end to end", async () => {
-			let source = readFileSync(
-				join(import.meta.dir, "../..", "testFiles/GenericChoice.es"),
-				{ encoding: "utf-8" },
-			)
+		it("compiles and runs GenericChoice.es end to end", async () => {
+			let source = readFileSync(fixturePath("GenericChoice.es"), {
+				encoding: "utf-8",
+			})
 
 			expect(await run(source)).toEqual([
 				"0",
