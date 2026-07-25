@@ -1,0 +1,30 @@
+{
+	"name": "escodegen",
+	"version": "2.1.0-essence.1",
+	"description": "ECMAScript code generator — vendored fork, see PATCHES.md",
+	"private": true,
+	"main": "./escodegen.js",
+	"homepage": "http://github.com/estools/escodegen",
+	"repository": {
+		"type": "git",
+		"url": "http://github.com/estools/escodegen.git"
+	},
+	"license": "BSD-2-Clause",
+	"maintainers": [
+		{
+			"name": "Yusuke Suzuki",
+			"email": "utatane.tea@gmail.com",
+			"web": "http://github.com/Constellation"
+		}
+	],
+	"engines": {
+		"node": ">=6.0"
+	},
+	"dependencies": {
+		"estraverse": "^5.2.0",
+		"esutils": "^2.0.2"
+	},
+	"optionalDependencies": {
+		"source-map": "~0.6.1"
+	}
+}
