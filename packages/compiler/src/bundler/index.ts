@@ -52,12 +52,30 @@ export async function bundle(
 				sourcefile: options.sourceFileName,
 			},
 			tsconfig: path.join(runtimeDirectory, "__internal/tsconfig.json"),
+			// NOTE: esbuild labels every module it inlines with that module's
+			// path relative to its working directory, and those labels are part
+			// of the emitted file. Left at the process's working directory they
+			// spell out wherever the Compiler happens to be installed, as seen
+			// from wherever the user happened to run it — in practice a line
+			// like `// ../../../../../Users/someone/…/__internal/Number.ts`
+			// above each one. That leaks the building machine's layout into
+			// every shipped bundle, costs a kilobyte and a half of nothing, and
+			// makes the same Program compile to different bytes from two
+			// different directories. Anchored here the labels read
+			// `__internal/Number.ts`, and the output depends on the Program
+			// alone.
+			absWorkingDir: runtimeDirectory,
 			minify: options.minify ?? false,
 			sourcemap: options.sourcemap === true ? "linked" : false,
 			treeShaking: true,
 			bundle: true,
 			format: "esm",
-			outfile: options.outputFileName,
+			// NOTE: Absolute, because `absWorkingDir` is what a relative
+			// `outfile` resolves against — which would put the user's output
+			// inside the Compiler's own directory rather than beside their
+			// source. `resolve` anchors it to the working directory, which is
+			// what esbuild would have done with it before.
+			outfile: path.resolve(options.outputFileName),
 			write: false,
 		})
 

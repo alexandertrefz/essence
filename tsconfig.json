@@ -1,21 +1,10 @@
 {
-	"compilerOptions": {
-		"lib": ["ESNext"],
-		"module": "esnext",
-		"target": "esnext",
-		"moduleResolution": "bundler",
-		"moduleDetection": "force",
-		"allowImportingTsExtensions": true,
-		"noImplicitReturns": true,
-		"strict": true,
-		"skipLibCheck": true,
-		"jsx": "preserve",
-		"allowSyntheticDefaultImports": true,
-		"forceConsistentCasingInFileNames": true,
-		"allowJs": true,
-		"noEmit": true,
-		"types": [
-			"bun-types" // add Bun global
-		]
-	}
+	// NOTE: One program over every package rather than project references.
+	// Nothing is built — `tsc` only ever type-checks here — so there are no
+	// output artifacts for references to order, and a single program is what
+	// lets a cross-package import be checked against the imported package's
+	// source rather than against a declaration file that would have to be
+	// generated first.
+	"extends": "./tsconfig.base.json",
+	"include": ["packages/*/src/**/*"]
 }

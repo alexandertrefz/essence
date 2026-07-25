@@ -1,0 +1,28 @@
+{
+	"name": "@essence/compiler",
+	"version": "0.0.1",
+	"description": "The Essence compiler, its Language Server and the esc command line.",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"esc": "bin/esc",
+		"esls": "bin/esls"
+	},
+	"scripts": {
+		"generate:natives": "bun run src/tools/generateNatives.ts"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"dependencies": {
+		"bigint-fraction": "1.0.6",
+		"esbuild": "0.28.1",
+		"escodegen": "alexandertrefz/escodegen#b4cb6d12aa3eb4082d001e0900ec30379ee79a63",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12"
+	},
+	"devDependencies": {
+		"@essence/fixtures": "workspace:*",
+		"@types/escodegen": "0.0.10",
+		"@types/estree": "1.0.9"
+	}
+}

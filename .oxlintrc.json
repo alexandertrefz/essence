@@ -6,7 +6,7 @@
 	},
 	"overrides": [
 		{
-			"files": ["src/ariadne/**"],
+			"files": ["packages/*/src/ariadne/**"],
 			"rules": {
 				"no-control-regex": "off"
 			}
@@ -14,7 +14,7 @@
 	],
 	"ignorePatterns": [
 		"coverage/**",
-		"src/rewriter/__internal/natives.generated.ts",
+		"packages/compiler/src/rewriter/__internal/natives.generated.ts",
 		"packages/fixtures/files/**",
 		"docs/**"
 	]
