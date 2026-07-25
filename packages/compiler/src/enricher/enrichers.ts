@@ -4249,14 +4249,57 @@ function instantiatedCaseOf(
 	declaredCase: common.CaseType,
 	valueType: common.Type,
 ): common.CaseType | null {
-	let instantiated = caseMatcherCandidates(valueType).find(
-		(member): member is common.CaseType =>
-			member.type === "Case" &&
-			member.name === declaredCase.name &&
-			member.choice === declaredCase.choice,
+	return joinCaseInstantiations(
+		caseMatcherCandidates(valueType).filter(
+			(member): member is common.CaseType =>
+				member.type === "Case" &&
+				member.name === declaredCase.name &&
+				member.choice === declaredCase.choice,
+		),
 	)
+}
 
-	return instantiated ?? null
+// NOTE: One Matcher for several instantiations of the same Case — a scrutinee
+// typed `Box<Integer> | Box<String>` carries `Box#Full` twice, and both are
+// this Handler's, because the emitted check starts at the tag both of them
+// share. So what the Handler may assume of the payload is what EVERY
+// instantiation carries: each member joined across them, which makes `@.value`
+// an `Integer | String` the Handler has to narrow further before using. Taking
+// the first instantiation instead typed the payload by whichever member the
+// Union happened to name first, and a `Box<String>`'s String arrived typed
+// Integer — `@.value::add(1)` compiled clean and answered "hello1".
+//
+// NOTE: The joined Case carries no `typeArguments`: the instantiations disagree
+// about them, and they are display spelling — the members decide assignability.
+function joinCaseInstantiations(
+	instantiations: Array<common.CaseType>,
+): common.CaseType | null {
+	if (instantiations.length === 0) {
+		return null
+	}
+
+	if (instantiations.length === 1) {
+		return instantiations[0]
+	}
+
+	let members: Record<string, common.Type> = {}
+
+	for (let name of Object.keys(instantiations[0].members)) {
+		members[name] = buildUnion(
+			instantiations.flatMap((instantiation) => {
+				let member = instantiation.members[name]
+
+				return member === undefined ? [] : [member]
+			}),
+		)
+	}
+
+	return {
+		type: "Case",
+		choice: instantiations[0].choice,
+		name: instantiations[0].name,
+		members,
+	}
 }
 
 // NOTE: A bare Case Matcher (`case #Add`) resolves against the matched
@@ -4325,8 +4368,15 @@ export function resolveCaseMatcherType(
 			member.type === "Case" && member.name === node.caseName.content,
 	)
 
-	if (candidates.length === 1) {
-		return candidates[0]
+	// NOTE: Several candidates of ONE Choice are instantiations of the same
+	// Case, which no Matcher can tell apart at runtime — they are joined, the
+	// way the prefixed form joins them. Only candidates of DIFFERENT Choices
+	// are an ambiguity the prefix can resolve.
+	if (
+		candidates.length > 0 &&
+		new Set(candidates.map((candidate) => candidate.choice)).size === 1
+	) {
+		return joinCaseInstantiations(candidates) ?? { type: "Error" }
 	}
 
 	if (candidates.length === 0) {
