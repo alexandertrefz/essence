@@ -18,13 +18,34 @@ import {
 	withArticle,
 } from "../helpers/index"
 import type { common, enricher, parser } from "../interfaces/index"
+import { recordAnnotation } from "./annotations"
 import { childScope } from "./scope"
 
 // NOTE: Type-declaration and signature resolution. Expressions are no longer
 // typed here — enrichment is the only Expression walker, and a Node's Type is
 // read off its enriched children. What remains resolves the Types written in
 // annotations, plus a fully annotated Function signature.
+//
+// NOTE: THE choke point where a written annotation meets the Type it resolves
+// to, which is why the annotation index is recorded here and nowhere else. The
+// switch below recurses back through this function for a Generic's Arguments, a
+// Union's members, a Record's member Types and a Function Type's Parameters and
+// return — so recording once covers every nested sub-annotation for free, and
+// the cursor on `Item` inside `List<Item>` is answered by `Item`. Deliberately
+// NOT also recorded in `resolveDeclaredType`, which is a null guard that
+// forwards here; recording there would file every annotation twice.
 export function resolveType(
+	node: parser.TypeDeclarationNode,
+	scope: enricher.Scope,
+): common.Type {
+	let type = resolveTypeDeclaration(node, scope)
+
+	recordAnnotation(node, type)
+
+	return type
+}
+
+function resolveTypeDeclaration(
 	node: parser.TypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {

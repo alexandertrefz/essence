@@ -18,7 +18,7 @@ import {
 	TextDocuments,
 } from "vscode-languageserver/node"
 
-import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
+import { enrichDocument, parseDocument } from "../documents"
 import { loadStdlib } from "../enricher/stdlib"
 import type { common } from "../interfaces/index"
 import { analyse } from "./analyse"
@@ -105,7 +105,10 @@ export function startServer() {
 	// bind Method and Record member references; a compiler bug in it must
 	// never take down the Language Server, so those features degrade to the
 	// purely lexical index instead.
-	function parseAndEnrich(uri: string) {
+	function parseAndEnrich(
+		uri: string,
+		options: { annotations?: boolean } = {},
+	) {
 		let document = documents.get(uri)
 
 		if (document === undefined) {
@@ -114,12 +117,18 @@ export function startServer() {
 
 		let { program } = parseDocument(document.getText(), uri)
 		let enrichedProgram: common.typed.Program | null = null
+		// NOTE: Only Hover asks for these. Every other request enriches without
+		// a collector and pays nothing for it.
+		let annotations: Array<common.TypeAnnotation> = []
 
 		try {
-			enrichedProgram = enrichDocument(program, uri).program
+			let enriched = enrichDocument(program, uri, options)
+
+			enrichedProgram = enriched.program
+			annotations = enriched.annotations
 		} catch {}
 
-		return { program, enrichedProgram }
+		return { program, enrichedProgram, annotations }
 	}
 
 	// NOTE: The `uri` is what lets `findRenameableOccurrence` refuse inside a
@@ -224,7 +233,9 @@ export function startServer() {
 	})
 
 	connection.onHover((params) => {
-		let parsed = parseAndEnrich(params.textDocument.uri)
+		let parsed = parseAndEnrich(params.textDocument.uri, {
+			annotations: true,
+		})
 
 		if (parsed?.enrichedProgram == null) {
 			return null
@@ -233,7 +244,8 @@ export function startServer() {
 		let hover = findHover(
 			parsed.enrichedProgram,
 			toCursor(params.position),
-			isStdlibDocument(params.textDocument.uri) ? parsed.program : null,
+			parsed.program,
+			parsed.annotations,
 		)
 
 		if (hover === null) {
