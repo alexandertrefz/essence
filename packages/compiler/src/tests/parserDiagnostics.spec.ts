@@ -422,6 +422,66 @@ _ 2
 		})
 	})
 
+	describe("Documentation", () => {
+		it("should report a tag that runs into its text", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+§§ @param subject who to greet
+function greet(subject: String) -> String { <- subject }
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("missing-documentation-separator")
+			expect(diagnostics[0].message).toBe(
+				"This '@param' tag is not separated from its text",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Write '@param subject —' before the text.",
+			])
+			// NOTE: The text alone, rather than the whole Comment — the
+			// em-dash is missing exactly where 'who' begins.
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 2, column: 19 },
+				end: { line: 2, column: 31 },
+			})
+		})
+
+		it("should report nothing for a separated or a bare tag", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+§§ @param subject — who to greet
+§§ @returns
+§§ the greeting
+function greet(subject: String) -> String { <- subject }
+}`,
+			)
+
+			expect(diagnostics).toEqual([])
+		})
+
+		it("should report a tag it read only once", () => {
+			// NOTE: The Documentation of a Declaration inside a Namespace is
+			// reached through readings the Parser abandons; the Diagnostic
+			// must survive the kept one exactly once all the same.
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+namespace Greeting for String {
+§§ @returns the greeting
+greet() -> String { <- @ }
+}
+}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("missing-documentation-separator")
+			expect(diagnostics[0].helps).toEqual([
+				"Write '@returns —' before the text.",
+			])
+		})
+	})
+
 	describe("Speculative parsing", () => {
 		it("should report a duplicate in an annotation exactly once", () => {
 			let { diagnostics } = parseWithDiagnostics(
