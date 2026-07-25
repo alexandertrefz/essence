@@ -174,6 +174,7 @@ export type DiagnosticCode =
 	| "partial-type-mismatch"
 	| "wrong-type-argument-count"
 	| "type-not-generic"
+	| "infer-on-applied-parameter"
 	| "zero-denominator"
 	// Dispatch — which Method, in which Namespace, with which overload.
 	| "no-matching-overload"

@@ -614,6 +614,87 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: `infer` marks a Type Parameter a USE works out for itself. A Choice
+	// and a Type Alias have no such use — every one of theirs applies its
+	// Arguments outright — so the marker is refused rather than accepted and
+	// ignored, which is what it was while a construction's payload could stand in
+	// for a use site that worked the Argument out.
+	describe("'infer' on an Applied Type Parameter", () => {
+		it("refuses it on a Choice", () => {
+			let source = `implementation {
+				choice Box<infer Value> { Full { value: Value }, Empty }
+			}`
+
+			expect(codesOf(source)).toEqual(["infer-on-applied-parameter"])
+			expect(messagesOf(source)).toEqual([
+				"A Choice's Type Parameters can not be inferred",
+			])
+		})
+
+		it("refuses it on a bounded Choice Parameter", () => {
+			expect(
+				codesOf(`implementation {
+					choice Box<infer Value is Equatable> {
+						Full { value: Value },
+						Empty,
+					}
+				}`),
+			).toEqual(["infer-on-applied-parameter"])
+		})
+
+		it("refuses it on a generic Type Alias", () => {
+			let source = `implementation {
+				type Boxed<infer T> = { value: T }
+			}`
+
+			expect(codesOf(source)).toEqual(["infer-on-applied-parameter"])
+			expect(messagesOf(source)).toEqual([
+				"A Type Alias's Type Parameters can not be inferred",
+			])
+		})
+
+		it("names the Parameter to unmark", () => {
+			expect(
+				helpsOf(`implementation {
+					choice Pair<Left, infer Right> {
+						Both { left: Left, right: Right },
+					}
+				}`),
+			).toEqual(["Remove the 'infer' before 'Right'."])
+		})
+
+		// NOTE: The Generic list is the same grammar a Method writes, where the
+		// marker is the whole point — which is why this is a Diagnostic and not a
+		// parse error.
+		it("leaves a Method's own Type Parameters alone", async () => {
+			expect(
+				await run(`implementation {
+					namespace Nums for Integer {
+						pick<infer Target>(
+							_ transform: (_ value: Integer) -> Target,
+						) -> Target {
+							<- transform(@)
+						}
+					}
+
+					__print(1::pick((n) { <- n::toString() }))
+				}`),
+			).toEqual(['"1"'])
+		})
+
+		// NOTE: `infer` is a valid Identifier, so `<infer>` declares a Generic
+		// NAMED infer and marks nothing — the Parser only reads it as the modifier
+		// when a name follows it.
+		it("leaves a Type Parameter actually named 'infer' alone", () => {
+			expect(
+				messagesOf(`implementation {
+					type Boxed<infer> = { value: infer }
+					constant b: Boxed<Integer> = { value = 1 }
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Validator", () => {
 		it("reports unhandled Cases by name", () => {
 			expect(

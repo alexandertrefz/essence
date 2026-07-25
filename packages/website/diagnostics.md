@@ -244,6 +244,16 @@ A generic Type was given the wrong number of Type Arguments.
 
 Type Arguments were given to a Type that takes none.
 
+### `infer-on-applied-parameter`
+
+A Choice or a Type Alias marked one of its Type Parameters `infer`. That
+marker belongs to a Function, a Method or a Namespace, where a use site hands
+over Arguments a Type Parameter can be worked out FROM. A Choice and a Type
+Alias have no such use: every one of theirs applies the Arguments outright,
+either in a Type position (`Holder<Integer>`) or at a construction
+(`Holder<Integer>#Bare`). Drop the `infer`; the bound and the default, if the
+Parameter carries them, stay exactly as written.
+
 ### `zero-denominator`
 
 A Rational Literal with a denominator of zero.
