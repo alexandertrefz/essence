@@ -1,0 +1,240 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
+""2"
+"cleared"
+"undone""
+`;
+
+exports[`Fixture Sweep ConditionalConformance.es should print what it printed before 1`] = `
+"[ 1, 2, 3 ]
+[ [ 1, 2 ], [ 3 ] ]
+[ [ [ 1 ] ], [ [ 2 ] ] ]
+"Less""
+`;
+
+exports[`Fixture Sweep Documentation.es should print what it printed before 1`] = `
+""Hello, World!"
+"Hello! Hello again!"
+"Look!!!"
+"Hello, Essence!"
+"3"
+"6"
+"Hello, stranger!"
+"Hello, all 3 of you!""
+`;
+
+exports[`Fixture Sweep Event.es should print what it printed before 1`] = `
+""The Records are the same!"
+"The Records are not the same anymore!""
+`;
+
+exports[`Fixture Sweep Everyday.es should print what it printed before 1`] = `
+"2
+1024
+1/4
+5
+true
+false
+10
+4
+3
+-3
+3
+4/3
+4/9
+42
+0
+3/4
+6
+2
+1/3
+3/2
+π
+true
+true
+false
+"a + b + c"
+1
+99
+[ 1, 2, 3 ]
+[ "apple", "banana" ]
+[ 1/2, 1, 3/2 ]
+[ 1, 2, 3 ]
+3
+{ matching = [ 2, 4 ], rest = [ 1, 3 ] }
+[
+    { first = "a", second = 1 },
+    { first = "b", second = 2 }
+]
+[ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
+[ 1, 2, 3, 4, 5 ]
+[ "x", "x", "x" ]"
+`;
+
+exports[`Fixture Sweep GenericChoice.es should print what it printed before 1`] = `
+"0
+"15"
+42
+"packed"
+"nothing""
+`;
+
+exports[`Fixture Sweep Generics.es should print what it printed before 1`] = `
+""1"
+1
+42
+"hello"
+7"
+`;
+
+exports[`Fixture Sweep HelloWorld.es should print what it printed before 1`] = `
+""Greetee can not be empty!"
+"Hello, World."
+"Hello, Universe!""
+`;
+
+exports[`Fixture Sweep Inference.es should print what it printed before 1`] = `
+"[ 1, 2 ]
+[ 1, 2 ]
+[ 1, 2 ]
+[ 1, 2 ]
+[ 1, 3, 4 ]
+"1"
+true
+2
+9/2"
+`;
+
+exports[`Fixture Sweep Irrational.es should print what it printed before 1`] = `
+"3
+√2
+2·√3
+2/1
+1 + √2
+3·√2
+1/2·√2
+"Less"
+"√2"
+π
+2·π
+2/1
+true
+"Less"
+true
+false
+true
+true
+true
+1 + π
+"1 < √2: true, 2 > √2: true, 1 + √2 = 1 + √2"
+"transcendental""
+`;
+
+exports[`Fixture Sweep List.es should print what it printed before 1`] = `
+"[ 1/1, 2/1 ]
+[ 1/1, 2/1, 3/1, 4/1, 5/1 ]
+[ 1/1, 2/1 ]
+[ 1/1, 2/1 ]
+[ 0, 1, 2 ]
+[ "3", "1", "2", "1", "4" ]
+11
+[ 3, 2, 4 ]
+3
+true
+true
+2
+Nothing
+1
+[ 1, 2 ]
+2
+true
+true
+[ 4, 1, 2, 1, 3 ]
+[ 3, 1, 1, 4 ]
+[ 3, 1, 99, 2, 1, 4 ]
+[ 99, 1, 2, 1, 4 ]
+[ 1, 1, 2, 3, 4 ]"
+`;
+
+exports[`Fixture Sweep Loops.es should print what it printed before 1`] = `
+""55"
+"15"
+"128"
+"128"
+"2""
+`;
+
+exports[`Fixture Sweep Match.es should print what it printed before 1`] = `
+""a fraction: 1/2"
+"none"
+"exactly one"
+"less than none?"
+"many"
+"no count at all"
+"clicked the y axis at 7""
+`;
+
+exports[`Fixture Sweep Maybe.es should print what it printed before 1`] = `
+"1/5
+1
+42
+Nothing
+1/5"
+`;
+
+exports[`Fixture Sweep Namespace.es should print what it printed before 1`] = `
+""stringForInteger: 3"
+"stringForNumber: 3"
+"stringForRational: 3/1"
+"stringForNumber: 3/1""
+`;
+
+exports[`Fixture Sweep Number.es should print what it printed before 1`] = `
+"100
+100
+1000
+100000
+555/1
+554/555
+4503599627370495500
+3/1
+1/6"
+`;
+
+exports[`Fixture Sweep Protocols.es should print what it printed before 1`] = `
+""12"
+"1420/113"
+3
+1/3
+"Less"
+true"
+`;
+
+exports[`Fixture Sweep String.es should print what it printed before 1`] = `
+"12
+"HELLO, WORLD"
+"hello, world"
+true
+true
+7
+true
+"dlroW ,olleH"
+"Hell0, W0rld"
+"Hello"
+"ababab"
+"spaced"
+"007"
+"7.."
+"e"
+Nothing
+12
+3
+"😀"
+2
+"b😀a"
+[ "apple", "banana", "cherry" ]
+"Less""
+`;
+
+exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `""`;
