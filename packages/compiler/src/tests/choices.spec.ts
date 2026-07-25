@@ -1447,6 +1447,33 @@ describe("Choices", () => {
 				).toEqual(['"took"', '"took"', '"took"'])
 			})
 
+			// NOTE: A receiver is not a position that decides, and deliberately
+			// so: dispatch READS the receiver's Type to find the Namespace, so a
+			// Namespace found by handing one down would be the Namespace deciding
+			// what it is being called on. A construction written directly on a
+			// `::` decides for itself or not at all.
+			it("offers a construction no decision from the receiver position", () => {
+				let namespaces = `
+					choice Box<Value> { Full { value: Value }, Empty }
+
+					namespace IntegerBox for Box<Integer> {
+						label() -> String { <- "intbox" }
+					}
+				`
+
+				expect(
+					codesOf(`implementation { ${namespaces}
+						__print(Box#Full(1)::label())
+					}`),
+				).toEqual(["undecided-type-arguments"])
+
+				expect(
+					messagesOf(`implementation { ${namespaces}
+						__print(Box<Integer>#Full(1)::label())
+					}`),
+				).toEqual([])
+			})
+
 			// NOTE: The Alias application rail is where the bound is kept, and the
 			// construction reads its instantiation off exactly that — so writing
 			// the Type Argument out is as strict here as in any annotation.

@@ -596,6 +596,15 @@ export function enrichMethodInvocation(
 	// NOTE: The receiver is enriched once and its Type drives Method resolution
 	// — the resolved Invocation reuses this same typed base. Each Argument is
 	// likewise enriched once, by the typer, and reused for the final Node.
+	//
+	// NOTE: And with no expected Type, deliberately: the receiver position offers
+	// none. Dispatch READS the receiver's Type to find the Namespace, so there is
+	// nothing to hand down before that Type exists, and a Namespace found by
+	// handing one down would be the Namespace deciding what it is being called
+	// on. A construction written directly on a `::` therefore decides for itself
+	// or not at all — `Box<Integer>#Full(1)::label()` is the spelling, and the
+	// undecided `Box#Full(1)::label()` says which Arguments are missing and how
+	// to write them.
 	let base = enrichExpression(node.base, scope)
 	let typer = makeArgumentTyper(scope)
 	let {
