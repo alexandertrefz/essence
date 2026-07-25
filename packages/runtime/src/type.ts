@@ -14,19 +14,50 @@ import type { TranscendentalType } from "./Transcendental"
 export const typeKeySymbol = Symbol("$type")
 
 // NOTE: The runtime half of Union Method dispatch — each case holds a member
-// Type descriptor, the statically chosen Method, and that Method's hidden
-// conformance Arguments. The Enricher orders the cases most specific first
-// and only emits a dispatch when some case is guaranteed to match.
+// Type descriptor, the statically chosen Method, that Method's hidden
+// conformance Arguments, and the Arguments this case alone is given. The
+// Enricher orders the cases most specific first and only emits a dispatch when
+// some case is guaranteed to match.
+//
+// NOTE: An Argument means something different in every branch when its Type
+// came from the branch: the Function literal `(item) { <- item::label() }`
+// calls one Namespace's `label` for a `List<Alpha>` receiver and another's for
+// a `List<Beta>` one — so the Enricher compiles one copy per branch and lists
+// each here under the position it stands in for. Only the matched case's copies
+// are ever reached. Everything else is shared: `args` is built once at the call
+// site, before any case is tried, so an Argument with a side effect happens
+// exactly once however many branches the dispatch has, and the overrides are
+// written into a copy so one case's Arguments can not become another's.
 export function dispatchMethod(
 	receiver: AnyType,
 	args: Array<unknown>,
 	cases: Array<
-		[common.Type, (...args: Array<unknown>) => unknown, Array<unknown>]
+		[
+			common.Type,
+			(...args: Array<unknown>) => unknown,
+			Array<unknown>,
+			Array<[number, unknown]>?,
+		]
 	>,
 ): unknown {
-	for (let [type, method, conformanceArguments] of cases) {
+	for (let [
+		type,
+		method,
+		conformanceArguments,
+		contextualArguments,
+	] of cases) {
 		if (isValueOfType(receiver, type)) {
-			return method(receiver, ...args, ...conformanceArguments)
+			let caseArguments = args
+
+			if (contextualArguments !== undefined) {
+				caseArguments = [...args]
+
+				for (let [index, argument] of contextualArguments) {
+					caseArguments[index] = argument
+				}
+			}
+
+			return method(receiver, ...caseArguments, ...conformanceArguments)
 		}
 	}
 

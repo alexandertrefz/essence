@@ -3067,6 +3067,71 @@ describe("Rewriter", () => {
 					"conformance",
 				])
 			})
+
+			// NOTE: A Function literal Argument is typed by the branch it is
+			// passed to, so each branch carries its own compiled copy of it and
+			// names the position that copy stands in for. The copies of the
+			// branches that did NOT match must not reach the Method — that was
+			// the whole fault: one copy, typed by whichever branch happened to
+			// resolve last, was handed to all of them.
+			it("substitutes the matched case's own Arguments by position", () => {
+				let receivedArguments: Array<unknown> = []
+				let method = (...args: Array<unknown>) => {
+					receivedArguments = args
+					return nothing()
+				}
+
+				dispatchMethod(
+					integerTwo(),
+					["shared", "shared second"],
+					[
+						[{ type: "String" }, method, [], [[1, "String's own"]]],
+						[
+							{ type: "Integer" },
+							method,
+							["conformance"],
+							[[1, "Integer's own"]],
+						],
+					],
+				)
+
+				expect(receivedArguments).toEqual([
+					integerTwo(),
+					"shared",
+					"Integer's own",
+					"conformance",
+				])
+			})
+
+			// NOTE: The shared Arguments are evaluated once, at the call site,
+			// and the same array is handed to whichever case matches — so a case
+			// that overrides a position must leave that array alone. Writing
+			// through it would make one dispatch's substitution the next one's
+			// Argument.
+			it("leaves the shared Arguments untouched", () => {
+				let sharedArguments = ["shared"]
+				let receivedArguments: Array<unknown> = []
+				let method = (...args: Array<unknown>) => {
+					receivedArguments = args
+					return nothing()
+				}
+
+				dispatchMethod(integerTwo(), sharedArguments, [
+					[{ type: "Integer" }, method, [], [[0, "Integer's own"]]],
+				])
+
+				expect(receivedArguments).toEqual([
+					integerTwo(),
+					"Integer's own",
+				])
+				expect(sharedArguments).toEqual(["shared"])
+
+				dispatchMethod(integerTwo(), sharedArguments, [
+					[{ type: "Integer" }, method, [], []],
+				])
+
+				expect(receivedArguments).toEqual([integerTwo(), "shared"])
+			})
 		})
 	})
 })
