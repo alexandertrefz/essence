@@ -1054,13 +1054,14 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			it("names the Choice's own Type Parameters in the way out", () => {
+			it("names the Choice's own Type Parameters in both ways out", () => {
 				expect(
 					helpsOf(`implementation { ${holder}
 						constant left = Holder#Bare
 					}`),
 				).toEqual([
 					"Annotate the declaration: 'constant left: Holder<Item> = Holder#Bare'.",
+					"Or apply the Type Arguments: 'Holder<Item>#Bare'.",
 				])
 			})
 
@@ -1161,6 +1162,241 @@ describe("Choices", () => {
 						__print(left)
 					}`),
 				).toEqual(["Holder#Bare"])
+			})
+		})
+
+		// NOTE: The other half of the decision — the Type Arguments written at the
+		// construction itself, which is the spelling for every position that hands
+		// none down. It is the SAME application an annotation's `Holder<Integer>`
+		// is, routed through the same rail, so everything the annotation is held to
+		// holds here: the arity, the bounds, and the refusal of a Type that takes
+		// no Arguments at all.
+		describe("Type Arguments applied at the construction", () => {
+			const holder = `choice Holder<Item is Equatable> {
+				Bare,
+				Full { value: Item },
+			}`
+
+			const pair = `choice Pair<Left, Right> {
+				Both { left: Left, right: Right },
+				Neither,
+			}`
+
+			it("decides a unit Case with nothing else in sight", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant left = Holder<Integer>#Bare
+
+						__print(left::is(Holder<Integer>#Bare))
+					}`),
+				).toEqual(["true"])
+			})
+
+			// NOTE: Read through `.value` rather than through a Match, because the
+			// construction's own Type is the CASE — a Match wants the Choice's
+			// Union, which is what an annotation would have made of it.
+			it("decides a Case carrying a payload", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant left = Holder<Integer>#Full({ value = 1 })
+
+						__print(left.value::toString())
+					}`),
+				).toEqual(['"1"'])
+			})
+
+			// NOTE: The Arguments decide, and THEN the payload is checked against
+			// what they decided — which is the one-member shorthand's Record here,
+			// wrapped after the instantiation exactly as everywhere else.
+			it("takes the one-member shorthand", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant left = Holder<String>#Full("packed")
+
+						__print(left.value)
+					}`),
+				).toEqual(['"packed"'])
+			})
+
+			it("takes a nested Type Argument", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant left = Box<List<Integer>>#Full([1, 2])
+					}`),
+				).toEqual([])
+			})
+
+			it("takes a Choice's several Type Arguments in order", () => {
+				expect(
+					valueTypeOf(
+						`implementation { ${pair}
+							constant both =
+								Pair<Integer, String>#Both({ left = 1, right = "x" })
+						}`,
+						"both",
+					),
+				).toEqual({
+					type: "Case",
+					choice: "Pair",
+					name: "Both",
+					members: {
+						left: { type: "Integer" },
+						right: { type: "String" },
+					},
+					typeArguments: [{ type: "Integer" }, { type: "String" }],
+				})
+			})
+
+			it("reports the wrong number of Type Arguments", () => {
+				let source = `implementation { ${pair}
+					constant left = Pair<Integer>#Neither
+				}`
+
+				expect(codesOf(source)).toEqual(["wrong-type-argument-count"])
+				expect(messagesOf(source)).toEqual([
+					"Type 'Pair' was given the wrong number of Type Arguments",
+				])
+			})
+
+			it("reports a Type Argument that does not satisfy its bound", () => {
+				let source = `implementation { ${holder}
+					constant left = Holder<(_ x: Integer) -> Integer>#Bare
+				}`
+
+				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+				expect(messagesOf(source)).toEqual([
+					"Function does not conform to 'Equatable'",
+				])
+			})
+
+			// NOTE: The payload is checked against the instantiation the Arguments
+			// decided, which is the whole point of them deciding first.
+			it("checks the payload against what the Arguments decided", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						constant left = Holder<Integer>#Full("x")
+					}`),
+				).toEqual(["payload-type-mismatch"])
+			})
+
+			it("refuses Type Arguments at a Choice that takes none", () => {
+				expect(
+					codesOf(`implementation {
+						choice Colour { Red, Green }
+
+						constant c = Colour<Integer>#Red
+					}`),
+				).toEqual(["type-not-generic"])
+			})
+
+			it("agrees with a position that decided the same thing", () => {
+				expect(
+					messagesOf(`implementation { ${holder}
+						constant left: Holder<Integer> = Holder<Integer>#Full(1)
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The written Arguments win, so a position that wanted something
+			// else is an ordinary value-does-not-fit — no Diagnostic of its own,
+			// because there is nothing special about this way of disagreeing.
+			it("leaves a disagreeing annotation to the assignment", () => {
+				let source = `implementation { ${holder}
+					constant left: Holder<String> = Holder<Integer>#Full(1)
+				}`
+
+				expect(codesOf(source)).toEqual(["assignment-type-mismatch"])
+				expect(messagesOf(source)).toEqual([
+					"This value does not fit the declared Type of Constant 'left'",
+				])
+			})
+
+			it("leaves a disagreeing Parameter to the Argument check", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						function take(_ held: Holder<String>) -> Integer { <- 1 }
+
+						__print(take(Holder<Integer>#Full(1))::toString())
+					}`),
+				).toEqual(["argument-type-mismatch"])
+			})
+
+			it("applies a Type Parameter of the enclosing Function", async () => {
+				expect(
+					await run(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						function empty <infer Value>(_ seed: Value) -> Box<Value> {
+							<- Box<Value>#Empty
+						}
+
+						__print(match empty(1) -> String {
+							case #Full  { <- "full" }
+							case #Empty { <- "empty" }
+						})
+					}`),
+				).toEqual(['"empty"'])
+			})
+
+			// NOTE: A `<` after an Identifier opens nothing else in expression
+			// position, but the reading is speculative all the same — what makes it
+			// a construction is the `#` on the far side of the Arguments. Reaching
+			// no `#` has to leave the Identifier readable as itself.
+			it("leaves an Identifier that opens no application alone", () => {
+				expect(
+					messagesOf(`implementation {
+						constant a = 1
+
+						__print(a::isLessThan(2))
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: An application is written on one line, in a value position for
+			// the reason it is in a Type position — a `<` that opens the NEXT line
+			// begins something of its own, and reading across the break would let
+			// it be swallowed.
+			it("does not read Type Arguments across a line break", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant b = Box
+							<Integer>#Empty
+					}`),
+				).toEqual(["syntax-error"])
+			})
+
+			// NOTE: The far side of the same rule. A `#` reaches this parse only
+			// when it sits directly against what precedes it — that is what keeps
+			// `label #Case` readable as a labelled Argument — and an application
+			// standing between the two must not be the way around it.
+			it("does not read a '#' that opens the next line", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant b = Box<Integer>
+						#Full(1)
+					}`),
+				).toEqual(["syntax-error"])
+			})
+
+			// NOTE: The line the `#` is held to is the one the Arguments CLOSE
+			// on, not the one they open on, so a list written over several lines
+			// still constructs.
+			it("holds the '#' to the line the Arguments close on", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant b = Box<
+							Integer,
+						>#Full(1)
+					}`),
+				).toEqual([])
 			})
 		})
 	})

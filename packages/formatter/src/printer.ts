@@ -1180,10 +1180,31 @@ export class Printer {
 		])
 	}
 
+	// NOTE: Never broken, for the same reason a Type application is not — a `<`
+	// that opens the line after the Choice's name reads as a new declaration, and
+	// the `#` has to stay against the `>` for the construction to be recognised
+	// at all.
 	private printCaseValue(node: parser.CaseValueNode): Doc {
-		let prefix = node.choice === null ? "" : node.choice.content
+		let parts: Array<Doc> = []
 
-		let parts: Array<Doc> = [text(prefix + "#" + node.caseName.content)]
+		if (node.choice !== null) {
+			parts.push(text(node.choice.content))
+		}
+
+		if (node.typeArguments !== null) {
+			parts.push(
+				text("<"),
+				join(
+					text(", "),
+					node.typeArguments.map((argument) =>
+						this.printType(argument),
+					),
+				),
+				text(">"),
+			)
+		}
+
+		parts.push(text("#" + node.caseName.content))
 
 		if (node.value !== null) {
 			parts.push(text("("), this.printExpression(node.value), text(")"))

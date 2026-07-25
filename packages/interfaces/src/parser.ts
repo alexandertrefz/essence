@@ -46,6 +46,14 @@ export type ExpressionNode =
 export interface CaseValueNode {
 	nodeType: "CaseValue"
 	choice: IdentifierNode | null
+	// NOTE: The Type Arguments of a value-position application —
+	// `Holder<Integer>#Full({ … })`. A Choice's Type Parameters are applied,
+	// never inferred, and this is the spelling that applies them where the
+	// position the construction stands in does not. Null when none were written,
+	// which is every construction that reads them off its position instead; only
+	// the prefixed form can carry them, since the bare form names no Choice to
+	// apply them to.
+	typeArguments: Array<TypeDeclarationNode> | null
 	caseName: IdentifierNode
 	value: ExpressionNode | null
 	position: Position

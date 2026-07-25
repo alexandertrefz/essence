@@ -196,6 +196,7 @@ export function identifier(
 
 export function caseValueNode(
 	choice: parser.IdentifierNode | null,
+	typeArguments: Array<parser.TypeDeclarationNode> | null,
 	caseName: parser.IdentifierNode,
 	value: parser.ExpressionNode | null,
 	position: common.Position,
@@ -203,6 +204,7 @@ export function caseValueNode(
 	return {
 		nodeType: "CaseValue",
 		choice,
+		typeArguments,
 		caseName,
 		value,
 		position,

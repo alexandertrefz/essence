@@ -1365,15 +1365,33 @@ class DescentParser {
 		// between them (`label #Case`) marks a bare Case value passed as a
 		// labelled argument, where the Identifier is the label, not a Choice
 		// prefix — so the prefixed reading requires the two to be adjacent.
-		let followingHash = this.tokens.peek(1)
+		let following = this.tokens.peek(1)
 
 		if (
 			isIdentifierToken(token) &&
-			followingHash?.type === TokenType.SymbolHash &&
-			token.position.end.line === followingHash.position.start.line &&
-			token.position.end.column === followingHash.position.start.column
+			following?.type === TokenType.SymbolHash &&
+			token.position.end.line === following.position.start.line &&
+			token.position.end.column === following.position.start.column
 		) {
 			return this.parseCaseValue()
+		}
+
+		// NOTE: `Holder<Integer>#Full(…)` — the same construction with its Type
+		// Arguments applied. Speculative, because a `<` after an Identifier opens
+		// nothing else in expression position today and there is no adjacency rule
+		// that could tell the two apart on sight: what makes this a construction is
+		// the `#` on the far side of the Arguments, which only a parse can find.
+		// A reading that does not reach one leaves nothing behind and the
+		// Identifier is read as itself.
+		if (
+			isIdentifierToken(token) &&
+			following?.type === TokenType.SymbolLeftAngle
+		) {
+			let applied = this.backtrack(() => this.parseCaseValue())
+
+			if (applied !== null) {
+				return applied
+			}
 		}
 
 		if (
@@ -1460,12 +1478,51 @@ class DescentParser {
 	// Without a leading Identifier this parses the bare form (`#Add({ … })`).
 	protected parseCaseValue(): parser.CaseValueNode {
 		let choice: parser.IdentifierNode | null = null
+		let typeArguments: Array<parser.TypeDeclarationNode> | null = null
 		let hash: Token
 
 		if (this.tokens.peek()?.type === TokenType.SymbolHash) {
 			hash = this.tokens.next()
 		} else {
 			choice = this.parseIdentifier()
+
+			// NOTE: `Holder<Integer>#Full(…)` — the Choice's Type Arguments
+			// applied at the value, which is the other half of how a construction
+			// is decided. The same list an annotation writes, read by the same
+			// parse, so `Holder<List<Integer>>#Full` needs nothing of its own —
+			// and held to the same one-line rule, for the same reason: a `<` that
+			// opens the NEXT line begins something of its own, and an application
+			// is always written on one line.
+			let leftAngleToken = this.tokens.peek()
+
+			if (
+				leftAngleToken?.type === TokenType.SymbolLeftAngle &&
+				leftAngleToken.position.start.line === choice.position.end.line
+			) {
+				let argumentList = this.parseTypeArgumentList()
+				let hashToken = this.tokens.peek()
+
+				// NOTE: And the `#` is held to the closing `>`'s line, for the
+				// reason the `<` is held to the Choice's: a construction is
+				// written on one line. Without it the applied form escaped the
+				// adjacency the bare one is held to — `Box#Full` reaches this
+				// parse only when the `#` sits directly against the name, so that
+				// a `label #Case` Argument stays readable, and an application in
+				// between must not be the way around it.
+				if (
+					hashToken?.type === TokenType.SymbolHash &&
+					hashToken.position.start.line !==
+						argumentList.position.end.line
+				) {
+					fail(
+						"Expected '#' on the line its Type Arguments close on.",
+						hashToken.position,
+					)
+				}
+
+				typeArguments = argumentList.typeArguments
+			}
+
 			hash = this.tokens.expect(TokenType.SymbolHash)
 		}
 
@@ -1483,10 +1540,16 @@ class DescentParser {
 			end = this.tokens.expect(TokenType.SymbolRightParen).position.end
 		}
 
-		return generators.caseValueNode(choice, caseName, value, {
-			start: choice?.position.start ?? hash.position.start,
-			end,
-		})
+		return generators.caseValueNode(
+			choice,
+			typeArguments,
+			caseName,
+			value,
+			{
+				start: choice?.position.start ?? hash.position.start,
+				end,
+			},
+		)
 	}
 
 	protected parseMatch(): parser.MatchNode {
@@ -2427,34 +2490,52 @@ class DescentParser {
 			leftAngleToken?.type === TokenType.SymbolLeftAngle &&
 			leftAngleToken.position.start.line === baseType.position.end.line
 		) {
-			this.tokens.next()
-
-			let generics = [this.parseType()]
-
-			while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-				this.tokens.next()
-
-				if (this.tokens.peek()?.type === TokenType.SymbolRightAngle) {
-					break
-				}
-
-				generics.push(this.parseType())
-			}
-
-			let rightAngle = this.tokens.expect(TokenType.SymbolRightAngle)
+			let { typeArguments, position } = this.parseTypeArgumentList()
 
 			// NOTE: From the base Type, not from the `<` — the Node stands for
 			// `List<Item>`, so that is what it spans. Starting at the bracket
 			// would leave `List` inside no Node at all, which is what made the
 			// Editor underline the Arguments alone while naming the whole
 			// application.
-			return generators.genericTypeDeclaration(baseType, generics, {
+			return generators.genericTypeDeclaration(baseType, typeArguments, {
 				start: baseType.position.start,
-				end: rightAngle.position.end,
+				end: position.end,
 			})
 		}
 
 		return baseType
+	}
+
+	// NOTE: `<Integer, String>` — the Arguments of an application, wherever one
+	// is written. An annotation's `Holder<Integer>` and a value's
+	// `Holder<Integer>#Full` are the same list, so they are the same parse.
+	protected parseTypeArgumentList(): {
+		typeArguments: Array<parser.TypeDeclarationNode>
+		position: common.Position
+	} {
+		let leftAngle = this.tokens.expect(TokenType.SymbolLeftAngle)
+
+		let typeArguments = [this.parseType()]
+
+		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
+			this.tokens.next()
+
+			if (this.tokens.peek()?.type === TokenType.SymbolRightAngle) {
+				break
+			}
+
+			typeArguments.push(this.parseType())
+		}
+
+		let rightAngle = this.tokens.expect(TokenType.SymbolRightAngle)
+
+		return {
+			typeArguments,
+			position: {
+				start: leftAngle.position.start,
+				end: rightAngle.position.end,
+			},
+		}
 	}
 
 	protected parseSimpleType():
