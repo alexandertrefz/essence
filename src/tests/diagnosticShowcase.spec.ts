@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
+
 import { containsErrors } from "../diagnostics/index"
 import { renderDiagnostics } from "../diagnostics/render"
 import { enrich } from "../enricher/index"
@@ -15,13 +17,7 @@ import { validate } from "../validator/index"
 // labels, its notes or its code shows up as a snapshot diff rather than as
 // output nobody looked at.
 
-const SHOWCASE_DIRECTORY = path.join(
-	import.meta.dir,
-	"..",
-	"..",
-	"testFiles",
-	"diagnostics",
-)
+const SHOWCASE_DIRECTORY = fixturePath("diagnostics")
 
 function analyse(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics: parserDiagnostics } =

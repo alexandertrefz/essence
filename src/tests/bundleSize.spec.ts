@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+
+import { fixturePath } from "@essence/fixtures"
 
 import { bundle } from "../bundler/index"
 import { enrich } from "../enricher/index"
@@ -23,8 +24,8 @@ import { validate } from "../validator/index"
 // NOTE: `bundle` imports esbuild lazily and costs a few hundred ms per call, so
 // this is kept to the two files that actually regressed. `write: false` keeps
 // it off the file system — nothing reaches disk.
-async function bundleSizeOf(relativePath: string): Promise<number> {
-	let source = readFileSync(join(import.meta.dir, "../..", relativePath), {
+async function bundleSizeOf(fixtureName: string): Promise<number> {
+	let source = readFileSync(fixturePath(fixtureName), {
 		encoding: "utf-8",
 	})
 
@@ -63,7 +64,7 @@ describe("Bundle Size", () => {
 	// holds — but the headroom is only ~800 bytes, so the next conversion that
 	// touches List will want this ceiling raised along with it.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("testFiles/Everyday.es")).toBeLessThan(56_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(56_000)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -74,8 +75,6 @@ describe("Bundle Size", () => {
 	// Program. The ceiling moves with it, keeping the same order of headroom;
 	// it is still eleven kB below the spread figure this guard is about.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("testFiles/Irrational.es")).toBeLessThan(
-			45_500,
-		)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(45_500)
 	})
 })

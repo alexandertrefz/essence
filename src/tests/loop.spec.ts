@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
+
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { optimise } from "../optimiser/index"
@@ -309,12 +311,11 @@ describe("a Step compares by its derived Equality", () => {
 	})
 })
 
-describe("testFiles/Loops.es", () => {
+describe("Loops.es", () => {
 	it("compiles and runs the loop showcase end to end", async () => {
-		let source = readFileSync(
-			join(import.meta.dir, "../..", "testFiles/Loops.es"),
-			{ encoding: "utf-8" },
-		)
+		let source = readFileSync(fixturePath("Loops.es"), {
+			encoding: "utf-8",
+		})
 
 		expect(await run(source)).toEqual([
 			'"55"',

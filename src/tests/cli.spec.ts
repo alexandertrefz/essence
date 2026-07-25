@@ -3,6 +3,8 @@ import { readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
+
 import { parseArguments, UsageError } from "../cli/args"
 import { commands, findCommand, globalOptions } from "../cli/commands"
 import { colorChoiceFor } from "../cli/context"
@@ -304,18 +306,21 @@ describe("CLI", () => {
 
 		it("fails when a pattern matches nothing", async () => {
 			await expect(
-				resolveInputFiles(["testFiles/*.nothing"], buildCommand),
+				resolveInputFiles([fixturePath("*.nothing")], buildCommand),
 			).rejects.toThrow(UsageError)
 		})
 
+		// NOTE: An absolute pattern rather than one relative to the working
+		// directory, because `glob` resolves against the cwd and a spec must
+		// not care which directory `bun test` was started from.
 		it("expands a glob", async () => {
 			let files = await resolveInputFiles(
-				["testFiles/*.es"],
+				[fixturePath("*.es")],
 				buildCommand,
 			)
 
 			expect(files.length).toBeGreaterThan(1)
-			expect(files).toContain("testFiles/HelloWorld.es")
+			expect(files).toContain(fixturePath("HelloWorld.es"))
 		})
 
 		it("treats --out as a file for a single input", async () => {

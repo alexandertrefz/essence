@@ -4,9 +4,8 @@
 
 .nyc_output
 
-lib
 node_modules
-testFiles/local
-testFiles/*.js
-src/parser/grammar.ts
 coverage
+
+packages/fixtures/files/local
+packages/fixtures/files/*.js

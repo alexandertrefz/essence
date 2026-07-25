@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"
@@ -1124,10 +1125,9 @@ describe("Code Generation", () => {
 		// `Everyday.es` reaches an Essence Method AND a large runtime module, the
 		// exact shape that used to spread.
 		it("never spreads a runtime module", () => {
-			const source = readFileSync(
-				join(import.meta.dir, "../..", "testFiles/Everyday.es"),
-				{ encoding: "utf-8" },
-			)
+			const source = readFileSync(fixturePath("Everyday.es"), {
+				encoding: "utf-8",
+			})
 
 			expect(generate(source)).not.toMatch(/\{\s*\.\.\./)
 		})
