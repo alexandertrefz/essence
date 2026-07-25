@@ -466,6 +466,12 @@ A conditional conformance was selected at a use site, but one of its `where`
 conditions is not met — the Type binding a bounded Type Parameter does not
 itself conform to the Protocol the condition requires.
 
+A condition is also unmet when nothing has determined the Type it speaks about
+yet: `[[], []]::sort()` asks for `List<Unknown> is Comparable`, whose condition
+is about the empty Lists' item Type, and an empty List Literal leaves that
+unknown. Annotate the List (`constant items: List<Integer> = []`) to say what
+its items are.
+
 ## Inference
 
 ### `uninferable-type-parameter`

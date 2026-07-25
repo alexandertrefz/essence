@@ -21,6 +21,7 @@ import {
 	type GenericBindings,
 	matchesType,
 	matchesTypeWithBindings,
+	typeContainsError,
 	typeMentionsGeneric,
 	withArticle,
 } from "../helpers/index"
@@ -2251,8 +2252,26 @@ function solveNamespaceConformance(
 			condition.generic,
 		)
 
+		// NOTE: The unification above reached the candidate without pinning this
+		// condition's Generic, which an empty List Literal does: `List<ItemType>`
+		// accepts a `List<Unknown>` receiver outright, binding nothing. There is
+		// no witness to hand over — skipping the condition used to emit a plain
+		// method map where the fulfilling Method expects a curried one, and the
+		// Program died reading `compareTo` off `undefined`. Binding the Generic
+		// to Unknown instead would only move the lie one level down.
 		if (conditionBinding === undefined) {
-			continue
+			return {
+				ok: false,
+				// NOTE: An Error somewhere in the binding was reported where it
+				// went wrong — that is why nothing pinned the Generic, and a
+				// second Diagnostic about it would only repeat the first.
+				chain: typeContainsError(binding)
+					? []
+					: [
+							`${describeType(binding)} does not conform to '${protocolName}'.`,
+							`Its '${condition.generic}' is not determined here — an empty List Literal leaves the item Type unknown until something pins it down.`,
+						],
+			}
 		}
 
 		let solved = solveConformance(
