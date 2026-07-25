@@ -18,6 +18,32 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
 }
 
+// NOTE: The typed Invocation a Program's LAST Constant was declared from —
+// which is how a test asks what a call resolved to: which Namespace won, which
+// Overload, which dispatch branches, and what the Arguments were typed as. The
+// Program is required to enrich cleanly, so a test that means to assert on a
+// resolution can not silently assert on a failed one instead.
+function lastConstantMethodInvocation(
+	source: string,
+): common.typed.MethodInvocationNode {
+	let { program, diagnostics } = enrichSource(source)
+
+	expect(diagnostics).toEqual([])
+
+	let constants = program.implementation.nodes.filter(
+		(node) => node.nodeType === "ConstantDeclarationStatement",
+	)
+	let value = constants[constants.length - 1].value
+
+	expect(value.nodeType).toBe("MethodInvocation")
+
+	if (value.nodeType !== "MethodInvocation") {
+		throw new Error("Last Constant is not a MethodInvocation.")
+	}
+
+	return value
+}
+
 // NOTE: The LIVE Namespace of that name — the one read from `src/stdlib/*.es`
 // and handed to every Program's top level Scope. Asserting against this rather
 // than against a declaration read straight out of a source file is the point:
@@ -810,6 +836,158 @@ describe("Enricher", () => {
 					}`),
 				).toEqual({ type: "String" })
 			})
+
+			// NOTE: Resolution probes EVERY Namespace declaring the Method,
+			// including the ones it goes on to reject — an unannotated literal
+			// matches whatever Parameter Type it is probed against, so each
+			// probe resolves it differently. Only the winning Namespace's
+			// resolution may reach the literal's body: it decides which
+			// Namespace `item::toString()` is looked up in, and the receiver
+			// the Rewriter actually passes is the winner's.
+			it("types the literal by the Namespace that won, not the last probed", () => {
+				let source = `implementation {
+					namespace IntApplier for Integer {
+						apply(_ transform: (_ item: Integer) -> String) -> String {
+							<- transform(@)
+						}
+					}
+
+					namespace NumApplier for Number {
+						apply(_ transform: (_ item: Boolean) -> String) -> String {
+							<- transform(true)
+						}
+					}
+
+					constant applied = 1::apply((item) { <- item::toString() })
+				}`
+
+				expect(diagnosticsFor(source)).toEqual([])
+
+				let invocation = lastConstantMethodInvocation(source)
+
+				expect(invocation.namespace.name).toBe("IntApplier")
+
+				let literal = invocation.arguments[0].value
+
+				expect(literal.nodeType).toBe("FunctionValue")
+
+				if (literal.nodeType !== "FunctionValue") {
+					throw new Error("The Argument is not a Function literal.")
+				}
+
+				expect(literal.value.parameters[0].internalName?.type).toEqual({
+					type: "Integer",
+				})
+
+				let body = literal.value.body[0]
+
+				expect(body.nodeType).toBe("ReturnStatement")
+
+				if (body.nodeType !== "ReturnStatement") {
+					throw new Error("The literal does not return.")
+				}
+
+				expect(body.expression.nodeType).toBe("MethodInvocation")
+
+				if (body.expression.nodeType !== "MethodInvocation") {
+					throw new Error("The literal does not return a call.")
+				}
+
+				expect(body.expression.namespace.name).toBe("Integer")
+			})
+
+			it("keeps the literal typed when resolution stays ambiguous", () => {
+				// NOTE: No winner to read the literal's Types off, so the last
+				// probe's stand in — the Invocation fails either way, and a
+				// literal left with nothing recorded would report its
+				// Parameters as uninferable on top of the real Diagnostic.
+				expect(
+					diagnosticsFor(`implementation {
+						namespace FirstApplier for Integer {
+							apply(_ transform: (_ item: Integer) -> String) -> String {
+								<- transform(@)
+							}
+						}
+
+						namespace SecondApplier for Integer {
+							apply(_ transform: (_ item: Integer) -> String) -> String {
+								<- transform(@)
+							}
+						}
+
+						constant applied = 1::apply((item) { <- item::toString() })
+					}`).map((diagnostic) => diagnostic.code),
+				).toEqual(["ambiguous-namespace"])
+			})
+
+			// NOTE: A callee with no Type Parameters infers nothing, which is
+			// why its Arguments used to be handed straight back — and a literal
+			// that omitted its annotations was told it had nothing to infer
+			// from, in the very Argument position the Diagnostic's own Note
+			// names as the one place that works. The identical literal passed
+			// to a non-Generic METHOD always resolved, because Method
+			// resolution matches its Arguments on every path.
+			it("takes its Parameter Type from a non-Generic free Function", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						function apply(_ transform: (_ item: Integer) -> Integer) -> Integer {
+							<- transform(1)
+						}
+
+						constant applied = apply((item) { <- item::add(1) })
+					}`),
+				).toEqual({ type: "Integer" })
+			})
+
+			it("takes its return Type from a non-Generic free Function", () => {
+				// NOTE: The Parameter is written out, so only the omitted
+				// `-> Type` is left to come from the expected signature.
+				expect(
+					diagnosticsFor(`implementation {
+						function apply(_ transform: (_ item: Integer) -> Integer) -> Integer {
+							<- transform(1)
+						}
+
+						constant applied = apply((_ item: Integer) { <- item::add(1) })
+					}`),
+				).toEqual([])
+			})
+
+			it("types the body with a non-Generic free Function's Parameter", () => {
+				// NOTE: `isGreaterThan` only resolves for an Integer, so a
+				// Parameter Type that never reaches the body fails outright
+				// here rather than subtly.
+				expect(
+					diagnosticsFor(`implementation {
+						function describe(_ transform: (_ item: String) -> String) -> String {
+							<- transform("a")
+						}
+
+						constant described = describe((item) { <- item::isGreaterThan(2) })
+					}`).map((diagnostic) => diagnostic.message),
+				).toContain("No Method named 'isGreaterThan' for this value")
+			})
+
+			it("threads the expected Types past a labelled Parameter", () => {
+				// NOTE: Two Parameters, the literal in front of the plain one —
+				// every Argument is asked for its Type against the Parameter it
+				// was written for, not just the first.
+				expect(
+					typeOfFirstConstant(`implementation {
+						function combine(
+							with combiner: (_ left: Integer, _ right: Integer) -> String,
+							and seed: Integer,
+						) -> String {
+							<- combiner(seed, seed)
+						}
+
+						constant joined = combine(
+							with (left, right) { <- left::add(right)::toString() },
+							and 3,
+						)
+					}`),
+				).toEqual({ type: "String" })
+			})
 		})
 
 		it("should infer Generic Functions from their Arguments", () => {
@@ -845,6 +1023,27 @@ describe("Enricher", () => {
 			expect(
 				diagnostics.map((diagnostic) => diagnostic.message),
 			).toContain("Type Parameter 'T' could not be inferred")
+		})
+
+		// NOTE: An Error Type matches everything — that is what keeps a
+		// reported mistake from being reported again at every Type it flows
+		// through — but matching a Type Parameter binds nothing, so the
+		// Invocation would go on to announce that it could not infer it. The
+		// Diagnostic points at the enclosing call rather than at the Argument
+		// that actually failed, which is the cascade poison Types exist to
+		// prevent.
+		it("should not report uninferable Type Parameters for an Error Argument", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace IntList for List<Integer> {
+						firstItem() -> Integer {
+							<- 0
+						}
+					}
+
+					__print([1, 2, 3]::firstItem())
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["ambiguous-namespace"])
 		})
 
 		it("should apply defaults for unbound plain Generics", () => {
@@ -2479,29 +2678,8 @@ describe("Enricher", () => {
 	})
 
 	describe("Union Method Dispatch", () => {
-		function lastConstantValue(
-			source: string,
-		): common.typed.MethodInvocationNode {
-			let { program, diagnostics } = enrichSource(source)
-
-			expect(diagnostics).toEqual([])
-
-			let constants = program.implementation.nodes.filter(
-				(node) => node.nodeType === "ConstantDeclarationStatement",
-			)
-			let value = constants[constants.length - 1].value
-
-			expect(value.nodeType).toBe("MethodInvocation")
-
-			if (value.nodeType !== "MethodInvocation") {
-				throw new Error("Last Constant is not a MethodInvocation.")
-			}
-
-			return value
-		}
-
 		it("should dispatch a Number receiver to every member Namespace", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant number: Number = 5
 				constant doubled = number::multiply(with 2)
 			}`)
@@ -2525,7 +2703,7 @@ describe("Enricher", () => {
 		})
 
 		it("should collapse identical branch return Types", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant value: Integer | Boolean = 5
 				constant text = value::toString()
 			}`)
@@ -2539,7 +2717,7 @@ describe("Enricher", () => {
 		// the wrong reason. `toString` is a Method the covering Namespace
 		// actually declares, which is what this is about.
 		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant ordering = 5::compareTo(7)
 				constant text = ordering::toString()
 			}`)
@@ -2550,7 +2728,7 @@ describe("Enricher", () => {
 		})
 
 		it("should dispatch across unrelated member Namespaces", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant quotient = 10::divide(by 0)
 				constant text = quotient::toString()
 			}`)
@@ -2560,7 +2738,7 @@ describe("Enricher", () => {
 		})
 
 		it("should union distinct branch return Types through user Namespaces", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				namespace IntegerTag for Integer {
 					tag() -> String {
 						<- "integer"
@@ -2676,7 +2854,7 @@ describe("Enricher", () => {
 		})
 
 		it("should prefer the more specific member Namespace inside a dispatch", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				namespace IntegerTag for Integer {
 					tag() -> String {
 						<- "integer"
@@ -2705,32 +2883,65 @@ describe("Enricher", () => {
 				),
 			).toEqual(["IntegerTag", "StringTag"])
 		})
+
+		// NOTE: Record matching is OPEN at runtime — a `{ width, height }`
+		// value matches the branch for `{ width }` — so the branch for the
+		// more specific Record has to be tried first or it can never be
+		// reached. Such a Union arrives here because applying a Generic Alias
+		// rebuilds it without the subsumption pass that would have collapsed
+		// the two members.
+		function dispatchOrderOf(alias: string): Array<string> | undefined {
+			let invocation = lastConstantMethodInvocation(`implementation {
+				type Mixed<Extra> = ${alias}
+
+				namespace Square for { width: Integer } {
+					describe() -> String {
+						<- "square"
+					}
+				}
+
+				namespace Flag for Boolean {
+					describe() -> String {
+						<- "flag"
+					}
+				}
+
+				namespace Rect for { width: Integer, height: Integer } {
+					describe() -> String {
+						<- "rect"
+					}
+				}
+
+				constant shape: Mixed<{ width: Integer, height: Integer }> = { width = 1, height = 2 }
+				constant described = shape::describe()
+			}`)
+
+			return invocation.dispatch?.map(
+				(dispatchCase) => dispatchCase.namespaceName,
+			)
+		}
+
+		it("should order a more specific Record member ahead of an open one", () => {
+			expect(
+				dispatchOrderOf("{ width: Integer } | Boolean | Extra"),
+			).toEqual(["Rect", "Square", "Flag"])
+		})
+
+		// NOTE: The same Union, written with its incomparable member moved.
+		// Sorting with a partial order only compared the pairs the sort
+		// happened to reach, so `Boolean` standing between the two Records was
+		// enough to leave them in declaration order — and the Program printed
+		// something else.
+		it("should order the same members the same way however they are spelled", () => {
+			expect(
+				dispatchOrderOf("{ width: Integer } | Extra | Boolean"),
+			).toEqual(dispatchOrderOf("{ width: Integer } | Boolean | Extra"))
+		})
 	})
 
 	describe("Method Target Specificity", () => {
-		function lastConstantValue(
-			source: string,
-		): common.typed.MethodInvocationNode {
-			let { program, diagnostics } = enrichSource(source)
-
-			expect(diagnostics).toEqual([])
-
-			let constants = program.implementation.nodes.filter(
-				(node) => node.nodeType === "ConstantDeclarationStatement",
-			)
-			let value = constants[constants.length - 1].value
-
-			expect(value.nodeType).toBe("MethodInvocation")
-
-			if (value.nodeType !== "MethodInvocation") {
-				throw new Error("Last Constant is not a MethodInvocation.")
-			}
-
-			return value
-		}
-
 		it("should prefer the Namespace with the strictly more specific target Type", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				namespace IntegerTag for Integer {
 					tag() -> String {
 						<- "integer"
@@ -2751,7 +2962,7 @@ describe("Enricher", () => {
 		})
 
 		it("should resolve a Union receiver through the covering Namespace", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				namespace IntegerTag for Integer {
 					tag() -> String {
 						<- "integer"
@@ -2774,7 +2985,7 @@ describe("Enricher", () => {
 		})
 
 		it("should route single-member receivers past the Number Namespace", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant same = 5::is(3)
 			}`)
 
@@ -2782,7 +2993,7 @@ describe("Enricher", () => {
 		})
 
 		it("should resolve mixed-member comparisons through the Number Namespace", () => {
-			let invocation = lastConstantValue(`implementation {
+			let invocation = lastConstantMethodInvocation(`implementation {
 				constant same = 1::is(1/1)
 			}`)
 
@@ -2797,6 +3008,179 @@ describe("Enricher", () => {
 						case #Less    { <- "smaller" }
 						case #Equal   { <- "same" }
 						case #Greater { <- "bigger" }
+					}
+				}`),
+			).toEqual([])
+		})
+	})
+
+	// NOTE: A static Method is called on its Namespace and takes no receiver.
+	// Both halves of that are load-bearing for what the Rewriter emits: the
+	// call passes only the written Arguments, and the definition is emitted
+	// without the `_self` Parameter `@` compiles to.
+	describe("Static Methods", () => {
+		it("should reject a static Method called on a value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Maker for Integer {
+					static make(_ base: Integer) -> Integer {
+						<- base
+					}
+				}
+
+				constant made = 5::make(7)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("static-method-on-value")
+			expect(diagnostics[0].message).toBe("'make' is a static Method")
+		})
+
+		// NOTE: `Integer.parse` — the Invocation type-checked against the
+		// written Arguments alone while the Simplifier prepended the receiver
+		// anyway, so every runtime Argument landed one place too far right and
+		// the Program answered with the receiver instead of erroring.
+		it("should reject a builtin static Method called on a value", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant weird = 999::parse("42")
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["static-method-on-value"])
+		})
+
+		it("should reject an overloaded static Method called on a value", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Maker for Integer {
+						overload static make {
+							(_ base: Integer) -> Integer {
+								<- base
+							}
+
+							(_ base: String) -> Integer {
+								<- 0
+							}
+						}
+					}
+
+					constant made = 5::make(7)
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["static-method-on-value"])
+		})
+
+		it("should reject a static Method called on a member of a Union", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace IntegerTag for Integer {
+						static tag() -> String {
+							<- "integer"
+						}
+					}
+
+					namespace StringTag for String {
+						tag() -> String {
+							<- "string"
+						}
+					}
+
+					constant value: Integer | String = 5
+					constant tagged = value::tag()
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["static-method-on-value"])
+		})
+
+		it("should still resolve the same Method called on its Namespace", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				namespace Maker for Integer {
+					static make(_ base: Integer) -> Integer {
+						<- base
+					}
+				}
+
+				constant made = Maker.make(7)
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+
+			expect(constants[constants.length - 1].type).toEqual({
+				type: "Integer",
+			})
+		})
+
+		// NOTE: An instance Method of the same Namespace binds `@` right
+		// beside it, which is exactly why this is an easy mistake — and why
+		// the Scope has to refuse `@` rather than merely leave it undeclared.
+		it("should reject '@' in a static Method body", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Maker for Integer {
+					static make() -> Integer {
+						<- @::add(1)
+					}
+
+					doubled() -> Integer {
+						<- @::multiply(with 2)
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("at-in-static-method")
+			expect(diagnostics[0].message).toBe(
+				"There is no '@' in a static Method",
+			)
+			expect(diagnostics[0].position?.start.line).toBe(4)
+		})
+
+		it("should reject '@' in an overloaded static Method body", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Maker for Integer {
+						overload static make {
+							() -> Integer {
+								<- @
+							}
+
+							(_ base: Integer) -> Integer {
+								<- base
+							}
+						}
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["at-in-static-method"])
+		})
+
+		// NOTE: A Match Handler binds its own `@` — the value that matched —
+		// and is emitted as a Function taking it, so it keeps working inside a
+		// static Method. Only the receiver `@` is gone.
+		it("should keep '@' bound in a Match Handler inside a static Method", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Maker for Integer {
+						static describe(_ value: Integer | Boolean) -> String {
+							<- match value -> String {
+								case Integer { <- @::toString() }
+								case Boolean { <- "boolean" }
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should keep '@' bound in the instance Methods beside it", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Maker for Integer {
+						static make() -> Integer {
+							<- 1
+						}
+
+						doubled() -> Integer {
+							<- @::multiply(with 2)
+						}
 					}
 				}`),
 			).toEqual([])

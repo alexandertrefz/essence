@@ -100,6 +100,7 @@ export type DiagnosticCode =
 	| "unexpected-token"
 	| "unclosed-string"
 	| "unclosed-block"
+	| "invalid-number"
 	| "redundant-parameter-label"
 	| "declarations-outside-stdlib"
 	// Names — declared twice, never declared, or not what the position wants.
@@ -107,6 +108,9 @@ export type DiagnosticCode =
 	| "duplicate-type"
 	| "duplicate-protocol"
 	| "duplicate-case"
+	| "duplicate-method"
+	| "duplicate-property"
+	| "duplicate-member"
 	| "reserved-type-name"
 	| "unknown-name"
 	| "unknown-type"
@@ -136,8 +140,10 @@ export type DiagnosticCode =
 	| "ambiguous-namespace"
 	| "unknown-method"
 	| "no-namespace-for-value"
+	| "not-a-namespace"
 	| "undispatchable-method"
 	| "untyped-namespace-method"
+	| "static-method-on-value"
 	| "native-property-without-type"
 	// Choices and their Cases.
 	| "empty-choice"
@@ -178,6 +184,7 @@ export type DiagnosticCode =
 	| "bundler-warning"
 	// Everything else.
 	| "at-outside-method"
+	| "at-in-static-method"
 	| "internal-error"
 
 export type UnknownType = {
@@ -427,11 +434,28 @@ export type DescriptorNode =
 	| { k: "list"; of: DescriptorNode }
 	| { k: "record"; m: Record<string, DescriptorNode> }
 	| { k: "case"; m: Record<string, DescriptorNode> }
-	// NOTE: A Union-typed payload member — its concrete arms are discriminated
-	// at runtime by the value's `typeKeySymbol` tag, and the one generic arm
-	// (`tag: null`) catches everything else, so `T | Nothing` compares a
-	// Nothing structurally and a `T` through its witness.
-	| { k: "union"; arms: Array<{ tag: string | null; node: DescriptorNode }> }
+	// NOTE: A Union-typed payload member — its arms are claimed at runtime by
+	// the value's `typeKeySymbol` tag, and the generic arm (`tag: null`)
+	// catches everything no arm claims, so `T | Nothing` compares a Nothing
+	// structurally and a `T` through its witness.
+	//
+	// NOTE: A tag says which KIND a value is, not which Type — every Record
+	// carries "Record", every List "List" — so where two arms share one, the
+	// tag alone claims the wrong values. `shape` is the arm's Type as the
+	// runtime can check it (`$type.isValueOfType`, the same check a Match
+	// narrows with), and it is carried by exactly the arms that need telling
+	// apart: `{ code: Integer }` claims the Records that have an Integer
+	// `code`, and a `T` bound to `{ name: String }` keeps the rest. Arms are
+	// ordered most specific first, so an Argument that is a strict refinement
+	// of a concrete arm claims its own values before that arm does.
+	| {
+			k: "union"
+			arms: Array<{
+				tag: string | null
+				shape?: Type
+				node: DescriptorNode
+			}>
+	  }
 
 // NOTE: How a bounded Type Parameter's Protocol requirement is fulfilled at
 // one invocation. A `namespace` source packages the conforming Namespace's

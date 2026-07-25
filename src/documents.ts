@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import path from "node:path"
 
 import { enrich } from "./enricher/index"
@@ -25,6 +26,51 @@ import { parseWithDiagnostics } from "./parser/index"
 // String, Integer and Rational conversions are hundreds of hand transcribed
 // Methods each, so the editor has to work inside these files.
 
+// NOTE: The one spelling of a path every other spelling of it agrees with.
+// `path.resolve` is purely lexical — it flattens `.`/`..` and prefixes the
+// working directory and stops there — while `realpathSync` is the system
+// `realpath(3)`: it follows symlinks, and on a case-insensitive filesystem it
+// answers in the casing the entry is stored under. A checkout opened through
+// a symlink (`~/dev/essence` → the real directory) or spelled with different
+// casing names the very files `STDLIB_DIRECTORY` names, byte-differently, and
+// a byte-exact comparison would hand a genuine standard library source the
+// strict user-file treatment below — for the whole Editor session. Where the
+// filesystem IS case-sensitive, a differently cased path is a different file;
+// leaving the casing to `realpath` keeps that true as well.
+//
+// The document need not exist on disk — an Editor holds files that have never
+// been saved — so the deepest ancestor that DOES exist is canonicalised and
+// the missing tail appended lexically.
+function canonicalPath(filePath: string): string {
+	let resolved = path.resolve(filePath)
+	let existing = resolved
+	let missing: Array<string> = []
+
+	while (true) {
+		try {
+			return path.join(realpathSync.native(existing), ...missing)
+		} catch {}
+
+		let parent = path.dirname(existing)
+
+		// NOTE: The filesystem root is its own parent — there is nothing left
+		// above it to resolve, so the lexical spelling is all there is.
+		if (parent === existing) {
+			return resolved
+		}
+
+		missing.unshift(path.basename(existing))
+		existing = parent
+	}
+}
+
+// NOTE: BOTH sides of the comparison are canonical. The module system handed
+// this compiler its own location with symlinks already resolved, so
+// `STDLIB_DIRECTORY` is canonical in practice — but nothing in its contract
+// says so, and one un-canonicalised side is enough to lose every match.
+// Resolved once: the standard library does not move while the process runs.
+const CANONICAL_STDLIB_DIRECTORY = canonicalPath(STDLIB_DIRECTORY)
+
 // NOTE: The Language Server is handed URIs (`file:///…/src/stdlib/List.es`)
 // and the tests plain paths; both are matched, and a `%20` or the like is
 // decoded first so a path with a space is not missed.
@@ -51,7 +97,9 @@ export function isStdlibDocument(documentPath: string | undefined): boolean {
 		return false
 	}
 
-	return path.resolve(filePath).startsWith(`${STDLIB_DIRECTORY}${path.sep}`)
+	return canonicalPath(filePath).startsWith(
+		`${CANONICAL_STDLIB_DIRECTORY}${path.sep}`,
+	)
 }
 
 export function parseDocument(

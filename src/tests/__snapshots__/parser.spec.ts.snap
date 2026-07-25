@@ -1110,6 +1110,220 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 }
 `;
 
+exports[`Parser Expressions FunctionInvocations should parse a bare Case value as a labelled argument, the space before \`#\` keeping the label distinct from a Choice prefix 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": {
+              "content": "at",
+              "nodeType": "Identifier",
+              "position": {
+                "end": {
+                  "column": 31,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+            },
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Start",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 38,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 33,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": null,
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 38,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 32,
+                  "line": 1,
+                },
+              },
+              "value": null,
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 39,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 41,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 41,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choice#Case\` as a prefixed Case value passed positionally 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": null,
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Start",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 39,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 34,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": {
+                "content": "Side",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 33,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 29,
+                    "line": 1,
+                  },
+                },
+              },
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 39,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+              "value": null,
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 40,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 42,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 42,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with one argument and a trailing comma 1`] = `
 {
   "implementation": {
@@ -6388,7 +6602,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
         "numerator": "3",
         "position": {
           "end": {
-            "column": 23,
+            "column": 21,
             "line": 1,
           },
           "start": {
@@ -6400,7 +6614,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
     ],
     "position": {
       "end": {
-        "column": 25,
+        "column": 23,
         "line": 1,
       },
       "start": {
@@ -6413,7 +6627,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
   "nodeType": "Program",
   "position": {
     "end": {
-      "column": 25,
+      "column": 23,
       "line": 1,
     },
     "start": {
@@ -6433,147 +6647,6 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
         "denominator": "9",
         "nodeType": "RationalValue",
         "numerator": "1000",
-        "position": {
-          "end": {
-            "column": 27,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 29,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 29,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals RationalLiterals should parse negative numerator RationalLiterals 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "denominator": "2",
-        "nodeType": "RationalValue",
-        "numerator": "-3",
-        "position": {
-          "end": {
-            "column": 24,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 26,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 26,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals RationalLiterals should parse negative denominator RationalLiterals 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "denominator": "-2",
-        "nodeType": "RationalValue",
-        "numerator": "3",
-        "position": {
-          "end": {
-            "column": 24,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 26,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 26,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals RationalLiterals should parse fully negative RationalLiterals 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "denominator": "-2",
-        "nodeType": "RationalValue",
-        "numerator": "-3",
         "position": {
           "end": {
             "column": 25,
@@ -6602,6 +6675,147 @@ exports[`Parser Expressions Literals RationalLiterals should parse fully negativ
   "position": {
     "end": {
       "column": 27,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals RationalLiterals should parse negative numerator RationalLiterals 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "2",
+        "nodeType": "RationalValue",
+        "numerator": "-3",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals RationalLiterals should parse negative denominator RationalLiterals 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "-2",
+        "nodeType": "RationalValue",
+        "numerator": "3",
+        "position": {
+          "end": {
+            "column": 22,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 24,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 24,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Expressions Literals RationalLiterals should parse fully negative RationalLiterals 1`] = `
+{
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "denominator": "-2",
+        "nodeType": "RationalValue",
+        "numerator": "-3",
+        "position": {
+          "end": {
+            "column": 23,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 25,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 25,
       "line": 1,
     },
     "start": {
@@ -16840,7 +17054,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
                           "line": 5,
                         },
                         "start": {
-                          "column": 24,
+                          "column": 20,
                           "line": 5,
                         },
                       },
@@ -18073,7 +18287,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
                     "line": 2,
                   },
                   "start": {
-                    "column": 65,
+                    "column": 61,
                     "line": 2,
                   },
                 },
@@ -19251,7 +19465,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
               "line": 1,
             },
             "start": {
-              "column": 53,
+              "column": 49,
               "line": 1,
             },
           },
@@ -21429,220 +21643,6 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
     "end": {
       "column": 7,
       "line": 5,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions FunctionInvocations should parse a bare Case value as a labelled argument, the space before \`#\` keeping the label distinct from a Choice prefix 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "arguments": [
-          {
-            "name": {
-              "content": "at",
-              "nodeType": "Identifier",
-              "position": {
-                "end": {
-                  "column": 31,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 29,
-                  "line": 1,
-                },
-              },
-            },
-            "nodeType": "Argument",
-            "value": {
-              "caseName": {
-                "content": "Start",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 38,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 33,
-                    "line": 1,
-                  },
-                },
-              },
-              "choice": null,
-              "nodeType": "CaseValue",
-              "position": {
-                "end": {
-                  "column": 38,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 32,
-                  "line": 1,
-                },
-              },
-              "value": null,
-            },
-          },
-        ],
-        "name": {
-          "content": "invocation",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 28,
-              "line": 1,
-            },
-            "start": {
-              "column": 18,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "FunctionInvocation",
-        "position": {
-          "end": {
-            "column": 39,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 41,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 41,
-      "line": 1,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choice#Case\` as a prefixed Case value passed positionally 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "arguments": [
-          {
-            "name": null,
-            "nodeType": "Argument",
-            "value": {
-              "caseName": {
-                "content": "Start",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 39,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 34,
-                    "line": 1,
-                  },
-                },
-              },
-              "choice": {
-                "content": "Side",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 33,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 29,
-                    "line": 1,
-                  },
-                },
-              },
-              "nodeType": "CaseValue",
-              "position": {
-                "end": {
-                  "column": 39,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 29,
-                  "line": 1,
-                },
-              },
-              "value": null,
-            },
-          },
-        ],
-        "name": {
-          "content": "invocation",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 28,
-              "line": 1,
-            },
-            "start": {
-              "column": 18,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "FunctionInvocation",
-        "position": {
-          "end": {
-            "column": 40,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 42,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 42,
-      "line": 1,
     },
     "start": {
       "column": 1,

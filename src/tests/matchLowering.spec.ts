@@ -1,0 +1,253 @@
+import { describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import type { common } from "../interfaces/index"
+import { optimise } from "../optimiser/index"
+import { parseWithDiagnostics } from "../parser/index"
+import { rewrite } from "../rewriter/index"
+import { simplify } from "../simplifier/index"
+import { validate } from "../validator/index"
+
+// NOTE: The same stages the CLI runs, minus bundling — a Match is lowered to
+// an emitted `if` chain, and both halves of what it does wrong are only
+// visible once that chain RUNS, so these go all the way through.
+function generate(source: string): string {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program)
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+	expect(containsErrors(validate(enriched.program))).toBe(false)
+
+	return rewrite(optimise(simplify(enriched.program)))
+}
+
+// NOTE: Writes the emitted Program to a throwaway module and imports it so its
+// top-level `__print` calls run. The emitted imports are absolute paths into
+// this repo's runtime, so the module resolves from anywhere; `console.log` is
+// captured to collect the output, then restored.
+async function run(source: string): Promise<Array<string>> {
+	let js = generate(source)
+	let directory = mkdtempSync(join(tmpdir(), "essence-match-"))
+	let file = join(directory, "program.ts")
+
+	writeFileSync(file, js)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((arg) => String(arg)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+		rmSync(directory, { recursive: true, force: true })
+	}
+
+	return output
+}
+
+// NOTE: The counterpart for a Program that is supposed to be reported on —
+// a Warning is not an error, so the Program still compiles and still runs.
+function diagnosticsOf(source: string): Array<common.Diagnostic> {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program)
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+
+	return validate(enriched.program)
+}
+
+describe("Match Lowering", () => {
+	// NOTE: Regression tests — a Record Matcher naming a Function-typed member
+	// lowered to a runtime check that could never answer true, because the
+	// Function descriptor reached `isValueOfType`'s "not implemented" branch:
+	// it printed a line of Compiler prose into the Program's own output and
+	// answered false. Every Handler of an exhaustive Match declined, the
+	// emitted chain fell off its end, and the Match answered `undefined` —
+	// which `__print` then read a Type key off, so a Program that compiled
+	// green died with a `TypeError` naming the runtime's internals.
+	describe("Record Matchers naming a Function member", () => {
+		let source = (value: string) => `implementation {
+			type Click = { x: Integer }
+			type Handler = { fn: (_ n: Integer) -> Integer }
+
+			constant input: Click | Handler = ${value}
+
+			__print(match input -> String {
+				case { x: Integer } { <- "click" }
+				case { fn: (_ n: Integer) -> Integer } { <- "handler" }
+			})
+		}`
+
+		it("matches the value carrying the callback", async () => {
+			expect(
+				await run(
+					source(`{ fn = (_ n: Integer) -> Integer { <- n } }`),
+				),
+			).toEqual(['"handler"'])
+		})
+
+		it("still declines it for the Case that names other members", async () => {
+			expect(await run(source(`{ x = 7 }`))).toEqual(['"click"'])
+		})
+
+		it("reads the matched callback inside the Handler", async () => {
+			expect(
+				await run(`implementation {
+					type Click = { x: Integer }
+					type Handler = { fn: (_ n: Integer) -> Integer }
+
+					constant input: Click | Handler = {
+						fn = (_ n: Integer) -> Integer { <- n::multiply(with 2) }
+					}
+
+					__print(match input -> Integer {
+						case { x: Integer } { <- @.x }
+						case { fn: (_ n: Integer) -> Integer } { <- @.fn(21) }
+					})
+				}`),
+			).toEqual(["42"])
+		})
+
+		// NOTE: A Signature does not survive to runtime, so a callback member
+		// only ever answers "callable" — two Cases are told apart by the OTHER
+		// members they name, and a pair that names nothing else is reported as
+		// unreachable rather than silently taking the first branch.
+		it("tells two callback-carrying Cases apart by their other members", async () => {
+			expect(
+				await run(`implementation {
+					type IntHandler = { fn: (_ n: Integer) -> Integer, arity: Integer }
+					type StringHandler = { fn: (_ s: String) -> String, label: String }
+
+					constant input: IntHandler | StringHandler = {
+						fn = (_ s: String) -> String { <- s },
+						label = "strings",
+					}
+
+					__print(match input -> String {
+						case { fn: (_ n: Integer) -> Integer, arity: Integer } { <- "int handler" }
+						case { fn: (_ s: String) -> String, label: String } { <- "string handler" }
+					})
+				}`),
+			).toEqual(['"string handler"'])
+		})
+
+		// NOTE: A Guard is ANDed onto the Matcher's own check, so a Matcher
+		// that never answered true made the Guard unreachable too.
+		it("narrows a Guarded Case naming a callback member", async () => {
+			expect(
+				await run(`implementation {
+					type Click = { x: Integer }
+					type Handler = { fn: (_ n: Integer) -> Integer, times: Integer }
+
+					constant input: Click | Handler = {
+						fn = (_ n: Integer) -> Integer { <- n },
+						times = 3,
+					}
+
+					__print(match input -> String {
+						case { x: Integer } { <- "click" }
+						case { fn: (_ n: Integer) -> Integer, times: Integer } where @.times::isGreaterThan(2) {
+							<- "handler, more than twice"
+						}
+						case { fn: (_ n: Integer) -> Integer, times: Integer } {
+							<- "handler"
+						}
+					})
+				}`),
+			).toEqual(['"handler, more than twice"'])
+		})
+	})
+
+	// NOTE: Regression test — the emitted chain used to simply END after the
+	// last Handler. Nothing answered for a value no Matcher accepted: the
+	// wrapper returned `undefined`, which is not an Essence value at all, so
+	// the Program failed later and elsewhere, in whatever read the missing
+	// Type key next.
+	describe("Exhaustiveness fallback", () => {
+		it("ends the emitted chain in an else no Handler owns", () => {
+			let generated = generate(`implementation {
+				constant maybe: Integer | Nothing = 5
+
+				__print(match maybe -> String {
+					case Integer { <- "an Integer" }
+					case Nothing { <- "nothing" }
+				})
+			}`)
+
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		// NOTE: A Match written for its effects has Handlers that return
+		// nothing, so the fallback has to be the innermost `else` rather than a
+		// Statement after the chain — a Handler that RAN and fell through must
+		// not reach it.
+		it("leaves a Match in Statement position alone", async () => {
+			expect(
+				await run(`implementation {
+					constant maybe: Integer | Nothing = nothing
+
+					match maybe -> Nothing {
+						case Integer { __print("an Integer") }
+						case Nothing { __print("nothing") }
+					}
+				}`),
+			).toEqual(['"nothing"'])
+		})
+	})
+
+	// NOTE: Regression tests — Types erase before a Match runs, so the check
+	// emitted for a Generic Matcher is unconditionally true. A Generic Case
+	// written above a concrete one therefore swallowed every value, and neither
+	// the Enricher nor the Validator said so: `unwrap(nothing, fallback 7)`
+	// compiled with no Diagnostic at all and answered the Nothing, where its
+	// own Signature promised a `Value`.
+	describe("Generic Cases", () => {
+		let unwrap = (cases: string) => `implementation {
+			function unwrap <infer Value>(
+				_ maybe: Value | Nothing,
+				fallback fallbackValue: Value,
+			) -> Value {
+				<- match maybe -> Value {
+					${cases}
+				}
+			}
+
+			__print(unwrap(nothing, fallback 7))
+			__print(unwrap(3, fallback 7))
+		}`
+
+		it("reports the Case a Generic Case above it swallows", () => {
+			let diagnostics = diagnosticsOf(
+				unwrap(`case Value { <- @ }
+					case Nothing { <- fallbackValue }`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("unreachable-case")
+		})
+
+		it("answers with the fallback once the Generic Case is written last", async () => {
+			expect(
+				await run(
+					unwrap(`case Nothing { <- fallbackValue }
+						case Value { <- @ }`),
+				),
+			).toEqual(["7", "3"])
+		})
+	})
+})

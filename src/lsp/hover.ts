@@ -215,7 +215,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 						state.best = {
 							position,
 							content,
-							documentation: renderDocumentation(node.documentation),
+							documentation: renderDocumentation(
+								node.documentation,
+							),
 						}
 					}
 				}

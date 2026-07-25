@@ -6,9 +6,7 @@ import * as algebraic from "../rewriter/__internal/Algebraic"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
 import * as list from "../rewriter/__internal/List"
-import { createNothing } from "../rewriter/__internal/Nothing"
 import * as number from "../rewriter/__internal/Number"
-import * as optional from "../rewriter/__internal/Optional"
 import * as rational from "../rewriter/__internal/Rational"
 import * as string from "../rewriter/__internal/String"
 import * as transcendental from "../rewriter/__internal/Transcendental"
@@ -302,8 +300,11 @@ describe("Stdlib", () => {
 		})
 
 		// NOTE: `lastIndex` (and `firstIndex`) are written in Essence now,
-		// walking the positions with `loop` and stopping at the first match;
-		// their behaviour is covered by the golden harness over every Method.
+		// counting their way through the ITEMS with `reduce` and stopping at the
+		// first match; their behaviour is covered by the golden harness over
+		// every Method, and by `stdlibSearch.spec.ts` for the item Types that
+		// contain `Nothing` — where reading each position with `item(at:)`
+		// skipped a stored `nothing` instead of comparing it.
 
 		// NOTE: The equality counterpart of "sorts nested Lists through a bound
 		// conformance" below. `List is Equatable` is conditional, so the witness

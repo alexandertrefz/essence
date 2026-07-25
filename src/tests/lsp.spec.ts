@@ -1,10 +1,20 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
-import { enrichDocument, parseDocument } from "../documents"
+import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
 import { STDLIB_DIRECTORY } from "../enricher/stdlib"
 import { analyse } from "../lsp/analyse"
 import { findCompletions } from "../lsp/completion"
@@ -359,6 +369,81 @@ describe("LSP in a standard library source", () => {
 
 	it("should accept a file:// URI as well as a plain path", () => {
 		expect(analyse(source, `file://${stdlibPath}`)).toEqual([])
+	})
+
+	// NOTE: The same file under the spelling the Editor happens to have opened
+	// the checkout with. A developer working through a symlink
+	// (`~/dev/essence` → the real directory) hands the Language Server a path
+	// that names this very file — compared lexically it matched nothing, and
+	// the standard library became uneditable for that whole session: the
+	// `declarations` header rejected, everything behind it mis-parsed, every
+	// declaration a redeclaration of itself.
+	it("should recognise the standard library through a symlinked checkout", () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-symlink-"))
+		let checkout = path.join(directory, "essence")
+
+		symlinkSync(path.resolve(STDLIB_DIRECTORY, "../.."), checkout, "dir")
+
+		try {
+			let linkedPath = path.join(checkout, "src", "stdlib", "Boolean.es")
+
+			expect(isStdlibDocument(linkedPath)).toBe(true)
+			expect(analyse(source, linkedPath)).toEqual([])
+		} finally {
+			// NOTE: The link is unlinked FIRST and on its own. A recursive
+			// delete over a directory holding a link to the checkout is a
+			// sentence nobody should have to trust twice.
+			rmSync(checkout, { force: true })
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// NOTE: On a case-insensitive filesystem — macOS' default — `src/stdlib`
+	// and `src/STDLIB` are one directory and an Editor may hand over either
+	// spelling; on a case-sensitive one they are two, and the variant is
+	// genuinely not the standard library. Which of the two it is, is the
+	// filesystem's answer to give rather than this comparison's to guess, so
+	// the expectation is written as the filesystem's own.
+	it("should recognise the standard library through a case-variant path", () => {
+		let variantPath = path.join(
+			path.dirname(STDLIB_DIRECTORY),
+			path.basename(STDLIB_DIRECTORY).toUpperCase(),
+			"Boolean.es",
+		)
+
+		expect(isStdlibDocument(variantPath)).toBe(existsSync(variantPath))
+	})
+
+	// NOTE: A standard library source that has never been saved is still a
+	// standard library source — the Editor opens `src/stdlib/Ordering.es` as a
+	// new file and the `declarations` header has to be allowed while it is
+	// typed. Canonicalising must therefore not require the file to exist.
+	it("should recognise a standard library document that is not on disk yet", () => {
+		expect(
+			isStdlibDocument(path.join(STDLIB_DIRECTORY, "NotWrittenYet.es")),
+		).toBe(true)
+	})
+
+	// NOTE: The other half of resolving paths for real: a user's own
+	// `src/stdlib/Boolean.es` exists on disk and canonicalises perfectly well,
+	// and is still not THIS compiler's standard library. Matching by shape
+	// would tell them in their Editor that a `declarations { … }` block is
+	// fine while `esc` rejects it.
+	it("should still refuse a real src/stdlib in someone else's project", () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-project-"))
+		let ownPath = path.join(directory, "src", "stdlib", "Boolean.es")
+
+		mkdirSync(path.dirname(ownPath), { recursive: true })
+		writeFileSync(ownPath, source)
+
+		try {
+			expect(isStdlibDocument(ownPath)).toBe(false)
+			expect(
+				analyse(source, ownPath).map((diagnostic) => diagnostic.code),
+			).toContain("declarations-outside-stdlib")
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	})
 
 	// NOTE: The permission is the standard library's alone. Lifting it for

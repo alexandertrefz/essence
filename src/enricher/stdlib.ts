@@ -9,6 +9,7 @@ import { builtinMemberOrder, builtinTypeOrder } from "./builtins"
 import { enrichPrograms } from "./index"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
+import { scopeMap } from "./scope"
 
 // NOTE: Where the standard library's Essence sources live. Resolved off this
 // module's own location rather than the working directory — the same trick the
@@ -379,17 +380,17 @@ export function loadStdlibFrom(
 	// handful of Types a declaration bottoms out in. Everything else in the
 	// language, `__print` and every other free Function included, is declared by
 	// the sources being loaded here, into this same Scope.
-	let members: Record<string, common.Type> = {}
+	let members: Record<string, common.Type> = scopeMap()
 
 	let scope: enricher.Scope = {
 		parent: null,
 		members,
 		// NOTE: As in a user Program's top level Scope — what is already in
 		// scope before the first line has no Position to point a Diagnostic at.
-		declarations: {},
+		declarations: scopeMap(),
 		constants: new Set(Object.keys(members)),
-		types: { ...primitiveTypes },
-		protocols: {},
+		types: scopeMap(primitiveTypes),
+		protocols: scopeMap(),
 	}
 
 	let enrichStarted = performance.now()

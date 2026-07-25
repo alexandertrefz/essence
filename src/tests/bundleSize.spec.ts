@@ -67,9 +67,15 @@ describe("Bundle Size", () => {
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
+	// It rose to 44,174 when a Match grew its exhaustiveness fallback: every
+	// emitted `if` chain now ends in an `else` that calls `noCaseMatched`
+	// instead of falling off its end and answering `undefined`, and that helper
+	// — like the rest of the runtime's Type Module — is carried by every
+	// Program. The ceiling moves with it, keeping the same order of headroom;
+	// it is still eleven kB below the spread figure this guard is about.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("testFiles/Irrational.es")).toBeLessThan(
-			44_000,
+			45_500,
 		)
 	})
 })

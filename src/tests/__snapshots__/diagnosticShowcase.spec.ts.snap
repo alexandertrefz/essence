@@ -110,11 +110,11 @@ Error: { x: Integer, y: Integer } has no member 'z'
 exports[`Diagnostic Showcase GenericChoice.es should render the same report every time 1`] = `
 "[wrong-type-argument-count]
 Error: Type 'Step' was given the wrong number of Type Arguments
-    ╭─┤ GenericChoice.es:19:25 │
+    ╭─┤ GenericChoice.es:19:21 │
     │
  19 │     type OneArgument = Step<Integer>
-    │                            ────┬────  
-    │                                ╰────── 1 Type Argument given
+    │                        ──────┬──────  
+    │                              ╰──────── 1 Type Argument given
     │ 
     │ Note: 'Step' takes 2 Type Parameters.
 ────╯

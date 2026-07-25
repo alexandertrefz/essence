@@ -48,7 +48,8 @@ export function boundConformance(
 	let bound: Record<string, (...args: Array<any>) => unknown> = {}
 
 	for (let [name, method] of Object.entries(methods)) {
-		bound[name] = (...args: Array<unknown>) => method(...args, ...conditions)
+		bound[name] = (...args: Array<unknown>) =>
+			method(...args, ...conditions)
 	}
 
 	return bound
@@ -133,10 +134,31 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		return value[typeKeySymbol] === `${type.choice}#${type.name}`
 	} else if (type.type === "UnionType") {
 		return type.types.some((memberType) => isValueOfType(value, memberType))
+	} else if (type.type === "Function") {
+		// NOTE: A Function is the one runtime value carrying no Type key — it
+		// is emitted as a bare JavaScript function — so `typeof` is what
+		// answers for it, exactly as `getStringRepresentation` and `anyIs`
+		// answer for it. Its Signature is erased by the time the check runs:
+		// Parameter and Return Types leave nothing behind to compare, and
+		// `Function.length` counts only the emitted Parameters, which the
+		// hidden conformance Arguments of a bounded Function add to. So
+		// callability IS the whole check, and two Matchers naming
+		// Function-typed members ask the same question however differently
+		// they are declared — which is why the Validator reports the second of
+		// them as a Case that can never match rather than letting it look like
+		// it narrows.
+		//
+		// NOTE: This used to fall through to the "not implemented" branch
+		// below and answer FALSE, so a Record Matcher naming a callback member
+		// could never match: every Handler declined, the emitted `if` chain
+		// fell off its end, and the Match answered `undefined`.
+		return typeof (value as unknown) === "function"
 	} else if (type.type === "GenericUse") {
 		// NOTE: Types erase at runtime — a Generic matcher stands for any
 		// value. Handlers are tested in order, so concrete matchers narrow
-		// the value before a Generic matcher catches the rest.
+		// the value before a Generic matcher catches the rest. A Handler
+		// written BELOW such a matcher can therefore never run, which the
+		// Validator reports as an unreachable Case.
 		return true
 	} else if (type.type === "Unknown") {
 		// NOTE: The Type a wildcard Handler (`case _`) resolves to once no
@@ -144,7 +166,40 @@ export function isValueOfType(value: AnyType, type: common.Type): boolean {
 		// whatever the Handlers before it did not catch.
 		return true
 	} else {
-		console.log("Complex type checking has yet to be implemented!")
-		return false
+		// NOTE: Every Type a Matcher or a dispatch case can name is answered
+		// above, so reaching here is a Compiler bug rather than a Program one
+		// — a descriptor was emitted that the runtime does not know. It used
+		// to `console.log` and answer false, which put a line of Compiler
+		// prose in the Program's own output and then silently took a wrong
+		// branch; a throw names the descriptor instead of hiding it.
+		throw new Error(
+			`Type '${type.type}' can not be checked at runtime. This is a bug in the Compiler.`,
+		)
 	}
+}
+
+// NOTE: The end of an emitted Match's `if` chain — reached only when no
+// Handler accepted the value. The Validator refuses a Match that does not
+// cover its Union, so this is unreachable in a Program that compiled clean,
+// and reaching it means a Matcher's runtime check disagrees with the Type the
+// Enricher gave it. The chain used to simply END here: the emitted wrapper
+// answered `undefined`, which is not an Essence value at all, and the failure
+// surfaced somewhere else entirely — as a `TypeError` in whatever read the
+// missing Type key next, or as a wrong value flowing on unnoticed.
+//
+// NOTE: The value is named by its Type key and nothing more — enough to say
+// WHICH value fell through, while staying small enough to carry: this Module
+// is not shaken out of any Program's bundle, so every line here is a line
+// every Program pays for. Rendering the value itself is
+// `getStringRepresentation`'s job, and reaching for it would make the runtime's
+// Type Module depend on the printing one.
+export function noCaseMatched(value: AnyType): never {
+	let description =
+		typeof (value as unknown) === "function"
+			? "Function"
+			: String(value[typeKeySymbol])
+
+	throw new Error(
+		`No Case of this Match matched the ${description} it was given. This is a bug in the Compiler.`,
+	)
 }
