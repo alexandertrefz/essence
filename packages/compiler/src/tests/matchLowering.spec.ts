@@ -173,6 +173,62 @@ describe("Match Lowering", () => {
 		})
 	})
 
+	// NOTE: Regression tests — an Essence identifier may hold characters no
+	// JavaScript IdentifierName may, and a Matcher's Record members reached the
+	// emitted Type descriptor as bare Identifiers, so `case { ok?: Boolean }`
+	// emitted `members: { ok?: … }`. Nothing in the Compiler objected: the
+	// Program type-checked clean, the only stage that ever parsed the emitted
+	// JavaScript was the bundler, and all it could say was that bundling had
+	// failed.
+	describe("Member names JavaScript can not spell", () => {
+		let source = (value: string) => `implementation {
+			constant input: { ok?: Boolean } | { count: Integer } = ${value}
+
+			__print(match input -> String {
+				case { ok?: Boolean } { <- "flag" }
+				case { count: Integer } { <- "count" }
+			})
+		}`
+
+		it("matches either arm of a Union naming such a member", async () => {
+			expect(await run(source(`{ ok? = true }`))).toEqual(['"flag"'])
+			expect(await run(source(`{ count = 3 }`))).toEqual(['"count"'])
+		})
+
+		it("dispatches on a member Type naming one", async () => {
+			expect(
+				await run(`implementation {
+					namespace Flag for { ok?: Boolean } {
+						describe() -> String {
+							<- "flag"
+						}
+					}
+
+					namespace Counter for { count: Integer } {
+						describe() -> String {
+							<- "count"
+						}
+					}
+
+					variable thing: { ok?: Boolean } | { count: Integer } = { ok? = true }
+
+					__print(thing::describe())
+				}`),
+			).toEqual(['"flag"'])
+		})
+
+		// NOTE: The descriptor and the Record literal have to spell the name
+		// the same way — `isValueOfType` reads the member back off the value by
+		// the key the literal wrote — so the quoted form is pinned here rather
+		// than left to whichever of the two the emitted JavaScript happens to
+		// parse.
+		it("writes the member as a quoted key in the emitted descriptor", () => {
+			expect(generate(source(`{ ok? = true }`))).toContain(
+				'members: { "ok?":',
+			)
+		})
+	})
+
 	// NOTE: Regression test — the emitted chain used to simply END after the
 	// last Handler. Nothing answered for a value no Matcher accepted: the
 	// wrapper returned `undefined`, which is not an Essence value at all, so
