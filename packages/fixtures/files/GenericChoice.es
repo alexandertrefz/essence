@@ -18,47 +18,52 @@ implementation {
 			step advance: (_ state: State) -> Progress<State, Result>,
 		) -> Result {
 			<- match advance(state) -> Result {
-				case #Going { <- Loop.run(startingWith @.state, step advance) }
+				case #Going   {
+					<- Loop.run(startingWith @.state, step advance)
+				}
 				case #Stopped { <- @.value }
 			}
 		}
 	}
 
 	§ Prefixed construction with an explicit payload Record.
-	constant startState: Progress<{ index: Integer, total: Integer }, Integer> =
-		Progress#Going({ state = { index = 1, total = 0 } })
+	constant startState: Progress<{
+		index: Integer,
+		total: Integer,
+	}, Integer> = Progress#Going({ state = { index = 1, total = 0 } })
 
 	§ Match narrows an instantiated Case to its concrete member Types —
 	§ `@.state` is the Record, `@.total` inside it is an Integer.
 	__print(match startState -> Integer {
-		case #Going { <- @.state.total }
+		case #Going   { <- @.state.total }
 		case #Stopped { <- @.value }
-	})                                          § 0
+	}) § 0
 
 	§ The driver, threading a Record State through `{ state with … }` and
 	§ stopping with the one-member `#Stopped` shorthand — `#Stopped(state.total)`
 	§ instead of `#Stopped({ value = state.total })`.
-	constant summed: Integer = Loop.run(
-		startingWith { index = 1, total = 0 },
-		step (state) {
-			if state.index::isGreaterThan(5) { <- #Stopped(state.total) }
+	constant summed: Integer = Loop.run(startingWith {
+		index = 1,
+		total = 0,
+	}, step (state) {
+		if state.index::isGreaterThan(5) {
+			<- #Stopped(state.total)
+		}
 
-			<- #Going({ state with
-				index = state.index::add(1),
-				total = state.total::add(state.index),
-			})
-		})
+		<- #Going({ state with index = state.index::add(1),
+		total = state.total::add(state.index) })
+	})
 
-	__print(summed::toString())                 § "15"
+	__print(summed::toString()) § "15"
 
 	§ A bare `#Stopped` resolves against the annotation; the shorthand wraps the
 	§ lone Integer into the Case's one-member Record.
 	constant answer: Progress<Integer, Integer> = #Stopped(42)
 
 	__print(match answer -> Integer {
-		case #Going { <- @.state }
+		case #Going   { <- @.state }
 		case #Stopped { <- @.value }
-	})                                          § 42
+	}) § 42
 
 	§ A generic Choice with a unit Case still constructs and matches.
 	choice Box<Value> {
@@ -70,13 +75,12 @@ implementation {
 	constant empty: Box<String> = Box#Empty
 
 	__print(match full -> String {
-		case #Full { <- @.value }
+		case #Full  { <- @.value }
 		case #Empty { <- "nothing" }
-	})                                          § "packed"
+	}) § "packed"
 
 	__print(match empty -> String {
-		case #Full { <- @.value }
+		case #Full  { <- @.value }
 		case #Empty { <- "nothing" }
-	})                                          § "nothing"
-
+	}) § "nothing"
 }

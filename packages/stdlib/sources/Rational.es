@@ -18,7 +18,7 @@ declarations {
 		toString() -> String {
 			<- match @ -> String {
 				case #Fraction { <- "Fraction" }
-				case #Decimal { <- "Decimal" }
+				case #Decimal  { <- "Decimal" }
 			}
 		}
 	}
@@ -33,7 +33,10 @@ declarations {
 		§§ @param numerator the numerator
 		§§ @param over the denominator
 		§§ @returns the Rational, or `Nothing` when the denominator is zero.
-		static of(_ numerator: Integer, over denominator: Integer) -> Optional<Rational>
+		static of(
+			_ numerator: Integer,
+			over denominator: Integer,
+		) -> Optional<Rational>
 
 		§§ Checks whether the Rational has the same value as another — compared in lowest terms, so `1/2 is 2/4` holds.
 		§§
@@ -163,7 +166,10 @@ declarations {
 
 		§§ The Rational with its sign flipped.
 		negate() -> Rational {
-			<- Rational.of(@::numerator()::negate(), over @::denominator())::otherwise(@)
+			<- Rational.of(
+				@::numerator()::negate(),
+				over @::denominator(),
+			)::otherwise(@)
 		}
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.

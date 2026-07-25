@@ -14,23 +14,25 @@ implementation {
 
 	namespace StringForNumber for Number {
 		string(_ foo: Boolean) -> String {
-			<- "stringForNumber: "::append(
-				match @ -> String {
-					case Integer  { <- @::toString() }
-					case Rational { <- @::toString() }
-					case Algebraic { <- @::toString() }
-					case Transcendental { <- @::toString() }
-				}
-			)
+			<- "stringForNumber: "::append(match @ -> String {
+				case Integer        { <- @::toString() }
+				case Rational       { <- @::toString() }
+				case Algebraic      { <- @::toString() }
+				case Transcendental { <- @::toString() }
+			})
 		}
 	}
 
 	§ The receiver's Type and the Arguments pick the Namespace — and where
 	§ several would fit, `::<Namespace>` names the one that is meant.
-	__print(1::add(2)::string())                          § "stringForInteger: 3"
-	__print(1::add(2)::string(false))                     § "stringForNumber: 3"
-	__print(1::add(2/1)::<StringForRational>string(false)) § "stringForRational: 3/1"
-	__print(1::add(2/1)::<StringForNumber>string(false))  § "stringForNumber: 3/1"
+	__print(1::add(2)::string()) § "stringForInteger: 3"
+	__print(1::add(2)::string(false)) § "stringForNumber: 3"
+	__print(
+		1::add(2/1)::<StringForRational>string(false),
+	) § "stringForRational: 3/1"
+	__print(
+		1::add(2/1)::<StringForNumber>string(false),
+	) § "stringForNumber: 3/1"
 
 	§ § Namespace for Record Type
 

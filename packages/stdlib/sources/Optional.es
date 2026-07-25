@@ -24,7 +24,7 @@ declarations {
 		otherwise(_ fallback: ItemType) -> ItemType {
 			<- match @ -> ItemType {
 				case Nothing { <- fallback }
-				case _ { <- @ }
+				case _       { <- @ }
 			}
 		}
 
@@ -42,7 +42,7 @@ declarations {
 		hasValue() -> Boolean {
 			<- match @ -> Boolean {
 				case Nothing { <- false }
-				case _ { <- true }
+				case _       { <- true }
 			}
 		}
 

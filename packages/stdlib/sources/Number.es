@@ -52,9 +52,9 @@ declarations {
 		§§ Represents the Number as a String, in the notation of the member Type it currently holds.
 		toString() -> String {
 			<- match @ -> String {
-				case Integer { <- @::toString() }
-				case Rational { <- @::toString() }
-				case Algebraic { <- @::toString() }
+				case Integer        { <- @::toString() }
+				case Rational       { <- @::toString() }
+				case Algebraic      { <- @::toString() }
 				case Transcendental { <- @::toString() }
 			}
 		}
@@ -99,7 +99,9 @@ declarations {
 		§§ @param and the upper bound, included
 		§§ @returns `true` when the Number is within the bounds.
 		isBetween(_ lower: Number, and upper: Number) -> Boolean {
-			<- @::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))
+			<- @
+				::isGreaterThanOrEqualTo(lower)
+				::and(@::isLessThanOrEqualTo(upper))
 		}
 
 		§§ Adds up every Number in the List. The empty List sums to zero.
@@ -155,7 +157,8 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer
+			| Rational {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -163,7 +166,8 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer
+			| Rational {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -175,7 +179,8 @@ declarations {
 
 			(_ rationals: List<Rational>) -> Optional<Rational>
 
-			(_ numbers: List<Integer | Rational>) -> Optional<Integer | Rational>
+			(_ numbers: List<Integer | Rational>) -> Optional<Integer
+			| Rational>
 		}
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
@@ -198,7 +203,8 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {
+			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer
+			| Rational {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -206,7 +212,8 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer | Rational {
+			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer
+			| Rational {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -218,7 +225,8 @@ declarations {
 
 			(_ rationals: List<Rational>) -> Optional<Rational>
 
-			(_ numbers: List<Integer | Rational>) -> Optional<Integer | Rational>
+			(_ numbers: List<Integer | Rational>) -> Optional<Integer
+			| Rational>
 		}
 	}
 }

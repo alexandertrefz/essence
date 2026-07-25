@@ -4,7 +4,10 @@ declarations {
 	§ Every guarantee is exact: equality and ordering are decided
 	§ symbolically, never by approximation, which is why Algebraic conforms
 	§ to Comparable while Transcendental does not.
-	namespace Algebraic for Algebraic is Equatable, is Printable, is Comparable {
+	namespace Algebraic for Algebraic
+		is Equatable,
+		is Printable,
+		is Comparable {
 		§§ Whether both Algebraics are the same number.
 		§§
 		§§ Normal forms make this exact — no approximation is consulted.

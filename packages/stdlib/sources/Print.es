@@ -4,5 +4,5 @@ declarations {
 	§§
 	§§ @param value the value to print
 	§§ @returns the value it was given, unchanged.
-	function __print <infer Item>(_ value: Item) -> Item
+	function __print<infer Item>(_ value: Item) -> Item
 }

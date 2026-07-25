@@ -17,5 +17,4 @@ implementation {
 	greet("")
 	greet("World")
 	greet("Universe")
-
 }

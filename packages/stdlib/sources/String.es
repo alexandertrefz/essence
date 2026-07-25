@@ -22,8 +22,8 @@ declarations {
 		§§ @returns the name of the Side variant.
 		toString() -> String {
 			<- match @ -> String {
-				case #Start { <- "Start" }
-				case #End { <- "End" }
+				case #Start    { <- "Start" }
+				case #End      { <- "End" }
 				case #BothEnds { <- "BothEnds" }
 			}
 		}
@@ -46,7 +46,7 @@ declarations {
 		§§ @returns the name of the Case variant.
 		toString() -> String {
 			<- match @ -> String {
-				case #Sensitive { <- "Sensitive" }
+				case #Sensitive   { <- "Sensitive" }
 				case #Insensitive { <- "Insensitive" }
 			}
 		}
@@ -66,15 +66,17 @@ declarations {
 	}
 
 	§ The same unit-Case shape again; equality derived, only `toString` written.
-	namespace NormalizationForm for NormalizationForm is Equatable, is Printable {
+	namespace NormalizationForm for NormalizationForm
+		is Equatable,
+		is Printable {
 		§§ Represents the NormalizationForm by its name.
 		§§
 		§§ @returns the name of the NormalizationForm variant.
 		toString() -> String {
 			<- match @ -> String {
-				case #ComposedCanonical { <- "ComposedCanonical" }
-				case #DecomposedCanonical { <- "DecomposedCanonical" }
-				case #ComposedCompatibility { <- "ComposedCompatibility" }
+				case #ComposedCanonical       { <- "ComposedCanonical" }
+				case #DecomposedCanonical     { <- "DecomposedCanonical" }
+				case #ComposedCompatibility   { <- "ComposedCompatibility" }
 				case #DecomposedCompatibility { <- "DecomposedCompatibility" }
 			}
 		}
@@ -319,7 +321,9 @@ declarations {
 					§ separator is the one that becomes the replacement.
 					constant head = pieces::firstItem()::otherwise("")
 
-					<- head::append(replacement)::append(pieces::removeFirst()::join(with part))
+					<- head
+						::append(replacement)
+						::append(pieces::removeFirst()::join(with part))
 				}
 			}
 		}
@@ -404,12 +408,12 @@ declarations {
 				§ `@` is the SCRUTINEE inside a match, not the receiver, so both
 				§ lengths are bound before the match to stay reachable in the Case
 				§ bodies.
-				<- match @::reverse()::firstIndex(of part::reverse()) -> Optional<Integer> {
-					case Nothing {
-						<- nothing
-					}
+				<- match @
+					::reverse()
+					::firstIndex(of part::reverse()) -> Optional<Integer> {
+					case Nothing { <- nothing }
 
-					case _ {
+					case _       {
 						<- length::subtract(@)::subtract(partLength)
 					}
 				}
@@ -433,14 +437,22 @@ declarations {
 			}
 
 			§§ @param at the end to pad
-			(to length: Integer, with padding: String, at side: Side) -> String {
+			(
+				to length: Integer,
+				with padding: String,
+				at side: Side,
+			) -> String {
 				§ An empty padding has nothing to repeat, and a String already
 				§ that long needs nothing — both leave it as it is.
-				if padding::isEmpty() { <- @ }
+				if padding::isEmpty() {
+					<- @
+				}
 
 				constant characterCount = @::length()
 
-				if length::isLessThanOrEqualTo(characterCount) { <- @ }
+				if length::isLessThanOrEqualTo(characterCount) {
+					<- @
+				}
 
 				constant needed = length::subtract(characterCount)
 
@@ -460,7 +472,7 @@ declarations {
 						<- text::prepend(filler::slice(from 0, to needed))
 					}
 
-					case #End {
+					case #End   {
 						<- text::append(filler::slice(from 0, to needed))
 					}
 
@@ -471,10 +483,18 @@ declarations {
 						§ left, which is what centring in a fixed width
 						§ conventionally does. `quotient` can only answer
 						§ `Nothing` for a zero divisor, and this one is two.
-						constant atStart = needed::quotient(dividingBy 2)::otherwise(0)
+						constant atStart = needed
+							::quotient(dividingBy 2)
+							::otherwise(0)
 
-						<- text::prepend(filler::slice(from 0, to atStart))
-							::append(filler::slice(from 0, to needed::subtract(atStart)))
+						<- text
+							::prepend(filler::slice(from 0, to atStart))
+							::append(
+								filler::slice(
+									from 0,
+									to needed::subtract(atStart),
+								),
+							)
 					}
 				}
 			}
@@ -505,9 +525,7 @@ declarations {
 				constant text = @
 
 				<- match sensitivity -> Ordering {
-					case #Sensitive {
-						<- text::compareTo(other)
-					}
+					case #Sensitive   { <- text::compareTo(other) }
 
 					case #Insensitive {
 						<- text::lowercased()::compareTo(other::lowercased())

@@ -21,8 +21,8 @@ declarations {
 		§§ @returns the name of the Ordering variant.
 		toString() -> String {
 			<- match @ -> String {
-				case #Less { <- "Less" }
-				case #Equal { <- "Equal" }
+				case #Less    { <- "Less" }
+				case #Equal   { <- "Equal" }
 				case #Greater { <- "Greater" }
 			}
 		}

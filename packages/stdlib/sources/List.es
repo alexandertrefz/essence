@@ -37,8 +37,7 @@ declarations {
 	namespace List<infer ItemType> for List<ItemType>
 		is Printable,
 		is Equatable where ItemType is Equatable,
-		is Comparable where ItemType is Comparable
-	{
+		is Comparable where ItemType is Comparable {
 		§ NOTE: This would read better in Essence — length equality AND
 		§ `pair(with other)::everyItem(matches (pair) { … })` — and it can not
 		§ be written that way yet. Binding a List Method's own `ItemType` to a
@@ -107,7 +106,9 @@ declarations {
 		§§
 		§§ @param item the item to look for
 		§§ @returns `true` when the item does not occur.
-		doesNotContain<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
+		doesNotContain<infer ItemType is Equatable>(
+			_ item: ItemType,
+		) -> Boolean {
 			<- @::contains(item)::negate()
 		}
 
@@ -144,7 +145,9 @@ declarations {
 				constant start: Optional<ItemType> = nothing
 
 				<- @::reduce(startingWith start, step (found, item) {
-					if check(item) { <- #Done(item) }
+					if check(item) {
+						<- #Done(item)
+					}
 
 					<- #Continue(found)
 				})
@@ -189,9 +192,11 @@ declarations {
 			§ negative one empties the first slice and clamps the second's start
 			§ to zero, and one at or past the end fills the first slice with the
 			§ whole List and empties the second.
-			<- @::slice(from 0, to index)::append(
-				contentsOf @::slice(from index::add(1), to @::length()),
-			)
+			<- @
+				::slice(from 0, to index)
+				::append(
+					contentsOf @::slice(from index::add(1), to @::length()),
+				)
 		}
 
 		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
@@ -357,7 +362,9 @@ declarations {
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		firstIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
+		firstIndex<infer ItemType is Equatable>(
+			of item: ItemType,
+		) -> Optional<Integer> {
 			§ The accumulator is the position under test: `#Done` leaves the fold
 			§ at the first match, carrying that position, and a fold that reaches
 			§ the end settles on the position AFTER the last item — the length,
@@ -420,7 +427,9 @@ declarations {
 			§§
 			§§ @param by the comparison to order the items with
 			§§ @returns the ordered List.
-			(by comparison: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
+			(
+				by comparison: (_: ItemType, _: ItemType) -> Ordering,
+			) -> List<ItemType>
 		}
 
 		§ The witness behind List's conditional Comparable conformance —
@@ -432,7 +441,9 @@ declarations {
 		§§
 		§§ @param other the List to compare with
 		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo<infer ItemType is Comparable>(_ other: List<ItemType>) -> Ordering
+		compareTo<infer ItemType is Comparable>(
+			_ other: List<ItemType>,
+		) -> Ordering
 
 		§ `anyItem`/`everyItem` read as sentences — "any item matches …", "every
 		§ item matches …" — the existential and universal checks over a
@@ -499,7 +510,8 @@ declarations {
 			§ start empties the first slice and prepends, and one at or past the
 			§ end fills it with the whole List and appends — insertion never
 			§ drops the item.
-			<- @::slice(from 0, to index)
+			<- @
+				::slice(from 0, to index)
 				::append(item)
 				::append(contentsOf @::slice(from index, to @::length()))
 		}
@@ -523,7 +535,9 @@ declarations {
 		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
-		lastIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
+		lastIndex<infer ItemType is Equatable>(
+			of item: ItemType,
+		) -> Optional<Integer> {
 			§ The LAST occurrence is the FIRST occurrence of the reversed List, so
 			§ `firstIndex` answers this one too and only the position has to be
 			§ counted back from the end. Counting down from the last position
@@ -540,13 +554,9 @@ declarations {
 			§ position is bound before the match to stay reachable in the Case
 			§ bodies.
 			<- match @::reverse()::firstIndex(of item) -> Optional<Integer> {
-				case Nothing {
-					<- nothing
-				}
+				case Nothing { <- nothing }
 
-				case _ {
-					<- lastPosition::subtract(@)
-				}
+				case _       { <- lastPosition::subtract(@) }
 			}
 		}
 
@@ -576,7 +586,10 @@ declarations {
 		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
 		§§
 		§§ @returns a Record with the accepted items under `matching` and the others under `rest`.
-		partition(where check: (_: ItemType) -> Boolean) -> { matching: List<ItemType>, rest: List<ItemType> } {
+		partition(where check: (_: ItemType) -> Boolean) -> {
+			matching: List<ItemType>,
+			rest: List<ItemType>,
+		} {
 			§ Two passes where the native made one, each keeping the original
 			§ order — which is what the halves are specified to do.
 			<- {
@@ -589,7 +602,10 @@ declarations {
 		§§
 		§§ @param other the List to pair the items with
 		§§ @returns a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
-		pair<infer Other>(with other: List<Other>) -> List<{ first: ItemType, second: Other }>
+		pair<infer Other>(with other: List<Other>) -> List<{
+			first: ItemType,
+			second: Other,
+		}>
 
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§
@@ -602,7 +618,10 @@ declarations {
 		§§ @param item the item to repeat
 		§§ @param times how many copies the List holds
 		§§ @returns the List of repeated items.
-		static repeat(_ item: ItemType, times count: Integer) -> List<ItemType> {
+		static repeat(
+			_ item: ItemType,
+			times count: Integer,
+		) -> List<ItemType> {
 			§ `of` counts DOWN when the first Integer is the greater, so a count
 			§ below one would give `[1]` rather than nothing — hence the guard.
 			if count::isLessThan(1) {
@@ -623,7 +642,10 @@ declarations {
 		§§ @param integersFrom the first Integer of the List
 		§§ @param through the last Integer of the List, included
 		§§ @returns the List of Integers.
-		static of(integersFrom start: Integer, through end: Integer) -> List<Integer>
+		static of(
+			integersFrom start: Integer,
+			through end: Integer,
+		) -> List<Integer>
 	}
 
 	§ A List of Lists, and the one Method that only such a List can answer. It

@@ -23,5 +23,4 @@ implementation {
 	§ 		right = #Leaf({ value = 3 }),
 	§ 	}),
 	§ })))                                  § 6
-
 }
