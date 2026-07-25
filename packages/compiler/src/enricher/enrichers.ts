@@ -228,14 +228,26 @@ export function enrichCaseValue(
 	// position hands one down directly.
 	let context = expectedType ?? recordedContextualCaseValueType(node) ?? null
 
-	// NOTE: The payload is enriched BEFORE the Case is resolved, because a
-	// prefixed construction whose expected Type offers several instantiations of
-	// the one Case — `Box<Integer> | Box<String>` — picks the arm its payload
-	// fits, the way any value picks the arm of a Union annotation it fits. It
-	// never DECIDES a Type Argument; it only chooses among the ones the context
-	// already decided.
-	let value = node.value === null ? null : enrichExpression(node.value, scope)
-	let type = resolveCaseValueType(node, scope, context, value?.type ?? null)
+	// NOTE: The Case is resolved BEFORE its payload is enriched, so that what the
+	// position decided is what the payload stands in: the members of a
+	// `Box<Box<Integer>>#Full` are the position an inner `Box#Full(1)` reads its
+	// own Type Arguments off, and without them a nesting whose outer Type is
+	// spelled out in full had nothing to read at all.
+	//
+	// A position offering SEVERAL instantiations of the one Case — `Box<Integer>
+	// | Box<String>` — is the one place that order can not hold: which of them is
+	// meant is what the payload says. There the payload is read once per
+	// candidate, silently and under that candidate's own members, and enriched
+	// for real afterwards under the one that won. It still never DECIDES a Type
+	// Argument; it only chooses among the ones the context already decided.
+	let type = resolveCaseValueType(node, scope, context, (expected) =>
+		silentPayloadTypeOf(node, scope, expected),
+	)
+
+	let value =
+		node.value === null
+			? null
+			: enrichExpression(node.value, scope, expectedPayloadType(type))
 
 	if (type.type === "Case") {
 		// NOTE: The one-member shorthand rewraps first, so the instantiation
@@ -274,6 +286,63 @@ export function enrichCaseValue(
 		position: node.position,
 		type,
 	}
+}
+
+// NOTE: What a Case expects of its payload — the Record its members spell out
+// or, on a one-member Case, that Record OR the member's own Type, because the
+// shorthand hands the member's value directly. Both readings are offered at
+// once and the payload settles which of them it is, exactly as
+// `wrapSingleMemberShorthand` settles it afterwards, so `Box#Full(Box#Empty)`
+// and `Box#Full({ value = Box#Empty })` each reach the inner construction with
+// the Type its own position decides.
+//
+// `null` for a Case that is still the DECLARED one — a bare sigil the scope scan
+// resolved, whose members are the Choice's own Type Parameters and decide
+// nothing for whatever stands in them — and for anything that is no Case at all.
+function expectedPayloadType(caseType: common.Type): common.Type | null {
+	if (caseType.type !== "Case" || caseType.choiceGenerics !== undefined) {
+		return null
+	}
+
+	let recordShape: common.RecordType = {
+		type: "Record",
+		members: caseType.members,
+	}
+	let memberNames = Object.keys(caseType.members)
+
+	if (memberNames.length !== 1) {
+		return recordShape
+	}
+
+	return {
+		type: "UnionType",
+		types: [recordShape, caseType.members[memberNames[0]]],
+	}
+}
+
+// NOTE: What the payload's Type comes out as under a given expectation, with
+// nothing reported — the reading arm selection asks for while the Case it
+// belongs to is still being resolved. Silent because the payload is enriched
+// again for real once the Case IS resolved, under what it decided, and that is
+// the pass the reader hears from; said here too, everything would be said twice.
+// Read afresh per candidate rather than once and cached, because each candidate
+// expects something different of it, which is the whole reason it is being asked.
+function silentPayloadTypeOf(
+	node: parser.CaseValueNode,
+	scope: enricher.Scope,
+	expectedType: common.Type | null,
+): common.Type | null {
+	let payload = node.value
+
+	if (payload === null) {
+		return null
+	}
+
+	let { result } = collectDiagnostics(
+		() => enrichExpression(payload, scope, expectedType).type,
+	)
+
+	return result
 }
 
 // NOTE: `#Case(value)` on a single-member Case may hand the member's value
@@ -2783,29 +2852,6 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		return cached
 	}
 
-	// NOTE: The payload of a prefixed Case Argument, enriched once per Invocation
-	// resolution and SILENTLY — the probes below need its Type to pick which
-	// instantiation of a Case a Parameter offers, and the real enrichment further
-	// down reports whatever it has to say about it. Reported twice, it would be
-	// said twice.
-	let probedPayloadTypes = new Map<parser.CaseValueNode, common.Type | null>()
-
-	function probedPayloadTypeOf(
-		node: parser.CaseValueNode,
-	): common.Type | null {
-		if (!probedPayloadTypes.has(node)) {
-			let { result } = collectDiagnostics(() =>
-				node.value === null
-					? null
-					: enrichExpression(node.value, scope).type,
-			)
-
-			probedPayloadTypes.set(node, result)
-		}
-
-		return probedPayloadTypes.get(node) ?? null
-	}
-
 	// NOTE: An Argument's position is the Parameter Type of whichever candidate
 	// wins, and that is not known while the candidates are still being probed. A
 	// prefixed Case construction reads its Choice's Type Arguments off exactly
@@ -2838,10 +2884,10 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
 	): common.Type {
-		let payloadType = probedPayloadTypeOf(node)
-
 		let { result } = collectDiagnostics(() =>
-			resolveCaseValueType(node, scope, expectedType, payloadType),
+			resolveCaseValueType(node, scope, expectedType, (expected) =>
+				silentPayloadTypeOf(node, scope, expected),
+			),
 		)
 
 		if (result.type === "Case") {
@@ -2850,6 +2896,15 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			}
 
 			recordContextualCaseValueType(node, expectedType)
+
+			// NOTE: Read under what this candidate decided, which is the Type
+			// the real enrichment will read it under too — a nested construction
+			// is only itself once its own position is decided.
+			let payloadType = silentPayloadTypeOf(
+				node,
+				scope,
+				expectedPayloadType(result),
+			)
 
 			if (payloadType === null || payloadFitsCase(result, payloadType)) {
 				return result
@@ -4505,11 +4560,19 @@ function resolveCaseInExpectedType(
 	return candidates[0]
 }
 
+// NOTE: The payload's Type is asked for rather than handed over, because
+// resolving the Case is what decides the Type the payload should be READ under
+// — a question only the one position that offers several instantiations of the
+// same Case has to ask, and then once per candidate.
+export type PayloadReader = (
+	expectedType: common.Type | null,
+) => common.Type | null
+
 export function resolveCaseValueType(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
-	payloadType: common.Type | null = null,
+	payloadTypeUnder: PayloadReader = () => null,
 ): common.CaseType | common.ErrorType {
 	if (node.choice === null) {
 		if (expectedType !== null) {
@@ -4531,7 +4594,7 @@ export function resolveCaseValueType(
 		node.choice,
 		scope,
 		expectedType,
-		payloadType,
+		payloadTypeUnder,
 	)
 }
 
@@ -4560,7 +4623,7 @@ function resolvePrefixedCaseValueType(
 	choice: parser.IdentifierNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null,
-	payloadType: common.Type | null,
+	payloadTypeUnder: PayloadReader,
 ): common.CaseType | common.ErrorType {
 	let declaredCase = resolveCaseReference(choice, node.caseName, scope)
 
@@ -4585,7 +4648,7 @@ function resolvePrefixedCaseValueType(
 		let decided = decideCaseFromExpectedType(
 			declaredCase,
 			expectedType,
-			payloadType,
+			payloadTypeUnder,
 		)
 
 		if (decided !== null) {
@@ -4667,14 +4730,16 @@ function resolveAppliedCase(
 // A Union can offer SEVERAL instantiations of the one Case (`Box<Integer> |
 // Box<String>` carries `Box#Full` twice), and then the payload picks which of
 // them is meant, the way any value picks the arm of a Union annotation it fits.
-// A payload that fits none leaves the first standing, so the mismatch is
-// reported against a concrete instantiation rather than swallowed here; a unit
-// Case fits every one of them and takes the first, which is the same value under
-// every arm.
+// Each is asked what the payload comes out as under ITS members, so a payload
+// that is itself a construction is read against a decided Type rather than
+// against nothing at all. A payload that fits none leaves the first standing, so
+// the mismatch is reported against a concrete instantiation rather than
+// swallowed here; a unit Case fits every one of them and takes the first, which
+// is the same value under every arm.
 function decideCaseFromExpectedType(
 	declaredCase: common.CaseType,
 	expectedType: common.Type,
-	payloadType: common.Type | null,
+	payloadTypeUnder: PayloadReader,
 ): common.CaseType | null {
 	let candidates = unionArmsOf(expectedType).filter(
 		(member): member is common.CaseType =>
@@ -4683,18 +4748,28 @@ function decideCaseFromExpectedType(
 			member.choice === declaredCase.choice,
 	)
 
-	if (candidates.length === 0) {
-		return null
-	}
-
-	if (candidates.length === 1 || payloadType === null) {
-		return candidates[0]
+	if (candidates.length <= 1) {
+		return candidates[0] ?? null
 	}
 
 	return (
-		candidates.find((candidate) =>
-			payloadFitsCase(candidate, payloadType),
-		) ?? candidates[0]
+		candidates.find((candidate) => {
+			let payloadType = payloadTypeUnder(expectedPayloadType(candidate))
+
+			if (payloadType === null) {
+				return true
+			}
+
+			// NOTE: A payload that could not even be READ under a candidate has
+			// not fit it. An Error matches everything, which is what keeps one
+			// mistake from becoming several — but here it would make the first
+			// arm win every time a payload the next arm decides is undecided
+			// under this one, which is exactly the question being asked.
+			return (
+				!typeContainsError(payloadType) &&
+				payloadFitsCase(candidate, payloadType)
+			)
+		}) ?? candidates[0]
 	)
 }
 
