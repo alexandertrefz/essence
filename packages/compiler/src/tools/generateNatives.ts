@@ -5,7 +5,10 @@ import type { common } from "@essence/interfaces"
 import { RUNTIME_DIRECTORY } from "@essence/runtime"
 
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
-import { resolveOverloadedMethodName } from "../helpers/index"
+import {
+	conformanceParameterName,
+	resolveOverloadedMethodName,
+} from "../helpers/index"
 
 // NOTE: The renderer that turns the loaded standard library into a checked-in
 // TypeScript contract for the runtime bindings — `@essence/runtime`.
@@ -346,7 +349,7 @@ function renderArrow(
 		if (generic.constraint != null) {
 			ctx.usedProtocols.add(generic.constraint)
 			params.push(
-				`${generic.name}__conformance: ${conformanceTypeName(generic.constraint)}<${generic.name}>`,
+				`${conformanceParameterName(generic.name)}: ${conformanceTypeName(generic.constraint)}<${generic.name}>`,
 			)
 		}
 	}

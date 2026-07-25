@@ -9,6 +9,7 @@ import {
 } from "../diagnostics/index"
 import {
 	bodyDefinitelyReturns,
+	conformanceParameterName,
 	countOf,
 	createFreshenedInference,
 	describeParameter,
@@ -18,6 +19,7 @@ import {
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
+	typeContainsError,
 	withArticle,
 } from "../helpers/index"
 
@@ -25,9 +27,24 @@ type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
 type MatchHandler = common.typed.MatchNode["handlers"][number]
 
+// NOTE: The Protocol-bounded Type Parameters of every enclosing Function
+// Definition, innermost last — one Set per Function, because a Function
+// literal written inside a bounded one reaches the enclosing hidden
+// conformance Parameter the way any closure reaches what encloses it, so a
+// witness resolves against the whole stack rather than against its top.
+// Module state for the reason the Diagnostic collection is: the alternative is
+// threading it through every `validate…` function, and only one Program is
+// validated at a time.
+let witnessScopes: Array<Set<string>> = []
+
 export const validate = (
 	program: common.typed.Program,
 ): Array<common.Diagnostic> => {
+	// NOTE: A fresh stack per run. Each frame is popped in a `finally`, so this
+	// is the guarantee rather than the mechanism: no Program is ever checked
+	// against a Type Parameter that another Program declared.
+	witnessScopes = []
+
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let node of program.implementation.nodes) {
 			// NOTE: Expected errors are reported as Diagnostics and recovered
@@ -250,6 +267,147 @@ function validateNativeFunctionInvocation(
 	return node
 }
 
+// NOTE: The two checks below are about the COMPILER, not about the Program:
+// each states an invariant the emitted JavaScript rests on, and each throws
+// where it does not hold, which `validate` turns into the `internal-error`
+// Diagnostic. They are safety nets — every hole they were written for is fixed
+// — and what they buy is that the next one shows up as a Diagnostic naming the
+// call it is about, rather than as a `ReferenceError` or a wrong answer out of
+// the emitted Program.
+//
+// NOTE: The Language Server runs the Validator whenever the ENRICHER was
+// clean, which a Program the Parser already broke can be — so one of these can
+// report beside the Diagnostic that explains it. That is accepted: a
+// double-report on a Program that does not compile costs a line of output,
+// while gating the check on there being no other Diagnostic at all would take
+// the net away from every Program that has one.
+
+// NOTE: The Type Parameters of the Signature an Invocation resolved to — one
+// entry per Overload, so a Method that has several is asked about the one the
+// Arguments picked. Null where there is no Signature to count: a callee that is
+// not a Function at all, or an overloaded one no index was settled on, both of
+// which the Enricher has already reported.
+function invokedSignatureGenerics(
+	calleeType: common.Type,
+	overloadedMethodIndex: number | null,
+): Array<common.GenericDeclaration> | null {
+	if (
+		calleeType.type === "Function" ||
+		calleeType.type === "SimpleMethod" ||
+		calleeType.type === "StaticMethod"
+	) {
+		return calleeType.generics
+	}
+
+	if (
+		calleeType.type === "OverloadedMethod" ||
+		calleeType.type === "OverloadedStaticMethod"
+	) {
+		return overloadedMethodIndex === null
+			? null
+			: (calleeType.overloads[overloadedMethodIndex]?.generics ?? null)
+	}
+
+	return null
+}
+
+// NOTE: A bounded Type Parameter appends one hidden trailing Parameter to the
+// emitted Function and one hidden trailing Argument to every call of it, so a
+// call site that resolved a different NUMBER of witnesses than its callee
+// declares bounds emits a call whose Arguments are shifted — the witness lands
+// in a Parameter that expected a value, and the Program fails somewhere else
+// entirely.
+//
+// NOTE: The callee Type is read BY REFERENCE at validation time, which is the
+// point of the check rather than an implementation detail: a conditional
+// conformance's bounds are woven into a Namespace's Method Types while the
+// Namespace hoists, so a call enriched BEFORE the weave — a use site written
+// above the Namespace — resolved its witnesses against a Signature that had no
+// bounds yet, and only the finally-woven Type says so.
+//
+// NOTE: An Error anywhere in what the Invocation was resolved FROM is why a
+// witness would be missing — a Type Parameter bound to an Error is skipped on
+// purpose, so that the one mistake is reported once, where it was made — and
+// the count says nothing then. The Validator only runs when the Enricher was
+// clean, so this is reachable only for a Program the Parser already broke.
+function checkConformanceArity(
+	node:
+		| common.typed.MethodInvocationNode
+		| common.typed.FunctionInvocationNode,
+	calleeType: common.Type | undefined,
+	describeCallee: () => string,
+): void {
+	if (calleeType === undefined || typeContainsError(calleeType)) {
+		return
+	}
+
+	if (
+		typeContainsError(node.type) ||
+		node.arguments.some((argumentNode) =>
+			typeContainsError(argumentNode.type),
+		) ||
+		(node.nodeType === "MethodInvocation" &&
+			typeContainsError(node.base.type))
+	) {
+		return
+	}
+
+	let generics = invokedSignatureGenerics(
+		calleeType,
+		node.overloadedMethodIndex,
+	)
+
+	if (generics === null) {
+		return
+	}
+
+	let bounded = generics.filter(
+		(generic) => generic.constraint != null,
+	).length
+
+	if (bounded === node.conformances.length) {
+		return
+	}
+
+	throw new Error(
+		`${describeCallee()} was given ${countOf(node.conformances.length, "conformance Argument")} for a Signature with ${countOf(bounded, "Protocol-bounded Type Parameter")}. This is a bug in the Compiler.`,
+	)
+}
+
+// NOTE: A `parameter` source forwards the enclosing bounded Function's own
+// hidden conformance Parameter, which the Simplifier emits from that Function's
+// constrained Generics — so the name has to be one of those, from this Function
+// or from one it is written inside. Where it is not, the emitted call reads a
+// binding nothing declares: a `ReferenceError` at run time out of a Program
+// that compiled without a word. The names compared are the EMITTED ones on both
+// sides, which is what keeps the check about the JavaScript rather than about
+// the Type Parameter each side happens to call its own.
+//
+// NOTE: Conditions are walked alongside the conformance that carries them — a
+// conditional conformance curries one witness per `where` condition, each
+// solved the same way, so each can forward a Parameter just as the outer one
+// can.
+function checkWitnessScope(
+	conformances: Array<common.Conformance>,
+	describeSite: () => string,
+): void {
+	for (let conformance of conformances) {
+		if (conformance.source.kind === "namespace") {
+			checkWitnessScope(conformance.source.conditions, describeSite)
+
+			continue
+		}
+
+		let name = conformance.source.name
+
+		if (!witnessScopes.some((scope) => scope.has(name))) {
+			throw new Error(
+				`${describeSite()} forwards the conformance Parameter '${name}', which no enclosing Function declares. This is a bug in the Compiler.`,
+			)
+		}
+	}
+}
+
 function validateMethodInvocation(
 	node: common.typed.MethodInvocationNode,
 ): common.typed.MethodInvocationNode {
@@ -274,6 +432,29 @@ function validateMethodInvocation(
 		}
 
 		validateDispatchCases(node, node.dispatch)
+	}
+
+	let describeCallee = () => `'${node.namespace.name}::${node.member.name}'`
+
+	// NOTE: A dispatched Invocation names no Namespace of its own — each branch
+	// carries its target by NAME, with no Type to read a Signature off — so the
+	// arity of its witnesses is the one thing here that can not be cross-checked.
+	// Their scopes still can be, and are, for every branch.
+	if (node.dispatch === null) {
+		checkConformanceArity(
+			node,
+			node.namespace.type.methods[node.member.name],
+			describeCallee,
+		)
+		checkWitnessScope(node.conformances, describeCallee)
+	} else {
+		for (let dispatchCase of node.dispatch) {
+			checkWitnessScope(
+				dispatchCase.conformances,
+				() =>
+					`'${dispatchCase.namespaceName}::${node.member.name}', the branch for ${describeType(dispatchCase.memberType)},`,
+			)
+		}
 	}
 
 	return node
@@ -363,6 +544,17 @@ function validateFunctionInvocation(
 		validateExpression(argumentNode.value)
 		validateNoBoundFunctionValue(argumentNode.value)
 	}
+
+	// NOTE: An Identifier callee names itself; a Lookup and an Expression that
+	// answers with a Function have no one name to give, and the Position the
+	// Diagnostic carries says which call is meant either way.
+	let describeCallee = () =>
+		node.name.nodeType === "Identifier"
+			? `'${node.name.content}'`
+			: "This call"
+
+	checkConformanceArity(node, functionType, describeCallee)
+	checkWitnessScope(node.conformances, describeCallee)
 
 	if (
 		functionType.type !== "Function" &&
@@ -487,7 +679,22 @@ function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): common.typed.FunctionDefinitionNode {
-	node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
+	// NOTE: The hidden conformance Parameters this Function is emitted with —
+	// the Simplifier reads them off these same Generic Declarations, so what a
+	// witness inside the body may forward is exactly what is pushed here.
+	witnessScopes.push(
+		new Set(
+			node.generics
+				.filter((generic) => generic.constraint !== null)
+				.map((generic) => conformanceParameterName(generic.name)),
+		),
+	)
+
+	try {
+		node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
+	} finally {
+		witnessScopes.pop()
+	}
 
 	validateDefiniteReturn(node, position)
 

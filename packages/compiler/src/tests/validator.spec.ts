@@ -1274,4 +1274,232 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 	})
+
+	// NOTE: The two cross-checks are about the COMPILER rather than about a
+	// Program — while the Compiler is right, nothing anyone can write reaches
+	// them — so each failing case is a typed Program put by hand into the state a
+	// fixed hole used to produce: a witness dropped on the way (the `List<Unknown>`
+	// hole), a Signature that grew its bound after the call was typed (the
+	// hoisting-order hole), a witness forwarded out of a Function that declares no
+	// such Parameter (the declared-Case fallback hole). Each of those compiled
+	// green and failed at run time, which is what these turn into a Diagnostic.
+	describe("Compiler cross-checks", () => {
+		function enrichedProgram(source: string): common.typed.Program {
+			let { program, diagnostics } = enrich(parse(source))
+
+			expect(diagnostics).toEqual([])
+
+			return program
+		}
+
+		// NOTE: Every Node of the typed Program, walked structurally — the Nodes
+		// below are reached through a Namespace, a Function body and a Match
+		// alike, and none of the tests here cares which.
+		function walk(
+			program: common.typed.Program,
+			visit: (node: Record<string, unknown>) => void,
+		): void {
+			let go = (node: unknown): void => {
+				if (node === null || typeof node !== "object") {
+					return
+				}
+
+				if (Array.isArray(node)) {
+					node.forEach(go)
+
+					return
+				}
+
+				visit(node as Record<string, unknown>)
+
+				Object.values(node).forEach(go)
+			}
+
+			program.implementation.nodes.forEach(go)
+		}
+
+		// NOTE: A Union receiver whose every member has the Method, each branch
+		// binding the enclosing Function's own bounded Type Parameter — so every
+		// branch forwards the same hidden conformance Parameter.
+		const dispatchedWitnesses = `implementation {
+			namespace Firsts for Integer {
+				pair <infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+			}
+
+			namespace Seconds for String {
+				pair <infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+			}
+
+			function both <infer Item is Printable>(
+				_ receiver: Integer | String,
+				_ item: Item,
+			) -> String {
+				<- receiver::pair(item)
+			}
+
+			__print(both(1, 2))
+		}`
+
+		it("accepts a bounded call that forwards the enclosing Function's witness", () => {
+			expect(
+				validate(
+					enrichedProgram(`implementation {
+						function ordered <infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+							<- items::sort()
+						}
+
+						__print(ordered([3, 1, 2]))
+					}`),
+				),
+			).toEqual([])
+		})
+
+		it("accepts a conditional conformance's nested witnesses", () => {
+			expect(
+				validate(
+					enrichedProgram(`implementation {
+						constant ordered: List<List<Integer>> = [[2], [1]]::sort()
+						__print(ordered)
+					}`),
+				),
+			).toEqual([])
+		})
+
+		it("accepts a dispatch whose every branch forwards the same witness", () => {
+			expect(validate(enrichedProgram(dispatchedWitnesses))).toEqual([])
+		})
+
+		it("reports a call that was handed fewer witnesses than its callee has bounds", () => {
+			let program = enrichedProgram(`implementation {
+				constant ordered: List<List<Integer>> = [[2], [1]]::sort()
+				__print(ordered)
+			}`)
+
+			// NOTE: What the silent `continue` in conformance solving left
+			// behind — the Method still expects its hidden trailing Argument.
+			walk(program, (node) => {
+				if (node["nodeType"] === "MethodInvocation") {
+					node["conformances"] = []
+				}
+			})
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"'List::sort' was given 0 conformance Arguments for a Signature with 1 Protocol-bounded Type Parameter",
+			)
+		})
+
+		it("reports a call typed before its callee's Signature was woven", () => {
+			let program = enrichedProgram(`implementation {
+				namespace Counting for List<Integer> {
+					total() -> Integer { <- @::length() }
+				}
+
+				__print([1, 2]::total())
+			}`)
+
+			// NOTE: The weave a conditional conformance performs, arriving after
+			// the call was typed — the Namespace Type is shared by reference, so
+			// the call site that resolved no witness now names a Method that
+			// wants one.
+			walk(program, (node) => {
+				if (node["nodeType"] !== "NamespaceDefinitionStatement") {
+					return
+				}
+
+				let methods = (node["type"] as common.NamespaceType).methods
+				let method = methods["total"] as common.SimpleMethodType
+
+				methods["total"] = {
+					...method,
+					generics: [
+						...method.generics,
+						{
+							name: "ItemType",
+							infer: true,
+							defaultType: null,
+							constraint: "Comparable",
+						},
+					],
+				}
+			})
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"'Counting::total' was given 0 conformance Arguments",
+			)
+		})
+
+		it("reports a witness no enclosing Function declares", () => {
+			let program = enrichedProgram(`implementation {
+				function ordered <infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+					<- items::sort()
+				}
+
+				__print(ordered([3, 1, 2]))
+			}`)
+
+			// NOTE: The bound gone from the Declaration the Simplifier emits the
+			// hidden Parameter from, while the call inside still forwards it —
+			// `Item__conformance` is read where nothing binds it.
+			walk(program, (node) => {
+				if (node["nodeType"] === "FunctionDefinition") {
+					node["generics"] = (
+						node[
+							"generics"
+						] as Array<common.typed.GenericDeclarationNode>
+					).map((generic) => ({ ...generic, constraint: null }))
+				}
+			})
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"'List::sort' forwards the conformance Parameter 'Item__conformance', which no enclosing Function declares",
+			)
+		})
+
+		it("reports a dispatch branch's witness no enclosing Function declares", () => {
+			let program = enrichedProgram(dispatchedWitnesses)
+
+			// NOTE: A branch carries its own witnesses and its own Arguments, so
+			// it is its own chance to name something that is not there.
+			walk(program, (node) => {
+				if (node["nodeType"] !== "MethodInvocation") {
+					return
+				}
+
+				for (let dispatchCase of (node["dispatch"] ??
+					[]) as Array<common.DispatchCase>) {
+					for (let conformance of dispatchCase.conformances) {
+						conformance.source = {
+							kind: "parameter",
+							name: "Other__conformance",
+						}
+					}
+				}
+			})
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"the branch for Integer, forwards the conformance Parameter 'Other__conformance'",
+			)
+		})
+	})
 })

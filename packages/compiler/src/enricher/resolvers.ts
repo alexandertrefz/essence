@@ -14,6 +14,7 @@ import {
 	computeConformanceMethodMap,
 	closestMatch,
 	conformanceKey,
+	conformanceParameterName,
 	countOf,
 	createInferenceContext,
 	describeType,
@@ -2071,7 +2072,7 @@ export function solveConformance(
 				ok: true,
 				source: {
 					kind: "parameter",
-					name: `${binding.name}__conformance`,
+					name: conformanceParameterName(binding.name),
 				},
 			}
 		}
@@ -2465,7 +2466,7 @@ export function resolveConformances(
 					protocolName: generic.constraint,
 					source: {
 						kind: "parameter",
-						name: `${binding.name}__conformance`,
+						name: conformanceParameterName(binding.name),
 					},
 				})
 			} else {
@@ -3830,7 +3831,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		let protocol = findProtocolInScope(baseType.constraint, scope)
 
 		if (protocol !== null) {
-			let conformanceName = `${baseType.name}__conformance`
+			let conformanceName = conformanceParameterName(baseType.name)
 			let selfBindings: GenericBindings = new Map([["Self", baseType]])
 			let methods: Record<string, common.MethodType> = {}
 
