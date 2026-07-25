@@ -1938,12 +1938,53 @@ export function enrichProtocolDeclarationStatement(
 	}
 }
 
+// NOTE: `infer` marks a Type Parameter a USE works out for itself, from the
+// Arguments it hands over — a call's, a Method's receiver's. A Choice and a Type
+// Alias have no such use: every one of theirs APPLIES its Arguments outright, in
+// a Type position or at a construction, so there is nothing for the marker to
+// mean and it was accepted and ignored. Ignored, it read as a promise that some
+// use site would work the Argument out, and the one thing that came close — a
+// construction reading its Type Arguments off its payload — is exactly what
+// `undecided-type-arguments` replaced.
+//
+// Reported here rather than at the Parser, because the Generic list is the same
+// grammar a Function, a Method and a Namespace write, where `infer` is the whole
+// point. It is reported in the enrichment pass rather than while the Type
+// resolves, so a Choice that only wrote the marker wrongly still hoists and
+// everything that names it stays about itself.
+function reportInferredTypeParameters(
+	generics: Array<parser.GenericDeclarationNode>,
+	declaration: "Choice" | "Type Alias",
+): void {
+	for (let generic of generics) {
+		if (!generic.inferred) {
+			continue
+		}
+
+		reportError(
+			`A ${declaration}'s Type Parameters can not be inferred`,
+			generic.position,
+			{
+				code: "infer-on-applied-parameter",
+				labels: [
+					primary(generic.position, "'infer' has nothing to do here"),
+				],
+				notes: [
+					`A ${declaration}'s Type Parameters are applied at every use, never inferred from one.`,
+				],
+				helps: [`Remove the 'infer' before '${generic.name.content}'.`],
+			},
+		)
+	}
+}
+
 export function enrichTypeAliasStatement(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 	hoistedType?: common.Type,
 ): common.typed.TypeAliasStatementNode {
 	reportUnknownDocumentationParameters(node.documentation, [])
+	reportInferredTypeParameters(node.generics, "Type Alias")
 
 	let type = hoistedType ?? resolveTypeAliasStatementType(node, scope)
 
@@ -1969,6 +2010,7 @@ export function enrichChoiceDeclarationStatement(
 	hoistedType?: common.UnionType | common.GenericAliasType,
 ): common.typed.ChoiceDeclarationStatementNode {
 	reportUnknownDocumentationParameters(node.documentation, [])
+	reportInferredTypeParameters(node.generics, "Choice")
 
 	let type = hoistedType ?? resolveChoiceDeclarationStatementType(node, scope)
 
