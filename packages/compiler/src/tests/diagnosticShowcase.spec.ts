@@ -11,11 +11,11 @@ import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 
-// NOTE: The files in `testFiles/diagnostics/` are deliberately broken — they
-// are the one place where the Compiler's error output can be read end to end.
-// Snapshotting it here is what keeps it that way: a Diagnostic that loses its
-// labels, its notes or its code shows up as a snapshot diff rather than as
-// output nobody looked at.
+// NOTE: The files in `packages/fixtures/files/diagnostics/` are deliberately
+// broken — they are the one place where the Compiler's error output can be
+// read end to end. Snapshotting it here is what keeps it that way: a
+// Diagnostic that loses its labels, its notes or its code shows up as a
+// snapshot diff rather than as output nobody looked at.
 
 const SHOWCASE_DIRECTORY = fixturePath("diagnostics")
 

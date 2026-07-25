@@ -25,9 +25,11 @@ package is where it goes.
 
 Two things are worth knowing before that work starts:
 
-- **`index.md` is stale.** It is an old copy of the root `Readme.md` and still
-  documents a `bun compile-grammar` command that no longer exists. Do not carry
-  it forward without reading it.
+- **`index.md` duplicates the root `Readme.md`.** It is an old copy that drifted
+  — it had been documenting a `bun compile-grammar` command removed when the
+  parser became hand-written recursive descent. The outright-wrong parts are
+  corrected, but the duplication is not something to carry forward: pick one
+  home for the pitch when the real site is built.
 - **Syntax highlighting is already written.** `packages/vscode-extension` has a
   TextMate grammar at `syntaxes/essence.tmLanguage.json`, and every one of the
   candidate frameworks highlights through Shiki, which loads TextMate grammars

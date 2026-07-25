@@ -13,13 +13,14 @@ import { validate } from "../validator/index"
 
 // NOTE: The whole point of emitting each Essence Method as its own const rather
 // than merging it into a spread of its runtime module is that a native the
-// Program does not use stays shakeable. These two testFiles are the ones that
-// reach an Essence-implemented Method AND a large runtime module — Everyday and
-// Irrational both use `Number`, whose module drags in the numeric tower and
-// `bigint-fraction`. Before the change each carried ~13 kB it never used; the
-// ceilings here are a few kB above the measured sizes, low enough that a
-// reintroduced spread (which would add those kilobytes straight back) trips
-// them, high enough not to churn on an ordinary edit.
+// Program does not use stays shakeable. These two files in
+// `packages/fixtures/files/` are the ones that reach an Essence-implemented
+// Method AND a large runtime module — Everyday and Irrational both use
+// `Number`, whose module drags in the numeric tower and `bigint-fraction`.
+// Before the change each carried ~13 kB it never used; the ceilings here are a
+// few kB above the measured sizes, low enough that a reintroduced spread (which
+// would add those kilobytes straight back) trips them, high enough not to churn
+// on an ordinary edit.
 //
 // NOTE: `bundle` imports esbuild lazily and costs a few hundred ms per call, so
 // this is kept to the two files that actually regressed. `write: false` keeps
