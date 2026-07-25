@@ -2924,6 +2924,7 @@ export function resolveTypeAliasStatementType(
 function applyGenericAlias(
 	aliasType: common.GenericAliasType,
 	typeArguments: Array<common.Type>,
+	scope: enricher.Scope,
 	position: common.Position,
 ): common.Type {
 	let generics = aliasType.generics
@@ -2964,6 +2965,16 @@ function applyGenericAlias(
 
 		bindings.set(generic.name, argument)
 	}
+
+	// NOTE: A bound is a promise the APPLICATION has to keep — nothing below
+	// this point ever asks again, so `Box<Function>` used to substitute a Type
+	// with no equality into a payload declared Equatable and only fall over when
+	// something reached for the witness. Solved for the Diagnostic alone: the
+	// witnesses a call needs are solved at the call, against the Types the
+	// arguments actually have. An Alias whose Generics carry no bound at all —
+	// every one the standard library declares — pays nothing for this, because
+	// `resolveConformances` returns before it looks at any of them.
+	resolveConformances(aliasType.generics, bindings, scope, position)
 
 	let appliedType = applyGenericBindings(aliasType.aliasedType, bindings)
 
@@ -3029,7 +3040,7 @@ export function resolveIdentifierTypeDeclarationType(
 	// NOTE: A bare use of a Generic Type Alias applies the defaults — without
 	// a full set of defaults it is missing Type Arguments.
 	if (result.type === "GenericAlias") {
-		return applyGenericAlias(result, [], node.position)
+		return applyGenericAlias(result, [], scope, node.position)
 	}
 
 	return result
@@ -3135,6 +3146,7 @@ export function resolveGenericTypeDeclarationType(
 		return applyGenericAlias(
 			baseType,
 			node.generics.map((generic) => resolveType(generic, scope)),
+			scope,
 			node.position,
 		)
 	}

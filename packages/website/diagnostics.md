@@ -315,6 +315,10 @@ not declare it (`Operation#Ad`), the matched value's Union has none (`case
 list the Cases they did find as notes; the scope-wide scan does not, since it
 reaches every Choice in the language.
 
+A prefixed Matcher says which Choice's Case is meant, never which value it
+matches, so it has to name one the matched Union has — `case Signal#Red` on a
+`Command` is refused.
+
 **Quick Fix — "Change to '#X'":** replaces the Case name with the suggestion,
 when there is one — offered on all three forms. The `#` is already written, so
 only the name is rewritten, and the underlined span stops short of the sigil.

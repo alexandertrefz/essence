@@ -485,6 +485,82 @@ describe("Resolvers", () => {
 		})
 	})
 
+	// NOTE: An application is the only place a Generic Alias' bound can be
+	// checked — the body is substituted and gone by the time anything else looks
+	// at it, so `Ranked<Function>` used to hand a Type with no ordering to a
+	// member declared Comparable and be found out at the call that reached for
+	// the witness, if at all.
+	describe("Type Argument Bounds", () => {
+		let ranked = `protocol Rankable {
+			rank() -> Integer
+		}
+
+		type Ranked<T is Rankable> = { value: T }`
+
+		it("should report a Type Argument that does not conform", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				${ranked}
+
+				function take(_ ranked: Ranked<Integer>) -> Integer {
+					<- ranked.value
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unsatisfied-bound")
+			expect(diagnostics[0].message).toBe(
+				"Integer does not conform to 'Rankable'",
+			)
+		})
+
+		it("should report a bound carried by an unbounded Type Parameter", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${ranked}
+
+					function take<Item>(_ item: Item) -> Ranked<Item> {
+						<- { value = item }
+					}
+				}`).map((diagnostic) => diagnostic.helps),
+			).toEqual([["Declare it as '<infer Item is Rankable>'."]])
+		})
+
+		it("should accept a Type Argument a Namespace makes conform", async () => {
+			expect(
+				await run(`implementation {
+					${ranked}
+
+					namespace IntegerRank for Integer is Rankable {
+						rank() -> Integer {
+							<- @
+						}
+					}
+
+					constant one: Ranked<Integer> = { value = 7 }
+
+					__print(one.value::rank())
+				}`),
+			).toEqual(["7"])
+		})
+
+		// NOTE: Every Alias the standard library declares is unbounded, and the
+		// bound check has to cost them nothing — `resolveConformances` answers
+		// before it looks at a single Argument when no Generic carries a bound.
+		it("should leave an unbounded Alias applying to anything", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Held<T> = { value: T }
+
+					constant held: Held<(_ x: Integer) -> Integer> = {
+						value = (_ x: Integer) -> Integer { <- x }
+					}
+
+					__print(held.value(1))
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Derived Equality of a generic Choice", () => {
 		let pace = `choice Pace<A, B> {
 			First { a: A },
