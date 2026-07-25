@@ -1,0 +1,26 @@
+{
+	"name": "@essence/formatter",
+	"version": "0.0.1",
+	"description": "esfmt — the Essence source formatter.",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./doc": "./src/doc.ts"
+	},
+	"bin": {
+		"esfmt": "bin/esfmt"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"dependencies": {
+		"@essence/compiler": "workspace:*",
+		"@essence/interfaces": "workspace:*"
+	},
+	"devDependencies": {
+		"@essence/fixtures": "workspace:*",
+		"@essence/stdlib": "workspace:*"
+	}
+}

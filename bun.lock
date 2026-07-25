@@ -64,6 +64,21 @@
       "name": "@essence/fixtures",
       "version": "0.0.1",
     },
+    "packages/formatter": {
+      "name": "@essence/formatter",
+      "version": "0.0.1",
+      "bin": {
+        "esfmt": "bin/esfmt",
+      },
+      "dependencies": {
+        "@essence/compiler": "workspace:*",
+        "@essence/interfaces": "workspace:*",
+      },
+      "devDependencies": {
+        "@essence/fixtures": "workspace:*",
+        "@essence/stdlib": "workspace:*",
+      },
+    },
     "packages/interfaces": {
       "name": "@essence/interfaces",
       "version": "0.0.1",
@@ -178,6 +193,8 @@
     "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
 
     "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
+
+    "@essence/formatter": ["@essence/formatter@workspace:packages/formatter"],
 
     "@essence/interfaces": ["@essence/interfaces@workspace:packages/interfaces"],
 

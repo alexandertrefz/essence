@@ -54,15 +54,27 @@ packages/cli/bin/esc watch List.es          # recompile on every save
 packages/cli/bin/esc build *.es -o dist/    # compile a batch, in parallel
 ```
 
-`bun install` also links `esc` and `esls` into `node_modules/.bin`, so `bun run esc …` works from anywhere in
-the repository.
+Formatting is a separate command, and never something a build does to your sources:
+
+```sh
+packages/formatter/bin/esfmt List.es           # format in place
+packages/formatter/bin/esfmt --check '*.es'    # report what is unformatted, write nothing
+packages/formatter/bin/esfmt --stdin           # format standard input onto standard output
+```
+
+There is nothing to configure: Essence is written with tabs, laid out to fit 80 columns. `esfmt` refuses any
+file that does not parse, and verifies before it writes that the result means the same thing, kept every
+comment where it was, and is unchanged by a second pass — so it can only improve a file or leave it alone.
+
+`bun install` also links `esc`, `esls` and `esfmt` into `node_modules/.bin`, so `bun run esc …` works from
+anywhere in the repository.
 
 Run `esc help` for the command overview, and `esc help <command>` for everything a single command can do.
 `--json` turns any of them into a machine-readable report for editors and CI.
 
 # Repository layout
 
-One workspace, eleven packages. Nothing is built: every package points `main` straight at its TypeScript, and
+One workspace, twelve packages. Nothing is built: every package points `main` straight at its TypeScript, and
 Bun runs the sources.
 
 | Package | What it is |
@@ -74,6 +86,7 @@ Bun runs the sources.
 | [`ariadne`](packages/ariadne) | a TypeScript port of the `ariadne` diagnostic renderer |
 | [`escodegen`](packages/escodegen) | vendored fork of the ECMAScript code generator, see its [PATCHES.md](packages/escodegen/PATCHES.md) |
 | [`cli`](packages/cli) | `esc` |
+| [`formatter`](packages/formatter) | `esfmt` — the source formatter |
 | [`language-server`](packages/language-server) | `esls`, spoken over stdio |
 | [`vscode-extension`](packages/vscode-extension) | the VS Code extension, which bundles the language server |
 | [`website`](packages/website) | the documentation |
