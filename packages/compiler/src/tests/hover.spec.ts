@@ -705,7 +705,7 @@ describe("Hover of conformance clauses", () => {
 })
 
 // NOTE: Boolean stands in for the standard library as a whole here
-// (`src/stdlib/Boolean.es`). What an Editor shows for a builtin comes from the
+// (`packages/stdlib/sources/Boolean.es`). What an Editor shows for a builtin comes from the
 // `§§` block in that source and nowhere else — the documentation an Essence
 // declaration carries has to reach Hover intact.
 describe("Hover of a standard library Method", () => {

@@ -7,7 +7,7 @@ import { simplify } from "../simplifier/index"
 
 // NOTE: A standard library Namespace is now written in TWO languages at once:
 // some of its Methods are bound to a runtime module in `__internal/`, the rest
-// are implemented in Essence in `src/stdlib/`. Emitted user code can not tell
+// are implemented in Essence in `packages/stdlib/sources/`. Emitted user code can not tell
 // the two apart — it says `Boolean.isNot(…)` either way — so the Rewriter has
 // to hand it ONE object that answers to both halves. That object is the prelude:
 // the runtime module spread into an object literal, with the Essence-implemented

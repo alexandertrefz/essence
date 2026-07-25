@@ -385,7 +385,7 @@ describe("Standard Library Loader", () => {
 			// same synthetic file rather than a builtin like
 			// `Integer::multiply`. A synthetic standard library is
 			// enriched against the bare Type tags plus these sources ALONE —
-			// nothing of `src/stdlib` is in scope — so reaching for a real
+			// nothing of `packages/stdlib/sources` is in scope — so reaching for a real
 			// builtin Method would simply not resolve.
 			`declarations {
 				namespace Doubler for Integer {
@@ -970,7 +970,7 @@ describe("Standard Library Loader", () => {
 	// NOTE: A standard library file is the WHOLE of what the Namespace it
 	// declares contains. Nothing is merged in from anywhere else — a name the
 	// sources do not write is a name a Program can not reach, which is what
-	// makes `src/stdlib/*.es` readable as the definition of the language.
+	// makes `packages/stdlib/sources/*.es` readable as the definition of the language.
 	it("gives a Namespace exactly what its source declares", () => {
 		let stdlib = load([
 			"Nothing.es",

@@ -419,7 +419,7 @@ function denominatorOf(number: RationalKind): bigint {
 }
 
 // NOTE: `is`, `isNot` and `toString` are written in Essence now —
-// `src/stdlib/Number.es`. `is` reads the covering `compareTo` against
+// `packages/stdlib/sources/Number.es`. `is` reads the covering `compareTo` against
 // `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
 // and defers to that member's own `toString`. `compareTo` below is the one
 // ordering primitive they all fall out of, and it stays native.
@@ -502,12 +502,12 @@ export function compareTo(number: NumberType, other: NumberType): OrderingType {
 
 // NOTE: The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
 // `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
-// `src/stdlib/Number.es`. Each reads the covering `compareTo` above against the
+// `packages/stdlib/sources/Number.es`. Each reads the covering `compareTo` above against the
 // matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
 // on), and the `…OrEqualTo` pair negates the strict opposite. `compareTo` is
 // the one ordering primitive they all fall out of, and it stays native.
 
-// NOTE: `isBetween` is written in Essence now — `src/stdlib/Number.es` — as
+// NOTE: `isBetween` is written in Essence now — `packages/stdlib/sources/Number.es` — as
 // `@::isGreaterThanOrEqualTo(lower)::and(@::isLessThanOrEqualTo(upper))`, which
 // is the same two comparisons this function made, read off the same covering
 // order. Both bounds stay included, and bounds in the wrong order still enclose

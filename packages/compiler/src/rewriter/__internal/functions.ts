@@ -112,7 +112,7 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	}
 }
 
-// NOTE: The one native free Function, declared in `src/stdlib/Print.es` as
+// NOTE: The one native free Function, declared in `packages/stdlib/sources/Print.es` as
 // `__print<Item>(_ value: Item) -> Item` and bound here by that name. It is
 // generic — it answers with the very value it was handed — so the runtime
 // signature is generic too, which is also exactly what the generated native
@@ -124,7 +124,7 @@ export function __print<Item extends AnyType>(message: Item): Item {
 }
 
 // NOTE: The `loop` family — the native drivers behind the `loop` Overloads
-// declared in `src/stdlib/Loop.es`. Each is a free Function, bound by its
+// declared in `packages/stdlib/sources/Loop.es`. Each is a free Function, bound by its
 // mangled `loop__overload$N` name to the Overload it implements; the order here
 // is the order the entries are written there. Only TWO are native: a loop can
 // not be written in Essence — it would need a loop to write — so the two

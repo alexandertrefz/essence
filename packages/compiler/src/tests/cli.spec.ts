@@ -641,7 +641,7 @@ describe("CLI", () => {
 })
 
 // NOTE: The CLI and the Language Server have to agree about the file in front
-// of them. `esc check src/stdlib/List.es` used to reject the `declarations { …
+// of them. `esc check packages/stdlib/sources/List.es` used to reject the `declarations { …
 // }` header of the very sources the compiler loads at startup — while the
 // Editor reported the same file clean — so a compiler developer could not
 // check their own transcription. Both now route through `documents.ts`.

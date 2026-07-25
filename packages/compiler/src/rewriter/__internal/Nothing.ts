@@ -9,4 +9,4 @@ export function createNothing(): NothingType {
 }
 
 // NOTE: `is`, `isNot` and `toString` are implemented in Essence — see
-// `src/stdlib/Nothing.es`. Only the value constructor stays native.
+// `packages/stdlib/sources/Nothing.es`. Only the value constructor stays native.

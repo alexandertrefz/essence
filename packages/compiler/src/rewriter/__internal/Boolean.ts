@@ -34,6 +34,6 @@ export function or(
 }
 
 // NOTE: `isNot`, `exclusiveOr` and `toString` are implemented in Essence — see
-// `src/stdlib/Boolean.es`. `negate`, `is`, `and` and `or` stay native: they are
+// `packages/stdlib/sources/Boolean.es`. `negate`, `is`, `and` and `or` stay native: they are
 // the anchors the Essence half is built from, and `or` in particular would cost
 // four Method calls through De Morgan where this does one `||`.
