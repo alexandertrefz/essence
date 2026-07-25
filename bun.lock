@@ -91,6 +91,7 @@
       },
       "dependencies": {
         "@essence/compiler": "workspace:*",
+        "@essence/formatter": "workspace:*",
         "@essence/interfaces": "workspace:*",
         "vscode-languageserver": "10.1.0",
         "vscode-languageserver-textdocument": "1.0.12",

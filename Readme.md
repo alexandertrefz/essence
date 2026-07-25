@@ -66,6 +66,10 @@ There is nothing to configure: Essence is written with tabs, laid out to fit 80 
 file that does not parse, and verifies before it writes that the result means the same thing, kept every
 comment where it was, and is unchanged by a second pass — so it can only improve a file or leave it alone.
 
+The Language Server offers the same formatter as a document formatting provider, so an editor's Format
+Document — and Format On Save — go through it. A file mid-edit that does not parse is left alone rather than
+reported twice.
+
 `bun install` also links `esc`, `esls` and `esfmt` into `node_modules/.bin`, so `bun run esc …` works from
 anywhere in the repository.
 

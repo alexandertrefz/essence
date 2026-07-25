@@ -33,6 +33,7 @@ import {
 	findDocumentSymbols,
 } from "./documentSymbols"
 import { findFoldingRanges } from "./foldingRanges"
+import { findFormattingEdits } from "./formatting"
 import { findHover } from "./hover"
 import { findInlayHints } from "./inlayHints"
 import { isSamePosition } from "./positions"
@@ -78,6 +79,7 @@ export function startServer() {
 				referencesProvider: true,
 				documentHighlightProvider: true,
 				documentSymbolProvider: true,
+				documentFormattingProvider: true,
 				completionProvider: {
 					triggerCharacters: [".", ":", "<"],
 				},
@@ -372,6 +374,16 @@ export function startServer() {
 		)
 
 		return findDocumentSymbols(program).map(toLspDocumentSymbol)
+	})
+
+	connection.onDocumentFormatting((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		return findFormattingEdits(document.getText(), params.textDocument.uri)
 	})
 
 	connection.onFoldingRanges((params) => {
