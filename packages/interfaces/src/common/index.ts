@@ -196,6 +196,8 @@ export type DiagnosticCode =
 	// Match Expressions.
 	| "missing-case"
 	| "unreachable-case"
+	| "erased-case-conflict"
+	| "empty-list-overlap"
 	| "match-on-non-union"
 	// Protocols and conformance.
 	| "protocol-as-value"
