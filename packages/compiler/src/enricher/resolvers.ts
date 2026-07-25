@@ -2,7 +2,12 @@ import { isDeepStrictEqual } from "node:util"
 
 import type { common, enricher, parser } from "@essence/interfaces"
 
-import { primary, reportError, secondary } from "../diagnostics/index"
+import {
+	primary,
+	reportError,
+	reportWarning,
+	secondary,
+} from "../diagnostics/index"
 import {
 	applyGenericBindings,
 	buildUnion,
@@ -831,6 +836,11 @@ export function resolveOverloadedFunctionStatementType(
 	node: parser.OverloadedFunctionStatementNode,
 	scope: enricher.Scope,
 ): common.OverloadedStaticMethodType {
+	reportUnknownDocumentationParameters(
+		node.documentation,
+		node.methods.map((entry) => methodSignatureEntry(entry).parameters),
+	)
+
 	return {
 		type: "OverloadedStaticMethod",
 		overloads: node.methods.map((entry) =>
@@ -903,6 +913,11 @@ function resolveProtocolMethodType(
 			...resolveProtocolSignature(node.signature, scope, null),
 		}
 	} else if (node.nodeType === "OverloadedProtocolMethod") {
+		reportUnknownDocumentationParameters(
+			node.documentation,
+			node.signatures.map((signature) => signature.parameters),
+		)
+
 		return {
 			type: "OverloadedMethod",
 			overloads: node.signatures.map((signature) =>
@@ -911,6 +926,11 @@ function resolveProtocolMethodType(
 			documentation: node.documentation ?? undefined,
 		}
 	} else {
+		reportUnknownDocumentationParameters(
+			node.documentation,
+			node.signatures.map((signature) => signature.parameters),
+		)
+
 		return {
 			type: "OverloadedStaticMethod",
 			overloads: node.signatures.map((signature) =>
@@ -3624,6 +3644,10 @@ function resolveParameterTypes(
 	},
 	scope: enricher.Scope,
 ): Array<common.Parameter> {
+	reportUnknownDocumentationParameters(definition.documentation, [
+		definition.parameters,
+	])
+
 	return definition.parameters.map((parameter) => ({
 		name: parameter.externalName?.content ?? null,
 		type: resolveDeclaredType(parameter.type, scope),
@@ -3632,6 +3656,86 @@ function resolveParameterTypes(
 			definition.documentation,
 		),
 	}))
+}
+
+// NOTE: A `@param` naming neither the external nor the internal name of any
+// Parameter describes nothing. It attaches to nothing and was rendered into
+// every Hover regardless — a description of a Parameter the reader then went
+// looking for and could not find, which is the failure mode a rename leaves
+// behind.
+//
+// `signatures` is a list rather than one Parameter list because a `§§` block
+// above an `overload` keyword documents the set as a whole: a name any one of
+// its Overloads takes is a name that exists. Each Overload's own block is
+// checked against its own Parameters separately.
+export function reportUnknownDocumentationParameters(
+	documentation: common.Documentation | null | undefined,
+	signatures: Array<Array<parser.ParameterNode>>,
+): void {
+	let tags = documentation?.parameterTags
+
+	// NOTE: Absent both when the block writes no `@param` and when there is no
+	// block to point at — a builtin Namespace documents itself in TypeScript,
+	// and the standard library's Positions are stripped as it loads.
+	if (tags === undefined) {
+		return
+	}
+
+	let names: Array<string> = []
+
+	for (let parameters of signatures) {
+		for (let parameter of parameters) {
+			// NOTE: A `_` label leaves the external name null, so only the
+			// internal one can be written about. Both are collected in the
+			// order `parameterDocumentation` looks them up.
+			for (let name of [parameter.externalName, parameter.internalName]) {
+				if (name !== null && !names.includes(name.content)) {
+					names.push(name.content)
+				}
+			}
+		}
+	}
+
+	for (let [written, tag] of Object.entries(tags)) {
+		if (names.includes(written)) {
+			continue
+		}
+
+		let suggestion = closestMatch(written, names)
+		let notes = [
+			"A '@param' is matched against each Parameter's external name first and then its internal one — 'startingWith initial: Result' is documented as '@param startingWith'.",
+		]
+
+		if (signatures.length > 1) {
+			notes.push(
+				"An 'overload' block's own Documentation may name a Parameter of any of its Overloads.",
+			)
+		}
+
+		reportWarning(
+			"This '@param' names a Parameter that does not exist",
+			tag.position,
+			{
+				code: "unknown-documentation-parameter",
+				labels: [
+					primary(
+						tag.position,
+						names.length === 0
+							? "what this documents takes no Parameters"
+							: `no Parameter is named '${written}'`,
+					),
+				],
+				notes,
+				helps: [
+					suggestion !== null
+						? `Did you mean '${suggestion}'?`
+						: names.length === 0
+							? "Remove the tag — there is no Parameter for it to describe."
+							: `The Parameters are '${names.join("', '")}'.`,
+				],
+			},
+		)
+	}
 }
 
 export function parameterDocumentation(
@@ -3900,6 +4004,11 @@ export function resolveMethodType(
 	if (normalized.kind === "StaticMethod") {
 		return { type: "StaticMethod", ...resolveEntry(normalized.entries[0]!) }
 	}
+
+	reportUnknownDocumentationParameters(
+		normalized.documentation,
+		normalized.entries.map((entry) => entry.parameters),
+	)
 
 	return {
 		type: normalized.kind,

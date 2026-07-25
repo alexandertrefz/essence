@@ -3019,6 +3019,129 @@ describe("Enricher", () => {
 	// Both halves of that are load-bearing for what the Rewriter emits: the
 	// call passes only the written Arguments, and the definition is emitted
 	// without the `_self` Parameter `@` compiles to.
+	describe("Documentation", () => {
+		it("should report a '@param' naming no Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ Greets.
+				§§ @param subjekt — who to greet
+				function greet(subject: String) -> String { <- subject }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"no Parameter is named 'subjekt'",
+			)
+			expect(diagnostics[0].helps).toEqual(["Did you mean 'subject'?"])
+			// NOTE: The name alone is underlined, rather than the whole block
+			// or the whole Comment.
+			expect(diagnostics[0].position).toEqual({
+				start: { line: 3, column: 15 },
+				end: { line: 3, column: 22 },
+			})
+		})
+
+		it("should take either name a Parameter is written with", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param subject — who to greet
+					function greet(_ subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param to — who to greet
+					function greet(to subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+		})
+
+		it("should let an overload block name a Parameter of any Overload", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Ladder for Integer {
+						§§ Climbs.
+						§§ @param count — how far
+						overload climb {
+							(_ count: Integer) -> Integer { <- @ }
+							() -> Integer { <- @ }
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		it("should report an overload block naming no Overload's Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Ladder for Integer {
+					§§ Climbs.
+					§§ @param hight — how far
+					overload climb {
+						(_ height: Integer) -> Integer { <- @ }
+						() -> Integer { <- @ }
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].helps).toEqual(["Did you mean 'height'?"])
+			expect(diagnostics[0].notes).toHaveLength(2)
+		})
+
+		it("should report a '@param' on a Declaration that holds no Function", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				§§ The default.
+				§§ @param subject — who to greet
+				constant fallback = "Hello"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"what this documents takes no Parameters",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Remove the tag — there is no Parameter for it to describe.",
+			])
+		})
+
+		it("should read a Declaration's '@param' against the Function it holds", () => {
+			// NOTE: The block sits above the `constant`, and the Parameters it
+			// can be describing are the held Function's.
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param subject — who to greet
+					constant greet = (subject: String) -> String { <- subject }
+				}`),
+			).toEqual([])
+
+			expect(
+				diagnosticsFor(`implementation {
+					§§ Greets.
+					§§ @param subjekt — who to greet
+					constant greet = (subject: String) -> String { <- subject }
+				}`),
+			).toHaveLength(1)
+		})
+
+		it("should report nothing for the Documentation of a builtin", () => {
+			// NOTE: A builtin Namespace documents itself in TypeScript and the
+			// standard library's Positions are stripped as it loads, so there
+			// is no `§§` line to point at and nothing to check.
+			expect(
+				diagnosticsFor(`implementation {
+					constant length = "abc"::length()
+				}`),
+			).toEqual([])
+		})
+	})
+
 	describe("Static Methods", () => {
 		it("should reject a static Method called on a value", () => {
 			let diagnostics = diagnosticsFor(`implementation {

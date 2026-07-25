@@ -153,8 +153,10 @@ describe("Standard Library Loader", () => {
 			expect(firstItem.documentation?.description).toBe(
 				"The first item, if there is one.",
 			)
-			// NOTE: A builtin has no file to point at.
+			// NOTE: A builtin has no file to point at — neither for the block
+			// as a whole nor for the `@param` lines inside it.
 			expect(firstItem.documentation?.position).toBeNull()
+			expect(firstItem.documentation?.parameterTags).toBeUndefined()
 		}
 
 		let wrap = namespace.methods["wrap"]!

@@ -84,10 +84,12 @@ export function parseDocumentation(
 			}
 
 			parameterName = tagged
-			rest = afterName
 			parameters[parameterName] ??= []
-			parameterTags[parameterName] ??= { position: line.position }
+			parameterTags[parameterName] ??= {
+				position: spanIn(line, rest, tagged.length),
+			}
 			section = parameters[parameterName]
+			rest = afterName
 		} else {
 			returns = []
 			section = returns
@@ -104,7 +106,7 @@ export function parseDocumentation(
 				kind: "missing-separator",
 				tag: parameterName === null ? "returns" : "param",
 				name: parameterName,
-				position: textPosition(line, body, text.content),
+				position: spanIn(line, text.content, text.content.length),
 			})
 		}
 
@@ -172,24 +174,21 @@ function splitTagText(
 		: { content: text, separated: false }
 }
 
-// NOTE: The span of the text that should have been separated, rather than of
-// the whole Comment — the Diagnostic is about where the em-dash is missing,
-// which is exactly where this text begins. `content` is a suffix of `body`
-// whenever it was not separated, and `body` a suffix of the written line, so
-// the column follows from the two lengths without tracking offsets through
-// the parse.
-function textPosition(
+// NOTE: The span of `length` characters at the head of `suffix`, which is what
+// lets a Diagnostic underline one tag rather than the whole Comment — the name
+// a `@param` writes, or the text an em-dash should have preceded. Every string
+// the parse works with is a suffix of the written line, so the column follows
+// from the two lengths without threading offsets through the loop.
+function spanIn(
 	line: DocumentationLine,
-	body: string,
-	content: string,
+	suffix: string,
+	length: number,
 ): common.Position {
+	let column = line.position.start.column + line.text.length - suffix.length
+
 	return {
-		start: {
-			line: line.position.start.line,
-			column:
-				line.position.start.column + line.text.length - content.length,
-		},
-		end: line.position.end,
+		start: { line: line.position.start.line, column },
+		end: { line: line.position.start.line, column: column + length },
 	}
 }
 

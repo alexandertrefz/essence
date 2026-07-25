@@ -187,11 +187,12 @@ describe("Documentation", () => {
 			"§§ @param other — what to append",
 		])
 
+		// NOTE: The name alone — what a Diagnostic about it underlines.
 		expect(documentation.parameterTags).toEqual({
 			other: {
 				position: {
-					start: { line: 2, column: 1 },
-					end: { line: 2, column: 33 },
+					start: { line: 2, column: 11 },
+					end: { line: 2, column: 16 },
 				},
 			},
 		})
