@@ -424,6 +424,24 @@ function expectedPayloadType(caseType: common.Type): common.Type | null {
 	}
 }
 
+// NOTE: An Argument that can bind no Type Parameter of the call it stands in: a
+// prefixed construction with no Type Arguments of its own reads its Choice's off
+// the Parameter it is matched against, and answers with an Error where that
+// Parameter has not been decided either. So it is matched after every Argument
+// that CAN decide one — the same holding-back a contextually typed Function
+// literal gets, for the same reason and one kind of Argument over.
+//
+// The bare form is not one of these: it resolves through the scope scan and its
+// payload still decides. Nor is an applied one — its members are concrete, and
+// they bind like any other value's.
+function bindsNoTypeParameter(argument: parser.ArgumentNode): boolean {
+	return (
+		argument.value.nodeType === "CaseValue" &&
+		argument.value.choice !== null &&
+		argument.value.typeArguments === null
+	)
+}
+
 // NOTE: What the payload's Type comes out as under a given expectation, with
 // nothing reported — the reading arm selection asks for while the Case it
 // belongs to is still being resolved. Silent because the payload is enriched
@@ -3294,6 +3312,7 @@ function resolveInferredReturnType(
 			name: argument.name?.content ?? null,
 			getType: (expectedType) =>
 				typer.getType(argument.value, expectedType),
+			bindsNothing: bindsNoTypeParameter(argument),
 		}),
 	)
 
@@ -3386,6 +3405,7 @@ function resolveInvokedMethodInNamespace(
 			name: argument.name?.content ?? null,
 			getType: (expectedType) =>
 				typer.getType(argument.value, expectedType),
+			bindsNothing: bindsNoTypeParameter(argument),
 		}),
 	)
 
@@ -4350,6 +4370,7 @@ function resolveFunctionInvocation(
 				name: argument.name?.content ?? null,
 				getType: (expectedType) =>
 					typer.getType(argument.value, expectedType),
+				bindsNothing: bindsNoTypeParameter(argument),
 			}),
 		)
 
@@ -4417,6 +4438,7 @@ function resolveFunctionInvocation(
 				name: argument.name?.content ?? null,
 				getType: (expectedType) =>
 					typer.getType(argument.value, expectedType),
+				bindsNothing: bindsNoTypeParameter(argument),
 			}),
 		)
 
