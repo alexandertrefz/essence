@@ -8,6 +8,7 @@ import {
 	secondary,
 } from "../diagnostics/index"
 import {
+	bodyDefinitelyReturns,
 	countOf,
 	createFreshenedInference,
 	describeParameter,
@@ -1271,27 +1272,6 @@ function validateCondition(
 	}
 
 	validateExpression(condition)
-}
-
-function bodyDefinitelyReturns(
-	body: Array<common.typed.ImplementationNode>,
-): boolean {
-	return body.some(nodeDefinitelyReturns)
-}
-
-function nodeDefinitelyReturns(node: common.typed.ImplementationNode): boolean {
-	if (node.nodeType === "ReturnStatement") {
-		return true
-	}
-
-	if (node.nodeType === "IfElseStatement") {
-		return (
-			bodyDefinitelyReturns(node.trueBody) &&
-			bodyDefinitelyReturns(node.falseBody)
-		)
-	}
-
-	return false
 }
 
 function validateDefiniteReturn(

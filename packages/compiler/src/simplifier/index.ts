@@ -1,6 +1,9 @@
 import type { common } from "@essence/interfaces"
 
-import { resolveOverloadedMethodName } from "../helpers/index"
+import {
+	bodyDefinitelyReturns,
+	resolveOverloadedMethodName,
+} from "../helpers/index"
 
 export const simplify = (
 	program: common.typed.Program,
@@ -474,7 +477,7 @@ function simplifyMatch(
 						handler.guard === null
 							? null
 							: simplifyExpression(handler.guard),
-					body: handler.body.map(simplifyImplementationNode),
+					body: simplifyBody(handler.body),
 				}
 			}),
 		),
@@ -777,6 +780,35 @@ function simplifyParameter(
 	}
 }
 
+// NOTE: A body that can fall off its end is only legal when it promises
+// Nothing — for every other Return Type the Validator has already reported
+// `missing-return` — but falling off the end of an emitted JavaScript Function
+// answers `undefined`, which carries no hidden Type key and so is not an
+// Essence value at all. The Nothing that was promised is spelled out here
+// instead, at the one place a Function body and a Match Handler body both pass
+// through; without it the failure surfaced somewhere else entirely, as a
+// `TypeError` out of whatever read the missing Type key next.
+function simplifyBody(
+	body: Array<common.typed.ImplementationNode>,
+): Array<common.typedSimple.ImplementationNode> {
+	let simplifiedBody = body.map((node) => simplifyImplementationNode(node))
+
+	if (bodyDefinitelyReturns(body)) {
+		return simplifiedBody
+	}
+
+	return [
+		...simplifiedBody,
+		{
+			nodeType: "ReturnStatement",
+			expression: {
+				nodeType: "NothingValue",
+				type: { type: "Nothing" },
+			},
+		},
+	]
+}
+
 function simplifyFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 ): common.typedSimple.FunctionDefinitionNode {
@@ -804,7 +836,7 @@ function simplifyFunctionDefinition(
 			),
 			...conformanceParameters,
 		],
-		body: node.body.map((node) => simplifyImplementationNode(node)),
+		body: simplifyBody(node.body),
 		returnType: node.returnType,
 	}
 }
