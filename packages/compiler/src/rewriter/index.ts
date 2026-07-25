@@ -1824,9 +1824,11 @@ function convertValueToExpression(value: unknown): estree.Expression {
 }
 
 // NOTE: A derived-equality descriptor emitted as a plain JSON-shaped literal.
-// Its keys are Case tags like `"Choice#Case"`, which are not valid Identifiers,
-// so every key is a string Literal — the one difference from
-// `convertObjectToObjectExpression`, which names Type fields that always are.
+// Its keys are Case tags like `"Choice#Case"` and the payload member names
+// underneath them, neither of which a JavaScript IdentifierName is guaranteed
+// to spell, so every key here is a string Literal — one rule for the whole
+// tree, where `convertObjectToObjectExpression` asks `memberKey` per key and
+// leaves the ordinary names unquoted.
 function jsonExpression(value: unknown): estree.Expression {
 	if (Array.isArray(value)) {
 		return {
@@ -1855,6 +1857,15 @@ function jsonExpression(value: unknown): estree.Expression {
 	return { type: "Literal", value } as estree.Literal
 }
 
+// NOTE: A Type descriptor emitted as the object literal the runtime's Type
+// check reads. Most of its keys are the descriptor's own fields — `type`,
+// `members`, `itemType` — but a Record descriptor's `members` map is keyed by
+// Essence member names, and an Essence identifier may hold characters no
+// JavaScript IdentifierName may: `case { ok?: Boolean }` emitted
+// `members: { ok?: … }`, which no JavaScript parser accepts, so a Program that
+// compiled without a single Diagnostic died in the bundler instead. `memberKey`
+// is the same answer the Record literal and the member read give, so all three
+// spell such a name alike.
 function convertObjectToObjectExpression(
 	object: object,
 ): estree.ObjectExpression {
@@ -1864,10 +1875,7 @@ function convertObjectToObjectExpression(
 			([key, value]) => {
 				return {
 					type: "Property",
-					key: {
-						type: "Identifier",
-						name: key,
-					},
+					key: memberKey(key),
 					value: convertValueToExpression(value),
 					kind: "init",
 					computed: false,
