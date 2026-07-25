@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
 
 import { enrichDocument, isStdlibDocument, parseDocument } from "../documents"
@@ -454,7 +455,7 @@ describe("LSP in a standard library source", () => {
 	it("should still reject a 'declarations' header anywhere else", () => {
 		for (let documentPath of [
 			undefined,
-			path.join(STDLIB_DIRECTORY, "../../testFiles/Boolean.es"),
+			fixturePath("Boolean.es"),
 			"/somewhere/essence/src/stdlib/Boolean.es",
 			"/somewhere/stdlib/Boolean.es",
 		]) {

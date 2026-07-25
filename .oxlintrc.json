@@ -13,11 +13,9 @@
 		}
 	],
 	"ignorePatterns": [
-		"lib/**",
-		"src/coverage/**",
-		"src/parser/grammar.ts",
+		"coverage/**",
 		"src/rewriter/__internal/natives.generated.ts",
-		"testFiles/**",
+		"packages/fixtures/files/**",
 		"docs/**"
 	]
 }
