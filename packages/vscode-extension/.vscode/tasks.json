@@ -1,0 +1,24 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			// `main` points at the bundle, so F5 runs built code — without this
+			// every edit to extension.js would need a manual rebuild first.
+			//
+			// Only the extension is rebuilt. The Server bundle comes out of the
+			// compiler checkout next door and is slow to build, and developing
+			// against it is what `essence.server.path` is for; run
+			// `bun run build:server` when the bundled one needs refreshing.
+			"label": "build:extension",
+			"type": "shell",
+			"command": "bun run build:extension",
+			"group": "build",
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared",
+				"clear": true
+			}
+		}
+	]
+}
