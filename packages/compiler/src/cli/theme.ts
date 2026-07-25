@@ -1,6 +1,6 @@
 import { styleText } from "node:util"
 
-import { stripAnsi } from "../ariadne/color"
+import { stripAnsi } from "@essence/ariadne"
 
 // NOTE: Colour and Unicode support are resolved once at startup and passed
 // around as a Theme, so that every renderer draws consistently and tests can

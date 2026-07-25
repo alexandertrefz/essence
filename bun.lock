@@ -11,6 +11,10 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/ariadne": {
+      "name": "@essence/ariadne",
+      "version": "0.0.1",
+    },
     "packages/compiler": {
       "name": "@essence/compiler",
       "version": "0.0.1",
@@ -19,6 +23,7 @@
         "esls": "bin/esls",
       },
       "dependencies": {
+        "@essence/ariadne": "workspace:*",
         "bigint-fraction": "1.0.6",
         "esbuild": "0.28.1",
         "escodegen": "alexandertrefz/escodegen#b4cb6d12aa3eb4082d001e0900ec30379ee79a63",
@@ -91,6 +96,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.28.1", "", { "os": "win32", "cpu": "ia32" }, "sha512-zvb/mB2bSCoJOpoCBgYKKpX6YM6mJBlBUVUtVj41DlZJVEB6/0CKlRYxP5wWl1C1ILiCoAU5wZZ4q1P3qeS6Eg=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A=="],
+
+    "@essence/ariadne": ["@essence/ariadne@workspace:packages/ariadne"],
 
     "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
 
