@@ -20,7 +20,7 @@
 		"packages/vscode-extension/snippets/**",
 		"packages/vscode-extension/syntaxes/**",
 		"packages/vscode-extension/language-configuration.json",
-		"docs/_layouts/**",
+		"packages/website/_layouts/**",
 		"packages/fixtures/files/**",
 		"**/*.es",
 		"**/__snapshots__/**",

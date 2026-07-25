@@ -1,0 +1,12 @@
+theme: jekyll-theme-midnight
+title: "Essence"
+show_downloads: false
+
+# NOTE: This directory is a package as well as a site, so the package's own
+# files are kept out of what gets published. Jekyll already skips anything
+# beginning with `_` or `.`; these are the rest.
+exclude:
+  - README.md
+  - package.json
+  - tests
+  - node_modules
