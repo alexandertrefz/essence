@@ -4,6 +4,9 @@
 	"scopeName": "source.essence",
 	"patterns": [
 		{
+			"include": "#documentation"
+		},
+		{
 			"include": "#comment"
 		},
 		{
@@ -62,6 +65,45 @@
 		}
 	],
 	"repository": {
+		"documentation": {
+			"patterns": [
+				{
+					"match": "(§§)[ \\t]*(@param)[ \\t]+([^\\s—]+)[ \\t]*(—)?.*$",
+					"name": "comment.line.documentation.essence",
+					"captures": {
+						"1": {
+							"name": "punctuation.definition.comment.essence"
+						},
+						"2": {
+							"name": "keyword.other.documentation.essence"
+						},
+						"3": { "name": "variable.parameter.essence" },
+						"4": {
+							"name": "punctuation.separator.documentation.essence"
+						}
+					}
+				},
+				{
+					"match": "(§§)[ \\t]*(@returns)\\b[ \\t]*(—)?.*$",
+					"name": "comment.line.documentation.essence",
+					"captures": {
+						"1": {
+							"name": "punctuation.definition.comment.essence"
+						},
+						"2": {
+							"name": "keyword.other.documentation.essence"
+						},
+						"3": {
+							"name": "punctuation.separator.documentation.essence"
+						}
+					}
+				},
+				{
+					"match": "§§.*$",
+					"name": "comment.line.documentation.essence"
+				}
+			]
+		},
 		"comment": {
 			"match": "§.*$",
 			"name": "comment.line.essence"
