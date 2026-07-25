@@ -1251,6 +1251,100 @@ describe("Choices", () => {
 				).toEqual(['"full"'])
 			})
 
+			// NOTE: The other side of that — a Parameter Type mentioning the
+			// CALL's own Type Parameters decides nothing, because nothing has
+			// decided them either. Recorded as a decision it built the undecided
+			// state outright: the construction became a `Holder<Item>` whose
+			// payload was then forbidden from deciding `Item`, so nothing ever
+			// did, and what the reader was shown was a payload reported for not
+			// fitting a Type Parameter, followed by an Internal Compiler Error
+			// from a call forwarding a conformance witness no caller declares.
+			it("refuses a Parameter Type the call has not decided either", () => {
+				let source = `implementation { ${holder}
+					function take<infer Item is Equatable>(_ h: Holder<Item>) -> String {
+						<- "took"
+					}
+
+					__print(take(Holder#Full(1)))
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+				expect(messagesOf(source)).toEqual([
+					"Nothing decides the Type Arguments of 'Holder#Full'",
+				])
+			})
+
+			it("refuses one at a Method identically", () => {
+				expect(
+					codesOf(`implementation { ${holder}
+						namespace Takers for Integer {
+							take<infer Item is Equatable>(_ h: Holder<Item>) -> String {
+								<- "took"
+							}
+						}
+
+						__print(1::take(Holder#Full(1)))
+					}`),
+				).toEqual(["undecided-type-arguments"])
+			})
+
+			// NOTE: With no bound in sight either — the shape that used to blame
+			// the payload for not being an unsolved Type Parameter, with no help
+			// and no mention of Type Arguments at all.
+			it("refuses one carrying no bound", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						function take<infer Item>(_ b: Box<Item>) -> String {
+							<- "took"
+						}
+
+						__print(take(Box#Full(1)))
+					}`),
+				).toEqual(["undecided-type-arguments"])
+			})
+
+			// NOTE: And says it ONCE. The unsolved Type Parameter used to travel
+			// out through the return Type, where the next Method call searched a
+			// Namespace named after the Compiler's own conformance Parameter.
+			it("says so once, and lets nothing carry the Parameter onward", () => {
+				let source = `implementation {
+					choice Result<Value is Equatable> { Ok { value: Value }, Err }
+
+					function orElse<infer Value is Equatable>(
+						_ r: Result<Value>,
+						_ fallback: Value,
+					) -> Value {
+						<- fallback
+					}
+
+					__print(orElse(Result#Ok(1), 0)::toString())
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+			})
+
+			// NOTE: The three spellings that DO decide such a call, which is what
+			// makes refusing it a Diagnostic rather than a wall: the Arguments
+			// written at the construction, the bare sigil the Parameter's own
+			// Choice resolves, and a Constant annotated on the way in.
+			it("takes every spelling that decides such a call", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						function take<infer Item is Equatable>(_ h: Holder<Item>) -> String {
+							<- "took"
+						}
+
+						constant bound: Holder<Integer> = Holder#Full(1)
+
+						__print(take(Holder<Integer>#Full(1)))
+						__print(take(#Full(1)))
+						__print(take(bound))
+					}`),
+				).toEqual(['"took"', '"took"', '"took"'])
+			})
+
 			// NOTE: The Alias application rail is where the bound is kept, and the
 			// construction reads its instantiation off exactly that — so writing
 			// the Type Argument out is as strict here as in any annotation.

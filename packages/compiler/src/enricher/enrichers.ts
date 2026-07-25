@@ -21,6 +21,7 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
@@ -2821,6 +2822,18 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// is still RECORDED, so a call where no candidate fits commits a decided
 	// context and reports the one Diagnostic it has rather than that one and
 	// `undecided-type-arguments` on top.
+	//
+	// NOTE: A Parameter Type that still mentions the CALL's own unsolved Type
+	// Parameters is no decision at all, and recording it committed the undecided
+	// state the whole rail exists to refuse: `take(Holder#Full(1))` against
+	// `take<infer Item>(_ h: Holder<Item>)` became a `Holder<Item>#Full` whose
+	// payload was then forbidden from deciding `Item`, so nothing ever did — the
+	// Validator compared the payload against a Type Parameter and codegen emitted
+	// a call forwarding a conformance witness no caller declares. It is refused
+	// here instead, which leaves the construction to report
+	// `undecided-type-arguments` for itself, and answered with an Error so that
+	// the unsolved Parameter does not report a second time as uninferable and the
+	// return Type it appears in does not carry it onward.
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
@@ -2832,6 +2845,10 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		)
 
 		if (result.type === "Case") {
+			if (mentionsUnsolvedTypeParameter(result)) {
+				return { type: "Error" }
+			}
+
 			recordContextualCaseValueType(node, expectedType)
 
 			if (payloadType === null || payloadFitsCase(result, payloadType)) {
