@@ -1209,6 +1209,108 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
+			// NOTE: And from the payload position of the Case around it, which is
+			// a position like any other once the Case that carries it is decided —
+			// so a nesting whose outer Type is spelled out in full decides every
+			// construction inside it, however deep and through whatever stands
+			// between them.
+			it("takes the decision from the payload position around it", async () => {
+				expect(
+					await run(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant nested: Box<Box<Integer>> = Box#Full(Box#Full(1))
+
+						__print(match nested -> String {
+							case #Full {
+								<- match @.value -> String {
+									case #Full { <- @.value::toString() }
+									case #Empty { <- "inner empty" }
+								}
+							}
+							case #Empty { <- "outer empty" }
+						})
+					}`),
+				).toEqual(['"1"'])
+			})
+
+			it("reaches a nesting spelled out three deep", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant nested: Box<Box<Box<Integer>>> =
+							Box#Full(Box#Full(Box#Full(1)))
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: Through the one-member shorthand and through the Record it is
+			// shorthand FOR, and through a List and a Record standing between two
+			// constructions — every position that hands an expected Type down
+			// hands down what the Case decided for it.
+			it("reaches through what stands between two constructions", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+						choice Wrap<Value> { One { value: Value }, None }
+
+						constant items: Box<List<Box<Integer>>> =
+							Box#Full([Box#Empty, Box#Full(2)])
+						constant member: Wrap<{ b: Box<Integer> }> =
+							Wrap#One({ b = Box#Empty })
+						constant written: Box<Box<Integer>> =
+							Box#Full({ value = Box#Full(1) })
+					}`),
+				).toEqual([])
+			})
+
+			it("mixes the bare and the prefixed spelling in one nesting", async () => {
+				expect(
+					await run(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant outer: Box<Box<Integer>> = Box#Full(#Full(1))
+						constant inner: Box<Box<Integer>> = #Full(Box#Full(1))
+
+						__print(outer::is(inner))
+					}`),
+				).toEqual(["true"])
+			})
+
+			// NOTE: Which instantiation a position offering several of them meant
+			// is what the payload answers — so the payload is read once per
+			// candidate, under that candidate's own members, and a payload that
+			// can not be read under one has not fit it. Read once with no context
+			// instead, a nested construction came out an Error, an Error fits
+			// everything, and the FIRST arm won whatever was written.
+			it("reads the payload under each instantiation the position offers", () => {
+				expect(
+					valueTypeOf(
+						`implementation {
+							choice Box<Value> { Full { value: Value }, Empty }
+
+							constant chosen: Box<String> | Box<Box<Integer>> =
+								Box#Full(Box#Full(1))
+						}`,
+						"chosen",
+					),
+				).toMatchObject({
+					type: "Case",
+					choice: "Box",
+					name: "Full",
+					typeArguments: [
+						{
+							type: "UnionType",
+							alias: {
+								name: "Box",
+								typeArguments: [{ type: "Integer" }],
+							},
+						},
+					],
+				})
+			})
+
 			// NOTE: An Argument is matched by a Case's MEMBERS, and a payload that
 			// does not fit them is a Diagnostic one stage later — too late to keep
 			// an overload from winning on it. So the probe answers with the
