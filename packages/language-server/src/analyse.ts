@@ -1,8 +1,10 @@
+import {
+	containsErrors,
+	placelessDiagnostic,
+} from "@essence/compiler/diagnostics"
+import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import { validate } from "@essence/compiler/validator"
 import type { common } from "@essence/interfaces"
-
-import { containsErrors, placelessDiagnostic } from "../diagnostics/index"
-import { enrichDocument, parseDocument } from "../documents"
-import { validate } from "../validator/index"
 
 // NOTE: The pipeline stages are fault-tolerant, so parsing and enrichment
 // always run — broken statements are dropped from the AST, and the remaining
