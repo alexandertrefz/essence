@@ -1,0 +1,10 @@
+.vscode/**
+.vscode-test/**
+.gitignore
+.gitattributes
+bun.lock
+vsc-extension-quickstart.md
+
+# Bundled into dist/extension.js by `bun run build`.
+node_modules/**
+extension.js

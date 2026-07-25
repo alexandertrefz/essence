@@ -1,0 +1,88 @@
+{
+	"name": "essence-language",
+	"displayName": "Essence",
+	"description": "Language support for Essence: syntax highlighting, diagnostics, navigation and completion.",
+	"version": "0.1.0",
+	"type": "module",
+	"publisher": "essence",
+	"license": "MIT",
+	"icon": "icon.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/essence-language/vscode-extension.git"
+	},
+	"engines": {
+		"vscode": "^1.100.0"
+	},
+	"categories": [
+		"Programming Languages",
+		"Snippets"
+	],
+	"main": "./dist/extension.js",
+	"activationEvents": [
+		"onLanguage:essence"
+	],
+	"scripts": {
+		"build": "bun run build:server && bun run build:extension",
+		"build:server": "bun build ../essence/src/lsp/serverEntry.ts --target=node --format=esm --outfile=server/server.js",
+		"build:extension": "bun build extension.js --target=node --format=esm --external vscode --outfile=dist/extension.js",
+		"package": "bun run build && bunx @vscode/vsce package"
+	},
+	"contributes": {
+		"languages": [
+			{
+				"id": "essence",
+				"aliases": [
+					"Essence",
+					"essence"
+				],
+				"extensions": [
+					".es"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "essence",
+				"scopeName": "source.essence",
+				"path": "./syntaxes/essence.tmLanguage.json"
+			}
+		],
+		"snippets": [
+			{
+				"language": "essence",
+				"path": "./snippets/essence.code-snippets"
+			}
+		],
+		"configuration": {
+			"title": "Essence",
+			"properties": {
+				"essence.server.path": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Absolute path to a Language Server to run instead of the bundled one. A built `.js` bundle is run with `node`; anything else — a `.ts` entry point, or the compiler's `bin/esls` — is run with `bun`. Useful for developing against a compiler checkout without rebuilding the bundle."
+				},
+				"essence.trace.server": {
+					"type": "string",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"default": "off",
+					"description": "Log the traffic between VS Code and the Essence Language Server."
+				}
+			}
+		},
+		"commands": [
+			{
+				"command": "essence.restartServer",
+				"title": "Essence: Restart Language Server"
+			}
+		]
+	},
+	"dependencies": {
+		"vscode-languageclient": "9.0.1"
+	}
+}

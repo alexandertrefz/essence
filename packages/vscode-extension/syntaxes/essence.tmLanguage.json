@@ -1,0 +1,197 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Essence",
+	"scopeName": "source.essence",
+	"patterns": [
+		{
+			"include": "#comment"
+		},
+		{
+			"include": "#string"
+		},
+		{
+			"include": "#valueDeclaration"
+		},
+		{
+			"include": "#functionDeclaration"
+		},
+		{
+			"include": "#typeLikeDeclaration"
+		},
+		{
+			"include": "#controlKeyword"
+		},
+		{
+			"include": "#declarationKeyword"
+		},
+		{
+			"include": "#modifierKeyword"
+		},
+		{
+			"include": "#languageConstant"
+		},
+		{
+			"include": "#fraction"
+		},
+		{
+			"include": "#number"
+		},
+		{
+			"include": "#self"
+		},
+		{
+			"include": "#nativeInvocation"
+		},
+		{
+			"include": "#methodInvocation"
+		},
+		{
+			"include": "#functionInvocation"
+		},
+		{
+			"include": "#caseReference"
+		},
+		{
+			"include": "#type"
+		},
+		{
+			"include": "#operator"
+		},
+		{
+			"include": "#punctuation"
+		}
+	],
+	"repository": {
+		"comment": {
+			"match": "§.*$",
+			"name": "comment.line.essence"
+		},
+		"string": {
+			"begin": "\"",
+			"end": "\"",
+			"name": "string.quoted.double.essence"
+		},
+		"valueDeclaration": {
+			"match": "\\b(constant|variable)[ \\t]+([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+			"captures": {
+				"1": {
+					"name": "storage.type.essence"
+				},
+				"2": {
+					"name": "variable.other.essence"
+				}
+			}
+		},
+		"functionDeclaration": {
+			"match": "\\b(function)[ \\t]+([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+			"captures": {
+				"1": {
+					"name": "storage.type.essence"
+				},
+				"2": {
+					"name": "entity.name.function.essence"
+				}
+			}
+		},
+		"typeLikeDeclaration": {
+			"match": "\\b(namespace|type|choice|protocol)[ \\t]+([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+			"captures": {
+				"1": {
+					"name": "storage.type.essence"
+				},
+				"2": {
+					"name": "entity.name.type.essence"
+				}
+			}
+		},
+		"controlKeyword": {
+			"match": "\\b(if|else|match|case|for|with)\\b",
+			"name": "keyword.control.essence"
+		},
+		"declarationKeyword": {
+			"match": "\\b(implementation|constant|variable|function|namespace|type|choice|protocol)\\b",
+			"name": "storage.type.essence"
+		},
+		"modifierKeyword": {
+			"match": "\\b(static|overload|infer)\\b",
+			"name": "storage.modifier.essence"
+		},
+		"languageConstant": {
+			"match": "\\b(true|false|nothing)\\b",
+			"name": "constant.language.essence"
+		},
+		"fraction": {
+			"match": "-?[0-9][0-9_]*/-?[0-9][0-9_]*",
+			"name": "constant.numeric.fraction.essence"
+		},
+		"number": {
+			"match": "-?[0-9][0-9_]*",
+			"name": "constant.numeric.integer.essence"
+		},
+		"self": {
+			"match": "@",
+			"name": "variable.language.self.essence"
+		},
+		"nativeInvocation": {
+			"match": "(__)([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+			"name": "support.function.native.essence"
+		},
+		"methodInvocation": {
+			"match": "(::)(?:(<)([^>]+)(>))?([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)?",
+			"captures": {
+				"1": {
+					"name": "keyword.operator.method.essence"
+				},
+				"3": {
+					"name": "entity.name.type.namespace.essence"
+				},
+				"5": {
+					"name": "entity.name.function.essence"
+				}
+			}
+		},
+		"functionInvocation": {
+			"match": "([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)(?=\\()",
+			"name": "entity.name.function.essence"
+		},
+		"caseReference": {
+			"match": "(#)([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+			"captures": {
+				"1": {
+					"name": "punctuation.definition.case.essence"
+				},
+				"2": {
+					"name": "variable.other.enummember.essence"
+				}
+			}
+		},
+		"type": {
+			"match": "\\b[A-Z][^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]*",
+			"name": "entity.name.type.essence"
+		},
+		"operator": {
+			"match": "<-|->|[=|~]",
+			"name": "keyword.operator.essence"
+		},
+		"punctuation": {
+			"patterns": [
+				{
+					"match": "\\{|\\}",
+					"name": "punctuation.definition.block.essence"
+				},
+				{
+					"match": "\\(|\\)",
+					"name": "meta.brace.round.essence"
+				},
+				{
+					"match": ",",
+					"name": "punctuation.separator.comma.essence"
+				},
+				{
+					"match": "\\.",
+					"name": "punctuation.accessor.essence"
+				}
+			]
+		}
+	}
+}

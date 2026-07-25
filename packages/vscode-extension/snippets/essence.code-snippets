@@ -1,0 +1,88 @@
+{
+	// Place your essence workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
+	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
+	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
+	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
+	// Placeholders with the same ids are connected.
+	"implementation": {
+		"prefix": [
+			"impl",
+		],
+		"body": [
+			"implementation {",
+			"\t",
+			"\t$0",
+			"\t",
+			"}"
+		],
+		"description": "An implementation block."
+	},
+	"variable": {
+		"prefix": [
+			"var",
+		],
+		"body": [
+			"variable ${1:name} = ${3:value}",
+			"$0",
+		],
+		"description": "A variable declaration."
+	},
+	"constant": {
+		"prefix": [
+			"con",
+		],
+		"body": [
+			"constant ${1:name} = ${3:value}",
+			"$0",
+		],
+		"description": "A constant declaration."
+	},
+	"function": {
+		"prefix": [
+			"fun",
+		],
+		"body": [
+			"function ${1:name}(${2:externalName} ${3:internalName}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t$0",
+			"}"
+		],
+		"description": "A constant declaration."
+	},
+	"choice": {
+		"prefix": [
+			"cho"
+		],
+		"body": [
+			"choice ${1:Name} {",
+			"\t${2:Case} { ${3:member}: ${4:Type} },",
+			"\t$0",
+			"}"
+		],
+		"description": "A choice declaration."
+	},
+	"match": {
+		"prefix": [
+			"mat"
+		],
+		"body": [
+			"match ${1:value} {",
+			"\tcase ${2:matcher} -> ${3:returnType} {",
+			"\t\t<- $0",
+			"\t}",
+			"}"
+		],
+		"description": "A match expression."
+	},
+	"case": {
+		"prefix": [
+			"cas"
+		],
+		"body": [
+			"case ${1:matcher} -> ${2:returnType} {",
+			"\t<- $0",
+			"}",
+		],
+		"description": "A case handler within a match expression."
+	}
+}
