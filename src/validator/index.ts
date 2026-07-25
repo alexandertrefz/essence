@@ -21,6 +21,8 @@ import type { common } from "../interfaces/index"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
+type MatchHandler = common.typed.MatchNode["handlers"][number]
+
 export const validate = (
 	program: common.typed.Program,
 ): Array<common.Diagnostic> => {
@@ -117,18 +119,11 @@ function validateExpression(
 		case "RationalValue":
 			return validateRationalValue(node)
 		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				validateNoBoundFunctionValue(member)
-			}
-
-			return node
+			return validateRecordValue(node)
 		case "ListValue":
-			for (let value of node.values) {
-				validateNoBoundFunctionValue(value)
-			}
-
-			return node
+			return validateListValue(node)
 		case "Combination":
+			return validateCombination(node)
 		case "StringValue":
 		case "IntegerValue":
 		case "BooleanValue":
@@ -426,16 +421,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		let unhandledTypes: Array<common.Type> = []
 
 		for (let memberType of memberTypes) {
-			// NOTE: A Handler with a literal Matcher or a Guard covers only
-			// part of its Type — `case 0` leaves every other Integer, and a
-			// Guard can decline outright — so neither can discharge a member
-			// of the Union. Only an unconditional Handler makes a Match
-			// exhaustive.
 			let isHandled = node.handlers.some(
 				(handler) =>
-					handler.literal === null &&
-					handler.memberLiterals === null &&
-					handler.guard === null &&
+					isUnconditionalHandler(handler) &&
 					matchesType(handler.matcher, memberType),
 			)
 
@@ -472,12 +460,35 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			)
 		}
 
-		for (let handler of node.handlers) {
-			let isReachable = memberTypes.some((memberType) =>
-				matchesType(handler.matcher, memberType),
-			)
+		// NOTE: Which Handler already answers for each member of the Union, by
+		// index — a Handler is dead not only when its Matcher names a Type the
+		// Union does not have, but also when every Type it could match was
+		// already taken by an earlier Handler. Only an unconditional Handler
+		// takes one: a Handler that can decline a value it accepted by Type
+		// leaves that Type for whatever comes after it.
+		let claimedBy: Array<number | null> = memberTypes.map(() => null)
 
-			if (!isReachable) {
+		for (
+			let handlerIndex = 0;
+			handlerIndex < node.handlers.length;
+			handlerIndex++
+		) {
+			let handler = node.handlers[handlerIndex]
+			let matchedMemberIndices: Array<number> = []
+
+			for (
+				let memberIndex = 0;
+				memberIndex < memberTypes.length;
+				memberIndex++
+			) {
+				if (
+					acceptsAtRuntime(handler.matcher, memberTypes[memberIndex])
+				) {
+					matchedMemberIndices.push(memberIndex)
+				}
+			}
+
+			if (matchedMemberIndices.length === 0) {
 				// NOTE: Tagged `unnecessary` so that clients grey the case out
 				// instead of underlining it — it is dead, not wrong. The
 				// Position is the Matcher's, so only the dead Handler is
@@ -500,6 +511,95 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						],
 					},
 				)
+
+				continue
+			}
+
+			let claimingHandlerIndices: Array<number> = []
+
+			for (let memberIndex of matchedMemberIndices) {
+				let claimingHandlerIndex = claimedBy[memberIndex]
+
+				if (claimingHandlerIndex !== null) {
+					claimingHandlerIndices.push(claimingHandlerIndex)
+				}
+			}
+
+			// NOTE: Every Type this Handler could match is spoken for, and the
+			// first Handler that fits is the one that runs — so this one never
+			// does, whether it is a duplicated `case Integer` or a Case written
+			// below the `case _` that swallows it. Its own Guard or literal
+			// makes no difference: the earlier Handler decides first.
+			if (claimingHandlerIndices.length === matchedMemberIndices.length) {
+				let claimingHandler =
+					node.handlers[Math.min(...claimingHandlerIndices)]
+
+				// NOTE: WHY the earlier Case answers for this one decides what
+				// there is to say about it, and two of the three reasons are
+				// nowhere in the source. A Generic Matcher covers its members
+				// because there is nothing left to check by the time it runs,
+				// and a Function-typed member covers a differently-signed one
+				// because a Signature is not a runtime question — in both cases
+				// the Warning names two Types that look unrelated, and without
+				// the reason it reads like a mistake.
+				let notes = [
+					"Cases are tried in order, and the first one that fits wins.",
+				]
+				let helps = [
+					"Remove this Case, or write it above the one that covers it.",
+				]
+
+				if (claimingHandler.matcher.type === "GenericUse") {
+					notes.push(
+						`Types erase before a Match runs, so the Generic Case '${describeType(claimingHandler.matcher)}' narrows nothing and accepts every value that reaches it.`,
+					)
+
+					helps = [
+						`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
+					]
+				} else if (
+					!matchesType(claimingHandler.matcher, handler.matcher)
+				) {
+					// NOTE: The earlier Matcher does not accept this one's Type
+					// at all, so what it claimed it claimed through erasure —
+					// which is only ever a Function-typed member. Reordering can
+					// not help here: whichever of the two is written first
+					// swallows the other.
+					notes.push(
+						"A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
+					)
+
+					helps = [
+						"Tell the two Cases apart by a member that survives to runtime, or give this one a Guard.",
+					]
+				}
+
+				reportWarning(
+					`This Case can never match`,
+					handler.matcherPosition,
+					{
+						code: "unreachable-case",
+						tags: ["unnecessary"],
+						labels: [
+							primary(
+								handler.matcherPosition,
+								"an earlier Case already answers for every Type this one matches",
+							),
+							secondary(
+								claimingHandler.matcherPosition,
+								"this Case runs first",
+							),
+						],
+						notes,
+						helps,
+					},
+				)
+			} else if (isUnconditionalHandler(handler)) {
+				for (let memberIndex of matchedMemberIndices) {
+					if (claimedBy[memberIndex] === null) {
+						claimedBy[memberIndex] = handlerIndex
+					}
+				}
 			}
 		}
 	} else if (node.value.type.type !== "Error") {
@@ -522,6 +622,26 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	}
 
 	for (let handler of node.handlers) {
+		// NOTE: A Guard decides, per value, whether its Handler runs — it is a
+		// Condition, and is held to what every other Condition is held to.
+		if (handler.guard !== null) {
+			validateCondition(handler.guard, "A Case Guard")
+		}
+
+		// NOTE: A Matcher's literals are Expressions of their own — only a
+		// Literal can stand there, so in practice this is `case 1/0`'s
+		// denominator, but a Matcher is no more exempt from the walk than any
+		// other place a value is written.
+		if (handler.literal !== null) {
+			validateExpression(handler.literal)
+		}
+
+		if (handler.memberLiterals !== null) {
+			for (let memberLiteral of Object.values(handler.memberLiterals)) {
+				validateExpression(memberLiteral)
+			}
+		}
+
 		// NOTE: Synthetic — a Match handler is validated as if it were a
 		// Function body so that its `<-` Statements are checked against the
 		// Match's Type. It has no Parameter list of its own, so nothing here
@@ -544,6 +664,63 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	}
 
 	return node
+}
+
+// NOTE: A Handler with a literal Matcher, a value-constrained Record member or
+// a Guard covers only part of its Matcher's Type — `case 0` leaves every other
+// Integer, and a Guard can decline outright. So only an unconditional Handler
+// discharges a member of the Union, and only an unconditional Handler takes a
+// Type away from the Handlers below it.
+function isUnconditionalHandler(handler: MatchHandler): boolean {
+	return (
+		handler.literal === null &&
+		handler.memberLiterals === null &&
+		handler.guard === null
+	)
+}
+
+// NOTE: Whether the check emitted for `matcher` answers TRUE for every value of
+// `memberType` — which decides reachability, and is a WIDER question than
+// assignability. Some of what a Matcher names does not survive to runtime, and
+// what does not survive can not narrow: assignability answers what a Case may
+// assume about the values it accepts, this answers which values reach it at all.
+//
+// NOTE: Two things erase, and each one is a Case that swallowed everything below
+// it with nothing here to say so. A Generic Matcher (and the wildcard's Unknown,
+// which is the same answer spelled differently) has no Type left to check, so
+// `isValueOfType` returns true unconditionally — `case Value` above `case
+// Nothing` left the second Case dead, and the Program answered the Nothing where
+// its own Signature promised a `Value`. A Function's Signature is equally gone:
+// the emitted check can only ask whether the value is callable, so a Record
+// Matcher naming a callback member accepts every Record carrying one, whatever
+// that callback's Parameters and Return Type were declared as.
+function acceptsAtRuntime(
+	matcher: common.Type,
+	memberType: common.Type,
+): boolean {
+	if (matcher.type === "GenericUse" || matcher.type === "Unknown") {
+		return true
+	}
+
+	if (matchesType(matcher, memberType)) {
+		return true
+	}
+
+	if (matcher.type === "Function") {
+		return memberType.type === "Function"
+	}
+
+	// NOTE: Structural and open, exactly as the runtime check is — the value
+	// has to carry every member the Matcher names, and may carry more besides.
+	if (matcher.type === "Record" && memberType.type === "Record") {
+		return Object.entries(matcher.members).every(
+			([name, memberMatcher]) =>
+				name in memberType.members &&
+				acceptsAtRuntime(memberMatcher, memberType.members[name]),
+		)
+	}
+
+	return false
 }
 
 // NOTE: Whether the payload is present and matches is checked here rather
@@ -647,6 +824,45 @@ function validateRationalValue(
 	return node
 }
 
+// NOTE: A member is an Expression like any other — a Match, an Invocation, a
+// Function literal — so it is walked rather than only checked for the values
+// that can not travel. The Record's own shape is the Enricher's business; what
+// is checked here is what the members are made of.
+function validateRecordValue(
+	node: common.typed.RecordValueNode,
+): common.typed.RecordValueNode {
+	for (let member of Object.values(node.members)) {
+		validateExpression(member)
+		validateNoBoundFunctionValue(member)
+	}
+
+	return node
+}
+
+function validateListValue(
+	node: common.typed.ListValueNode,
+): common.typed.ListValueNode {
+	for (let value of node.values) {
+		validateExpression(value)
+		validateNoBoundFunctionValue(value)
+	}
+
+	return node
+}
+
+// NOTE: Both sides are Expressions of their own — `{ makeBase(1) with x =
+// compute("2") }` holds two Invocations — so both are walked. Whether the two
+// shapes combine at all is the Enricher's business
+// (`partial-type-mismatch`); what is checked here is what they are made of.
+function validateCombination(
+	node: common.typed.CombinationNode,
+): common.typed.CombinationNode {
+	validateExpression(node.lhs)
+	validateExpression(node.rhs)
+
+	return node
+}
+
 // #endregion
 
 // #region Statements
@@ -723,7 +939,7 @@ function validateVariableDeclarationStatement(
 // the Type it demands is stated as a note rather than pointed at. The value
 // is what gets the arrow — it is the part that can be changed.
 function reportDeclarationMismatch(
-	kind: "Constant" | "Variable",
+	kind: "Constant" | "Variable" | "Property",
 	name: string,
 	declaredType: common.Type,
 	value: common.typed.ExpressionNode,
@@ -889,6 +1105,26 @@ function checkInfiniteRecursion(
 function validateNamespaceDefinitionStatement(
 	node: common.typed.NamespaceDefinitionStatementNode,
 ): common.typed.NamespaceDefinitionStatementNode {
+	// NOTE: A static Property's initialiser is an Expression that runs when the
+	// Program loads, so it is held to what a Constant Declaration is held to —
+	// it is the same Declaration, written in a Namespace. A native Property has
+	// no value to check and is not in the typed tree at all.
+	for (let propertyName in node.properties) {
+		let property = node.properties[propertyName]
+
+		if (!matchesType(property.type, property.value.type)) {
+			reportDeclarationMismatch(
+				"Property",
+				`${node.name.content}.${property.name.content}`,
+				property.type,
+				property.value,
+			)
+		}
+
+		validateExpression(property.value)
+		validateNoBoundFunctionValue(property.value)
+	}
+
 	for (let methodName in node.methods) {
 		let method = node.methods[methodName]
 
@@ -929,29 +1165,7 @@ function validateIfElseStatementNode(
 	node: common.typed.IfElseStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfElseStatementNode {
-	if (
-		node.condition.type.type !== "Boolean" &&
-		node.condition.type.type !== "Error"
-	) {
-		reportError(
-			"An If Condition has to be a Boolean",
-			node.condition.position,
-			{
-				code: "condition-not-boolean",
-				labels: [
-					primary(
-						node.condition.position,
-						`this is ${withArticle(describeType(node.condition.type))}`,
-					),
-				],
-				notes: [
-					"Essence has no truthiness — only a Boolean can be a Condition.",
-				],
-			},
-		)
-	}
-
-	validateExpression(node.condition)
+	validateCondition(node.condition, "An If Condition")
 
 	node.trueBody.map((node) =>
 		validateImplementationNode(node, currentFunctionContext),
@@ -967,29 +1181,7 @@ function validateIfStatement(
 	node: common.typed.IfStatementNode,
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.IfStatementNode {
-	if (
-		node.condition.type.type !== "Boolean" &&
-		node.condition.type.type !== "Error"
-	) {
-		reportError(
-			"An If Condition has to be a Boolean",
-			node.condition.position,
-			{
-				code: "condition-not-boolean",
-				labels: [
-					primary(
-						node.condition.position,
-						`this is ${withArticle(describeType(node.condition.type))}`,
-					),
-				],
-				notes: [
-					"Essence has no truthiness — only a Boolean can be a Condition.",
-				],
-			},
-		)
-	}
-
-	validateExpression(node.condition)
+	validateCondition(node.condition, "An If Condition")
 
 	node.body.map((node) =>
 		validateImplementationNode(node, currentFunctionContext),
@@ -1049,6 +1241,32 @@ function validateFunctionStatement(
 // #endregion
 
 // #region Helpers
+
+// NOTE: An `if`, an `else if` and a Match Handler's Guard all pick a path from
+// a value, and Essence has no truthiness — only a Boolean can decide. One
+// check for all of them, so the rule can not hold in one place and lapse in
+// another; `description` is what names the Condition in the message.
+function validateCondition(
+	condition: common.typed.ExpressionNode,
+	description: string,
+): void {
+	if (condition.type.type !== "Boolean" && condition.type.type !== "Error") {
+		reportError(`${description} has to be a Boolean`, condition.position, {
+			code: "condition-not-boolean",
+			labels: [
+				primary(
+					condition.position,
+					`this is ${withArticle(describeType(condition.type))}`,
+				),
+			],
+			notes: [
+				"Essence has no truthiness — only a Boolean can be a Condition.",
+			],
+		})
+	}
+
+	validateExpression(condition)
+}
 
 function bodyDefinitelyReturns(
 	body: Array<common.typed.ImplementationNode>,

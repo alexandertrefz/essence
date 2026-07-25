@@ -1615,6 +1615,65 @@ describe("Helpers", () => {
 				).toBe(true)
 				expect(context.bindings.get("Value")).toEqual(integer)
 			})
+
+			// NOTE: The first member binds `T := String` off `left` and THEN
+			// fails on `right`. That binding is worth no more than the member
+			// that made it, but it used to survive the failed attempt, so the
+			// second member — which matches on its own with `T := Integer` —
+			// was checked against the leftover `T := String` and wrongly
+			// rejected. Which spelling of the same Union compiled came down to
+			// the order its members were written in.
+			it("should roll a failed Union member's bindings back", () => {
+				let context = inferContextFor(["T"])
+				let leftOrRight: UnionType = {
+					type: "UnionType",
+					types: [
+						{
+							type: "Record",
+							members: { left: genericT, right: string },
+						},
+						{
+							type: "Record",
+							members: { left: string, right: genericT },
+						},
+					],
+				}
+				let actual: RecordType = {
+					type: "Record",
+					members: { left: string, right: integer },
+				}
+
+				expect(
+					matchesTypeWithBindings(leftOrRight, actual, context),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(integer)
+			})
+
+			it("should leave no bindings behind when no Union member matches", () => {
+				let context = inferContextFor(["T"])
+				let leftOrRight: UnionType = {
+					type: "UnionType",
+					types: [
+						{
+							type: "Record",
+							members: { left: genericT, right: string },
+						},
+						{
+							type: "Record",
+							members: { left: string, right: genericT },
+						},
+					],
+				}
+				let actual: RecordType = {
+					type: "Record",
+					members: { left: integer, right: integer },
+				}
+
+				expect(
+					matchesTypeWithBindings(leftOrRight, actual, context),
+				).toBe(false)
+				expect(context.bindings.has("T")).toBe(false)
+			})
 		})
 
 		describe("applyGenericBindings", () => {
@@ -1711,6 +1770,81 @@ describe("Helpers", () => {
 						{ inference: inferContextFor(["T"]) },
 					),
 				).toEqual({ type: "Match" })
+			})
+
+			// NOTE: A callback Parameter still waiting on an unbound Generic is
+			// matched LAST. An unannotated Function literal is typed from the
+			// Parameter it is passed to — modelled here by an Argument that
+			// echoes the expected Type back — so matched while `T` was open it
+			// echoed `T` itself, pinning the Generic to its own name: the
+			// Generic went opaque and the `5` that followed, its own inferred
+			// Type, was turned away.
+			describe("callbacks waiting on a Generic", () => {
+				const transform: FunctionType = {
+					type: "Function",
+					generics: [],
+					parameterTypes: [{ name: null, type: genericT }],
+					returnType: genericT,
+				}
+				const callbackFirst = [
+					{ name: "transform", type: transform },
+					{ name: "to", type: genericT },
+				]
+
+				it("should bind from the other Argument and resolve the callback against it", () => {
+					let context = inferContextFor(["T"])
+					let expectedTypes: Array<Type> = []
+
+					expect(
+						matchArguments(
+							callbackFirst,
+							[
+								{
+									name: "transform",
+									getType: (expectedType) => {
+										expectedTypes.push(expectedType)
+
+										return expectedType
+									},
+								},
+								{ name: "to", getType: () => integer },
+							],
+							{ inference: context },
+						),
+					).toEqual({ type: "Match" })
+
+					expect(context.bindings.get("T")).toEqual(integer)
+					// NOTE: The Type the literal was resolved against — the
+					// signature with the binding substituted in, which is what
+					// gives the lambda's body real Types to work with.
+					expect(expectedTypes).toEqual([
+						{
+							type: "Function",
+							generics: [],
+							parameterTypes: [{ name: null, type: integer }],
+							returnType: integer,
+						},
+					])
+				})
+
+				it("should report mismatching Arguments in the order they were written", () => {
+					expect(
+						matchArguments(
+							callbackFirst,
+							[
+								{ name: null, getType: () => transform },
+								{ name: null, getType: () => integer },
+							],
+							{
+								inference: inferContextFor(["T"]),
+								collectAllMismatches: true,
+							},
+						),
+					).toEqual({
+						type: "ArgumentMismatch",
+						mismatchedArgumentIndices: [0, 1],
+					})
+				})
 			})
 		})
 	})
@@ -1981,6 +2115,48 @@ describe("Helpers", () => {
 
 		it("should collapse to Nothing when nothing else remains", () => {
 			expect(buildUnion([nothing, nothing])).toEqual(nothing)
+		})
+
+		// NOTE: The Unknown item Type an empty List Literal carries is a
+		// wildcard in BOTH directions — `List<Unknown>` accepts `List<Integer>`
+		// and is accepted by it — so the two subsume one another and whichever
+		// was collected FIRST used to survive. That made `[[], [1]]` infer
+		// `List<List<Unknown>>`, a Type that fits EVERY List Type: the
+		// annotation `List<List<String>>` was accepted for a List of Integers,
+		// while the same Literal spelled `[[1], []]` was rejected.
+		it("should keep the concrete member beside an empty List's placeholder", () => {
+			const listOfUnknown: ListType = {
+				type: "List",
+				itemType: { type: "Unknown" },
+			}
+			const listOfInteger: ListType = { type: "List", itemType: integer }
+
+			expect(buildUnion([listOfUnknown, listOfInteger])).toEqual(
+				listOfInteger,
+			)
+			expect(buildUnion([listOfInteger, listOfUnknown])).toEqual(
+				listOfInteger,
+			)
+		})
+
+		// NOTE: Losing the Union costs the placeholder nothing — an empty List
+		// Literal is still assignable to every List Type, which is the whole
+		// reason Unknown is a wildcard to begin with.
+		it("should leave an empty List Literal assignable everywhere", () => {
+			const listOfUnknown: ListType = {
+				type: "List",
+				itemType: { type: "Unknown" },
+			}
+
+			expect(
+				matchesType(
+					{ type: "List", itemType: { type: "String" } },
+					listOfUnknown,
+				),
+			).toBe(true)
+			expect(buildUnion([listOfUnknown, listOfUnknown])).toEqual(
+				listOfUnknown,
+			)
 		})
 	})
 

@@ -130,6 +130,86 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: The four end-to-end guards for what the runtime PRINTS and what it
+	// calls EQUAL. Each fault below was invisible to every stage before the
+	// emitted Program ran, so each is pinned by running one — the unit-level
+	// counterparts live in `runtimeInternal.spec.ts`.
+	describe("Runtime Printing and Equality", () => {
+		// NOTE: A Record whose single-line rendering reaches sixty characters
+		// goes multi-line, and every member used to be printed TWICE — once
+		// unindented from the single-line attempt, once indented.
+		it("prints each member of a multi-line Record exactly once", async () => {
+			expect(
+				await run(`implementation {
+					__print({
+						firstName = "Alexander",
+						lastName = "Trefz",
+						occupation = "Language designer",
+					})
+				}`),
+			).toEqual([
+				[
+					"{",
+					'    firstName = "Alexander",',
+					'    lastName = "Trefz",',
+					'    occupation = "Language designer"',
+					"}",
+				].join("\n"),
+			])
+		})
+
+		// NOTE: A Function is the one value carrying no Type key, so printing
+		// one — or anything holding one — read `undefined.includes` and threw a
+		// TypeError at run time out of a Program that compiled clean.
+		it("prints a Function, and a value holding one, without crashing", async () => {
+			expect(
+				await run(`implementation {
+					constant double = (_ value: Integer) -> Integer {
+						<- value::multiply(with 2)
+					}
+
+					__print(double)
+					__print({ callback = double })
+					__print([double])
+				}`),
+			).toEqual(["Function", "{ callback = Function }", "[ Function ]"])
+		})
+
+		// NOTE: `String::is` is canonical equivalence — `compareTo` normalises
+		// to NFC — so a composed and a decomposed `café` are the same String.
+		// Deep equality compared the raw code units, so the same pair came out
+		// unequal the moment it was wrapped.
+		it("compares Strings inside a Record by canonical equivalence", async () => {
+			expect(
+				await run(`implementation {
+					constant composed = "café"::normalized()
+					constant decomposed = "café"::normalized(as #DecomposedCanonical)
+
+					__print(composed::is(decomposed))
+					__print({ v = composed }::is({ v = decomposed }))
+					__print([{ v = composed }]::is([{ v = decomposed }]))
+				}`),
+			).toEqual(["true", "true", "true"])
+		})
+
+		// NOTE: `Number::is` is numeric equality — `1 is 1/1` holds — but deep
+		// equality demanded the same member Type on both sides, so a Record
+		// holding the Integer answered unequal to one holding the Rational.
+		it("compares Numbers inside a Record across the tower", async () => {
+			expect(
+				await run(`implementation {
+					constant whole: Number = 1
+					constant ratio: Number = 1/1
+
+					__print(whole::is(ratio))
+					__print({ x = 1 }::is({ x = 1/1 }))
+					__print({ x = 1/2::add(1/2) }::is({ x = 1 }))
+					__print({ x = 1 }::is({ x = 1/2 }))
+				}`),
+			).toEqual(["true", "true", "true", "false"])
+		})
+	})
+
 	describe("Match", () => {
 		// NOTE: Regression test — the Handlers used to be folded into the
 		// if/else cascade in a way that only kept the first and the last, so
@@ -168,8 +248,12 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			// NOTE: Three Handlers produce one `if` plus two `else` branches.
-			expect(generated.split("else").length - 1).toBe(2)
+			// NOTE: Three Handlers produce one `if` plus two `else` branches,
+			// and the chain ends in a third `else` that no Handler owns — the
+			// exhaustiveness fallback, which throws rather than letting the
+			// wrapper answer `undefined`.
+			expect(generated.split("else").length - 1).toBe(3)
+			expect(generated).toContain("$type.noCaseMatched(_self)")
 		})
 
 		// NOTE: Regression test — a Union Matcher used to be serialised with

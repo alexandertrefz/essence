@@ -4,16 +4,29 @@ const TokenType = lexer.TokenType
 type Token = lexer.Token
 type Cursor = common.Cursor
 
+// NOTE: The Lexer's non-fatal problems — a Token it could read but that can
+// never be valid, like `0xFF`. They are handed to the caller rather than
+// thrown, because the Token stream is intact and every later Token is worth
+// reading; the parser's TokenStream turns each into a positioned Diagnostic.
+// The one fatal case, an unterminated String Literal, still throws, because
+// after it there is nothing left to lex.
+export type LexingError = {
+	message: string
+	position: common.Position
+}
+
 type SubLexingResult = {
 	input: string
 	token: Token
 	cursor: Cursor
+	error?: LexingError
 }
 
 type LexingResult = {
 	input: string
 	token: Token | undefined
 	cursor: Cursor
+	error?: LexingError
 }
 
 const createIsHelper = (tester: string | Array<string>) => {
@@ -373,6 +386,14 @@ const lexComment = (input: string, cursor: Cursor): SubLexingResult => {
 	}
 }
 
+// NOTE: A Number Literal is digits and nothing else — Essence has no
+// hexadecimal, binary or exponent form, so `0xFF`, `0b101` and `1e5` are all
+// wrong. The letters are read into the Literal anyway, and reported as one
+// malformed Number: stopping at the first letter instead would leave `FF`
+// behind as an Identifier Statement, which is neither what was written nor
+// anything the author could act on. The Token still carries only its leading
+// digits, so every later stage sees a well-formed Number and reports its own
+// problems rather than failing on text no Number can hold.
 const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 	let token: Token = {
 		value: "",
@@ -383,6 +404,8 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 		},
 	}
 
+	let lexeme = ""
+	let sawNonDigit = false
 	let i: number
 
 	for (i = 0; i < input.length; i++) {
@@ -390,7 +413,13 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 
 		if (
 			orHelper(
-				[isLinebreak, isSymbol, isCommentLiteral, isWhitespace],
+				[
+					isLinebreak,
+					isSymbol,
+					isCommentLiteral,
+					isStringLiteral,
+					isWhitespace,
+				],
 				currentChar,
 			)
 		) {
@@ -398,7 +427,15 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 			break
 		}
 
-		token.value += currentChar
+		if (isNumberLiteral(currentChar)) {
+			if (!sawNonDigit) {
+				token.value += currentChar
+			}
+		} else {
+			sawNonDigit = true
+		}
+
+		lexeme += currentChar
 		cursor = moveCursor(currentChar, cursor)
 
 		if (isEOF(input, i)) {
@@ -409,10 +446,22 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 	input = input.slice(i + 1)
 	token.position.end = cursor
 
+	if (!sawNonDigit) {
+		return {
+			input,
+			token,
+			cursor,
+		}
+	}
+
 	return {
 		input,
 		token,
 		cursor,
+		error: {
+			message: `'${lexeme}' is not a valid Number`,
+			position: token.position,
+		},
 	}
 }
 
@@ -431,7 +480,21 @@ const lexIdentifier = (input: string, cursor: Cursor): SubLexingResult => {
 	for (i = 0; i < input.length; i++) {
 		let currentChar = input[i]
 
-		if (orHelper([isSymbol, isLinebreak, isWhitespace], currentChar)) {
+		// NOTE: The Comment and String sigils end an Identifier exactly as a
+		// Symbol does — `name§ note` is a name and a Comment written flush
+		// against each other, not an Identifier called `name§`.
+		if (
+			orHelper(
+				[
+					isSymbol,
+					isLinebreak,
+					isWhitespace,
+					isCommentLiteral,
+					isStringLiteral,
+				],
+				currentChar,
+			)
+		) {
 			i--
 			break
 		}
@@ -460,6 +523,7 @@ const lexToken = (
 	ignoreList: Array<string>,
 ): LexingResult => {
 	let token: Token | undefined
+	let error: LexingError | undefined
 
 	if (input.length === 0) {
 		return {
@@ -488,7 +552,7 @@ const lexToken = (
 	} else if (isStringLiteral(firstChar)) {
 		;({ input, token, cursor } = lexString(input, cursor))
 	} else if (isNumberLiteral(firstChar)) {
-		;({ input, token, cursor } = lexNumber(input, cursor))
+		;({ input, token, cursor, error } = lexNumber(input, cursor))
 	} else {
 		;({ input, token, cursor } = lexIdentifier(input, cursor))
 
@@ -509,6 +573,7 @@ const lexToken = (
 		input,
 		token,
 		cursor,
+		error,
 	}
 }
 
@@ -517,28 +582,37 @@ export class Lexer {
 	protected index: number
 	protected state: Cursor
 	protected ignoreList: Array<string>
+	// NOTE: Collected rather than thrown — see `LexingError`. The caller reads
+	// them once lexing is done; `reset` starts a new input with none.
+	public errors: Array<LexingError>
 
 	constructor() {
 		this.data = ""
 		this.index = 0
 		this.state = { line: 1, column: 1 }
 		this.ignoreList = []
+		this.errors = []
 	}
 
 	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
 		this.data = data
 		this.index = 0
 		this.state = state
+		this.errors = []
 	}
 
 	next(): lexer.Token | undefined {
 		const data = this.data.slice(this.index)
 
-		const { input, token, cursor } = lexToken(
+		const { input, token, cursor, error } = lexToken(
 			data,
 			this.state,
 			this.ignoreList,
 		)
+
+		if (error !== undefined) {
+			this.errors.push(error)
+		}
 
 		this.state = cursor
 		this.index = this.data.length - input.length

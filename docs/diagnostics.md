@@ -43,6 +43,12 @@ A String Literal runs to the end of the file without its closing quote.
 A `{` was never closed. Only the innermost torn-open block reports — a missing
 `}` necessarily tears open every enclosing block as well.
 
+### `invalid-number`
+
+A Number Literal holds something that is not a digit — `0xFF`, `0b101`, `1e5`.
+Essence has no hexadecimal, binary or exponent form; a Number is written in
+decimal digits, grouped with `_` where that helps.
+
 ### `redundant-parameter-label`
 
 A Parameter of a Function that takes its Types from the surrounding context
@@ -72,6 +78,23 @@ A Protocol name is declared twice.
 ### `duplicate-case`
 
 A Choice declares the same Case twice.
+
+### `duplicate-method`
+
+A Namespace defines the same Method name twice. Methods are stored by name, so
+the second definition would replace the first — write an `overload` block when
+both are meant to exist.
+
+### `duplicate-property`
+
+A Namespace defines the same static Property twice.
+
+### `duplicate-member`
+
+A Record names the same member twice — in a Literal (`{ a = 1, a = 2 }`), in a
+Type (`{ a: Integer, a: String }`) or in a Matcher. A Record holds one value
+per name, so the earlier member — and anything its Expression does — would be
+dropped.
 
 ### `reserved-type-name`
 
@@ -109,9 +132,9 @@ Namespaces can.
 
 ### `assignment-type-mismatch`
 
-The assigned value does not fit the declared Type of the Constant or Variable.
-The report points at the value and, when the declaration is in the same file,
-at the declaration it is measured against:
+The assigned value does not fit the declared Type of the Constant, Variable or
+static Property. The report points at the value and, when the declaration is in
+the same file, at the declaration it is measured against:
 
 ```
 [assignment-type-mismatch]
@@ -142,8 +165,8 @@ A `<-` yields a value that does not match the declared return Type.
 
 ### `condition-not-boolean`
 
-An `if` Condition is not a Boolean. Essence has no truthiness; a Condition
-must be a Boolean and nothing else.
+An `if` Condition, or a `match` Case's `where` Guard, is not a Boolean. Essence
+has no truthiness; a Condition must be a Boolean and nothing else.
 
 ### `constant-reassignment`
 
@@ -215,6 +238,13 @@ No Namespace in scope declares a Method of that name for the value's Type.
 
 The value's Type has no Namespace at all, so no Method can be found on it.
 
+### `not-a-namespace`
+
+The name in a Namespace specifier — the `Name` of `value::<Name>method()` —
+means something other than a Namespace where the call is written. A Namespace
+of that name further out is shadowed, and shadowed is what the emitted code
+sees.
+
 ### `undispatchable-method`
 
 Two or more member Types of the value's Union Type are indistinguishable at
@@ -225,6 +255,12 @@ runtime, so the correct Method can not be chosen. Narrow the value with a
 
 A Namespace declared without a target Type (`for …`) can only hold static
 Methods.
+
+### `static-method-on-value`
+
+A static Method was called with instance-call syntax — `value::make(…)`. A
+static Method takes no receiver, so there is nowhere for the value to go; call
+it on the Namespace instead, as `Namespace.make(…)`.
 
 ### `native-property-without-type`
 
@@ -275,8 +311,24 @@ Types are listed.
 
 ### `unreachable-case`
 
-A Warning: a `case` matches a Type that is not a member of the matched Union,
-so it can never run.
+A Warning: a `case` that can never run. Either it matches a Type that is not a
+member of the matched Union, or an earlier Case already answers for every Type
+it matches — a duplicated `case Integer`, or a Case written below the `case _`
+that swallows it. A Case that can decline the values it accepts by Type (one
+with a literal Matcher, a value-constrained Record member, or a Guard) takes
+nothing away from the Cases below it.
+
+A Generic Case (`case Value`, inside `<infer Value>`) swallows the rest the same
+way `case _` does, even though it names a Type of its own: Types erase before a
+Match runs, so it narrows nothing and accepts every value that reaches it. It
+can therefore only ever be written last.
+
+A Function-typed member erases the same way: a Signature is not a runtime
+question, so `case { fn: (_ n: Integer) -> Integer }` accepts every Record
+carrying a callable `fn`, whatever that callback was declared as. Two Cases
+telling themselves apart by nothing but a callback's Signature can not be told
+apart at all — reordering does not help, and one of them has to name a member
+that survives to runtime, or carry a Guard.
 
 ### `match-on-non-union`
 
@@ -408,6 +460,12 @@ A warning from the JavaScript bundler, passed through unchanged.
 
 `@` was used outside a Method or a Match Handler, where there is nothing for
 it to refer to.
+
+### `at-in-static-method`
+
+`@` was used inside a static Method. A static Method is called on its
+Namespace rather than on a value, so it has no receiver — take the value as a
+Parameter, or drop `static` to make the Method an instance Method.
 
 ### `internal-error`
 

@@ -1,3 +1,4 @@
+import { displayGenericName } from "../helpers/index"
 import type { common } from "../interfaces/index"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
@@ -42,9 +43,12 @@ export function printType(type: common.Type): string {
 		case "OverloadedStaticMethod":
 			return printSignatureSummary(type.overloads)
 		case "Namespace":
+			return type.name
+		// NOTE: Under the name the source wrote, never the one an invocation
+		// freshened it to — see `displayGenericName`.
 		case "GenericUse":
 		case "GenericAlias":
-			return type.name
+			return displayGenericName(type.name)
 		default:
 			return type.type
 	}

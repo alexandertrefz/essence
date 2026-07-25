@@ -12,35 +12,47 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
+	// NOTE: A Function is the one runtime value carrying no Type key — it is
+	// emitted as a bare JavaScript function, not a tagged object — so it is
+	// answered before anything reads that key, exactly as `anyIs` answers it.
+	// Without this, printing a Function, or anything merely HOLDING one, read
+	// `undefined.includes` and threw.
+	//
+	// NOTE: One fixed word, and no more. A Function's Type is erased by the
+	// time it reaches here, and its source text is a JavaScript rendering of a
+	// simplified body — neither is something a Program should print. The name
+	// stays stable so a Record holding a Function renders the same every time.
+	if (typeof obj === "function") {
+		return "Function"
+	}
+
 	if (obj[typeKeySymbol] === "Record") {
-		let keyValuePairs: Array<string> = []
+		let entries = Object.entries(obj)
 
-		if (Object.entries(obj).length > 0) {
-			let singleLineString = ""
-
-			for (let [key, value] of Object.entries(obj)) {
-				keyValuePairs.push(
-					`${key} = ${getStringRepresentation(value, 0)}`,
+		if (entries.length > 0) {
+			// NOTE: The pairs are rendered ONCE per layout — the single-line
+			// pass at indent zero, and, only if that came out too long, a
+			// fresh pass at the nested indent. Pushing the second pass onto
+			// the array the first one filled printed every member twice.
+			let singleLineString = `{ ${entries
+				.map(
+					([key, value]) =>
+						`${key} = ${getStringRepresentation(value, 0)}`,
 				)
-			}
-
-			singleLineString = `{ ${keyValuePairs.join(", ")} }`
+				.join(", ")} }`
 
 			if (singleLineString.length < singleLineMaxLength) {
 				return singleLineString
 			} else {
-				for (let [key, value] of Object.entries(obj)) {
-					keyValuePairs.push(
-						`${key} = ${getStringRepresentation(
-							value,
-							indentLevel + 1,
-						)}`,
+				return `{\n${contentIndent}${entries
+					.map(
+						([key, value]) =>
+							`${key} = ${getStringRepresentation(
+								value,
+								indentLevel + 1,
+							)}`,
 					)
-				}
-
-				return `{\n${contentIndent}${keyValuePairs.join(
-					`,\n${contentIndent}`,
-				)}\n${baseIndent}}`
+					.join(`,\n${contentIndent}`)}\n${baseIndent}}`
 			}
 		} else {
 			return "{}"

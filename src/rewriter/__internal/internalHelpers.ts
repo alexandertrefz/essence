@@ -1,13 +1,15 @@
 import type { Fraction } from "bigint-fraction"
 
+import type { common } from "../../interfaces/index"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
+import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
 import type { AnyType } from "./type"
-import { typeKeySymbol } from "./type"
+import { isValueOfType, typeKeySymbol } from "./type"
 
 export function getInt32(number: IntegerType): number {
 	return Number(BigInt.asIntN(32, number.value))
@@ -25,6 +27,31 @@ export function isFirstRationalBigger(
 			secondRational.numerator * firstRational.denominator
 		)
 	}
+}
+
+// NOTE: Integer and Rational — the two members of the numeric tower that spell
+// the SAME value two ways, which is why they need one comparison between them
+// rather than a cell each. `Algebraic` and `Transcendental` need none: each is
+// provably irrational and canonically formed, so a value of either can equal
+// only a value of its own kind, and every pairing across kinds is decided by
+// the tags alone.
+function isRationalKind(value: AnyType): value is IntegerType | RationalType {
+	return (
+		value[typeKeySymbol] === "Integer" ||
+		value[typeKeySymbol] === "Rational"
+	)
+}
+
+function numeratorOf(number: IntegerType | RationalType): bigint {
+	return number[typeKeySymbol] === "Integer"
+		? number.value
+		: number.rational.numerator
+}
+
+function denominatorOf(number: IntegerType | RationalType): bigint {
+	return number[typeKeySymbol] === "Integer"
+		? 1n
+		: number.rational.denominator
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {
@@ -56,29 +83,43 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		b[typeKeySymbol] === "String"
 	) {
 		// NOTE: String.is is written in Essence now — it reads `compareTo`,
-		// which is lexicographic by code point and answers `Equal` exactly for
-		// two Strings of the same code points. Compare the runtime
-		// representation directly rather than importing the deleted native.
-		return a.value === b.value
-	} else if (
-		a[typeKeySymbol] === "Integer" &&
-		b[typeKeySymbol] === "Integer"
-	) {
-		// NOTE: Integer.is is written in Essence now; compare the runtime
-		// representation directly rather than importing the deleted native.
-		return a.value === b.value
-	} else if (
-		a[typeKeySymbol] === "Rational" &&
-		b[typeKeySymbol] === "Rational"
-	) {
-		// NOTE: Rational.is is written in Essence now — it reads `compareTo`,
-		// which cross-multiplies. Compare the runtime representation the same
-		// way rather than importing the deleted native; cross-multiplication
-		// answers for unreduced Fractions too, and denominators are kept
-		// positive by `createRational`.
+		// which is lexicographic by code point over the NFC-normalised String,
+		// so it answers `Equal` for any two canonically equivalent Strings (an
+		// accent composed or decomposed). Normalising both sides here is the
+		// same answer without importing the whole comparison: two NFC Strings
+		// are `Equal` exactly when their code points match, which is what `===`
+		// decides. Comparing the RAW representations, as this did, made the same
+		// pair of Strings equal on their own and unequal inside a Record.
+		//
+		// NOTE: Identical code units are already canonically equivalent, so the
+		// normalisation — which allocates twice — only has to run for a pair
+		// that differs.
 		return (
-			a.rational.numerator * b.rational.denominator ===
-			b.rational.numerator * a.rational.denominator
+			a.value === b.value ||
+			a.value.normalize("NFC") === b.value.normalize("NFC")
+		)
+	} else if (isRationalKind(a) && isRationalKind(b)) {
+		// NOTE: ONE cell for the two rational kinds, because that is what the
+		// language promises: `Number.is` is `compareTo(other)::is(#Equal)` over
+		// the covering order, and it answers by VALUE — `1 is 1/1` holds. A cell
+		// per kind could not see across the two, so an Integer beside a
+		// numerically equal Rational matched nothing and fell to `false`: a
+		// value stopped being equal to its equal the moment either was wrapped
+		// in a Record or a Case payload. Ordinary arithmetic reaches the mixed
+		// pair, too — `createRational` never reduces, so `(1/2)::add(1/2)` is
+		// the Rational `4/4` beside anyone else's Integer `1`.
+		//
+		// NOTE: Cross-multiplication, which is what `Number.compareTo` does for
+		// this pairing — it answers for unreduced Fractions and for either sign,
+		// and it is not the covering `compareTo` itself because EVERY emitted
+		// Program imports this module: reading the covering order here dragged
+		// π's interval arithmetic and the algebraic sign routines into Programs
+		// holding no Numbers at all (measured at ~11 kB on one that only
+		// compares Records of Strings). The pairings that order needs it for are
+		// exactly the ones equality can decide by tag — see `isRationalKind`.
+		return (
+			numeratorOf(a) * denominatorOf(b) ===
+			numeratorOf(b) * denominatorOf(a)
 		)
 	} else if (
 		a[typeKeySymbol] === "Algebraic" &&
@@ -87,7 +128,9 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// NOTE: Algebraic.is is written in Essence now — it reads `compareTo`,
 		// which decides the sign of the difference symbolically. Normal forms
 		// make that the same answer as comparing the representation directly,
-		// which is what the deleted native did.
+		// which is what the deleted native did. An Algebraic is irrational, so
+		// it can equal no Integer, Rational or Transcendental — those pairings
+		// need no cell of their own and fall through to `false` below.
 		return (
 			a.radicand === b.radicand &&
 			a.rationalPartNumerator === b.rationalPartNumerator &&
@@ -102,7 +145,9 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// NOTE: Transcendental.is is written in Essence now — it reads the
 		// `Number` Union's `is`, whose Transcendental/Transcendental cell is
 		// exact. Canonical forms make that the same answer as comparing the
-		// representation directly, which is what the deleted native did.
+		// representation directly, which is what the deleted native did. A
+		// Transcendental equals no value of any other kind, for the same reason
+		// an Algebraic does not.
 		return (
 			a.rationalPartNumerator === b.rationalPartNumerator &&
 			a.rationalPartDenominator === b.rationalPartDenominator &&
@@ -176,7 +221,17 @@ type DescriptorNode =
 	| { k: "list"; of: DescriptorNode }
 	| { k: "record"; m: Record<string, DescriptorNode> }
 	| { k: "case"; m: Record<string, DescriptorNode> }
-	| { k: "union"; arms: Array<{ tag: string | null; node: DescriptorNode }> }
+	// NOTE: `shape` is carried by exactly the arms one tag can not tell apart —
+	// the Types every Record and every List share a tag with. It is checked with
+	// the same `isValueOfType` a Match narrows with, and the Enricher orders the
+	// arms most specific first.
+	| { k: "union"; arms: Array<UnionArm> }
+
+type UnionArm = {
+	tag: string | null
+	shape?: common.Type
+	node: DescriptorNode
+}
 
 type DerivedEquatableDescriptor = Record<string, Record<string, DescriptorNode>>
 
@@ -296,16 +351,14 @@ function memberEqual(
 
 			return membersEqual(a, b, node.m, witnesses)
 		case "union": {
-			// NOTE: A concrete arm claims a value by its `typeKeySymbol` tag —
-			// both sides must land on the same arm, so a Nothing and a `T` value
-			// are unequal. Anything no concrete arm claims falls to the one
-			// generic arm (`tag: null`) and compares through its witness.
-			let aArm = node.arms.find(
-				(arm) => arm.tag !== null && arm.tag === a[typeKeySymbol],
-			)
-			let bArm = node.arms.find(
-				(arm) => arm.tag !== null && arm.tag === b[typeKeySymbol],
-			)
+			// NOTE: An arm claims a value by its `typeKeySymbol` tag, and — when
+			// the tag alone can not tell it from another arm — by the shape the
+			// Enricher gave it. Both sides must land on the same arm, so a
+			// Nothing and a `T` value are unequal. Anything no arm claims falls
+			// to the one generic arm (`tag: null`) and compares through its
+			// witness.
+			let aArm = node.arms.find((arm) => armClaims(arm, a))
+			let bArm = node.arms.find((arm) => armClaims(arm, b))
 
 			if (aArm !== undefined || bArm !== undefined) {
 				return aArm === bArm
@@ -320,4 +373,22 @@ function memberEqual(
 				: memberEqual(a, b, fallback.node, witnesses)
 		}
 	}
+}
+
+// NOTE: Whether one arm of a Union-typed payload member claims this value. A
+// tagged arm claims the values carrying its tag, narrowed by its shape when it
+// has one — the arms that share a tag are the ones the Enricher shapes. The
+// generic arm carries no tag and claims nothing here: it is the FALLBACK, taken
+// above only once no arm claimed. It claims positively only when it was shaped
+// too, which happens when the Type Argument refines a concrete arm and has to
+// take its own values off it.
+function armClaims(arm: UnionArm, value: AnyType): boolean {
+	if (arm.tag === null) {
+		return arm.shape !== undefined && isValueOfType(value, arm.shape)
+	}
+
+	return (
+		arm.tag === value[typeKeySymbol] &&
+		(arm.shape === undefined || isValueOfType(value, arm.shape))
+	)
 }

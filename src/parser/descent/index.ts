@@ -3,8 +3,10 @@
 // node generators in ../nodeGenerators.
 import {
 	collectDiagnostics,
+	markDiagnostics,
 	primary,
 	reportError,
+	rewindDiagnostics,
 	secondary,
 } from "../../diagnostics/index"
 import { type common, lexer, type parser } from "../../interfaces/index"
@@ -57,12 +59,16 @@ const literalMatcherTokenTypes = [
 ]
 
 // NOTE: The Token types that can begin a Statement — these are the
-// resynchronisation points after a parse error.
+// resynchronisation points after a parse error. Every Keyword
+// `parseImplementationNode` dispatches on belongs here: one that is missing
+// is not a Statement start to the recovery, so the whole Declaration it opens
+// — braces and all — is skipped without a word.
 const statementStartTokenTypes = [
 	TokenType.KeywordConstant,
 	TokenType.KeywordVariable,
 	TokenType.KeywordFunction,
 	TokenType.KeywordNamespace,
+	TokenType.KeywordProtocol,
 	TokenType.KeywordType,
 	TokenType.KeywordIf,
 	TokenType.KeywordMatch,
@@ -72,6 +78,17 @@ const statementStartTokenTypes = [
 	TokenType.KeywordStatic,
 	TokenType.KeywordChoice,
 ]
+
+// NOTE: Whether two Positions are written flush against each other, with
+// neither whitespace nor a line break between them. Some of the grammar reads
+// several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
+// tells that apart from the same Tokens written as separate things.
+function isAdjacent(left: common.Position, right: common.Position): boolean {
+	return (
+		left.end.line === right.start.line &&
+		left.end.column === right.start.column
+	)
+}
 
 export type ParserOptions = {
 	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
@@ -248,6 +265,51 @@ class DescentParser {
 					? [primary(error.position, "here")]
 					: [primary(error.position, error.label)],
 		})
+	}
+
+	// NOTE: Several parts of the AST hold their members in a name-keyed
+	// Record — a Namespace's Methods, a Record's members — where a repeated
+	// name can not be represented at all: building the Record drops the
+	// earlier definition, and with it whatever Expression it held. No later
+	// stage ever sees the first one, so the duplicate is reported here, where
+	// both are still in hand.
+	protected reportDuplicateNames(
+		entries: Array<{ name: parser.IdentifierNode }>,
+		kind: string,
+		code: common.DiagnosticCode,
+		helps: Array<string> = [],
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let firstPositions = new Map<string, common.Position>()
+
+		for (let entry of entries) {
+			let firstPosition = firstPositions.get(entry.name.content)
+
+			if (firstPosition === undefined) {
+				firstPositions.set(entry.name.content, entry.name.position)
+
+				continue
+			}
+
+			reportError(
+				`${kind} '${entry.name.content}' is already defined`,
+				entry.name.position,
+				{
+					code,
+					labels: [
+						primary(
+							entry.name.position,
+							"defined a second time here",
+						),
+						secondary(firstPosition, "first defined here"),
+					],
+					helps,
+				},
+			)
+		}
 	}
 
 	// NOTE: Parses list elements until the closing `}` (or the end of the
@@ -715,6 +777,24 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
+		// NOTE: Properties and Methods are built into two separate name-keyed
+		// Records, so a Property may share its name with a Method — but not
+		// with another Property, and a Method not with another Method, not
+		// even when one of the two is `static`.
+		this.reportDuplicateNames(
+			body.filter((node) => node.nodeType === "NamespacePropertyNode"),
+			"Property",
+			"duplicate-property",
+		)
+		this.reportDuplicateNames(
+			body.filter((node) => node.nodeType !== "NamespacePropertyNode"),
+			"Method",
+			"duplicate-method",
+			[
+				"Write both signatures inside one 'overload' block when both are meant to exist.",
+			],
+		)
+
 		return generators.namespaceDefinitionStatement(
 			name,
 			generics,
@@ -1081,6 +1161,12 @@ class DescentParser {
 
 		let body = this.parseStatementList(() => this.parseProtocolBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		// NOTE: A Protocol's signatures are name-keyed exactly as a
+		// Namespace's Methods are, and lose the first definition the same way.
+		this.reportDuplicateNames(body, "Method", "duplicate-method", [
+			"Write both signatures inside one 'overload' block when both are meant to exist.",
+		])
 
 		return generators.protocolDeclarationStatement(
 			name,
@@ -1517,6 +1603,12 @@ class DescentParser {
 
 		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
+		this.reportDuplicateNames(
+			members.map(([, member]) => member),
+			"Member",
+			"duplicate-member",
+		)
+
 		return generators.recordMatcher(Object.fromEntries(members), {
 			start: leftBrace.position.start,
 			end: rightBrace.position.end,
@@ -1545,6 +1637,11 @@ class DescentParser {
 		return [name.content, { kind: "Type", name, type: this.parseType() }]
 	}
 
+	// NOTE: A Matcher compares against a written literal and nothing else —
+	// `size = expected` does not read the Constant `expected`, because a
+	// Matcher is a pattern rather than an Expression. Anything else after `=`
+	// is a parse error here: taking the Token and calling it `nothing`, as
+	// this once did, inverted what the Matcher was written to say.
 	protected parseLiteralMatcherValue(): parser.LiteralMatcherValueNode {
 		let token = this.peekOrFail()
 
@@ -1561,9 +1658,15 @@ class DescentParser {
 			case TokenType.LiteralFalse:
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
-			default:
+			case TokenType.LiteralNothing:
 				this.tokens.next()
 				return generators.nothingValueNode(token.position)
+			default:
+				fail(
+					`Expected a literal value but found ${describeToken(token)}.`,
+					token.position,
+					"expected a Number, a String, a Boolean or 'nothing'",
+				)
 		}
 	}
 
@@ -1712,6 +1815,8 @@ class DescentParser {
 			pairs.push(this.parseKeyValuePair())
 		}
 
+		this.reportDuplicateNames(pairs, "Member", "duplicate-member")
+
 		return generators.buildKeyValuePairList(
 			pairs.slice(0, -1),
 			pairs[pairs.length - 1],
@@ -1736,7 +1841,19 @@ class DescentParser {
 		| parser.RationalValueNode {
 		let numerator = this.parseInteger()
 
-		if (this.tokens.peek()?.type === TokenType.SymbolSlash) {
+		// NOTE: `1/2` is one Rational Literal because the three Tokens are
+		// written flush — a `/` that stands apart from the Integer above it
+		// belongs to whatever was meant on its own line, and joining it here
+		// would silently turn that Integer into a Rational instead.
+		let slash = this.tokens.peek()
+		let denominatorStart = this.tokens.peek(1)
+
+		if (
+			slash?.type === TokenType.SymbolSlash &&
+			denominatorStart !== undefined &&
+			isAdjacent(numerator.position, slash.position) &&
+			isAdjacent(slash.position, denominatorStart.position)
+		) {
 			this.tokens.next()
 
 			let denominator = this.parseInteger()
@@ -1763,20 +1880,33 @@ class DescentParser {
 		let firstPart = this.tokens.expect(TokenType.LiteralNumber)
 
 		let value = firstPart.value
-		let end = firstPart.position.end
+		let lastPart = firstPart
 
-		while (
-			this.tokens.peek()?.type === TokenType.SymbolUnderscore &&
-			this.tokens.peek(1)?.type === TokenType.LiteralNumber
-		) {
+		// NOTE: `1_000` is one Number only because its Tokens are written
+		// flush against one another. The same Tokens with anything between
+		// them are separate things — a line that begins `_ 2` is a Statement
+		// of its own (a broken one), not the tail of the Number above it.
+		while (true) {
+			let underscore = this.tokens.peek()
+			let part = this.tokens.peek(1)
+
+			if (
+				underscore?.type !== TokenType.SymbolUnderscore ||
+				part?.type !== TokenType.LiteralNumber ||
+				!isAdjacent(lastPart.position, underscore.position) ||
+				!isAdjacent(underscore.position, part.position)
+			) {
+				break
+			}
+
+			this.tokens.next()
 			this.tokens.next()
 
-			let part = this.tokens.next()
-
 			value += part.value
-			end = part.position.end
+			lastPart = part
 		}
 
+		let end = lastPart.position.end
 		let start = firstPart.position.start
 		if (dash !== null) {
 			value = `-${value}`
@@ -2296,7 +2426,7 @@ class DescentParser {
 			leftAngleToken?.type === TokenType.SymbolLeftAngle &&
 			leftAngleToken.position.start.line === baseType.position.end.line
 		) {
-			let leftAngle = this.tokens.next()
+			this.tokens.next()
 
 			let generics = [this.parseType()]
 
@@ -2312,8 +2442,13 @@ class DescentParser {
 
 			let rightAngle = this.tokens.expect(TokenType.SymbolRightAngle)
 
+			// NOTE: From the base Type, not from the `<` — the Node stands for
+			// `List<Item>`, so that is what it spans. Starting at the bracket
+			// would leave `List` inside no Node at all, which is what made the
+			// Editor underline the Arguments alone while naming the whole
+			// application.
 			return generators.genericTypeDeclaration(baseType, generics, {
-				start: leftAngle.position.start,
+				start: baseType.position.start,
 				end: rightAngle.position.end,
 			})
 		}
@@ -2442,6 +2577,8 @@ class DescentParser {
 
 		let rightBrace = this.tokens.expect(TokenType.SymbolRightBrace)
 
+		this.reportDuplicateNames(pairs, "Member", "duplicate-member")
+
 		return generators.recordTypeDeclaration(
 			generators.buildKeyTypePairList(
 				pairs.slice(0, -1),
@@ -2539,14 +2676,22 @@ class DescentParser {
 		return token
 	}
 
+	// NOTE: A speculation that is thrown away must leave nothing behind — not
+	// the Tokens it read and not the Diagnostics it reported, which are about
+	// a shape the Program was never in. The same text is often read twice
+	// (a typed Record Literal, then a Record Literal), and only the reading
+	// that is kept gets to report on it.
 	protected backtrack<T>(parseAttempt: () => T): T | null {
 		let saved = this.tokens.save()
+		let diagnosticMark = markDiagnostics()
 
 		try {
 			return parseAttempt()
 		} catch (error) {
 			if (error instanceof ParseError) {
 				this.tokens.restore(saved)
+				rewindDiagnostics(diagnosticMark)
+
 				return null
 			}
 

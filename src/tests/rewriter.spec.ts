@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { Fraction } from "bigint-fraction"
 
+import type { common } from "../interfaces/index"
 import * as boolean from "../rewriter/__internal/Boolean"
 import * as integer from "../rewriter/__internal/Integer"
 import {
@@ -18,7 +19,11 @@ import * as rational from "../rewriter/__internal/Rational"
 import * as record from "../rewriter/__internal/Record"
 import * as side from "../rewriter/__internal/Side"
 import * as string from "../rewriter/__internal/String"
-import { dispatchMethod, isValueOfType } from "../rewriter/__internal/type"
+import {
+	dispatchMethod,
+	isValueOfType,
+	noCaseMatched,
+} from "../rewriter/__internal/type"
 
 const booleanTrue = () => boolean.createBoolean(true)
 const booleanFalse = () => boolean.createBoolean(false)
@@ -401,6 +406,94 @@ describe("Rewriter", () => {
 							itemType: { type: "Integer" },
 						}),
 					).toBeFalse()
+				})
+
+				// NOTE: Regression test — a Function descriptor used to reach
+				// the "not implemented" branch, which printed a line of
+				// Compiler prose into the Program's output and answered FALSE.
+				// A Record Matcher naming a callback member could therefore
+				// never match: every Handler of an exhaustive Match declined,
+				// and the Match answered `undefined`.
+				it("matches a Function by its callability", () => {
+					let functionType: common.FunctionType = {
+						type: "Function",
+						generics: [],
+						parameterTypes: [
+							{ name: null, type: { type: "Integer" } },
+						],
+						returnType: { type: "Integer" },
+					}
+
+					let double = (value: integer.IntegerType) =>
+						integer.createInteger(value.value * 2n)
+
+					// NOTE: A Function value carries no Type key — `typeof` is
+					// the whole check, because the Signature is erased by the
+					// time it runs.
+					expect(
+						isValueOfType(double as never, functionType),
+					).toBeTrue()
+
+					expect(
+						isValueOfType(integerOne(), functionType),
+					).toBeFalse()
+
+					expect(
+						isValueOfType(
+							record.createRecord({ fn: double as never }),
+							{
+								type: "Record",
+								members: { fn: functionType },
+							},
+						),
+					).toBeTrue()
+
+					expect(
+						isValueOfType(
+							record.createRecord({ fn: integerOne() }),
+							{
+								type: "Record",
+								members: { fn: functionType },
+							},
+						),
+					).toBeFalse()
+				})
+
+				// NOTE: The descriptors that are left are Types no Matcher and
+				// no dispatch case can name — reaching one is a Compiler bug,
+				// and it used to be answered with a `console.log` and a false,
+				// which took a silently wrong branch instead.
+				it("throws on a descriptor it can not check", () => {
+					expect(() =>
+						isValueOfType(integerOne(), {
+							type: "Protocol",
+							name: "Comparable",
+							methods: {},
+						} as never),
+					).toThrow("This is a bug in the Compiler.")
+				})
+			})
+
+			describe("noCaseMatched", () => {
+				// NOTE: The end of an emitted Match's `if` chain. It used to
+				// simply not exist: the wrapper fell off its end and answered
+				// `undefined`, which is not an Essence value, so the failure
+				// surfaced somewhere else entirely — as a `TypeError` out of
+				// whatever read the missing Type key next.
+				it("throws, naming the value that matched no Case", () => {
+					expect(() => noCaseMatched(integerOne())).toThrow(
+						"No Case of this Match matched the Integer it was given.",
+					)
+
+					expect(() => noCaseMatched(nothing())).toThrow(
+						"No Case of this Match matched the Nothing it was given.",
+					)
+
+					expect(() =>
+						noCaseMatched(((value: never) => value) as never),
+					).toThrow(
+						"No Case of this Match matched the Function it was given.",
+					)
 				})
 			})
 		})

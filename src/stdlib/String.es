@@ -385,18 +385,33 @@ declarations {
 			if part::isEmpty() {
 				<- @::length()
 			} else {
-				constant pieces = @::split(on part)
+				§ The LAST occurrence of the part is the FIRST occurrence of the
+				§ reversed part in the reversed String, so `firstIndex` answers
+				§ this one too and only the position has to be counted back from
+				§ the end: a match that far into the reversal is that far from the
+				§ right, so the occurrence ENDS there and begins one part-length
+				§ before that.
+				§
+				§ Deriving it from `split(on:)` instead — the whole String less
+				§ the last piece and the part — answers the last NON-OVERLAPPING
+				§ match, because splitting scans left to right and consumes each
+				§ match it finds: "aaa" split on "aa" consumes the match at 0 and
+				§ leaves "a", giving 0, while the last occurrence of "aa" really
+				§ begins at 1.
+				constant length = @::length()
+				constant partLength = part::length()
 
-				§ One piece means the separator was never found.
-				if pieces::length()::is(1) {
-					<- nothing
-				} else {
-					§ The last piece is everything after the last occurrence, so
-					§ the occurrence begins one part-length before it — the whole
-					§ String less the last piece and the part itself.
-					constant lastPieceLength = pieces::lastItem()::otherwise("")::length()
+				§ `@` is the SCRUTINEE inside a match, not the receiver, so both
+				§ lengths are bound before the match to stay reachable in the Case
+				§ bodies.
+				<- match @::reverse()::firstIndex(of part::reverse()) -> Optional<Integer> {
+					case Nothing {
+						<- nothing
+					}
 
-					<- @::length()::subtract(lastPieceLength)::subtract(part::length())
+					case _ {
+						<- length::subtract(@)::subtract(partLength)
+					}
 				}
 			}
 		}

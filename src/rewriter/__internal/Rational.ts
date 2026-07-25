@@ -27,6 +27,13 @@ import { typeKeySymbol } from "./type"
 
 export type RationalType = { [typeKeySymbol]: "Rational"; rational: Fraction }
 
+// NOTE: The single gateway every Rational is built through, and the reason the
+// ordering primitives may cross-multiply the raw parts: the sign lives on the
+// numerator, never on the denominator. Zero is canonicalised here as well —
+// `bigint-fraction`'s GCD answers 0 whenever an operand is 0 and its `reduce`
+// bails on a gcd of 0, so a zero reached by cancellation (`1/2 − 1/2` gives
+// `0/4`) can never reduce itself afterwards. Zero has one lowest-terms form,
+// and it is `0/1`.
 export function createRational(
 	numerator: bigint,
 	denominator: bigint,
@@ -34,6 +41,10 @@ export function createRational(
 	if (denominator < 0) {
 		numerator = numerator * -1n
 		denominator = denominator * -1n
+	}
+
+	if (numerator === 0n && denominator !== 0n) {
+		denominator = 1n
 	}
 
 	return {
@@ -70,15 +81,20 @@ export function add__overload$1(
 	)
 }
 
+// NOTE: The Integer-operand overloads do the arithmetic on the parts and hand
+// the result to `createRational`, rather than mutating a clone of the
+// `Fraction`. The class's own operations promise neither of the invariants —
+// `divide(-3n)` multiplies the DENOMINATOR by −3 and leaves the sign there,
+// which every ordering primitive then reads backwards — so nothing may reach a
+// caller without passing through the gateway.
 export function add__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): RationalType {
-	let clonedRational = rational.rational.clone()
+	const numerator = rational.rational.numerator
+	const denominator = rational.rational.denominator
 
-	clonedRational.add(integer.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
+	return createRational(numerator + integer.value * denominator, denominator)
 }
 
 // #endregion
@@ -109,11 +125,10 @@ export function divide__overload$2(
 		return createNothing()
 	}
 
-	let clonedRational = rational.rational.clone()
-
-	clonedRational.divide(integer.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
+	return createRational(
+		rational.rational.numerator,
+		rational.rational.denominator * integer.value,
+	)
 }
 
 // #endregion
@@ -136,11 +151,10 @@ export function multiply__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): RationalType {
-	let clonedRational = rational.rational.clone()
-
-	clonedRational.multiply(integer.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
+	return createRational(
+		rational.rational.numerator * integer.value,
+		rational.rational.denominator,
+	)
 }
 
 // #endregion
@@ -237,6 +251,15 @@ function reducedParts(rational: RationalType): {
 	if (denominator < 0n) {
 		numerator = -numerator
 		denominator = -denominator
+	}
+
+	// NOTE: The one case `reduce()` can not answer — its GCD is 0 whenever an
+	// operand is 0, and it bails on a gcd of 0, so a zero keeps whatever
+	// denominator it was built with. `createRational` canonicalises zero, but
+	// a Rational the Integer Namespace built by adding to a Fraction has not
+	// been through it, and `denominator()` and `isWholeNumber()` read here.
+	if (numerator === 0n) {
+		denominator = 1n
 	}
 
 	return { numerator, denominator }
@@ -338,16 +361,28 @@ export function parse(text: StringType): RationalType | NothingType {
 
 // #endregion
 
-function formatAsRational(rational: Fraction): string {
-	let clonedRational = rational.clone()
-	clonedRational.reduce()
-	return `${clonedRational.numerator}/${clonedRational.denominator}`
+function formatAsRational(rational: RationalType): string {
+	let parts = reducedParts(rational)
+
+	return `${parts.numerator}/${parts.denominator}`
+}
+
+// NOTE: `bigint-fraction` seeds its decimal text with `${wholePart}.` and only
+// then appends fractional digits, so a Rational that IS a whole number comes
+// back as "2." — text `Rational.parse` refuses to read back, since its decimal
+// form requires digits behind the dot. Drop a separator with nothing behind it.
+function formatAsDecimal(rational: RationalType): string {
+	let decimalForm = rational.rational.toString()
+
+	return decimalForm.endsWith(".")
+		? decimalForm.slice(0, decimalForm.length - 1)
+		: decimalForm
 }
 
 // #region toString
 
 export function toString__overload$1(rational: RationalType): StringType {
-	return createString(formatAsRational(rational.rational))
+	return createString(formatAsRational(rational))
 }
 
 // NOTE: The format arrives as a `NumberFormat` Case rather than a String, so
@@ -358,9 +393,9 @@ export function toString__overload$2(
 	formatAs: NumberFormatType,
 ): StringType {
 	if (formatAs[typeKeySymbol] === "NumberFormat#Decimal") {
-		return createString(rational.rational.toString())
+		return createString(formatAsDecimal(rational))
 	} else {
-		return createString(formatAsRational(rational.rational))
+		return createString(formatAsRational(rational))
 	}
 }
 

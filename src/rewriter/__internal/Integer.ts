@@ -41,10 +41,11 @@ export function add__overload$2(
 	originalNumber: IntegerType,
 	other: RationalType,
 ): RationalType {
-	let clonedRational = other.rational.clone()
-	clonedRational.add(originalNumber.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
+	return createRational(
+		other.rational.numerator +
+			originalNumber.value * other.rational.denominator,
+		other.rational.denominator,
+	)
 }
 
 // #endregion
@@ -62,10 +63,10 @@ export function multiply__overload$2(
 	originalNumber: IntegerType,
 	other: RationalType,
 ): RationalType {
-	let clonedRational = other.rational.clone()
-	clonedRational.multiply(originalNumber.value)
-
-	return { [typeKeySymbol]: "Rational", rational: clonedRational }
+	return createRational(
+		other.rational.numerator * originalNumber.value,
+		other.rational.denominator,
+	)
 }
 
 // #endregion

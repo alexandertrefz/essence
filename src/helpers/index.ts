@@ -51,6 +51,20 @@ export function closestMatch(
 		: null
 }
 
+// NOTE: The spelling a Generic is SHOWN under. `createFreshenedInference`
+// alpha-renames a callee's Generics for the span of one invocation — `T`
+// becomes `T`, a zero-width space and a counter — and a Generic that never
+// binds stays under that fresh name in the Types stamped onto the Argument
+// Nodes, which is where Hover and Inlay Hints read their Types back from: the
+// reader is shown `T117`, since only the separator is invisible. Stripped
+// where a name is rendered rather than un-freshened in the Types themselves,
+// so the fresh name stays the collision-proof symbol inference needs it to
+// be. A source Generic can not carry a zero-width space — the assumption the
+// freshening itself rests on — so nothing a Program spells is touched.
+export function displayGenericName(name: common.GenericName): string {
+	return name.replace(/\u200B\d+$/, "")
+}
+
 // NOTE: A compact, one-line description of a Type for Diagnostics — the
 // spelling a reader would recognise from their own source, not the internal
 // Type tag. `printType` in the Language Server is its Hover-oriented sibling;
@@ -92,7 +106,7 @@ export function describeType(type: common.Type): string {
 			return `Namespace '${type.name}'`
 		case "GenericUse":
 		case "GenericAlias":
-			return type.name
+			return displayGenericName(type.name)
 		default:
 			return type.type
 	}
@@ -293,7 +307,10 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 			bindableNames.add(freshName)
 		} else if (generic.defaultType !== null) {
 			bindableNames.add(freshName)
-			bindings.set(freshName, applyGenericBindings(generic.defaultType, rename))
+			bindings.set(
+				freshName,
+				applyGenericBindings(generic.defaultType, rename),
+			)
 		}
 	}
 
@@ -559,6 +576,49 @@ function matchGenericUse(
 	return false
 }
 
+// NOTE: A mark in a context's bindings, taken before a match attempt — the
+// number of bindings it starts from. Everything the attempt binds is added
+// AFTER the mark, so `restoreBindings` can undo a failed attempt by dropping
+// the tail, which beats copying the whole Map for every attempt of every Union
+// member the Enricher meets. What makes the tail exactly the attempt's own work
+// is that bindings only ever GROW while a Type is matched: `matchGenericUse`
+// binds a Generic on its FIRST occurrence and only ever CHECKS it afterwards,
+// so no earlier binding can be overwritten out from under the mark, and a Map
+// iterates in insertion order.
+function markBindings(context: GenericInferenceContext | null): number {
+	return context === null ? 0 : context.bindings.size
+}
+
+// NOTE: Rolls a context back to a mark — the state before a match attempt that
+// has since failed. A failed attempt may well have bound Generics on its way
+// down, and those bindings are worth no more than the attempt that made them:
+// left behind, they decide the attempts that follow. The bindings are dropped
+// in place rather than the Map replaced, so every holder of the context keeps
+// looking at the same object.
+function restoreBindings(
+	context: GenericInferenceContext | null,
+	mark: number,
+): void {
+	if (context === null || context.bindings.size <= mark) {
+		return
+	}
+
+	let bound: Array<common.GenericName> = []
+	let index = 0
+
+	for (let name of context.bindings.keys()) {
+		if (index >= mark) {
+			bound.push(name)
+		}
+
+		index += 1
+	}
+
+	for (let name of bound) {
+		context.bindings.delete(name)
+	}
+}
+
 // NOTE: The failure fallback of Union-against-Union matching with an
 // inference context — it only ever turns a rejection into an acceptance, so
 // every match that succeeded before still succeeds unchanged. When the
@@ -575,19 +635,15 @@ function matchUnionRemainder(
 	lhs: common.UnionType,
 	rhs: common.UnionType,
 	context: GenericInferenceContext | null,
-	snapshot: GenericBindings | null,
+	mark: number,
 ): boolean {
-	if (context === null || snapshot === null) {
+	if (context === null) {
 		return false
 	}
 
 	// NOTE: The failed whole-member pass may have bound Generics on its way
 	// down — those bindings are rolled back before the remainder is collected.
-	context.bindings.clear()
-
-	for (let [name, binding] of snapshot) {
-		context.bindings.set(name, binding)
-	}
+	restoreBindings(context, mark)
 
 	let unboundGenericMembers = lhs.types.filter(
 		(member): member is common.GenericUse =>
@@ -737,6 +793,16 @@ export function typeMentionsGeneric(
 	type: common.Type,
 	genericName: string,
 ): boolean {
+	return typeMentionsAnyGeneric(type, new Set([genericName]))
+}
+
+// NOTE: The same walk over a whole SET of Generic names, which is what
+// Argument ordering asks (`does this Parameter wait on anything still
+// unbound?`) — one pass instead of one per name.
+function typeMentionsAnyGeneric(
+	type: common.Type,
+	genericNames: ReadonlySet<common.GenericName>,
+): boolean {
 	let walk = (value: unknown): boolean => {
 		if (value === null || typeof value !== "object") {
 			return false
@@ -748,7 +814,11 @@ export function typeMentionsGeneric(
 
 		let record = value as Record<string, unknown>
 
-		if (record.type === "GenericUse" && record.name === genericName) {
+		if (
+			record.type === "GenericUse" &&
+			typeof record.name === "string" &&
+			genericNames.has(record.name)
+		) {
 			return true
 		}
 
@@ -964,6 +1034,45 @@ export function matchesType(lhs: common.Type, rhs: common.Type): boolean {
 	return matchTypes(lhs, rhs, null)
 }
 
+// NOTE: The subsumption order Union building dedupes by — whether `member`
+// says nothing `existing` does not already cover. Assignability alone can not
+// answer that: the Unknown item Type an empty List Literal carries is a
+// wildcard in BOTH directions — `List<Unknown>` accepts `List<Integer>`
+// through the Unknown rule and is accepted by it through the empty-List rule —
+// so the two subsume each other and whichever was collected FIRST would
+// survive. That is right for assignability, an empty List really does fit any
+// List, but as a specificity order it destroys exactly the information the
+// checker needs: `[[], [1]]` would build `List<List<Unknown>>`, a Type that
+// fits every List Type, and `constant broken: List<List<String>> = [[], [1]]`
+// would pass while its reversed spelling is rejected. So when two members
+// accept one another, the one that spells more out wins and the empty List's
+// placeholder yields to the concrete Type beside it — the empty Literal itself
+// stays assignable everywhere, since nothing about `matchesType` changes.
+function subsumesForUnion(existing: common.Type, member: common.Type): boolean {
+	if (!matchesType(existing, member)) {
+		return false
+	}
+
+	return !(isLessSpecific(existing, member) && matchesType(member, existing))
+}
+
+// NOTE: Whether `left` says strictly less about the same shape than `right` —
+// an Unknown standing where `right` names a Type. ONLY the placeholder an
+// empty List Literal leaves behind is weighed; every other pair reports no
+// difference, so nothing but that one wildcard can change which member of a
+// Union survives.
+function isLessSpecific(left: common.Type, right: common.Type): boolean {
+	if (left.type === "Unknown") {
+		return right.type !== "Unknown"
+	}
+
+	if (left.type === "List" && right.type === "List") {
+		return isLessSpecific(left.itemType, right.itemType)
+	}
+
+	return false
+}
+
 // NOTE: Builds a Union in its canonical, Optional-shaped form: `Nothing` is
 // hoisted to a single top-level member and every other member becomes the
 // payload — one member, or one anonymous nested Union of them. So
@@ -984,11 +1093,13 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	let distinct: Array<common.Type> = []
 
 	for (let member of members) {
-		if (distinct.some((existing) => matchesType(existing, member))) {
+		if (distinct.some((existing) => subsumesForUnion(existing, member))) {
 			continue
 		}
 
-		distinct = distinct.filter((existing) => !matchesType(member, existing))
+		distinct = distinct.filter(
+			(existing) => !subsumesForUnion(member, existing),
+		)
 		distinct.push(member)
 	}
 
@@ -1044,11 +1155,13 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	let payload: Array<common.Type> = []
 
 	for (let member of payloadMembers) {
-		if (payload.some((existing) => matchesType(existing, member))) {
+		if (payload.some((existing) => subsumesForUnion(existing, member))) {
 			continue
 		}
 
-		payload = payload.filter((existing) => !matchesType(member, existing))
+		payload = payload.filter(
+			(existing) => !subsumesForUnion(member, existing),
+		)
 		payload.push(member)
 	}
 
@@ -1093,12 +1206,14 @@ export function mergeUnionMembers(
 				: [type]
 
 		for (let member of members) {
-			if (distinct.some((existing) => matchesType(existing, member))) {
+			if (
+				distinct.some((existing) => subsumesForUnion(existing, member))
+			) {
 				continue
 			}
 
 			distinct = distinct.filter(
-				(existing) => !matchesType(member, existing),
+				(existing) => !subsumesForUnion(member, existing),
 			)
 			distinct.push(member)
 		}
@@ -1275,17 +1390,24 @@ function matchTypes(
 			// it is a nested actual member decomposed against the whole
 			// expected Union, which makes the nested and the flattened
 			// spelling of the same Union interchangeable.
-			let snapshot = context === null ? null : new Map(context.bindings)
+			let mark = markBindings(context)
 			let matchedWholeMembers = true
 
 			for (let rhsType of rhs.types) {
 				let foundMatch = false
+				// NOTE: Every candidate is tried from the bindings the ones
+				// BEFORE it earned, never from the wreckage of a candidate that
+				// bound its way down and then failed — see the `else` arm below
+				// for what such leftovers do to the candidates after them.
+				let attempt = markBindings(context)
 
 				for (let lhsType of lhsMembers) {
 					if (matchTypes(lhsType, rhsType, context)) {
 						foundMatch = true
 						break
 					}
+
+					restoreBindings(context, attempt)
 				}
 
 				if (!foundMatch && rhsType.type === "UnionType") {
@@ -1302,12 +1424,29 @@ function matchTypes(
 				return true
 			}
 
-			return matchUnionRemainder(lhs, rhs, context, snapshot)
+			return matchUnionRemainder(lhs, rhs, context, mark)
 		} else {
+			// NOTE: Each member is tried on its own. A composite member — a
+			// Record, Case or Function mentioning a bindable Generic — can bind
+			// Generics on its way down and THEN fail, and those bindings are
+			// worth no more than the member that made them: rolled back here,
+			// or they decide the members after it. Matching
+			// `{ left = "hi", right = 5 }` against
+			// `{ left: T, right: String } | { left: String, right: T }` binds
+			// `T := String` off the first member's `left`, fails on its
+			// `right`, and the second member — which matches on its own with
+			// `T := Integer` — was then checked against that leftover `T` and
+			// wrongly rejected, so the same call compiled or not depending on
+			// the order the Union was written in. Whichever member finally
+			// matches keeps the bindings it made.
+			let attempt = markBindings(context)
+
 			for (let type of lhsMembers) {
 				if (matchTypes(type, rhs, context)) {
 					return true
 				}
+
+				restoreBindings(context, attempt)
 			}
 		}
 
@@ -1460,6 +1599,154 @@ export type ArgumentMatchResult =
 	| { type: "ArityMismatch" }
 	| { type: "ArgumentMismatch"; mismatchedArgumentIndices: Array<number> }
 
+// NOTE: Collects every Type Parameter of THIS invocation that `type` mentions
+// — a structural walk, so a Generic buried in a Record member, a List's items
+// or a nested signature counts as much as one written at the top. Generics of
+// an enclosing definition are opaque symbols here and are not collected: they
+// are not what an Argument could bind.
+function collectBindableGenerics(
+	type: common.Type,
+	context: GenericInferenceContext,
+	into: Set<common.GenericName>,
+): void {
+	let walk = (value: unknown): void => {
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		if (Array.isArray(value)) {
+			for (let item of value) {
+				walk(item)
+			}
+
+			return
+		}
+
+		let record = value as Record<string, unknown>
+
+		if (
+			record.type === "GenericUse" &&
+			typeof record.name === "string" &&
+			context.bindableNames.has(record.name)
+		) {
+			into.add(record.name)
+		}
+
+		for (let item of Object.values(record)) {
+			walk(item)
+		}
+	}
+
+	walk(type)
+}
+
+// NOTE: Whether a callback Parameter's own PARAMETERS mention a Type Parameter
+// nothing has bound yet — the Types an unannotated Function literal would have
+// to read off them. Its return Type is deliberately not asked about: an omitted
+// `-> Type` is read off the literal's BODY, so a Generic standing there is one
+// the callback BINDS rather than one it waits for, and holding the callback
+// back for it would wait for something only it can provide.
+function callbackWaitsOnUnboundGeneric(
+	callback: common.FunctionType,
+	boundSoFar: ReadonlySet<common.GenericName>,
+	context: GenericInferenceContext,
+): boolean {
+	let needed = new Set<common.GenericName>()
+
+	for (let parameter of callback.parameterTypes) {
+		collectBindableGenerics(parameter.type, context, needed)
+	}
+
+	for (let name of needed) {
+		if (!boundSoFar.has(name)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// NOTE: The order the Arguments are matched in — their own, except that a
+// callback Parameter still waiting on an unbound `infer` Generic is held back
+// to the end. An unannotated Function literal is typed FROM the Parameter it
+// is passed to, so matching it while that Generic is open makes it echo the
+// Generic straight back: the Generic binds to a use of ITSELF, is opaque from
+// then on, and every later Argument that could have named a real Type is
+// turned away — `apply(transform (x) { <- x }, to 5)` pinned `T` on the
+// callback and then refused `5`, its own inferred Type. Matching the Arguments
+// that can actually name a Type first means the callback is resolved against
+// `(_: Integer) -> Integer` and the invocation reads a real Type throughout.
+// Which is why inference must not depend on the order the Parameters happen to
+// be written in: the same call with `to 5` first always compiled.
+//
+// Nothing is deferred without a Generic to wait for, and deferred Arguments
+// keep their order among themselves — so a callback is held back behind ANY
+// Argument that can still name a Type, another callback (one whose own
+// Parameters are already concrete) included.
+//
+// `null` means "the order they were written in", which is the answer for every
+// invocation whose callbacks already come last — every one in the stdlib,
+// where `map`'s transform is the final Parameter — so the overwhelmingly
+// common case allocates nothing and the loop counts as it always did.
+function deferredArgumentOrder(
+	parameters: common.BaseFunction["parameterTypes"],
+	context: GenericInferenceContext | null,
+): Array<number> | null {
+	if (context === null || parameters.length < 2) {
+		return null
+	}
+
+	// NOTE: Only a Parameter that FOLLOWS a callback has anything to gain from
+	// being matched first, so an invocation without a callback — or with none
+	// but a trailing one, which is every Method in the stdlib, `map`'s
+	// transform being its last Parameter — is answered here, by a walk over the
+	// Parameter kinds that allocates nothing.
+	let firstCallback = parameters.findIndex(
+		(parameter) => parameter.type.type === "Function",
+	)
+
+	if (firstCallback === -1 || firstCallback === parameters.length - 1) {
+		return null
+	}
+
+	let boundSoFar = new Set<common.GenericName>()
+
+	for (let name of context.bindableNames) {
+		if (context.bindings.has(name)) {
+			boundSoFar.add(name)
+		}
+	}
+
+	let immediate: Array<number> = []
+	let deferred: Array<number> = []
+
+	for (let [index, parameter] of parameters.entries()) {
+		if (
+			parameter.type.type === "Function" &&
+			callbackWaitsOnUnboundGeneric(parameter.type, boundSoFar, context)
+		) {
+			deferred.push(index)
+
+			continue
+		}
+
+		immediate.push(index)
+
+		// NOTE: What this Parameter can name is counted as bound for the
+		// Parameters after it — a callback waits for the Argument that names its
+		// Types, not for one that waits alongside it.
+		collectBindableGenerics(parameter.type, context, boundSoFar)
+	}
+
+	let order = [...immediate, ...deferred]
+
+	if (order.every((value, position) => value === position)) {
+		return null
+	}
+
+	return order
+}
+
 // NOTE: Checks whether passed Arguments match a parameter list — arity,
 // labels (matched by name equality; a labelless Argument only matches a
 // labelless parameter), and per-Argument `matchesType`.
@@ -1467,12 +1754,13 @@ export type ArgumentMatchResult =
 // that only need a boolean "does this overload match" rely on to avoid
 // resolving further Argument Types. With `collectAllMismatches` every
 // mismatching Argument index is collected, which the Validator uses to report
-// one Diagnostic per mismatching Argument.
-// With `inference` the Arguments are matched left to right against a Generic
-// signature — the first occurrence of a bindable Generic binds the Argument's
-// Type, later occurrences check against the binding. Callers pass a fresh
-// context per overload candidate, so bindings can not leak between
-// candidates.
+// one Diagnostic per mismatching Argument — in Argument order, whatever order
+// they were matched in.
+// With `inference` the Arguments are matched against a Generic signature in
+// the order `deferredArgumentOrder` gives — the first occurrence of a bindable
+// Generic binds the Argument's Type, later occurrences check against the
+// binding. Callers pass a fresh context per overload candidate, so bindings
+// can not leak between candidates.
 export function matchArguments(
 	parameters: common.BaseFunction["parameterTypes"],
 	matchableArguments: Array<MatchableArgument>,
@@ -1487,16 +1775,18 @@ export function matchArguments(
 
 	let inferenceContext = options.inference ?? null
 	let mismatchedArgumentIndices: Array<number> = []
+	let order = deferredArgumentOrder(parameters, inferenceContext)
 
-	for (let i = 0; i < parameters.length; i++) {
+	for (let position = 0; position < parameters.length; position++) {
+		let i = order === null ? position : order[position]
 		let parameter = parameters[i]
 		let argument = matchableArguments[i]
 
-		// NOTE: Arguments bind left to right, so by the time a callback is
-		// reached the Generics its Parameters mention have usually been bound
-		// by earlier Arguments — substituting them is what turns `map`'s
-		// declared `(_ item: ItemType) -> Result` into the `(_ item: Integer)
-		// -> Result` the literal is actually resolved against.
+		// NOTE: A callback is matched after the Arguments that bind, so the
+		// Generics its Parameters mention have been bound by then —
+		// substituting them is what turns `map`'s declared
+		// `(_ item: ItemType) -> Result` into the `(_ item: Integer) ->
+		// Result` the literal is actually resolved against.
 		let expectedType =
 			inferenceContext === null
 				? parameter.type
@@ -1525,7 +1815,15 @@ export function matchArguments(
 	}
 
 	if (mismatchedArgumentIndices.length > 0) {
-		return { type: "ArgumentMismatch", mismatchedArgumentIndices }
+		// NOTE: Sorted, because a deferred callback may have been matched out
+		// of turn — the Validator reports one Diagnostic per index and they
+		// must still arrive in the order the Arguments were written.
+		return {
+			type: "ArgumentMismatch",
+			mismatchedArgumentIndices: mismatchedArgumentIndices.sort(
+				(left, right) => left - right,
+			),
+		}
 	}
 
 	return { type: "Match" }

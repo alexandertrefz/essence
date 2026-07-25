@@ -15,6 +15,7 @@ import {
 	resolveProtocolDeclarationStatementType,
 	resolveTypeAliasStatementType,
 } from "./resolvers"
+import { scopeMap } from "./scope"
 
 // NOTE: Names to leave OUT of the top level Scope, per table. Exactly one
 // caller needs this: the Language Server, editing a standard library source.
@@ -49,9 +50,9 @@ export const enrich = (
 
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
-			let members: Record<string, common.Type> = {
-				...withoutShadowed(builtinMembers(), shadowed?.members),
-			}
+			let members: Record<string, common.Type> = scopeMap(
+				withoutShadowed(builtinMembers(), shadowed?.members),
+			)
 
 			let topLevelScope: enricher.Scope = {
 				parent: null,
@@ -59,12 +60,14 @@ export const enrich = (
 				// NOTE: The builtins are declared in TypeScript, not in
 				// Essence — there is no source Position to point a
 				// Diagnostic at.
-				declarations: {},
+				declarations: scopeMap(),
 				constants: new Set(Object.keys(members)),
-				types: { ...withoutShadowed(builtinTypes(), shadowed?.types) },
-				protocols: {
-					...withoutShadowed(builtinProtocols(), shadowed?.protocols),
-				},
+				types: scopeMap(
+					withoutShadowed(builtinTypes(), shadowed?.types),
+				),
+				protocols: scopeMap(
+					withoutShadowed(builtinProtocols(), shadowed?.protocols),
+				),
 			}
 
 			return {

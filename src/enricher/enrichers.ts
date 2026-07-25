@@ -418,6 +418,9 @@ export function enrichMethodFunctionDefinition(
 	// (so it can call the Protocol's Methods on `Item` values), and leading the
 	// typed Generics so their hidden conformance Parameters are emitted first.
 	injectedGenerics: Array<common.typed.GenericDeclarationNode> = [],
+	// NOTE: A static Method is called on the Namespace, so it has no receiver
+	// and its body Scope is marked as the barrier `@` resolution stops at.
+	isStatic: boolean = false,
 ): common.typed.FunctionDefinitionNode {
 	// NOTE: `scope` and `selfType` already carry the injected bounds when this
 	// is a fulfilling Method (the caller resolved the signature under them too),
@@ -426,7 +429,14 @@ export function enrichMethodFunctionDefinition(
 	// and Return Types as well as the body can reference them.
 	let newScope = scopeWithGenerics(method.value.generics, scope)
 
-	if (selfType !== null) {
+	if (isStatic) {
+		// NOTE: The Rewriter emits a static Method WITHOUT the `_self`
+		// Parameter `@` lowers to, so an `@` accepted here would compile to a
+		// name nothing binds. Marking the Scope refuses it outright — leaving
+		// it merely undeclared would let the enclosing Namespace's `@` (every
+		// instance Method beside it binds one) answer in its place.
+		newScope.isStaticMethodBody = true
+	} else if (selfType !== null) {
 		declareVariableInScope(
 			"@",
 			shadowSelfTypeGenerics(selfType, method.value.generics, newScope),
@@ -622,6 +632,12 @@ export function enrichMethodFunctionValue(
 			bounded.selfType,
 			type,
 			injectedGenerics,
+			// NOTE: Read off the Node rather than taken from the caller, so
+			// that a static Method can not be enriched as an instance one by a
+			// call site that forgot to say which it is. Its `selfType` is the
+			// Namespace's target Type, which a static Method's Parameter and
+			// return Types may name — it simply never becomes `@`.
+			node.nodeType === "StaticMethod",
 		),
 		position: node.method.position,
 		type,
@@ -652,6 +668,7 @@ export function enrichMethodsFunctionValue(
 				bounded.selfType,
 				type,
 				injected,
+				node.nodeType === "OverloadedStaticMethod",
 			),
 			position: method.position,
 			type,
@@ -2239,10 +2256,26 @@ type ArgumentTyper = {
 	enrichArgumentNode: (
 		argument: parser.ArgumentNode,
 	) => common.typed.ArgumentNode
+	// NOTE: Whether any Argument of this Invocation typed as Error, which is
+	// the poison value a Diagnostic already reported. `matchTypes` lets an
+	// Error match anything — including a Type Parameter, which it then leaves
+	// UNBOUND — so an Invocation asks this before reporting that a Type
+	// Parameter could not be inferred. The answer is only meaningful once the
+	// Arguments have been matched, which is where every Type is asked for.
+	hasErrorArgument: () => boolean
 }
 
 function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	let cache = new Map<parser.ExpressionNode, common.typed.ExpressionNode>()
+	let sawErrorArgument = false
+
+	function noteErrors(type: common.Type): common.Type {
+		if (type.type === "Error") {
+			sawErrorArgument = true
+		}
+
+		return type
+	}
 
 	function enrichOnce(
 		value: parser.ExpressionNode,
@@ -2269,10 +2302,15 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				value.nodeType === "FunctionValue" &&
 				needsContext(value.value)
 			) {
-				return resolveFunctionValueType(value, scope, expectedType)
+				return noteErrors(
+					resolveFunctionValueType(value, scope, expectedType),
+				)
 			}
 
-			return enrichOnce(value).type
+			return noteErrors(enrichOnce(value).type)
+		},
+		hasErrorArgument() {
+			return sawErrorArgument
 		},
 		enrichArgumentNode(argument) {
 			let value = enrichOnce(argument.value)
@@ -2302,7 +2340,7 @@ function resolveFunctionDefinitionType(
 		return resolveFunctionSignatureType(node, scope)
 	}
 
-	let recorded = contextualFunctionTypes.get(node)
+	let recorded = recordedContextualFunctionType(node)
 
 	if (expectedType === null && recorded !== undefined) {
 		return recorded
@@ -2333,7 +2371,7 @@ function resolveFunctionDefinitionType(
 		documentation: node.documentation ?? undefined,
 	}
 
-	contextualFunctionTypes.set(node, resolved)
+	recordContextualFunctionType(node, resolved)
 
 	return resolved
 }
@@ -2419,10 +2457,21 @@ function substituteInferredReturnType(
 	}
 }
 
+// NOTE: Silent when an Argument already typed as Error — that Argument's own
+// Diagnostic has been reported, and it is exactly why nothing bound the Type
+// Parameter: `matchTypes` short-circuits an Error to a match without binding
+// anything. Reporting on top of it would point at the call rather than at the
+// Argument that actually failed, which is the cascade the poison Type exists to
+// prevent.
 function reportUnboundGenerics(
 	unboundGenerics: Array<string>,
 	position: common.Position,
+	typer: ArgumentTyper,
 ): void {
+	if (typer.hasErrorArgument()) {
+		return
+	}
+
 	for (let name of unboundGenerics) {
 		reportError(
 			`Type Parameter '${name}' could not be inferred`,
@@ -2510,10 +2559,48 @@ function resolveInferredReturnType(
 	)
 
 	if (matchResult.type === "Match") {
-		reportUnboundGenerics(inferred.unboundGenerics, position)
+		reportUnboundGenerics(inferred.unboundGenerics, position, typer)
 	}
 
 	return inferred.returnType
+}
+
+// NOTE: A Method that is called on its Namespace (`Namespace.method(…)`)
+// rather than on a value. `undefined` answers false: a Namespace that does not
+// declare the name at all is not the static case, it is the unknown-Method one.
+function isStaticMethodType(methodType: common.Type | undefined): boolean {
+	return (
+		methodType !== undefined &&
+		(methodType.type === "StaticMethod" ||
+			methodType.type === "OverloadedStaticMethod")
+	)
+}
+
+// NOTE: Which of the Namespaces declaring the Method can answer an INSTANCE
+// call, and which only declare it as static. Every Method Invocation is an
+// instance call — the receiver written left of the `::` is the first Argument —
+// so a static declaration is not a candidate at all. Keeping the static ones
+// rather than dropping them is what lets the Diagnostic say the Method exists
+// and is called differently, instead of claiming there is no such Method.
+function partitionInstanceMethodNamespaces(
+	methodName: string,
+	namespaces: Map<string, common.NamespaceType>,
+): {
+	instanceNamespaces: Map<string, common.NamespaceType>
+	staticNamespaces: Map<string, common.NamespaceType>
+} {
+	let instanceNamespaces = new Map<string, common.NamespaceType>()
+	let staticNamespaces = new Map<string, common.NamespaceType>()
+
+	for (let [name, namespace] of namespaces) {
+		if (isStaticMethodType(namespace.methods[methodName])) {
+			staticNamespaces.set(name, namespace)
+		} else {
+			instanceNamespaces.set(name, namespace)
+		}
+	}
+
+	return { instanceNamespaces, staticNamespaces }
 }
 
 function resolveInvokedMethodInNamespace(
@@ -2533,6 +2620,17 @@ function resolveInvokedMethodInNamespace(
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
 
+	// NOTE: `value::method(…)` is instance-call syntax, and a static Method has
+	// no receiver Parameter for the value to occupy — resolving one here would
+	// match the written Arguments against the whole signature and leave the
+	// Simplifier to prepend the receiver anyway, shifting every runtime
+	// Argument one place to the right. Static Methods are filtered out before
+	// resolution reaches this (`reportStaticMethodOnValue` says so); refusing
+	// them again here is what keeps that filtering from being load-bearing.
+	if (isStaticMethodType(methodType)) {
+		return
+	}
+
 	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
@@ -2541,24 +2639,16 @@ function resolveInvokedMethodInNamespace(
 		}),
 	)
 
-	if (
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "OverloadedMethod"
-	) {
-		// NOTE: Union dispatch resolves the Method once per member Type — the
-		// override stands in for the receiver so each member is matched as if
-		// the receiver had that Type. Otherwise the receiver is the Type the
-		// base was already enriched to.
-		matchableArguments.unshift({
-			name: null,
-			getType: () => receiverType ?? baseType,
-		})
-	}
+	// NOTE: Union dispatch resolves the Method once per member Type — the
+	// override stands in for the receiver so each member is matched as if
+	// the receiver had that Type. Otherwise the receiver is the Type the
+	// base was already enriched to.
+	matchableArguments.unshift({
+		name: null,
+		getType: () => receiverType ?? baseType,
+	})
 
-	if (
-		methodType.type === "SimpleMethod" ||
-		methodType.type === "StaticMethod"
-	) {
+	if (methodType.type === "SimpleMethod") {
 		let inferred = inferInvocation(methodType, matchableArguments)
 
 		if (inferred === undefined) {
@@ -2572,10 +2662,7 @@ function resolveInvokedMethodInNamespace(
 			signatureGenerics: methodType.generics,
 			bindings: inferred.bindings,
 		}
-	} else if (
-		methodType.type === "OverloadedMethod" ||
-		methodType.type === "OverloadedStaticMethod"
-	) {
+	} else if (methodType.type === "OverloadedMethod") {
 		for (
 			let overloadIndex = 0;
 			overloadIndex < methodType.overloads.length;
@@ -2683,6 +2770,47 @@ function reportUnknownMethod(
 								.join(", ")}.`,
 						],
 			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+		},
+	)
+}
+
+// NOTE: The Method is there, it is simply not called this way — which is a
+// different mistake from a misspelling, and the only one of the two whose fix
+// is a rewritten call rather than a rewritten name. `memberType` is set only
+// for a Union receiver's per-member dispatch, where the Namespace that
+// declared it static was found for ONE member rather than for the value.
+function reportStaticMethodOnValue(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	memberType: common.Type | null,
+	staticNamespaces: Map<string, common.NamespaceType>,
+): void {
+	let namespaceNames = [...staticNamespaces.keys()]
+
+	reportError(
+		memberType === null
+			? `'${node.member.content}' is a static Method`
+			: `'${node.member.content}' is a static Method for ${describeType(memberType)}`,
+		node.member.position,
+		{
+			code: "static-method-on-value",
+			labels: [
+				primary(
+					node.member.position,
+					"a static Method is called on its Namespace, not on a value",
+				),
+				secondary(
+					node.base.position,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+			],
+			notes: namespaceNames.map(
+				(name) =>
+					`'${name}' declares '${node.member.content}' as static.`,
+			),
+			helps: [
+				`Write '${namespaceNames[0]}.${node.member.content}(…)', passing the value as an Argument if it needs one.`,
+			],
 		},
 	)
 }
@@ -2827,12 +2955,16 @@ function resolveMethodInvocation(
 		scope,
 	)
 
-	let matchingNamespaces = namespacesDeclaringMethod(
-		node.member.content,
-		namespaces,
-		baseType,
-		scope,
-	)
+	let { instanceNamespaces: matchingNamespaces, staticNamespaces } =
+		partitionInstanceMethodNamespaces(
+			node.member.content,
+			namespacesDeclaringMethod(
+				node.member.content,
+				namespaces,
+				baseType,
+				scope,
+			),
+		)
 
 	// NOTE: A Union-typed receiver falls back to per-member dispatch whenever
 	// no Namespace covering the whole Union can resolve the Method — a
@@ -2840,6 +2972,15 @@ function resolveMethodInvocation(
 	if (matchingNamespaces.size === 0) {
 		if (baseType.type === "UnionType") {
 			return resolveUnionMethodDispatch(node, baseType, scope, typer)
+		}
+
+		// NOTE: The name resolves, just not to something an instance call can
+		// reach — reported before the two "no such Method" Diagnostics, which
+		// would both be untrue.
+		if (staticNamespaces.size > 0) {
+			reportStaticMethodOnValue(node, baseType, null, staticNamespaces)
+
+			return resolveFailedMethodInvocation()
 		}
 
 		// NOTE: Nothing targets the value at all, versus something does but
@@ -2877,13 +3018,26 @@ function resolveMethodInvocation(
 
 	let resolvedMethods = []
 
+	// NOTE: Every Namespace is probed even after one has matched — that is how
+	// an ambiguity is found — and a probe RECORDS what an unannotated Function
+	// literal Argument resolved to against that candidate's Parameter Types.
+	// Each probe's recordings are therefore held aside and only the selected
+	// candidate's are committed, so the literal's body is typed by the
+	// Namespace that actually won rather than by whichever was probed last.
+	let lastRecording: ContextualFunctionTypeRecording | undefined
+
 	for (let [namespaceName, namespaceType] of matchingNamespaces) {
-		let resolvedMethod = resolveInvokedMethodInNamespace(
-			node,
-			namespaceType,
-			baseType,
-			typer,
-		)
+		let { result: resolvedMethod, recording } =
+			probeContextualFunctionTypes(() =>
+				resolveInvokedMethodInNamespace(
+					node,
+					namespaceType,
+					baseType,
+					typer,
+				),
+			)
+
+		lastRecording = recording
 
 		if (resolvedMethod) {
 			resolvedMethods.push({
@@ -2896,6 +3050,7 @@ function resolveMethodInvocation(
 				unboundGenerics: resolvedMethod.unboundGenerics,
 				signatureGenerics: resolvedMethod.signatureGenerics,
 				bindings: resolvedMethod.bindings,
+				recording,
 			})
 		}
 	}
@@ -2915,6 +3070,12 @@ function resolveMethodInvocation(
 			return resolveUnionMethodDispatch(node, baseType, scope, typer)
 		}
 
+		// NOTE: No candidate to commit, so the last probe's recordings stand
+		// in: the Invocation is an Error either way, and a literal left with no
+		// recording at all would report its Parameters as uninferable on top of
+		// the Diagnostic below.
+		commitContextualFunctionTypes(lastRecording)
+
 		reportNoMatchingOverload(
 			node,
 			[...matchingNamespaces.entries()].map(
@@ -2929,10 +3090,16 @@ function resolveMethodInvocation(
 	} else if (resolvedMethods.length === 1) {
 		let resolvedMethod = resolvedMethods[0]
 
+		commitContextualFunctionTypes(resolvedMethod.recording)
+
 		// NOTE: Unbound Type Parameters are only reported for the selected
 		// candidate — losing overloads and Namespaces must not leak
 		// Diagnostics.
-		reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
+		reportUnboundGenerics(
+			resolvedMethod.unboundGenerics,
+			node.position,
+			typer,
+		)
 
 		return {
 			namespace: resolvedMethod.namespace,
@@ -2956,6 +3123,10 @@ function resolveMethodInvocation(
 			dispatch: null,
 		}
 	} else {
+		// NOTE: As above — an ambiguity leaves no winner, so the last probe's
+		// recordings stand in rather than none at all.
+		commitContextualFunctionTypes(lastRecording)
+
 		reportAmbiguousNamespace(
 			node,
 			resolvedMethods.map((method) => method.namespace.name),
@@ -2988,14 +3159,32 @@ function resolveUnionMethodDispatch(
 			scope,
 		)
 
-		let matchingNamespaces = namespacesDeclaringMethod(
-			node.member.content,
-			namespaces,
-			memberType,
-			scope,
-		)
+		let { instanceNamespaces: matchingNamespaces, staticNamespaces } =
+			partitionInstanceMethodNamespaces(
+				node.member.content,
+				namespacesDeclaringMethod(
+					node.member.content,
+					namespaces,
+					memberType,
+					scope,
+				),
+			)
 
 		if (matchingNamespaces.size === 0) {
+			// NOTE: As for a non-Union receiver — this member's Method exists
+			// and is called on its Namespace, which is not the same as the
+			// member not providing it at all.
+			if (staticNamespaces.size > 0) {
+				reportStaticMethodOnValue(
+					node,
+					unionType,
+					memberType,
+					staticNamespaces,
+				)
+
+				return resolveFailedMethodInvocation()
+			}
+
 			reportError(
 				`No Method named '${node.member.content}' for ${describeType(memberType)}`,
 				node.member.position,
@@ -3021,20 +3210,31 @@ function resolveUnionMethodDispatch(
 		}
 
 		let resolvedMethods = []
+		// NOTE: As in `resolveMethodInvocation` — every Namespace is probed
+		// before one is selected, so what a probe recorded for a contextually
+		// typed Function literal Argument is held aside until this member's
+		// branch has picked its Namespace.
+		let lastRecording: ContextualFunctionTypeRecording | undefined
 
 		for (let [namespaceName, namespaceType] of matchingNamespaces) {
-			let resolvedMethod = resolveInvokedMethodInNamespace(
-				node,
-				namespaceType,
-				unionType,
-				typer,
-				memberType,
-			)
+			let { result: resolvedMethod, recording } =
+				probeContextualFunctionTypes(() =>
+					resolveInvokedMethodInNamespace(
+						node,
+						namespaceType,
+						unionType,
+						typer,
+						memberType,
+					),
+				)
+
+			lastRecording = recording
 
 			if (resolvedMethod) {
 				resolvedMethods.push({
 					namespaceName,
 					namespaceType,
+					recording,
 					...resolvedMethod,
 				})
 			}
@@ -3048,6 +3248,8 @@ function resolveUnionMethodDispatch(
 		}
 
 		if (resolvedMethods.length === 0) {
+			commitContextualFunctionTypes(lastRecording)
+
 			reportError(
 				`No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
 				node.position,
@@ -3079,6 +3281,8 @@ function resolveUnionMethodDispatch(
 		}
 
 		if (resolvedMethods.length > 1) {
+			commitContextualFunctionTypes(lastRecording)
+
 			reportError(
 				`'${node.member.content}' is provided by more than one Namespace for ${describeType(memberType)}`,
 				node.position,
@@ -3105,11 +3309,21 @@ function resolveUnionMethodDispatch(
 
 		let resolvedMethod = resolvedMethods[0]
 
+		// NOTE: One recording per member, each committed as its branch is
+		// settled. A literal Argument shared by every branch ends up typed by
+		// the LAST branch that resolved it, which is the same literal the
+		// Rewriter passes to all of them.
+		commitContextualFunctionTypes(resolvedMethod.recording)
+
 		// NOTE: Unbound Type Parameters depend on the Arguments, which every
 		// branch shares — reporting them for the first member only keeps the
 		// Diagnostic from repeating per member.
 		if (memberIndex === 0) {
-			reportUnboundGenerics(resolvedMethod.unboundGenerics, node.position)
+			reportUnboundGenerics(
+				resolvedMethod.unboundGenerics,
+				node.position,
+				typer,
+			)
 		}
 
 		dispatchCases.push({
@@ -3166,37 +3380,85 @@ function resolveUnionMethodDispatch(
 		return resolveFailedMethodInvocation()
 	}
 
-	let sortedCases = [...dispatchCases].sort((a, b) => {
-		let aCatchAll = isRuntimeCatchAllType(a.memberType)
-		let bCatchAll = isRuntimeCatchAllType(b.memberType)
-
-		if (aCatchAll !== bCatchAll) {
-			return aCatchAll ? 1 : -1
-		}
-
-		let aIsMoreSpecific =
-			matchesType(b.memberType, a.memberType) &&
-			!matchesType(a.memberType, b.memberType)
-		let bIsMoreSpecific =
-			matchesType(a.memberType, b.memberType) &&
-			!matchesType(b.memberType, a.memberType)
-
-		if (aIsMoreSpecific) {
-			return -1
-		} else if (bIsMoreSpecific) {
-			return 1
-		} else {
-			return 0
-		}
-	})
-
 	return {
 		namespace: placeholderNamespace(),
 		type: buildUnion(mergeUnionMembers(caseReturnTypes)),
 		overloadedMethodIndex: null,
 		conformances: [],
-		dispatch: sortedCases,
+		dispatch: orderDispatchCasesBySpecificity(dispatchCases),
 	}
+}
+
+// NOTE: Is `dispatchCase` the branch that has to be tried FIRST of the two —
+// every value the runtime would hand to it would also be accepted by `other`,
+// but not the other way round. A runtime catch-all accepts every value there
+// is, so anything else outranks it without the Types being compared at all.
+function dispatchCaseIsMoreSpecific(
+	dispatchCase: common.DispatchCase,
+	other: common.DispatchCase,
+): boolean {
+	let caseIsCatchAll = isRuntimeCatchAllType(dispatchCase.memberType)
+	let otherIsCatchAll = isRuntimeCatchAllType(other.memberType)
+
+	if (caseIsCatchAll !== otherIsCatchAll) {
+		return otherIsCatchAll
+	}
+
+	return (
+		matchesType(other.memberType, dispatchCase.memberType) &&
+		!matchesType(dispatchCase.memberType, other.memberType)
+	)
+}
+
+// NOTE: `dispatchMethod` takes the FIRST branch whose member Type the receiver
+// matches, and that match is open — a Record value "may carry more besides",
+// so `{ width: Integer }` accepts a `{ width: Integer, height: Integer }`.
+// Every branch must therefore stand before the branches that would swallow it.
+//
+// A `sort` can not do this: "strictly more specific" is a PARTIAL order, its
+// comparator has to answer 0 for the incomparable pairs, and `sort` only ever
+// compares the pairs its own algorithm reaches. With an incomparable member
+// (`Boolean`) sitting between an open Record and the more specific Record it
+// swallows, the two are never compared and the array keeps declaration order —
+// which made a Union's runtime behaviour depend on how its members were
+// spelled. Emitting each branch after everything strictly more specific than it
+// compares every pair that matters, and walking the branches in declaration
+// order keeps the rest of the order — and the emitted code — stable.
+function orderDispatchCasesBySpecificity(
+	dispatchCases: Array<common.DispatchCase>,
+): Array<common.DispatchCase> {
+	let ordered: Array<common.DispatchCase> = []
+	let placed = new Set<common.DispatchCase>()
+
+	function place(dispatchCase: common.DispatchCase): void {
+		if (placed.has(dispatchCase)) {
+			return
+		}
+
+		// NOTE: Marked before the recursion rather than after, so that a
+		// relation that somehow cycles terminates here instead of overflowing
+		// the stack. A cycle can not arise from the definition above — it takes
+		// two Types each strictly more specific than the other — which is
+		// exactly why nothing but termination has to be salvaged.
+		placed.add(dispatchCase)
+
+		for (let other of dispatchCases) {
+			if (
+				other !== dispatchCase &&
+				dispatchCaseIsMoreSpecific(other, dispatchCase)
+			) {
+				place(other)
+			}
+		}
+
+		ordered.push(dispatchCase)
+	}
+
+	for (let dispatchCase of dispatchCases) {
+		place(dispatchCase)
+	}
+
+	return ordered
 }
 
 // NOTE: `isValueOfType` answers true for every value on these — such a
@@ -3261,14 +3523,6 @@ function resolveFunctionInvocation(
 		type.type === "SimpleMethod" ||
 		type.type === "StaticMethod"
 	) {
-		if (type.generics.length === 0) {
-			return {
-				type: type.returnType,
-				conformances: [],
-				overloadedMethodIndex: null,
-			}
-		}
-
 		// NOTE: Mirrors resolveInferredReturnType, additionally keeping the
 		// bindings — conformance resolution for Protocol bounds needs to know
 		// what each Type Parameter was bound to. Argument mismatches are the
@@ -3281,6 +3535,29 @@ function resolveFunctionInvocation(
 					typer.getType(argument.value, expectedType),
 			}),
 		)
+
+		if (type.generics.length === 0) {
+			// NOTE: Nothing is inferred here, but the Arguments are still
+			// matched: a Function literal that omitted its annotations takes
+			// them from the Parameter it is passed to, and matching is what
+			// hands each Argument the Parameter's Type to read them off. Handing
+			// back the return Type without matching left such a literal with no
+			// context at all, and it was reported as uninferable — while the
+			// identical literal passed to a non-generic METHOD resolved fine,
+			// because Method resolution matches its Arguments on every path.
+			// The result is discarded — a mismatch is the Validator's to report
+			// — and every Argument is asked for its Type, so one mismatching
+			// Argument does not leave the literals after it without a context.
+			matchArguments(type.parameterTypes, matchableArguments, {
+				collectAllMismatches: true,
+			})
+
+			return {
+				type: type.returnType,
+				conformances: [],
+				overloadedMethodIndex: null,
+			}
+		}
 
 		let { parameterTypes, context, freshToOriginal } =
 			createFreshenedInference(type)
@@ -3295,7 +3572,11 @@ function resolveFunctionInvocation(
 		let conformances: Array<common.Conformance> = []
 
 		if (matchResult.type === "Match") {
-			reportUnboundGenerics(inferred.unboundGenerics, node.position)
+			reportUnboundGenerics(
+				inferred.unboundGenerics,
+				node.position,
+				typer,
+			)
 
 			conformances = resolveConformances(
 				type.generics,
@@ -3331,7 +3612,11 @@ function resolveFunctionInvocation(
 			let inferred = inferInvocation(overload, matchableArguments)
 
 			if (inferred !== undefined) {
-				reportUnboundGenerics(inferred.unboundGenerics, node.position)
+				reportUnboundGenerics(
+					inferred.unboundGenerics,
+					node.position,
+					typer,
+				)
 
 				return {
 					type: inferred.returnType,
@@ -3578,6 +3863,34 @@ export function resolveCaseValueType(
 	return resolveCaseReference(node.choice, node.caseName, scope)
 }
 
+// NOTE: The Cases a Matcher can pick from — the scrutinee's own members, with
+// a nested Union spelled out, so `Walk<Integer> | Nothing` offers Walk's Cases
+// as readily as `Walk<Integer>` does.
+function caseMatcherCandidates(valueType: common.Type): Array<common.Type> {
+	return valueType.type === "UnionType"
+		? flattenUnionMembers(valueType)
+		: [valueType]
+}
+
+// NOTE: The scrutinee's own member for a declared Case — the same Choice and
+// the same Case name, but with the Type Arguments the matched value applied
+// substituted into its payload. `null` when the matched value has no such
+// member at all: the declared Case then stands, and whether a Handler that can
+// never run is worth a Diagnostic is the Validator's question, not this one's.
+function instantiatedCaseOf(
+	declaredCase: common.CaseType,
+	valueType: common.Type,
+): common.CaseType | null {
+	let instantiated = caseMatcherCandidates(valueType).find(
+		(member): member is common.CaseType =>
+			member.type === "Case" &&
+			member.name === declaredCase.name &&
+			member.choice === declaredCase.choice,
+	)
+
+	return instantiated ?? null
+}
+
 // NOTE: A bare Case Matcher (`case #Add`) resolves against the matched
 // value's own Union — the Case's name never has to be in scope by itself.
 // Ambiguity (two Choices in one Union sharing a Case name) asks for the
@@ -3588,17 +3901,32 @@ export function resolveCaseMatcherType(
 	scope: enricher.Scope,
 ): common.Type {
 	if (node.choice !== null) {
-		return resolveCaseReference(node.choice, node.caseName, scope)
+		let declaredCase = resolveCaseReference(
+			node.choice,
+			node.caseName,
+			scope,
+		)
+
+		if (declaredCase.type === "Error") {
+			return declaredCase
+		}
+
+		// NOTE: The prefix only says WHICH Choice's Case is meant — never with
+		// which Type Arguments. A generic Choice's DECLARED Case still carries
+		// its Type Parameters (`Walk#Done` is `{ value: Result }`), and the
+		// scrutinee is what applied them, so `@` binds to the matching member of
+		// the scrutinee's own Union, exactly as the bare form does. Written out,
+		// `case Walk#Done` left `@.value` an opaque `Result` while the identical
+		// `case #Done` narrowed it to Integer — and the prefix is the form the
+		// ambiguity Diagnostic asks for.
+		return instantiatedCaseOf(declaredCase, valueType) ?? declaredCase
 	}
 
 	if (valueType.type === "Error") {
 		return { type: "Error" }
 	}
 
-	let members =
-		valueType.type === "UnionType"
-			? flattenUnionMembers(valueType)
-			: [valueType]
+	let members = caseMatcherCandidates(valueType)
 
 	let candidates = members.filter(
 		(member): member is common.CaseType =>
@@ -3649,7 +3977,7 @@ export function contextualFunctionTypeOf(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 ): common.FunctionType | undefined {
-	let recorded = contextualFunctionTypes.get(node)
+	let recorded = recordedContextualFunctionType(node)
 
 	if (recorded !== undefined) {
 		return recorded
@@ -3671,6 +3999,81 @@ const contextualFunctionTypes = new WeakMap<
 	parser.FunctionDefinitionNode,
 	common.FunctionType
 >()
+
+type ContextualFunctionTypeRecording = Map<
+	parser.FunctionDefinitionNode,
+	common.FunctionType
+>
+
+// NOTE: The recordings of the probes currently running, innermost last. An
+// Invocation probes EVERY candidate — that is how an ambiguity is found — and
+// resolving a contextually typed Function literal against a candidate's
+// Parameter Type records what the literal's omitted annotations resolved to. A
+// candidate that then LOSES resolution must not leave that recording behind:
+// the enrichment pass reads it back to type the literal's body, so the losing
+// candidate would decide what the body means. Probes hold their recordings
+// aside and the caller commits the winner's. A stack rather than one recording,
+// because an Argument's own Invocation is probed while the outer one is.
+let probeRecordings: Array<ContextualFunctionTypeRecording> = []
+
+// NOTE: A nested probe commits into the enclosing probe's recording rather than
+// straight into the shared one, so an inner Invocation's winner is still
+// discarded when the outer candidate it was probed for loses.
+function recordContextualFunctionType(
+	node: parser.FunctionDefinitionNode,
+	resolved: common.FunctionType,
+): void {
+	let innermost = probeRecordings[probeRecordings.length - 1]
+
+	if (innermost === undefined) {
+		contextualFunctionTypes.set(node, resolved)
+	} else {
+		innermost.set(node, resolved)
+	}
+}
+
+// NOTE: Innermost first, so a probe sees what it recorded itself before what an
+// enclosing one recorded, and the committed record answers when no probe did.
+function recordedContextualFunctionType(
+	node: parser.FunctionDefinitionNode,
+): common.FunctionType | undefined {
+	for (let index = probeRecordings.length - 1; index >= 0; index--) {
+		let recorded = probeRecordings[index].get(node)
+
+		if (recorded !== undefined) {
+			return recorded
+		}
+	}
+
+	return contextualFunctionTypes.get(node)
+}
+
+function probeContextualFunctionTypes<Result>(probe: () => Result): {
+	result: Result
+	recording: ContextualFunctionTypeRecording
+} {
+	let recording: ContextualFunctionTypeRecording = new Map()
+
+	probeRecordings.push(recording)
+
+	try {
+		return { result: probe(), recording }
+	} finally {
+		probeRecordings.pop()
+	}
+}
+
+function commitContextualFunctionTypes(
+	recording: ContextualFunctionTypeRecording | undefined,
+): void {
+	if (recording === undefined) {
+		return
+	}
+
+	for (let [node, resolved] of recording) {
+		recordContextualFunctionType(node, resolved)
+	}
+}
 
 function needsContext(node: parser.FunctionDefinitionNode): boolean {
 	return (

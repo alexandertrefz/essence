@@ -113,7 +113,12 @@ export function rewrite(program: common.typedSimple.Program): string {
 function rewriteImplementationSection(
 	implementation: common.typedSimple.ImplementationSectionNode,
 ): Array<estree.ModuleDeclaration | estree.Statement> {
-	return implementation.nodes.map((node) => rewriteStatement(node))
+	// NOTE: The outermost block a user Namespace can be declared in, and a Scope
+	// of its own for the same reason every inner block is one — the Enricher
+	// refuses a top-level `namespace List` today, but nothing here rests on that.
+	return withNamespaceScope(() =>
+		implementation.nodes.map((node) => rewriteStatement(node)),
+	)
 }
 
 // #region Statements
@@ -160,9 +165,18 @@ function rewriteVariableDeclarationStatement(
 function rewriteNamespaceDefinitionStatement(
 	node: common.typedSimple.NamespaceDefinitionStatementNode,
 ): estree.ClassDeclaration {
+	// NOTE: Declared BEFORE the body is rewritten, because a Namespace is in
+	// scope inside its own Methods — `quadrupledValue` calling `@::doubledValue()`
+	// is a reference to the class being declared — so the two have to agree on
+	// the escaped name from the first Method onward.
+	declareUserNamespace(node.name.name)
+
 	return {
 		type: "ClassDeclaration",
-		id: rewriteVerbatimIdentifier(node.name),
+		id: {
+			type: "Identifier",
+			name: namespaceIdentifierName(node.name.name),
+		},
 		superClass: null,
 		body: {
 			type: "ClassBody",
@@ -172,10 +186,7 @@ function rewriteNamespaceDefinitionStatement(
 				).map<estree.PropertyDefinition>(([name, value]) => {
 					return {
 						type: "PropertyDefinition",
-						key: {
-							type: "Identifier",
-							name,
-						},
+						key: memberKey(name),
 						value: rewriteExpression(value),
 						computed: false,
 						static: true,
@@ -185,10 +196,7 @@ function rewriteNamespaceDefinitionStatement(
 					([name, method]) => {
 						return {
 							type: "MethodDefinition",
-							key: {
-								type: "Identifier",
-								name,
-							},
+							key: memberKey(name),
 							value: rewriteFunctionExpression(
 								method.method.value,
 							),
@@ -456,15 +464,22 @@ export function essenceMethodReferences(
 				consider(dispatch["namespaceName"], dispatch["methodName"])
 			}
 		} else if (record["nodeType"] === "Lookup") {
-			// NOTE: A `Lookup` off a Namespace Identifier is a static-Method
-			// reference — as a call's callee or a bare value both — and is the
-			// only spelling `rewriteLookup` sends through `namespaceMember`. A
-			// `Lookup` off any other base (a Record field) is filtered by
-			// `implemented`.
+			// NOTE: A `Lookup` off an Identifier whose TYPE is a Namespace is a
+			// static-Method reference — as a call's callee or a bare value both
+			// — and is the only spelling `rewriteLookup` sends through
+			// `namespaceMember`. The Type is what decides it there, so it
+			// decides it here: a local named after a Namespace
+			// (`constant Optional = { otherwise = 5 }`) is a Record field read,
+			// and drawing an edge from it would emit a const nothing names.
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 
-			if (base?.["nodeType"] === "Identifier") {
+			if (
+				base?.["nodeType"] === "Identifier" &&
+				(base["type"] as Record<string, unknown> | undefined)?.[
+					"type"
+				] === "Namespace"
+			) {
 				consider(base["name"], member?.["name"])
 			}
 		} else if (record["nodeType"] === "ConformanceValue") {
@@ -720,7 +735,7 @@ function rewriteConformanceValue(
 		properties: Object.entries(node.methodMap).map(
 			([protocolMethodName, namespaceMethodName]): estree.Property => ({
 				type: "Property",
-				key: { type: "Identifier", name: protocolMethodName },
+				key: memberKey(protocolMethodName),
 				value: namespaceMember(
 					node.namespaceName,
 					namespaceMethodName,
@@ -898,19 +913,24 @@ function namespaceMember(
 		}
 	}
 
-	let essenceName = essenceMethodName(namespaceName, memberName)
+	// NOTE: The `$es_<Namespace>_<member>` const belongs to the STANDARD LIBRARY's
+	// Namespace of that name, so a user Namespace shadowing it must not be routed
+	// to one: `namespace List for Integer { contains(…) }` emitted
+	// `$es_List_contains(5, 5)` — the library's List.contains, run against an
+	// Integer — where the user's own class Method was written. The same lexical
+	// answer decides it as decides the Identifier below.
+	let essenceName = isShadowingUserNamespace(namespaceName)
+		? null
+		: essenceMethodName(namespaceName, memberName)
 
 	if (essenceName !== null) {
 		return { type: "Identifier", name: essenceName }
 	}
 
-	return {
-		type: "MemberExpression",
-		optional: false,
-		computed: false,
-		object: { type: "Identifier", name: namespaceName },
-		property: { type: "Identifier", name: memberName },
-	}
+	return memberRead(
+		{ type: "Identifier", name: namespaceIdentifierName(namespaceName) },
+		memberName,
+	)
 }
 
 function rewriteMethodInvocation(
@@ -1037,10 +1057,7 @@ function rewriteRecordValue(
 					([key, value]) => {
 						return {
 							type: "Property",
-							key: {
-								type: "Identifier",
-								name: key,
-							},
+							key: memberKey(key),
 							value: rewriteExpression(value),
 							kind: "init",
 							computed: false,
@@ -1082,9 +1099,26 @@ function rewriteStringValue(
 	}
 }
 
+// NOTE: A Number Literal is decimal digits and nothing else — Essence has no
+// hexadecimal, binary or exponent form — and the Lexer is what refuses the rest,
+// with a positioned Diagnostic naming the text the author wrote. This is the
+// belt to that braces: `BigInt` is not a decimal parser, it reads `"0xFF"` as
+// 255 and THROWS on `"FF"`, so a digit string that ever slipped past the Lexer
+// would either compile to a silently different number or abort the Rewriter with
+// a JavaScript SyntaxError carrying no source location at all. Keeping the
+// leading decimal run — and 0 when there is none — makes the emission total, and
+// leaves a well-formed Literal byte-identical.
+function decimalDigits(value: string): string {
+	let digits = /^-?[0-9]+/.exec(value)?.[0]
+
+	return digits === undefined ? "0" : digits
+}
+
 function rewriteIntegerValue(
 	node: common.typedSimple.IntegerValueNode,
 ): estree.CallExpression {
+	let value = decimalDigits(node.value)
+
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -1104,8 +1138,8 @@ function rewriteIntegerValue(
 		arguments: [
 			{
 				type: "Literal",
-				bigint: node.value,
-				value: BigInt(node.value),
+				bigint: value,
+				value: BigInt(value),
 			},
 		],
 	}
@@ -1114,6 +1148,9 @@ function rewriteIntegerValue(
 function rewriteRationalValue(
 	node: common.typedSimple.RationalValueNode,
 ): estree.CallExpression {
+	let numerator = decimalDigits(node.numerator)
+	let denominator = decimalDigits(node.denominator)
+
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -1133,13 +1170,13 @@ function rewriteRationalValue(
 		arguments: [
 			{
 				type: "Literal",
-				bigint: node.numerator,
-				value: BigInt(node.numerator),
+				bigint: numerator,
+				value: BigInt(numerator),
 			},
 			{
 				type: "Literal",
-				bigint: node.denominator,
-				value: BigInt(node.denominator),
+				bigint: denominator,
+				value: BigInt(denominator),
 			},
 		],
 	}
@@ -1232,23 +1269,24 @@ function rewriteListValue(
 
 // NOTE: A Lookup reaches here for a static Method call (`Number.sum(…)`), a
 // static Property read (`Number.PI`) and a plain Record member access
-// (`record.field`). Only the first two name a Namespace, so only a Lookup whose
-// base is an Identifier routes through `namespaceMember` — and even then the
-// member read is unchanged unless the pair is Essence-implemented, which a
-// Record field or a Property never is. A base that is any other Expression
-// (a chained access, a call result) keeps the plain member read.
+// (`record.field`). Only the first two name a Namespace, and WHICH of the three
+// this is has to be read off the base's resolved Type, not off its spelling: a
+// local may be named after a Namespace — `constant Optional = { otherwise = 5 }`
+// is a legal Program the Enricher types as a Record — and deciding by the name
+// alone sent `Optional.otherwise` through `namespaceMember`, which answered with
+// the standard library's `$es_Optional_otherwise` Function in place of the
+// field. That miscompiled silently: it type checks, it emits, and the value is
+// simply the wrong one. Every other base — a shadowing local, a chained access,
+// a call result — keeps the plain member read.
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
-	if (node.base.nodeType === "Identifier") {
+	if (
+		node.base.nodeType === "Identifier" &&
+		node.base.type.type === "Namespace"
+	) {
 		return namespaceMember(node.base.name, node.member.name)
 	}
 
-	return {
-		type: "MemberExpression",
-		optional: false,
-		object: rewriteExpression(node.base),
-		property: rewriteVerbatimIdentifier(node.member),
-		computed: false,
-	}
+	return memberRead(rewriteExpression(node.base), node.member.name)
 }
 
 // NOTE: The JavaScript words that can not be a binding or a bare reference —
@@ -1310,14 +1348,92 @@ const reservedJavaScriptWords = new Set([
 	"eval",
 ])
 
-// NOTE: A reserved word is escaped by prefixing `_`, which NO Essence identifier
-// can contain — the Lexer reads `_` as a Symbol, so it can never be part of a
-// name — which is what makes the escape collision-proof: `_case` can not be a
-// user's own identifier, and no reserved word starts with `_`, so the map is
-// injective. Member and property positions do NOT come through here: a reserved
-// word is a legal property key (`record.case`, `{ case: … }`), and escaping one
-// would part it from the key the record literal emits.
-function escapeReservedWord(name: string): string {
+// NOTE: The names the emitted Program binds — or reads off the host — for its
+// OWN purposes: the runtime Namespace imports (`List`, `String`, …), the three
+// module aliases beside them, and the global `Object` a Combination's
+// `Object.assign` reaches for. None of them is an Essence keyword and none can
+// be reported to the author as taken, so a Program is free to bind any of them
+// itself — and ordinary JavaScript lexical scoping then rebinds every emitted
+// `List.createList(…)`, `$type.isValueOfType(…)` and `Object.assign(…)` below it
+// to the user's value. `constant List = 5` beside a List literal is a
+// `TypeError` out of a Program that compiled green, and `$type`/`$helpers` are
+// worse: `$` is a legal Essence identifier character, so they are names a user
+// can write without any way of knowing they are spoken for. Every one of them is
+// therefore a name the user half of the Program can not hold — `escapeName`
+// mangles it instead, at the binding and at every reference alike.
+const compilerOwnedNames = new Set([
+	...runtimeNamespaceNames,
+	"$_",
+	"$type",
+	"$helpers",
+	"Object",
+])
+
+// NOTE: The builtin Namespaces as a set, for the one question emission asks of
+// a Namespace name: is this the `import * as <Name>` the Program opens with, or
+// a user's `class`?
+const runtimeNamespaceNameSet = new Set(runtimeNamespaceNames)
+
+// NOTE: A JavaScript IdentifierName, spelled as the specification does — an
+// ID_Start (or `$`/`_`) followed by ID_Continue — so an Essence name that is
+// already a legal JavaScript one is emitted untouched, accents and all. The
+// Lexer ends an Identifier only at one of ITS symbols, and `?`, `+`, `!`, `%`,
+// `*`, `&`, `^`, `;` and `'` are not among them, so `ok?` and `a+b` are single
+// Identifier Tokens that every stage carries to here. Emitted raw they are not
+// JavaScript at all, and the build died in the bundler — an esbuild syntax error
+// quoting generated text, at a line number that does not exist in the author's
+// file.
+const javaScriptIdentifierName =
+	/^[$_\p{ID_Start}][$\u200C\u200D\p{ID_Continue}]*$/u
+
+function isJavaScriptIdentifierName(name: string): boolean {
+	return javaScriptIdentifierName.test(name)
+}
+
+// NOTE: The escape hatch for a name JavaScript can not spell, or one the
+// compiler has already spoken for. Every character JavaScript accepts unchanged
+// is kept, and every other becomes `_<code point in hex>_` — an encoding that is
+// injective, because `_` can appear NOWHERE else in the result: the Lexer reads
+// `_` as a Symbol, so no Essence identifier contains one, and the kept
+// characters are exactly `[A-Za-z0-9$]`. Two different names therefore can not
+// mangle alike, and the `$user_` prefix — itself unspellable in Essence, for the
+// same reason — keeps the whole space clear of the compiler's own `$es_…`
+// consts, `$type`, `$_`, `_self` and the `_`-escaped reserved words.
+const mangledNamePrefix = "$user_"
+const keptMangledCharacter = /^[A-Za-z0-9$]$/
+
+function mangleName(name: string): string {
+	let mangled = mangledNamePrefix
+
+	for (let character of name) {
+		mangled += keptMangledCharacter.test(character)
+			? character
+			: `_${character.codePointAt(0)!.toString(16)}_`
+	}
+
+	return mangled
+}
+
+// NOTE: One Essence name as the emitted Program binds and reads it. Three things
+// can be wrong with it, and a name is left ALONE unless one of them is — which
+// is what keeps every ordinary Program's emission byte-identical:
+//
+//   spelled like the compiler's own    `List`, `$type`   → mangled
+//   not a JavaScript IdentifierName    `ok?`, `a+b`      → mangled
+//   a JavaScript reserved word         `new`, `default`  → `_`-prefixed
+//
+// The reserved-word escape stays its own, older answer: `_case` can not be a
+// user's own identifier and no reserved word starts with `_`, so it is injective
+// on its own, and it does not collide with a mangled name, which always begins
+// `$user_`. Member and property positions do NOT come through here — a reserved
+// word is a legal property key (`record.case`, `{ case: … }`) and escaping one
+// would part it from the key the Record literal wrote. `memberKey` answers for
+// those.
+function escapeName(name: string): string {
+	if (compilerOwnedNames.has(name) || !isJavaScriptIdentifierName(name)) {
+		return mangleName(name)
+	}
+
 	return reservedJavaScriptWords.has(name) ? `_${name}` : name
 }
 
@@ -1326,24 +1442,108 @@ function rewriteIdentifier(
 ): estree.Identifier {
 	return {
 		type: "Identifier",
-		name: escapeReservedWord(node.name),
+		name: escapeName(node.name),
 	}
 }
 
-// NOTE: A name that has to be emitted VERBATIM, never escaped, because it must
-// match a JavaScript name written elsewhere the same way: a member or property
-// read (`record.case` matches the key `{ case: … }` the record literal wrote),
-// and a Namespace's class Identifier (its references go through
-// `namespaceMember`, which names it raw). `rewriteIdentifier` above escapes, so
-// these positions use this instead. A reserved word is legal in every one of
-// them — a property key, and a Namespace name is a Type, which is never a
-// lower-case JavaScript reserved word in practice.
-function rewriteVerbatimIdentifier(
-	node: common.typedSimple.IdentifierNode,
-): estree.Identifier {
+// NOTE: A Namespace's emitted binding. A builtin's name IS the `import * as
+// <Name>` the Program opens with, so it is emitted verbatim — escaping it would
+// part every reference from the import. Every other Namespace is a user's,
+// emitted as a `class <Name>`, and its name is an ordinary Essence identifier:
+// `namespace new for Integer` and `namespace Object for Integer` both parse. So
+// it is escaped exactly as a Constant is — here, at the class declaration, and
+// in `namespaceMember`, at every reference — which is what keeps the two
+// agreeing. They did not: the declaration was escaped and the references were
+// not, so `constant this = { x = 1 }` bound `_this` and read `this.x`.
+//
+// NOTE: A user Namespace named after a builtin — `namespace List for Integer` —
+// is refused where the Enricher can see it: at the top level `List` is already
+// declared, and the answer is 'Variable 'List' is already declared'. A NESTED
+// one is accepted, because it declares `List` in an inner Scope where nothing is
+// taken yet, and it used to be emitted verbatim as well: the `class List` inside
+// the Function then shadowed the `import * as List` for the rest of that block,
+// so the List literal two lines below it called the user's class and died with
+// `List.createList is not a function` out of a Program that compiled green.
+//
+// The two ARE tellable apart, and lexically: a name is the user's inside the
+// block that declares it and the import everywhere else, which is exactly what
+// `shadowingNamespaceScopes` tracks. The user's is mangled — declaration and
+// every reference alike — and the import keeps the name it was imported under,
+// so a List literal beside a `namespace List` calls the runtime and
+// `21::doubledValue()` calls `$user_List`.
+function namespaceIdentifierName(namespaceName: string): string {
+	return runtimeNamespaceNameSet.has(namespaceName) &&
+		!isShadowingUserNamespace(namespaceName)
+		? namespaceName
+		: escapeName(namespaceName)
+}
+
+// NOTE: The user Namespaces in lexical scope right now whose name the compiler
+// has already spoken for — one Set per emitted block, innermost last. Only a
+// name in `compilerOwnedNames` is ever recorded: every other Namespace name
+// means the same thing wherever it is written, and `escapeName` already answers
+// for it without any scope to consult.
+//
+// NOTE: The stack mirrors the Enricher's own Scope chain, and that is what makes
+// it exact rather than a guess. A nested Namespace does not merely add a name —
+// it REPLACES the builtin of that name for the rest of its block, in Method
+// resolution ('No Method named 'firstItem'' for a List beside a
+// `namespace List`) and in conformance solving alike ('String does not conform
+// to 'Comparable'' beside a `namespace String`). So inside the block every
+// `List` a Node can carry is the user's, and outside it every one is the
+// import — including the ones that arrive as a bare string with no Type to ask,
+// a `UnionMethodInvocation`'s dispatch case and a `ConformanceValue`'s witness.
+let shadowingNamespaceScopes: Array<Set<string>> = [new Set()]
+
+// NOTE: `finally`, so a throw out of the Rewriter — the one for a Lookup on a
+// native invocation, say — can not leave the stack deeper than it found it and
+// mangle a Namespace name in the NEXT Program this process compiles.
+function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
+	shadowingNamespaceScopes.push(new Set())
+
+	try {
+		return rewriteScope()
+	} finally {
+		shadowingNamespaceScopes.pop()
+	}
+}
+
+function declareUserNamespace(namespaceName: string): void {
+	if (compilerOwnedNames.has(namespaceName)) {
+		shadowingNamespaceScopes.at(-1)!.add(namespaceName)
+	}
+}
+
+function isShadowingUserNamespace(namespaceName: string): boolean {
+	return shadowingNamespaceScopes.some((scope) => scope.has(namespaceName))
+}
+
+// NOTE: A name in KEY or PROPERTY position — a Record field, a Namespace's
+// static Method, a Protocol Method in a conformance witness. It is never
+// escaped: a reserved word is a legal property key, and the read has to match
+// the key the literal wrote. It does still have to be spellable, though, and an
+// Essence identifier may hold characters no JavaScript IdentifierName may — so
+// such a name becomes a string Literal instead. `{ "ok?": … }` and
+// `record["ok?"]` are the same property under a spelling JavaScript accepts, and
+// because both positions ask this one question they still agree.
+function memberKey(name: string): estree.Identifier | estree.Literal {
+	return isJavaScriptIdentifierName(name)
+		? { type: "Identifier", name }
+		: { type: "Literal", value: name }
+}
+
+// NOTE: One member read, `computed` iff the key had to become a Literal — the
+// dotted form for every ordinary name, the bracketed one for the rest.
+function memberRead(
+	object: estree.Expression,
+	name: string,
+): estree.MemberExpression {
 	return {
-		type: "Identifier",
-		name: node.name,
+		type: "MemberExpression",
+		optional: false,
+		object,
+		property: memberKey(name),
+		computed: !isJavaScriptIdentifierName(name),
 	}
 }
 
@@ -1424,13 +1624,7 @@ function rewriteMatch(
 				test = and(
 					test,
 					callAnyIs(
-						{
-							type: "MemberExpression",
-							object: value,
-							property: { type: "Identifier", name },
-							optional: false,
-							computed: false,
-						},
+						memberRead(value, name),
 						rewriteExpression(literal),
 					),
 				)
@@ -1448,6 +1642,41 @@ function rewriteMatch(
 			optional: false,
 			computed: false,
 		})
+	}
+
+	// NOTE: The `else` no Handler owns — the one branch taken when every
+	// Matcher declined. The Validator has already refused a Match that leaves
+	// a member of its Union unhandled, so this is dead code in a Program that
+	// compiled clean; it exists because it did NOT used to, and the chain
+	// ending in nothing was invisible: the wrapper answered `undefined`, which
+	// is not an Essence value, and the Program failed later and elsewhere —
+	// with a `TypeError` out of whatever read the missing Type key, or with
+	// `undefined` flowing on as if it were a result. It is the innermost
+	// `else` rather than a Statement after the chain on purpose: a Handler
+	// body is not obliged to return (a Match in Statement position is written
+	// for its effects), so a Handler that ran and fell through must NOT reach
+	// it.
+	function noCaseMatched(
+		value: estree.Identifier,
+	): estree.ExpressionStatement {
+		return {
+			type: "ExpressionStatement",
+			expression: {
+				type: "CallExpression",
+				optional: false,
+				callee: {
+					type: "MemberExpression",
+					object: { type: "Identifier", name: "$type" },
+					property: {
+						type: "Identifier",
+						name: "noCaseMatched",
+					},
+					optional: false,
+					computed: false,
+				},
+				arguments: [value],
+			},
+		}
 	}
 
 	const valueExpression = rewriteExpression(node.value)
@@ -1468,10 +1697,10 @@ function rewriteMatch(
 			type: "IfStatement",
 			test: handlerTest(currentHandler, selfParameter),
 			consequent: rewriteBlockStatement(currentHandler.body),
-		}
-
-		if (ifChain) {
-			ifStatement.alternate = ifChain
+			alternate: ifChain ?? {
+				type: "BlockStatement",
+				body: [noCaseMatched(selfParameter)],
+			},
 		}
 
 		ifChain = ifStatement
@@ -1483,7 +1712,7 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				body: ifChain ? [ifChain] : [],
+				body: [ifChain ?? noCaseMatched(selfParameter)],
 			},
 			params: [selfParameter],
 		},
@@ -1501,9 +1730,15 @@ function rewriteBlockStatement(
 ): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		body: nodes
-			.map((node) => rewriteStatement(node))
-			.filter((value) => !!value),
+		// NOTE: One emitted block is one Namespace Scope, so a `namespace List`
+		// declared inside a Function is the user's for the rest of that Function
+		// and the import again the moment the block closes — which is what lets a
+		// sibling Function beside it keep calling the runtime's List.
+		body: withNamespaceScope(() =>
+			nodes
+				.map((node) => rewriteStatement(node))
+				.filter((value) => !!value),
+		),
 	}
 }
 

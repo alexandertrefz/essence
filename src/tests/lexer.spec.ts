@@ -277,6 +277,60 @@ describe("Lexer", () => {
 				]),
 			).toEqual(output)
 		})
+
+		it("should end an identifier at a Comment written against it", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: Array<SimpleToken>
+
+			input = "y§ doubled later"
+			output = [
+				{ value: "y", type: TokenType.Identifier },
+				{ value: "§ doubled later", type: TokenType.Comment },
+			]
+
+			lexer.reset(input)
+
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
+		})
+
+		it("should end a Keyword at a Comment written against it", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: Array<SimpleToken>
+
+			input = "else§ note"
+			output = [
+				{ value: "else", type: TokenType.KeywordElse },
+				{ value: "§ note", type: TokenType.Comment },
+			]
+
+			lexer.reset(input)
+
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
+		})
+
+		it("should end an identifier at a String written against it", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: Array<SimpleToken>
+
+			input = 'name"text"'
+			output = [
+				{ value: "name", type: TokenType.Identifier },
+				{ value: "text", type: TokenType.LiteralString },
+			]
+
+			lexer.reset(input)
+
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual(output)
+		})
 	})
 
 	describe("Booleans", () => {
@@ -876,6 +930,82 @@ describe("Lexer", () => {
 			lexer.reset(input)
 
 			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex a valid Number without reporting an error", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("1000")
+			lexer.next()
+
+			expect(lexer.errors).toEqual([])
+		})
+
+		// NOTE: Essence has no hexadecimal, binary or exponent form, so each of
+		// these is a Number Literal holding something no Number can hold. They
+		// used to be taken as written — `0xFF` became 255 — or to reach the
+		// Rewriter and fail there, with no position to point at.
+		for (let malformed of ["0xFF", "0b101", "0o17", "1e5", "12abc"]) {
+			it(`should report ${malformed} as an invalid Number`, () => {
+				let lexer = new Lexer()
+
+				lexer.reset(malformed)
+
+				let token = lexer.next()
+
+				expect(token?.type).toBe(TokenType.LiteralNumber)
+				expect(lexer.errors).toHaveLength(1)
+				expect(lexer.errors[0].message).toBe(
+					`'${malformed}' is not a valid Number`,
+				)
+				expect(lexer.errors[0].position).toEqual({
+					start: { line: 1, column: 1 },
+					end: { line: 1, column: malformed.length + 1 },
+				})
+			})
+		}
+
+		it("should keep only the digits of an invalid Number", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("12abc")
+
+			expect(lexer.next()?.value).toBe("12")
+		})
+
+		it("should not leave the letters of an invalid Number behind", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("0xFF")
+			lexer.next()
+
+			expect(lexer.next()).toBeUndefined()
+		})
+
+		it("should end a Number at a String written against it", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('5"text"')
+
+			expect(
+				stripPositionFromArray([lexer.next(), lexer.next()]),
+			).toEqual([
+				{ value: "5", type: TokenType.LiteralNumber },
+				{ value: "text", type: TokenType.LiteralString },
+			])
+			expect(lexer.errors).toEqual([])
+		})
+
+		it("should forget the errors of the previous input on reset", () => {
+			let lexer = new Lexer()
+
+			lexer.reset("1e5")
+			lexer.next()
+
+			lexer.reset("5")
+			lexer.next()
+
+			expect(lexer.errors).toEqual([])
 		})
 	})
 })

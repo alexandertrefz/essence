@@ -126,8 +126,15 @@ declarations {
 			§ first match is the whole of the difference from
 			§ `keepEvery(where:)::firstItem()`, and leaving a walk before its end is
 			§ what the `Step` Choice made an Essence expression able to do — this
-			§ Method was native until it existed. `anyItem`/`everyItem` are written
-			§ on top of this, so they short circuit through it too.
+			§ Method was native until it existed.
+			§
+			§ What this Method can NOT say is which of two things happened when it
+			§ answers `Nothing`: no item matched, or the item that matched IS
+			§ `nothing`. Both are the same value, and no return Type here can tell
+			§ them apart. So the Methods that only want the DECISION —
+			§ `anyItem`/`everyItem`, and `firstIndex`/`lastIndex` for the position —
+			§ step the same fold themselves, carrying a Boolean or an Integer, and
+			§ are not written on top of this one.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
 				§ `reduce` binds its `Result` from the `startingWith` value, and a
 				§ bare `nothing` would fix it to `Nothing` alone — so the seed is
@@ -326,45 +333,49 @@ declarations {
 		§§ @returns the item, or `Nothing` when the position is outside the List.
 		item(at index: Integer) -> Optional<ItemType>
 
-		§ `firstIndex` and `lastIndex` walk the positions with the general `loop`,
-		§ stopping at the first match — the walk-and-stop the native did, now that
-		§ the `Step` Choice lets an Essence expression leave a walk before its end.
+		§ `firstIndex` and `lastIndex` COUNT their way through the items, stopping
+		§ at the first match — the walk-and-stop the native did, now that the
+		§ `Step` Choice lets an Essence expression leave a walk before its end.
 		§ The old objection — that Essence would have to pair every item with its
 		§ position, build that whole List of Records and read one member back out —
-		§ was about a `pair(with:)` formulation; the loop threads the position as
-		§ its State and never builds a List. The bound is the whole of the search:
-		§ the item Type's own `is` decides which position is found, arriving as the
-		§ hidden conformance Argument exactly as `contains` hands it to `anyItem`.
+		§ was about a `pair(with:)` formulation; the fold threads the position as
+		§ its accumulator and never builds a List.
+		§
+		§ The counting is what makes them right for EVERY item Type. Walking the
+		§ positions with `item(at:)` reads better and is wrong: `item(at:)` answers
+		§ `Optional<ItemType>`, so a `nothing` STORED in the List and a position
+		§ past the end come back as the same value, and an item Type that already
+		§ contains `Nothing` — a `List<Nothing>`, or any `… | Nothing` Union a
+		§ Program conforms to `Equatable` — would have its `nothing` items skipped
+		§ without ever being compared. `reduce` hands the item ITSELF, so every
+		§ item reaches the comparison.
+		§
+		§ The bound is the whole of the search: the item Type's own `is` decides
+		§ which position is found, arriving as the hidden conformance Argument
+		§ exactly as `contains` hands it to `anyItem`.
 
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
 		firstIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
-			constant length = @::length()
-			constant list = @
-
-			§ State is the position under test, Result the answer. `item(at:)`
-			§ answers `Nothing` only past the end, which the length guard has
-			§ already stopped on, so the `Nothing` Case is the unreachable arm.
-			<- loop(startingWith 0, step (index) -> Step<Integer, Optional<Integer>> {
-				if index::isGreaterThanOrEqualTo(length) {
-					<- #Done(nothing)
-				}
-
-				<- match list::item(at index) -> Step<Integer, Optional<Integer>> {
-					case Nothing {
-						<- #Continue(index::add(1))
-					}
-
-					case _ {
-						if @::is(item) {
-							<- #Done(index)
-						} else {
-							<- #Continue(index::add(1))
-						}
-					}
+			§ The accumulator is the position under test: `#Done` leaves the fold
+			§ at the first match, carrying that position, and a fold that reaches
+			§ the end settles on the position AFTER the last item — the length,
+			§ which is the one Integer no match can answer. So "absent" needs no
+			§ sentinel of its own, and every item, `nothing` included, is compared.
+			constant found = @::reduce(startingWith 0, step (index, candidate) {
+				if candidate::is(item) {
+					<- #Done(index)
+				} else {
+					<- #Continue(index::add(1))
 				}
 			})
+
+			if found::isLessThan(@::length()) {
+				<- found
+			} else {
+				<- nothing
+			}
 		}
 
 		§§ A new List of the items from one position up to, but not including, another.
@@ -427,17 +438,31 @@ declarations {
 		§ item matches …" — the existential and universal checks over a
 		§ predicate. The no-argument existential is `hasItems`.
 		§
-		§ Both are written on `firstItem(where:)`, which stops at the first item
-		§ that decides the answer, so they short circuit: `anyItem` returns on
-		§ the first match, `everyItem` on the first failure. `count(where:)`
-		§ below stays on `keepEvery` — counting has to see every item, so there
-		§ is no walk to leave early.
+		§ Both stop at the first item that decides the answer — `anyItem` at the
+		§ first match, `everyItem` at the first failure — and both stop on
+		§ `reduce`'s early-stopping entry, carrying the ANSWER rather than the
+		§ item. `firstItem(where:)::hasValue()` would read the same way and is
+		§ wrong: it answers `Nothing` both when no item matched and when the
+		§ matching item IS `nothing`, so on a `List<Optional<Integer>>` a check
+		§ that accepts the empty Optionals would find one and report `false`.
+		§ A Boolean has no such second reading. `count(where:)` below stays on
+		§ `keepEvery` — counting has to see every item, so there is no walk to
+		§ leave early.
 
 		§§ Whether the given check accepts at least one item.
 		§§
 		§§ @returns `true` when some item is accepted.
 		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
-			<- @::firstItem(where check)::hasValue()
+			§ The accumulator is the answer so far, which stays `false` until an
+			§ item is accepted and `#Done` finishes the fold with `true`. The
+			§ empty List has no item to accept and keeps the seed.
+			<- @::reduce(startingWith false, step (found, item) {
+				if check(item) {
+					<- #Done(true)
+				} else {
+					<- #Continue(found)
+				}
+			})
 		}
 
 		§§ Whether the given check accepts every item.
@@ -499,30 +524,30 @@ declarations {
 		§§
 		§§ @returns the zero-based position, or `Nothing` when the item is absent.
 		lastIndex<infer ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
-			constant list = @
+			§ The LAST occurrence is the FIRST occurrence of the reversed List, so
+			§ `firstIndex` answers this one too and only the position has to be
+			§ counted back from the end. Counting down from the last position
+			§ instead would have to read each one with `item(at:)`, which can not
+			§ say whether a `Nothing` is the item stored there or the end of the
+			§ List — see the note above `firstIndex`.
+			§
+			§ The empty List reverses to itself and holds no item to find, so it
+			§ answers `Nothing` without a guard of its own — the -1 that
+			§ `lastPosition` holds for it never reaches the subtraction.
+			constant lastPosition = @::length()::subtract(1)
 
-			§ The mirror of `firstIndex` — the same walk-and-stop, from the last
-			§ position down. The empty List seeds the loop at -1, already below
-			§ zero, so it stops with `Nothing` before reading anything.
-			<- loop(startingWith @::length()::subtract(1), step (index) -> Step<Integer, Optional<Integer>> {
-				if index::isLessThan(0) {
-					<- #Done(nothing)
+			§ `@` is the SCRUTINEE inside a match, not the receiver, so the last
+			§ position is bound before the match to stay reachable in the Case
+			§ bodies.
+			<- match @::reverse()::firstIndex(of item) -> Optional<Integer> {
+				case Nothing {
+					<- nothing
 				}
 
-				<- match list::item(at index) -> Step<Integer, Optional<Integer>> {
-					case Nothing {
-						<- #Continue(index::subtract(1))
-					}
-
-					case _ {
-						if @::is(item) {
-							<- #Done(index)
-						} else {
-							<- #Continue(index::subtract(1))
-						}
-					}
+				case _ {
+					<- lastPosition::subtract(@)
 				}
-			})
+			}
 		}
 
 		§ The one bounded Method whose bound does real work rather than

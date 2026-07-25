@@ -142,7 +142,7 @@
 "Integer.isGreaterThanOrEqualTo(_ Rational) [less] => false"
 "Integer.squareRoot() [perfect square] => 3"
 "Integer.squareRoot() [irrational] => √2"
-"Integer.squareRoot() [zero] => √0"
+"Integer.squareRoot() [zero] => 0"
 "Integer.squareRoot() [negative] => Nothing"
 "Integer.absolute() => 5"
 "Integer.absolute() [positive] => 5"

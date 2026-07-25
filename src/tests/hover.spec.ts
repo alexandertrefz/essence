@@ -350,6 +350,28 @@ describe("Hover", () => {
 		)
 	})
 
+	// NOTE: A callee's Generics are alpha-renamed for the span of one
+	// invocation, so a caller's same-named Generic can not collide with them —
+	// `T` is matched as `T`, a zero-width space and a counter. One that never
+	// binds stays under that fresh name in the Types stamped onto the
+	// Argument, and Hover reads its Types back from exactly there: rendered
+	// verbatim the reader is shown `T117`, since only the separator is
+	// invisible. `T` here occurs ONLY inside the callback, so no Argument can
+	// name it and it stays unbound for the whole invocation.
+	it("should describe a Generic under the name the source wrote", () => {
+		let source = [
+			"implementation {",
+			"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> Nothing {",
+			"\t\t<- nothing",
+			"\t}",
+			"\tconstant r = apply((x) { <- x }, times 5)",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 5, column: 22 })).toBe("x: T")
+		expect(hover(source, { line: 5, column: 21 })).toBe("(_ T) -> T")
+	})
+
 	it("should return null outside of any typed node", () => {
 		let source = ["implementation {", "\tconstant a = 1", "}"].join("\n")
 
