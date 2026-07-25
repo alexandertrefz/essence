@@ -364,29 +364,29 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they differ.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they differ.
 		isNot(_ other: Boolean) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
 		§§ Whether both Booleans are the same.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they match.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			<- @::and(other)
 		}
 
 		§§ Both Booleans at once.
 		§§
-		§§ @param other the Boolean to combine with
-		§§ @returns the conjunction.
+		§§ @param other — the Boolean to combine with
+		§§ @returns — the conjunction.
 		and(_ other: Boolean) -> Boolean
 
 		§§ The other Boolean.
 		§§
-		§§ @returns the negation.
+		§§ @returns — the negation.
 		negate() -> Boolean
 	}
 }`),
@@ -407,16 +407,16 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean matches, the long way around.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they match.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they match.
 		alpha(_ other: Boolean) -> Boolean {
 			<- Boolean.beta(other)
 		}
 
 		§§ A static helper that defers to another static.
 		§§
-		§§ @param value the Boolean.
-		§§ @returns the Boolean unchanged.
+		§§ @param value — the Boolean.
+		§§ @returns — the Boolean unchanged.
 		static beta(_ value: Boolean) -> Boolean {
 			<- Boolean.gamma(value)
 		}
@@ -424,8 +424,8 @@ describe("Stdlib Call Graph", () => {
 		§§ A static helper that reads a Record field — a Lookup that is NOT
 		§§ a Method call and must not become an edge.
 		§§
-		§§ @param value the Boolean.
-		§§ @returns the Boolean unchanged.
+		§§ @param value — the Boolean.
+		§§ @returns — the Boolean unchanged.
 		static gamma(_ value: Boolean) -> Boolean {
 			constant boxed = { field = value }
 			<- boxed.field
@@ -451,16 +451,16 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they differ.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they differ.
 		isNot(_ other: Boolean) -> Boolean {
 			<- @::is(other)
 		}
 
 		§§ Whether both Booleans are the same.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they match.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			<- @::isNot(other)
 		}
@@ -482,16 +482,16 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Beta defers to gamma.
 		§§
-		§§ @param value the Boolean.
-		§§ @returns the Boolean.
+		§§ @param value — the Boolean.
+		§§ @returns — the Boolean.
 		static beta(_ value: Boolean) -> Boolean {
 			<- Boolean.gamma(value)
 		}
 
 		§§ Gamma defers back to beta.
 		§§
-		§§ @param value the Boolean.
-		§§ @returns the Boolean.
+		§§ @param value — the Boolean.
+		§§ @returns — the Boolean.
 		static gamma(_ value: Boolean) -> Boolean {
 			<- Boolean.beta(value)
 		}
@@ -515,16 +515,16 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Alpha defers to the static beta.
 		§§
-		§§ @param other the Boolean.
-		§§ @returns the Boolean.
+		§§ @param other — the Boolean.
+		§§ @returns — the Boolean.
 		alpha(_ other: Boolean) -> Boolean {
 			<- Boolean.beta(other)
 		}
 
 		§§ Beta calls alpha back on its argument.
 		§§
-		§§ @param value the Boolean.
-		§§ @returns the Boolean.
+		§§ @param value — the Boolean.
+		§§ @returns — the Boolean.
 		static beta(_ value: Boolean) -> Boolean {
 			<- value::alpha(value)
 		}
@@ -553,8 +553,8 @@ describe("Stdlib Call Graph", () => {
 	namespace Boolean for Boolean {
 		§§ Whether both Booleans are the same, the long way around.
 		§§
-		§§ @param other the Boolean to compare with
-		§§ @returns whether they match.
+		§§ @param other — the Boolean to compare with
+		§§ @returns — whether they match.
 		is(_ other: Boolean) -> Boolean {
 			if @ {
 				<- other

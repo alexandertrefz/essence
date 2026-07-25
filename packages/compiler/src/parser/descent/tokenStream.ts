@@ -2,7 +2,7 @@ import { type common, lexer } from "@essence/interfaces"
 
 import { primary, reportError } from "../../diagnostics/index"
 import { Lexer } from "../../lexer/index"
-import { parseDocumentation } from "../documentation"
+import { type DocumentationLine, parseDocumentation } from "../documentation"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -225,7 +225,7 @@ export class TokenStream {
 	// run — a blank line or an ordinary `§` Comment in between means the block
 	// was written about something else, so it documents nothing.
 	documentationAbove(line: number): common.Documentation | null {
-		let lines: Array<string> = []
+		let lines: Array<DocumentationLine> = []
 		let start: common.Cursor | null = null
 		let end: common.Cursor | null = null
 
@@ -236,7 +236,7 @@ export class TokenStream {
 		) {
 			let token = this.documentationLines.get(current) as Token
 
-			lines.unshift(token.value)
+			lines.unshift({ text: token.value, position: token.position })
 			start = token.position.start
 			end ??= token.position.end
 		}
@@ -245,7 +245,7 @@ export class TokenStream {
 			return null
 		}
 
-		return parseDocumentation(lines, { start, end })
+		return parseDocumentation(lines, { start, end }).documentation
 	}
 
 	peek(offset = 0): Token | undefined {

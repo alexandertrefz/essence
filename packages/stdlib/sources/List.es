@@ -52,38 +52,38 @@ declarations {
 
 		§§ Checks whether the Lists are structurally equal — the same items in the same order, each pair compared with the items' own `is`. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @param other the value to compare with
-		§§ @returns `true` when the Lists are equal.
+		§§ @param other — the value to compare with
+		§§ @returns — `true` when the Lists are equal.
 		is<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
 
 		§§ Checks whether the Lists differ — in any item or in their order. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @param other the value to compare with
-		§§ @returns `true` when the Lists are not equal.
+		§§ @param other — the value to compare with
+		§§ @returns — `true` when the Lists are not equal.
 		isNot<infer ItemType is Equatable>(_ other: List<ItemType>) -> Boolean {
 			<- @::is(other)::negate()
 		}
 
 		§§ Represents the List and its items as a String.
 		§§
-		§§ @returns the String representation of the List.
+		§§ @returns — the String representation of the List.
 		toString() -> String
 
 		§§ How many items the List has.
 		§§
-		§§ @returns the number of items.
+		§§ @returns — the number of items.
 		length() -> Integer
 
 		§§ Whether the List has at least one item — the opposite of `isEmpty`.
 		§§
-		§§ @returns `true` when the List is not empty.
+		§§ @returns — `true` when the List is not empty.
 		hasItems() -> Boolean {
 			<- @::isEmpty()::negate()
 		}
 
 		§§ Whether the List has no items at all.
 		§§
-		§§ @returns `true` for the empty List.
+		§§ @returns — `true` for the empty List.
 		isEmpty() -> Boolean {
 			§ `List.length` is native and O(1) — it reads the underlying array's
 			§ length — so asking for it costs nothing. `String.isEmpty` is
@@ -93,8 +93,8 @@ declarations {
 
 		§§ Whether an item equal to the given one — by the items' own `is` — is in the List. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @param item the item to look for
-		§§ @returns `true` when the item occurs.
+		§§ @param item — the item to look for
+		§§ @returns — `true` when the item occurs.
 		contains<infer ItemType is Equatable>(_ item: ItemType) -> Boolean {
 			§ The bound is the whole of the difference from `anyItem`: the
 			§ conforming Namespace's `is` arrives as the hidden conformance
@@ -104,8 +104,8 @@ declarations {
 
 		§§ Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @param item the item to look for
-		§§ @returns `true` when the item does not occur.
+		§§ @param item — the item to look for
+		§§ @returns — `true` when the item does not occur.
 		doesNotContain<infer ItemType is Equatable>(
 			_ item: ItemType,
 		) -> Boolean {
@@ -114,7 +114,7 @@ declarations {
 
 		§§ The first item, or the first item the given check accepts.
 		§§
-		§§ @returns the matching item, or `Nothing` when there is none.
+		§§ @returns — the matching item, or `Nothing` when there is none.
 		overload firstItem {
 			() -> Optional<ItemType> {
 				§ `item(at:)` answers `Nothing` for a position outside the List, so
@@ -156,7 +156,7 @@ declarations {
 
 		§§ The last item of the List.
 		§§
-		§§ @returns the item, or `Nothing` for the empty List.
+		§§ @returns — the item, or `Nothing` for the empty List.
 		lastItem() -> Optional<ItemType> {
 			§ The empty List's last position is -1, which is outside it, so
 			§ `item(at:)` answers `Nothing` without a guard here.
@@ -165,7 +165,7 @@ declarations {
 
 		§§ A new List without the first item, or without the given number of leading items.
 		§§
-		§§ @returns the shortened List — empty when more items were removed than it had.
+		§§ @returns — the shortened List — empty when more items were removed than it had.
 		overload removeFirst {
 			() -> List<ItemType> {
 				§ On the empty List this slices [1, 0), an inverted range, which
@@ -184,8 +184,8 @@ declarations {
 
 		§§ A new List without the item at the given position, counting from zero.
 		§§
-		§§ @param index the position of the item to remove
-		§§ @returns the List without that item, or unchanged when the position is outside it.
+		§§ @param index — the position of the item to remove
+		§§ @returns — the List without that item, or unchanged when the position is outside it.
 		remove(at index: Integer) -> List<ItemType> {
 			§ Everything before the position, then everything after it. A
 			§ position outside the List leaves it unchanged without a guard: a
@@ -201,7 +201,7 @@ declarations {
 
 		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns the List of remaining items.
+		§§ @returns — the List of remaining items.
 		overload removeEvery {
 			<infer ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
 				<- @::removeEvery(where (candidate) { <- candidate::is(item) })
@@ -214,7 +214,7 @@ declarations {
 
 		§§ A new List without the last item, or without the given number of trailing items.
 		§§
-		§§ @returns the shortened List — empty when more items were removed than it had.
+		§§ @returns — the shortened List — empty when more items were removed than it had.
 		overload removeLast {
 			() -> List<ItemType> {
 				§ On the empty List the end is -1, which `slice` clamps to zero
@@ -233,7 +233,7 @@ declarations {
 
 		§§ A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns the List without duplicates.
+		§§ @returns — the List without duplicates.
 		removeDuplicates<infer ItemType is Equatable>() -> List<ItemType> {
 			§ NOTE: Quadratic, as the native was — each item is looked for among
 			§ the ones kept so far. The empty List the fold starts from is
@@ -253,7 +253,7 @@ declarations {
 
 		§§ A new List with the given item — or the contents of the given List — added at the front.
 		§§
-		§§ @returns the extended List.
+		§§ @returns — the extended List.
 		overload prepend {
 			(_ item: ItemType) -> List<ItemType> {
 				<- [item]::append(contentsOf @)
@@ -266,7 +266,7 @@ declarations {
 
 		§§ A new List with the given item — or the contents of the given List — added at the end.
 		§§
-		§§ @returns the extended List.
+		§§ @returns — the extended List.
 		overload append {
 			(_ item: ItemType) -> List<ItemType> {
 				§ The other entry of this same block — a different emitted
@@ -287,7 +287,7 @@ declarations {
 
 		§§ A new List with the given transform applied to every item.
 		§§
-		§§ @returns the List of transformed items.
+		§§ @returns — the List of transformed items.
 		map<infer Result>(_ transform: (_: ItemType) -> Result) -> List<Result>
 
 		§ `reduce` is one Method with two Overloads. The first folds every item
@@ -302,12 +302,12 @@ declarations {
 		§§ Combines every item into a single value, starting from the given one —
 		§§ folding to the end, or stopping early when the combiner says to.
 		§§
-		§§ @returns the combined value.
+		§§ @returns — the combined value.
 		overload reduce {
 			§§ Combines every item into a single value, starting from the given one.
 			§§
-			§§ @param startingWith the value the first combination builds on.
-			§§ @returns the combined value.
+			§§ @param startingWith — the value the first combination builds on.
+			§§ @returns — the combined value.
 			<infer Result>(
 				startingWith initial: Result,
 				_ combine: (_: Result, _: ItemType) -> Result,
@@ -315,9 +315,9 @@ declarations {
 
 			§§ Combines the items into a single value, starting from the given one, and may stop before the end: the `step` combiner answers with a `Step` — `#Continue` carries the accumulator forward, `#Done` finishes at once with its value. An empty List returns the starting value untouched.
 			§§
-			§§ @param startingWith the value the first combination builds on.
-			§§ @param step the combiner, handed the accumulator and each item, answering with a `Step` — `#Continue` to fold on, `#Done` to finish now.
-			§§ @returns the accumulated value, or the value the first `#Done` carries.
+			§§ @param startingWith — the value the first combination builds on.
+			§§ @param step — the combiner, handed the accumulator and each item, answering with a `Step` — `#Continue` to fold on, `#Done` to finish now.
+			§§ @returns — the accumulated value, or the value the first `#Done` carries.
 			<infer Result>(
 				startingWith initial: Result,
 				step combine: (_: Result, _: ItemType) -> Step<Result, Result>,
@@ -330,12 +330,12 @@ declarations {
 
 		§§ A new List of just the items the given check accepts.
 		§§
-		§§ @returns the List of accepted items.
+		§§ @returns — the List of accepted items.
 		keepEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
 		§§ The item at the given position, counting from zero.
 		§§
-		§§ @returns the item, or `Nothing` when the position is outside the List.
+		§§ @returns — the item, or `Nothing` when the position is outside the List.
 		item(at index: Integer) -> Optional<ItemType>
 
 		§ `firstIndex` and `lastIndex` COUNT their way through the items, stopping
@@ -361,7 +361,7 @@ declarations {
 
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns the zero-based position, or `Nothing` when the item is absent.
+		§§ @returns — the zero-based position, or `Nothing` when the item is absent.
 		firstIndex<infer ItemType is Equatable>(
 			of item: ItemType,
 		) -> Optional<Integer> {
@@ -387,14 +387,14 @@ declarations {
 
 		§§ A new List of the items from one position up to, but not including, another.
 		§§
-		§§ @param from the first position to include, counting from zero.
-		§§ @param to the position to stop before.
-		§§ @returns the List of items in that range.
+		§§ @param from — the first position to include, counting from zero.
+		§§ @param to — the position to stop before.
+		§§ @returns — the List of items in that range.
 		slice(from: Integer, to: Integer) -> List<ItemType>
 
 		§§ A new List with the items in the opposite order.
 		§§
-		§§ @returns the reversed List.
+		§§ @returns — the reversed List.
 		reverse() -> List<ItemType>
 
 		§ The `Comparable` bound works exactly as the `Equatable` one above
@@ -416,17 +416,17 @@ declarations {
 
 		§§ A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison.
 		§§
-		§§ @returns the ordered List.
+		§§ @returns — the ordered List.
 		overload sort {
 			§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use the `by:` entry.
 			§§
-			§§ @returns the ordered List.
+			§§ @returns — the ordered List.
 			<infer ItemType is Comparable>() -> List<ItemType>
 
 			§§ A new List ordered by the given comparison, applied to each pair of items.
 			§§
-			§§ @param by the comparison to order the items with
-			§§ @returns the ordered List.
+			§§ @param by — the comparison to order the items with
+			§§ @returns — the ordered List.
 			(
 				by comparison: (_: ItemType, _: ItemType) -> Ordering,
 			) -> List<ItemType>
@@ -439,8 +439,8 @@ declarations {
 
 		§§ Orders the List against another one lexicographically — the first differing pair of items decides, and on an equal prefix the shorter List comes first. Available whenever the items conform to `Comparable`.
 		§§
-		§§ @param other the List to compare with
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the List to compare with
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo<infer ItemType is Comparable>(
 			_ other: List<ItemType>,
 		) -> Ordering
@@ -462,7 +462,7 @@ declarations {
 
 		§§ Whether the given check accepts at least one item.
 		§§
-		§§ @returns `true` when some item is accepted.
+		§§ @returns — `true` when some item is accepted.
 		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
 			§ The accumulator is the answer so far, which stays `false` until an
 			§ item is accepted and `#Done` finishes the fold with `true`. The
@@ -478,7 +478,7 @@ declarations {
 
 		§§ Whether the given check accepts every item.
 		§§
-		§§ @returns `true` when all items are accepted, including the empty List.
+		§§ @returns — `true` when all items are accepted, including the empty List.
 		everyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
 			§ No item fails the check. The empty List has none to fail, so it
 			§ answers `true`, as it should.
@@ -487,7 +487,7 @@ declarations {
 
 		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns the count.
+		§§ @returns — the count.
 		overload count {
 			<infer ItemType is Equatable>(of item: ItemType) -> Integer {
 				<- @::count(where (candidate) { <- candidate::is(item) })
@@ -503,7 +503,7 @@ declarations {
 
 		§§ A new List with the given item inserted before the given position.
 		§§
-		§§ @returns the List with the item inserted.
+		§§ @returns — the List with the item inserted.
 		insert(_ item: ItemType, at index: Integer) -> List<ItemType> {
 			§ Everything before the position, the item, then everything from the
 			§ position on. `slice` clamps both ends, so a position before the
@@ -518,7 +518,7 @@ declarations {
 
 		§§ A new List with the item at the given position replaced.
 		§§
-		§§ @returns the List with the item replaced, or unchanged when the position is outside it.
+		§§ @returns — the List with the item replaced, or unchanged when the position is outside it.
 		replace(_ item: ItemType, at index: Integer) -> List<ItemType> {
 			§ A position outside the List leaves it unchanged. The guard is
 			§ needed: `remove(at:)` would ignore such a position but `insert(_:at:)`
@@ -534,7 +534,7 @@ declarations {
 
 		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns the zero-based position, or `Nothing` when the item is absent.
+		§§ @returns — the zero-based position, or `Nothing` when the item is absent.
 		lastIndex<infer ItemType is Equatable>(
 			of item: ItemType,
 		) -> Optional<Integer> {
@@ -574,8 +574,8 @@ declarations {
 
 		§§ Joins the items into one String, each item as its own `toString`, with the given separator between them — the return trip of `String::split(on:)` for a List of Strings.
 		§§
-		§§ @param separator the separator to place between the items
-		§§ @returns the joined String, or the empty String for the empty List.
+		§§ @param separator — the separator to place between the items
+		§§ @returns — the joined String, or the empty String for the empty List.
 		join<infer ItemType is Printable>(with separator: String) -> String
 
 		§ `flatten` would read naturally here too, and it is not here: it is
@@ -585,7 +585,7 @@ declarations {
 
 		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
 		§§
-		§§ @returns a Record with the accepted items under `matching` and the others under `rest`.
+		§§ @returns — a Record with the accepted items under `matching` and the others under `rest`.
 		partition(where check: (_: ItemType) -> Boolean) -> {
 			matching: List<ItemType>,
 			rest: List<ItemType>,
@@ -600,8 +600,8 @@ declarations {
 
 		§§ Pairs the items of the two Lists position by position. The pairing stops with the shorter List.
 		§§
-		§§ @param other the List to pair the items with
-		§§ @returns a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
+		§§ @param other — the List to pair the items with
+		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
 		pair<infer Other>(with other: List<Other>) -> List<{
 			first: ItemType,
 			second: Other,
@@ -609,15 +609,15 @@ declarations {
 
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§
-		§§ @param groupsOf how many items each group holds
-		§§ @returns the List of groups, or `Nothing` when the group size is below one.
+		§§ @param groupsOf — how many items each group holds
+		§§ @returns — the List of groups, or `Nothing` when the group size is below one.
 		split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
 
 		§§ A List holding the given item the given number of times. Zero or fewer times gives the empty List.
 		§§
-		§§ @param item the item to repeat
-		§§ @param times how many copies the List holds
-		§§ @returns the List of repeated items.
+		§§ @param item — the item to repeat
+		§§ @param times — how many copies the List holds
+		§§ @returns — the List of repeated items.
 		static repeat(
 			_ item: ItemType,
 			times count: Integer,
@@ -639,9 +639,9 @@ declarations {
 
 		§§ The Integers from one value through another, both included — counting down when the first is the greater.
 		§§
-		§§ @param integersFrom the first Integer of the List
-		§§ @param through the last Integer of the List, included
-		§§ @returns the List of Integers.
+		§§ @param integersFrom — the first Integer of the List
+		§§ @param through — the last Integer of the List, included
+		§§ @returns — the List of Integers.
 		static of(
 			integersFrom start: Integer,
 			through end: Integer,
@@ -672,7 +672,7 @@ declarations {
 	namespace NestedList<infer ItemType> for List<List<ItemType>> {
 		§§ Flattens a List of Lists by one level — every inner List's items, in order, in a single List.
 		§§
-		§§ @returns the flattened List.
+		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
 	}
 }

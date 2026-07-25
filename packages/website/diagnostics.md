@@ -427,6 +427,29 @@ explicit `-> Type`.
 
 A Function that is not passed as an Argument must write its return Type.
 
+## Documentation
+
+A `§§` block above a Declaration documents it. These are always Warnings — the
+Program compiles either way, and what is wrong is the description rather than
+the code it describes.
+
+### `missing-documentation-separator`
+
+A `@param` or `@returns` tag carrying its text on its own line ran the two
+together. The two are separated by an em-dash — `@param other — the String to
+add` — so that the name and its description stay legible in the source. A tag
+that leaves its text to the lines below it needs no separator. The text is
+lifted onto the Parameter either way.
+
+### `unknown-documentation-parameter`
+
+A `@param` named something the Declaration below it does not take. Such a tag
+attaches to nothing, and used to be rendered into every Hover regardless — a
+description of a Parameter that the reader could not find. A name is matched
+against each Parameter's external name first and then its internal one, and an
+`overload` block's own Documentation may name a Parameter of any of its
+Overloads.
+
 ## The Compiler as a program
 
 These are not about a Program at all — they are about the run. They carry no

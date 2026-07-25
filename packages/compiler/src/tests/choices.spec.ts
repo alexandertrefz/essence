@@ -1110,16 +1110,16 @@ describe("Choices", () => {
 				namespace Colour for Colour is Equatable {
 					§§ Every Colour is the same Colour.
 					§§
-					§§ @param other the Colour to compare with
-					§§ @returns always true.
+					§§ @param other — the Colour to compare with
+					§§ @returns — always true.
 					is(_ other: Colour) -> Boolean {
 						<- true
 					}
 
 					§§ The negation.
 					§§
-					§§ @param other the Colour to compare with
-					§§ @returns always false.
+					§§ @param other — the Colour to compare with
+					§§ @returns — always false.
 					isNot(_ other: Colour) -> Boolean {
 						<- @::is(other)::negate()
 					}

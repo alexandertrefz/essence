@@ -1817,8 +1817,8 @@ describe("Parser", () => {
 				`declarations {
 					namespace Container for List {
 						§§ Wraps a value.
-						§§ @param value the value to wrap
-						§§ @returns the wrapped value
+						§§ @param value — the value to wrap
+						§§ @returns — the wrapped value
 						wrap <Item>(value: Item) -> Item
 					}
 				}`,

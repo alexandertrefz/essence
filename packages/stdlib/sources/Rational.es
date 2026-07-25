@@ -14,7 +14,7 @@ declarations {
 	namespace NumberFormat for NumberFormat is Equatable, is Printable {
 		§§ Represents the NumberFormat as `Fraction` or `Decimal`.
 		§§
-		§§ @returns the name of the NumberFormat variant.
+		§§ @returns — the name of the NumberFormat variant.
 		toString() -> String {
 			<- match @ -> String {
 				case #Fraction { <- "Fraction" }
@@ -30,9 +30,9 @@ declarations {
 	namespace Rational for Rational is Equatable, is Printable, is Comparable {
 		§§ Builds the Rational one Integer over another — the way to write a ratio of computed values, where the literal form `3/4` is not available.
 		§§
-		§§ @param numerator the numerator
-		§§ @param over the denominator
-		§§ @returns the Rational, or `Nothing` when the denominator is zero.
+		§§ @param numerator — the numerator
+		§§ @param over — the denominator
+		§§ @returns — the Rational, or `Nothing` when the denominator is zero.
 		static of(
 			_ numerator: Integer,
 			over denominator: Integer,
@@ -40,16 +40,16 @@ declarations {
 
 		§§ Checks whether the Rational has the same value as another — compared in lowest terms, so `1/2 is 2/4` holds.
 		§§
-		§§ @param other the Rational to compare against
-		§§ @returns `true` when both are equal.
+		§§ @param other — the Rational to compare against
+		§§ @returns — `true` when both are equal.
 		is(_ other: Rational) -> Boolean {
 			<- @::compareTo(other)::is(#Equal)
 		}
 
 		§§ Checks whether the Rational has a different value than another.
 		§§
-		§§ @param other the Rational to compare against
-		§§ @returns `true` when the two differ.
+		§§ @param other — the Rational to compare against
+		§§ @returns — `true` when the two differ.
 		isNot(_ other: Rational) -> Boolean {
 			<- @::is(other)::negate()
 		}
@@ -174,7 +174,7 @@ declarations {
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.
 		§§
-		§§ @returns the reciprocal, or `Nothing` for zero.
+		§§ @returns — the reciprocal, or `Nothing` for zero.
 		reciprocal() -> Optional<Rational> {
 			<- Rational.of(@::denominator(), over @::numerator())
 		}
@@ -212,14 +212,14 @@ declarations {
 
 		§§ Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.
 		§§
-		§§ @param exponent the exponent
-		§§ @returns the power, or `Nothing` when raising zero to a negative power.
+		§§ @param exponent — the exponent
+		§§ @returns — the power, or `Nothing` when raising zero to a negative power.
 		raise(to exponent: Integer) -> Optional<Rational>
 
 		§§ Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.
 		§§
-		§§ @param text the text to read
-		§§ @returns the Rational, or `Nothing` when the text has any other shape or divides by zero.
+		§§ @param text — the text to read
+		§§ @returns — the Rational, or `Nothing` when the text has any other shape or divides by zero.
 		static parse(_ text: String) -> Optional<Rational>
 
 		§ The format was a String — `toString(formatAs "decimal")` — which meant
@@ -230,18 +230,18 @@ declarations {
 
 		§§ Represents the Rational as a String — `"3/4"` in lowest terms when no format is named, or in the named format.
 		§§
-		§§ @returns the String representation of the Rational.
+		§§ @returns — the String representation of the Rational.
 		overload toString {
 			() -> String
 
-			§§ @param formatAs the form to represent the Rational in
+			§§ @param formatAs — the form to represent the Rational in
 			(formatAs: NumberFormat) -> String
 		}
 
 		§§ Orders the Rational against another Rational.
 		§§
-		§§ @param other the Rational to order against
-		§§ @returns `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
+		§§ @param other — the Rational to order against
+		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compareTo(_ other: Rational) -> Ordering
 	}
 }

@@ -13,16 +13,16 @@ declarations {
 		§§
 		§§ Within the current grammar this is exactly numeric equality.
 		§§
-		§§ @param other the Transcendental to compare with
-		§§ @returns `true` when the canonical forms agree.
+		§§ @param other — the Transcendental to compare with
+		§§ @returns — `true` when the canonical forms agree.
 		is(_ other: Transcendental) -> Boolean {
 			<- @::<Number>is(other)
 		}
 
 		§§ Whether the Transcendentals have different canonical forms — within the current grammar, different numbers.
 		§§
-		§§ @param other the Transcendental to compare with
-		§§ @returns `true` when the canonical forms differ.
+		§§ @param other — the Transcendental to compare with
+		§§ @returns — `true` when the canonical forms differ.
 		isNot(_ other: Transcendental) -> Boolean {
 			<- @::is(other)::negate()
 		}
