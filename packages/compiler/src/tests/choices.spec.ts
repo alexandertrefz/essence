@@ -1185,6 +1185,54 @@ describe("Choices", () => {
 				).toEqual(['"bare"', '"full"'])
 			})
 
+			// NOTE: An item stands in the item position of whatever the List is
+			// expected to be, and a member in the position its name has in the
+			// expected Record — the same decision the annotation makes for a Case
+			// written directly under it.
+			it("takes the decision from a List's item position", async () => {
+				expect(
+					await run(`implementation { ${holder}
+						constant items: List<Holder<Integer>> = [Holder#Bare]
+
+						__print(items::length()::toString())
+					}`),
+				).toEqual(['"1"'])
+			})
+
+			it("takes the decision from a Record member's position", () => {
+				expect(
+					messagesOf(`implementation { ${holder}
+						constant held: { inner: Holder<Integer> } = {
+							inner = Holder#Full(1),
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: An Argument is matched by a Case's MEMBERS, and a payload that
+			// does not fit them is a Diagnostic one stage later — too late to keep
+			// an overload from winning on it. So the probe answers with the
+			// declared Case where the payload does not fit what the Parameter
+			// decided, and the overload whose payload does fit is the one that
+			// wins.
+			it("picks the overload whose instantiation the payload fits", async () => {
+				expect(
+					await run(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						namespace Taker for Integer {
+							overload take {
+								(_ b: Box<String>) -> String { <- "string" }
+								(_ b: Box<Integer>) -> String { <- "integer" }
+							}
+						}
+
+						__print(1::take(Box#Full(5)))
+						__print(1::take(Box#Full("x")))
+					}`),
+				).toEqual(['"integer"', '"string"'])
+			})
+
 			// NOTE: A partially generic decision is still a decision — `Item` is
 			// the enclosing Function's Type Parameter, and the construction is a
 			// Holder OF it rather than of nothing.
