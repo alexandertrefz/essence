@@ -11,7 +11,8 @@
 		"check": "oxlint --fix && oxfmt",
 		"generate:natives": "bun run --cwd packages/compiler generate:natives",
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"format:essence": "bun packages/formatter/bin/esfmt 'packages/stdlib/sources/*.es' 'packages/fixtures/files/*.es'"
 	},
 	"keywords": [
 		"language",
