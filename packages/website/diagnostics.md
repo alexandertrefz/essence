@@ -484,6 +484,18 @@ A Parameter of a Function Literal has no Type and nothing to infer one from —
 only a Function passed as an Argument takes its Types from the surrounding
 context.
 
+### `uninferable-item-type`
+
+A Function Literal captures a Variable whose Type still has a slot nothing has
+decided — `variable items = []` leaves the item Type unknown until an
+assignment decides it.
+
+The assignment narrows the Variable, but a Function written above it was
+already checked against the undecided Type, and `List<Unknown>` fits every
+List: the captured `items` could be returned as a `List<String>` and hold
+Integers when it runs. Annotate the declaration (`variable items: List<Integer>
+= []`) so the body is checked against the Type the Variable will hold.
+
 ### `uninferable-return-type`
 
 The return Type could not be inferred from the body; give the Function an

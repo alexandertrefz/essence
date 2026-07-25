@@ -214,6 +214,7 @@ export type DiagnosticCode =
 	// Inference — what the Compiler could not work out on its own.
 	| "uninferable-type-parameter"
 	| "uninferable-parameter-type"
+	| "uninferable-item-type"
 	| "uninferable-return-type"
 	| "missing-return-type"
 	// Documentation — the `§§` blocks above Declarations.

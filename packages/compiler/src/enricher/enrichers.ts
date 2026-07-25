@@ -23,6 +23,8 @@ import {
 	matchesTypeWithBindings,
 	mergeUnionMembers,
 	resolveOverloadedMethodName,
+	resolveUnknownSlots,
+	typeContainsUnknown,
 	typeMentionsGeneric,
 	unfreshenBindings,
 	unionMembersKeepingNames,
@@ -835,12 +837,100 @@ export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 ): common.typed.FunctionValueNode {
-	return {
-		nodeType: "FunctionValue",
-		value: enrichFunctionDefinition(node.value, scope),
-		position: node.position,
-		type: resolveFunctionValueType(node, scope),
+	captureBoundaries.push(scope)
+
+	try {
+		return {
+			nodeType: "FunctionValue",
+			value: enrichFunctionDefinition(node.value, scope),
+			position: node.position,
+			type: resolveFunctionValueType(node, scope),
+		}
+	} finally {
+		captureBoundaries.pop()
 	}
+}
+
+// NOTE: The Scopes the Function literals currently being enriched were written
+// in, innermost last. A name resolving AT or ABOVE one of them is captured
+// rather than local, and a capture is the one thing a later assignment can not
+// repair: the body is checked once, here, against the Type the captured name
+// has at this moment.
+let captureBoundaries: Array<enricher.Scope> = []
+
+// NOTE: Whether `declaringScope` is the Scope the innermost Function literal
+// was written in, or one it can see — walking OUTWARDS from the boundary, so
+// that the literal's own Parameters and locals, which live in a Scope below it,
+// are not mistaken for captures.
+function isCapturedFrom(
+	boundary: enricher.Scope,
+	declaringScope: enricher.Scope,
+): boolean {
+	let searchScope: enricher.Scope | null = boundary
+
+	while (searchScope !== null) {
+		if (searchScope === declaringScope) {
+			return true
+		}
+
+		searchScope = searchScope.parent
+	}
+
+	return false
+}
+
+// NOTE: Narrowing decides an undecided Type at the assignment that decides it,
+// which is too late for a Function literal written above one: its body was
+// already checked against the undecided Type, and `List<Unknown>` fits every
+// List, so a captured `items` could be returned as a List of Strings and hold
+// Integers at runtime. The capture is refused instead — it is the one place
+// where nothing later can make the body's Types true.
+function reportUninferableCapture(
+	node: parser.IdentifierNode,
+	scope: enricher.Scope,
+	type: common.Type,
+): void {
+	let boundary = captureBoundaries[captureBoundaries.length - 1]
+
+	if (boundary === undefined || !typeContainsUnknown(type)) {
+		return
+	}
+
+	let declaringScope = findDeclaringScope(node.content, scope)
+
+	if (declaringScope === null || !isCapturedFrom(boundary, declaringScope)) {
+		return
+	}
+
+	let declarationPosition = declaringScope.declarations[node.content] ?? null
+
+	reportError(
+		`'${node.content}' is captured before its item Type is decided`,
+		node.position,
+		{
+			code: "uninferable-item-type",
+			labels: [
+				primary(
+					node.position,
+					`captured here as ${withArticle(describeType(type))}`,
+				),
+				...(declarationPosition === null
+					? []
+					: [
+							secondary(
+								declarationPosition,
+								"declared with nothing to say what it holds",
+							),
+						]),
+			],
+			notes: [
+				"An empty List Literal leaves its item Type unknown until an assignment decides it, and this Function was checked before that happened.",
+			],
+			helps: [
+				`Annotate the declaration — 'variable ${node.content}: List<Integer> = []' — so the Function is checked against the Type it will hold.`,
+			],
+		},
+	)
 }
 
 export function enrichListValue(
@@ -891,6 +981,8 @@ export function enrichIdentifier(
 	scope: enricher.Scope,
 	type: common.Type = resolveIdentifierType(node, scope),
 ): common.typed.IdentifierNode {
+	reportUninferableCapture(node, scope, type)
+
 	return {
 		nodeType: "Identifier",
 		content: node.content,
@@ -1293,14 +1385,50 @@ export function enrichVariableAssignmentStatement(
 
 	let name = enrichIdentifier(node.name, scope)
 
+	// NOTE: The target Variable's Type is the value's expected Type — a bare
+	// Case in the value resolves against it before the scope scan.
+	let value = enrichExpression(node.value, scope, name.type)
+
+	narrowUnknownSlots(node.name.content, declaringScope, value.type)
+
 	return {
 		nodeType: "VariableAssignmentStatement",
 		name,
-		// NOTE: The target Variable's Type is the value's expected Type — a
-		// bare Case in the value resolves against it before the scope scan.
-		value: enrichExpression(node.value, scope, name.type),
+		value,
 		declarationPosition,
 		position: node.position,
+	}
+}
+
+// NOTE: An empty List Literal leaves its item Type Unknown, so `variable items
+// = []` declares a name whose Type has a slot nothing has decided. The FIRST
+// assignment that decides one decides it for good: from here on `items` is a
+// List of Integers, a later `items = ["a"]` is the assignment-type-mismatch it
+// looks like, and no annotation can be handed a List of Integers under the name
+// of a List of Strings. Reads written ABOVE this point keep the undecided Type,
+// which is sound — the value they read is genuinely empty — while a Function
+// literal that captured it is not, and `enrichIdentifier` refuses that.
+//
+// Two Handlers of a Match assigning different item Types therefore leave the
+// second one mismatched rather than widening to a Union: the declaration is
+// where a name that holds both belongs, and an annotation there says so.
+function narrowUnknownSlots(
+	name: string,
+	declaringScope: enricher.Scope | null,
+	valueType: common.Type,
+): void {
+	// NOTE: A Constant's reassignment was reported already, and letting the
+	// statement that was refused decide the Type every accepted one is judged
+	// against would make the refusal change the Program.
+	if (declaringScope === null || declaringScope.constants.has(name)) {
+		return
+	}
+
+	let storedType = declaringScope.members[name]
+	let narrowed = resolveUnknownSlots(storedType, valueType)
+
+	if (narrowed !== storedType) {
+		declaringScope.members[name] = narrowed
 	}
 }
 

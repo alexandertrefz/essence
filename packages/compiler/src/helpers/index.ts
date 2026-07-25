@@ -884,6 +884,117 @@ export function typeContainsError(type: common.Type): boolean {
 	return walk(type)
 }
 
+// NOTE: Whether a slot nothing has decided yet sits anywhere in this Type. It
+// enumerates the shapes on purpose, unlike its Error-hunting sibling: an
+// Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
+// walk that reads every field would call every bare `List` undecided. Only the
+// places a Type ARGUMENT can end up in are looked at — a List's items, a
+// Record's members, a Union's arms — which is also what keeps a Choice's
+// self-referential payload from looping.
+export function typeContainsUnknown(type: common.Type): boolean {
+	switch (type.type) {
+		case "Unknown":
+			return true
+		case "List":
+			return typeContainsUnknown(type.itemType)
+		case "Record":
+			return Object.values(type.members).some(typeContainsUnknown)
+		case "UnionType":
+			return type.types.some(typeContainsUnknown)
+		default:
+			return false
+	}
+}
+
+// NOTE: `stored` with every Unknown slot `value` has an answer for filled in —
+// what turns `variable items = []` into a List of Integers the moment
+// `items = [1, 2]` says so. Only slots that are Unknown are touched, so a Type
+// that already decided something keeps it and the caller can tell that nothing
+// was pinned by getting the very same Type back.
+//
+// An Error is not an answer: whatever produced it was reported where it came
+// from, and pinning a slot to it would spread that one mistake over every later
+// use of the name.
+export function resolveUnknownSlots(
+	stored: common.Type,
+	value: common.Type,
+): common.Type {
+	// NOTE: A Choice's payload may name the Choice, so a Union arm can lead
+	// back to a Type already being walked.
+	let visiting = new Set<common.Type>()
+
+	let resolve = (stored: common.Type, value: common.Type): common.Type => {
+		if (stored === value || visiting.has(stored)) {
+			return stored
+		}
+
+		if (stored.type === "Unknown") {
+			return value.type === "Unknown" || typeContainsError(value)
+				? stored
+				: value
+		}
+
+		visiting.add(stored)
+
+		try {
+			if (stored.type === "List" && value.type === "List") {
+				let itemType = resolve(stored.itemType, value.itemType)
+
+				return itemType === stored.itemType
+					? stored
+					: { type: "List", itemType }
+			}
+
+			if (stored.type === "Record" && value.type === "Record") {
+				let members: Record<string, common.Type> = {}
+				let pinned = false
+
+				for (let [name, memberType] of Object.entries(stored.members)) {
+					let valueMember = value.members[name]
+					let resolved =
+						valueMember === undefined
+							? memberType
+							: resolve(memberType, valueMember)
+
+					members[name] = resolved
+					pinned ||= resolved !== memberType
+				}
+
+				return pinned ? { type: "Record", members } : stored
+			}
+
+			if (stored.type === "UnionType" && value.type === "UnionType") {
+				// NOTE: Arms are paired by shape — a `List` arm is answered by
+				// the value's `List` arm — and only when exactly one arm
+				// answers. Two arms of the same shape have no obvious pairing,
+				// and guessing one would decide a slot from the wrong Type.
+				let types = stored.types.map((arm) => {
+					let candidates = value.types.filter(
+						(candidate) => candidate.type === arm.type,
+					)
+
+					return candidates.length === 1
+						? resolve(arm, candidates[0])
+						: arm
+				})
+
+				// NOTE: The name and the alias are dropped along with the arm
+				// they described — `Optional<List<Unknown>>` is not what a
+				// Union whose List arm now holds Integers is called.
+				return types.some((arm, index) => arm !== stored.types[index])
+					? { type: "UnionType", types }
+					: stored
+			}
+
+			return stored
+		} finally {
+			visiting.delete(stored)
+		}
+	}
+
+	return resolve(stored, value)
+}
+
 export type ConformanceCheckResult =
 	| { kind: "conforms"; methodMap: ConformanceMethodMap }
 	| { kind: "missing"; methodName: string }
