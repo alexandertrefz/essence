@@ -188,7 +188,7 @@ export function enrichExpression(
 		case "Combination":
 			return enrichCombination(node, scope)
 		case "RecordValue":
-			return enrichRecordValue(node, scope)
+			return enrichRecordValue(node, scope, expectedType)
 		case "StringValue":
 			return enrichStringValue(node, scope)
 		case "IntegerValue":
@@ -202,7 +202,7 @@ export function enrichExpression(
 		case "FunctionValue":
 			return enrichFunctionValue(node, scope)
 		case "ListValue":
-			return enrichListValue(node, scope)
+			return enrichListValue(node, scope, expectedType)
 		case "Lookup":
 			return enrichLookup(node, scope)
 		case "Identifier":
@@ -776,6 +776,7 @@ export function enrichMethodsFunctionValue(
 export function enrichRecordValue(
 	node: parser.RecordValueNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.typed.RecordValueNode {
 	// NOTE: The annotation is resolved once here and handed to the core, which
 	// is the single place that reports 'record-annotation-not-record'. The
@@ -784,7 +785,14 @@ export function enrichRecordValue(
 	let resolvedAnnotation =
 		node.type !== null ? resolveType(node.type, scope) : null
 
-	let members = enrichMembers(node.members, scope)
+	// NOTE: A member stands in the position its name has in whatever Record the
+	// literal is expected to be — its own annotation first, since that is the
+	// Type it will HAVE, and the surrounding position otherwise.
+	let members = enrichMembers(
+		node.members,
+		scope,
+		expectedRecordMembers(resolvedAnnotation ?? expectedType),
+	)
 
 	let memberTypes: Record<string, common.Type> = {}
 
@@ -973,8 +981,17 @@ function reportUninferableCapture(
 export function enrichListValue(
 	node: parser.ListValueNode,
 	scope: enricher.Scope,
+	expectedType: common.Type | null = null,
 ): common.typed.ListValueNode {
-	let values = node.values.map((expr) => enrichExpression(expr, scope))
+	// NOTE: A List's items stand in the item position of whatever the List is
+	// expected to be, so that is the expected Type they are enriched under —
+	// `constant items: List<Box<Integer>> = [Box#Empty]` is the same decision the
+	// annotation makes for a Case written directly under it.
+	let expectedItemType = expectedListItemType(expectedType)
+
+	let values = node.values.map((expr) =>
+		enrichExpression(expr, scope, expectedItemType),
+	)
 
 	return {
 		nodeType: "ListValue",
@@ -2363,14 +2380,73 @@ function declareProtocolInScope(
 function enrichMembers(
 	members: Record<string, parser.RecordValueMemberNode>,
 	scope: enricher.Scope,
+	expectedMemberTypes: Record<string, common.Type> | null = null,
 ): Record<string, common.typed.ExpressionNode> {
 	let result: Record<string, common.typed.ExpressionNode> = {}
 
 	for (let [memberKey, memberValue] of Object.entries(members)) {
-		result[memberKey] = enrichExpression(memberValue.value, scope)
+		result[memberKey] = enrichExpression(
+			memberValue.value,
+			scope,
+			expectedMemberTypes?.[memberKey] ?? null,
+		)
 	}
 
 	return result
+}
+
+// NOTE: What the item position of an expected Type wants, for the Expressions
+// that react to one. A Union spells its members out — `List<Box<Integer>> |
+// Nothing` still wants a Box in its items — and several Lists in one Union offer
+// the Union of their item Types, which is what a single item may be any of. `null`
+// where nothing there is a List at all, which is what "no expected Type" means to
+// everything downstream.
+function expectedListItemType(
+	expectedType: common.Type | null,
+): common.Type | null {
+	if (expectedType === null) {
+		return null
+	}
+
+	let itemTypes = unionArmsOf(expectedType).flatMap((member) =>
+		member.type === "List" ? [member.itemType] : [],
+	)
+
+	return itemTypes.length === 0 ? null : buildUnion(itemTypes)
+}
+
+// NOTE: The same for a Record's members, keyed by name — a member missing from
+// one arm of a Union simply is not offered by it, and one offered by several is
+// their Union, as at an item position.
+function expectedRecordMembers(
+	expectedType: common.Type | null,
+): Record<string, common.Type> | null {
+	if (expectedType === null) {
+		return null
+	}
+
+	let records = unionArmsOf(expectedType).flatMap((member) =>
+		member.type === "Record" ? [member] : [],
+	)
+
+	if (records.length === 0) {
+		return null
+	}
+
+	let members: Record<string, Array<common.Type>> = {}
+
+	for (let record of records) {
+		for (let [name, type] of Object.entries(record.members)) {
+			;(members[name] ??= []).push(type)
+		}
+	}
+
+	return Object.fromEntries(
+		Object.entries(members).map(([name, types]) => [
+			name,
+			buildUnion(types),
+		]),
+	)
 }
 
 function enrichMethods(
@@ -2734,27 +2810,33 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// prefixed Case construction reads its Choice's Type Arguments off exactly
 	// that position, so each probe asks silently and RECORDS the Parameter Type
 	// that decided — the winner's recording is committed, and the one real
-	// enrichment below runs under it and reports what is left to report. A probe
-	// nothing decides answers with the DECLARED Case, which matches a Parameter of
-	// that Choice and nothing else: exactly what a candidate probe needs it to
-	// say, and what it said before this rail existed.
+	// enrichment below runs under it and reports what is left to report.
+	//
+	// A probe that decides but whose payload does not FIT what it decided answers
+	// with the DECLARED Case all the same: a Case's members are what an Argument
+	// is matched by, and the mismatch is the Validator's, one stage too late to
+	// keep a candidate from winning on it. `take(Box#Full(5))` against a
+	// `Box<String>` overload beside a `Box<Integer>` one picked the String one
+	// otherwise, and then reported the Integer payload for not being a String. It
+	// is still RECORDED, so a call where no candidate fits commits a decided
+	// context and reports the one Diagnostic it has rather than that one and
+	// `undecided-type-arguments` on top.
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
 	): common.Type {
+		let payloadType = probedPayloadTypeOf(node)
+
 		let { result } = collectDiagnostics(() =>
-			resolveCaseValueType(
-				node,
-				scope,
-				expectedType,
-				probedPayloadTypeOf(node),
-			),
+			resolveCaseValueType(node, scope, expectedType, payloadType),
 		)
 
 		if (result.type === "Case") {
 			recordContextualCaseValueType(node, expectedType)
 
-			return result
+			if (payloadType === null || payloadFitsCase(result, payloadType)) {
+				return result
+			}
 		}
 
 		let { result: declared } = collectDiagnostics(() =>
@@ -4577,7 +4659,7 @@ function decideCaseFromExpectedType(
 	expectedType: common.Type,
 	payloadType: common.Type | null,
 ): common.CaseType | null {
-	let candidates = caseMatcherCandidates(expectedType).filter(
+	let candidates = unionArmsOf(expectedType).filter(
 		(member): member is common.CaseType =>
 			member.type === "Case" &&
 			member.name === declaredCase.name &&
@@ -4628,13 +4710,12 @@ function payloadFitsCase(
 	})
 }
 
-// NOTE: The Cases a Matcher can pick from — the scrutinee's own members, with
-// a nested Union spelled out, so `Walk<Integer> | Nothing` offers Walk's Cases
-// as readily as `Walk<Integer>` does.
-function caseMatcherCandidates(valueType: common.Type): Array<common.Type> {
-	return valueType.type === "UnionType"
-		? flattenUnionMembers(valueType)
-		: [valueType]
+// NOTE: What a Type offers as its arms, with a nested Union spelled out, so
+// `Walk<Integer> | Nothing` offers Walk's Cases as readily as `Walk<Integer>`
+// does. A Type that is no Union is its own only arm — every caller here is
+// asking "what could a value of this be", and one shape is an answer to that.
+function unionArmsOf(type: common.Type): Array<common.Type> {
+	return type.type === "UnionType" ? flattenUnionMembers(type) : [type]
 }
 
 // NOTE: The scrutinee's own member for a declared Case — the same Choice and
@@ -4649,7 +4730,7 @@ function instantiatedCaseOf(
 	valueType: common.Type,
 ): common.CaseType | null {
 	return joinCaseInstantiations(
-		caseMatcherCandidates(valueType).filter(
+		unionArmsOf(valueType).filter(
 			(member): member is common.CaseType =>
 				member.type === "Case" &&
 				member.name === declaredCase.name &&
@@ -4760,7 +4841,7 @@ export function resolveCaseMatcherType(
 		return { type: "Error" }
 	}
 
-	let members = caseMatcherCandidates(valueType)
+	let members = unionArmsOf(valueType)
 
 	let candidates = members.filter(
 		(member): member is common.CaseType =>
