@@ -24,6 +24,7 @@ import {
 	mergeUnionMembers,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
+	typeContainsError,
 	typeContainsUnknown,
 	typeMentionsGeneric,
 	unfreshenBindings,
@@ -232,7 +233,7 @@ export function enrichCaseValue(
 			value = wrapSingleMemberShorthand(type, value)
 		}
 
-		type = instantiateCaseFromPayload(type, value)
+		type = instantiateCaseFromPayload(type, value, scope, node.position)
 	}
 
 	return {
@@ -328,6 +329,8 @@ function wrapSingleMemberShorthand(
 function instantiateCaseFromPayload(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode | null,
+	scope: enricher.Scope,
+	position: common.Position,
 ): common.CaseType {
 	let choiceGenerics = caseType.choiceGenerics
 
@@ -353,6 +356,15 @@ function instantiateCaseFromPayload(
 			context,
 		)
 	}
+
+	// NOTE: The construction is the other half of where a bound is kept — an
+	// annotation checks what it names, and an unannotated `#Full(f)` names
+	// nothing, so the Types the payload bound here are what has to answer for
+	// the Choice's bounds. Solved for the Diagnostic alone, as at an Alias
+	// application; a Generic the payload never mentions stays unbound and
+	// silent, the way an unbound Generic always surfaces at the use that needs
+	// it rather than here.
+	resolveConformances(choiceGenerics, context.bindings, scope, position)
 
 	return applyGenericBindings(caseType, context.bindings) as common.CaseType
 }
@@ -4229,8 +4241,10 @@ function caseMatcherCandidates(valueType: common.Type): Array<common.Type> {
 // NOTE: The scrutinee's own member for a declared Case — the same Choice and
 // the same Case name, but with the Type Arguments the matched value applied
 // substituted into its payload. `null` when the matched value has no such
-// member at all: the declared Case then stands, and whether a Handler that can
-// never run is worth a Diagnostic is the Validator's question, not this one's.
+// member at all, which its caller reports: the DECLARED Case can not stand in
+// for one, because its members are still the Choice's Type Parameters, bounds
+// and all, and a Handler reaching through one solves the bound against a hidden
+// conformance Parameter no call site in sight ever fills.
 function instantiatedCaseOf(
 	declaredCase: common.CaseType,
 	valueType: common.Type,
@@ -4273,7 +4287,31 @@ export function resolveCaseMatcherType(
 		// `case Walk#Done` left `@.value` an opaque `Result` while the identical
 		// `case #Done` narrowed it to Integer — and the prefix is the form the
 		// ambiguity Diagnostic asks for.
-		return instantiatedCaseOf(declaredCase, valueType) ?? declaredCase
+		let instantiated = instantiatedCaseOf(declaredCase, valueType)
+
+		if (instantiated !== null) {
+			return instantiated
+		}
+
+		// NOTE: The prefix names a Case the matched value can not be, which the
+		// bare form says outright and this one used to answer with the declared
+		// Case instead — a Handler that can never run, typed by Type Parameters
+		// nothing here binds.
+		if (!typeContainsError(valueType)) {
+			reportError(
+				`The matched value has no Case '${node.choice.content}#${node.caseName.content}'`,
+				node.position,
+				{
+					code: "unknown-case",
+					labels: [
+						primary(node.position, "no such Case in this Union"),
+					],
+					notes: [`The matched value is ${describeType(valueType)}.`],
+				},
+			)
+		}
+
+		return { type: "Error" }
 	}
 
 	if (valueType.type === "Error") {

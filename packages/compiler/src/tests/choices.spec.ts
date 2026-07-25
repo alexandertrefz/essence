@@ -643,24 +643,6 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		it("warns about Cases of a foreign Choice", () => {
-			let diagnostics = diagnosticsOf(`implementation {
-				choice A { Go }
-				choice B { Wait }
-
-				constant command: A = A#Go
-
-				match command -> Nothing {
-					case #Go { <- nothing }
-					case B#Wait { <- nothing }
-				}
-			}`)
-
-			expect(
-				diagnostics.map((diagnostic) => diagnostic.message),
-			).toContain("This Case can never match")
-		})
-
 		it("requires a payload for payload-carrying Cases", () => {
 			expect(
 				messagesOf(`implementation { ${calculatorChoice}
@@ -721,6 +703,144 @@ describe("Choices", () => {
 					constant smaller: Ordering = #Less
 
 					__print(smaller::is(1::compareTo(2)))
+				}`),
+			).toEqual([])
+		})
+	})
+
+	// NOTE: `case Choice#Case` says which Choice's Case is meant. A Case the
+	// matched value can not be is the bare form's error, and used to be a
+	// Validator Warning here — the Handler stood, typed by the DECLARED Case,
+	// whose members are still the Choice's Type Parameters. A bounded one then
+	// solved its bound against a hidden conformance Parameter of a Choice
+	// nothing in sight applied, and the emitted Handler read a name no `const`
+	// declares.
+	describe("Prefixed Case Matchers", () => {
+		it("rejects a Case of a foreign Choice", () => {
+			expect(
+				diagnosticsOf(`implementation {
+					choice A { Go }
+					choice B { Wait }
+
+					constant command: A = A#Go
+
+					match command -> Nothing {
+						case #Go { <- nothing }
+						case B#Wait { <- nothing }
+					}
+				}`).map((diagnostic) => [diagnostic.code, diagnostic.message]),
+			).toEqual([
+				["unknown-case", "The matched value has no Case 'B#Wait'"],
+			])
+		})
+
+		it("rejects a bounded Choice's Case the matched value can not be", () => {
+			expect(
+				codesOf(`implementation {
+					choice Box<T is Equatable> { Full { value: T }, Empty }
+					choice Other { Thing { name: String } }
+
+					constant other: Other = #Thing({ name = "x" })
+
+					__print(match other -> Boolean {
+						case Box#Full { <- @.value::is(@.value) }
+						case #Thing { <- true }
+					})
+				}`),
+			).toEqual(["unknown-case"])
+		})
+
+		it("stays silent about a Matcher on a scrutinee that is already broken", () => {
+			expect(
+				codesOf(`implementation {
+					choice A { Go }
+					choice B { Wait }
+
+					match undeclared -> Nothing {
+						case B#Wait { <- nothing }
+					}
+				}`),
+			).toEqual(["unknown-name"])
+		})
+
+		it("still narrows a Case the matched value does have", async () => {
+			expect(
+				await run(`implementation {
+					choice Walk<Result> { Done { value: Result }, Going }
+
+					constant walk: Walk<Integer> = #Done({ value = 3 })
+
+					__print(match walk -> String {
+						case Walk#Done { <- @.value::toString() }
+						case #Going { <- "going" }
+					})
+				}`),
+			).toEqual(['"3"'])
+		})
+	})
+
+	// NOTE: A bound on a Choice's Type Parameter is a promise the APPLICATION
+	// has to keep — nothing downstream asks again, so `Box<Function>` used to
+	// substitute a Type with no equality into a payload declared Equatable and
+	// only fall over when something reached for the witness.
+	describe("Bounded Generic Choices", () => {
+		const boundedBox = `choice Box<T is Equatable> {
+			Full { value: T },
+			Empty,
+		}`
+
+		it("rejects an annotation whose Type Argument does not conform", () => {
+			let source = `implementation { ${boundedBox}
+				constant b: Box<(_ x: Integer) -> Integer> = #Empty
+			}`
+
+			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+			expect(messagesOf(source)).toEqual([
+				"Function does not conform to 'Equatable'",
+			])
+		})
+
+		it("tells an unbounded Type Parameter what to declare", () => {
+			let source = `implementation { ${boundedBox}
+				function wrap<Value>(_ value: Value) -> Box<Value> {
+					<- #Full({ value = value })
+				}
+			}`
+
+			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
+			expect(helpsOf(source)).toEqual([
+				"Declare it as '<infer Value is Equatable>'.",
+			])
+		})
+
+		it("rejects a construction whose payload does not conform", () => {
+			expect(
+				codesOf(`implementation { ${boundedBox}
+					constant b = Box#Full({ value = (_ x: Integer) -> Integer { <- x } })
+				}`),
+			).toEqual(["unsatisfied-bound"])
+		})
+
+		it("leaves a conforming Type Argument alone", async () => {
+			expect(
+				await run(`implementation { ${boundedBox}
+					constant b: Box<Integer> = #Full({ value = 5 })
+
+					__print(match b -> Boolean {
+						case Box#Full { <- @.value::is(5) }
+						case #Empty { <- false }
+					})
+				}`),
+			).toEqual(["true"])
+		})
+
+		it("leaves an unbounded Choice free to hold anything", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Holder<T> { Held { value: T } }
+
+					constant held: Holder<(_ x: Integer) -> Integer> =
+						#Held({ value = (_ x: Integer) -> Integer { <- x } })
 				}`),
 			).toEqual([])
 		})
