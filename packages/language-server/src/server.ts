@@ -476,7 +476,21 @@ export function startServer() {
 			return null
 		}
 
-		return findFormattingEdits(document.getText(), params.textDocument.uri)
+		let result = findFormattingEdits(
+			document.getText(),
+			params.textDocument.uri,
+		)
+
+		// NOTE: An `unsafe` refusal means esfmt distrusted its own output and
+		// kept the file as it was — a formatter bug, which the CLI reports
+		// loudly and the editor should not swallow.
+		if (result.warning !== null) {
+			connection.window.showWarningMessage(
+				`esfmt: ${result.warning} The file was left unchanged; this is a bug in esfmt.`,
+			)
+		}
+
+		return result.edits
 	})
 
 	connection.onCodeAction((params) => {
