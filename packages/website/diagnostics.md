@@ -120,8 +120,10 @@ declaration may take that name.
 
 A Namespace is named by something that runs above the Declaration of it — a
 Method call whose Namespace is written further down, a static Property read, a
-bare reference. A Namespace comes into being where it is written, so a use that
-runs first has nothing to reach.
+bare reference, or a conformance witness: a call like `things::sort()` reaches
+for the Namespace that makes its items `Comparable`, even though that Namespace
+is not written on the line. A Namespace comes into being where it is written,
+so a use that runs first has nothing to reach.
 
 Only what RUNS at the top level counts. A Function's or a Method's body runs when
 it is called, so it may name a Namespace declared below it; a static Property's
