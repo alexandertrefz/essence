@@ -5,7 +5,7 @@ import * as path from "node:path"
 import { fixturePath } from "@essence/fixtures"
 import { readStdlibFiles } from "@essence/stdlib"
 
-import { format } from "../index"
+import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"
 
 // NOTE: Every `.es` source in the repository, which is what a formatter has to
@@ -120,6 +120,21 @@ describe("formatter", () => {
 			let result = format("implementation {\n\tconstant = = =\n}\n")
 
 			expect(result.refusal?.diagnostics.length).toBeGreaterThan(0)
+		})
+
+		// NOTE: `guarded` is the wrapper `format` runs inside; no reachable
+		// source crashes the printer today, so the catch path is exercised
+		// through the seam directly.
+		it("turns an unexpected crash into a refusal with the original bytes", () => {
+			let source = "implementation {\n\tconstant a = 1\n}\n"
+			let result = guarded(source, () => {
+				throw new Error("boom")
+			})
+
+			expect(result.refusal?.kind).toBe("unsafe")
+			expect(result.refusal?.message).toContain("boom")
+			expect(result.changed).toBe(false)
+			expect(result.text).toBe(source)
 		})
 	})
 

@@ -93,9 +93,31 @@ function unsafe(source: string, message: string): FormatResult {
 	}
 }
 
+// NOTE: The last line of the safety story. Every check below catches a
+// mistake the formatter is known to be able to make; this catches the ones it
+// is not — a printer thrown off by an AST shape it has never seen must still
+// hand the original bytes back, not take the process down. Exported so the
+// catch path can be tested without engineering a real crash.
+export function guarded(source: string, work: () => FormatResult): FormatResult {
+	try {
+		return work()
+	} catch (error) {
+		let reason = error instanceof Error ? error.message : String(error)
+
+		return unsafe(source, `Formatting failed unexpectedly (${reason}).`)
+	}
+}
+
 export function format(
 	source: string,
 	options: { documentPath?: string; verify?: boolean } = {},
+): FormatResult {
+	return guarded(source, () => formatUnguarded(source, options))
+}
+
+function formatUnguarded(
+	source: string,
+	options: { documentPath?: string; verify?: boolean },
 ): FormatResult {
 	let { documentPath, verify = true } = options
 
