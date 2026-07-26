@@ -3,6 +3,10 @@ import { loadStdlib } from "@essence/compiler/enricher/stdlib"
 import type { common } from "@essence/interfaces"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import {
+	type CallHierarchyItem as LspCallHierarchyItem,
+	type CodeAction,
+	CodeActionKind,
+	type CodeActionParams,
 	type CompletionItem,
 	CompletionItemKind,
 	createConnection,
@@ -14,8 +18,10 @@ import {
 	type MarkupContent,
 	type Position,
 	ProposedFeatures,
+	type Range,
 	ResponseError,
 	type SelectionRange,
+	type ServerCapabilities,
 	SymbolKind,
 	TextDocumentSyncKind,
 	TextDocuments,
@@ -23,11 +29,20 @@ import {
 
 import { analyse } from "./analyse"
 import {
+	type CallHierarchyItem,
+	type CallHierarchyItemKind,
+	findIncomingCalls,
+	findOutgoingCalls,
+	prepareCallHierarchy,
+} from "./callHierarchy"
+import { escapeSnippet } from "./callSnippets"
+import { type CodeActionEntry, findCodeActions } from "./codeActions"
+import {
 	type CompletionEntry,
 	type CompletionKind,
 	findCompletions,
 } from "./completion"
-import { toCursor, toLspDiagnostic, toLspRange } from "./conversion"
+import { toCursor, toLspDiagnostic, toLspRange, toRange } from "./conversion"
 import {
 	type DocumentSymbolEntry,
 	findDocumentSymbols,
@@ -56,6 +71,56 @@ import { findSignatureHelp } from "./signatureHelp"
 
 const analysisDebounceInMilliseconds = 200
 
+// NOTE: Module level rather than written into the `onInitialize` result, so
+// that the answer to "what does this Server advertise" is a value a test can
+// read. A capability that silently stops being announced disables its feature
+// in every Editor while every handler behind it keeps passing its own spec.
+export const serverCapabilities: ServerCapabilities = {
+	textDocumentSync: TextDocumentSyncKind.Full,
+	renameProvider: {
+		prepareProvider: true,
+	},
+	definitionProvider: true,
+	hoverProvider: true,
+	referencesProvider: true,
+	documentHighlightProvider: true,
+	documentSymbolProvider: true,
+	documentFormattingProvider: true,
+	// NOTE: No `resolveProvider` — every action carries its edits already,
+	// computed on the buffer as it is now. Deliberately no `source.fixAll`
+	// either: not one of these fixes is both unambiguous and
+	// semantics-preserving, so applying them in bulk is exactly what a reader
+	// must not be able to ask for. The reasoning is written out under
+	// "Why there is no fix-all" in the Diagnostics reference.
+	codeActionProvider: {
+		codeActionKinds: [
+			CodeActionKind.QuickFix,
+			CodeActionKind.RefactorRewrite,
+		],
+	},
+	completionProvider: {
+		triggerCharacters: [".", ":", "<", "#"],
+	},
+	signatureHelpProvider: {
+		triggerCharacters: ["(", ","],
+		// NOTE: Closing a nested call puts the cursor back inside the outer
+		// one, which is a different signature than the one on screen.
+		retriggerCharacters: [")"],
+	},
+	semanticTokensProvider: {
+		legend: {
+			tokenTypes: semanticTokenTypes,
+			tokenModifiers: semanticTokenModifiers,
+		},
+		full: true,
+	},
+	foldingRangeProvider: true,
+	selectionRangeProvider: true,
+	inlayHintProvider: true,
+	linkedEditingRangeProvider: true,
+	callHierarchyProvider: true,
+}
+
 export function startServer() {
 	let connection = createConnection(ProposedFeatures.all)
 	let documents = new TextDocuments(TextDocument)
@@ -68,37 +133,7 @@ export function startServer() {
 	connection.onInitialize(() => {
 		loadStdlib()
 
-		return {
-			capabilities: {
-				textDocumentSync: TextDocumentSyncKind.Full,
-				renameProvider: {
-					prepareProvider: true,
-				},
-				definitionProvider: true,
-				hoverProvider: true,
-				referencesProvider: true,
-				documentHighlightProvider: true,
-				documentSymbolProvider: true,
-				documentFormattingProvider: true,
-				completionProvider: {
-					triggerCharacters: [".", ":", "<"],
-				},
-				signatureHelpProvider: {
-					triggerCharacters: ["(", ","],
-				},
-				semanticTokensProvider: {
-					legend: {
-						tokenTypes: semanticTokenTypes,
-						tokenModifiers: semanticTokenModifiers,
-					},
-					full: true,
-				},
-				foldingRangeProvider: true,
-				selectionRangeProvider: true,
-				inlayHintProvider: true,
-				linkedEditingRangeProvider: true,
-			},
-		}
+		return { capabilities: serverCapabilities }
 	})
 
 	// NOTE: Requests are resolved on a fresh parse of the current document
@@ -361,19 +396,77 @@ export function startServer() {
 		}
 	})
 
-	connection.onDocumentSymbol((params) => {
-		let document = documents.get(params.textDocument.uri)
+	connection.languages.callHierarchy.onPrepare((params) => {
+		let parsed = parseAndEnrich(params.textDocument.uri)
 
-		if (document === undefined) {
+		if (parsed === null) {
 			return null
 		}
 
-		let { program } = parseDocument(
-			document.getText(),
-			params.textDocument.uri,
+		let item = prepareCallHierarchy(
+			parsed.program,
+			toCursor(params.position),
+			parsed.enrichedProgram,
 		)
 
-		return findDocumentSymbols(program).map(toLspDocumentSymbol)
+		if (item === null) {
+			return null
+		}
+
+		return [toLspCallHierarchyItem(item, params.textDocument.uri)]
+	})
+
+	// NOTE: An Item round-trips its uri and its selectionRange, so the
+	// Declaration it names is resolved again from a fresh parse — nothing is
+	// kept between the prepare and the expansion that follows it.
+	connection.languages.callHierarchy.onIncomingCalls((params) => {
+		let parsed = parseAndEnrich(params.item.uri)
+
+		if (parsed === null) {
+			return null
+		}
+
+		return findIncomingCalls(
+			parsed.program,
+			toCursor(params.item.selectionRange.start),
+			parsed.enrichedProgram,
+		).map((entry) => ({
+			from: toLspCallHierarchyItem(entry.item, params.item.uri),
+			fromRanges: entry.ranges.map(toLspRange),
+		}))
+	})
+
+	connection.languages.callHierarchy.onOutgoingCalls((params) => {
+		let parsed = parseAndEnrich(params.item.uri)
+
+		if (parsed === null) {
+			return null
+		}
+
+		return findOutgoingCalls(
+			parsed.program,
+			toCursor(params.item.selectionRange.start),
+			parsed.enrichedProgram,
+		).map((entry) => ({
+			to: toLspCallHierarchyItem(entry.item, params.item.uri),
+			fromRanges: entry.ranges.map(toLspRange),
+		}))
+	})
+
+	// NOTE: The outline enriches so that entries can carry their Types, and
+	// degrades to the Parser's answer alone when enrichment throws — the whole
+	// point of building it off the Parser AST is that it survives a Program
+	// that does not type check.
+	connection.onDocumentSymbol((params) => {
+		let parsed = parseAndEnrich(params.textDocument.uri)
+
+		if (parsed === null) {
+			return null
+		}
+
+		return findDocumentSymbols(parsed.program, parsed.enrichedProgram).map(
+			toLspDocumentSymbol,
+		)
 	})
 
 	connection.onDocumentFormatting((params) => {
@@ -384,6 +477,20 @@ export function startServer() {
 		}
 
 		return findFormattingEdits(document.getText(), params.textDocument.uri)
+	})
+
+	connection.onCodeAction((params) => {
+		let document = documents.get(params.textDocument.uri)
+
+		if (document === undefined) {
+			return null
+		}
+
+		return findCodeActions(
+			document.getText(),
+			toRange(params.range),
+			params.textDocument.uri,
+		).map((entry) => toLspCodeAction(entry, params))
 	})
 
 	connection.onFoldingRanges((params) => {
@@ -440,14 +547,30 @@ export function startServer() {
 		return findInlayHints(parsed.enrichedProgram, {
 			start: toCursor(params.range.start),
 			end: toCursor(params.range.end),
-		}).map((hint) => ({
-			position: {
-				line: hint.position.line - 1,
-				character: hint.position.column - 1,
-			},
-			label: hint.label,
-			kind: InlayHintKind.Type,
-		}))
+		}).map((hint) => {
+			// NOTE: Accepting a Hint writes its own label at its own position,
+			// which the protocol asks for as an edit — and an insertion is an
+			// empty Range there rather than a Position of its own.
+			let insertion = {
+				line: hint.textEdit.position.line - 1,
+				character: hint.textEdit.position.column - 1,
+			}
+
+			return {
+				position: {
+					line: hint.position.line - 1,
+					character: hint.position.column - 1,
+				},
+				label: hint.label,
+				kind: InlayHintKind.Type,
+				textEdits: [
+					{
+						range: { start: insertion, end: insertion },
+						newText: hint.textEdit.newText,
+					},
+				],
+			}
+		})
 	})
 
 	connection.onCompletion((params) => {
@@ -582,10 +705,82 @@ function toLspDocumentSymbol(entry: DocumentSymbolEntry): DocumentSymbol {
 	return {
 		name: entry.name,
 		kind: symbolKinds[entry.kind],
+		detail: entry.detail ?? undefined,
 		range: toLspRange(entry.range),
 		selectionRange: toLspRange(entry.selectionRange),
 		children: entry.children.map(toLspDocumentSymbol),
 	}
+}
+
+const callHierarchyKinds: Record<CallHierarchyItemKind, SymbolKind> = {
+	function: SymbolKind.Function,
+	method: SymbolKind.Method,
+	staticMethod: SymbolKind.Method,
+	property: SymbolKind.Property,
+	implementation: SymbolKind.Module,
+}
+
+function toLspCallHierarchyItem(
+	item: CallHierarchyItem,
+	uri: string,
+): LspCallHierarchyItem {
+	return {
+		name: item.name,
+		kind: callHierarchyKinds[item.kind],
+		detail: item.container ?? undefined,
+		uri,
+		range: toLspRange(item.range),
+		selectionRange: toLspRange(item.selectionRange),
+	}
+}
+
+// NOTE: The edits were computed on the current buffer, so the client's own
+// Diagnostics are used for nothing but attribution — matched by code and
+// overlapping range so the Editor can tie the fix to the squiggle it is
+// offered on, and retire it once applied.
+export function toLspCodeAction(
+	entry: CodeActionEntry,
+	params: CodeActionParams,
+): CodeAction {
+	let position = entry.diagnosticPosition
+
+	return {
+		title: entry.title,
+		kind:
+			entry.kind === "quickfix"
+				? CodeActionKind.QuickFix
+				: CodeActionKind.RefactorRewrite,
+		isPreferred: entry.isPreferred,
+		diagnostics:
+			position === null
+				? undefined
+				: params.context.diagnostics.filter(
+						(diagnostic) =>
+							diagnostic.code === entry.diagnosticCode &&
+							rangesOverlap(
+								diagnostic.range,
+								toLspRange(position),
+							),
+					),
+		edit: {
+			changes: {
+				[params.textDocument.uri]: entry.edits.map((edit) => ({
+					range: toLspRange(edit.range),
+					newText: edit.newText,
+				})),
+			},
+		},
+	}
+}
+
+function rangesOverlap(a: Range, b: Range): boolean {
+	return (
+		!isBeforePosition(a.end, b.start) && !isBeforePosition(b.end, a.start)
+	)
+}
+
+function isBeforePosition(a: Position, b: Position): boolean {
+	return a.line < b.line || (a.line === b.line && a.character < b.character)
 }
 
 const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
@@ -603,32 +798,48 @@ const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	member: CompletionItemKind.Field,
 	label: CompletionItemKind.Text,
 	case: CompletionItemKind.EnumMember,
+	keyword: CompletionItemKind.Keyword,
 }
 
-// NOTE: The kinds that are invoked rather than referred to — completing one
-// inserts its parentheses and leaves the cursor between them.
+// NOTE: The kinds that are invoked rather than referred to. This is only the
+// fallback now — an entry whose signature resolved carries the call written
+// out, labels and all, and this inserts the bare parentheses for the ones
+// halfway through a keystroke where nothing resolved yet.
 const callableKinds = new Set<CompletionKind>([
 	"function",
 	"method",
 	"staticMethod",
 ])
 
-function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
-	if (!callableKinds.has(entry.kind)) {
-		return {
-			label: entry.label,
-			kind: completionItemKinds[entry.kind],
-			detail: entry.detail ?? undefined,
-			documentation: toMarkdown(entry.documentation ?? null),
-		}
-	}
+export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
+	let callable = entry.snippet != null
+	let fallback = !callable && callableKinds.has(entry.kind)
 
 	return {
 		label: entry.label,
 		kind: completionItemKinds[entry.kind],
 		detail: entry.detail ?? undefined,
 		documentation: toMarkdown(entry.documentation ?? null),
-		insertText: `${entry.label}($0)`,
-		insertTextFormat: InsertTextFormat.Snippet,
+		// NOTE: Overloads deliberately share a label, so the Editor is told to
+		// filter every one of them on it; `labelDetails` is what tells them
+		// apart in the list.
+		labelDetails:
+			entry.labelDetail == null
+				? undefined
+				: { detail: ` ${entry.labelDetail}` },
+		filterText: entry.label,
+		sortText: `${entry.tier}${entry.label}`,
+		preselect: entry.preselect === true ? true : undefined,
+		// NOTE: The fallback is snippet-formatted too, so the label goes
+		// through the same escape the resolved snippet is built with — `$` is
+		// an ordinary Identifier character, and an unescaped one in `we$rd`
+		// reads as the snippet variable `$rd` and writes the wrong name.
+		insertText: callable
+			? (entry.snippet ?? undefined)
+			: fallback
+				? `${escapeSnippet(entry.label)}($0)`
+				: undefined,
+		insertTextFormat:
+			callable || fallback ? InsertTextFormat.Snippet : undefined,
 	}
 }
