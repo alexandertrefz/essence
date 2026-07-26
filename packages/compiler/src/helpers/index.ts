@@ -469,6 +469,22 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	}
 }
 
+// NOTE: The name a FABRICATED signature borrows a Type Parameter under. A
+// derived Method takes its Parameters from the Type it was fabricated for, so
+// their names are that Type's own — and `createFreshenedInference` can not undo
+// a collision with the CALLER's Generics on its own here, because the receiver's
+// Type Arguments arrive as `defaultType` pins, which are caller-side Types: the
+// alpha-rename above renamed the pin along with the Parameter it pinned, and the
+// Parameter ended up pinned to itself. Borrowing under a name no source Generic
+// can carry settles it before an invocation ever sees the signature. Stable
+// rather than counted, because the invocation freshens on top of this anyway and
+// a fabricated signature should be the same every time it is built.
+export function borrowedGenericName(
+	name: common.GenericName,
+): common.GenericName {
+	return `${name}${freshGenericSeparator}`
+}
+
 // NOTE: Translates the bindings collected against freshened Generic names back
 // to the Generics the signature declares, so the return-Type substitution and
 // conformance resolution downstream read in the original names. Binding VALUES

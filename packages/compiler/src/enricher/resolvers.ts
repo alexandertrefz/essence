@@ -10,6 +10,7 @@ import {
 } from "../diagnostics/index"
 import {
 	applyGenericBindings,
+	borrowedGenericName,
 	buildUnion,
 	computeConformanceMethodMap,
 	closestMatch,
@@ -1854,6 +1855,32 @@ export function derivedEquatableNamespaceForChoice(
 ): common.NamespaceType {
 	let isGeneric = declaredAlias !== null && declaredAlias.generics.length > 0
 
+	// NOTE: The Methods borrow the Choice's Parameters under names no source can
+	// spell, and the body Union below is rewritten to match. The Choice's own
+	// names would be the CALLER's too as soon as it declares one of the same
+	// spelling — `function same<infer T is Equatable>(_ a: Maybe<T>, …)` over a
+	// `choice Maybe<T>` — and a receiver's Type Argument is pinned here as a
+	// `defaultType`, which the invocation's alpha-rename rewrites along with the
+	// Parameter: `T` was pinned to `T`, matched nothing, and the whole derive went
+	// missing behind `no-matching-overload` for the one name a generic helper is
+	// likeliest to pick.
+	//
+	// NOTE: Only the BOUNDED Parameters are borrowed. A Parameter no payload
+	// mentions is declared by none of the Methods, so a borrowed name for it
+	// would be one nothing can ever bind — and it still rides along in the Cases'
+	// own Type Arguments, where an unbindable name reads as a Parameter the
+	// invocation left unsolved and refuses whatever is matched against it.
+	let borrowed: GenericBindings = new Map()
+
+	if (isGeneric && declaredAlias !== null) {
+		for (let name of constrainedGenericOrder(declaredAlias)) {
+			borrowed.set(name, {
+				type: "GenericUse",
+				name: borrowedGenericName(name),
+			})
+		}
+	}
+
 	// NOTE: R4 — a fresh bound list per Method, never the singleton Alias'
 	// Declarations. Only the mentioned Parameters are bounded; an unmentioned
 	// one would stay unbound at inference and misreport as uninferable.
@@ -1863,7 +1890,8 @@ export function derivedEquatableNamespaceForChoice(
 					// NOTE: A Parameter the receiver spells out is declared as a
 					// default rather than as `infer`, which is what pre-binds it
 					// — inference seeds the defaults of the Parameters it is not
-					// asked to infer, and checks the Arguments against them.
+					// asked to infer, and checks the Arguments against them. The
+					// pin is the CALLER's Type and stays in the caller's names.
 					let pinned =
 						typeArguments[
 							declaredAlias.generics.findIndex(
@@ -1872,7 +1900,7 @@ export function derivedEquatableNamespaceForChoice(
 						]
 
 					return {
-						name,
+						name: borrowedGenericName(name),
 						infer: pinned === undefined,
 						defaultType: pinned ?? null,
 						constraint: "Equatable",
@@ -1881,10 +1909,11 @@ export function derivedEquatableNamespaceForChoice(
 			: []
 
 	// NOTE: The Parameters are the UNAPPLIED body Union for a generic Choice, so
-	// its GenericUse members give inference something to bind the bounds to.
+	// its GenericUse members give inference something to bind the bounds to —
+	// under the borrowed names, which is what keeps them the Methods' own.
 	let parameterType =
 		isGeneric && declaredAlias !== null
-			? declaredAlias.aliasedType
+			? applyGenericBindings(declaredAlias.aliasedType, borrowed)
 			: choiceType
 
 	let method = (

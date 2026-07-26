@@ -2796,6 +2796,31 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: Without `infer` the Parameter is opaque and binds to nothing, so
+		// the target Type matches no receiver and the Namespace is never found —
+		// which no Diagnostic used to say. A generic Choice made the silence
+		// dangerous: nothing declared `is`, so the DERIVED equality answered it,
+		// and a Namespace that wrote the Method by hand was contradicted without
+		// a word. Refused at the declaration, which is upstream of all of that.
+		it("should reject Namespace Type Parameters written without 'infer'", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Wrapper<Item> for List<Item> {
+					firstText() -> String {
+						<- ""
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("uninferred-namespace-parameter")
+			expect(diagnostics[0].message).toBe(
+				"A Namespace's Type Parameters must be inferred",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Declare it as 'infer Item'.",
+			])
+		})
+
 		// NOTE: Bounds decide which Overload a call selects, so the SAME
 		// Overload set resolves the same way whichever order its entries were
 		// written in — an Overload whose bound the Argument can not satisfy is

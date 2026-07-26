@@ -179,6 +179,7 @@ export type DiagnosticCode =
 	| "wrong-type-argument-count"
 	| "type-not-generic"
 	| "infer-on-applied-parameter"
+	| "uninferred-namespace-parameter"
 	| "zero-denominator"
 	// Dispatch — which Method, in which Namespace, with which overload.
 	| "no-matching-overload"
