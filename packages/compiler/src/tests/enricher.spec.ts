@@ -1183,9 +1183,13 @@ describe("Enricher", () => {
 		// that actually failed, which is the cascade poison Types exist to
 		// prevent.
 		it("should not report uninferable Type Parameters for an Error Argument", () => {
+			// NOTE: Two generic Namespaces with the same target, so the
+			// specificity order can not break the tie and the Argument really
+			// is an Error — a concrete Namespace beside the stdlib's generic
+			// one would simply win and leave nothing to cascade from.
 			expect(
 				diagnosticsFor(`implementation {
-					namespace IntList for List<Integer> {
+					namespace AnyList<infer ItemType> for List<ItemType> {
 						firstItem() -> Integer {
 							<- 0
 						}
@@ -1647,6 +1651,32 @@ describe("Enricher", () => {
 						conformance.source.name === "IntegerListEquatable",
 				),
 			).toBe(true)
+		})
+
+		it("should report a concrete covering Union against the generic blanket", () => {
+			// NOTE: The one shape the specificity order leaves ambiguous where
+			// concreteness alone used to decide it: a Namespace for
+			// `List<Integer> | Nothing` covers the binding without spelling it
+			// out, and `List<ItemType>` covers it without being concrete, so
+			// neither target is narrower than the other. Naming the Union in
+			// full is what makes it a real choice, and a hand written
+			// `for List<Integer>` still wins outright.
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace MaybeListEquatable for List<Integer> | Nothing is Equatable {
+					is(_ other: List<Integer> | Nothing) -> Boolean { <- true }
+					isNot(_ other: List<Integer> | Nothing) -> Boolean { <- false }
+				}
+
+				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
+					<- a::is(b)
+				}
+
+				constant result: Boolean = areEqual([1, 2], [3, 4])
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"ambiguous-conformance",
+			)
 		})
 
 		it("should report a Method that needs a condition", () => {
@@ -3484,6 +3514,71 @@ describe("Enricher", () => {
 					}
 				}`),
 			).toEqual([])
+		})
+
+		it("should prefer a concrete target over a generic one", () => {
+			// NOTE: `firstItem` is the stdlib's, declared for every
+			// `List<ItemType>` — a Namespace naming the item Type outright is
+			// the more specific of the two and answers the call.
+			let invocation = lastConstantMethodInvocation(`implementation {
+				namespace IntegerList for List<Integer> {
+					firstItem() -> Integer {
+						<- 0
+					}
+				}
+
+				constant first = [1, 2, 3]::firstItem()
+			}`)
+
+			expect(invocation.namespace.name).toBe("IntegerList")
+			expect(invocation.type).toEqual({ type: "Integer" })
+		})
+
+		it("should prefer a nested generic target over a flat one", () => {
+			// NOTE: Both targets are generic, so neither is concrete — the
+			// deeper structure is what decides: `List<List<ItemType>>` covers
+			// only nested Lists, while `List<ItemType>` covers those too. Both
+			// spell their Generic `ItemType`, which is the case the alpha-rename
+			// in the comparison exists for: without it the two capture each
+			// other and read as covering one another.
+			let invocation = lastConstantMethodInvocation(`implementation {
+				namespace FlatTag<infer ItemType> for List<ItemType> {
+					tag() -> String {
+						<- "flat"
+					}
+				}
+
+				namespace NestedTag<infer ItemType> for List<List<ItemType>> {
+					tag() -> Integer {
+						<- 1
+					}
+				}
+
+				constant tagged = [[1], [2]]::tag()
+			}`)
+
+			expect(invocation.namespace.name).toBe("NestedTag")
+			expect(invocation.type).toEqual({ type: "Integer" })
+		})
+
+		it("should keep two identically targeted generic Namespaces ambiguous", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace FirstTag<infer ItemType> for List<ItemType> {
+						tag() -> String {
+							<- "first"
+						}
+					}
+
+					namespace SecondTag<infer Item> for List<Item> {
+						tag() -> String {
+							<- "second"
+						}
+					}
+
+					constant tagged = [1, 2]::tag()
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["ambiguous-namespace"])
 		})
 	})
 

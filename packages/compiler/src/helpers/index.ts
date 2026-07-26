@@ -475,6 +475,109 @@ export function unfreshenBindings(
 	return result
 }
 
+// NOTE: A Namespace as the specificity order below sees it — the target Type
+// exactly as DECLARED, plus the Generics that are open in it. Never a
+// specialized copy: `List<Integer>` specialized out of `List<ItemType>` is
+// structurally identical to a hand written `for List<Integer>`, and comparing
+// those two would tie where one is strictly narrower.
+export type NamespaceTarget = {
+	targetType: common.Type | null
+	generics: Array<common.GenericDeclaration>
+}
+
+// NOTE: Whether `pattern`'s target Type covers `subject` with the pattern's own
+// Generics OPEN — `List<ItemType>` covers `List<Integer>` and `List<List<X>>`,
+// while `List<List<ItemType>>` covers only the nested one. The pattern's
+// Generics are alpha-renamed first, exactly as `createFreshenedInference` does
+// for a call's Parameters: Namespaces spell their Generics alike (`ItemType`
+// throughout the stdlib) and Generic identity is by name, so without the rename
+// the pattern's bindable `ItemType` and the subject's opaque one are a single
+// symbol — `List<List<ItemType>>` binds `ItemType` to a Type mentioning itself,
+// reads as covering `List<ItemType>`, and the two targets tie.
+function targetCoversAsPattern(
+	pattern: NamespaceTarget,
+	subject: common.Type,
+): boolean {
+	if (pattern.targetType === null) {
+		return false
+	}
+
+	if (pattern.generics.length === 0) {
+		return matchesType(pattern.targetType, subject)
+	}
+
+	let rename: GenericBindings = new Map()
+
+	for (let generic of pattern.generics) {
+		rename.set(generic.name, {
+			type: "GenericUse",
+			name: `${generic.name}${freshGenericSeparator}${(freshGenericCounter += 1)}`,
+		})
+	}
+
+	let generics = pattern.generics.map((generic) => ({
+		...generic,
+		name: (rename.get(generic.name) as common.GenericUse).name,
+		defaultType:
+			generic.defaultType === null
+				? null
+				: applyGenericBindings(generic.defaultType, rename),
+	}))
+
+	return matchesTypeWithBindings(
+		applyGenericBindings(pattern.targetType, rename),
+		subject,
+		createInferenceContext(generics),
+	)
+}
+
+// NOTE: THE specificity order over overlapping Namespaces, shared by Method
+// dispatch and Protocol conformance so both answer "which Namespace covers this
+// receiver more closely" the same way. `target` wins when `other` covers it as a
+// pattern and not the other way around: a concrete `List<Integer>` beats the
+// generic `List<ItemType>`, and the deeper `List<List<ItemType>>` beats the
+// shallower `List<ItemType>`. Everything else is a tie the callers report: the
+// same target twice, and equally a pair the cover fails both ways for — a
+// `List<Integer> | Nothing` is no case of a `List<ItemType>` and no `List<…>`
+// is a case of that Union, so a receiver matching both has no narrower
+// Namespace to be dispatched to.
+function isStrictlyMoreSpecificTarget(
+	target: NamespaceTarget,
+	other: NamespaceTarget,
+): boolean {
+	if (target.targetType === null || other.targetType === null) {
+		return false
+	}
+
+	return (
+		targetCoversAsPattern(other, target.targetType) &&
+		!targetCoversAsPattern(target, other.targetType)
+	)
+}
+
+// NOTE: Keeps only the candidates no other candidate is strictly more specific
+// than. A cyclic order would leave nothing standing, which must not read as "no
+// Namespace matched" — the unfiltered set is handed back instead, and the
+// caller reports the ambiguity it already reports for a tie.
+export function filterMostSpecificByTarget<Candidate>(
+	candidates: Array<Candidate>,
+	targetOf: (candidate: Candidate) => NamespaceTarget,
+): Array<Candidate> {
+	let mostSpecific = candidates.filter(
+		(candidate) =>
+			!candidates.some(
+				(other) =>
+					other !== candidate &&
+					isStrictlyMoreSpecificTarget(
+						targetOf(other),
+						targetOf(candidate),
+					),
+			),
+	)
+
+	return mostSpecific.length > 0 ? mostSpecific : candidates
+}
+
 // NOTE: Substitutes bound Generics in `type` — unbound bindable Generics are
 // left untouched, opaque Generics always are.
 export function applyGenericBindings(

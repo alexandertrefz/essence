@@ -254,9 +254,14 @@ guards two files, but it is a floor, not a substitute for measuring.
   declared as `NestedList<infer ItemType> for List<List<ItemType>>` in
   `List.es`, beside the Namespace it left. A receiver matches every Namespace
   whose target Type it unifies with, so `[[1]]::` reaches both `List` and
-  `NestedList`, and `[1]::flatten()` finds no Namespace to search. Two such
-  Namespaces must not declare the SAME Method name: receiver specificity does
-  not break that tie, and the call is reported as `ambiguous-namespace`.
+  `NestedList`, and `[1]::flatten()` finds no Namespace to search. When two such
+  Namespaces declare the SAME Method name, the narrower target wins —
+  `List<List<ItemType>>` covers only nested Lists, `List<ItemType>` covers those
+  too, so a nested receiver resolves to `NestedList` — and it is a Namespace
+  whose target is no narrower than another's that leaves the call
+  `ambiguous-namespace`. Naming a Method twice is still worth avoiding: which
+  one a call reaches then depends on the receiver's Type rather than on what it
+  says.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Type and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea

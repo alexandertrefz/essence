@@ -285,8 +285,16 @@ Function. Each candidate signature is listed as a note.
 
 ### `ambiguous-namespace`
 
-The passed Arguments match a Method in more than one Namespace. The matching
-Namespaces are listed; qualify the call to pick one.
+The passed Arguments match a Method in more than one Namespace, and no candidate
+covers the receiver more closely than the others: a Namespace whose target Type
+is strictly narrower wins outright — a concrete `for List<Integer>` beats
+`List<ItemType>`, and `for List<List<ItemType>>` beats `for List<ItemType>` — so
+what is left is a tie, two targets of which neither is the narrower one. The
+same target twice is one such tie; so is a pair that does not compare at all.
+`for List<Integer> | Nothing` and `for List<ItemType>` are both matched by a
+List of Integers, yet the Union is no case of the generic List and the generic
+List is no case of the Union, which leaves that receiver with nothing to pick
+by. The matching Namespaces are listed; qualify the call to pick one.
 
 ### `unknown-method`
 
@@ -511,7 +519,12 @@ to — either it carries no such bound, or no conforming Namespace is in scope.
 
 ### `ambiguous-conformance`
 
-More than one Namespace in scope makes the Type conform to the Protocol.
+More than one Namespace in scope makes the Type conform to the Protocol, and
+none of them targets it more closely than the rest. The same specificity order
+Method dispatch uses applies here: a concrete `for List<Integer> is Equatable`
+wins over the blanket `List<ItemType> is Equatable`, while a target that only
+COVERS the Type without spelling it out — a Union the Type is a member of —
+ties with the blanket one rather than beating it.
 
 ### `nonconforming-namespace`
 

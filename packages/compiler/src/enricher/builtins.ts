@@ -50,15 +50,18 @@ export const builtinMemberOrder: Array<string> = [
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
-	// IS the tie-break. The Enricher builds `matchingNamespaces` in this order
-	// and Completion dedupes members first-Namespace-wins, so a
-	// `List<List<…>>` receiver has to meet the general `List` FIRST and pick up
-	// `NestedList::flattened` as the extra it is — putting it ahead of `List`
-	// would make the narrow Namespace the first one searched for every Method a
-	// nested List has, and would name it first in every "searched Namespaces"
-	// Diagnostic. It is listed here at all, rather than left to fall to the
-	// end, so that the two Namespaces a List value can reach sit together where
-	// a reader of this list expects them.
+	// decides how the two are PRESENTED. The Enricher builds
+	// `matchingNamespaces` in this order and Completion dedupes members
+	// first-Namespace-wins, so a `List<List<…>>` receiver has to meet the
+	// general `List` FIRST and pick up `NestedList::flattened` as the extra it
+	// is — putting it ahead of `List` would make the narrow Namespace the first
+	// one searched for every Method a nested List has, and would name it first
+	// in every "searched Namespaces" Diagnostic. It is listed here at all,
+	// rather than left to fall to the end, so that the two Namespaces a List
+	// value can reach sit together where a reader of this list expects them.
+	// What a call RESOLVES to is not decided here: two Namespaces declaring one
+	// Method name are separated by target specificity, where the nested target
+	// beats the flat one regardless of this order.
 	"NestedList",
 ]
 
