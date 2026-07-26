@@ -282,6 +282,52 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The tag travels: an unannotated binding initialised from a
+		// Method is DECLARED `StaticMethod`, and every later assignment is
+		// measured against that. Both directions have to wave the tag through,
+		// or the mirrored Program — `variable read = <literal>` taking a
+		// Method — would be the only one of the two that compiles.
+		it("should let a Function literal stand where a Method decided the Type", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Reader {
+						static readsBase(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					variable read = Reader.readsBase
+					read = (_ x: Integer) -> Integer { <- x::add(1) }
+					__print(read(1)::toString())
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: `SimpleMethod` and `StaticMethod` say where the signature was
+		// written down, not what the value is — of one signature, either
+		// stands for the other.
+		it("should let a static and an instance Method stand for one another", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Reader {
+						static readsBase(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					namespace Doubler for Integer {
+						double() -> Integer {
+							<- @::add(@)
+						}
+					}
+
+					variable read = Reader.readsBase
+					read = Doubler.double
+					__print(read(1)::toString())
+				}`),
+			).toEqual([])
+		})
+
 		// NOTE: Only the tag is waved through — the signature is judged
 		// exactly as one Function against another.
 		it("should still reject a Method whose signature disagrees", () => {
@@ -293,6 +339,22 @@ describe("Type matching", () => {
 				}
 
 				constant read: (_ x: String) -> Integer = Reader.readsBase
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("assignment-type-mismatch")
+		})
+
+		it("should still reject a Function whose signature disagrees with the Method that decided the Type", () => {
+			let errors = errorsFor(`implementation {
+				namespace Reader {
+					static readsBase(_ x: Integer) -> Integer {
+						<- x
+					}
+				}
+
+				variable read = Reader.readsBase
+				read = (_ x: String) -> Integer { <- x::length() }
 			}`)
 
 			expect(errors).toHaveLength(1)

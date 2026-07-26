@@ -1886,20 +1886,22 @@ function matchTypes(
 	// already stands as the first Parameter of the Type, and it is emitted as a
 	// plain function taking it there. The `SimpleMethod`/`StaticMethod` tag
 	// only records where the signature was written down, and no annotation can
-	// spell either one, so an expected `Function` accepts all three. The
-	// reverse direction is unreachable and stays out.
+	// spell either one, so the three are one kind of value here and only the
+	// signature decides.
+	// Interchangeable in BOTH directions, because the tag also travels: an
+	// unannotated `variable read = Reader.readsBase` is DECLARED
+	// `StaticMethod`, and every later assignment to it is measured against
+	// that. Waving the tag through in one direction only would refuse a
+	// Function literal assigned to that Variable while accepting a Method
+	// assigned to the mirrored `variable read = <literal>` — the same Program
+	// compiling or not by which of the two happened to be written first.
 	if (
-		lhs.type === "Function" &&
+		(lhs.type === "Function" ||
+			lhs.type === "SimpleMethod" ||
+			lhs.type === "StaticMethod") &&
 		(rhs.type === "Function" ||
 			rhs.type === "SimpleMethod" ||
 			rhs.type === "StaticMethod")
-	) {
-		return signatureMatches(lhs, rhs, context)
-	}
-
-	if (
-		(lhs.type === "SimpleMethod" && rhs.type === "SimpleMethod") ||
-		(lhs.type === "StaticMethod" && rhs.type === "StaticMethod")
 	) {
 		return signatureMatches(lhs, rhs, context)
 	}
