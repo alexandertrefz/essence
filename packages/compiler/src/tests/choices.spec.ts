@@ -2518,6 +2518,7 @@ describe("Choices", () => {
 		const bag = `choice Bag<T> { Full { items: List<T> } }`
 		const opt = `choice Opt<T> { Holding { value: T | Nothing } }`
 		const wrap = `choice Wrap<T> { It { value: T } }`
+		const tagged = `choice Tagged<T, Phantom> { Val { value: T }, Empty }`
 
 		it("compares two instantiated Cases through their payload's equality", async () => {
 			expect(
@@ -2651,6 +2652,129 @@ describe("Choices", () => {
 
 			expect(generated).toContain("$type.boundConformance(")
 			expect(generated).toContain("$helpers.boundChoiceIs(")
+		})
+
+		// NOTE: The shape the whole derive exists for — a List of a generic
+		// Choice compares as a List, which needs the Choice's conditional
+		// conformance as a nested witness rather than a Namespace anybody wrote.
+		it("compares two Lists of a generic Choice", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					constant a: List<Maybe<Integer>> = [#Some({ value = 1 }), #None]
+					constant b: List<Maybe<Integer>> = [#Some({ value = 1 }), #None]
+					constant c: List<Maybe<Integer>> = [#Some({ value = 2 }), #None]
+
+					__print(a::is(b)::toString())
+					__print(a::is(c)::toString())
+				}`),
+			).toEqual(['"true"', '"false"'])
+		})
+
+		// NOTE: The same withholding one level out — the bound is reported where
+		// the List asks its Item for equality, rather than the derive quietly
+		// comparing a Function structurally.
+		it("reports the bound at a List element site too", () => {
+			expect(
+				codesOf(`implementation { ${maybe}
+					constant f: Maybe<(_ x: Integer) -> Integer> =
+						#Some({ value = (_ x: Integer) -> Integer { <- x } })
+
+					__print([f]::contains(f))
+				}`),
+			).toContain("unsatisfied-bound")
+		})
+
+		// NOTE: Only the Parameters some payload MENTIONS are bounded — a
+		// phantom Parameter is equal to nothing and compares nothing, so
+		// demanding equality of it would refuse a Choice that never holds one.
+		// The Rational payload is what says the remaining witness is still the
+		// right one: it is compared by its own equality, not by structure.
+		it("needs no bound for a Parameter no payload mentions", async () => {
+			expect(
+				await run(`implementation { ${tagged}
+					constant a: Tagged<Rational, (_ x: Integer) -> Integer> =
+						#Val({ value = 1/2 })
+					constant b: Tagged<Rational, (_ x: Integer) -> Integer> =
+						#Val({ value = 2/4 })
+
+					__print(a::is(b)::toString())
+					__print(a::is(#Empty)::toString())
+					__print([a]::contains(b)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"'])
+		})
+
+		// NOTE: The condition a derive solves can be another derive — the outer
+		// `Maybe`'s witness for its payload is the inner `Maybe`'s own
+		// conditional one, curried with Integer's equality.
+		it("chains one derive's condition onto another's", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					constant a: Maybe<Maybe<Integer>> = #Some({ value = #Some({ value = 1 }) })
+					constant b: Maybe<Maybe<Integer>> = #Some({ value = #Some({ value = 1 }) })
+					constant c: Maybe<Maybe<Integer>> = #Some({ value = #Some({ value = 2 }) })
+
+					__print(a::is(b)::toString())
+					__print(a::is(c)::toString())
+					__print([a]::contains(c)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"false"'])
+		})
+
+		// NOTE: The fallback rule holds for a generic Choice exactly as it does
+		// for a plain one — a written Namespace decides equality at the call AND
+		// in the witness a List reaches for, so both answer the Namespace's way
+		// rather than the derive's structural one.
+		it("lets a written Namespace beat the derive for a generic Choice", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					namespace Maybe<infer T> for Maybe<T> is Equatable {
+						§§ Every Maybe is the same Maybe.
+						§§
+						§§ @param other — the Maybe to compare with
+						§§ @returns — always true.
+						is(_ other: Maybe<T>) -> Boolean {
+							<- true
+						}
+
+						§§ The negation.
+						§§
+						§§ @param other — the Maybe to compare with
+						§§ @returns — always false.
+						isNot(_ other: Maybe<T>) -> Boolean {
+							<- @::is(other)::negate()
+						}
+					}
+
+					constant a: Maybe<Integer> = #Some({ value = 1 })
+					constant b: Maybe<Integer> = #Some({ value = 2 })
+
+					__print(a::is(b)::toString())
+					__print(a::isNot(b)::toString())
+					__print([a]::contains(b)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"'])
+		})
+
+		// NOTE: A generic RECORD needs none of this. Its equality is the
+		// runtime's structural one, which reads each member's own Type key and
+		// answers by it — so a Rational member is compared as a Rational without
+		// any compile-time witness deciding that. There is nothing to derive and
+		// nothing to bound, which is why only Choices grew the machinery above.
+		it("leaves a generic Record comparing structurally", async () => {
+			expect(
+				await run(`implementation {
+					type Boxed<Item> = { value: Item }
+
+					constant a: Boxed<Rational> = { value = 1/2 }
+					constant b: Boxed<Rational> = { value = 2/4 }
+					constant c: Boxed<Rational> = { value = 1/3 }
+
+					__print(a::is(b)::toString())
+					__print(a::is(c)::toString())
+					__print([a]::contains(b)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
 		// NOTE: Regression tests — a payload Union with SEVERAL arms mentioning
