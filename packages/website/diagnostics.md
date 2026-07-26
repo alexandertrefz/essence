@@ -487,10 +487,18 @@ literal with no written return Type answers with — `<- #Done(item)` in a `loop
 or `reduce` callback, which the standard library's folds are written on — is
 decided by that position and never reaches this.
 
+Only a payload that STOOD is asked what it decided. A Case that carries one and
+was written without reports `missing-payload` — the bare `#Full` of a `Full {
+value: Value }` — and one whose payload is not the Case's Record reports
+`payload-type-mismatch` — `#Both({ a = 1 })` of a `Both { a: A, b: B }`. Either
+says what the reader left out, whichever Type Parameters are standing behind it.
+
 An Argument position decides a bare construction exactly as it decides the
 prefixed one: `steps::contains(#Done(2))` against a `List<Step<Integer,
 Integer>>` reads both of `Step`'s Arguments off the Parameter Type, the same as
-`steps::contains(Step<Integer, Integer>#Done(2))` does.
+`steps::contains(Step<Integer, Integer>#Done(2))` does — and whichever Overload
+of `contains` happens to be declared first, since a candidate that decides
+nothing leaves the construction to its payload and nothing else.
 
 A Parameter Type that mentions the CALL's own Type Parameters decides nothing
 either, because nothing has decided them: `take(Holder#Full(1))` against

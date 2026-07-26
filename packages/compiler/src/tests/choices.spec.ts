@@ -1068,6 +1068,45 @@ describe("Choices", () => {
 				])
 			})
 
+			// NOTE: And asked only where a payload STOOD. A Case that carries one
+			// and was written without has `missing-payload` to report, and one
+			// whose payload is not the Case's Record has `payload-type-mismatch` —
+			// each about the mistake the reader made, where the refusal is about
+			// the Type Arguments a payload that stood did not decide. Standing in
+			// front of either hid it: `#Full` on its own was told its payload
+			// decides none of them, spelled with a `(…)` it never wrote, and a
+			// misspelled member was answered with a message claiming the other
+			// half of the application had been decided by it.
+			it("leaves a payload that was never given to its own Diagnostic", () => {
+				const box = `choice Box<Value> { Full { value: Value } }`
+
+				expect(
+					codesOf(`implementation { ${box}
+						constant full = #Full
+					}`),
+				).toEqual(["missing-payload"])
+				expect(
+					codesOf(`implementation { ${box}
+						constant full = #Full()
+					}`),
+				).toEqual(["missing-payload"])
+			})
+
+			it("leaves a payload that does not fit to its own Diagnostic", () => {
+				const pair = `choice Pair<A, B> { Both { a: A, b: B } }`
+
+				expect(
+					codesOf(`implementation { ${pair}
+						constant both = #Both({ a = 1 })
+					}`),
+				).toEqual(["payload-type-mismatch"])
+				expect(
+					codesOf(`implementation { ${pair}
+						constant both = #Both({ a = 1, c = 2 })
+					}`),
+				).toEqual(["payload-type-mismatch"])
+			})
+
 			it("takes the decision from an annotation", () => {
 				expect(
 					valueTypeOf(
@@ -1124,6 +1163,40 @@ describe("Choices", () => {
 
 			expect(await run(program)).toEqual(["true"])
 			expect(messagesOf(program)).toEqual([])
+		})
+
+		// NOTE: And decides it whatever order the Overloads are declared in. A
+		// candidate that decides nothing — an unrelated Parameter Type, or an
+		// instantiation the payload does not fit — used to leave the construction to
+		// be enriched FOR REAL from inside the probe: the refusal was reported from
+		// a position no candidate had committed to, and the Error it answered was
+		// kept for every candidate after it. The Overload that decides both
+		// Parameters went on to win all the same, with an Argument that was an Error
+		// and a recording of its own that nothing read. Reading the payload silently
+		// instead is what makes the two orders the same call.
+		it("decides one from the Argument position whatever the Overload order", async () => {
+			let program = `implementation {
+				choice Pair<A, B> { Both { a: A, b: B }, Left { a: A }, None }
+
+				namespace Taker for Integer {
+					overload take {
+						(_ text: String) -> String { <- "text" }
+						(_ pair: Pair<String, String>) -> String { <- "strings" }
+						(_ pair: Pair<Integer, Integer>) -> String { <- "integers" }
+					}
+				}
+
+				__print(1::take(#Left({ a = 1 })))
+				__print(1::take(#Left({ a = "x" })))
+				__print(1::take("x"))
+			}`
+
+			expect(messagesOf(program)).toEqual([])
+			expect(await run(program)).toEqual([
+				'"integers"',
+				'"strings"',
+				'"text"',
+			])
 		})
 
 		// NOTE: A unit Case has no payload to read a decision off and no Choice
