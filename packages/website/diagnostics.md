@@ -399,8 +399,12 @@ The payload does not match the Type the Case declares.
 
 A generic Choice names itself in one of its payloads. A generic Choice's
 payloads are substituted eagerly at each use, so a self-reference would never
-finish substituting. Introduce a separate non-generic Choice or Type for the
-recursive part.
+finish substituting. Recursive Type declarations are not part of the language
+yet; the cycle has to be broken.
+
+A Type Parameter that spells the Choice's own name shadows it, so a payload
+naming it names the Parameter and is no recursion — `choice Bad<Bad> { … }` is
+reported as little as `type Bad<Bad> = { next: Bad }` is.
 
 ### `indistinguishable-union-arms`
 
