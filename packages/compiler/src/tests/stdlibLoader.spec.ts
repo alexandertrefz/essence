@@ -687,6 +687,56 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/PI/)
 	})
 
+	// NOTE: The value band's counterpart of the Namespace naming itself: a
+	// bodied Property reads one written above it in its own Namespace, and the
+	// Rewriter's topological order emits the two consts in that order.
+	it("loads a static Property that reads one written above it in its own Namespace", () => {
+		let stdlib = load([
+			"Constants.es",
+			`declarations {
+				§ The constants.
+				namespace Constants {
+					§§ The base value.
+					static BASE: Integer = 2
+
+					§§ The base value, read the long way around.
+					static ECHO: Integer = Constants.BASE
+				}
+			}`,
+		])
+
+		expect(namespaceNamed(stdlib, "Constants").properties).toEqual({
+			BASE: { type: "Integer" },
+			ECHO: { type: "Integer" },
+		})
+	})
+
+	// NOTE: The consts are emitted in the order the Properties are written, so a
+	// read of one below is a read of a const that does not exist yet. The
+	// Validator refuses it, and the standard library's zero-Diagnostic gate
+	// turns that into a load that fails rather than a `ReferenceError` at import.
+	it("rejects a static Property that reads one written below it in its own Namespace", () => {
+		let load = () =>
+			loadStdlibFrom([
+				parseStdlibSource(
+					"Constants.es",
+					`declarations {
+						§ The constants.
+						namespace Constants {
+							§§ The base value, read the long way around.
+							static ECHO: Integer = Constants.BASE
+
+							§§ The base value.
+							static BASE: Integer = 2
+						}
+					}`,
+				),
+			])
+
+		expect(load).toThrow(/use-before-declaration/)
+		expect(load).toThrow(/Constants\.BASE/)
+	})
+
 	// NOTE: Every Documentation a consumer can reach has to be sourceless — a
 	// Position pointing into a standard library file is a Position with no file
 	// attached, as far as every consumer of these tables is concerned.

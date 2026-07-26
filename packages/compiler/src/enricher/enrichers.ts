@@ -70,7 +70,7 @@ import {
 	suggestionHelps,
 	suggestionInScope,
 } from "./resolvers"
-import { childScope } from "./scope"
+import { childScope, scopeMap } from "./scope"
 
 // NOTE: Hoisting resolves each order-independent declaration's Type up front
 // (see `hoistDeclarations`) and hands it back keyed by its Node. The in-order
@@ -1764,9 +1764,30 @@ export function enrichNamespaceDefinitionStatement(
 
 	function enrichProperties(
 		properties: Record<string, parser.NamespacePropertyNode>,
+		namespaceType: common.NamespaceType,
 		scope: enricher.Scope,
 	): Record<string, common.typed.NamespaceProperty> {
 		let result: Record<string, common.typed.NamespaceProperty> = {}
+
+		// NOTE: The Namespace as its own static Properties see it, seeded the
+		// way the resolution pass seeded it — every native bound, every bodied
+		// Property Error until its value has been enriched here — so a value
+		// enriched in this pass is typed exactly as the one that pass read the
+		// Namespace Type off was. The Methods are the finished ones either way.
+		let boundProperties = scopeMap<common.Type>()
+
+		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
+			boundProperties[propertyKey] =
+				propertyValue.value === null
+					? namespaceType.properties[propertyKey]
+					: { type: "Error" }
+		}
+
+		let selfScope = scopeWithNamespaceSelf(
+			node,
+			{ ...namespaceType, properties: boundProperties },
+			scope,
+		)
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
 			// NOTE: A native static Property has no value to enrich, so there
@@ -1785,7 +1806,7 @@ export function enrichNamespaceDefinitionStatement(
 			let type: common.Type
 			let value: common.typed.ExpressionNode = enrichExpression(
 				propertyValue.value,
-				scope,
+				selfScope,
 			)
 
 			if (propertyValue.type === null) {
@@ -1807,6 +1828,8 @@ export function enrichNamespaceDefinitionStatement(
 				value,
 				documentation: propertyValue.documentation,
 			}
+
+			boundProperties[propertyKey] = type
 		}
 
 		return result
@@ -1884,7 +1907,7 @@ export function enrichNamespaceDefinitionStatement(
 			})),
 		})),
 		name: enrichIdentifier(node.name, scope),
-		properties: enrichProperties(node.properties, scope),
+		properties: enrichProperties(node.properties, type, scope),
 		methods: enrichMethods(
 			node.methods,
 			methodScope,
@@ -6005,6 +6028,25 @@ function functionLiteralPosition(
 	return node.parameters[0]?.position ?? null
 }
 
+// NOTE: A Namespace's own name, bound to the Namespace itself — what makes
+// `Reader.readsBase` inside `namespace Reader` read exactly like the same
+// spelling written outside it. Every body a Namespace holds gets it: a Method's
+// signature and body, and a static Property's value.
+//
+// The Namespace is injected as a MEMBER only — injecting it as a Type would
+// shadow a same-named Type Alias (`namespace Event for Event`).
+function scopeWithNamespaceSelf(
+	node: parser.NamespaceDefinitionStatementNode,
+	type: common.NamespaceType,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return childScope(scope, {
+		members: { [node.name.content]: type },
+		declarations: { [node.name.content]: node.name.position },
+		constants: new Set([node.name.content]),
+	})
+}
+
 export function resolveNamespaceDefinitionStatementType(
 	node: parser.NamespaceDefinitionStatementNode,
 	scope: enricher.Scope,
@@ -6035,6 +6077,13 @@ export function resolveNamespaceDefinitionStatementType(
 		}
 	}
 
+	// NOTE: The maps the Type is built from are the ones it CARRIES, filled in
+	// place as they resolve, so the Namespace injected into its own body sees
+	// every member resolved so far — a Property naming one above it reads the
+	// Type that one resolved to.
+	let properties: Record<string, common.Type> = {}
+	let methods: Record<string, common.MethodType> = {}
+
 	let resultType: common.NamespaceType = {
 		type: "Namespace",
 		targetType:
@@ -6043,43 +6092,71 @@ export function resolveNamespaceDefinitionStatementType(
 				: resolveType(node.targetType, genericScope),
 		name: node.name.content,
 		generics: resolveGenericDeclarations(node.generics, scope),
-		properties: {},
-		methods: {},
+		properties,
+		methods,
 		conformsTo: node.conformsTo.map((clause) => clause.protocol.content),
 		conformanceConditions,
 	}
 
-	let properties: Record<string, common.Type> = {}
-	let methods: Record<string, common.MethodType> = {}
-
+	// NOTE: The natives first, and in one pass of their own: a value-LESS
+	// Property is answered by the runtime rather than by an initialiser, so it
+	// has a value wherever it is written, and a Property above it may read it.
 	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
+		if (memberValue.value !== null) {
+			// NOTE: A bodied Property has no Type until its value is enriched,
+			// and the Property BELOW is the one whose read is too early, so it
+			// is seeded as Error rather than left out — the read resolves, and
+			// the Validator, which is the pass that knows the order the
+			// initialisers run in, is the one that refuses it.
+			properties[memberKey] = { type: "Error" }
+
+			continue
+		}
+
 		// NOTE: A native static Property declares its Type instead of carrying
 		// a value — `static PI: Transcendental` — so the annotation IS the
 		// Type. Resolved in the outer Scope, like the bodied form's value.
+		//
+		// With neither a value nor an annotation there is nothing left to say
+		// what the Property is. Silently resolving to Error would let a
+		// Namespace ship a Property of no Type at all, and the standard
+		// library's zero-Diagnostic gate would wave it through.
+		if (memberValue.type === null) {
+			reportError(
+				`Native Property '${memberKey}' declares no Type`,
+				memberValue.name.position,
+				{
+					code: "native-property-without-type",
+					labels: [
+						primary(
+							memberValue.name.position,
+							"no Type and no value",
+						),
+					],
+					helps: [`Annotate it: 'static ${memberKey}: Type'.`],
+				},
+			)
+		}
+
+		properties[memberKey] = resolveDeclaredType(memberValue.type, scope)
+	}
+
+	// NOTE: Before the Property values, so that one of them may CALL a Method of
+	// its own Namespace: a Method is installed with the class, ahead of every
+	// static initialiser, so it answers whatever order the two are written in.
+	for (let [methodName, methodValue] of Object.entries(node.methods)) {
+		methods[methodName] = resolveMethodType(
+			methodValue,
+			scopeWithNamespaceSelf(node, resultType, genericScope),
+			resultType.targetType,
+			resultType.generics,
+		)
+	}
+
+	let selfScope = scopeWithNamespaceSelf(node, resultType, scope)
+
+	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
 		if (memberValue.value === null) {
-			// NOTE: With neither a value nor an annotation there is nothing
-			// left to say what the Property is. Silently resolving to Error
-			// would let a Namespace ship a Property of no Type at all, and the
-			// standard library's zero-Diagnostic gate would wave it through.
-			if (memberValue.type === null) {
-				reportError(
-					`Native Property '${memberKey}' declares no Type`,
-					memberValue.name.position,
-					{
-						code: "native-property-without-type",
-						labels: [
-							primary(
-								memberValue.name.position,
-								"no Type and no value",
-							),
-						],
-						helps: [`Annotate it: 'static ${memberKey}: Type'.`],
-					},
-				)
-			}
-
-			properties[memberKey] = resolveDeclaredType(memberValue.type, scope)
-
 			continue
 		}
 
@@ -6087,30 +6164,11 @@ export function resolveNamespaceDefinitionStatementType(
 		// Expression — the same walk the Node build uses, so the two agree.
 		// Enriching an Expression declares nothing, so this is safe under the
 		// speculative resolution hoisting runs.
-		properties[memberKey] = enrichExpression(memberValue.value, scope).type
+		properties[memberKey] = enrichExpression(
+			memberValue.value,
+			selfScope,
+		).type
 	}
-
-	for (let [methodName, methodValue] of Object.entries(node.methods)) {
-		// NOTE: The Namespace is only injected as a member for
-		// self-reference — injecting it as a type would shadow a
-		// same-named Type Alias (`namespace Event for Event`).
-		methods[methodName] = resolveMethodType(
-			methodValue,
-			{
-				parent: genericScope,
-				members: { [node.name.content]: resultType },
-				declarations: { [node.name.content]: node.name.position },
-				constants: new Set([node.name.content]),
-				types: {},
-				protocols: {},
-			},
-			resultType.targetType,
-			resultType.generics,
-		)
-	}
-
-	resultType.properties = properties
-	resultType.methods = methods
 
 	if (options.deferOnPendingConformance !== undefined) {
 		weaveMethodBounds(

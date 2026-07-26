@@ -2301,9 +2301,41 @@ describe("Code Generation", () => {
 				])
 			})
 
+			// NOTE: The edge inside ONE Namespace, which is the shape a Namespace
+			// naming itself made writable — `static TAU = Number.PI` is the
+			// spelling the numeric tower's constants want. It is an ordinary edge
+			// of the band, and it is the only direction there is: a Property
+			// reading one written BELOW it is refused by the Validator, so the
+			// consts of one Namespace reach the band in an order that already runs.
+			it("orders a Property below the one it reads in its own Namespace", () => {
+				const ownNamespace = `declarations {
+	namespace Constants for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+
+		§§ The base value, read through the Namespace's own name.
+		static ECHO: Integer = Constants.BASE
+	}
+}`
+
+				let reachable = reachableEssenceMethods(
+					preludeOf(ownNamespace),
+					[referenceOf("$es_Constants_ECHO")],
+				)
+
+				expect(
+					reachable.get("$es_Constants_ECHO")?.evaluatedReferences,
+				).toEqual(new Set(["$es_Constants_BASE"]))
+				expect(orderEssenceMembers(reachable).map(nameOf)).toEqual([
+					"$es_Constants_BASE",
+					"$es_Constants_ECHO",
+				])
+			})
+
 			// NOTE: The shapes the band can not survive, handed in directly because
 			// none of them can be written in a source: a Property's value only
-			// names Namespaces above it, so every edge points backwards. They are
+			// names Namespaces above it — or its own, and there only a Property
+			// written above it — so every edge points backwards. They are
 			// refused rather than emitted in an order that happens to run —
 			// whichever const comes first reads one that does not exist yet, which
 			// is a `ReferenceError` at import out of a Program that compiled green.

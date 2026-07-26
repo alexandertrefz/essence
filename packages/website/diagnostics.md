@@ -130,6 +130,14 @@ it is called, so it may name a Namespace declared below it; a static Property's
 initialiser runs with its own Namespace's Declaration, so it may not. The body of
 a top-level `if` runs at the top level like everything around it.
 
+The same rule holds one level in, among the static Properties of one Namespace: a
+Namespace names itself from its own body, and its Properties are given their
+values in the order they are written, so an initialiser may read a Property
+written above it but not one written below it, nor itself. A Method is not
+subject to it — it exists before any initialiser runs, so a Property's value may
+call one whichever order the two are written in — and neither is a Function
+literal written in an initialiser, whose body runs when it is called.
+
 ### `unknown-name`
 
 A Variable or Constant that was never declared. The Diagnostic suggests the

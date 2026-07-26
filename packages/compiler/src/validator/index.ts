@@ -56,6 +56,17 @@ let topLevelNamespaces: Map<
 // Namespace's Declaration does, so it keeps the index it is written under.
 let executingTopLevelIndex: number | null = null
 
+// NOTE: The static Property initialiser being validated: its Namespace's name,
+// and the Properties of that Namespace which have no value yet where it runs —
+// itself and everything written below it, each with the Position it is declared
+// at. Null anywhere else, including inside a Function literal written in such an
+// initialiser, whose body runs when it is called like any other.
+// Module state for the reason `witnessScopes` is.
+let initialisingProperty: {
+	namespaceName: string
+	unbound: Map<string, common.Position>
+} | null = null
+
 export const validate = (
 	program: common.typed.Program,
 ): Array<common.Diagnostic> => {
@@ -65,6 +76,7 @@ export const validate = (
 	witnessScopes = []
 	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
 	executingTopLevelIndex = null
+	initialisingProperty = null
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let [index, node] of program.implementation.nodes.entries()) {
@@ -722,7 +734,10 @@ function validateFunctionInvocation(
 	// NOTE: The callee is not walked as an Expression of its own — a static call
 	// (`Namespace.method(…)`) is the one shape whose callee names something that
 	// can be too early, so it is asked about here rather than through
-	// `validateIdentifier`, which would never see it.
+	// `validateIdentifier`, which would never see it. The Property behind the
+	// call is asked about for the same reason: a static Property holding a
+	// Function is CALLED through the very Lookup that reads it, so the read
+	// would go unexamined.
 	if (
 		node.name.nodeType === "Lookup" &&
 		node.name.base.nodeType === "Identifier" &&
@@ -733,6 +748,7 @@ function validateFunctionInvocation(
 			node.name.base.position,
 			"this names it",
 		)
+		checkPropertyIsBound(node.name)
 	}
 
 	// NOTE: An Identifier callee names itself; a Lookup and an Expression that
@@ -846,15 +862,20 @@ function validateFunctionDefinition(
 	// NOTE: A body does not run where it is written — it runs when the Function
 	// is called, which is at the earliest the statement that calls it — so
 	// nothing inside it is a top-level use, however far above a Declaration it
-	// stands.
+	// stands. A Function literal written INSIDE a static Property's initialiser
+	// is such a body too: what it names is read when it is called, by which time
+	// every Property of its Namespace is bound.
 	let enclosingIndex = executingTopLevelIndex
+	let enclosingProperty = initialisingProperty
 
 	executingTopLevelIndex = null
+	initialisingProperty = null
 
 	try {
 		node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 	} finally {
 		executingTopLevelIndex = enclosingIndex
+		initialisingProperty = enclosingProperty
 		witnessScopes.pop()
 	}
 
@@ -867,8 +888,53 @@ function validateLookup(
 	node: common.typed.LookupNode,
 ): common.typed.LookupNode {
 	validateExpression(node.base)
+	checkPropertyIsBound(node)
 
 	return node
+}
+
+// NOTE: A static Property read out of the initialiser of a Property of the SAME
+// Namespace, where the one being read is written at or below the one reading it.
+// The Namespace is emitted as a `class` and its Properties as static fields,
+// which are initialised in the order they are written, so the read answers
+// `undefined` — a value of no Type at all, out of a Program that compiled green.
+//
+// It is the same fault `checkNamespaceIsDeclared` reports one level up, and
+// carries the same code: something that runs above a Declaration reaches for
+// what that Declaration binds. A Method is not among them — it is installed with
+// the class, ahead of every initialiser — and neither is a body, which runs when
+// it is called.
+function checkPropertyIsBound(node: common.typed.LookupNode): void {
+	if (
+		initialisingProperty === null ||
+		node.base.nodeType !== "Identifier" ||
+		node.base.type.type !== "Namespace" ||
+		node.base.content !== initialisingProperty.namespaceName
+	) {
+		return
+	}
+
+	let declaration = initialisingProperty.unbound.get(node.member.content)
+
+	if (declaration === undefined) {
+		return
+	}
+
+	reportError(
+		`Property '${initialisingProperty.namespaceName}.${node.member.content}' is read before it has a value`,
+		node.member.position,
+		{
+			code: "use-before-declaration",
+			labels: [
+				primary(node.member.position, "this reads it"),
+				secondary(declaration, "it is given its value here"),
+			],
+			notes: [
+				"A static Property is given its value where it is written, in order, so one written above it has nothing to read yet.",
+			],
+			helps: ["Move this Declaration below the one it reads."],
+		},
+	)
 }
 
 // NOTE: A name is nothing but a name in every other respect — the one thing it
@@ -1837,6 +1903,20 @@ function validateNamespaceDefinitionStatement(
 	// Program loads, so it is held to what a Constant Declaration is held to —
 	// it is the same Declaration, written in a Namespace. A native Property has
 	// no value to check and is not in the typed tree at all.
+	//
+	// NOTE: The Properties are walked in the order they are written, which is
+	// the order their initialisers run in, so the ones still without a value
+	// where one of them runs are itself and everything below it — which is what
+	// `unbound` holds, shrinking as each is left behind. A native is not among
+	// them for the same reason it is not walked here: the runtime answers it,
+	// wherever it is written.
+	let unbound = new Map(
+		Object.entries(node.properties).map(([name, property]) => [
+			name,
+			property.name.position,
+		]),
+	)
+
 	for (let propertyName in node.properties) {
 		let property = node.properties[propertyName]
 
@@ -1849,8 +1929,16 @@ function validateNamespaceDefinitionStatement(
 			)
 		}
 
-		validateExpression(property.value)
-		validateNoBoundFunctionValue(property.value)
+		initialisingProperty = { namespaceName: node.name.content, unbound }
+
+		try {
+			validateExpression(property.value)
+			validateNoBoundFunctionValue(property.value)
+		} finally {
+			initialisingProperty = null
+		}
+
+		unbound.delete(propertyName)
 	}
 
 	for (let methodName in node.methods) {

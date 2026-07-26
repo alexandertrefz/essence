@@ -922,10 +922,11 @@ describe("Stdlib Call Graph", () => {
 			}
 		})
 
-		// NOTE: The edge the ordering rests on. A Property's value is enriched
-		// where its `namespace` stands, so it can only read a Namespace declared
-		// ABOVE it — which is why a cycle can not be written in a source at all,
-		// and why the two shapes below are handed in directly.
+		// NOTE: The edge the ordering rests on. A Property's value can only read
+		// a Namespace declared ABOVE it — or its OWN, and there only a Property
+		// written above it, which the Validator is what enforces — so every edge
+		// points backwards and a cycle can not be written in a source at all,
+		// which is why the two cyclic shapes below are handed in directly.
 		it("records a read of one static Property by another", () => {
 			let graph = propertyGraphOf(`declarations {
 	namespace Other for Integer {
@@ -953,6 +954,27 @@ describe("Stdlib Call Graph", () => {
 			// its own const stands above the whole value band. What it READS is
 			// another matter, which is the next test.
 			expect(graph.get("Other.BASE")).toEqual(new Set())
+		})
+
+		// NOTE: The same edge inside ONE Namespace, which is the shape a Namespace
+		// naming itself opened up — `static TAU = Number.PI` is the spelling the
+		// numeric tower's constants want, and it is an edge of this graph like any
+		// other rather than something the Namespace hides.
+		it("records a read of one static Property by another in the same Namespace", () => {
+			let graph = propertyGraphOf(`declarations {
+	namespace Constants for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+
+		§§ The base value, read through the Namespace's own name.
+		static ECHO: Integer = Constants.BASE
+	}
+}`)
+
+			expect(graph.get("Constants.ECHO")).toEqual(
+				new Set(["Constants.BASE"]),
+			)
+			expect(graph.get("Constants.BASE")).toEqual(new Set())
 		})
 
 		// NOTE: The edge that is only there in a Method's body. `Constants.DOUBLE`

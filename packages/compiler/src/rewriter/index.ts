@@ -340,9 +340,10 @@ export type EssenceMember = {
 // `ReferenceError` at import out of a Program that compiled green, where a
 // Method that calls itself is only recursion. Neither shape can be written in a
 // standard library source as it stands — a Property's value is enriched where its
-// `namespace` is, so it can only read a Namespace already declared, and every
-// edge therefore points backwards. This answers for the day that changes, rather
-// than for a mistake anyone has made yet.
+// `namespace` is, so it can only read a Namespace already declared, or its OWN,
+// and of that one only a Property written above it, which is what the Validator
+// refuses to let past — so every edge points backwards. This answers for the day
+// that changes, rather than for a mistake anyone has made yet.
 export function orderEssenceMembers(
 	members: Map<string, EssenceMember>,
 ): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
