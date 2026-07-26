@@ -512,6 +512,54 @@ function checkWitnessScope(
 	}
 }
 
+// NOTE: A `namespace` source is spelled into the Argument list of the CALL, not
+// of the Declaration it comes from — `things::sort()` emits `{ compareTo:
+// Thing.compareTo }` — so a call that RUNS above the conforming Namespace reads
+// a `class` binding that holds nothing yet. The Namespace's name appears
+// nowhere in the source, which is why the rails that check the names a call
+// does spell walk straight past it; it is the same fault they report, one
+// indirection further in.
+//
+// NOTE: Conditions are walked alongside the conformance that carries them, for
+// the reason `checkWitnessScope` walks them: a conditional conformance names
+// one more Namespace per `where` condition, and every one of them is spelled
+// into the same Argument list. Each name is reported once, so a Signature that
+// bounds two Type Parameters through the same Namespace does not say it twice.
+function checkWitnessNamespacesAreDeclared(
+	conformances: Array<common.Conformance>,
+	position: common.Position,
+	describeUse: (protocolName: string) => string,
+): void {
+	let protocolsByNamespace = new Map<string, string>()
+
+	let collect = (candidates: Array<common.Conformance>): void => {
+		for (let conformance of candidates) {
+			if (conformance.source.kind !== "namespace") {
+				continue
+			}
+
+			if (!protocolsByNamespace.has(conformance.source.name)) {
+				protocolsByNamespace.set(
+					conformance.source.name,
+					conformance.protocolName,
+				)
+			}
+
+			collect(conformance.source.conditions)
+		}
+	}
+
+	collect(conformances)
+
+	for (let [namespaceName, protocolName] of protocolsByNamespace) {
+		checkNamespaceIsDeclared(
+			namespaceName,
+			position,
+			describeUse(protocolName),
+		)
+	}
+}
+
 function validateMethodInvocation(
 	node: common.typed.MethodInvocationNode,
 ): common.typed.MethodInvocationNode {
@@ -556,6 +604,12 @@ function validateMethodInvocation(
 			node.member.position,
 			"this Method comes from it",
 		)
+		checkWitnessNamespacesAreDeclared(
+			node.conformances,
+			node.member.position,
+			(protocolName) =>
+				`this call's ${protocolName} conformance comes from it`,
+		)
 	} else {
 		for (let dispatchCase of node.dispatch) {
 			checkWitnessScope(
@@ -567,6 +621,12 @@ function validateMethodInvocation(
 				dispatchCase.namespaceName,
 				node.member.position,
 				`the branch for ${describeType(dispatchCase.memberType)} takes this Method from it`,
+			)
+			checkWitnessNamespacesAreDeclared(
+				dispatchCase.conformances,
+				node.member.position,
+				(protocolName) =>
+					`the branch for ${describeType(dispatchCase.memberType)} takes its ${protocolName} conformance from it`,
 			)
 		}
 	}
@@ -685,6 +745,12 @@ function validateFunctionInvocation(
 
 	checkConformanceArity(node, functionType, describeCallee)
 	checkWitnessScope(node.conformances, describeCallee)
+	checkWitnessNamespacesAreDeclared(
+		node.conformances,
+		node.name.position,
+		(protocolName) =>
+			`this call's ${protocolName} conformance comes from it`,
+	)
 
 	if (
 		functionType.type !== "Function" &&

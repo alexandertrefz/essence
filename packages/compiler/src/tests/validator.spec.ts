@@ -14,6 +14,27 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return validate(program)
 }
 
+// NOTE: The text a Label underlines. A Diagnostic that names a Namespace the
+// source never spells at the place it is reported — a conformance witness — is
+// only readable if its Labels land on the right two spans, and reading them
+// back out of the source is the only way to say so without counting columns by
+// hand. Single line spans only; every Label asked this points at one name.
+function underlinedBy(
+	source: string,
+	label: common.DiagnosticLabel | undefined,
+): string {
+	if (label === undefined) {
+		throw new Error("Diagnostic has no such Label.")
+	}
+
+	return source
+		.split("\n")
+		[label.position.start.line - 1].slice(
+			label.position.start.column - 1,
+			label.position.end.column - 1,
+		)
+}
+
 describe("Validator", () => {
 	describe("Diagnostics", () => {
 		it("should report no Diagnostics for a valid Program", () => {
@@ -1385,6 +1406,218 @@ describe("Validator", () => {
 					"Namespace 'Strings' is used before it is declared",
 				],
 			)
+		})
+
+		// NOTE: A conformance witness names a Namespace that the source does not
+		// spell anywhere — `things::sort()` emits `{ compareTo: Thing.compareTo }`
+		// — so these compiled green and threw a `TypeError` reading `compareTo` of
+		// `undefined` before the witness rail existed.
+		it("reports a call whose conformance witness comes from a Namespace declared below it", () => {
+			let source = `implementation {
+				constant things = [{ value = 3 }, { value = 1 }]
+
+				__print(things::sort()::length()::toString())
+
+				namespace Thing for { value: Integer } is Comparable {
+					compareTo(_ other: { value: Integer }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'Thing' is used before it is declared",
+			)
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this call's Comparable conformance comes from it",
+			)
+			expect(diagnostics[0].labels[1]?.message).toBe(
+				"declared here, below the use",
+			)
+			// NOTE: The Method the witness is passed to, and the Namespace the
+			// witness reads its Method off — the two spans are the whole of what
+			// the Diagnostic explains, since neither place spells the other.
+			expect(diagnostics[0].labels[0]?.kind).toBe("primary")
+			expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
+			expect(diagnostics[0].labels[0]?.position.start.line).toBe(4)
+			expect(underlinedBy(source, diagnostics[0].labels[0])).toBe("sort")
+			expect(diagnostics[0].labels[1]?.position.start.line).toBe(6)
+			expect(underlinedBy(source, diagnostics[0].labels[1])).toBe("Thing")
+		})
+
+		it("reports a bounded Function call whose witness comes from a Namespace declared below it", () => {
+			let source = `implementation {
+				function ordered <infer Item is Comparable>(_ items: List<Item>) -> List<Item> {
+					<- items::sort()
+				}
+
+				__print(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
+
+				namespace Thing for { value: Integer } is Comparable {
+					compareTo(_ other: { value: Integer }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this call's Comparable conformance comes from it",
+			)
+			// NOTE: The call that hands the witness over, not the `items::sort()`
+			// in the body that ends up using it — the body is only ever reached
+			// through a call, and the call is the place that can be moved.
+			expect(diagnostics[0].labels[0]?.position.start.line).toBe(6)
+			expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+				"ordered",
+			)
+			expect(diagnostics[0].labels[1]?.position.start.line).toBe(8)
+			expect(underlinedBy(source, diagnostics[0].labels[1])).toBe("Thing")
+		})
+
+		it("reports a conditional conformance's nested witness Namespaces", () => {
+			let source = `implementation {
+				constant boxes = [{ item = { value = 3 } }, { item = { value = 1 } }]
+
+				__print(boxes::sort()::length()::toString())
+
+				namespace Boxes<infer Item> for { item: Item }
+					is Comparable where Item is Comparable
+				{
+					compareTo(_ other: { item: Item }) -> Ordering {
+						<- @.item::compareTo(other.item)
+					}
+				}
+
+				namespace Thing for { value: Integer } is Comparable {
+					compareTo(_ other: { value: Integer }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				[
+					"Namespace 'Boxes' is used before it is declared",
+					"Namespace 'Thing' is used before it is declared",
+				],
+			)
+			// NOTE: One call, two Namespaces — the witness `boxes::sort()` is
+			// built from is composed of both — so the secondary Label is the only
+			// thing telling the two Diagnostics apart.
+			expect(
+				diagnostics.map((diagnostic) => [
+					underlinedBy(source, diagnostic.labels[0]),
+					diagnostic.labels[0]?.position.start.line,
+					underlinedBy(source, diagnostic.labels[1]),
+					diagnostic.labels[1]?.position.start.line,
+				]),
+			).toEqual([
+				["sort", 4, "Boxes", 6],
+				["sort", 4, "Thing", 14],
+			])
+		})
+
+		it("reports every dispatch branch whose witness comes from a Namespace declared below", () => {
+			let source = `implementation {
+				namespace Lefts for { left: Integer } {
+					ranked <infer Item is Comparable>(_ item: Item) -> String {
+						<- item::compareTo(item)::toString()
+					}
+				}
+
+				namespace Rights for { right: Integer } {
+					ranked <infer Item is Printable>(_ item: Item) -> String {
+						<- item::toString()
+					}
+				}
+
+				constant receiver: { left: Integer } | { right: Integer } = { left = 1 }
+
+				__print(receiver::ranked({ value = 3 }))
+
+				namespace Ordered for { value: Integer } is Comparable {
+					compareTo(_ other: { value: Integer }) -> Ordering {
+						<- @.value::compareTo(other.value)
+					}
+				}
+
+				namespace Shown for { value: Integer } is Printable {
+					toString() -> String { <- @.value::toString() }
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.message,
+					diagnostic.labels[0]?.message,
+				]),
+			).toEqual([
+				[
+					"Namespace 'Ordered' is used before it is declared",
+					"the branch for { left: Integer } takes its Comparable conformance from it",
+				],
+				[
+					"Namespace 'Shown' is used before it is declared",
+					"the branch for { right: Integer } takes its Printable conformance from it",
+				],
+			])
+			// NOTE: A branch is not written anywhere, so both Diagnostics point at
+			// the dispatched call itself; the branch each one is about is said in
+			// the Label's message, and the Namespace is pointed at.
+			expect(
+				diagnostics.map((diagnostic) => [
+					underlinedBy(source, diagnostic.labels[0]),
+					diagnostic.labels[0]?.position.start.line,
+					underlinedBy(source, diagnostic.labels[1]),
+					diagnostic.labels[1]?.position.start.line,
+				]),
+			).toEqual([
+				["ranked", 16, "Ordered", 18],
+				["ranked", 16, "Shown", 24],
+			])
+		})
+
+		it("accepts a call whose conformance witness comes from a Namespace declared above it", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Thing for { value: Integer } is Comparable {
+						compareTo(_ other: { value: Integer }) -> Ordering {
+							<- @.value::compareTo(other.value)
+						}
+					}
+
+					constant things = [{ value = 3 }, { value = 1 }]
+
+					__print(things::sort()::length()::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("accepts a Function body whose conformance witness comes from a Namespace declared below it", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function ordered (_ items: List<{ value: Integer }>) -> List<{ value: Integer }> {
+						<- items::sort()
+					}
+
+					namespace Thing for { value: Integer } is Comparable {
+						compareTo(_ other: { value: Integer }) -> Ordering {
+							<- @.value::compareTo(other.value)
+						}
+					}
+
+					__print(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
+				}`),
+			).toEqual([])
 		})
 
 		it("accepts a Function body that names a Namespace declared below it", () => {
