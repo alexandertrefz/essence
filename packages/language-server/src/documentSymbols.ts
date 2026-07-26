@@ -1,11 +1,30 @@
+import {
+	printCaseWithPayload,
+	printSignatureSummary,
+	printType,
+	signaturesOf,
+} from "@essence/compiler/printType"
 import type { common, parser } from "@essence/interfaces"
 
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 
 // NOTE: The outline is built from the Parser AST alone — it must work while
 // the Program has Type errors. Top level Statements become symbols;
 // Namespaces contribute their Properties and Methods as children, Record
 // Type Aliases their members.
+//
+// A named construct owns the bodies it carries, so a Function declared inside
+// a Function is a child of it. An unnamed block — an `if` or `else` body, a
+// Match arm, a Function literal passed as an Argument — is transparent
+// instead: there is no name to hang an entry on, so what it declares joins the
+// enclosing entry rather than nesting a level per block, which is what keeps a
+// Match of a dozen arms from burying the outline it sits in.
+//
+// `detail` is the one thing the Parser cannot answer. An enriched Program may
+// be handed in to fill it, matched to the Parser's entries by the Position of
+// their names. Without one every detail stays null and the outline is exactly
+// what it is without Types — which is the whole point of the Parser-only rule.
 
 export type DocumentSymbolKind =
 	| "constant"
@@ -24,6 +43,9 @@ export type DocumentSymbolKind =
 export type DocumentSymbolEntry = {
 	name: string
 	kind: DocumentSymbolKind
+	// NOTE: The text shown beside the name — a printed Type, a signature, or a
+	// Case with its payload. Null whenever no enriched Program was given.
+	detail: string | null
 	// NOTE: `range` spans the whole construct, `selectionRange` just the
 	// name — mirroring the LSP's DocumentSymbol.
 	range: common.Position
@@ -33,18 +55,93 @@ export type DocumentSymbolEntry = {
 
 export function findDocumentSymbols(
 	program: parser.Program,
+	enrichedProgram: common.typed.Program | null = null,
 ): Array<DocumentSymbolEntry> {
-	let symbols: Array<DocumentSymbolEntry> = []
+	let symbols = symbolsOfBody(program.implementation.nodes)
 
-	for (let node of program.implementation.nodes) {
-		let symbol = symbolForStatement(node)
-
-		if (symbol !== null) {
-			symbols.push(symbol)
-		}
+	if (enrichedProgram === null) {
+		return symbols
 	}
 
-	return symbols
+	return withDetails(symbols, detailsOf(enrichedProgram))
+}
+
+function symbolsOfBody(
+	nodes: Array<parser.ImplementationNode>,
+): Array<DocumentSymbolEntry> {
+	return nodes.flatMap(symbolsOfNode)
+}
+
+function symbolsOfNode(
+	node: parser.ImplementationNode,
+): Array<DocumentSymbolEntry> {
+	let symbol = symbolForStatement(node)
+
+	if (symbol !== null) {
+		return [symbol]
+	}
+
+	switch (node.nodeType) {
+		case "VariableAssignmentStatement":
+			return symbolsOfNode(node.value)
+		case "ReturnStatement":
+			return symbolsOfNode(node.expression)
+		case "IfStatement":
+			return [
+				...symbolsOfNode(node.condition),
+				...symbolsOfBody(node.body),
+			]
+		case "IfElseStatement":
+			return [
+				...symbolsOfNode(node.condition),
+				...symbolsOfBody(node.trueBody),
+				...symbolsOfBody(node.falseBody),
+			]
+		case "Match":
+			return [
+				...symbolsOfNode(node.value),
+				...node.handlers.flatMap((handler) => [
+					...(handler.guard === null
+						? []
+						: symbolsOfNode(handler.guard)),
+					...symbolsOfBody(handler.body),
+				]),
+			]
+		case "FunctionValue":
+			return symbolsOfBody(node.value.body)
+		case "FunctionInvocation":
+			return [
+				...symbolsOfNode(node.name),
+				...symbolsOfArguments(node.arguments),
+			]
+		case "MethodInvocation":
+			return [
+				...symbolsOfNode(node.base),
+				...symbolsOfArguments(node.arguments),
+			]
+		case "NativeFunctionInvocation":
+			return symbolsOfArguments(node.arguments)
+		case "Lookup":
+			return symbolsOfNode(node.base)
+		case "Combination":
+			return [...symbolsOfNode(node.lhs), ...symbolsOfNode(node.rhs)]
+		case "RecordValue":
+			return Object.values(node.members).flatMap((member) =>
+				symbolsOfNode(member.value),
+			)
+		case "ListValue":
+			return node.values.flatMap(symbolsOfNode)
+		case "CaseValue":
+			return node.value === null ? [] : symbolsOfNode(node.value)
+		default:
+			return []
+	}
+}
+
+function symbolsOfArguments(
+	nodeArguments: Array<parser.ArgumentNode>,
+): Array<DocumentSymbolEntry> {
+	return nodeArguments.flatMap((argument) => symbolsOfNode(argument.value))
 }
 
 function symbolForStatement(
@@ -55,30 +152,34 @@ function symbolForStatement(
 			return {
 				name: node.name.content,
 				kind: "constant",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				children: [],
+				children: symbolsOfNode(node.value),
 			}
 		case "VariableDeclarationStatement":
 			return {
 				name: node.name.content,
 				kind: "variable",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				children: [],
+				children: symbolsOfNode(node.value),
 			}
 		case "FunctionStatement":
 			return {
 				name: node.name.content,
 				kind: "function",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				children: [],
+				children: symbolsOfBody(node.value.body),
 			}
 		case "TypeAliasStatement":
 			return {
 				name: node.name.content,
 				kind: "typeAlias",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
 				children: recordTypeMembers(node.type),
@@ -87,11 +188,13 @@ function symbolForStatement(
 			return {
 				name: node.name.content,
 				kind: "choice",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
 				children: node.cases.map((choiceCase) => ({
 					name: `#${choiceCase.name.content}`,
 					kind: "case" as const,
+					detail: null,
 					range:
 						choiceCase.type === null
 							? choiceCase.name.position
@@ -113,6 +216,7 @@ function symbolForStatement(
 			return {
 				name: node.name.content,
 				kind: "namespace",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
 				children: namespaceMembers(node),
@@ -121,6 +225,7 @@ function symbolForStatement(
 			return {
 				name: node.name.content,
 				kind: "protocol",
+				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
 				children: protocolMembers(node),
@@ -155,6 +260,7 @@ function protocolMembers(
 		members.push({
 			name: member.name.content,
 			kind: isStatic ? "staticMethod" : "method",
+			detail: null,
 			range,
 			selectionRange: member.name.position,
 			children: [],
@@ -175,6 +281,7 @@ function recordTypeMembers(
 		return {
 			name: member.name.content,
 			kind: "member" as const,
+			detail: null,
 			range: unionOfPositions(member.name.position, member.type.position),
 			selectionRange: member.name.position,
 			children: [],
@@ -191,6 +298,7 @@ function namespaceMembers(
 		members.push({
 			name: property.name.content,
 			kind: "property",
+			detail: null,
 			range: unionOfPositions(
 				property.name.position,
 				// NOTE: A native static Property has no value to span to — its
@@ -198,7 +306,8 @@ function namespaceMembers(
 				property.value?.position ?? property.name.position,
 			),
 			selectionRange: property.name.position,
-			children: [],
+			children:
+				property.value === null ? [] : symbolsOfNode(property.value),
 		})
 	}
 
@@ -223,17 +332,24 @@ function namespaceMembers(
 		// NOTE: The Method wrappers carry no Position of their own — the
 		// range is the span from the name to the end of the last overload.
 		let range = member.name.position
+		let children: Array<DocumentSymbolEntry> = []
 
 		for (let method of methods) {
 			range = unionOfPositions(range, method.position)
+
+			// NOTE: A body-less native signature declares nothing to outline.
+			if (method.nodeType === "FunctionValue") {
+				children.push(...symbolsOfBody(method.value.body))
+			}
 		}
 
 		members.push({
 			name: member.name.content,
 			kind: isStatic ? "staticMethod" : "method",
+			detail: null,
 			range,
 			selectionRange: member.name.position,
-			children: [],
+			children,
 		})
 	}
 
@@ -248,4 +364,216 @@ function unionOfPositions(
 		start: isAtOrBefore(a.start, b.start) ? a.start : b.start,
 		end: isAtOrBefore(a.end, b.end) ? b.end : a.end,
 	}
+}
+
+/***********/
+/* Details */
+/***********/
+
+// NOTE: Keyed by the start of the name, which is the one Position the Parser
+// and the Enricher are guaranteed to agree on for every entry the outline
+// shows — a Namespace Method's wrapper has no Position at all, and a Case's
+// span depends on whether it declared a payload.
+type Details = Map<string, string>
+
+function withDetails(
+	symbols: Array<DocumentSymbolEntry>,
+	details: Details,
+): Array<DocumentSymbolEntry> {
+	return symbols.map((symbol) => ({
+		...symbol,
+		detail: details.get(cursorKey(symbol.selectionRange.start)) ?? null,
+		children: withDetails(symbol.children, details),
+	}))
+}
+
+function cursorKey(cursor: common.Cursor): string {
+	return `${cursor.line}:${cursor.column}`
+}
+
+function detailsOf(program: common.typed.Program): Details {
+	let details: Details = new Map()
+
+	collectDetails(program.implementation.nodes, details)
+
+	return details
+}
+
+function collectDetails(
+	nodes: Array<common.typed.ImplementationNode>,
+	details: Details,
+) {
+	for (let node of nodes) {
+		collectDetail(node, details)
+	}
+}
+
+function collectDetail(
+	node: common.typed.ImplementationNode,
+	details: Details,
+) {
+	switch (node.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+			record(details, node.name.position.start, typeDetail(node.type))
+			collectDetail(node.value, details)
+			return
+		case "VariableAssignmentStatement":
+			collectDetail(node.value, details)
+			return
+		case "FunctionStatement":
+			record(
+				details,
+				node.name.position.start,
+				signatureDetail(node.type),
+			)
+			collectDetails(node.value.body, details)
+			return
+		case "NamespaceDefinitionStatement":
+			for (let property of Object.values(node.properties)) {
+				record(
+					details,
+					property.name.position.start,
+					typeDetail(property.type),
+				)
+				collectDetail(property.value, details)
+			}
+
+			for (let [name, member] of Object.entries(node.methods)) {
+				let methodType = node.type.methods[name]
+
+				if (methodType !== undefined) {
+					record(
+						details,
+						member.name.position.start,
+						signatureDetail(methodType),
+					)
+				}
+
+				let methods =
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+						? member.methods
+						: [member.method]
+
+				for (let method of methods) {
+					collectDetails(method.value.body, details)
+				}
+			}
+
+			return
+		case "ChoiceDeclarationStatement":
+			for (let choiceCase of node.cases) {
+				record(
+					details,
+					choiceCase.name.position.start,
+					printCaseWithPayload(choiceCase.type),
+				)
+			}
+
+			return
+		case "IfStatement":
+			collectDetail(node.condition, details)
+			collectDetails(node.body, details)
+			return
+		case "IfElseStatement":
+			collectDetail(node.condition, details)
+			collectDetails(node.trueBody, details)
+			collectDetails(node.falseBody, details)
+			return
+		case "ReturnStatement":
+			collectDetail(node.expression, details)
+			return
+		case "Match":
+			collectDetail(node.value, details)
+
+			for (let handler of node.handlers) {
+				// NOTE: The Parser walk above outlines whatever a Guard or a
+				// Matcher literal declares, so this one has to reach the same
+				// Nodes — otherwise those entries are the only ones in the
+				// outline with no Type beside them.
+				for (let expression of typedHandlerExpressions(handler)) {
+					collectDetail(expression, details)
+				}
+
+				collectDetails(handler.body, details)
+			}
+
+			return
+		case "FunctionValue":
+			collectDetails(node.value.body, details)
+			return
+		case "FunctionInvocation":
+			collectDetail(node.name, details)
+			collectArgumentDetails(node.arguments, details)
+			return
+		case "MethodInvocation":
+			collectDetail(node.base, details)
+			collectArgumentDetails(node.arguments, details)
+			return
+		case "NativeFunctionInvocation":
+			collectArgumentDetails(node.arguments, details)
+			return
+		case "Lookup":
+			collectDetail(node.base, details)
+			return
+		case "Combination":
+			collectDetail(node.lhs, details)
+			collectDetail(node.rhs, details)
+			return
+		case "RecordValue":
+			for (let member of Object.values(node.members)) {
+				collectDetail(member, details)
+			}
+
+			return
+		case "ListValue":
+			for (let value of node.values) {
+				collectDetail(value, details)
+			}
+
+			return
+		case "CaseValue":
+			if (node.value !== null) {
+				collectDetail(node.value, details)
+			}
+
+			return
+		default:
+			return
+	}
+}
+
+function collectArgumentDetails(
+	nodeArguments: Array<common.typed.ArgumentNode>,
+	details: Details,
+) {
+	for (let argument of nodeArguments) {
+		collectDetail(argument.value, details)
+	}
+}
+
+function record(
+	details: Details,
+	cursor: common.Cursor,
+	detail: string | null,
+) {
+	if (detail !== null) {
+		details.set(cursorKey(cursor), detail)
+	}
+}
+
+// NOTE: A Type that failed to infer is left without a detail rather than
+// labelled `Error` — the Diagnostic already says so, in the place that can
+// explain it.
+function typeDetail(type: common.Type): string | null {
+	return type.type === "Error" ? null : printType(type)
+}
+
+// NOTE: Nameless, since the name is right beside it in the outline. Overloads
+// past the first are counted rather than spelled out — a detail is one line.
+function signatureDetail(type: common.Type): string | null {
+	let signatures = signaturesOf(type)
+
+	return signatures === null ? null : printSignatureSummary(signatures)
 }
