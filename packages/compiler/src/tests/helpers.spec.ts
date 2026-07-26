@@ -24,6 +24,7 @@ import {
 	buildUnion,
 	computeConformanceMethodMap,
 	createInferenceContext,
+	describeType,
 	first,
 	flatten,
 	matchArguments,
@@ -151,6 +152,96 @@ describe("Helpers", () => {
 			let output = `${name}__overload$${index + 1}`
 
 			expect(input).toEqual(output)
+		})
+	})
+
+	// NOTE: The three function-ish tags are one kind of value — only the
+	// signature tells two of them apart — so all three describe as the
+	// signature a Type Annotation would spell, rather than as the bare word
+	// "Function" that named both sides of every mismatch alike.
+	describe("describeType", () => {
+		it("should print a Function under the signature an Annotation spells", () => {
+			let doubler: FunctionType = {
+				type: "Function",
+				parameterTypes: [{ name: null, type: { type: "Integer" } }],
+				generics: [],
+				returnType: { type: "Integer" },
+			}
+
+			expect(describeType(doubler)).toBe("(_: Integer) -> Integer")
+		})
+
+		it("should print a labelled Parameter under its label", () => {
+			let adder: FunctionType = {
+				type: "Function",
+				parameterTypes: [{ name: "with", type: { type: "Integer" } }],
+				generics: [],
+				returnType: { type: "Integer" },
+			}
+
+			expect(describeType(adder)).toBe("(with: Integer) -> Integer")
+		})
+
+		it("should print a Function that takes nothing with an empty list", () => {
+			let now: FunctionType = {
+				type: "Function",
+				parameterTypes: [],
+				generics: [],
+				returnType: { type: "String" },
+			}
+
+			expect(describeType(now)).toBe("() -> String")
+		})
+
+		// NOTE: A Method read as a value carries its receiver as the first
+		// Parameter of its Type, and it is printed there — that receiver is
+		// exactly what makes it not fit a Function of one Argument fewer.
+		it("should print a Method's receiver as its first Parameter", () => {
+			let double: MethodType = {
+				type: "SimpleMethod",
+				parameterTypes: [{ name: null, type: { type: "Integer" } }],
+				generics: [],
+				returnType: { type: "Integer" },
+			}
+
+			expect(describeType(double)).toBe("(_: Integer) -> Integer")
+		})
+
+		it("should print a static Method's signature the same way", () => {
+			let readsBase: StaticMethodType = {
+				type: "StaticMethod",
+				parameterTypes: [{ name: null, type: { type: "String" } }],
+				generics: [],
+				returnType: { type: "Integer" },
+			}
+
+			expect(describeType(readsBase)).toBe("(_: String) -> Integer")
+		})
+
+		// NOTE: An Overload set has no ONE signature to print, so it keeps the
+		// bare word.
+		it("should leave an Overload set the bare word", () => {
+			let overloaded: OverloadedMethodType = {
+				type: "OverloadedMethod",
+				overloads: [
+					{
+						parameterTypes: [
+							{ name: null, type: { type: "Integer" } },
+						],
+						generics: [],
+						returnType: { type: "Integer" },
+					},
+					{
+						parameterTypes: [
+							{ name: null, type: { type: "String" } },
+						],
+						generics: [],
+						returnType: { type: "String" },
+					},
+				],
+			}
+
+			expect(describeType(overloaded)).toBe("Function")
 		})
 	})
 

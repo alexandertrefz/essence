@@ -3069,10 +3069,10 @@ describe("Enricher", () => {
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("no-matching-overload")
 				expect(diagnostics[0].notes).toEqual([
-					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'while' is Function, Parameter 'step' is Function.",
-					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is Function, Parameter 'step' is Function.",
-					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is Function.",
-					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is Function.",
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'while' is (_: State) -> Boolean, Parameter 'step' is (_: State) -> State.",
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is (_: State) -> Boolean, Parameter 'step' is (_: State) -> State.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is (_: Integer, _: State) -> State.",
+					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is (_: State) -> Step<State, Result>.",
 				])
 			})
 
