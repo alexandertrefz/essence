@@ -42,9 +42,8 @@ export function add__overload$2(
 	other: RationalType,
 ): RationalType {
 	return createRational(
-		other.rational.numerator +
-			originalNumber.value * other.rational.denominator,
-		other.rational.denominator,
+		other.numerator + originalNumber.value * other.denominator,
+		other.denominator,
 	)
 }
 
@@ -64,8 +63,8 @@ export function multiply__overload$2(
 	other: RationalType,
 ): RationalType {
 	return createRational(
-		other.rational.numerator * originalNumber.value,
-		other.rational.denominator,
+		other.numerator * originalNumber.value,
+		other.denominator,
 	)
 }
 
@@ -79,8 +78,8 @@ export function isLessThan__overload$2(
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = rational.rational.numerator
-	const denominator2 = rational.rational.denominator
+	const numerator2 = rational.numerator
+	const denominator2 = rational.denominator
 
 	const rational1 = numerator1 * denominator2
 	const rational2 = numerator2 * denominator1
@@ -98,8 +97,8 @@ export function isLessThanOrEqualTo__overload$2(
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = rational.rational.numerator
-	const denominator2 = rational.rational.denominator
+	const numerator2 = rational.numerator
+	const denominator2 = rational.denominator
 
 	const rational1 = numerator1 * denominator2
 	const rational2 = numerator2 * denominator1
@@ -117,8 +116,8 @@ export function isGreaterThan__overload$2(
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = rational.rational.numerator
-	const denominator2 = rational.rational.denominator
+	const numerator2 = rational.numerator
+	const denominator2 = rational.denominator
 
 	const rational1 = numerator1 * denominator2
 	const rational2 = numerator2 * denominator1
@@ -136,8 +135,8 @@ export function isGreaterThanOrEqualTo__overload$2(
 ): BooleanType {
 	const numerator1 = integer.value
 	const denominator1 = 1n
-	const numerator2 = rational.rational.numerator
-	const denominator2 = rational.rational.denominator
+	const numerator2 = rational.numerator
+	const denominator2 = rational.denominator
 
 	const rational1 = numerator1 * denominator2
 	const rational2 = numerator2 * denominator1
@@ -275,7 +274,7 @@ export function squareRoot(
 
 	if (root[typeKeySymbol] === "Rational") {
 		// NOTE: A whole number's exact root is whole — surface it as one.
-		return createInteger(root.rational.numerator)
+		return createInteger(root.numerator)
 	}
 
 	return root
@@ -286,9 +285,9 @@ export function squareRoot(
 // NOTE: Same-kind ordering stays native deliberately. Routing it through the
 // covering `Number.compareTo` reads better, but that Method decides every
 // cross-kind cell, so comparing two Integers would drag the Algebraic,
-// Transcendental and Rational machinery — and `bigint-fraction` — into any
-// Program that compares two Integers, which is nearly all of them. `is` and the
-// inequalities are still written in Essence on top of this.
+// Transcendental and Rational machinery into any Program that compares two
+// Integers, which is nearly all of them. `is` and the inequalities are still
+// written in Essence on top of this.
 export function compareTo(
 	originalInteger: IntegerType,
 	otherInteger: IntegerType,

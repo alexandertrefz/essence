@@ -1,6 +1,6 @@
 import type { common } from "@essence/interfaces"
-import type { Fraction } from "bigint-fraction"
 
+import type { BigRational } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -16,8 +16,8 @@ export function getInt32(number: IntegerType): number {
 }
 
 export function isFirstRationalBigger(
-	firstRational: Fraction,
-	secondRational: Fraction,
+	firstRational: BigRational,
+	secondRational: BigRational,
 ): boolean {
 	if (firstRational.denominator === secondRational.denominator) {
 		return firstRational.numerator > secondRational.numerator
@@ -43,15 +43,11 @@ function isRationalKind(value: AnyType): value is IntegerType | RationalType {
 }
 
 function numeratorOf(number: IntegerType | RationalType): bigint {
-	return number[typeKeySymbol] === "Integer"
-		? number.value
-		: number.rational.numerator
+	return number[typeKeySymbol] === "Integer" ? number.value : number.numerator
 }
 
 function denominatorOf(number: IntegerType | RationalType): bigint {
-	return number[typeKeySymbol] === "Integer"
-		? 1n
-		: number.rational.denominator
+	return number[typeKeySymbol] === "Integer" ? 1n : number.denominator
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {
@@ -110,7 +106,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// the Rational `4/4` beside anyone else's Integer `1`.
 		//
 		// NOTE: Cross-multiplication, which is what `Number.compareTo` does for
-		// this pairing — it answers for unreduced Fractions and for either sign,
+		// this pairing — it answers for unreduced parts and for either sign,
 		// and it is not the covering `compareTo` itself because EVERY emitted
 		// Program imports this module: reading the covering order here dragged
 		// π's interval arithmetic and the algebraic sign routines into Programs

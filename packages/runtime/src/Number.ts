@@ -1,7 +1,6 @@
-import { Fraction } from "bigint-fraction"
-
 import type { AlgebraicType } from "./Algebraic"
 import { compareTo as compareAlgebraicTo } from "./Algebraic"
+import type { BigRational } from "./bigRational"
 import { reduced } from "./bigRational"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
@@ -64,15 +63,12 @@ export function lowestNumber__overload$6(
 	let lowestRational = rationals.value[0]
 
 	for (let rational of rationals.value.slice(1)) {
-		if (isFirstRationalBigger(lowestRational.rational, rational.rational)) {
+		if (isFirstRationalBigger(lowestRational, rational)) {
 			lowestRational = rational
 		}
 	}
 
-	return createRational(
-		lowestRational.rational.numerator,
-		lowestRational.rational.denominator,
-	)
+	return createRational(lowestRational.numerator, lowestRational.denominator)
 }
 
 export function lowestNumber__overload$7(
@@ -92,29 +88,24 @@ export function lowestNumber__overload$7(
 				}
 			} else {
 				if (
-					isFirstRationalBigger(
-						lowestNumber.rational,
-						new Fraction(number.value, 1),
-					)
+					isFirstRationalBigger(lowestNumber, {
+						numerator: number.value,
+						denominator: 1n,
+					})
 				) {
 					lowestNumber = number
 				}
 			}
 		} else {
 			if (lowestNumber[typeKeySymbol] === "Rational") {
-				if (
-					isFirstRationalBigger(
-						lowestNumber.rational,
-						number.rational,
-					)
-				) {
+				if (isFirstRationalBigger(lowestNumber, number)) {
 					lowestNumber = number
 				}
 			} else {
 				if (
 					isFirstRationalBigger(
-						new Fraction(lowestNumber.value, 1),
-						number.rational,
+						{ numerator: lowestNumber.value, denominator: 1n },
+						number,
 					)
 				) {
 					lowestNumber = number
@@ -124,10 +115,7 @@ export function lowestNumber__overload$7(
 	}
 
 	if (lowestNumber[typeKeySymbol] === "Rational") {
-		return createRational(
-			lowestNumber.rational.numerator,
-			lowestNumber.rational.denominator,
-		)
+		return createRational(lowestNumber.numerator, lowestNumber.denominator)
 	} else {
 		return createInteger(lowestNumber.value)
 	}
@@ -165,16 +153,14 @@ export function greatestNumber__overload$6(
 	let greatestRational = rationals.value[0]
 
 	for (let rational of rationals.value.slice(1)) {
-		if (
-			isFirstRationalBigger(rational.rational, greatestRational.rational)
-		) {
+		if (isFirstRationalBigger(rational, greatestRational)) {
 			greatestRational = rational
 		}
 	}
 
 	return createRational(
-		greatestRational.rational.numerator,
-		greatestRational.rational.denominator,
+		greatestRational.numerator,
+		greatestRational.denominator,
 	)
 }
 
@@ -196,8 +182,8 @@ export function greatestNumber__overload$7(
 			} else {
 				if (
 					isFirstRationalBigger(
-						new Fraction(number.value, 1),
-						greatestNumber.rational,
+						{ numerator: number.value, denominator: 1n },
+						greatestNumber,
 					)
 				) {
 					greatestNumber = number
@@ -205,20 +191,15 @@ export function greatestNumber__overload$7(
 			}
 		} else {
 			if (greatestNumber[typeKeySymbol] === "Rational") {
-				if (
-					isFirstRationalBigger(
-						number.rational,
-						greatestNumber.rational,
-					)
-				) {
+				if (isFirstRationalBigger(number, greatestNumber)) {
 					greatestNumber = number
 				}
 			} else {
 				if (
-					isFirstRationalBigger(
-						number.rational,
-						new Fraction(greatestNumber.value, 1),
-					)
+					isFirstRationalBigger(number, {
+						numerator: greatestNumber.value,
+						denominator: 1n,
+					})
 				) {
 					greatestNumber = number
 				}
@@ -228,8 +209,8 @@ export function greatestNumber__overload$7(
 
 	if (greatestNumber[typeKeySymbol] === "Rational") {
 		return createRational(
-			greatestNumber.rational.numerator,
-			greatestNumber.rational.denominator,
+			greatestNumber.numerator,
+			greatestNumber.denominator,
 		)
 	} else {
 		return createInteger(greatestNumber.value)
@@ -243,9 +224,9 @@ export function greatestNumber__overload$7(
 // NOTE: The exact running total as a bigint rational — the one shape every
 // mix of Integers and Rationals folds into without loss.
 function addToRunningTotal(
-	total: { numerator: bigint; denominator: bigint },
+	total: BigRational,
 	number: IntegerType | RationalType,
-): { numerator: bigint; denominator: bigint } {
+): BigRational {
 	if (number[typeKeySymbol] === "Integer") {
 		return {
 			numerator: total.numerator + number.value * total.denominator,
@@ -255,16 +236,16 @@ function addToRunningTotal(
 
 	return {
 		numerator:
-			total.numerator * number.rational.denominator +
-			number.rational.numerator * total.denominator,
-		denominator: total.denominator * number.rational.denominator,
+			total.numerator * number.denominator +
+			number.numerator * total.denominator,
+		denominator: total.denominator * number.denominator,
 	}
 }
 
 function multiplyIntoRunningProduct(
-	product: { numerator: bigint; denominator: bigint },
+	product: BigRational,
 	number: IntegerType | RationalType,
-): { numerator: bigint; denominator: bigint } {
+): BigRational {
 	if (number[typeKeySymbol] === "Integer") {
 		return {
 			numerator: product.numerator * number.value,
@@ -273,8 +254,8 @@ function multiplyIntoRunningProduct(
 	}
 
 	return {
-		numerator: product.numerator * number.rational.numerator,
-		denominator: product.denominator * number.rational.denominator,
+		numerator: product.numerator * number.numerator,
+		denominator: product.denominator * number.denominator,
 	}
 }
 
@@ -407,7 +388,7 @@ function numeratorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
 		return number.value
 	} else {
-		return number.rational.numerator
+		return number.numerator
 	}
 }
 
@@ -415,7 +396,7 @@ function denominatorOf(number: RationalKind): bigint {
 	if (number[typeKeySymbol] === "Integer") {
 		return 1n
 	} else {
-		return number.rational.denominator
+		return number.denominator
 	}
 }
 

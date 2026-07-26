@@ -22,7 +22,6 @@ import {
 	isValueOfType,
 	noCaseMatched,
 } from "@essence/runtime/type"
-import { Fraction } from "bigint-fraction"
 
 const booleanTrue = () => boolean.createBoolean(true)
 const booleanFalse = () => boolean.createBoolean(false)
@@ -61,15 +60,15 @@ describe("Rewriter", () => {
 				it("returns true of the first rational is bigger", () => {
 					expect(
 						isFirstRationalBigger(
-							new Fraction(1, 2),
-							new Fraction(1, 3),
+							{ numerator: 1n, denominator: 2n },
+							{ numerator: 1n, denominator: 3n },
 						),
 					).toBeTrue()
 
 					expect(
 						isFirstRationalBigger(
-							new Fraction(2, 8),
-							new Fraction(3, 24),
+							{ numerator: 2n, denominator: 8n },
+							{ numerator: 3n, denominator: 24n },
 						),
 					).toBeTrue()
 				})
@@ -77,15 +76,15 @@ describe("Rewriter", () => {
 				it("returns false of the second rational is bigger", () => {
 					expect(
 						isFirstRationalBigger(
-							new Fraction(1, 2),
-							new Fraction(2, 3),
+							{ numerator: 1n, denominator: 2n },
+							{ numerator: 2n, denominator: 3n },
 						),
 					).toBeFalse()
 
 					expect(
 						isFirstRationalBigger(
-							new Fraction(2, 8),
-							new Fraction(7, 24),
+							{ numerator: 2n, denominator: 8n },
+							{ numerator: 7n, denominator: 24n },
 						),
 					).toBeFalse()
 				})

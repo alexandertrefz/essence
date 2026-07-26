@@ -1,5 +1,3 @@
-import { Fraction } from "bigint-fraction"
-
 import type { AlgebraicType } from "./Algebraic"
 import {
 	add as algebraicAdd,
@@ -7,7 +5,8 @@ import {
 	multiply as algebraicMultiplyWith,
 	squareRootOfRational,
 } from "./Algebraic"
-import { bigRationalOf } from "./bigRational"
+import type { BigRational } from "./bigRational"
+import { bigRationalOf, reduced } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -25,15 +24,19 @@ import {
 } from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
-export type RationalType = { [typeKeySymbol]: "Rational"; rational: Fraction }
+// NOTE: The parts are held unreduced — `4/2` prints as `4/2` — and are treated
+// as immutable everywhere; reduction happens on read, in `reducedParts`.
+export type RationalType = {
+	[typeKeySymbol]: "Rational"
+	numerator: bigint
+	denominator: bigint
+}
 
 // NOTE: The single gateway every Rational is built through, and the reason the
 // ordering primitives may cross-multiply the raw parts: the sign lives on the
 // numerator, never on the denominator. Zero is canonicalised here as well —
-// `bigint-fraction`'s GCD answers 0 whenever an operand is 0 and its `reduce`
-// bails on a gcd of 0, so a zero reached by cancellation (`1/2 − 1/2` gives
-// `0/4`) can never reduce itself afterwards. Zero has one lowest-terms form,
-// and it is `0/1`.
+// a zero reached by cancellation (`1/2 − 1/2` gives `0/4`) has one
+// lowest-terms form, and it is `0/1`.
 export function createRational(
 	numerator: bigint,
 	denominator: bigint,
@@ -49,7 +52,8 @@ export function createRational(
 
 	return {
 		[typeKeySymbol]: "Rational",
-		rational: new Fraction(numerator, denominator),
+		numerator,
+		denominator,
 	}
 }
 
@@ -70,10 +74,10 @@ export function add__overload$1(
 	firstRational: RationalType,
 	secondRational: RationalType,
 ): RationalType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
+	const numerator1 = firstRational.numerator
+	const denominator1 = firstRational.denominator
+	const numerator2 = secondRational.numerator
+	const denominator2 = secondRational.denominator
 
 	return createRational(
 		numerator1 * denominator2 + numerator2 * denominator1,
@@ -81,18 +85,16 @@ export function add__overload$1(
 	)
 }
 
-// NOTE: The Integer-operand overloads do the arithmetic on the parts and hand
-// the result to `createRational`, rather than mutating a clone of the
-// `Fraction`. The class's own operations promise neither of the invariants —
-// `divide(-3n)` multiplies the DENOMINATOR by −3 and leaves the sign there,
-// which every ordering primitive then reads backwards — so nothing may reach a
-// caller without passing through the gateway.
+// NOTE: The Integer-operand overloads do the arithmetic on the raw parts and
+// hand the result to `createRational` — nothing may reach a caller without
+// passing through the gateway, or an ordering primitive could read a sign off
+// a denominator.
 export function add__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): RationalType {
-	const numerator = rational.rational.numerator
-	const denominator = rational.rational.denominator
+	const numerator = rational.numerator
+	const denominator = rational.denominator
 
 	return createRational(numerator + integer.value * denominator, denominator)
 }
@@ -105,10 +107,10 @@ export function divide__overload$1(
 	firstRational: RationalType,
 	secondRational: RationalType,
 ): RationalType | NothingType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
+	const numerator1 = firstRational.numerator
+	const denominator1 = firstRational.denominator
+	const numerator2 = secondRational.numerator
+	const denominator2 = secondRational.denominator
 
 	if (numerator2 === 0n) {
 		return createNothing()
@@ -126,8 +128,8 @@ export function divide__overload$2(
 	}
 
 	return createRational(
-		rational.rational.numerator,
-		rational.rational.denominator * integer.value,
+		rational.numerator,
+		rational.denominator * integer.value,
 	)
 }
 
@@ -139,10 +141,10 @@ export function multiply__overload$1(
 	firstRational: RationalType,
 	secondRational: RationalType,
 ): RationalType {
-	const numerator1 = firstRational.rational.numerator
-	const denominator1 = firstRational.rational.denominator
-	const numerator2 = secondRational.rational.numerator
-	const denominator2 = secondRational.rational.denominator
+	const numerator1 = firstRational.numerator
+	const denominator1 = firstRational.denominator
+	const numerator2 = secondRational.numerator
+	const denominator2 = secondRational.denominator
 
 	return createRational(numerator1 * numerator2, denominator1 * denominator2)
 }
@@ -152,8 +154,8 @@ export function multiply__overload$2(
 	integer: IntegerType,
 ): RationalType {
 	return createRational(
-		rational.rational.numerator * integer.value,
-		rational.rational.denominator,
+		rational.numerator * integer.value,
+		rational.denominator,
 	)
 }
 
@@ -165,8 +167,8 @@ export function isLessThan__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): BooleanType {
-	const numerator1 = rational.rational.numerator
-	const denominator1 = rational.rational.denominator
+	const numerator1 = rational.numerator
+	const denominator1 = rational.denominator
 	const numerator2 = integer.value
 	const denominator2 = 1n
 
@@ -184,8 +186,8 @@ export function isLessThanOrEqualTo__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): BooleanType {
-	const numerator1 = rational.rational.numerator
-	const denominator1 = rational.rational.denominator
+	const numerator1 = rational.numerator
+	const denominator1 = rational.denominator
 	const numerator2 = integer.value
 	const denominator2 = 1n
 
@@ -203,8 +205,8 @@ export function isGreaterThan__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): BooleanType {
-	const numerator1 = rational.rational.numerator
-	const denominator1 = rational.rational.denominator
+	const numerator1 = rational.numerator
+	const denominator1 = rational.denominator
 	const numerator2 = integer.value
 	const denominator2 = 1n
 
@@ -222,8 +224,8 @@ export function isGreaterThanOrEqualTo__overload$2(
 	rational: RationalType,
 	integer: IntegerType,
 ): BooleanType {
-	const numerator1 = rational.rational.numerator
-	const denominator1 = rational.rational.denominator
+	const numerator1 = rational.numerator
+	const denominator1 = rational.denominator
 	const numerator2 = integer.value
 	const denominator2 = 1n
 
@@ -235,34 +237,10 @@ export function isGreaterThanOrEqualTo__overload$2(
 
 // #endregion
 
-// NOTE: The reduced form with the sign on the numerator — the shape the
-// accessors and the rounding family read. Operations on the underlying
-// Fraction class do not promise either normalization.
-function reducedParts(rational: RationalType): {
-	numerator: bigint
-	denominator: bigint
-} {
-	let clonedRational = rational.rational.clone()
-	clonedRational.reduce()
-
-	let numerator = clonedRational.numerator
-	let denominator = clonedRational.denominator
-
-	if (denominator < 0n) {
-		numerator = -numerator
-		denominator = -denominator
-	}
-
-	// NOTE: The one case `reduce()` can not answer — its GCD is 0 whenever an
-	// operand is 0, and it bails on a gcd of 0, so a zero keeps whatever
-	// denominator it was built with. `createRational` canonicalises zero, but
-	// a Rational the Integer Namespace built by adding to a Fraction has not
-	// been through it, and `denominator()` and `isWholeNumber()` read here.
-	if (numerator === 0n) {
-		denominator = 1n
-	}
-
-	return { numerator, denominator }
+// NOTE: The lowest-terms form with the sign on the numerator — the shape the
+// accessors, the rounding family and the formatters read.
+function reducedParts(rational: RationalType): BigRational {
+	return reduced(rational.numerator, rational.denominator)
 }
 
 // #region Everyday methods
@@ -367,16 +345,57 @@ function formatAsRational(rational: RationalType): string {
 	return `${parts.numerator}/${parts.denominator}`
 }
 
-// NOTE: `bigint-fraction` seeds its decimal text with `${wholePart}.` and only
-// then appends fractional digits, so a Rational that IS a whole number comes
-// back as "2." — text `Rational.parse` refuses to read back, since its decimal
-// form requires digits behind the dot. Drop a separator with nothing behind it.
-function formatAsDecimal(rational: RationalType): string {
-	let decimalForm = rational.rational.toString()
+// NOTE: A deliberate cap, not a technical one: a non-terminating expansion is
+// cut after this many fractional digits, with the last kept digit rounded.
+const DECIMAL_DIGIT_LIMIT = 80
 
-	return decimalForm.endsWith(".")
-		? decimalForm.slice(0, decimalForm.length - 1)
-		: decimalForm
+// NOTE: Long division on the magnitude, sign prefixed afterwards — so the cut
+// digit rounds halves away from zero, matching `round`. A terminating
+// expansion stops at its last digit, and a whole value prints without a dot,
+// so every result is text `Rational.parse` reads back.
+function formatAsDecimal(rational: RationalType): string {
+	let parts = reducedParts(rational)
+	let magnitude = parts.numerator < 0n ? -parts.numerator : parts.numerator
+
+	let wholePart = magnitude / parts.denominator
+	let remainder = magnitude % parts.denominator
+
+	let digits: Array<string> = []
+
+	while (remainder !== 0n && digits.length < DECIMAL_DIGIT_LIMIT) {
+		remainder = remainder * 10n
+		digits.push((remainder / parts.denominator).toString())
+		remainder = remainder % parts.denominator
+	}
+
+	if (remainder !== 0n && remainder * 2n >= parts.denominator) {
+		let index = digits.length - 1
+
+		while (index >= 0 && digits[index] === "9") {
+			digits[index] = "0"
+			index -= 1
+		}
+
+		if (index >= 0) {
+			digits[index] = (Number(digits[index]) + 1).toString()
+		} else {
+			wholePart = wholePart + 1n
+		}
+
+		// NOTE: Zeroes the carry walked over are rounding artifacts, not
+		// expansion digits — `0.0999…` rounds to `0.1`, not `0.1000…`.
+		while (digits.length > 0 && digits[digits.length - 1] === "0") {
+			digits.pop()
+		}
+	}
+
+	let sign = parts.numerator < 0n ? "-" : ""
+
+	if (digits.length === 0) {
+		return `${sign}${wholePart}`
+	}
+
+	return `${sign}${wholePart}.${digits.join("")}`
 }
 
 // #region toString
@@ -453,10 +472,8 @@ export function compareTo(
 	originalRational: RationalType,
 	otherRational: RationalType,
 ): OrderingType {
-	const lhs =
-		originalRational.rational.numerator * otherRational.rational.denominator
-	const rhs =
-		otherRational.rational.numerator * originalRational.rational.denominator
+	const lhs = originalRational.numerator * otherRational.denominator
+	const rhs = otherRational.numerator * originalRational.denominator
 
 	if (lhs < rhs) {
 		return less

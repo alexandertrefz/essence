@@ -30,8 +30,8 @@ const ratIs = (
 	first: rational.RationalType,
 	second: rational.RationalType,
 ): boolean =>
-	first.rational.numerator * second.rational.denominator ===
-	second.rational.numerator * first.rational.denominator
+	first.numerator * second.denominator ===
+	second.numerator * first.denominator
 
 // NOTE: `String.toString` is written in Essence now (packages/stdlib/sources/String.es) —
 // `<- @`, the identity — so there is no runtime export left to hand `join`

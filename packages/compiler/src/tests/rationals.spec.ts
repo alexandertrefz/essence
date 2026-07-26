@@ -20,14 +20,13 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
 // NOTE: The two invariants a Rational is built on — the sign lives on the
-// numerator, and zero is `0/1` — plus the two places they used to leak: the
-// Integer-operand `divide`, which handed the sign to the DENOMINATOR and made
-// every ordering primitive read the value backwards, and `bigint-fraction`'s
-// `reduce`, whose GCD answers 0 for a zero operand, so a cancelled `0/4` could
-// never reduce itself. Both are checked here on the runtime directly and again
-// through a compiled Program, because the damage they did was visible from
-// Essence: `absolute()`, `roundDown()` and `isWholeNumber()` are all written on
-// top of them.
+// numerator, and zero is `0/1` — plus the two places they historically leaked:
+// an Integer-operand `divide` that handed the sign to the DENOMINATOR, which
+// every ordering primitive then read backwards, and a `reduce` that bailed on
+// a zero operand, so a cancelled `0/4` could never reduce itself. Both are
+// checked here on the runtime directly and again through a compiled Program,
+// because the damage they did was visible from Essence: `absolute()`,
+// `roundDown()` and `isWholeNumber()` are all written on top of them.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -67,8 +66,8 @@ async function run(source: string): Promise<Array<string>> {
 }
 
 const partsOf = (value: rational.RationalType) => ({
-	numerator: value.rational.numerator,
-	denominator: value.rational.denominator,
+	numerator: value.numerator,
+	denominator: value.denominator,
 })
 
 describe("Rationals", () => {
@@ -156,7 +155,7 @@ describe("Rationals", () => {
 			).toEqual({ numerator: -1n, denominator: 2n })
 		})
 
-		it("leaves the receiver untouched — the Fraction is never shared", () => {
+		it("leaves the receiver untouched — the parts are never shared", () => {
 			const half = rational.createRational(1n, 2n)
 
 			rational.divide__overload$2(half, integer.createInteger(-3n))
@@ -168,9 +167,8 @@ describe("Rationals", () => {
 	})
 
 	describe("Canonical zero", () => {
-		// NOTE: `1/2 − 1/2` builds `(1·2 + −1·2)/4` — a zero with a denominator
-		// of 4, which `reduce()` can not touch, because bigint-fraction's GCD
-		// is 0 whenever an operand is.
+		// NOTE: `1/2 − 1/2` builds `(1·2 + −1·2)/4` — a zero that reaches the
+		// gateway with a denominator of 4 and must leave it as `0/1`.
 		const cancelled = () =>
 			rational.add__overload$1(
 				rational.createRational(1n, 2n),
@@ -210,9 +208,9 @@ describe("Rationals", () => {
 			).toBe("0/1")
 		})
 
-		// NOTE: The Integer Namespace builds its Rational results by adding to
-		// a clone of the Fraction rather than through `createRational`, so the
-		// accessors have to answer for a zero that never met the gateway.
+		// NOTE: A zero built by Integer-operand arithmetic rather than written
+		// as a literal — the accessors must answer canonically for it all the
+		// same.
 		it("answers for a zero the Integer Namespace built", () => {
 			const zero = integer.add__overload$2(
 				integer.createInteger(-1n),
@@ -269,6 +267,51 @@ describe("Rationals", () => {
 					decimal,
 				).value,
 			).toBe("-0.75")
+		})
+
+		// NOTE: The cap and the rounding are deliberate: a non-terminating
+		// expansion is cut at 80 fractional digits, and the cut digit rounds
+		// halves away from zero, like `round` does. `2/3` ending in `…667`
+		// is what separates rounding from the truncation it replaced.
+		it("cuts a non-terminating expansion at 80 digits and rounds the last one", () => {
+			expect(
+				rational.toString__overload$2(
+					rational.createRational(1n, 3n),
+					decimal,
+				).value,
+			).toBe(`0.${"3".repeat(80)}`)
+			expect(
+				rational.toString__overload$2(
+					rational.createRational(2n, 3n),
+					decimal,
+				).value,
+			).toBe(`0.${"6".repeat(79)}7`)
+			expect(
+				rational.toString__overload$2(
+					rational.createRational(-2n, 3n),
+					decimal,
+				).value,
+			).toBe(`-0.${"6".repeat(79)}7`)
+		})
+
+		// NOTE: `1 − 5·10⁻⁸¹` expands to eighty 9s with an exactly-half tail, so
+		// the round-up has to carry through every kept digit into the whole part
+		// — and the zeroes it leaves behind are artifacts, not expansion digits.
+		it("carries a round-up through the kept digits into the whole part", () => {
+			const scale = 2n * 10n ** 80n
+
+			expect(
+				rational.toString__overload$2(
+					rational.createRational(scale - 1n, scale),
+					decimal,
+				).value,
+			).toBe("1")
+			expect(
+				rational.toString__overload$2(
+					rational.createRational(1n - scale, scale),
+					decimal,
+				).value,
+			).toBe("-1")
 		})
 
 		it("round-trips the decimal form back through parse", () => {
