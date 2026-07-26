@@ -20,14 +20,29 @@ import {
 import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence/fixtures"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
-import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver"
+import {
+	CodeActionKind,
+	CompletionItemKind,
+	type Diagnostic,
+	DiagnosticSeverity,
+	DiagnosticTag,
+	InsertTextFormat,
+	TextDocumentSyncKind,
+} from "vscode-languageserver"
 
 import { analyse } from "../analyse"
-import { findCompletions } from "../completion"
-import { toLspDiagnostic, toLspRange } from "../conversion"
+import { findCodeActions } from "../codeActions"
+import { type CompletionEntry, findCompletions } from "../completion"
+import { toLspDiagnostic, toLspRange, toRange } from "../conversion"
 import { findHover } from "../hover"
 import { matchingNamespaces } from "../namespaces"
 import { findRenameableOccurrence } from "../rename"
+import { semanticTokenModifiers, semanticTokenTypes } from "../semanticTokens"
+import {
+	serverCapabilities,
+	toLspCodeAction,
+	toLspCompletionItem,
+} from "../server"
 
 describe("LSP", () => {
 	describe("analyse", () => {
@@ -114,6 +129,31 @@ describe("LSP", () => {
 			expect(toLspRange(null)).toEqual({
 				start: { line: 0, character: 0 },
 				end: { line: 0, character: 1 },
+			})
+		})
+	})
+
+	describe("toRange", () => {
+		it("should convert 0-based Ranges back to 1-based Positions", () => {
+			expect(
+				toRange({
+					start: { line: 2, character: 4 },
+					end: { line: 3, character: 8 },
+				}),
+			).toEqual({
+				start: { line: 3, column: 5 },
+				end: { line: 4, column: 9 },
+			})
+		})
+
+		// NOTE: An empty selection is what an Editor sends for a cursor sitting
+		// on a squiggle, which is how a Quick Fix is asked for in practice.
+		it("should carry an empty selection through as a zero-width Position", () => {
+			let cursor = { line: 5, character: 0 }
+
+			expect(toRange({ start: cursor, end: cursor })).toEqual({
+				start: { line: 6, column: 1 },
+				end: { line: 6, column: 1 },
 			})
 		})
 	})
@@ -268,6 +308,318 @@ describe("LSP", () => {
 					message: "declared as Integer here",
 				},
 			])
+		})
+	})
+
+	// NOTE: A capability is the only thing standing between a working feature
+	// and one no Editor ever asks for — every handler below keeps passing its
+	// own spec while the feature is dark. So the announcement is asserted as
+	// its own fact, feature by feature.
+	describe("capabilities", () => {
+		it("should announce every feature the Server implements", () => {
+			expect(serverCapabilities).toEqual({
+				textDocumentSync: TextDocumentSyncKind.Full,
+				renameProvider: { prepareProvider: true },
+				definitionProvider: true,
+				hoverProvider: true,
+				referencesProvider: true,
+				documentHighlightProvider: true,
+				documentSymbolProvider: true,
+				documentFormattingProvider: true,
+				codeActionProvider: {
+					codeActionKinds: [
+						CodeActionKind.QuickFix,
+						CodeActionKind.RefactorRewrite,
+					],
+				},
+				completionProvider: {
+					triggerCharacters: [".", ":", "<", "#"],
+				},
+				signatureHelpProvider: {
+					triggerCharacters: ["(", ","],
+					retriggerCharacters: [")"],
+				},
+				semanticTokensProvider: {
+					legend: {
+						tokenTypes: semanticTokenTypes,
+						tokenModifiers: semanticTokenModifiers,
+					},
+					full: true,
+				},
+				foldingRangeProvider: true,
+				selectionRangeProvider: true,
+				inlayHintProvider: true,
+				linkedEditingRangeProvider: true,
+				callHierarchyProvider: true,
+			})
+		})
+
+		// NOTE: The legend is handed over as two arrays of names and every
+		// Token is an index into them, so a client holding an older response
+		// recolours everything past an entry that moved.
+		it("should carry the semantic token legend in the order the encoder uses", () => {
+			expect(serverCapabilities.semanticTokensProvider).toEqual({
+				legend: {
+					tokenTypes: [
+						"namespace",
+						"type",
+						"typeParameter",
+						"parameter",
+						"variable",
+						"property",
+						"function",
+						"method",
+						"enumMember",
+					],
+					tokenModifiers: [
+						"declaration",
+						"readonly",
+						"static",
+						"defaultLibrary",
+					],
+				},
+				full: true,
+			})
+		})
+
+		// NOTE: Not one of the fixes is both unambiguous and
+		// semantics-preserving, so an Editor must never be told it may apply
+		// them all at once.
+		it("should not offer a fix-all Code Action kind", () => {
+			expect(
+				typeof serverCapabilities.codeActionProvider === "object"
+					? serverCapabilities.codeActionProvider.codeActionKinds
+					: [],
+			).not.toContain(CodeActionKind.SourceFixAll)
+		})
+	})
+
+	describe("toLspCompletionItem", () => {
+		function entry(overrides: Partial<CompletionEntry>): CompletionEntry {
+			return {
+				label: "greet",
+				kind: "function",
+				detail: null,
+				tier: 3,
+				...overrides,
+			}
+		}
+
+		it("should insert the call a resolved signature spells out", () => {
+			let source = [
+				"implementation {",
+				"\tfunction greet (subject: String) -> String {",
+				"\t\t<- subject",
+				"\t}",
+				"\t",
+				"}",
+			].join("\n")
+
+			let completion = findCompletions(source, {
+				line: 5,
+				column: 2,
+			}).find((candidate) => candidate.label === "greet")
+
+			expect(completion).toBeDefined()
+
+			let item = toLspCompletionItem(completion as CompletionEntry)
+
+			expect(item.insertText).toBe("greet(subject ${1})")
+			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
+			expect(item.kind).toBe(CompletionItemKind.Function)
+			expect(item.sortText).toBe("3greet")
+		})
+
+		// NOTE: Halfway through a keystroke nothing resolves, and a callable
+		// still has to insert something better than its bare name.
+		it("should fall back to bare parentheses for a callable with no snippet", () => {
+			let item = toLspCompletionItem(entry({ snippet: null }))
+
+			expect(item.insertText).toBe("greet($0)")
+			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
+		})
+
+		// NOTE: `$` is an ordinary Identifier character, so the fallback is as
+		// able to spell a snippet variable by accident as the resolved snippet
+		// is — an unescaped `we$rd` inserts `we` followed by whatever the
+		// Editor holds in `$rd`, which is the wrong name silently.
+		it("should escape a snippet metacharacter in the fallback insert text", () => {
+			let source = [
+				"implementation {",
+				"\tfunction we$rd (value: Integer) -> Integer { <- value }",
+				"\t",
+				"}",
+			].join("\n")
+
+			let resolved = findCompletions(source, {
+				line: 3,
+				column: 2,
+			}).find((candidate) => candidate.label === "we$rd")
+
+			expect(resolved?.label).toBe("we$rd")
+
+			let item = toLspCompletionItem(
+				entry({ label: "we$rd", snippet: null }),
+			)
+
+			expect(item.insertText).toBe("we\\$rd($0)")
+			expect(item.insertTextFormat).toBe(InsertTextFormat.Snippet)
+			// NOTE: The label the Editor matches and sorts on is not snippet
+			// text, so it keeps the name as written.
+			expect(item.label).toBe("we$rd")
+			expect(item.filterText).toBe("we$rd")
+		})
+
+		it("should insert nothing but the label for what is referred to rather than called", () => {
+			let item = toLspCompletionItem(
+				entry({ label: "subject", kind: "parameter", tier: 1 }),
+			)
+
+			expect(item.insertText).toBeUndefined()
+			expect(item.insertTextFormat).toBeUndefined()
+			expect(item.sortText).toBe("1subject")
+		})
+
+		it("should tell Overloads sharing a label apart by their signature tails", () => {
+			let item = toLspCompletionItem(
+				entry({
+					kind: "method",
+					snippet: "greet(with ${1})",
+					labelDetail: "(with String) -> String",
+				}),
+			)
+
+			expect(item.labelDetails).toEqual({
+				detail: " (with String) -> String",
+			})
+			expect(item.filterText).toBe("greet")
+		})
+
+		it("should carry a preselected entry through and leave the rest unset", () => {
+			expect(
+				toLspCompletionItem(entry({ preselect: true })).preselect,
+			).toBe(true)
+			expect(toLspCompletionItem(entry({})).preselect).toBeUndefined()
+		})
+
+		it("should announce the keyword kind it now offers", () => {
+			expect(
+				toLspCompletionItem(entry({ label: "match", kind: "keyword" }))
+					.kind,
+			).toBe(CompletionItemKind.Keyword)
+		})
+	})
+
+	describe("toLspCodeAction", () => {
+		const source = [
+			"implementation {",
+			"\ttype Value = Integer | String",
+			"\tconstant something: Value = 42",
+			"\tconstant answer = match something -> String {",
+			'\t\tcase Integer { <- "an Integer" }',
+			"\t}",
+			"}",
+		].join("\n")
+
+		const uri = "file:///Test.es"
+
+		function fixFor(code: string) {
+			let range = {
+				start: { line: 1, column: 1 },
+				end: { line: 7, column: 2 },
+			}
+			let action = findCodeActions(source, range).find(
+				(candidate) => candidate.diagnosticCode === code,
+			)
+
+			expect(action).toBeDefined()
+
+			return action as NonNullable<typeof action>
+		}
+
+		function paramsWith(diagnostics: Array<Diagnostic>) {
+			return {
+				textDocument: { uri },
+				range: {
+					start: { line: 0, character: 0 },
+					end: { line: 6, character: 1 },
+				},
+				context: { diagnostics },
+			}
+		}
+
+		function clientDiagnostic(
+			code: string,
+			range: ReturnType<typeof toLspRange>,
+		): Diagnostic {
+			return { code, range, message: "", source: "essence" }
+		}
+
+		it("should map the edits onto the document it was asked about", () => {
+			let action = fixFor("missing-case")
+			let item = toLspCodeAction(action, paramsWith([]))
+
+			expect(item.title).toBe("Add missing Cases")
+			expect(item.kind).toBe(CodeActionKind.QuickFix)
+			expect(item.isPreferred).toBe(true)
+			expect(item.edit?.changes?.[uri]).toEqual([
+				{
+					range: {
+						start: { line: 5, character: 0 },
+						end: { line: 5, character: 0 },
+					},
+					newText: "\t\tcase String {}\n",
+				},
+			])
+		})
+
+		// NOTE: Attribution only — the edits were computed on the buffer as it
+		// is now, while the Diagnostics the client echoes back belong to a
+		// buffer that is up to a debounce older.
+		it("should attach only the client Diagnostic the fix answers", () => {
+			let action = fixFor("missing-case")
+			let item = toLspCodeAction(
+				action,
+				paramsWith([
+					clientDiagnostic(
+						"missing-case",
+						toLspRange(action.diagnosticPosition),
+					),
+					clientDiagnostic("missing-case", {
+						start: { line: 30, character: 0 },
+						end: { line: 30, character: 4 },
+					}),
+					clientDiagnostic(
+						"missing-return",
+						toLspRange(action.diagnosticPosition),
+					),
+				]),
+			)
+
+			expect(item.diagnostics).toHaveLength(1)
+			expect(item.diagnostics?.[0].range).toEqual(
+				toLspRange(action.diagnosticPosition),
+			)
+		})
+
+		it("should leave an action that answers no Diagnostic unattributed", () => {
+			let range = {
+				start: { line: 1, column: 1 },
+				end: { line: 7, column: 2 },
+			}
+			let refactor = findCodeActions(source, range).find(
+				(candidate) => candidate.kind === "refactor.rewrite",
+			)
+
+			expect(refactor).toBeDefined()
+
+			let item = toLspCodeAction(
+				refactor as NonNullable<typeof refactor>,
+				paramsWith([]),
+			)
+
+			expect(item.kind).toBe(CodeActionKind.RefactorRewrite)
+			expect(item.diagnostics).toBeUndefined()
 		})
 	})
 
