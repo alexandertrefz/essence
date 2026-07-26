@@ -7,6 +7,7 @@ import { enrich } from "../enricher/index"
 import { derivedEquatableNamespace } from "../enricher/resolvers"
 import { computeConformanceMethodMap } from "../helpers/index"
 import { parse } from "../parser/index"
+import { printType } from "../printType"
 
 function enrichSource(source: string): {
 	program: common.typed.Program
@@ -1322,6 +1323,37 @@ describe("Enricher", () => {
 					[{ type: "Integer" }, { type: "Integer" }],
 					[{ type: "Integer" }, { type: "String" }],
 					[{ type: "Integer" }, { type: "String" }],
+				])
+			})
+
+			// NOTE: The Type Parameter of the Namespace a callback is written
+			// INSIDE is a decision — a generic one — and the position it makes
+			// is a real one. This is `List.firstItem(where:)` spelled out: the
+			// fold's `Result` is bound by the annotated seed, so `reduce` hands
+			// the callback a `Step<Optional<Item>, Optional<Item>>`, and the
+			// `#Done(item)` in it is decided by that rather than by the one
+			// Parameter its own payload happens to mention.
+			it("decides a Case in a callback by the enclosing Namespace's Type Parameter", () => {
+				let { program, diagnostics } = enrichSource(`implementation {
+					namespace Finder<infer Item> for List<Item> {
+						firstMatch(where check: (_ item: Item) -> Boolean) -> Optional<Item> {
+							constant start: Optional<Item> = nothing
+
+							<- @::reduce(startingWith start, step (found, item) {
+								if check(item) { <- #Done(item) }
+
+								<- #Continue(found)
+							})
+						}
+					}
+
+					constant found = [1, 2, 3]::firstMatch(where (item) { <- item::isGreaterThan(1) })
+				}`)
+
+				expect(diagnostics).toEqual([])
+				expect(collectCaseTypes(program).map(printType)).toEqual([
+					"Step<Optional<Item>, Optional<Item>>#Done",
+					"Step<Optional<Item>, Optional<Item>>#Continue",
 				])
 			})
 

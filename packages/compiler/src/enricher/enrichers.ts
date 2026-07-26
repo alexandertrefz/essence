@@ -5863,10 +5863,18 @@ function resolveContextualReturnType(
 		return { type: "Error" }
 	}
 
-	// NOTE: An expected return Type that is still an unbound Generic says
-	// nothing — in `map`'s `(_ item: ItemType) -> Result` nothing binds
-	// `Result` but this literal's own body, so the body is what it is read off.
-	if (containsGenericUse(expectedFunction.returnType)) {
+	// NOTE: An expected return Type the CALL has not solved says nothing — in
+	// `map`'s `(_ item: ItemType) -> Result` nothing binds `Result` but this
+	// literal's own body, so the body is what it is read off.
+	//
+	// A Type Parameter of an enclosing Namespace or Function is not that: it is
+	// a decision, a generic one, and reading `List.firstItem(where:)`'s fold off
+	// its body instead threw away the `Step<Optional<ItemType>,
+	// Optional<ItemType>>` its `reduce` had already decided — leaving the
+	// `#Done(item)` in it carrying whichever Parameters its payload happened to
+	// mention. `mentionsUnsolvedTypeParameter` tells the two apart by the fresh
+	// name only a call still matching can produce.
+	if (mentionsUnsolvedTypeParameter(expectedFunction.returnType)) {
 		let inferred = inferReturnTypeFromBody(node, parameterTypes, scope)
 
 		if (inferred !== null) {
@@ -5911,35 +5919,6 @@ function functionLiteralPosition(
 	node: parser.FunctionDefinitionNode,
 ): common.Position | null {
 	return node.parameters[0]?.position ?? null
-}
-
-function containsGenericUse(type: common.Type): boolean {
-	switch (type.type) {
-		case "GenericUse":
-			return true
-		case "UnionType":
-			return type.types.some(containsGenericUse)
-		case "List":
-			return containsGenericUse(type.itemType)
-		case "Function":
-			return (
-				type.parameterTypes.some((parameter) =>
-					containsGenericUse(parameter.type),
-				) || containsGenericUse(type.returnType)
-			)
-		case "Record":
-			return Object.values(type.members).some(containsGenericUse)
-		case "Case":
-			// NOTE: A generic Choice's Case buries its Generics in its members
-			// (`MyStep<Integer, Result>#Done` still carries `value: Result`), so
-			// a callback whose expected return is such a Union only has its body
-			// consulted when this looks through the Cases — otherwise `Result`
-			// would bind to itself and never reach the payload. `typeArguments`
-			// are display spelling and, like `matchTypes`, are not consulted.
-			return Object.values(type.members).some(containsGenericUse)
-		default:
-			return false
-	}
 }
 
 export function resolveNamespaceDefinitionStatementType(
