@@ -29,12 +29,15 @@ import {
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
+	mentionsUnsolvedTypeParameter,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
 	stripPositionFromArray,
 	symbol,
 	third,
+	typeContainsError,
+	typeMentionsGeneric,
 } from "../helpers/index"
 
 const TokenType = lexer.TokenType
@@ -2048,6 +2051,68 @@ describe("Helpers", () => {
 					combine__overload$2: "combine__overload$1",
 				},
 			})
+		})
+	})
+
+	// NOTE: A resolved Type is a DAG — every level of `type Nested = Box<Inner> |
+	// Box<List<Inner>>` names the ONE Type below it from four places — so a walk
+	// that follows every reference rather than every OBJECT visits what is shared
+	// exponentially often. Each level below names the one under it three times,
+	// so the sixteen levels here are fifty-odd objects held and forty million
+	// references followed, climbing by a factor of three for every level added.
+	//
+	// Which is why the ceiling is not a wall-clock race between two
+	// implementations that both work: it separates a walk over what is there —
+	// microseconds, whatever the machine — from one that answers in seconds here
+	// and not at all a few levels deeper. It is written as a time only because
+	// there is nothing else for a walk of the wrong shape to fail on, and the
+	// depth is chosen so that such a walk still FINISHES and reports rather than
+	// hanging the suite.
+	describe("walking a Type that shares its parts", () => {
+		function shared(levels: number, leaf: Type): Type {
+			let type = leaf
+
+			for (let level = 0; level < levels; level++) {
+				let inner = type
+
+				type = {
+					type: "UnionType",
+					types: [
+						{ type: "List", itemType: inner },
+						{
+							type: "Record",
+							members: { left: inner, right: inner },
+						},
+					],
+				}
+			}
+
+			return type
+		}
+
+		it("answers about one no larger than it is held", () => {
+			let deep = shared(16, { type: "Integer" })
+			let asked: Array<(type: Type) => boolean> = [
+				mentionsUnsolvedTypeParameter,
+				typeContainsError,
+				(type) => typeMentionsGeneric(type, "Value"),
+			]
+
+			for (let ask of asked) {
+				let start = performance.now()
+
+				expect(ask(deep)).toBe(false)
+				expect(performance.now() - start).toBeLessThan(500)
+			}
+		}, 30000)
+
+		it("still finds what is buried in the shared part", () => {
+			let error: ErrorType = { type: "Error" }
+			let generic: GenericUse = { type: "GenericUse", name: "Value" }
+
+			expect(typeContainsError(shared(8, error))).toBe(true)
+			expect(typeMentionsGeneric(shared(8, generic), "Value")).toBe(true)
+			expect(typeMentionsGeneric(shared(8, generic), "Other")).toBe(false)
 		})
 	})
 
