@@ -1472,6 +1472,100 @@ describe("Validator", () => {
 			)
 		})
 
+		// NOTE: Two Overloads that BOTH accept the same Argument, so which one a
+		// call was committed to can only be read off the Node — matching again
+		// would answer with the first, whatever the Enricher decided — and one
+		// that accepts nothing the call passes, to commit to by hand.
+		const overlappingOverloads = `implementation {
+			namespace Tags for Integer {
+				overload static tag {
+					(_ value: Integer) -> String {
+						<- "integer"
+					}
+
+					(_ value: Integer | String) -> String {
+						<- "either"
+					}
+
+					(_ value: Boolean) -> String {
+						<- "flag"
+					}
+				}
+			}
+
+			__print(Tags.tag(1))
+		}`
+
+		function overloadedCalls(
+			program: common.typed.Program,
+		): Array<common.typed.FunctionInvocationNode> {
+			let found: Array<common.typed.FunctionInvocationNode> = []
+
+			walk(program, (node) => {
+				if (
+					node["nodeType"] === "FunctionInvocation" &&
+					node["overloadedMethodIndex"] !== null
+				) {
+					found.push(
+						node as unknown as common.typed.FunctionInvocationNode,
+					)
+				}
+			})
+
+			return found
+		}
+
+		it("keeps the Overload the Enricher committed to", () => {
+			let program = enrichedProgram(overlappingOverloads)
+			let calls = overloadedCalls(program)
+
+			expect(calls.map((call) => call.overloadedMethodIndex)).toEqual([0])
+
+			// NOTE: The Overload a re-match would never arrive at, and the one
+			// this is about: the Enricher decides WHICH Overload with the context
+			// each Argument was written in, and the Simplifier mangles the callee
+			// from the index — so a Validator that answered again would emit a
+			// call against an Overload the Program was never checked against.
+			for (let call of calls) {
+				call.overloadedMethodIndex = 1
+			}
+
+			expect(validate(program)).toEqual([])
+			expect(calls.map((call) => call.overloadedMethodIndex)).toEqual([1])
+		})
+
+		it("reports a call committed to an Overload that refuses its Arguments", () => {
+			let program = enrichedProgram(overlappingOverloads)
+
+			for (let call of overloadedCalls(program)) {
+				call.overloadedMethodIndex = 2
+			}
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"This call was committed to the overload that takes 1 Argument: Parameter 1 is Boolean, which does not accept the Arguments it passes",
+			)
+		})
+
+		it("reports a call committed to an Overload its callee does not have", () => {
+			let program = enrichedProgram(overlappingOverloads)
+
+			for (let call of overloadedCalls(program)) {
+				call.overloadedMethodIndex = 7
+			}
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"This call was committed to overload 7 of a callee that has 3 overloads",
+			)
+		})
+
 		it("reports a dispatch branch's witness no enclosing Function declares", () => {
 			let program = enrichedProgram(dispatchedWitnesses)
 

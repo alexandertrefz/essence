@@ -374,6 +374,60 @@ function checkConformanceArity(
 	)
 }
 
+// NOTE: WHICH Overload a call resolved to is settled once, by the Enricher, and
+// the Validator only checks that the Signature it settled on still accepts the
+// Arguments — it is a consumer of `overloadedMethodIndex`, never a second
+// selector. Selecting again here would ask the question without what the
+// Enricher had to answer it: an unannotated Function literal reads its
+// Parameter Types off the Overload it is matched against, and a Protocol bound
+// is solved against the bindings that Overload inferred, neither of which a
+// typed Node carries. A different answer would not be a Diagnostic either — the
+// Simplifier mangles the callee from this index, so the call would be EMITTED
+// against an Overload the Program was never type-checked against.
+//
+// NOTE: The same Error rails as the checks above, and for the same reason: what
+// the Arguments were matched with is what a missing index or an Error-tainted
+// Argument says nothing about.
+function checkCommittedOverload(
+	node: common.typed.FunctionInvocationNode,
+	functionType:
+		| common.OverloadedMethodType
+		| common.OverloadedStaticMethodType,
+	describeCallee: () => string,
+): void {
+	if (
+		node.overloadedMethodIndex === null ||
+		typeContainsError(node.type) ||
+		node.arguments.some((argumentNode) =>
+			typeContainsError(argumentNode.type),
+		)
+	) {
+		return
+	}
+
+	let overload = functionType.overloads[node.overloadedMethodIndex]
+
+	if (overload === undefined) {
+		throw new Error(
+			`${describeCallee()} was committed to overload ${node.overloadedMethodIndex} of a callee that has ${countOf(functionType.overloads.length, "overload")}. This is a bug in the Compiler.`,
+		)
+	}
+
+	let { parameterTypes, context } = createFreshenedInference(overload)
+
+	if (
+		matchArguments(
+			parameterTypes,
+			matchableArgumentsFromTypedNodes(node.arguments),
+			{ inference: context },
+		).type !== "Match"
+	) {
+		throw new Error(
+			`${describeCallee()} was committed to the overload that ${describeSignature(overload.parameterTypes)}, which does not accept the Arguments it passes. This is a bug in the Compiler.`,
+		)
+	}
+}
+
 // NOTE: A `parameter` source forwards the enclosing bounded Function's own
 // hidden conformance Parameter, which the Simplifier emits from that Function's
 // constrained Generics — so the name has to be one of those, from this Function
@@ -594,50 +648,7 @@ function validateFunctionInvocation(
 			functionType.type === "OverloadedMethod" ||
 			functionType.type === "OverloadedStaticMethod"
 		) {
-			let matchableArguments = matchableArgumentsFromTypedNodes(
-				node.arguments,
-			)
-
-			let overloadMatched = true
-			let index = 0
-
-			for (let overload of functionType.overloads) {
-				let { parameterTypes, context } =
-					createFreshenedInference(overload)
-
-				overloadMatched =
-					matchArguments(parameterTypes, matchableArguments, {
-						inference: context,
-					}).type === "Match"
-
-				if (overloadMatched) {
-					break
-				}
-
-				index++
-			}
-
-			if (!overloadMatched) {
-				reportError(
-					"No overload accepts these Arguments",
-					node.position,
-					{
-						code: "no-matching-overload",
-						labels: [
-							primary(
-								node.position,
-								`this call passes ${countOf(node.arguments.length, "Argument")}`,
-							),
-						],
-						notes: functionType.overloads.map(
-							(overload) =>
-								`One overload ${describeSignature(overload.parameterTypes)}.`,
-						),
-					},
-				)
-			} else {
-				node.overloadedMethodIndex = index
-			}
+			checkCommittedOverload(node, functionType, describeCallee)
 		} else {
 			let { parameterTypes, context } =
 				createFreshenedInference(functionType)
