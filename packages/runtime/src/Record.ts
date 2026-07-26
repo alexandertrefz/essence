@@ -1,5 +1,5 @@
 import type { BooleanType } from "./Boolean"
-import { createBoolean, negate } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import { getStringRepresentation } from "./functions"
 import { anyIs } from "./internalHelpers"
 import type { ListType } from "./List"
