@@ -103,6 +103,46 @@ function builtinNamespace(name: string): common.NamespaceType {
 	return namespace
 }
 
+// NOTE: Every Case construction in a typed subtree, in the order it was built —
+// how a test asks what a Case a Program never spelled the Type Arguments of was
+// finally decided as. A `GenericUse` left in `typeArguments` is a Type Parameter
+// nothing decided, which is exactly what such an assertion is about.
+function collectCaseTypes(value: unknown): Array<common.Type> {
+	let found: Array<common.Type> = []
+
+	let visit = (node: unknown) => {
+		if (Array.isArray(node)) {
+			for (let element of node) {
+				visit(element)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (record.nodeType === "CaseValue") {
+			found.push(record.type as common.Type)
+		}
+
+		for (let key of Object.keys(record)) {
+			if (key === "position" || key === "type") {
+				continue
+			}
+
+			visit(record[key])
+		}
+	}
+
+	visit(value)
+
+	return found
+}
+
 // NOTE: Walks the typed Program collecting every resolved Conformance —
 // wherever a bounded Type Parameter was satisfied, an Invocation carries the
 // `{ genericName, protocolName, source }` shape. Used to assert which Namespace
@@ -1159,6 +1199,159 @@ describe("Enricher", () => {
 						constant applied = apply(1, 2, (item) { <- item::add(1) })
 					}`),
 				).toEqual([])
+			})
+
+			// NOTE: A callback's return position is the call's to decide, and a
+			// call decides it AFTER it has matched: nothing but this literal's
+			// own body binds `Result`, so while the literal is being matched its
+			// position still reads `Progress<State, Result>` and the body is all
+			// there is to read a return Type off. A body decides only what its
+			// payloads happen to mention — `#Stopped("done")` names `Result` and
+			// leaves `State` standing as the Choice's own Parameter — so the
+			// position is read a second time once the call has committed and its
+			// bindings are final, and THAT is what the body is enriched against.
+			it("decides a Case in the callback's return by the committed Overload", () => {
+				let stepped = collectCaseTypes(
+					lastConstantMethodInvocation(`implementation {
+						choice Progress<State, Result> {
+							Going { state: State },
+							Stopped { value: Result },
+						}
+
+						namespace Runner for Integer {
+							overload walk {
+								(
+									startingWith state: String,
+									step advance: (_ current: String) -> Progress<String, String>,
+								) -> String {
+									<- state
+								}
+								<infer State, infer Result>(
+									startingWith state: State,
+									step advance: (_ current: State) -> Progress<State, Result>,
+								) -> Result | Nothing {
+									<- nothing
+								}
+							}
+						}
+
+						constant walked = 1::walk(startingWith 0, step (count) {
+							if count::isGreaterThan(2) { <- #Stopped("done") }
+
+							<- #Going(count::add(1))
+						})
+					}`),
+				)
+
+				// NOTE: `Integer` from the committed Overload's bindings and
+				// `String` from the payload — neither the `State` the match was
+				// still carrying, nor the `Progress<String, String>` the Overload
+				// that lost would have decided.
+				expect(stepped).toEqual([
+					{
+						type: "Case",
+						choice: "Progress",
+						name: "Stopped",
+						members: { value: { type: "String" } },
+						typeArguments: [
+							{ type: "Integer" },
+							{ type: "String" },
+						],
+					},
+					{
+						type: "Case",
+						choice: "Progress",
+						name: "Going",
+						members: { state: { type: "Integer" } },
+						typeArguments: [
+							{ type: "Integer" },
+							{ type: "String" },
+						],
+					},
+				])
+			})
+
+			// NOTE: The same shape as the standard library spells it, which is
+			// where every Program meets it: `loop`'s general entry declares its
+			// `step` as `(_: State) -> Step<State, Result>`, and a `#Done` in
+			// that callback is the construction the whole rail is about.
+			it("decides a Case in a stdlib callback the same way", () => {
+				expect(
+					collectCaseTypes(
+						lastConstantFunctionInvocation(`implementation {
+							constant word = loop(startingWith 0, step (count) {
+								if count::isGreaterThanOrEqualTo(3) { <- #Done("done") }
+
+								<- #Continue(count::add(1))
+							})
+						}`),
+					).map((type) =>
+						type.type === "Case" ? type.typeArguments : type,
+					),
+				).toEqual([
+					[{ type: "Integer" }, { type: "String" }],
+					[{ type: "Integer" }, { type: "String" }],
+				])
+			})
+
+			// NOTE: A callback inside a callback is decided by ITS own call —
+			// `<-` returns from the literal it is written in, never from the walk
+			// around it, so the inner `loop`'s `#Done` carries the inner Result
+			// and the outer one's carries the outer's.
+			it("decides a nested callback by its own call", () => {
+				expect(
+					collectCaseTypes(
+						lastConstantFunctionInvocation(`implementation {
+							constant word = loop(startingWith 0, step (outer) {
+								constant inner = loop(startingWith outer, step (current) {
+									if current::isGreaterThan(5) { <- #Done(current) }
+
+									<- #Continue(current::add(1))
+								})
+
+								if inner::isGreaterThan(2) { <- #Done("stop") }
+
+								<- #Continue(inner)
+							})
+						}`),
+					).map((type) =>
+						type.type === "Case" ? type.typeArguments : type,
+					),
+				).toEqual([
+					[{ type: "Integer" }, { type: "Integer" }],
+					[{ type: "Integer" }, { type: "Integer" }],
+					[{ type: "Integer" }, { type: "String" }],
+					[{ type: "Integer" }, { type: "String" }],
+				])
+			})
+
+			// NOTE: What a Diagnostic from inside a callback body names is the
+			// committed Overload's reading of it. The Overload that lost takes a
+			// `Boolean` there and would have reported that Booleans have no
+			// `add` at all; the one that won hands the call the Integer
+			// signatures `add` actually offers.
+			it("reports from inside a callback in the committed Overload's Types", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Runner for Integer {
+						overload run {
+							(seed first: Boolean, step advance: (_ current: Boolean) -> Boolean) -> Boolean {
+								<- first
+							}
+							(seed first: Integer, step advance: (_ current: Integer) -> Integer) -> Integer {
+								<- first
+							}
+						}
+					}
+
+					constant ran = 1::run(seed 1, step (current) { <- current::add("x") })
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.message),
+				).toEqual(["No overload of 'add' accepts these Arguments"])
+				expect(diagnostics[0].notes[0]).toBe(
+					"'Integer::add' takes 1 Argument: Parameter 1 is Integer.",
+				)
 			})
 		})
 

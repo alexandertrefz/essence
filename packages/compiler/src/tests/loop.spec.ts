@@ -180,6 +180,36 @@ describe("loop", () => {
 		).toEqual(['"done"'])
 	})
 
+	// NOTE: A general loop inside another general loop's `step`, each finishing
+	// with a Result of its own Type — the inner one with the Integer it counted
+	// to, the outer one with a String. `<-` returns from the callback it is
+	// written in, so each `#Done` belongs to its own loop, and the inner Result
+	// has to survive being read where the outer one is expected: the inner walk
+	// is compared as the Integer it is before the outer one stops on it.
+	it("nests a general loop inside another general loop's step", async () => {
+		expect(
+			await run(`implementation {
+				constant word = loop(startingWith 0,
+					step (outer) {
+						constant doubled = loop(startingWith outer,
+							step (current) {
+								if current::isGreaterThanOrEqualTo(outer::add(2)) {
+									<- #Done(current)
+								}
+
+								<- #Continue(current::add(1))
+							})
+
+						if doubled::isGreaterThanOrEqualTo(6) { <- #Done("done") }
+
+						<- #Continue(doubled)
+					})
+
+				__print(word)
+			}`),
+		).toEqual(['"done"'])
+	})
+
 	// NOTE: The callback writes its return Type here, where the bare-sigil
 	// version above leaves it out. A Choice's Type Parameters are applied, never
 	// inferred: the bare `#Done` is read off whatever the position expects and,
