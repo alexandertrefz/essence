@@ -1,4 +1,4 @@
-import { glob, readFile, writeFile } from "node:fs/promises"
+import { glob, readFile, stat, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
 import { format, WIDTH } from "./index"
@@ -12,24 +12,51 @@ const USAGE = `esfmt — the Essence source formatter.
   esfmt <files…>           format each file in place
   esfmt --check <files…>   report which files are not formatted; write nothing
   esfmt --stdin            format standard input onto standard output
+                           (composes with --check; write nothing, report only)
+  esfmt --stdin-filepath <path>
+                           the path standard input should be read as, so that
+                           path-dependent sources — the standard library's
+                           declarations — parse as themselves
+  esfmt --version          print esfmt's version
 
-Arguments may be paths or globs. There is nothing to configure: Essence is
-written with tabs, and lines are laid out to fit ${WIDTH} columns.`
+Arguments may be paths, globs, or directories — a directory is every .es file
+under it. There is nothing to configure: Essence is written with tabs, and
+lines are laid out to fit ${WIDTH} columns.`
 
 type Options = {
 	check: boolean
 	stdin: boolean
+	stdinFilepath: string | null
+	version: boolean
 	patterns: Array<string>
 }
 
 function parseArguments(argv: Array<string>): Options | string {
-	let options: Options = { check: false, stdin: false, patterns: [] }
+	let options: Options = {
+		check: false,
+		stdin: false,
+		stdinFilepath: null,
+		version: false,
+		patterns: [],
+	}
 
-	for (let argument of argv) {
+	for (let index = 0; index < argv.length; index++) {
+		let argument = argv[index] as string
+
 		if (argument === "--check") {
 			options.check = true
 		} else if (argument === "--stdin") {
 			options.stdin = true
+		} else if (argument === "--stdin-filepath") {
+			let value = argv[++index]
+
+			if (value === undefined || value.startsWith("-")) {
+				return "'--stdin-filepath' needs a path."
+			}
+
+			options.stdinFilepath = value
+		} else if (argument === "--version") {
+			options.version = true
 		} else if (argument === "--help" || argument === "-h") {
 			return USAGE
 		} else if (argument.startsWith("-")) {
@@ -47,9 +74,25 @@ async function resolveFiles(patterns: Array<string>): Promise<Array<string>> {
 
 	for (let pattern of patterns) {
 		// NOTE: A plain path is its own match — `glob` would treat characters
-		// like `[` in a file name as a pattern rather than as the name.
+		// like `[` in a file name as a pattern rather than as the name. A named
+		// file is taken as it is, whatever its extension; only a directory
+		// filters, because there the author named a place rather than a file.
 		if (!/[*?[\]{}]/.test(pattern)) {
-			found.add(path.resolve(pattern))
+			let resolved = path.resolve(pattern)
+			let isDirectory = await stat(resolved).then(
+				(stats) => stats.isDirectory(),
+				() => false,
+			)
+
+			if (!isDirectory) {
+				found.add(resolved)
+
+				continue
+			}
+
+			for await (let match of glob(path.join(resolved, "**/*.es"))) {
+				found.add(path.resolve(match))
+			}
 
 			continue
 		}
@@ -97,12 +140,20 @@ function reportRefusal(
 	)
 }
 
-async function runStdin(check: boolean): Promise<number> {
+async function runStdin(
+	check: boolean,
+	stdinFilepath: string | null,
+): Promise<number> {
 	let source = await new Response(Bun.stdin.stream()).text()
-	let result = format(source)
+	let documentPath =
+		stdinFilepath === null ? undefined : path.resolve(stdinFilepath)
+	let result = format(source, { documentPath })
 
 	if (result.refusal !== null) {
-		reportRefusal("<stdin>", result.refusal)
+		reportRefusal(
+			documentPath === undefined ? "<stdin>" : documentPath,
+			result.refusal,
+		)
 
 		return EXIT_FAILURE
 	}
@@ -122,13 +173,33 @@ export async function run(argv: Array<string>): Promise<number> {
 	if (typeof parsed === "string") {
 		let isHelp = parsed === USAGE
 
-		process.stdout.write(isHelp ? parsed + "\n" : "")
+		if (isHelp) {
+			process.stdout.write(parsed + "\n")
 
-		if (!isHelp) {
-			process.stderr.write(parsed + "\n\n" + USAGE + "\n")
+			return EXIT_SUCCESS
 		}
 
-		return isHelp ? EXIT_SUCCESS : EXIT_USAGE
+		process.stderr.write(parsed + "\n\n" + USAGE + "\n")
+
+		return EXIT_USAGE
+	}
+
+	if (parsed.version) {
+		let packageJson = JSON.parse(
+			await readFile(new URL("../package.json", import.meta.url), "utf8"),
+		) as { version: string }
+
+		process.stdout.write(packageJson.version + "\n")
+
+		return EXIT_SUCCESS
+	}
+
+	if (parsed.stdinFilepath !== null && !parsed.stdin) {
+		process.stderr.write(
+			"'--stdin-filepath' names what standard input is read as, so it only goes with '--stdin'.\n",
+		)
+
+		return EXIT_USAGE
 	}
 
 	if (parsed.stdin) {
@@ -140,7 +211,7 @@ export async function run(argv: Array<string>): Promise<number> {
 			return EXIT_USAGE
 		}
 
-		return runStdin(parsed.check)
+		return runStdin(parsed.check, parsed.stdinFilepath)
 	}
 
 	if (parsed.patterns.length === 0) {
