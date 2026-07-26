@@ -39,14 +39,12 @@ function underlinedText(source: string, diagnostic: common.Diagnostic): string {
 		)
 }
 
-// NOTE: The typed Invocation a Program's LAST Constant was declared from —
+// NOTE: The typed Expression a Program's LAST Constant was declared from —
 // which is how a test asks what a call resolved to: which Namespace won, which
 // Overload, which dispatch branches, and what the Arguments were typed as. The
 // Program is required to enrich cleanly, so a test that means to assert on a
 // resolution can not silently assert on a failed one instead.
-function lastConstantMethodInvocation(
-	source: string,
-): common.typed.MethodInvocationNode {
+function lastConstantValue(source: string): common.typed.ExpressionNode {
 	let { program, diagnostics } = enrichSource(source)
 
 	expect(diagnostics).toEqual([])
@@ -54,12 +52,33 @@ function lastConstantMethodInvocation(
 	let constants = program.implementation.nodes.filter(
 		(node) => node.nodeType === "ConstantDeclarationStatement",
 	)
-	let value = constants[constants.length - 1].value
+
+	return constants[constants.length - 1].value
+}
+
+function lastConstantMethodInvocation(
+	source: string,
+): common.typed.MethodInvocationNode {
+	let value = lastConstantValue(source)
 
 	expect(value.nodeType).toBe("MethodInvocation")
 
 	if (value.nodeType !== "MethodInvocation") {
 		throw new Error("Last Constant is not a MethodInvocation.")
+	}
+
+	return value
+}
+
+function lastConstantFunctionInvocation(
+	source: string,
+): common.typed.FunctionInvocationNode {
+	let value = lastConstantValue(source)
+
+	expect(value.nodeType).toBe("FunctionInvocation")
+
+	if (value.nodeType !== "FunctionInvocation") {
+		throw new Error("Last Constant is not a FunctionInvocation.")
 	}
 
 	return value
@@ -2498,6 +2517,329 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe(
 				"A Namespace's Type Parameters can not carry Protocol bounds",
 			)
+		})
+
+		// NOTE: Bounds decide which Overload a call selects, so the SAME
+		// Overload set resolves the same way whichever order its entries were
+		// written in — an Overload whose bound the Argument can not satisfy is
+		// no candidate while another one takes the Argument. Each pair below is
+		// the same call against the same two entries, swapped, and the entry
+		// that accepts a Boolean is the one selected either way.
+		describe("Overload selection", () => {
+			const boundedFirst = `
+				<infer Value is Showable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+				(_ value: Boolean) -> String {
+					<- "boolean"
+				}
+			`
+
+			const boundedSecond = `
+				(_ value: Boolean) -> String {
+					<- "boolean"
+				}
+				<infer Value is Showable>(_ value: Value) -> String {
+					<- value::toString()
+				}
+			`
+
+			function methodCall(overloads: string): string {
+				return `implementation {
+					${printableSetup}
+
+					type Box = { size: Integer }
+
+					namespace BoxNamespace for Box {
+						overload render {
+							${overloads}
+						}
+					}
+
+					constant box: Box = { size = 1 }
+					constant text: String = box::render(true)
+				}`
+			}
+
+			function staticCall(overloads: string): string {
+				return `implementation {
+					${printableSetup}
+
+					namespace Renderer for Nothing {
+						overload static render {
+							${overloads}
+						}
+					}
+
+					constant text: String = Renderer.render(true)
+				}`
+			}
+
+			it("should pass over a bounded Method Overload the Argument can not satisfy", () => {
+				expect(
+					lastConstantMethodInvocation(methodCall(boundedFirst))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+
+			it("should select that same Method Overload with the entries swapped", () => {
+				expect(
+					lastConstantMethodInvocation(methodCall(boundedSecond))
+						.overloadedMethodIndex,
+				).toBe(0)
+			})
+
+			it("should pass over a bounded static Overload the Argument can not satisfy", () => {
+				expect(
+					lastConstantFunctionInvocation(staticCall(boundedFirst))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+
+			it("should select that same static Overload with the entries swapped", () => {
+				expect(
+					lastConstantFunctionInvocation(staticCall(boundedSecond))
+						.overloadedMethodIndex,
+				).toBe(0)
+			})
+
+			// NOTE: Selecting an Overload solves its bounds, and that solve is
+			// what the call carries — the Overload that wins is not solved a
+			// second time on the way out.
+			it("should carry the conformances the selected Overload was probed with", () => {
+				let invocation =
+					lastConstantFunctionInvocation(`implementation {
+					${printableSetup}
+
+					namespace Renderer for Nothing {
+						overload static render {
+							(_ value: Boolean) -> String {
+								<- "boolean"
+							}
+							<infer Value is Showable>(_ value: Value) -> String {
+								<- value::toString()
+							}
+						}
+					}
+
+					constant vector: Vector = { x = 1, y = 2 }
+					constant text: String = Renderer.render(vector)
+				}`)
+
+				expect(invocation.overloadedMethodIndex).toBe(1)
+				expect(invocation.conformances).toHaveLength(1)
+				expect(invocation.conformances[0].genericName).toBe("Value")
+				expect(invocation.conformances[0].protocolName).toBe("Showable")
+				expect(
+					invocation.conformances[0].source.kind === "namespace" &&
+						invocation.conformances[0].source.name,
+				).toBe("VectorShowable")
+			})
+
+			// NOTE: No candidate's bounds hold, so the call keeps the first
+			// matching candidate's own Diagnostic — which bound failed and how
+			// to satisfy it — rather than a bare "no overload accepts these
+			// Arguments" about Arguments that were accepted.
+			it("should report the first matching Overload's bound when no Overload's bounds hold", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					protocol Showable {
+						toString() -> String
+					}
+
+					protocol Matchable {
+						is(_ other: Self) -> Boolean
+					}
+
+					namespace Renderer for Nothing {
+						overload static render {
+							<infer Value is Showable>(_ value: Value) -> String {
+								<- value::toString()
+							}
+							<infer Item is Matchable>(_ value: Item) -> String {
+								<- "matchable"
+							}
+						}
+					}
+
+					constant text = Renderer.render(true)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("unsatisfied-bound")
+				expect(diagnostics[0].message).toBe(
+					"Boolean does not conform to 'Showable'",
+				)
+			})
+
+			// NOTE: A candidate whose bound could not be DECIDED must not drop
+			// out silently — the ambiguity is the reason the call fails, and
+			// probing is what would otherwise swallow the report.
+			it("should report an ambiguous conformance that failed the only matching Overload", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${printableSetup}
+
+					namespace VectorShowableToo for Vector is Showable {
+						toString() -> String {
+							<- "vector, too"
+						}
+					}
+
+					namespace Renderer for Nothing {
+						overload static render {
+							<infer Value is Showable>(_ value: Value) -> String {
+								<- value::toString()
+							}
+							(_ value: Boolean) -> String {
+								<- "boolean"
+							}
+						}
+					}
+
+					constant vector: Vector = { x = 1, y = 2 }
+					constant text = Renderer.render(vector)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("ambiguous-conformance")
+			})
+
+			it("should still report no matching Overload when the Arguments match none", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					${printableSetup}
+
+					namespace Renderer for Nothing {
+						overload static render {
+							<infer Value is Showable>(_ value: Value) -> String {
+								<- value::toString()
+							}
+							(_ value: Boolean, _ other: Boolean) -> String {
+								<- "boolean"
+							}
+						}
+					}
+
+					constant text = Renderer.render()
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("no-matching-overload")
+			})
+
+			// NOTE: Reaching past a candidate whose bound failed means typing the
+			// Arguments against the candidates behind it, and an unannotated
+			// Function literal reports from inside its own body when the Parameter
+			// it is read against is not a signature at all. The literal below is
+			// read against an `Integer` Parameter on the way to the Overload that
+			// takes it — a candidate that loses says nothing.
+			it("should keep the Arguments of a losing Overload from reporting", () => {
+				expect(
+					lastConstantMethodInvocation(`implementation {
+					${printableSetup}
+
+					namespace IntegerRunner for Integer {
+						overload run {
+							<infer Value is Showable>(_ value: Value, _ transform: (_ x: Integer) -> Integer) -> String {
+								<- value::toString()
+							}
+							(_ value: Boolean, _ transform: Integer) -> String {
+								<- "integer"
+							}
+							(_ value: Boolean, _ transform: (_ x: Integer) -> Integer) -> String {
+								<- "function"
+							}
+						}
+					}
+
+					constant text: String = 1::run(true, (x) { <- x })
+				}`).overloadedMethodIndex,
+				).toBe(2)
+			})
+
+			// NOTE: The same, one stage out: a Namespace that loses the specificity
+			// filter still probes its Overloads, and the Arguments it typed on the
+			// way are not the call's news either.
+			it("should keep the Arguments of a losing Namespace's Overloads from reporting", () => {
+				expect(
+					diagnosticsFor(`implementation {
+					${printableSetup}
+
+					namespace WideRunner for Integer | String {
+						overload run {
+							<infer Value is Showable>(_ value: Value, _ transform: (_ x: Integer) -> Integer) -> String {
+								<- value::toString()
+							}
+							(_ value: Boolean, _ transform: Integer) -> String {
+								<- "integer"
+							}
+						}
+					}
+
+					namespace NarrowRunner for Integer {
+						run(_ value: Boolean, _ transform: (_ x: Integer) -> Integer) -> String {
+							<- "narrow"
+						}
+					}
+
+					constant text = 1::run(true, (x) { <- x })
+				}`),
+				).toEqual([])
+			})
+
+			// NOTE: The other flavour of the same order-dependence, and not a bound
+			// failing: a prefixed Case construction read against `Holder<Item>` can
+			// not decide its Type Arguments from a Parameter Type that mentions the
+			// call's own unsolved Type Parameter, so it types as Error — which
+			// matches anything and leaves `Item` unbound, so the bound never fails.
+			// The generic candidate is passed over for the one that decides the
+			// construction, whichever order the two are written in.
+			function construction(overloads: string): string {
+				return `implementation {
+					choice Holder<Item is Equatable> {
+						Bare,
+						Full { value: Item },
+					}
+
+					namespace Takers for Nothing {
+						overload static take {
+							${overloads}
+						}
+					}
+
+					constant text: String = Takers.take(Holder#Full(1))
+				}`
+			}
+
+			const genericFirst = `
+				<infer Item is Equatable>(_ holder: Holder<Item>) -> String {
+					<- "generic"
+				}
+				(_ holder: Holder<Integer>) -> String {
+					<- "integer"
+				}
+			`
+
+			const genericSecond = `
+				(_ holder: Holder<Integer>) -> String {
+					<- "integer"
+				}
+				<infer Item is Equatable>(_ holder: Holder<Item>) -> String {
+					<- "generic"
+				}
+			`
+
+			it("should pass over an Overload no Argument can decide the Type Arguments of", () => {
+				expect(
+					lastConstantFunctionInvocation(construction(genericFirst))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+
+			it("should select that same Overload with the entries swapped", () => {
+				expect(
+					lastConstantFunctionInvocation(construction(genericSecond))
+						.overloadedMethodIndex,
+				).toBe(0)
+			})
 		})
 	})
 
