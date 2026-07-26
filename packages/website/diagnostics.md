@@ -408,14 +408,21 @@ than a Type Parameter tells them apart.
 
 ### `undecided-type-arguments`
 
-A Case of a generic Choice was constructed through its Choice's name —
-`Holder#Bare`, `Holder#Full({ value = 1 })` — where nothing says which
-`Holder` it is. A Choice's Type Parameters are APPLIED, never inferred: the
+A Case of a generic Choice was constructed where nothing says which `Holder` it
+is: through its Choice's name — `Holder#Bare`, `Holder#Full({ value = 1 })` — or
+as the bare sigil of a unit Case, `#Bare`, which carries no payload to be read
+under either. A Choice's Type Parameters are APPLIED, never inferred: the
 payload is checked against the instantiation, it does not pick one. So either
-the surrounding position decides, the way it does for the bare `#Bare` form —
-`constant left: Holder<Integer> = Holder#Bare` — or the construction applies
-them itself, `Holder<Integer>#Bare`. A Choice with no Type Parameters at all
-is never asked: `Ordering#Equal` is legal anywhere.
+the surrounding position decides — an annotation, a declared return Type, or the
+Parameter the construction is passed to, `constant left: Holder<Integer> =
+Holder#Bare` — or the construction applies them itself, `Holder<Integer>#Bare`.
+A Choice with no Type Parameters at all is never asked: `Ordering#Equal` is
+legal anywhere, and so is the bare `#Equal`.
+
+The bare form CARRYING a payload is the one that decides for itself — `#Full({
+value = 1 })` is a `Holder<Integer>` because its payload is one — which is what
+a Function literal with no written return Type answers with, and what the
+standard library's folds are written on.
 
 A Parameter Type that mentions the CALL's own Type Parameters decides nothing
 either, because nothing has decided them: `take(Holder#Full(1))` against
