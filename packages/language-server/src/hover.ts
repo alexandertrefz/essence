@@ -10,6 +10,7 @@ import {
 import type { common, parser } from "@essence/interfaces"
 
 import { documentationOf, renderDocumentation } from "./documentation"
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 
 // NOTE: Hovers are resolved on the enriched AST — every Expression carries
@@ -479,6 +480,10 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 						content: printCaseWithPayload(handler.matcher),
 						documentation: null,
 					}
+				}
+
+				for (let expression of typedHandlerExpressions(handler)) {
+					visitNode(expression, state)
 				}
 
 				visitBody(handler.body, state)
