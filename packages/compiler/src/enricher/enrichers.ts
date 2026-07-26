@@ -448,14 +448,15 @@ function expectedPayloadType(caseType: common.Type): common.Type | null {
 // that CAN decide one — the same holding-back a contextually typed Function
 // literal gets, for the same reason and one kind of Argument over.
 //
-// The bare form is not one of these: it resolves through the scope scan and its
-// payload still decides. Nor is an applied one — its members are concrete, and
-// they bind like any other value's.
+// A bare form carrying a payload is not one of these: it resolves through the
+// scope scan and its payload still decides. One carrying none has nothing to
+// decide with either and waits alongside the prefixed form. Nor is an applied
+// one — its members are concrete, and they bind like any other value's.
 function bindsNoTypeParameter(argument: parser.ArgumentNode): boolean {
 	return (
 		argument.value.nodeType === "CaseValue" &&
-		argument.value.choice !== null &&
-		argument.value.typeArguments === null
+		argument.value.typeArguments === null &&
+		(argument.value.choice !== null || argument.value.value === null)
 	)
 }
 
@@ -3118,7 +3119,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 
 		let { result: declared } = collectDiagnostics(() =>
 			node.choice === null
-				? { type: "Error" as const }
+				? resolveBareCaseReference(node.caseName, scope)
 				: resolveCaseReference(node.choice, node.caseName, scope),
 		)
 
@@ -3142,10 +3143,15 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				)
 			}
 
-			// NOTE: The other Expression that reacts — a prefixed Case
-			// construction of a generic Choice. The bare form resolves through the
-			// scope scan and needs nothing from here.
-			if (value.nodeType === "CaseValue" && value.choice !== null) {
+			// NOTE: The other Expression that reacts — a Case construction with
+			// nothing of its own to read its Choice's Type Arguments off: every
+			// prefixed one, and the bare sigil that carries no payload either. A
+			// bare form WITH a payload is what its payload decides, so it resolves
+			// through the scope scan and needs nothing from here.
+			if (
+				value.nodeType === "CaseValue" &&
+				(value.choice !== null || value.value === null)
+			) {
 				return noteErrors(
 					probedCaseValueType(value, expectedType, bindings),
 				)
@@ -4939,7 +4945,35 @@ export function resolveCaseValueType(
 			}
 		}
 
-		return resolveBareCaseReference(node.caseName, scope)
+		let bareCase = resolveBareCaseReference(node.caseName, scope)
+
+		// NOTE: A unit Case of a generic Choice carries no payload to read a Type
+		// Argument off, so a bare `#Bare` nothing around decides is exactly as
+		// undecided as the prefixed `Holder#Bare` is, and reports as one. It used
+		// to resolve to the DECLARED Case and stand: the Choice's own Type
+		// Parameters escaped into the Program as raw GenericUses and resurfaced far
+		// from here, as an `unsatisfied-bound` about a name nothing applied or as
+		// nothing at all.
+		//
+		// The payload-carrying bare form is untouched — it is the one form whose
+		// payload still decides, and the form a Function literal with no written
+		// return Type answers with, which is what the standard library's folds are
+		// written on (`<- #Done(item)`).
+		if (
+			bareCase.type === "Case" &&
+			bareCase.choiceGenerics !== undefined &&
+			Object.keys(bareCase.members).length === 0
+		) {
+			return reportUndecidedTypeArguments(
+				`#${node.caseName.content}`,
+				bareCase.choice,
+				node.caseName.content,
+				bareCase.choiceGenerics,
+				node.position,
+			)
+		}
+
+		return bareCase
 	}
 
 	return resolvePrefixedCaseValueType(
@@ -5009,33 +5043,53 @@ function resolvePrefixedCaseValueType(
 		}
 	}
 
-	// NOTE: The Choice's own Parameter names stand in for the Arguments in both
-	// helps — they are what the declaration calls them, so the reader has a name
-	// to replace rather than an ellipsis to decode.
-	let parameterNames = declaredCase.choiceGenerics.map(
-		(generic) => generic.name,
+	return reportUndecidedTypeArguments(
+		`${choice.content}#${node.caseName.content}`,
+		choice.content,
+		node.caseName.content,
+		declaredCase.choiceGenerics,
+		node.position,
 	)
-	let construction = `${choice.content}#${node.caseName.content}`
-	let application = `${choice.content}<${parameterNames.join(", ")}>`
+}
+
+// NOTE: The one Diagnostic both undecided rails report — the prefixed
+// `Holder#Bare` and the bare `#Bare` of a unit Case — spelled with the form the
+// source wrote, since the annotation that is one way out is written around that
+// very spelling. The Choice's name is handed in rather than read off the Case,
+// so the prefixed rail keeps naming the Alias the reader wrote where one stood
+// in for the Choice.
+//
+// NOTE: The Choice's own Parameter names stand in for the Arguments in both
+// helps — they are what the declaration calls them, so the reader has a name to
+// replace rather than an ellipsis to decode.
+function reportUndecidedTypeArguments(
+	construction: string,
+	choiceName: string,
+	caseName: string,
+	choiceGenerics: Array<common.GenericDeclaration>,
+	position: common.Position,
+): common.ErrorType {
+	let parameterNames = choiceGenerics.map((generic) => generic.name)
+	let application = `${choiceName}<${parameterNames.join(", ")}>`
 
 	reportError(
 		`Nothing decides the Type Arguments of '${construction}'`,
-		node.position,
+		position,
 		{
 			code: "undecided-type-arguments",
 			labels: [
 				primary(
-					node.position,
+					position,
 					"no Type Arguments here, and nothing around it decides them",
 				),
 			],
 			notes: [
-				`'${choice.content}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${parameterNames.map((name) => `'${name}'`).join(", ")}.`,
+				`'${choiceName}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${parameterNames.map((name) => `'${name}'`).join(", ")}.`,
 				"A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.",
 			],
 			helps: [
 				`Annotate the declaration: 'constant left: ${application} = ${construction}'.`,
-				`Or apply the Type Arguments: '${application}#${node.caseName.content}'.`,
+				`Or apply the Type Arguments: '${application}#${caseName}'.`,
 			],
 		},
 	)

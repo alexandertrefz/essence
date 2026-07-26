@@ -984,13 +984,14 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The bare form is untouched by the applied-Type-Arguments rule, and
-		// deliberately so — it is the form a Function literal with no written
-		// return Type answers with, where there is no position to read a decision
-		// off and the body is the only thing that can say what it returns. The
-		// standard library's `List.firstItem(where:)` is written on exactly this,
-		// and `#Done`/`#Continue` in a `loop`'s callback are the same shape. The
-		// PREFIXED form is what asks to be decided.
+		// NOTE: The bare form CARRYING A PAYLOAD is untouched by the
+		// applied-Type-Arguments rule, and deliberately so — it is the form a
+		// Function literal with no written return Type answers with, where there is
+		// no position to read a decision off and the body is the only thing that can
+		// say what it returns. The standard library's `List.firstItem(where:)` is
+		// written on exactly this, and `#Done`/`#Continue` in a `loop`'s callback
+		// are the same shape. The PREFIXED form is what asks to be decided, and so
+		// is the bare unit Case below: it has no payload to decide with either.
 		it("still reads a bare Case's Type Arguments off its payload", () => {
 			expect(
 				valueTypeOf(
@@ -1008,6 +1009,76 @@ describe("Choices", () => {
 					{ type: "GenericUse", name: "State" },
 					{ type: "String" },
 				],
+			})
+		})
+
+		// NOTE: A unit Case has no payload to read a decision off and no Choice
+		// name to apply Type Arguments to, so the bare spelling of one is asked to
+		// be decided exactly as the prefixed form is. Every position that decides
+		// the prefixed form decides this one; nothing around it at all is what
+		// reports, instead of the Choice's own Type Parameters standing here as the
+		// Type of a value.
+		describe("A unit Case of a generic Choice", () => {
+			const box = `choice Box<Value> { Full { value: Value }, Empty }`
+
+			it("reports one nothing decides", () => {
+				let source = `implementation { ${box}
+					constant empty = #Empty
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+				expect(messagesOf(source)).toEqual([
+					"Nothing decides the Type Arguments of '#Empty'",
+				])
+				expect(helpsOf(source)).toEqual([
+					"Annotate the declaration: 'constant left: Box<Value> = #Empty'.",
+					"Or apply the Type Arguments: 'Box<Value>#Empty'.",
+				])
+			})
+
+			it("takes the decision from an annotation", () => {
+				expect(
+					messagesOf(`implementation { ${box}
+						constant empty: Box<Integer> = #Empty
+					}`),
+				).toEqual([])
+			})
+
+			it("takes the decision from the Parameter it is passed to", async () => {
+				expect(
+					await run(`implementation { ${box}
+						function describe(_ b: Box<Integer>) -> String {
+							<- match b -> String {
+								case #Full { <- "full" }
+								case #Empty { <- "empty" }
+							}
+						}
+
+						__print(describe(#Empty))
+					}`),
+				).toEqual(['"empty"'])
+			})
+
+			// NOTE: And waits for the Argument beside it that decides the Parameter,
+			// the same holding-back the prefixed form gets: matching a Case that
+			// binds nothing first would only read a Parameter Type nothing has
+			// decided yet.
+			it("waits for an Argument that decides the Parameter", async () => {
+				expect(
+					await run(`implementation { ${box}
+						function orElse<infer Value is Equatable>(
+							_ b: Box<Value>,
+							_ fallback: Value,
+						) -> Value {
+							<- match b -> Value {
+								case #Full { <- @.value }
+								case #Empty { <- fallback }
+							}
+						}
+
+						__print(orElse(#Empty, 7)::toString())
+					}`),
+				).toEqual(['"7"'])
 			})
 		})
 	})
@@ -1247,11 +1318,11 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		// NOTE: The bare form is the one place a payload still decides, so it is
-		// the one place a payload can still decide BADLY — and it answers for the
-		// bound where it does. A payload that mentions no Generic at all decides
-		// none and is asked nothing, which is what keeps every `#Empty` of a
-		// bounded Choice from being an error on sight.
+		// NOTE: The bare form carrying a payload is the one place a payload still
+		// decides, so it is the one place a payload can still decide BADLY — and it
+		// answers for the bound where it does. A payload that mentions no Generic at
+		// all decides none and is asked nothing, which is what keeps an `#Empty` a
+		// position DID decide from being an error on sight.
 		it("holds a bare construction's payload to the bound it decides", () => {
 			expect(
 				codesOf(`implementation { ${boundedBox}
@@ -1260,12 +1331,20 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		it("asks a bare unit construction for no bound at all", () => {
-			expect(
-				codesOf(`implementation { ${boundedBox}
-					constant b = #Empty
-				}`),
-			).toEqual([])
+		// NOTE: A unit Case has no payload to decide with, so a bare one nothing
+		// around decides is undecided rather than free. It used to stand as a Box of
+		// the Choice's OWN Type Parameter: the raw GenericUse left here for the rest
+		// of the Program, where the bound had nothing to ask about and the Type
+		// Arguments named something no declaration in sight applies.
+		it("refuses a bare unit construction nothing decides", () => {
+			let source = `implementation { ${boundedBox}
+				constant b = #Empty
+			}`
+
+			expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+			expect(messagesOf(source)).toEqual([
+				"Nothing decides the Type Arguments of '#Empty'",
+			])
 		})
 
 		it("leaves a conforming Type Argument alone", async () => {
