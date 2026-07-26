@@ -474,13 +474,36 @@ class DescentParser {
 
 		// NOTE: `overload function …` is a free-Function Overload block, only
 		// meaningful in a `declarations { … }` Program — the standard library's
-		// alone. Anywhere else `overload` stays whatever the expression Parser
-		// makes of it, so a user Program's Diagnostics are unchanged.
+		// alone. Anywhere else it is a tailored Diagnostic, after which the block
+		// is parsed anyway so its contents still produce Diagnostics; without
+		// that the form read as an Expression and measured a bare "Expected an
+		// Expression but found 'overload'" plus a cascade off the block's `{`.
 		if (
-			this.mode === "declarations" &&
 			token.type === TokenType.KeywordOverload &&
 			this.tokens.peek(1)?.type === TokenType.KeywordFunction
 		) {
+			if (this.mode !== "declarations" && !this.suppressDiagnostics) {
+				reportError(
+					"Only the standard library may write an 'overload function' block",
+					token.position,
+					{
+						code: "overload-function-outside-stdlib",
+						labels: [
+							primary(
+								token.position,
+								"'overload function' is not allowed here",
+							),
+						],
+						notes: [
+							"Free-Function Overloads are a 'declarations { … }' form — a free Function in a Program carries one signature.",
+						],
+						helps: [
+							"Write the Overloads as an 'overload' Method block inside a Namespace instead.",
+						],
+					},
+				)
+			}
+
 			return this.parseOverloadedFunctionStatement()
 		}
 
@@ -695,7 +718,8 @@ class DescentParser {
 	// signature form, only meaningful in a `declarations { … }` Program. Each
 	// entry is a Function literal or a native signature, mixed freely; the
 	// written order is load-bearing, because the index names the `__overload$N`
-	// export a call site binds to.
+	// export a call site binds to. Outside declarations mode this runs only as
+	// recovery, after `parseImplementationNode` has already refused the form.
 	protected parseOverloadedFunctionStatement(): parser.OverloadedFunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordOverload)
 		let documentation = this.tokens.documentationAbove(

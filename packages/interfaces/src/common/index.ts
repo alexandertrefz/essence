@@ -143,6 +143,7 @@ export type DiagnosticCode =
 	| "invalid-number"
 	| "redundant-parameter-label"
 	| "declarations-outside-stdlib"
+	| "overload-function-outside-stdlib"
 	// Names — declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"

@@ -2112,6 +2112,58 @@ describe("Parser", () => {
 			)
 		})
 
+		it("should reject an overload function block outside the standard library", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					overload function combine {
+						(first value: Integer) -> Integer {
+							<- value
+						}
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+
+			let diagnostic = diagnostics[0]
+
+			expect(diagnostic.code).toBe("overload-function-outside-stdlib")
+			expect(diagnostic.labels[0]?.kind).toBe("primary")
+			expect(diagnostic.labels[0]?.message).toBe(
+				"'overload function' is not allowed here",
+			)
+			expect(diagnostic.notes).toEqual([
+				"Free-Function Overloads are a 'declarations { … }' form — a free Function in a Program carries one signature.",
+			])
+			expect(diagnostic.helps).toEqual([
+				"Write the Overloads as an 'overload' Method block inside a Namespace instead.",
+			])
+
+			// NOTE: Recovery parses the block anyway, so the block's contents
+			// still yield an AST instead of the cascade the Expression reading
+			// used to leave behind.
+			expect(program.implementation.nodes).toHaveLength(1)
+			expect(program.implementation.nodes[0].nodeType).toBe(
+				"OverloadedFunctionStatement",
+			)
+		})
+
+		it("should not reject an overload Method block inside a Namespace", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					namespace Doubling for Integer {
+						overload double {
+							(value: Integer) -> Integer {
+								<- value
+							}
+						}
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(0)
+		})
+
 		it("should reject a body-less Method in implementation mode", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
