@@ -1,88 +1,135 @@
 {
-	// Place your essence workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
-	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
-	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
-	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
-	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
-	// Placeholders with the same ids are connected.
 	"implementation": {
-		"prefix": [
-			"impl",
-		],
-		"body": [
-			"implementation {",
-			"\t",
-			"\t$0",
-			"\t",
-			"}"
-		],
-		"description": "An implementation block."
+		"prefix": "implementation",
+		"body": ["implementation {", "\t$0", "}"],
+		"description": "An implementation block — the body of a Program."
 	},
-	"variable": {
-		"prefix": [
-			"var",
-		],
-		"body": [
-			"variable ${1:name} = ${3:value}",
-			"$0",
-		],
-		"description": "A variable declaration."
+	"declarations": {
+		"prefix": "declarations",
+		"body": ["declarations {", "\t$0", "}"],
+		"description": "A declarations block — the body of a standard library file."
 	},
 	"constant": {
-		"prefix": [
-			"con",
-		],
-		"body": [
-			"constant ${1:name} = ${3:value}",
-			"$0",
-		],
+		"prefix": "constant",
+		"body": ["constant ${1:name}${2:: ${3:Type}} = ${0:value}"],
 		"description": "A constant declaration."
 	},
+	"variable": {
+		"prefix": "variable",
+		"body": ["variable ${1:name}${2:: ${3:Type}} = ${0:value}"],
+		"description": "A variable declaration."
+	},
 	"function": {
-		"prefix": [
-			"fun",
-		],
+		"prefix": "function",
 		"body": [
-			"function ${1:name}(${2:externalName} ${3:internalName}: ${4:Type}) -> ${5:ReturnType} {",
+			"function ${1:name}(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t<- $0",
+			"}"
+		],
+		"description": "A function declaration."
+	},
+	"overload": {
+		"prefix": "overload",
+		"body": [
+			"overload ${1:name} {",
+			"\t(${2:_} ${3:parameter}: ${4:Type}) -> ${5:ReturnType} {",
+			"\t\t<- $0",
+			"\t}",
+			"}"
+		],
+		"description": "An overload group of same-named signatures — a namespace member, so this body only parses inside a namespace."
+	},
+	"namespace": {
+		"prefix": "namespace",
+		"body": [
+			"namespace ${1:Name} for ${2:Type} is ${3:Protocol} {",
 			"\t$0",
 			"}"
 		],
-		"description": "A constant declaration."
+		"description": "A namespace conforming a Type to a Protocol."
+	},
+	"protocol": {
+		"prefix": "protocol",
+		"body": [
+			"protocol ${1:Name} {",
+			"\t${2:method}(${3:_} ${4:parameter}: ${5:Type}) -> ${0:ReturnType}",
+			"}"
+		],
+		"description": "A protocol declaration."
 	},
 	"choice": {
-		"prefix": [
-			"cho"
-		],
+		"prefix": "choice",
 		"body": [
 			"choice ${1:Name} {",
 			"\t${2:Case} { ${3:member}: ${4:Type} },",
-			"\t$0",
+			"\t${0:OtherCase},",
 			"}"
 		],
 		"description": "A choice declaration."
 	},
-	"match": {
-		"prefix": [
-			"mat"
-		],
+	"choice-generic": {
+		"prefix": "choice-generic",
 		"body": [
-			"match ${1:value} {",
-			"\tcase ${2:matcher} -> ${3:returnType} {",
-			"\t\t<- $0",
-			"\t}",
+			"choice ${1:Name}<${2:Parameter}> {",
+			"\t${3:Case} { ${4:member}: ${2:Parameter} },",
+			"\t${0:OtherCase},",
+			"}"
+		],
+		"description": "A generic choice declaration."
+	},
+	"type": {
+		"prefix": "type",
+		"body": ["type ${1:Name} = ${0:Type}"],
+		"description": "A type alias."
+	},
+	"type-record": {
+		"prefix": "type-record",
+		"body": ["type ${1:Name} = { ${2:member}: ${0:Type} }"],
+		"description": "A Record type alias."
+	},
+	"record": {
+		"prefix": "record",
+		"body": ["${1:Type} ~> { ${2:member} = ${0:value} }"],
+		"description": "A typed Record literal."
+	},
+	"match": {
+		"prefix": "match",
+		"body": [
+			"match ${1:value} -> ${2:ReturnType} {",
+			"\tcase ${3:Matcher} { <- ${4:value} }",
+			"\tcase ${5:_}       { <- ${0:value} }",
 			"}"
 		],
 		"description": "A match expression."
 	},
 	"case": {
-		"prefix": [
-			"cas"
-		],
-		"body": [
-			"case ${1:matcher} -> ${2:returnType} {",
-			"\t<- $0",
-			"}",
-		],
+		"prefix": "case",
+		"body": ["case ${1:Matcher} { <- ${0:value} }"],
 		"description": "A case handler within a match expression."
+	},
+	"case-where": {
+		"prefix": "case-where",
+		"body": ["case ${1:Matcher} where ${2:condition} { <- ${0:value} }"],
+		"description": "A guarded case handler within a match expression."
+	},
+	"if": {
+		"prefix": "if",
+		"body": ["if ${1:condition} {", "\t$0", "}"],
+		"description": "An if statement."
+	},
+	"ifelse": {
+		"prefix": "ifelse",
+		"body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
+		"description": "An if statement with an else branch."
+	},
+	"doc": {
+		"prefix": "doc",
+		"body": [
+			"§§ ${1:What it does.}",
+			"§§",
+			"§§ @param ${2:name} — ${3:what it carries}",
+			"§§ @returns — ${0:what it answers with}"
+		],
+		"description": "A §§ documentation block."
 	}
 }
