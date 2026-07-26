@@ -3955,6 +3955,57 @@ function reportAmbiguousNamespace(
 	)
 }
 
+// NOTE: A receiver with an undecided slot in it — the `List<Unknown>` an empty
+// List Literal has — is matched by every Namespace whose target is a List, in
+// both directions, because an Unknown fits anything and anything fits it. The
+// specificity order then reads that as a genuine overlap and hands the call to
+// the narrower target, so `[]::tag()` would silently be the nested Namespace's
+// `tag` rather than the flat one's. What is undecided must not be what decides,
+// which is why more than one match over such a receiver is refused here instead
+// of ordered: the receiver has to say what it holds first. Exactly one match is
+// left alone — nothing was picked by the Unknown when there was nothing to pick
+// between.
+function reportUndecidedReceiverType(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	memberType: common.Type | null,
+	namespaceNames: Array<string>,
+): void {
+	let undecidedType = memberType ?? baseType
+
+	reportError(
+		`'${node.member.content}' is called on a value whose Type is not fully known here`,
+		node.base.position,
+		{
+			code: "undecided-receiver-type",
+			labels: [
+				primary(
+					node.base.position,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+				secondary(
+					node.member.position,
+					`'${node.member.content}' is looked up in its Namespaces`,
+				),
+			],
+			notes: [
+				...(memberType === null
+					? []
+					: [
+							`${describeType(memberType)} is a member of this Union.`,
+						]),
+				...namespaceNames.map(
+					(name) => `'${name}' declares '${node.member.content}'.`,
+				),
+				`${describeType(undecidedType)} is matched by all of them, so which one runs would be decided by a Type nothing has decided.`,
+			],
+			helps: [
+				"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
+			],
+		},
+	)
+}
+
 // NOTE: Which of the Namespaces found for a receiver actually declare the
 // Method — and the ONE door the derived Equatable Namespace comes through, for
 // both the whole-Union lookup and the per-member one. It is consulted only when
@@ -4102,6 +4153,23 @@ function resolveMethodInvocation(
 	}
 
 	if (resolvedMethods.length > 1) {
+		// NOTE: An undecided receiver is refused before the order is asked
+		// anything — see `reportUndecidedReceiverType`. The shared filter itself
+		// stays as it is: Completion runs it over the same Namespaces and must
+		// keep listing them for a receiver the user is still writing.
+		if (typeContainsUnknown(baseType)) {
+			commitContextualFunctionTypes(lastRecording)
+
+			reportUndecidedReceiverType(
+				node,
+				baseType,
+				null,
+				resolvedMethods.map((method) => method.namespace.name),
+			)
+
+			return resolveFailedMethodInvocation()
+		}
+
 		// NOTE: The Namespaces here are the raw, unspecialized ones the Scope
 		// holds, so a generic candidate still spells its target with its own
 		// Generics — which is what the specificity order compares.
@@ -4296,6 +4364,22 @@ function resolveUnionMethodDispatch(
 		}
 
 		if (resolvedMethods.length > 1) {
+			// NOTE: As in `resolveMethodInvocation` — a member Type with an
+			// undecided slot in it must not have its Namespace picked for it by
+			// the order.
+			if (typeContainsUnknown(memberType)) {
+				commitContextualFunctionTypes(lastRecording)
+
+				reportUndecidedReceiverType(
+					node,
+					unionType,
+					memberType,
+					resolvedMethods.map((method) => method.namespaceName),
+				)
+
+				return resolveFailedMethodInvocation()
+			}
+
 			resolvedMethods = filterMostSpecificByTarget(
 				resolvedMethods,
 				(candidate) => candidate.namespaceType,

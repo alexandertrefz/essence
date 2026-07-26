@@ -3901,6 +3901,114 @@ describe("Enricher", () => {
 				}`).map((diagnostic) => diagnostic.code),
 			).toEqual(["ambiguous-namespace"])
 		})
+
+		// NOTE: An empty List Literal is a `List<Unknown>`, and an Unknown fits
+		// anything and is fit by anything — so every List target covers it, in
+		// both directions, and the order above would answer the call with the
+		// nested Namespace on the strength of a Type nothing has decided. The
+		// refusal comes BEFORE the order is asked, which is also what stops the
+		// winner's own `ItemType` from being reported uninferable: a Type
+		// Parameter of a Namespace the program never picked.
+		describe("An undecided receiver", () => {
+			let overlappingNamespaces = `namespace FlatTag<infer ItemType> for List<ItemType> {
+					tag() -> String {
+						<- "flat"
+					}
+				}
+
+				namespace NestedTag<infer ItemType> for List<List<ItemType>> {
+					tag() -> Integer {
+						<- 1
+					}
+				}`
+
+			it("should refuse a call more than one Namespace matches", () => {
+				expect(
+					diagnosticsFor(`implementation {
+				${overlappingNamespaces}
+
+				constant tagged = []::tag()
+			}`).map((diagnostic) => diagnostic.code),
+				).toEqual(["undecided-receiver-type"])
+			})
+
+			it("should point at the receiver and name what matched it", () => {
+				let source = `implementation {
+				${overlappingNamespaces}
+
+				constant tagged = []::tag()
+			}`
+				let diagnostic = diagnosticsFor(source)[0]
+
+				expect(diagnostic.message).toBe(
+					"'tag' is called on a value whose Type is not fully known here",
+				)
+				expect(underlinedText(source, diagnostic)).toBe("[]")
+				expect(diagnostic.labels[0]?.message).toBe(
+					"this is a List<Unknown>",
+				)
+				expect(diagnostic.labels[1]?.kind).toBe("secondary")
+				expect(diagnostic.labels[1]?.message).toBe(
+					"'tag' is looked up in its Namespaces",
+				)
+				expect(diagnostic.notes).toContain("'FlatTag' declares 'tag'.")
+				expect(diagnostic.notes).toContain(
+					"'NestedTag' declares 'tag'.",
+				)
+				expect(diagnostic.helps).toEqual([
+					"Annotate what the receiver comes from — 'constant items: List<Integer> = []' — so its Type is decided before the call.",
+				])
+			})
+
+			it("should resolve once the receiver is annotated", () => {
+				let invocation = lastConstantMethodInvocation(`implementation {
+				${overlappingNamespaces}
+
+				constant empty: List<Integer> = []
+				constant tagged = empty::tag()
+			}`)
+
+				expect(invocation.namespace.name).toBe("FlatTag")
+				expect(invocation.type).toEqual({ type: "String" })
+			})
+
+			it("should leave a lone matching Namespace alone", () => {
+				// NOTE: Nothing was decided by the Unknown where there was
+				// nothing to decide between — the call has the one Namespace to
+				// go to whatever the receiver turns out to hold.
+				let invocation = lastConstantMethodInvocation(`implementation {
+				namespace IntegerList for List<Integer> {
+					tag() -> String {
+						<- "integers"
+					}
+				}
+
+				constant tagged = []::tag()
+			}`)
+
+				expect(invocation.namespace.name).toBe("IntegerList")
+				expect(invocation.type).toEqual({ type: "String" })
+			})
+
+			it("should refuse an undecided member of a Union receiver", () => {
+				// NOTE: Per-member dispatch reaches the same order, so it
+				// refuses on the same terms — the `firstItem` of a List holding
+				// one empty List is an `Optional<List<Unknown>>`, whose List
+				// member both Namespaces match.
+				let diagnostics = diagnosticsFor(`implementation {
+				${overlappingNamespaces}
+
+				constant tagged = [[]]::firstItem()::tag()
+			}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["undecided-receiver-type"])
+				expect(diagnostics[0].notes).toContain(
+					"List<Unknown> is a member of this Union.",
+				)
+			})
+		})
 	})
 
 	// NOTE: A static Method is called on its Namespace and takes no receiver.

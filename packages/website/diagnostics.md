@@ -317,6 +317,18 @@ List of Integers, yet the Union is no case of the generic List and the generic
 List is no case of the Union, which leaves that receiver with nothing to pick
 by. The matching Namespaces are listed; qualify the call to pick one.
 
+### `undecided-receiver-type`
+
+The receiver's Type still holds a slot nothing has decided — the `List<Unknown>`
+an empty List Literal has — and more than one Namespace declares the Method for
+it. An undecided slot is matched by every candidate in both directions, so the
+narrower-target order of `ambiguous-namespace` would hand `[]::tag()` to
+whichever Namespace is nested deepest, decided by a Type the program never
+wrote. The candidates are listed; annotate what the receiver comes from —
+`constant items: List<Integer> = []` — so the call has a Type to dispatch on. A
+receiver like this matched by a single Namespace is fine: nothing was decided by
+the Unknown when there was nothing to decide.
+
 ### `unknown-method`
 
 No Namespace in scope declares a Method of that name for the value's Type.

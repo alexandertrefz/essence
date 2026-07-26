@@ -187,6 +187,36 @@ describe("Completion", () => {
 			])
 		})
 
+		// NOTE: The Enricher refuses this call — a `List<Unknown>` receiver is
+		// matched by both Namespaces and nothing but the Unknown would pick
+		// between them. Completion is written while the receiver is still
+		// undecided, though, so it keeps offering what either Namespace has:
+		// going silent would answer "your Type is not known yet" with no list
+		// at all, which is the least useful moment to have none.
+		it("should still list Methods for an undecided receiver", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace FlatTag<infer ItemType> for List<ItemType> {",
+				"\t\ttag() -> String {",
+				'\t\t\t<- "flat"',
+				"\t\t}",
+				"\t}",
+				"\tnamespace NestedTag<infer ItemType> for List<List<ItemType>> {",
+				"\t\ttag() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"\tconstant items = []",
+				"\titems::",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 13, column: 9 })
+
+			expect(labels).toContain("tag")
+			expect(labels).toContain("isEmpty")
+		})
+
 		it("should see a Namespace declared after the cursor", () => {
 			let source = [
 				"implementation {",

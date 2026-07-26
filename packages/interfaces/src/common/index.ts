@@ -182,6 +182,7 @@ export type DiagnosticCode =
 	// Dispatch — which Method, in which Namespace, with which overload.
 	| "no-matching-overload"
 	| "ambiguous-namespace"
+	| "undecided-receiver-type"
 	| "unknown-method"
 	| "no-namespace-for-value"
 	| "not-a-namespace"
