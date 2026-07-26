@@ -117,6 +117,15 @@ type RenderContext = {
 	usedProtocols: Set<string>
 }
 
+// NOTE: What one `*Natives` type carries to the assertions at the foot — its
+// text, the export names that must be ABSENT (the Essence-bodied members), and
+// the declared arity of each native Method, keyed by export name.
+type NativesSection = {
+	text: string
+	forbiddenKeys: Array<string>
+	arities: Array<[string, number]>
+}
+
 function conformanceTypeName(protocolName: string): string {
 	return `${protocolName}Conformance`
 }
@@ -313,12 +322,28 @@ function mapType(
 	}
 }
 
+// NOTE: The number of arguments the runtime calling convention passes a native
+// — the declared Parameters (the receiver leads a non-static signature, and is
+// already the first entry of `parameterTypes`) plus one conformance witness per
+// bounded Generic. The one place this count is written: `renderArrow` below
+// renders exactly this many Parameter slots, the emitted `AssertArities` records
+// pin it under `tsc`, and `tests/builtins.spec.ts` checks the runtime function's
+// own `.length` against it.
+export function nativeArity(fn: common.BaseFunction): number {
+	let generics = fn.generics ?? []
+
+	return (
+		fn.parameterTypes.length +
+		generics.filter((generic) => generic.constraint != null).length
+	)
+}
+
 // NOTE: One Method or Property signature as a TypeScript arrow type — NEVER
 // method shorthand, so `strictFunctionTypes` applies sound contravariant
 // parameter checking to it. The receiver leads a non-static entry (index 0,
 // named `self`); each bounded Method Generic appends a trailing
 // conformance-witness Parameter, in Generic declaration order, exactly as the
-// runtime calling convention passes them.
+// runtime calling convention passes them — `nativeArity` counts the slots.
 function renderArrow(
 	fn: common.BaseFunction,
 	isStatic: boolean,
@@ -466,16 +491,19 @@ function nativeEntry(comment: string, key: string, rendered: string): string {
 // NOTE: A Namespace's `*Natives` type — every native entry (Properties first,
 // in source order, then Methods, each Overload as its own mangled `__overload$N`
 // key). Also returns the export names of the Essence-bodied members, so the
-// assertion at the foot can forbid a runtime export for any of them. A fully
-// Essence Namespace has an empty `*Natives` (`{}`) and every member forbidden.
+// assertion at the foot can forbid a runtime export for any of them, and the
+// declared arity of every native METHOD — Properties are values, not functions,
+// so they have none. A fully Essence Namespace has an empty `*Natives` (`{}`),
+// every member forbidden and no arities.
 function renderNamespace(
 	namespace: common.NamespaceType,
 	nativeBindings: Stdlib["nativeBindings"],
 	ctx: RenderContext,
-): { text: string; forbiddenKeys: Array<string> } {
+): NativesSection {
 	let bindings = nativeBindings[namespace.name]
 	let nativeEntries: Array<string> = []
 	let bodiedKeys: Array<string> = []
+	let arities: Array<[string, number]> = []
 
 	for (let [name, propertyType] of Object.entries(namespace.properties)) {
 		let isNative = bindings?.properties[name] ?? true
@@ -520,6 +548,7 @@ function renderNamespace(
 							),
 						),
 					)
+					arities.push([key, nativeArity(overload)])
 				} else {
 					bodiedKeys.push(key)
 				}
@@ -540,6 +569,7 @@ function renderNamespace(
 						),
 					),
 				)
+				arities.push([name, nativeArity(method)])
 			} else {
 				bodiedKeys.push(name)
 			}
@@ -548,7 +578,7 @@ function renderNamespace(
 
 	let text = `export type ${namespace.name}Natives = {\n${nativeEntries.join("\n")}\n}`
 
-	return { text, forbiddenKeys: bodiedKeys }
+	return { text, forbiddenKeys: bodiedKeys, arities }
 }
 
 // NOTE: The free Functions' `*Natives` type — every native free Function the
@@ -562,9 +592,10 @@ function renderNamespace(
 function renderFunctionsNatives(
 	stdlib: Stdlib,
 	ctx: RenderContext,
-): { text: string; forbiddenKeys: Array<string> } {
+): NativesSection {
 	let nativeEntries: Array<string> = []
 	let bodiedKeys: Array<string> = []
+	let arities: Array<[string, number]> = []
 
 	for (let [name, flags] of Object.entries(stdlib.functionBindings)) {
 		let member = stdlib.members[name]
@@ -591,6 +622,7 @@ function renderFunctionsNatives(
 							),
 						),
 					)
+					arities.push([key, nativeArity(overload)])
 				} else {
 					bodiedKeys.push(key)
 				}
@@ -606,6 +638,7 @@ function renderFunctionsNatives(
 						renderArrow(member, true, ctx, `functions.${name}`),
 					),
 				)
+				arities.push([name, nativeArity(member)])
 			} else {
 				bodiedKeys.push(name)
 			}
@@ -614,29 +647,56 @@ function renderFunctionsNatives(
 
 	let text = `export type FunctionsNatives = {\n${nativeEntries.join("\n")}\n}`
 
-	return { text, forbiddenKeys: bodiedKeys }
+	return { text, forbiddenKeys: bodiedKeys, arities }
+}
+
+// NOTE: The absence and arity assertions of one module, in that order — the two
+// checks the positive `*Natives` assignment can not make. Both are skipped when
+// they would have nothing to say: a Namespace with no Essence-bodied member
+// needs no absence check, and one with no native Method no arity record.
+function renderExtraAssertions(
+	exportPrefix: string,
+	module: string,
+	section: NativesSection,
+): Array<string> {
+	let lines: Array<string> = []
+
+	if (section.forbiddenKeys.length > 0) {
+		let forbidden = section.forbiddenKeys
+			.map((key) => JSON.stringify(key))
+			.join(" | ")
+
+		lines.push(
+			`export const $${exportPrefix}Absent: AssertNoEssenceExports<${module}, ${forbidden}> = true`,
+		)
+	}
+
+	if (section.arities.length > 0) {
+		// NOTE: One `member: N` entry per line, so a signature that gains or
+		// loses a Parameter is a one-line diff rather than a re-flowed wall.
+		let arities = section.arities
+			.map(([key, arity]) => `\t${key}: ${arity}`)
+			.join("\n")
+
+		lines.push(
+			`export const $${exportPrefix}Arity: AssertArities<${module}, {\n${arities}\n}> = true`,
+		)
+	}
+
+	return lines
 }
 
 // NOTE: The functions module's half of the contract — the same shape
 // `renderModuleAssertion` builds for a Namespace, but the module is `./functions`
 // rather than the identity of a Namespace name, so it is spelled out here.
-function renderFunctionsAssertion(forbiddenKeys: Array<string>): string {
+function renderFunctionsAssertion(section: NativesSection): string {
 	let module = `typeof import("./functions")`
 
 	let lines = [
 		`declare const functionsModule: ${module}`,
 		`export const $functions: FunctionsNatives = functionsModule`,
+		...renderExtraAssertions("functions", module, section),
 	]
-
-	if (forbiddenKeys.length > 0) {
-		let forbidden = forbiddenKeys
-			.map((key) => JSON.stringify(key))
-			.join(" | ")
-
-		lines.push(
-			`export const $functionsAbsent: AssertNoEssenceExports<${module}, ${forbidden}> = true`,
-		)
-	}
 
 	return lines.join("\n")
 }
@@ -725,29 +785,25 @@ function renderImports(used: Set<string>): string {
 // moment `*Natives` went empty. The keyof form is non-weak and holds whether
 // `*Natives` is empty or not.
 //
+// A THIRD assertion pins the arity of every native Method via `AssertArities`.
+// The positive direction can not: a runtime function taking FEWER Parameters
+// than the declaration is assignable to the declared arrow Type, so `$<Namespace>`
+// happily accepts a native that ignores its last argument.
+//
 // The `declare const` carries no runtime value; nothing imports this file, so
 // the `export const`s are never evaluated. The Namespace → module path is the
 // identity.
 function renderModuleAssertion(
 	namespace: common.NamespaceType,
-	forbiddenKeys: Array<string>,
+	section: NativesSection,
 ): string {
 	let module = `typeof import("./${namespace.name}")`
 
 	let lines = [
 		`declare const ${namespace.name}Module: ${module}`,
 		`export const $${namespace.name}: ${namespace.name}Natives = ${namespace.name}Module`,
+		...renderExtraAssertions(namespace.name, module, section),
 	]
-
-	if (forbiddenKeys.length > 0) {
-		let forbidden = forbiddenKeys
-			.map((key) => JSON.stringify(key))
-			.join(" | ")
-
-		lines.push(
-			`export const $${namespace.name}Absent: AssertNoEssenceExports<${module}, ${forbidden}> = true`,
-		)
-	}
 
 	return lines.join("\n")
 }
@@ -759,7 +815,8 @@ const HEADER = `// GENERATED by \`bun run generate:natives\` — do not edit by 
 // shape the runtime module of that Namespace must have. The \`$<Namespace>\`
 // assertions at the foot check each runtime module against it; the paired
 // \`$<Namespace>Absent\` assertion forbids a runtime export for any Method that is
-// implemented in Essence. Nothing imports this file, so its only effect is the
+// implemented in Essence, and \`$<Namespace>Arity\` pins how many Parameters each
+// native takes. Nothing imports this file, so its only effect is the
 // type error a drifted native raises under \`tsc\`. Regenerate after changing a
 // standard library signature; \`src/tests/natives.spec.ts\` fails when it drifts
 // from the renderer.`
@@ -777,6 +834,29 @@ const ASSERT_HELPER = `type AssertNoEssenceExports<Module, Forbidden extends str
 	Extract<keyof Module, Forbidden> extends never
 		? true
 		: ["a Method implemented in Essence must not be a runtime export", Extract<keyof Module, Forbidden>]`
+
+// NOTE: The arity check — the one direction structural assignability can not
+// see, since a function taking FEWER Parameters is assignable to a wider Type.
+// \`Parameters<T>['length']\` is a LITERAL only for a plain signature: a default
+// Parameter widens it to a union (\`1 | 2\`), a rest Parameter to \`number\`, and
+// neither satisfies the declared literal — which is exactly right, because the
+// runtime convention passes every argument positionally and a native must spell
+// all of them out. A member the Module does not export at all is left to the
+// positive assertion, which already reports it as missing.
+const ASSERT_ARITY_HELPER = `type NativeArity<Member> = Member extends (...args: infer Arguments) => unknown
+	? Arguments["length"]
+	: never
+
+type MismatchedArities<Module, Arities extends Record<string, number>> = {
+	[Member in keyof Arities & keyof Module]: NativeArity<Module[Member]> extends Arities[Member]
+		? never
+		: Member
+}[keyof Arities & keyof Module]
+
+type AssertArities<Module, Arities extends Record<string, number>> =
+	MismatchedArities<Module, Arities> extends never
+		? true
+		: ["a native must take exactly the Parameters its declaration does, with no default or rest Parameter", MismatchedArities<Module, Arities>]`
 
 // NOTE: Pure — takes the loaded standard library and returns the module text,
 // so the drift test can render and compare without touching the file system.
@@ -818,19 +898,26 @@ export function renderNativesModule(stdlib: Stdlib): string {
 
 	let assertionSections = [
 		...namespaces.map((entry) =>
-			renderModuleAssertion(entry.namespace, entry.forbiddenKeys),
+			renderModuleAssertion(entry.namespace, entry),
 		),
-		renderFunctionsAssertion(functions.forbiddenKeys),
+		renderFunctionsAssertion(functions),
 	]
 
-	let needsAssertHelper =
-		namespaces.some((entry) => entry.forbiddenKeys.length > 0) ||
-		functions.forbiddenKeys.length > 0
+	let sections = [...namespaces, functions]
+
+	let needsAssertHelper = sections.some(
+		(entry) => entry.forbiddenKeys.length > 0,
+	)
+	let needsArityHelper = sections.some((entry) => entry.arities.length > 0)
 
 	let parts = [HEADER, renderImports(ctx.used)]
 
 	if (needsAssertHelper) {
 		parts.push(ASSERT_HELPER)
+	}
+
+	if (needsArityHelper) {
+		parts.push(ASSERT_ARITY_HELPER)
 	}
 
 	if (conformanceSections.length > 0) {

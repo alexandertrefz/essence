@@ -24,6 +24,7 @@ import { builtinNamespaces } from "../enricher/builtins"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import { runtimeNamespaceNames } from "../rewriter/index"
+import { nativeArity } from "../tools/generateNatives"
 
 // NOTE: The Rewriter imports one runtime module per builtin Namespace, under
 // the Namespace's own name, so the mapping is the identity. The keys are
@@ -53,20 +54,23 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 // a single signature, `name__overload$N` for each overload of an Overloaded
 // one (`simplifier/index.ts:142`). The index is the one the Method was WRITTEN
 // at, natives included, which is exactly how `nativeBindings` is indexed too.
-function expectedExportNames(
+// Each name carries the arity the runtime convention will call it with, from the
+// generator's own `nativeArity`, so the two checks can never disagree about it.
+function expectedExports(
 	name: string,
 	method: common.MethodType,
-): Array<string> {
+): Array<{ name: string; arity: number }> {
 	if (
 		method.type === "OverloadedMethod" ||
 		method.type === "OverloadedStaticMethod"
 	) {
-		return method.overloads.map((_, index) =>
-			resolveOverloadedMethodName(name, index),
-		)
+		return method.overloads.map((overload, index) => ({
+			name: resolveOverloadedMethodName(name, index),
+			arity: nativeArity(overload),
+		}))
 	}
 
-	return [name]
+	return [{ name, arity: nativeArity(method) }]
 }
 
 // NOTE: Which entries of a Namespace member are native. Every builtin
@@ -129,30 +133,46 @@ describe("Builtins", () => {
 	// Method WITH an export is dead code — the leftover TypeScript nobody
 	// deleted when the Method moved, which will never be called again and will
 	// quietly rot out of step with the Essence that replaced it.
+	//
+	// NOTE: The export's own `.length` is checked against the declared arity as
+	// well — the shape `natives.generated.ts` can not see, because a default or
+	// rest Parameter hides the real count from the type system.
 	describe("every declared Method has a runtime implementation", () => {
 		for (let namespace of builtinNamespaces()) {
 			it(`implements ${namespace.name}`, () => {
 				let missing: Array<string> = []
 				let stale: Array<string> = []
+				let wrongArity: Array<string> = []
 				let runtime = runtimeModules[namespace.name] ?? {}
 
 				for (let [name, method] of Object.entries(namespace.methods)) {
-					let exportNames = expectedExportNames(name, method)
+					let exports = expectedExports(name, method)
 					let native = nativeFlagsFor(
 						namespace.name,
 						name,
-						exportNames.length,
+						exports.length,
 					)
 
-					exportNames.forEach((exportName, index) => {
-						let implemented =
-							typeof runtime[exportName] === "function"
+					exports.forEach(({ name: exportName, arity }, index) => {
+						let implementation = runtime[exportName]
 
 						if (native[index] ?? true) {
-							if (!implemented) {
+							if (typeof implementation === "function") {
+								// NOTE: `natives.generated.ts` pins the same
+								// arity under tsc, but only for a plain
+								// signature — a default or rest Parameter makes
+								// `Parameters<T>['length']` non-literal, and
+								// then the only way to see the real count is to
+								// ask the function itself.
+								if (implementation.length !== arity) {
+									wrongArity.push(
+										`${namespace.name}.${exportName} takes ${implementation.length}, declares ${arity}`,
+									)
+								}
+							} else {
 								missing.push(`${namespace.name}.${exportName}`)
 							}
-						} else if (implemented) {
+						} else if (typeof implementation === "function") {
 							stale.push(`${namespace.name}.${exportName}`)
 						}
 					})
@@ -182,6 +202,7 @@ describe("Builtins", () => {
 
 				expect(missing).toEqual([])
 				expect(stale).toEqual([])
+				expect(wrongArity).toEqual([])
 			})
 		}
 	})
