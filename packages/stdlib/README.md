@@ -310,8 +310,15 @@ ever writing, when the checked-in file drifts from the renderer — regenerate a
 commit it in the same change as the signature. It is in both `.oxlintrc.json` and
 `.oxfmtrc.json` `ignorePatterns`, like the generated parser grammar.
 
-One gap remains: a native that accepts FEWER parameters than declared is not
-caught, because TypeScript treats a shorter function as assignable.
+A native that accepts FEWER parameters than declared is assignable to the
+declared arrow type, so the `$<Namespace>` assertion alone would let it through.
+The paired `$<Namespace>Arity` assertion pins the count instead, one `member: N`
+entry per native. `Parameters<T>['length']` is a literal only for a plain
+signature, so a default or rest parameter fails it too — which is the intent, as
+a native is called positionally with every argument the convention passes. The
+runtime `.length` of each export is checked against the same count in
+`packages/compiler/src/tests/builtins.spec.ts`, the one place a default parameter
+can still be seen.
 
 ## `List`'s bounded Methods
 

@@ -5,7 +5,8 @@
 // shape the runtime module of that Namespace must have. The `$<Namespace>`
 // assertions at the foot check each runtime module against it; the paired
 // `$<Namespace>Absent` assertion forbids a runtime export for any Method that is
-// implemented in Essence. Nothing imports this file, so its only effect is the
+// implemented in Essence, and `$<Namespace>Arity` pins how many Parameters each
+// native takes. Nothing imports this file, so its only effect is the
 // type error a drifted native raises under `tsc`. Regenerate after changing a
 // standard library signature; `src/tests/natives.spec.ts` fails when it drifts
 // from the renderer.
@@ -31,6 +32,21 @@ type AssertNoEssenceExports<Module, Forbidden extends string> =
 	Extract<keyof Module, Forbidden> extends never
 		? true
 		: ["a Method implemented in Essence must not be a runtime export", Extract<keyof Module, Forbidden>]
+
+type NativeArity<Member> = Member extends (...args: infer Arguments) => unknown
+	? Arguments["length"]
+	: never
+
+type MismatchedArities<Module, Arities extends Record<string, number>> = {
+	[Member in keyof Arities & keyof Module]: NativeArity<Module[Member]> extends Arities[Member]
+		? never
+		: Member
+}[keyof Arities & keyof Module]
+
+type AssertArities<Module, Arities extends Record<string, number>> =
+	MismatchedArities<Module, Arities> extends never
+		? true
+		: ["a native must take exactly the Parameters its declaration does, with no default or rest Parameter", MismatchedArities<Module, Arities>]
 
 type ComparableConformance<Self extends AnyType> = {
 	compareTo: (self: Self, argument1: Self) => OrderingType
@@ -363,30 +379,144 @@ export type FunctionsNatives = {
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
 export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
+export const $StringArity: AssertArities<typeof import("./String"), {
+	append: 2
+	split: 2
+	lines: 1
+	words: 1
+	length: 1
+	uppercased: 1
+	lowercased: 1
+	normalized__overload$2: 2
+	trim__overload$2: 2
+	ends: 2
+	compareTo__overload$1: 2
+}> = true
 
 declare const BooleanModule: typeof import("./Boolean")
 export const $Boolean: BooleanNatives = BooleanModule
 export const $BooleanAbsent: AssertNoEssenceExports<typeof import("./Boolean"), "isNot" | "exclusiveOr" | "toString"> = true
+export const $BooleanArity: AssertArities<typeof import("./Boolean"), {
+	negate: 1
+	is: 2
+	and: 2
+	or: 2
+}> = true
 
 declare const IntegerModule: typeof import("./Integer")
 export const $Integer: IntegerNatives = IntegerModule
 export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$1" | "divide__overload$2" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "isEven" | "isOdd" | "isPositive" | "isNegative" | "isZero" | "clamp"> = true
+export const $IntegerArity: AssertArities<typeof import("./Integer"), {
+	add__overload$1: 2
+	add__overload$2: 2
+	add__overload$3: 2
+	add__overload$4: 2
+	divide__overload$3: 2
+	multiply__overload$1: 2
+	multiply__overload$2: 2
+	multiply__overload$3: 2
+	multiply__overload$4: 2
+	isLessThan__overload$2: 2
+	isLessThanOrEqualTo__overload$2: 2
+	isGreaterThan__overload$2: 2
+	isGreaterThanOrEqualTo__overload$2: 2
+	squareRoot: 1
+	negate: 1
+	remainder: 2
+	quotient: 2
+	raise: 2
+	parse: 1
+	toString: 1
+	compareTo: 2
+}> = true
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
 export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "isLessThan__overload$1" | "isLessThanOrEqualTo__overload$1" | "isGreaterThan__overload$1" | "isGreaterThanOrEqualTo__overload$1" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "roundDown" | "roundUp"> = true
+export const $RationalArity: AssertArities<typeof import("./Rational"), {
+	of: 2
+	add__overload$1: 2
+	add__overload$2: 2
+	add__overload$3: 2
+	add__overload$4: 2
+	divide__overload$1: 2
+	divide__overload$2: 2
+	divide__overload$3: 2
+	multiply__overload$1: 2
+	multiply__overload$2: 2
+	multiply__overload$3: 2
+	multiply__overload$4: 2
+	isLessThan__overload$2: 2
+	isLessThanOrEqualTo__overload$2: 2
+	isGreaterThan__overload$2: 2
+	isGreaterThanOrEqualTo__overload$2: 2
+	squareRoot: 1
+	numerator: 1
+	denominator: 1
+	round: 1
+	truncate: 1
+	raise: 2
+	parse: 1
+	toString__overload$1: 1
+	toString__overload$2: 2
+	compareTo: 2
+}> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
 export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
+export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
+	compareTo: 2
+	add__overload$1: 2
+	add__overload$2: 2
+	add__overload$3: 2
+	multiply__overload$1: 2
+	multiply__overload$2: 2
+	multiply__overload$3: 2
+	divide__overload$1: 2
+	divide__overload$2: 2
+	divide__overload$3: 2
+	negate: 1
+	toString: 1
+}> = true
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
 export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
+export const $TranscendentalArity: AssertArities<typeof import("./Transcendental"), {
+	add__overload$1: 2
+	add__overload$2: 2
+	add__overload$3: 2
+	multiply__overload$1: 2
+	multiply__overload$2: 2
+	divide__overload$1: 2
+	divide__overload$2: 2
+	divide__overload$3: 2
+	negate: 1
+	toString: 1
+}> = true
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
 export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4"> = true
+export const $NumberArity: AssertArities<typeof import("./Number"), {
+	compareTo: 2
+	sum__overload$1: 1
+	sum__overload$2: 1
+	sum__overload$3: 1
+	product__overload$1: 1
+	product__overload$2: 1
+	product__overload$3: 1
+	average__overload$1: 1
+	average__overload$2: 1
+	average__overload$3: 1
+	lowestNumber__overload$5: 1
+	lowestNumber__overload$6: 1
+	lowestNumber__overload$7: 1
+	greatestNumber__overload$5: 1
+	greatestNumber__overload$6: 1
+	greatestNumber__overload$7: 1
+}> = true
 
 declare const NothingModule: typeof import("./Nothing")
 export const $Nothing: NothingNatives = NothingModule
@@ -419,14 +549,47 @@ export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./Number
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule
 export const $RecordAbsent: AssertNoEssenceExports<typeof import("./Record"), "isNot"> = true
+export const $RecordArity: AssertArities<typeof import("./Record"), {
+	is: 2
+	keys: 1
+	toString: 1
+}> = true
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
 export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListArity: AssertArities<typeof import("./List"), {
+	is: 3
+	toString: 1
+	length: 1
+	append__overload$2: 2
+	map: 2
+	reduce__overload$1: 3
+	reduce__overload$2: 3
+	keepEvery: 2
+	item: 2
+	slice: 3
+	reverse: 1
+	sort__overload$1: 2
+	sort__overload$2: 2
+	compareTo: 3
+	join: 3
+	pair: 2
+	split: 2
+	of: 2
+}> = true
 
 declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule
+export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
+	flatten: 1
+}> = true
 
 declare const functionsModule: typeof import("./functions")
 export const $functions: FunctionsNatives = functionsModule
 export const $functionsAbsent: AssertNoEssenceExports<typeof import("./functions"), "loop__overload$2" | "loop__overload$3"> = true
+export const $functionsArity: AssertArities<typeof import("./functions"), {
+	loop__overload$1: 3
+	loop__overload$4: 2
+	__print: 1
+}> = true
