@@ -2,6 +2,7 @@ import type { common, enricher, parser } from "@essence/interfaces"
 
 import {
 	collectDiagnostics,
+	containsErrors,
 	primary,
 	report,
 	reportError,
@@ -3020,6 +3021,16 @@ type ArgumentTyper = {
 	// Parameter could not be inferred. The answer is only meaningful once the
 	// Arguments have been matched, which is where every Type is asked for.
 	hasErrorArgument: () => boolean
+	// NOTE: Runs `probe` with that answer held aside, and reports what the probe
+	// alone saw. An Argument can type as Error against ONE candidate's Parameter
+	// Types and fine against another's, so the Error belongs to the candidate
+	// until a candidate is committed — `noteErrorArgument` is how the committed
+	// one hands it back to the Invocation.
+	probeErrorArguments: <Result>(probe: () => Result) => {
+		result: Result
+		sawErrorArgument: boolean
+	}
+	noteErrorArgument: () => void
 }
 
 function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
@@ -3143,6 +3154,20 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		},
 		hasErrorArgument() {
 			return sawErrorArgument
+		},
+		probeErrorArguments(probe) {
+			let outerSawErrorArgument = sawErrorArgument
+
+			sawErrorArgument = false
+
+			try {
+				return { result: probe(), sawErrorArgument }
+			} finally {
+				sawErrorArgument = outerSawErrorArgument
+			}
+		},
+		noteErrorArgument() {
+			sawErrorArgument = true
 		},
 		enrichArgumentNode(argument) {
 			let value = enrichOnce(argument.value)
@@ -3287,6 +3312,158 @@ function substituteInferredReturnType(
 		unboundGenerics,
 		bindings: originalBindings,
 	}
+}
+
+// NOTE: The Overload an Invocation settled on: which slot it was, what it
+// inferred, and the conformances its bounds solved to. `diagnostics` are what
+// probing that candidate reported, held back rather than reported — a candidate
+// is probed before it is known to win (and a Method is probed once per
+// Namespace), so the caller replays them only for the candidate it commits.
+type SelectedOverload = {
+	index: number
+	inferred: InferredInvocation
+	conformances: Array<common.Conformance>
+	diagnostics: Array<common.Diagnostic>
+}
+
+type ProbedOverload = {
+	inferred: InferredInvocation
+	conformances: Array<common.Conformance>
+	// NOTE: What solving this candidate's bounds reported. Held back always, on
+	// both rails of the loop below: which bound failed is only news once the
+	// candidate that failed it is the one being committed to.
+	diagnostics: Array<common.Diagnostic>
+	// NOTE: Whether typing an Argument against THIS candidate's Parameter Types
+	// produced an Error — which is not a candidate matching but a candidate the
+	// Arguments could not be read under at all.
+	sawErrorArgument: boolean
+}
+
+// NOTE: One candidate, matched and its bounds solved, with the bound solve's
+// reports and the Errors its Argument typing produced handed back rather than
+// left where the caller can not tell them apart from the Invocation's own.
+function probeOverload(
+	overload: common.BaseFunction,
+	matchableArguments: Array<MatchableArgument>,
+	scope: enricher.Scope,
+	position: common.Position,
+	typer: ArgumentTyper,
+): ProbedOverload | undefined {
+	let { result, sawErrorArgument } = typer.probeErrorArguments(() => {
+		let inferred = inferInvocation(overload, matchableArguments)
+
+		if (inferred === undefined) {
+			return undefined
+		}
+
+		let { result: conformances, diagnostics } = collectDiagnostics(() =>
+			resolveConformances(
+				overload.generics,
+				inferred.bindings,
+				scope,
+				position,
+			),
+		)
+
+		return { inferred, conformances, diagnostics }
+	})
+
+	if (result === undefined) {
+		return undefined
+	}
+
+	return { ...result, sawErrorArgument }
+}
+
+// NOTE: Bounds are part of selecting an Overload, not a check run on the
+// Overload that matching happened to pick first: a candidate whose Type
+// Parameter bounds the Arguments can not satisfy is no candidate at all while a
+// later one takes them. Neither is a candidate the Arguments only match because
+// reading one of them against its Parameter Types failed — a prefixed Case
+// construction against a Parameter Type that mentions the call's own unsolved
+// Type Parameters types as Error, and `matchTypes` lets an Error match anything.
+// Without either rule, an Invocation resolved or failed depending on the order
+// the Overloads were declared in.
+//
+// The probe's conformances are handed back so the winner is solved exactly once
+// — solving again on the way out would report every Diagnostic twice, and
+// `resolveConformances` is not free.
+//
+// When no candidate holds up, the FIRST arg-matching one is selected anyway: its
+// Diagnostics say which bound failed and how to satisfy it, which is what a call
+// with one plausible Overload needs to hear. Turning it into "no Overload
+// accepts these Arguments" would be a worse report about a call whose Arguments
+// were accepted.
+function selectOverload(
+	overloads: Array<common.BaseFunction>,
+	matchableArguments: Array<MatchableArgument>,
+	scope: enricher.Scope,
+	position: common.Position,
+	typer: ArgumentTyper,
+): SelectedOverload | undefined {
+	let firstArgumentMatch:
+		| { selected: SelectedOverload; sawErrorArgument: boolean }
+		| undefined
+
+	for (let [index, overload] of overloads.entries()) {
+		// NOTE: Up to and including the first candidate whose Arguments match, a
+		// probe reports and records where it stands — an Argument is enriched
+		// exactly once, so a report held back there would be held back forever.
+		// Past that candidate a probe is speculative, since a candidate to settle
+		// on already exists, and one that loses must leave nothing behind: an
+		// unannotated Function literal Argument is re-resolved against every
+		// candidate's Parameter Types and reports from inside its own body, so
+		// probing on turned calls that used to compile red. A speculative probe's
+		// reports and recordings are therefore held, and only the candidate the
+		// call commits to hands them on.
+		let probe = () =>
+			probeOverload(overload, matchableArguments, scope, position, typer)
+		let held =
+			firstArgumentMatch === undefined
+				? undefined
+				: probeContextualFunctionTypes(() => collectDiagnostics(probe))
+		let { result: probed, diagnostics: argumentDiagnostics } =
+			held?.result ?? { result: probe(), diagnostics: [] }
+
+		if (probed === undefined) {
+			continue
+		}
+
+		let candidate = {
+			index,
+			inferred: probed.inferred,
+			conformances: probed.conformances,
+			diagnostics: [...argumentDiagnostics, ...probed.diagnostics],
+		}
+
+		if (
+			!containsErrors(candidate.diagnostics) &&
+			!probed.sawErrorArgument
+		) {
+			commitContextualFunctionTypes(held?.recording)
+
+			return candidate
+		}
+
+		firstArgumentMatch ??= {
+			selected: candidate,
+			sawErrorArgument: probed.sawErrorArgument,
+		}
+	}
+
+	if (firstArgumentMatch === undefined) {
+		return undefined
+	}
+
+	// NOTE: Nothing held up, so the Invocation owns this candidate's Error
+	// Argument after all — it is why a Type Parameter went unbound, and
+	// `reportUnboundGenerics` asks for exactly that before reporting a cascade on
+	// top of the Argument's own Diagnostic.
+	if (firstArgumentMatch.sawErrorArgument) {
+		typer.noteErrorArgument()
+	}
+
+	return firstArgumentMatch.selected
 }
 
 // NOTE: Silent when an Argument already typed as Error — that Argument's own
@@ -3440,6 +3617,7 @@ function resolveInvokedMethodInNamespace(
 	node: parser.MethodInvocationNode,
 	resolvedNamespace: common.NamespaceType,
 	baseType: common.Type,
+	scope: enricher.Scope,
 	typer: ArgumentTyper,
 	receiverType: common.Type | null = null,
 ):
@@ -3447,8 +3625,10 @@ function resolveInvokedMethodInNamespace(
 			returnType: common.Type
 			overloadedMethodIndex: number | null
 			unboundGenerics: Array<string>
-			signatureGenerics: Array<common.GenericDeclaration>
-			bindings: GenericBindings
+			conformances: Array<common.Conformance>
+			// NOTE: What selecting this Overload reported, for the caller to
+			// replay once it commits to this Namespace — see `selectOverload`.
+			selectionDiagnostics: Array<common.Diagnostic>
 	  }
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
@@ -3482,43 +3662,39 @@ function resolveInvokedMethodInNamespace(
 		getType: () => receiverType ?? baseType,
 	})
 
-	if (methodType.type === "SimpleMethod") {
-		let inferred = inferInvocation(methodType, matchableArguments)
+	// NOTE: A SimpleMethod is its own single candidate — one signature to match
+	// and one set of bounds to solve is what `selectOverload` does for one
+	// Overload, so both Method shapes take the same path and can not drift.
+	let overloads =
+		methodType.type === "SimpleMethod"
+			? [methodType]
+			: methodType.type === "OverloadedMethod"
+				? methodType.overloads
+				: undefined
 
-		if (inferred === undefined) {
-			return
-		}
-
-		return {
-			returnType: inferred.returnType,
-			overloadedMethodIndex: null,
-			unboundGenerics: inferred.unboundGenerics,
-			signatureGenerics: methodType.generics,
-			bindings: inferred.bindings,
-		}
-	} else if (methodType.type === "OverloadedMethod") {
-		for (
-			let overloadIndex = 0;
-			overloadIndex < methodType.overloads.length;
-			overloadIndex++
-		) {
-			let overload = methodType.overloads[overloadIndex]
-			let inferred = inferInvocation(overload, matchableArguments)
-
-			if (inferred !== undefined) {
-				return {
-					overloadedMethodIndex: overloadIndex,
-					returnType: inferred.returnType,
-					unboundGenerics: inferred.unboundGenerics,
-					signatureGenerics: overload.generics,
-					bindings: inferred.bindings,
-				}
-			}
-		}
-
+	if (overloads === undefined) {
 		return undefined
-	} else {
+	}
+
+	let selected = selectOverload(
+		overloads,
+		matchableArguments,
+		scope,
+		node.position,
+		typer,
+	)
+
+	if (selected === undefined) {
 		return undefined
+	}
+
+	return {
+		returnType: selected.inferred.returnType,
+		overloadedMethodIndex:
+			methodType.type === "SimpleMethod" ? null : selected.index,
+		unboundGenerics: selected.inferred.unboundGenerics,
+		conformances: selected.conformances,
+		selectionDiagnostics: selected.diagnostics,
 	}
 }
 
@@ -3868,6 +4044,7 @@ function resolveMethodInvocation(
 					node,
 					namespaceType,
 					baseType,
+					scope,
 					typer,
 				),
 			)
@@ -3883,8 +4060,8 @@ function resolveMethodInvocation(
 				overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 				type: resolvedMethod.returnType,
 				unboundGenerics: resolvedMethod.unboundGenerics,
-				signatureGenerics: resolvedMethod.signatureGenerics,
-				bindings: resolvedMethod.bindings,
+				conformances: resolvedMethod.conformances,
+				selectionDiagnostics: resolvedMethod.selectionDiagnostics,
 				recording,
 			})
 		}
@@ -3936,16 +4113,18 @@ function resolveMethodInvocation(
 			typer,
 		)
 
+		// NOTE: The Overload was selected while this Namespace was probed; what
+		// that selection reported becomes the call's Diagnostics now that the
+		// Namespace is the one being committed.
+		for (let diagnostic of resolvedMethod.selectionDiagnostics) {
+			report(diagnostic)
+		}
+
 		return {
 			namespace: resolvedMethod.namespace,
 			type: resolvedMethod.type,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-			conformances: resolveConformances(
-				resolvedMethod.signatureGenerics,
-				resolvedMethod.bindings,
-				scope,
-				node.position,
-			),
+			conformances: resolvedMethod.conformances,
 			// NOTE: A direct `is`/`isNot` on a generic Choice widens at emission
 			// — the descriptor its runtime helper follows is recovered from the
 			// receiver's Choice, whose DECLARED Alias the applied receiver Type
@@ -4061,6 +4240,7 @@ function resolveUnionMethodDispatch(
 						node,
 						namespaceType,
 						unionType,
+						scope,
 						typer,
 						memberType,
 					),
@@ -4168,16 +4348,19 @@ function resolveUnionMethodDispatch(
 			)
 		}
 
+		// NOTE: As in `resolveMethodInvocation` — the branch's own selection
+		// Diagnostics, replayed now that its Namespace is settled. Every branch
+		// selects against the same Arguments, so a shared failure deduplicates to
+		// one report.
+		for (let diagnostic of resolvedMethod.selectionDiagnostics) {
+			report(diagnostic)
+		}
+
 		dispatchCases.push({
 			memberType,
 			namespaceName: resolvedMethod.namespaceName,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
-			conformances: resolveConformances(
-				resolvedMethod.signatureGenerics,
-				resolvedMethod.bindings,
-				scope,
-				node.position,
-			),
+			conformances: resolvedMethod.conformances,
 			contextualArguments: contextualArgumentsForBranch(
 				node,
 				scope,
@@ -4506,31 +4689,31 @@ function resolveFunctionInvocation(
 			}),
 		)
 
-		for (
-			let overloadIndex = 0;
-			overloadIndex < type.overloads.length;
-			overloadIndex++
-		) {
-			let overload = type.overloads[overloadIndex]!
-			let inferred = inferInvocation(overload, matchableArguments)
+		let selected = selectOverload(
+			type.overloads,
+			matchableArguments,
+			scope,
+			node.position,
+			typer,
+		)
 
-			if (inferred !== undefined) {
-				reportUnboundGenerics(
-					inferred.unboundGenerics,
-					node.position,
-					typer,
-				)
+		if (selected !== undefined) {
+			reportUnboundGenerics(
+				selected.inferred.unboundGenerics,
+				node.position,
+				typer,
+			)
 
-				return {
-					type: inferred.returnType,
-					conformances: resolveConformances(
-						overload.generics,
-						inferred.bindings,
-						scope,
-						node.position,
-					),
-					overloadedMethodIndex: overloadIndex,
-				}
+			// NOTE: What selecting this candidate reported was held back until it
+			// was known to be the selection; it is the call's to report now.
+			for (let diagnostic of selected.diagnostics) {
+				report(diagnostic)
+			}
+
+			return {
+				type: selected.inferred.returnType,
+				conformances: selected.conformances,
+				overloadedMethodIndex: selected.index,
 			}
 		}
 
