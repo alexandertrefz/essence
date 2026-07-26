@@ -9,16 +9,23 @@ import {
 import type { common } from "@essence/interfaces"
 
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
+import {
+	type CallSnippet,
+	callSnippetsFor,
+	qualifiedCallSnippetsFor,
+} from "./callSnippets"
 import { describe, documentationOf } from "./documentation"
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
 import { contains, isAtOrBefore, isSmaller } from "./positions"
-import { buildProbeSource } from "./probe"
+import { buildProbeSource, stripNoise } from "./probe"
 import {
 	type Declaration,
 	type DeclarationKind,
 	indexProgram,
 	type Scope,
 	type ScopeRange,
+	type SymbolSpace,
 } from "./rename"
 
 // NOTE: Completion has three modes, told apart by the text immediately
@@ -39,11 +46,23 @@ import {
 // carries the receiver's Type in `base.type`, at the Scope the cursor is
 // actually in (its enclosing Function's Parameters, `@`, and so on).
 
-// NOTE: Every rename Declaration kind plus `case` — a Case is not a lexical
-// Declaration (it resolves through its Choice, never a Scope), so it never
-// appears in the rename index, but `#` completion still offers Cases and needs
-// a kind of their own.
-export type CompletionKind = DeclarationKind | "case"
+// NOTE: Every rename Declaration kind plus `case` and `keyword` — neither is a
+// lexical Declaration (a Case resolves through its Choice, never a Scope; a
+// Keyword is not a name at all), so neither ever appears in the rename index,
+// but both are offered and need a kind of their own.
+export type CompletionKind = DeclarationKind | "case" | "keyword"
+
+// NOTE: An Editor sorts a Completion list on `sortText` rather than on the
+// order it was handed, so the ranking is carried by every entry: what is
+// nearest the cursor's own Scope first, what is merely part of the language
+// last.
+export const completionTiers = {
+	local: 1,
+	member: 2,
+	document: 3,
+	builtin: 4,
+	keyword: 5,
+} as const
 
 export type CompletionEntry = {
 	label: string
@@ -53,6 +72,16 @@ export type CompletionEntry = {
 	// tagged sections, and Signature Help shows them the moment the call is
 	// actually being written.
 	documentation?: string | null
+	// NOTE: The call as it must be written, in LSP snippet syntax, labels and
+	// all. Null wherever no signature resolved — the normal state halfway
+	// through a keystroke — and the Editor falls back to the bare name.
+	snippet?: string | null
+	// NOTE: Only set where a label alone would be ambiguous: the Overloads of
+	// one Method share a label on purpose, so their signature tails are what
+	// tell them apart.
+	labelDetail?: string | null
+	tier: number
+	preselect?: boolean
 }
 
 // NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols, and
@@ -63,6 +92,10 @@ const probeMemberName = "lspProbeMember"
 // NOTE: Mirrors `forbiddenIdentifierCharacters` in rename.ts — anything the
 // Lexer would not produce as part of a single Identifier Token.
 const identifierTail = /[^\s"§(){}[\]<>|/@,.:=~_-]*$/
+const identifierCharacter = /[^\s"§(){}[\]<>|/@,.:=~_-]/
+// NOTE: A whole `is` Token rather than the tail of an Identifier — `axis`
+// ends in the same two characters and means nothing of the sort.
+const trailingIsPattern = /(?:^|[\s"§(){}[\]<>|/@,.:=~_-])is$/
 const methodTriggerPattern = /::(?:<([^>]*)>)?[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 const memberTriggerPattern = /\.[^\s"§(){}[\]<>|/@,.:=~_-]*$/
 // NOTE: A Namespace specifier that is still being typed — the closing `>` is
@@ -78,6 +111,28 @@ const caseTriggerPattern =
 // stand-in a probe writes where the in-progress `#name` was, so the document
 // parses and its expected Type and Choices in scope can be read back.
 const probeCaseName = "LspProbeCase"
+
+// NOTE: The Keywords `parseImplementationNode` dispatches a Statement on,
+// plus the two that open a block of their own — `static` inside a Namespace
+// body and `implementation` around the whole Program.
+const statementKeywords = [
+	"constant",
+	"variable",
+	"function",
+	"if",
+	"match",
+	"namespace",
+	"protocol",
+	"type",
+	"choice",
+	"overload",
+	"static",
+	"implementation",
+]
+
+// NOTE: What `parsePrimaryExpression` accepts as the start of an Expression —
+// every other Keyword it reads there is an Identifier in disguise.
+const expressionKeywords = ["match", "true", "false", "nothing"]
 
 export function findCompletions(
 	documentText: string,
@@ -103,24 +158,24 @@ export function findCompletions(
 			beforeCursor.slice(0, match.index),
 		].join("\n")
 
-		let baseType = resolveProbedBaseType(headText, documentPath)
+		let base = resolveProbedBase(headText, documentPath)
 
-		if (baseType === null) {
+		if (base === null) {
 			return []
 		}
 
 		if (specifierMatch !== null) {
-			return specifierCompletions(documentText, baseType, documentPath)
+			return specifierCompletions(documentText, base.type, documentPath)
 		}
 
 		return methodMatch !== null
 			? methodCompletions(
 					documentText,
-					baseType,
+					base.type,
 					methodMatch[1] ?? null,
 					documentPath,
 				)
-			: memberCompletions(baseType)
+			: memberCompletions(base.type, base.program)
 	}
 
 	// NOTE: A `#` offers Cases rather than Scope names — the two never share a
@@ -140,12 +195,20 @@ export function findCompletions(
 		)
 	}
 
+	let headText = [...lines.slice(0, cursor.line - 1), beforeCursor].join("\n")
+	let space = detectSymbolSpace(headText)
+
 	// NOTE: Record member names and Argument labels are offered *alongside*
 	// the names in Scope — both are valid at those positions, since a member
 	// is written `name = value` and a labelled Argument `label value`.
+	//
+	// NOTE: Keywords are offered here and nowhere else — after a `.`, a `::`
+	// or a `#` the language allows nothing but a name — and only in the value
+	// space, since no Keyword names a Type.
 	return [
 		...contextualCompletions(lines, cursor, documentPath),
-		...scopeCompletions(documentText, cursor, beforeCursor, documentPath),
+		...scopeCompletions(documentText, cursor, space, documentPath),
+		...(space === "values" ? keywordCompletions(headText) : []),
 	]
 }
 
@@ -188,6 +251,7 @@ function contextualCompletions(
 				label: name,
 				kind: "member" as const,
 				detail: printType(type),
+				tier: completionTiers.member,
 			}))
 	}
 
@@ -201,6 +265,7 @@ function contextualCompletions(
 			label: parameter.name,
 			kind: "label" as const,
 			detail: printType(parameter.type),
+			tier: completionTiers.member,
 		}))
 }
 
@@ -208,20 +273,31 @@ function contextualCompletions(
 /* Probing for the receiver Type */
 /*********************************/
 
-function resolveProbedBaseType(
+// NOTE: The enriched probe Program is handed back alongside the Type it
+// resolved — a Namespace Type carries no `§§` documentation for its
+// Properties, only the declaration Node does, and the probe already holds
+// every declaration above the cursor.
+type ProbedBase = {
+	type: common.Type
+	program: common.typed.Program
+}
+
+function resolveProbedBase(
 	headText: string,
 	documentPath?: string,
-): common.Type | null {
+): ProbedBase | null {
 	let probeSource = buildProbeSource(headText, `.${probeMemberName}`)
 
 	try {
 		let { program } = parseDocument(probeSource, documentPath)
 		let { program: enrichedProgram } = enrichDocument(program, documentPath)
-
-		return (
+		let baseType =
 			findProbeLookup(enrichedProgram.implementation.nodes)?.base.type ??
 			null
-		)
+
+		return baseType === null
+			? null
+			: { type: baseType, program: enrichedProgram }
 	} catch {
 		return null
 	}
@@ -327,6 +403,17 @@ function findProbeLookupInNode(
 			}
 
 			for (let handler of node.handlers) {
+				// NOTE: The Matcher and its Guard come before the body in the
+				// source, so they are searched first — the probe is looked for
+				// where it was typed.
+				for (let expression of typedHandlerExpressions(handler)) {
+					let expressionFound = findProbeLookupInNode(expression)
+
+					if (expressionFound !== null) {
+						return expressionFound
+					}
+				}
+
 				let handlerFound = findProbeLookup(handler.body)
 
 				if (handlerFound !== null) {
@@ -395,16 +482,21 @@ function findProbeLookupInArguments(
 /* Member completion */
 /*********************/
 
-function memberCompletions(baseType: common.Type): Array<CompletionEntry> {
+function memberCompletions(
+	baseType: common.Type,
+	program: common.typed.Program,
+): Array<CompletionEntry> {
 	if (baseType.type === "Record") {
 		return Object.entries(baseType.members).map(([name, type]) => ({
 			label: name,
 			kind: "member" as const,
 			detail: printType(type),
+			tier: completionTiers.member,
 		}))
 	}
 
 	if (baseType.type === "Namespace") {
+		let documented = namespacePropertyDocumentation(program, baseType.name)
 		let entries: Array<CompletionEntry> = []
 
 		for (let [name, type] of Object.entries(baseType.properties)) {
@@ -412,22 +504,116 @@ function memberCompletions(baseType: common.Type): Array<CompletionEntry> {
 				label: name,
 				kind: "property",
 				detail: printType(type),
+				documentation: documented.get(name) ?? null,
+				tier: completionTiers.member,
 			})
 		}
 
 		for (let [name, method] of Object.entries(baseType.methods)) {
-			entries.push({
-				label: name,
-				kind: methodDeclarationKind(method),
-				detail: printType(method),
-				documentation: describe(documentationOf(method)) || null,
-			})
+			entries.push(
+				...callableEntries({
+					name,
+					kind: methodDeclarationKind(method),
+					snippets: qualifiedCallSnippetsFor(name, method),
+					detail: printType(method),
+					documentation: describe(documentationOf(method)) || null,
+					tier: completionTiers.member,
+				}),
+			)
 		}
 
 		return entries
 	}
 
 	return []
+}
+
+// NOTE: The `§§` block above each Property, keyed by name. A Namespace Type
+// keeps only the Property's Type, so this reads the declaration Node instead —
+// the probe stops at the cursor, and a Namespace whose members are being
+// looked up is necessarily declared above it.
+function namespacePropertyDocumentation(
+	program: common.typed.Program,
+	name: string,
+): Map<string, string> {
+	let documented = new Map<string, string>()
+
+	function visitBody(nodes: Array<common.typed.ImplementationNode>) {
+		for (let node of nodes) {
+			if (node.nodeType === "NamespaceDefinitionStatement") {
+				if (node.name.content !== name) {
+					continue
+				}
+
+				for (let [propertyName, property] of Object.entries(
+					node.properties,
+				)) {
+					let description = describe(property.documentation)
+
+					if (description !== "") {
+						documented.set(propertyName, description)
+					}
+				}
+			} else if (node.nodeType === "IfStatement") {
+				visitBody(node.body)
+			} else if (node.nodeType === "IfElseStatement") {
+				visitBody(node.trueBody)
+				visitBody(node.falseBody)
+			} else if (node.nodeType === "FunctionStatement") {
+				visitBody(node.value.body)
+			}
+		}
+	}
+
+	visitBody(program.implementation.nodes)
+
+	return documented
+}
+
+// NOTE: One entry PER OVERLOAD, all sharing a label — the Overloads of a
+// Method differ in exactly the Argument labels the snippet inserts, so a
+// single "primary" entry would write the wrong call half the time. The
+// signature tail in `labelDetail` is what tells them apart in the list. With
+// no signature at all — a half-enriched document, which is the normal state
+// while typing — the bare entry is kept and the Editor completes the name.
+function callableEntries({
+	name,
+	kind,
+	snippets,
+	detail,
+	documentation,
+	tier,
+}: {
+	name: string
+	kind: CompletionKind
+	snippets: Array<CallSnippet> | null
+	detail: string | null
+	documentation: string | null
+	tier: number
+}): Array<CompletionEntry> {
+	if (snippets === null) {
+		return [
+			{
+				label: name,
+				kind,
+				detail,
+				documentation,
+				snippet: null,
+				labelDetail: null,
+				tier,
+			},
+		]
+	}
+
+	return snippets.map((entry) => ({
+		label: name,
+		kind,
+		detail: entry.signature,
+		documentation,
+		snippet: entry.snippet,
+		labelDetail: snippets.length > 1 ? entry.signature : null,
+		tier,
+	}))
 }
 
 function methodDeclarationKind(method: common.MethodType): DeclarationKind {
@@ -473,12 +659,16 @@ function methodCompletions(
 
 			seen.add(name)
 
-			entries.push({
-				label: name,
-				kind: "method",
-				detail: printInvokedSignature(method),
-				documentation: describe(documentationOf(method)) || null,
-			})
+			entries.push(
+				...callableEntries({
+					name,
+					kind: "method",
+					snippets: callSnippetsFor(name, method),
+					detail: printInvokedSignature(method),
+					documentation: describe(documentationOf(method)) || null,
+					tier: completionTiers.member,
+				}),
+			)
 		}
 	}
 
@@ -514,6 +704,7 @@ function specifierCompletions(
 				namespace.targetType === null
 					? null
 					: printType(namespace.targetType),
+			tier: completionTiers.member,
 		})
 	}
 
@@ -582,8 +773,11 @@ function caseCompletions(
 				)
 			: []
 
+	// NOTE: An expectation names ONE Choice, so the list is complete and
+	// ordered as the Choice declared it — the first Case is preselected, which
+	// the prefix-less scan over every Choice in scope has no basis for.
 	if (expectedCases.length > 0) {
-		return caseEntries(expectedCases)
+		return caseEntries(expectedCases, true)
 	}
 
 	if (choicePrefix !== "") {
@@ -595,6 +789,7 @@ function caseCompletions(
 
 function caseEntries(
 	caseTypes: Array<common.CaseType>,
+	preselectFirst = false,
 ): Array<CompletionEntry> {
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
@@ -616,6 +811,8 @@ function caseEntries(
 			label: caseType.name,
 			kind: "case",
 			detail: printCaseWithPayload(caseType),
+			tier: completionTiers.member,
+			preselect: preselectFirst && entries.length === 0,
 		})
 	}
 
@@ -765,6 +962,10 @@ function analyseCaseProbe(program: common.typed.Program): {
 				visitNode(node.value, null)
 
 				for (let handler of node.handlers) {
+					for (let expression of typedHandlerExpressions(handler)) {
+						visitNode(expression, null)
+					}
+
 					visitBody(handler.body, expectedType)
 				}
 
@@ -810,7 +1011,7 @@ function analyseCaseProbe(program: common.typed.Program): {
 function scopeCompletions(
 	documentText: string,
 	cursor: common.Cursor,
-	beforeCursor: string,
+	space: SymbolSpace,
 	documentPath?: string,
 ): Array<CompletionEntry> {
 	let { program } = parseDocument(documentText, documentPath)
@@ -822,8 +1023,11 @@ function scopeCompletions(
 
 	let { scopes } = indexProgram(program, enrichedProgram)
 	let scope = scopeAt(scopes, cursor)
-	let space = detectSymbolSpace(beforeCursor)
-	let entries = new Map<string, Declaration>()
+	let described =
+		enrichedProgram === null
+			? new Map<string, DeclarationInfo>()
+			: describeDeclarations(enrichedProgram)
+	let entries = new Map<string, Array<CompletionEntry>>()
 
 	let searchScope: Scope | null = scope
 
@@ -841,33 +1045,392 @@ function scopeCompletions(
 				continue
 			}
 
-			if (!entries.has(name)) {
-				entries.set(name, declaration)
+			if (entries.has(name)) {
+				continue
 			}
+
+			// NOTE: The rename index is lexical and knows no Types; the
+			// enriched Program has the Types but no Scopes. A Declaration's
+			// name Position is what joins the two, and both sides read the
+			// same Parser Positions, so the key is exact rather than a range
+			// search.
+			let info =
+				declaration.definition === null
+					? null
+					: (described.get(positionKey(declaration.definition)) ??
+						null)
+
+			// NOTE: Only the top level Scope has no parent, and it holds the
+			// builtins beside the document's own top level Declarations — so
+			// the depth tells a local apart from a document-wide name, and
+			// `builtin` tells the two halves of the top level apart.
+			let tier = declaration.builtin
+				? completionTiers.builtin
+				: searchScope.parent === null
+					? completionTiers.document
+					: completionTiers.local
+
+			entries.set(name, scopeEntries(name, declaration, info, tier))
 		}
 
 		searchScope = searchScope.parent
 	}
 
-	return [...entries].map(([label, declaration]) => ({
-		label,
-		kind: declaration.kind,
-		detail: null,
-	}))
+	return [...entries.values()].flat()
 }
 
-function detectSymbolSpace(beforeCursor: string): "values" | "types" {
-	let trimmed = beforeCursor.replace(identifierTail, "").trimEnd()
+function scopeEntries(
+	label: string,
+	declaration: Declaration,
+	info: DeclarationInfo | null,
+	tier: number,
+): Array<CompletionEntry> {
+	// NOTE: Only a `function` Declaration is invoked by writing its name — a
+	// Constant or a Parameter may hold a Function Value just as well, but
+	// there the name is as often passed on as it is called, so nothing is
+	// inserted for it.
+	let snippets =
+		declaration.kind === "function" && info?.type != null
+			? callSnippetsFor(label, info.type)
+			: null
+
+	return callableEntries({
+		name: label,
+		kind: declaration.kind,
+		snippets,
+		detail: declarationDetail(label, info?.type ?? null),
+		documentation: info?.documentation ?? null,
+		tier,
+	})
+}
+
+// NOTE: A Namespace and a Choice both print as their own name, which the label
+// beside the detail already says. A Namespace's target Type is what a single
+// line can add instead; a Choice has nothing to add, so it stays bare.
+function declarationDetail(
+	label: string,
+	type: common.Type | null,
+): string | null {
+	if (type === null) {
+		return null
+	}
+
+	if (type.type === "Namespace") {
+		return type.targetType === null
+			? null
+			: `for ${printType(type.targetType)}`
+	}
+
+	let printed = printType(type)
+
+	return printed === label ? null : printed
+}
+
+type DeclarationInfo = {
+	type: common.Type | null
+	documentation: string | null
+}
+
+// NOTE: Every Declaration the enriched Program can say something about, keyed
+// by where its name was written. Kept deliberately close to the rename index's
+// own idea of a Declaration: the same Statements, plus the Parameters that
+// only a Function's inner Scope offers.
+function describeDeclarations(
+	program: common.typed.Program,
+): Map<string, DeclarationInfo> {
+	let described = new Map<string, DeclarationInfo>()
+
+	function describeAt(position: common.Position, info: DeclarationInfo) {
+		described.set(positionKey(position), info)
+	}
+
+	function visitFunction(
+		definition: common.typed.FunctionDefinitionNode,
+		documentation: common.Documentation | null,
+	) {
+		for (let parameter of definition.parameters) {
+			let name =
+				parameter.externalName?.content ??
+				parameter.internalName?.content
+			let info: DeclarationInfo = {
+				type:
+					parameter.internalName?.type ??
+					parameter.externalName?.type ??
+					null,
+				// NOTE: A Parameter's `@param` text lives on the enclosing
+				// callable's `§§` block, under the name the call site writes.
+				documentation:
+					name === undefined
+						? null
+						: (documentation?.parameters[name] ?? null),
+			}
+
+			if (parameter.externalName !== null) {
+				describeAt(parameter.externalName.position, info)
+			}
+
+			if (parameter.internalName !== null) {
+				describeAt(parameter.internalName.position, info)
+			}
+		}
+
+		visitBody(definition.body)
+	}
+
+	function visitBody(nodes: Array<common.typed.ImplementationNode>) {
+		for (let node of nodes) {
+			visitNode(node)
+		}
+	}
+
+	function visitArguments(nodeArguments: Array<common.typed.ArgumentNode>) {
+		for (let argument of nodeArguments) {
+			visitNode(argument.value)
+		}
+	}
+
+	function visitNode(node: common.typed.ImplementationNode) {
+		switch (node.nodeType) {
+			case "ConstantDeclarationStatement":
+			case "VariableDeclarationStatement":
+				describeAt(node.name.position, {
+					type: node.declaredType ?? node.type,
+					documentation: describe(node.documentation) || null,
+				})
+				visitNode(node.value)
+				return
+			case "FunctionStatement": {
+				let documentation = documentationOf(node.type)
+
+				describeAt(node.name.position, {
+					type: node.type,
+					documentation: describe(documentation) || null,
+				})
+				visitFunction(node.value, documentation)
+				return
+			}
+			case "NamespaceDefinitionStatement":
+				describeAt(node.name.position, {
+					type: node.type,
+					documentation: describe(node.documentation) || null,
+				})
+
+				for (let property of Object.values(node.properties)) {
+					visitNode(property.value)
+				}
+
+				for (let member of Object.values(node.methods)) {
+					let methods =
+						member.nodeType === "OverloadedMethod" ||
+						member.nodeType === "OverloadedStaticMethod"
+							? member.methods
+							: [member.method]
+
+					for (let method of methods) {
+						visitFunction(
+							method.value,
+							documentationOf(method.type),
+						)
+					}
+				}
+
+				return
+			case "ChoiceDeclarationStatement":
+			case "TypeAliasStatement":
+				describeAt(node.name.position, {
+					type: node.type,
+					documentation: describe(node.documentation) || null,
+				})
+				return
+			case "ProtocolDeclarationStatement":
+				describeAt(node.name.position, {
+					type: null,
+					documentation:
+						describe(node.protocolType.documentation ?? null) ||
+						null,
+				})
+				return
+			case "FunctionValue":
+				visitFunction(node.value, null)
+				return
+			case "VariableAssignmentStatement":
+				visitNode(node.value)
+				return
+			case "ReturnStatement":
+				visitNode(node.expression)
+				return
+			case "IfStatement":
+				visitNode(node.condition)
+				visitBody(node.body)
+				return
+			case "IfElseStatement":
+				visitNode(node.condition)
+				visitBody(node.trueBody)
+				visitBody(node.falseBody)
+				return
+			case "FunctionInvocation":
+				visitNode(node.name)
+				visitArguments(node.arguments)
+				return
+			case "MethodInvocation":
+				visitNode(node.base)
+				visitArguments(node.arguments)
+				return
+			case "NativeFunctionInvocation":
+				visitArguments(node.arguments)
+				return
+			case "Lookup":
+				visitNode(node.base)
+				return
+			case "Combination":
+				visitNode(node.lhs)
+				visitNode(node.rhs)
+				return
+			case "Match":
+				visitNode(node.value)
+
+				for (let handler of node.handlers) {
+					for (let expression of typedHandlerExpressions(handler)) {
+						visitNode(expression)
+					}
+
+					visitBody(handler.body)
+				}
+
+				return
+			case "RecordValue":
+				for (let member of Object.values(node.members)) {
+					visitNode(member)
+				}
+
+				return
+			case "ListValue":
+				for (let value of node.values) {
+					visitNode(value)
+				}
+
+				return
+			case "CaseValue":
+				if (node.value !== null) {
+					visitNode(node.value)
+				}
+
+				return
+			case "Identifier":
+			case "Self":
+			case "StringValue":
+			case "IntegerValue":
+			case "RationalValue":
+			case "BooleanValue":
+			case "NothingValue":
+				return
+		}
+	}
+
+	visitBody(program.implementation.nodes)
+
+	return described
+}
+
+function positionKey(position: common.Position): string {
+	return `${position.start.line}:${position.start.column}`
+}
+
+/**********************/
+/* Reading the cursor  */
+/**********************/
+
+// NOTE: The Parser only ever reads a Type after one of these: a `:`
+// annotation, a `->` return, a `<` Generic application, an `is` bound or
+// conformance clause, or a `|` — `parseType` is the only place a Pipe is
+// consumed at all, so one can never be anything else.
+//
+// A trailing `,` says nothing on its own, since it separates Arguments as
+// readily as Type Arguments; the bracket it sits inside decides. A Generic
+// DECLARATION list (`<infer Value is Comparable>`) is read as one too, so a
+// comma there offers Types where the Parser wants a Type Parameter — the same
+// approximation a bare `<` has always made.
+function detectSymbolSpace(headText: string): SymbolSpace {
+	let stripped = stripNoise(headText)
+	let trimmed = lastLineOf(stripped).replace(identifierTail, "").trimEnd()
 
 	if (
 		trimmed.endsWith(":") ||
 		trimmed.endsWith("->") ||
-		trimmed.endsWith("<")
+		trimmed.endsWith("<") ||
+		trimmed.endsWith("|") ||
+		trailingIsPattern.test(trimmed)
 	) {
 		return "types"
 	}
 
+	if (trimmed.endsWith(",") && innermostOpener(stripped) === "<") {
+		return "types"
+	}
+
 	return "values"
+}
+
+// NOTE: The bracket the cursor is innermost inside. A `<` counts as one only
+// where the Parser reads it as a bracket — a Generic application or a Generic
+// list opens directly against the name it belongs to, so a `<` with anything
+// else before it is the `<-` of a return or the `::<` of a Namespace
+// specifier. For the same reason a `>` closes only a `<` that was counted,
+// leaving the `>` of a `->` alone.
+function innermostOpener(text: string): string | null {
+	let stack: Array<string> = []
+	let previous = ""
+
+	for (let character of text) {
+		if (character === "(" || character === "[" || character === "{") {
+			stack.push(character)
+		} else if (
+			character === ")" ||
+			character === "]" ||
+			character === "}"
+		) {
+			stack.pop()
+		} else if (character === "<" && identifierCharacter.test(previous)) {
+			stack.push(character)
+		} else if (character === ">" && stack[stack.length - 1] === "<") {
+			stack.pop()
+		}
+
+		previous = character
+	}
+
+	return stack[stack.length - 1] ?? null
+}
+
+// NOTE: Statement start is read off the text alone — nothing but a block
+// boundary before the cursor on its line. Everything else is inside an
+// Expression: the value half of a declaration, an Argument, a `<-`.
+//
+// NOTE: No legality analysis happens here. `static` is only meaningful in a
+// Namespace body, `overload` only in a `declarations` Program, `implementation`
+// only at the very top, and none of that is checked. A Keyword offered where it
+// will not parse costs one Parser Diagnostic on the next keystroke; the
+// alternative is a second, approximate model of where each Keyword may stand,
+// which would be wrong in subtler ways.
+function keywordCompletions(headText: string): Array<CompletionEntry> {
+	let trimmed = lastLineOf(stripNoise(headText))
+		.replace(identifierTail, "")
+		.trimEnd()
+	let atStatementStart =
+		trimmed === "" || trimmed.endsWith("{") || trimmed.endsWith("}")
+
+	return (atStatementStart ? statementKeywords : expressionKeywords).map(
+		(keyword) => ({
+			label: keyword,
+			kind: "keyword" as const,
+			detail: null,
+			tier: completionTiers.keyword,
+		}),
+	)
+}
+
+function lastLineOf(text: string): string {
+	return text.slice(text.lastIndexOf("\n") + 1)
 }
 
 function scopeAt(scopes: Array<ScopeRange>, cursor: common.Cursor): Scope {
