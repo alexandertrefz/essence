@@ -18,10 +18,12 @@ import {
 	countOf,
 	createInferenceContext,
 	describeType,
+	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
 	matchesType,
 	matchesTypeWithBindings,
+	type NamespaceTarget,
 	typeContainsError,
 	typeMentionsGeneric,
 	withArticle,
@@ -2131,7 +2133,11 @@ function solveNamespaceConformance(
 	let candidates: Array<{
 		name: string
 		type: common.NamespaceType
-		isGeneric: boolean
+		// NOTE: The Namespace's target Type and Generics as DECLARED — `type` is
+		// specialized against the binding below, which erases exactly the
+		// difference the specificity order needs to see between a hand written
+		// `for List<Integer>` and `List<ItemType>` reached with an Integer item.
+		declaredTarget: NamespaceTarget
 		// NOTE: The Namespace's own `where` conditions for this Protocol, and
 		// the bindings that map each condition's Generic to a concrete Type, so
 		// the conditions can be solved recursively. Ordered by the Namespace's
@@ -2155,12 +2161,17 @@ function solveNamespaceConformance(
 			namespace.generics,
 		)
 
+		let declaredTarget = {
+			targetType: namespace.targetType,
+			generics: namespace.generics,
+		}
+
 		if (namespace.generics.length === 0) {
 			if (matchesType(namespace.targetType, binding)) {
 				candidates.push({
 					name,
 					type: namespace,
-					isGeneric: false,
+					declaredTarget,
 					conditions: orderedConditions,
 					conditionBindings: new Map(),
 				})
@@ -2182,48 +2193,24 @@ function solveNamespaceConformance(
 			candidates.push({
 				name,
 				type: specializeNamespace(namespace, context.bindings),
-				isGeneric: true,
+				declaredTarget,
 				conditions: orderedConditions,
 				conditionBindings: context.bindings,
 			})
 		}
 	}
 
-	// NOTE: A concrete Namespace always beats a generic one's blanket
-	// conformance — a hand-written `for List<Integer> is Equatable` wins
-	// over `List<Item> is Equatable`. This runs before the assignability
-	// filter below: a specialized generic target (`List<Integer>`) is
-	// structurally identical to a concrete one, so without this they would
-	// tie and spuriously read as ambiguous.
-	if (candidates.some((candidate) => !candidate.isGeneric)) {
-		candidates = candidates.filter((candidate) => !candidate.isGeneric)
-	}
-
-	// NOTE: Specificity by assignability — a candidate whose target Type
-	// is assignable to another candidate's (but not the other way around)
-	// is the more specific one and wins. This is what lets a Namespace for
-	// a concrete Record shape beat the builtin Record Namespace's blanket
-	// conformance, and an exact target beat a covering Union.
-	let isStrictlyMoreSpecific = (a: common.Type, b: common.Type): boolean =>
-		matchesType(b, a) && !matchesType(a, b)
-
-	let mostSpecificCandidates = candidates.filter(
-		(candidate) =>
-			!candidates.some(
-				(other) =>
-					other !== candidate &&
-					other.type.targetType !== null &&
-					candidate.type.targetType !== null &&
-					isStrictlyMoreSpecific(
-						other.type.targetType,
-						candidate.type.targetType,
-					),
-			),
+	// NOTE: The same specificity order Method dispatch picks between overlapping
+	// Namespaces with — a hand written `for List<Integer> is Equatable` beats
+	// `List<ItemType> is Equatable`, a Namespace for a concrete Record shape
+	// beats the builtin Record Namespace's blanket conformance, and an exact
+	// target beats a covering Union. Compared on the DECLARED targets: the
+	// candidates above are already specialized against the binding, which makes
+	// a generic target read as concrete.
+	candidates = filterMostSpecificByTarget(
+		candidates,
+		(candidate) => candidate.declaredTarget,
 	)
-
-	if (mostSpecificCandidates.length > 0) {
-		candidates = mostSpecificCandidates
-	}
 
 	if (candidates.length === 0) {
 		// NOTE: No written Namespace conforms — a Choice still does, through
