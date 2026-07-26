@@ -474,16 +474,30 @@ Holder#Bare` — or the construction applies them itself, `Holder<Integer>#Bare`
 A Choice with no Type Parameters at all is never asked: `Ordering#Equal` is
 legal anywhere, and so is the bare `#Equal`.
 
-The bare form CARRYING a payload is the one that decides for itself — `#Full({
-value = 1 })` is a `Holder<Integer>` because its payload is one — which is what
-a Function literal with no written return Type answers with, and what the
-standard library's folds are written on.
+The bare form CARRYING a payload decides what its payload MENTIONS, and only
+that: `#Full({ value = 1 })` is a `Holder<Integer>` because its payload is one,
+and a `#Stopped({ value = "x" })` of a `Progress<State, Result>` says what the
+Result is while leaving `State` to whatever is around it. Where nothing answers
+for the rest, this is what reports — the label names both halves, "its payload
+decides 'Result', and nothing decides 'State'" — and a payload that mentions no
+Type Parameter at all decides none of them. The position is asked first and the
+payload answers where it says nothing; a callback's position is asked AGAIN once
+the call around it has committed its own bindings, so the spelling a Function
+literal with no written return Type answers with — `<- #Done(item)` in a `loop`
+or `reduce` callback, which the standard library's folds are written on — is
+decided by that position and never reaches this.
+
+An Argument position decides a bare construction exactly as it decides the
+prefixed one: `steps::contains(#Done(2))` against a `List<Step<Integer,
+Integer>>` reads both of `Step`'s Arguments off the Parameter Type, the same as
+`steps::contains(Step<Integer, Integer>#Done(2))` does.
 
 A Parameter Type that mentions the CALL's own Type Parameters decides nothing
 either, because nothing has decided them: `take(Holder#Full(1))` against
 `take<infer Item is Equatable>(_ h: Holder<Item>)` is undecided, and the three
 spellings that do decide it are `take(Holder<Integer>#Full(1))`, the bare
-`take(#Full(1))`, and a Constant annotated on the way in.
+`take(#Full(1))` — which falls back on its payload where the Parameter Type has
+nothing to say — and a Constant annotated on the way in.
 
 Written Type Arguments that disagree with what the position decided are the
 ordinary mismatch of a value that does not fit where it is put, and are reported

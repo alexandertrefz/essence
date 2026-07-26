@@ -54,6 +54,15 @@ function notesOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
 }
 
+// NOTE: The text under the carets, which for the undecided rails is where the
+// reader is told WHICH Type Argument is missing — the message names the
+// construction and the labels name the Parameters.
+function labelsOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) =>
+		diagnostic.labels.map((label) => label.message),
+	)
+}
+
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `__print` calls run — the counterpart of `generate`, mirroring
 // codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
@@ -1006,32 +1015,115 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// NOTE: The bare form CARRYING A PAYLOAD is untouched by the
-		// applied-Type-Arguments rule, and deliberately so — it is the form a
-		// Function literal with no written return Type answers with, where there is
-		// no position to read a decision off and the body is the only thing that can
-		// say what it returns. The standard library's `List.firstItem(where:)` is
-		// written on exactly this, and `#Done`/`#Continue` in a `loop`'s callback
-		// are the same shape. The PREFIXED form is what asks to be decided, and so
-		// is the bare unit Case below: it has no payload to decide with either.
-		it("still reads a bare Case's Type Arguments off its payload", () => {
-			expect(
-				valueTypeOf(
-					`implementation { ${progressChoice}
-						constant done = #Stopped({ value = "x" })
-					}`,
-					"done",
-				),
-			).toEqual({
-				type: "Case",
-				choice: "Progress",
-				name: "Stopped",
-				members: { value: { type: "String" } },
-				typeArguments: [
-					{ type: "GenericUse", name: "State" },
-					{ type: "String" },
-				],
+		// NOTE: The bare form CARRYING A PAYLOAD reads what its payload MENTIONS
+		// and nothing else, which used to be blessed here as the whole of the
+		// rule: `#Stopped({ value = "x" })` decided `Result` and let `State` — a
+		// Parameter no member of `#Stopped` names — stand in the Program as the
+		// Type of a value, where it resurfaced far from this line. It is the same
+		// leak the unit Case below is refused for, one spelling over, so it is
+		// refused too: everything that decides runs first (the payload, the
+		// position, the Parameter Type an Argument is matched against), and what
+		// is STILL open then is what reports.
+		//
+		// The form a Function literal with no written return Type answers with —
+		// `<- #Done(item)` in a `loop` or `reduce` callback, which the standard
+		// library is written on throughout — is untouched by that: the callback's
+		// position is re-read once the call has committed, and every Parameter is
+		// decided by the time this asks. The tests below walk that end to end.
+		describe("A payload-carrying bare Case nothing finishes deciding", () => {
+			it("reports the Parameter the payload does not mention", () => {
+				let source = `implementation { ${progressChoice}
+					constant done = #Stopped({ value = "x" })
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+				expect(messagesOf(source)).toEqual([
+					"Nothing decides the Type Arguments of '#Stopped(…)'",
+				])
+				expect(labelsOf(source)).toEqual([
+					"its payload decides 'Result', and nothing decides 'State'",
+				])
+				expect(notesOf(source)).toEqual([
+					"'Progress' takes 2 Type Parameters: 'State', 'Result'.",
+					"A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
+				])
+				expect(helpsOf(source)).toEqual([
+					"Annotate the declaration: 'constant left: Progress<State, Result> = #Stopped(…)'.",
+					"Or apply the Type Arguments: 'Progress<State, Result>#Stopped(…)'.",
+				])
 			})
+
+			// NOTE: The other flavour — a payload that mentions no Type Parameter
+			// at all, so there is not even half a decision to report on.
+			it("reports one whose payload decides nothing at all", () => {
+				let source = `implementation {
+					choice Box<Value> { Full { value: Value }, Tag { label: String } }
+
+					constant tagged = #Tag({ label = "x" })
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+				expect(labelsOf(source)).toEqual([
+					"its payload decides none of them",
+				])
+			})
+
+			it("takes the decision from an annotation", () => {
+				expect(
+					valueTypeOf(
+						`implementation { ${progressChoice}
+							constant done: Progress<Integer, String> = #Stopped({ value = "x" })
+						}`,
+						"done",
+					),
+				).toEqual({
+					type: "Case",
+					choice: "Progress",
+					name: "Stopped",
+					members: { value: { type: "String" } },
+					typeArguments: [{ type: "Integer" }, { type: "String" }],
+				})
+			})
+
+			// NOTE: A Choice every one of whose Parameters the payload mentions
+			// needs no position at all — the rule asks what is left, not whether
+			// a position spoke.
+			it("leaves one its payload decides entirely alone", () => {
+				expect(
+					valueTypeOf(
+						`implementation {
+							choice Box<Value> { Full { value: Value } }
+
+							constant full = #Full(1)
+						}`,
+						"full",
+					),
+				).toEqual({
+					type: "Case",
+					choice: "Box",
+					name: "Full",
+					members: { value: { type: "Integer" } },
+					typeArguments: [{ type: "Integer" }],
+				})
+			})
+		})
+
+		// NOTE: An Argument position decides a bare construction exactly as it
+		// decides the prefixed twin — the two spellings used to part ways here,
+		// the prefixed one reading `Step<Integer, Integer>` straight off the
+		// Parameter Type while the bare one was left to its payload and refused
+		// for the `State` that payload never mentions.
+		it("decides a bare construction from the Argument position", async () => {
+			let program = `implementation {
+				constant steps: List<Step<Integer, Integer>> = [
+					Step<Integer, Integer>#Done(2),
+				]
+
+				__print(steps::contains(#Done(2)))
+			}`
+
+			expect(await run(program)).toEqual(["true"])
+			expect(messagesOf(program)).toEqual([])
 		})
 
 		// NOTE: A unit Case has no payload to read a decision off and no Choice
@@ -1704,6 +1796,30 @@ describe("Choices", () => {
 
 						__print(1::take(Box#Full(5)))
 						__print(1::take(Box#Full("x")))
+					}`),
+				).toEqual(['"integer"', '"string"'])
+			})
+
+			// NOTE: And the bare twin picks the same one. The bare form asks the
+			// position first now, so a candidate that decides but does NOT fit
+			// must leave no recording behind: the enrichment pass reads that
+			// recording back, and `#Full(5)` became a `Box<String>#Full` off the
+			// candidate it never picked, reported one stage later for a payload
+			// that was an Integer all along.
+			it("picks the same overload from the bare spelling", async () => {
+				expect(
+					await run(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						namespace Taker for Integer {
+							overload take {
+								(_ b: Box<String>) -> String { <- "string" }
+								(_ b: Box<Integer>) -> String { <- "integer" }
+							}
+						}
+
+						__print(1::take(#Full(5)))
+						__print(1::take(#Full("x")))
 					}`),
 				).toEqual(['"integer"', '"string"'])
 			})

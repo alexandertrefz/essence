@@ -229,6 +229,34 @@ describe("loop", () => {
 			}`),
 		).toEqual(['"6"'])
 	})
+
+	// NOTE: The two spellings of the one walk, run side by side. A bare
+	// construction whose payload leaves one of its Choice's Type Parameters
+	// standing is refused now, and this is the shape that must never be caught by
+	// that: `#Done("done")` names `Result` and says nothing about `State`, so
+	// what decides `State` is the position — read a SECOND time, once the call
+	// has committed and its bindings are final. The annotated twin decides the
+	// same thing at the callback's own `->`, and the two walks agree, value for
+	// value.
+	it("agrees with itself whether the callback writes its return Type or not", async () => {
+		let walk = (returnType: string, sigil: string): string =>
+			`implementation {
+				constant word = loop(startingWith 0, step (count)${returnType} {
+					if count::isGreaterThanOrEqualTo(3) { <- ${sigil}#Done("done") }
+
+					<- ${sigil}#Continue(count::add(1))
+				})
+
+				__print(word)
+			}`
+
+		expect(await run(walk("", ""))).toEqual(['"done"'])
+		expect(
+			await run(
+				walk(" -> Step<Integer, String>", "Step<Integer, String>"),
+			),
+		).toEqual(['"done"'])
+	})
 })
 
 describe("reduce(startingWith:step:)", () => {

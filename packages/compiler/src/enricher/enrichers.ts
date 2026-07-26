@@ -13,13 +13,13 @@ import {
 	buildUnion,
 	closestMatch,
 	countOf,
+	createFreshenedChoiceInference,
 	createFreshenedInference,
 	describeSignature,
 	describeType,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
-	type GenericInferenceContext,
 	type MatchableArgument,
 	matchArguments,
 	matchesType,
@@ -267,7 +267,21 @@ export function enrichCaseValue(
 			value = wrapSingleMemberShorthand(type, value)
 		}
 
+		// NOTE: Held on to before the instantiation drops them — what the
+		// refusal below names, since an instantiated Case keeps only the
+		// Arguments it was given. Set means the payload rail: every other way in
+		// here handed back a Case some position had already decided.
+		let choiceGenerics = type.choiceGenerics
+
 		type = instantiateCaseFromPayload(type, value, scope, node.position)
+
+		if (choiceGenerics !== undefined) {
+			type = reportUndecidedPayloadTypeArguments(
+				node,
+				type,
+				choiceGenerics,
+			)
+		}
 	}
 
 	return {
@@ -448,10 +462,11 @@ function expectedPayloadType(caseType: common.Type): common.Type | null {
 // that CAN decide one — the same holding-back a contextually typed Function
 // literal gets, for the same reason and one kind of Argument over.
 //
-// A bare form carrying a payload is not one of these: it resolves through the
-// scope scan and its payload still decides. One carrying none has nothing to
-// decide with either and waits alongside the prefixed form. Nor is an applied
-// one — its members are concrete, and they bind like any other value's.
+// A bare form carrying a payload is not one of these: it asks the position
+// first, but falls back on its payload where the position has not been decided,
+// and that payload still binds. One carrying none has nothing to decide with
+// either and waits alongside the prefixed form. Nor is an applied one — its
+// members are concrete, and they bind like any other value's.
 function bindsNoTypeParameter(argument: parser.ArgumentNode): boolean {
 	return (
 		argument.value.nodeType === "CaseValue" &&
@@ -553,21 +568,32 @@ function wrapSingleMemberShorthand(
 		return value
 	}
 
-	let recordShape: common.RecordType = {
-		type: "Record",
-		members: caseType.members,
-	}
-
 	// NOTE: A generic Case's members are still GenericUses here, so a plain
 	// `matchesType` would reject a Record that only fits once they bind. Binding
 	// the Choice's Generics in a throwaway context makes the question "does this
 	// fit AS the Record", independent of any later instantiation. A non-generic
 	// Case has no bindable names, so this is exactly `matchesType` for it.
-	let fitContext: GenericInferenceContext = {
-		bindableNames: new Set(
-			caseType.choiceGenerics?.map((generic) => generic.name) ?? [],
-		),
-		bindings: new Map(),
+	//
+	// Freshened for the same reason the instantiation below is: a payload Typed
+	// as a caller Generic sharing a name with one of the Choice's read as the
+	// Record itself — `current.carried`, Typed as `myCount`'s own `State`, bound
+	// `Step`'s `State` to `{ value: Result }` and was left unwrapped.
+	let { rename, context: fitContext } = createFreshenedChoiceInference(
+		caseType.choiceGenerics ?? [],
+	)
+
+	let recordShape: common.Type = {
+		type: "Record",
+		members: caseType.members,
+	}
+
+	// NOTE: Substituted only where there IS something to substitute. An
+	// instantiated Case reaches here with no Generics left and members that can
+	// be arbitrarily large — a nesting twenty deep spells its whole tree out —
+	// and walking one of those to rename nothing is exactly the per-level cost
+	// `makePayloadReadings` exists to keep off this path.
+	if (rename.size > 0) {
+		recordShape = applyGenericBindings(recordShape, rename)
 	}
 
 	if (matchesTypeWithBindings(recordShape, value.type, fitContext)) {
@@ -608,10 +634,13 @@ function instantiateCaseFromPayload(
 		return caseType
 	}
 
-	let context: GenericInferenceContext = {
-		bindableNames: new Set(choiceGenerics.map((generic) => generic.name)),
-		bindings: new Map(),
-	}
+	// NOTE: Freshened first — see `createFreshenedChoiceInference`. The payload
+	// is a caller-side Type and may mention a Generic spelled exactly like one of
+	// the Choice's, and Generic identity is by name, so the match has to be run
+	// under names no source can carry or the payload binds the Parameter it is
+	// itself written in terms of.
+	let { rename, freshNames, context } =
+		createFreshenedChoiceInference(choiceGenerics)
 
 	let mentionsGenerics = Object.values(caseType.members).some((member) =>
 		choiceGenerics.some((generic) =>
@@ -621,9 +650,31 @@ function instantiateCaseFromPayload(
 
 	if (value !== null && mentionsGenerics) {
 		matchesTypeWithBindings(
-			{ type: "Record", members: caseType.members },
+			applyGenericBindings(
+				{ type: "Record", members: caseType.members },
+				rename,
+			),
 			value.type,
 			context,
+		)
+	}
+
+	// NOTE: What the payload bound, under the names the Choice declares — and
+	// what it did NOT bind, left standing under its fresh name. That is the Type
+	// Argument nothing decided, and carrying it out of here under a name no
+	// source Generic can spell is what lets the construction be told from one
+	// standing in an enclosing Function's own Type Parameter, which IS a
+	// decision. `applyGenericBindings` stamps them onto the instantiated Case in
+	// declaration order, so both halves land in `typeArguments` together.
+	let bindings: GenericBindings = new Map()
+
+	for (let [index, generic] of choiceGenerics.entries()) {
+		bindings.set(
+			generic.name,
+			context.bindings.get(freshNames[index]) ?? {
+				type: "GenericUse",
+				name: freshNames[index],
+			},
 		)
 	}
 
@@ -644,12 +695,71 @@ function instantiateCaseFromPayload(
 	// reported — this one has nothing behind it, and asking for it would make
 	// every `Holder#Bare` an error.
 	let boundGenerics = choiceGenerics.filter(
-		(generic) => context.bindings.get(generic.name) !== undefined,
+		(_, index) => context.bindings.get(freshNames[index]) !== undefined,
 	)
 
-	resolveConformances(boundGenerics, context.bindings, scope, position)
+	resolveConformances(boundGenerics, bindings, scope, position)
 
-	return applyGenericBindings(caseType, context.bindings) as common.CaseType
+	return applyGenericBindings(caseType, bindings) as common.CaseType
+}
+
+// NOTE: The last word on a bare construction carrying a payload — the one
+// spelling whose Type Arguments are not all read off a position, and so the one
+// that can still be half decided once everything that decides has run. A payload
+// binds the Parameters its own members MENTION and no others: `#Stopped({ value
+// = "x" })` on a `Progress<State, Result>` says what the Result is and leaves
+// `State` standing, and `#Tag({ label = "x" })` on a `Box<Value>` says nothing
+// at all. Both used to carry the Choice's own Parameter into the Program as the
+// Type of a value, where it resurfaced far from here — as an `unsatisfied-bound`
+// about a name nothing applied, or as codegen forwarding a witness no caller
+// declares — which is the same leak the unit-Case rail was closed for.
+//
+// A Parameter the payload left is told from an enclosing Function's own by the
+// name it carries: `instantiateCaseFromPayload` matches under freshened names
+// and leaves what did not bind under one, and no source Generic can be spelled
+// that way. So `Step<Optional<Item>, Optional<Item>>` inside a generic Namespace
+// is decided — twice over by a Type Parameter the reader wrote — while the
+// `State` of a leaked `Progress` is not.
+//
+// Asked in the enrichment pass alone, never while a Function literal's return
+// Type is being worked out from its body: that pass seeds no expected return
+// Type on purpose, so `<- #Done(item)` is read there with nothing around it
+// every single time, and answering an Error where the pass needs a Type poisons
+// the very inference it exists to do. The construction is asked again once the
+// call has committed, under the position the finished call decided, and that is
+// the pass that refuses.
+function reportUndecidedPayloadTypeArguments(
+	node: parser.CaseValueNode,
+	caseType: common.CaseType,
+	choiceGenerics: Array<common.GenericDeclaration>,
+): common.CaseType | common.ErrorType {
+	if (inferReturnTypeFromBodyDepth > 0) {
+		return caseType
+	}
+
+	let undecided = choiceGenerics
+		.filter((_, index) => {
+			let typeArgument = caseType.typeArguments?.[index]
+
+			return (
+				typeArgument !== undefined &&
+				mentionsUnsolvedTypeParameter(typeArgument)
+			)
+		})
+		.map((generic) => generic.name)
+
+	if (undecided.length === 0) {
+		return caseType
+	}
+
+	return reportUndecidedTypeArguments(
+		`#${node.caseName.content}(…)`,
+		caseType.choice,
+		node.caseName.content,
+		choiceGenerics,
+		node.position,
+		undecided,
+	)
 }
 
 export function enrichNativeFunctionInvocation(
@@ -3000,6 +3110,15 @@ function unionOfTypes(types: Array<common.Type>): common.Type | null {
 	return buildUnion(distinct)
 }
 
+// NOTE: How many of these passes are running, innermost counted with the rest —
+// a nested Function literal's body is worked out inside its enclosing one's.
+// Read by `reportUndecidedPayloadTypeArguments`, which stays silent for the span
+// and answers with the Type it was handed: dropping the Diagnostics is not
+// enough on its own, because an Error TYPE reported here is what the pass hands
+// back as the literal's return Type, and the call then has nothing left to solve
+// its own Parameters from.
+let inferReturnTypeFromBodyDepth = 0
+
 // NOTE: Working out what a Function literal returns means enriching its body —
 // the Type of `<- total` can not be known without the Constants the body itself
 // declares. The body is enriched twice as a result — once here to find the Type,
@@ -3010,54 +3129,66 @@ function inferReturnTypeFromBody(
 	parameterTypes: Array<common.Parameter>,
 	scope: enricher.Scope,
 ): common.Type | null {
-	let { result } = collectDiagnostics(() => {
-		let inferenceScope = childScope(scope)
+	inferReturnTypeFromBodyDepth += 1
 
-		node.parameters.forEach((parameter, index) => {
-			let type = parameterTypes[index]?.type ?? { type: "Error" as const }
+	try {
+		let { result } = collectDiagnostics(() => {
+			let inferenceScope = childScope(scope)
 
-			if (parameter.internalName !== null) {
-				declareVariableInScope(
-					parameter.internalName,
-					type,
-					inferenceScope,
-					true,
-				)
+			node.parameters.forEach((parameter, index) => {
+				let type = parameterTypes[index]?.type ?? {
+					type: "Error" as const,
+				}
+
+				if (parameter.internalName !== null) {
+					declareVariableInScope(
+						parameter.internalName,
+						type,
+						inferenceScope,
+						true,
+					)
+				}
+			})
+
+			// NOTE: No `expectedReturnType` is seeded — there is none yet,
+			// which is the whole reason this runs. A bare Case in return
+			// position has nothing to resolve against and stays unresolved, so
+			// a literal returning one still has to write its `-> Type`.
+			//
+			// Null rather than left out, because leaving it out is not the
+			// absence of one: the search walks out to the ENCLOSING Function,
+			// whose expected return Type this literal's `<-` has nothing to do
+			// with — `<-` returns from the callback, never from the walk around
+			// it. A `loop` nested in another `loop`'s `step` read the outer
+			// callback's `Step<State, Result>` that way and decided its own
+			// `#Done` payload against it, so the inner call finished with the
+			// OUTER's Result Type while the value it actually carried was the
+			// inner one's.
+			inferenceScope.expectedReturnType = null
+
+			let types: Array<common.Type> = []
+
+			collectReturnedTypes(
+				node.body.map((bodyNode) =>
+					enrichNode(bodyNode, inferenceScope),
+				),
+				types,
+			)
+
+			// NOTE: A body that returns nothing at all is left to the
+			// Validator, which reports the missing return against the Function
+			// itself.
+			if (types.some((type) => type.type === "Error")) {
+				return null
 			}
+
+			return unionOfTypes(types)
 		})
 
-		// NOTE: No `expectedReturnType` is seeded — there is none yet, which
-		// is the whole reason this runs. A bare Case in return position has
-		// nothing to resolve against and stays unresolved, so a literal
-		// returning one still has to write its `-> Type`.
-		//
-		// Null rather than left out, because leaving it out is not the absence
-		// of one: the search walks out to the ENCLOSING Function, whose
-		// expected return Type this literal's `<-` has nothing to do with —
-		// `<-` returns from the callback, never from the walk around it. A
-		// `loop` nested in another `loop`'s `step` read the outer callback's
-		// `Step<State, Result>` that way and decided its own `#Done` payload
-		// against it, so the inner call finished with the OUTER's Result Type
-		// while the value it actually carried was the inner one's.
-		inferenceScope.expectedReturnType = null
-
-		let types: Array<common.Type> = []
-
-		collectReturnedTypes(
-			node.body.map((bodyNode) => enrichNode(bodyNode, inferenceScope)),
-			types,
-		)
-
-		// NOTE: A body that returns nothing at all is left to the Validator,
-		// which reports the missing return against the Function itself.
-		if (types.some((type) => type.type === "Error")) {
-			return null
-		}
-
-		return unionOfTypes(types)
-	})
-
-	return result
+		return result
+	} finally {
+		inferReturnTypeFromBodyDepth -= 1
+	}
 }
 
 // #endregion
@@ -3156,22 +3287,39 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// `undecided-type-arguments` for itself, and answered with an Error so that
 	// the unsolved Parameter does not report a second time as uninferable and the
 	// return Type it appears in does not carry it onward.
+	//
+	// NOTE: A bare form CARRYING a payload asks here too, though its payload is
+	// what answers when the position says nothing. It used to skip the rail
+	// altogether, on the grounds that its payload decides — but a payload decides
+	// only what it MENTIONS, so `steps::contains(#Done(2))` leaked the `State`
+	// its prefixed twin reads straight off the Parameter Type and was refused
+	// for it. `null` is how the two answers "the position decided nothing" and
+	// "the position is undecided itself" come back, and its caller falls back to
+	// the payload reading — the recording is left unmade with it, since the
+	// enrichment pass reads that recording back and a position that decided
+	// nothing must not be what it reads.
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
-	): common.Type {
+	): common.Type | null {
 		let payload = makePayloadReadings(node, scope)
 		let { result } = collectDiagnostics(() =>
 			resolveCaseValueType(node, scope, expectedType, payload.typeUnder),
 		)
+		let payloadDecides = node.choice === null && node.value !== null
 
 		if (result.type === "Case") {
-			if (mentionsUnsolvedTypeParameter(result)) {
-				return { type: "Error" }
+			// NOTE: A Case still carrying its Choice's `choiceGenerics` is the
+			// DECLARED one — the bare scan's answer where the position named no
+			// such Case at all, and the one shape that reaches here undecided
+			// without mentioning an unsolved Parameter of the call.
+			if (
+				mentionsUnsolvedTypeParameter(result) ||
+				result.choiceGenerics !== undefined
+			) {
+				return payloadDecides ? null : { type: "Error" }
 			}
-
-			recordContextualCaseValueType(node, { expectedType, bindings })
 
 			// NOTE: Read under what this candidate decided, which is the Type
 			// the real enrichment will read it under too — a nested construction
@@ -3179,10 +3327,28 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// selection already read it under this very Case, that reading
 			// answers.
 			let payloadType = payload.typeUnder(result)
+			let fits =
+				payloadType === null || payloadFitsCase(result, payloadType)
 
-			if (payloadType === null || payloadFitsCase(result, payloadType)) {
+			// NOTE: The prefixed form is recorded even where its payload does
+			// not fit — the paragraph above says why. The bare one is not: it
+			// falls back on reading its payload from here, and the enrichment
+			// pass reads this recording back, so a recording left behind is the
+			// position the fallback was made FOR deciding the construction
+			// anyway. `1::take(#Full(5))` between a `Box<String>` overload and a
+			// `Box<Integer>` one became a `Box<String>#Full` that way, off the
+			// candidate it does not fit and never picked.
+			if (fits || !payloadDecides) {
+				recordContextualCaseValueType(node, { expectedType, bindings })
+			}
+
+			if (fits) {
 				return result
 			}
+		}
+
+		if (payloadDecides) {
+			return null
 		}
 
 		let { result: declared } = collectDiagnostics(() =>
@@ -3217,18 +3383,17 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				)
 			}
 
-			// NOTE: The other Expression that reacts — a Case construction with
-			// nothing of its own to read its Choice's Type Arguments off: every
-			// prefixed one, and the bare sigil that carries no payload either. A
-			// bare form WITH a payload is what its payload decides, so it resolves
-			// through the scope scan and needs nothing from here.
-			if (
-				value.nodeType === "CaseValue" &&
-				(value.choice !== null || value.value === null)
-			) {
-				return noteErrors(
-					probedCaseValueType(value, expectedType, bindings),
-				)
+			// NOTE: The other Expression that reacts — a Case construction,
+			// whichever way it is spelled. The prefixed form and the bare unit
+			// sigil have nothing of their own to read their Choice's Type
+			// Arguments off and take the position's answer whatever it is; the
+			// bare form carrying a payload asks the position first and falls back
+			// on reading its payload where the position decided nothing, which is
+			// what `null` says.
+			if (value.nodeType === "CaseValue") {
+				let probed = probedCaseValueType(value, expectedType, bindings)
+
+				return noteErrors(probed ?? enrichOnce(value).type)
 			}
 
 			return noteErrors(enrichOnce(value).type)
@@ -5248,12 +5413,13 @@ function resolvePrefixedCaseValueType(
 	)
 }
 
-// NOTE: The one Diagnostic both undecided rails report — the prefixed
-// `Holder#Bare` and the bare `#Bare` of a unit Case — spelled with the form the
-// source wrote, since the annotation that is one way out is written around that
-// very spelling. The Choice's name is handed in rather than read off the Case,
-// so the prefixed rail keeps naming the Alias the reader wrote where one stood
-// in for the Choice.
+// NOTE: The one Diagnostic all three undecided rails report — the prefixed
+// `Holder#Bare`, the bare `#Bare` of a unit Case and the bare `#Full(…)` whose
+// payload left a Parameter standing — spelled with the form the source wrote,
+// since the annotation that is one way out is written around that very spelling.
+// The Choice's name is handed in rather than read off the Case, so the prefixed
+// rail keeps naming the Alias the reader wrote where one stood in for the
+// Choice.
 //
 // NOTE: The Choice's own Parameter names stand in for the Arguments in both
 // helps — they are what the declaration calls them, so the reader has a name to
@@ -5264,9 +5430,15 @@ function reportUndecidedTypeArguments(
 	caseName: string,
 	choiceGenerics: Array<common.GenericDeclaration>,
 	position: common.Position,
+	// NOTE: The payload rail's extra — the Parameters the payload did NOT
+	// decide, so the label can say which half of the application is missing
+	// rather than claim there is nothing here at all. Absent for the two rails
+	// that carry no payload to decide anything with, whose label is unchanged.
+	undecided?: Array<common.GenericName>,
 ): common.ErrorType {
 	let parameterNames = choiceGenerics.map((generic) => generic.name)
 	let application = `${choiceName}<${parameterNames.join(", ")}>`
+	let payloadSuffix = undecided === undefined ? "" : "(…)"
 
 	reportError(
 		`Nothing decides the Type Arguments of '${construction}'`,
@@ -5274,23 +5446,49 @@ function reportUndecidedTypeArguments(
 		{
 			code: "undecided-type-arguments",
 			labels: [
-				primary(
-					position,
-					"no Type Arguments here, and nothing around it decides them",
-				),
+				primary(position, undecidedLabel(parameterNames, undecided)),
 			],
 			notes: [
-				`'${choiceName}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${parameterNames.map((name) => `'${name}'`).join(", ")}.`,
-				"A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.",
+				`'${choiceName}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${quotedNames(parameterNames)}.`,
+				undecided === undefined
+					? "A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them."
+					: "A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
 			],
 			helps: [
 				`Annotate the declaration: 'constant left: ${application} = ${construction}'.`,
-				`Or apply the Type Arguments: '${application}#${caseName}'.`,
+				`Or apply the Type Arguments: '${application}#${caseName}${payloadSuffix}'.`,
 			],
 		},
 	)
 
 	return { type: "Error" }
+}
+
+// NOTE: What the primary label says under the construction. The two rails with
+// no payload say nothing decides them, which is the whole of it there. The
+// payload rail says which Parameters the payload DID decide beside the ones it
+// left, because a reader looking at `#Stopped({ value = "x" })` can see the
+// String going in and needs telling that the OTHER Parameter is the one nothing
+// answers for.
+function undecidedLabel(
+	parameterNames: Array<common.GenericName>,
+	undecided: Array<common.GenericName> | undefined,
+): string {
+	if (undecided === undefined) {
+		return "no Type Arguments here, and nothing around it decides them"
+	}
+
+	let decided = parameterNames.filter((name) => !undecided.includes(name))
+
+	if (decided.length === 0) {
+		return "its payload decides none of them"
+	}
+
+	return `its payload decides ${quotedNames(decided)}, and nothing decides ${quotedNames(undecided)}`
+}
+
+function quotedNames(names: Array<common.GenericName>): string {
+	return names.map((name) => `'${name}'`).join(", ")
 }
 
 // NOTE: `Holder<Integer>#Full(…)` — the Type Arguments written at the value.
