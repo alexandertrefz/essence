@@ -611,6 +611,7 @@ export function resolveIdentifierType(
 					primary(node.position, "no such Variable or Constant"),
 				],
 				helps: suggestionHelps(name, scope, "members"),
+				...suggestionData(suggestionInScope(name, scope, "members")),
 			})
 		}
 
@@ -724,6 +725,13 @@ export function resolveGenericDeclarations(
 						generic.constraint.content,
 						scope,
 						"protocols",
+					),
+					...suggestionData(
+						suggestionInScope(
+							generic.constraint.content,
+							scope,
+							"protocols",
+						),
 					),
 				},
 			)
@@ -2477,6 +2485,13 @@ export function checkProtocolConformance(
 						scope,
 						"protocols",
 					),
+					...suggestionData(
+						suggestionInScope(
+							identifier.content,
+							scope,
+							"protocols",
+						),
+					),
 				},
 			)
 
@@ -2589,6 +2604,13 @@ export function checkProtocolConformance(
 							condition.protocol.content,
 							scope,
 							"protocols",
+						),
+						...suggestionData(
+							suggestionInScope(
+								condition.protocol.content,
+								scope,
+								"protocols",
+							),
 						),
 					},
 				)
@@ -2866,6 +2888,7 @@ export function resolveIdentifierTypeDeclarationType(
 				code: "unknown-type",
 				labels: [primary(node.position, "no such Type")],
 				helps: suggestionHelps(name, scope, "types"),
+				...suggestionData(suggestionInScope(name, scope, "types")),
 			})
 		}
 
@@ -2932,6 +2955,7 @@ export function resolveGenericTypeDeclarationType(
 					code: "unknown-type",
 					labels: [primary(node.baseType.position, "no such Type")],
 					helps: suggestionHelps(name, scope, "types"),
+					...suggestionData(suggestionInScope(name, scope, "types")),
 				},
 			)
 
@@ -3048,6 +3072,7 @@ function reportUnknownMember(
 								.join(", ")}.`,
 						],
 			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+			...suggestionData(suggestion),
 		},
 	)
 }
@@ -3070,6 +3095,16 @@ function namesInScope(
 	return names
 }
 
+export function suggestionInScope(
+	name: string,
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): string | null {
+	let suggestion = closestMatch(name, namesInScope(scope, kind))
+
+	return suggestion === null || suggestion === name ? null : suggestion
+}
+
 // NOTE: A near miss is a Help rather than part of the message — it is a
 // suggestion, and a message that states one as fact reads as though the
 // Compiler knows something it does not.
@@ -3078,11 +3113,20 @@ export function suggestionHelps(
 	scope: enricher.Scope,
 	kind: "members" | "types" | "protocols",
 ): Array<string> {
-	let suggestion = closestMatch(name, namesInScope(scope, kind))
+	let suggestion = suggestionInScope(name, scope, kind)
 
-	return suggestion === null || suggestion === name
-		? []
-		: [`Did you mean '${suggestion}'?`]
+	return suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
+}
+
+// NOTE: The same near miss again, for the Quick Fix that applies it. Spread
+// rather than assigned, so a Diagnostic that has no suggestion carries no
+// `data` key at all rather than one holding `undefined`.
+export function suggestionData(suggestion: string | null): {
+	data?: common.DiagnosticData
+} {
+	return suggestion === null
+		? {}
+		: { data: { kind: "suggestion", suggestion } }
 }
 
 // NOTE: `Object.hasOwn`, not a plain index — as in `findTypeInScope` below.
@@ -3659,10 +3703,12 @@ function resolveParameterTypes(
 }
 
 // NOTE: A `@param` naming neither the external nor the internal name of any
-// Parameter describes nothing. It attaches to nothing and was rendered into
-// every Hover regardless — a description of a Parameter the reader then went
-// looking for and could not find, which is the failure mode a rename leaves
-// behind.
+// Parameter describes nothing. It attaches to nothing and is rendered into
+// every Hover regardless — a description of a Parameter the reader then goes
+// looking for and cannot find, which is the failure mode a rename leaves
+// behind. The Warning is what makes it visible; the rendering is unchanged,
+// since dropping the section would take the text away from the one person who
+// can still fix it.
 //
 // `signatures` is a list rather than one Parameter list because a `§§` block
 // above an `overload` keyword documents the set as a whole: a name any one of
@@ -3751,7 +3797,15 @@ export function parameterDocumentation(
 	for (let name of [parameter.externalName, parameter.internalName]) {
 		let tagged = documentation?.parameters[name?.content ?? ""]
 
-		if (tagged !== undefined) {
+		// NOTE: An own property, because a Parameter may be named after a
+		// member of `Object.prototype` — `toString`, `valueOf`, `constructor`.
+		// Asked without the guard, a Parameter named `toString` is handed the
+		// inherited native function as its description, which then reaches an
+		// Editor as the Parameter's documentation.
+		if (
+			tagged !== undefined &&
+			Object.hasOwn(documentation?.parameters ?? {}, name?.content ?? "")
+		) {
 			return tagged
 		}
 	}

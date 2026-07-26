@@ -165,6 +165,30 @@ describe("Validator", () => {
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].code).toBe("missing-case")
 			expect(diagnostics[0].notes).toEqual(["Unhandled: 'Rational'."])
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-case",
+				unhandled: ["Rational"],
+			})
+		})
+
+		// NOTE: The Quick Fix writes one Handler per entry in the order it
+		// finds them, so the order is part of what `data` promises — Handlers
+		// that appear in a different order than the Union declares its members
+		// read as though the Compiler shuffled them.
+		it("should carry every unhandled member in declaration order", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant value: Integer | Rational | String | Boolean = 5
+				constant a = match value -> Integer {
+					case Integer {
+						<- @
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-case",
+				unhandled: ["Rational", "String", "Boolean"],
+			})
 		})
 
 		it("should warn about unreachable Match cases", () => {

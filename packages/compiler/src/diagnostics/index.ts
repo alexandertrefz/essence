@@ -54,6 +54,7 @@ type DiagnosticDetails = {
 	notes?: Array<string>
 	helps?: Array<string>
 	tags?: Array<common.DiagnosticTag>
+	data?: common.DiagnosticData
 }
 
 // NOTE: The overloads are what carry the invariant down to the call sites: a

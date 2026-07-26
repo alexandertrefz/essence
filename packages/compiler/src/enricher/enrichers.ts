@@ -56,7 +56,9 @@ import {
 	resolveType,
 	resolveTypeAliasStatementType,
 	scopeWithGenerics,
+	suggestionData,
 	suggestionHelps,
+	suggestionInScope,
 } from "./resolvers"
 import { childScope } from "./scope"
 
@@ -1149,24 +1151,60 @@ export function enrichStatement(
 	}
 }
 
-// NOTE: A Declaration takes no Parameters of its own, but the value it holds
-// may — `constant greet = (subject: String) -> …` is documented above the
-// `constant`, and a `@param` there names a Parameter of the Function below it.
-// Anything else holds no Parameters at all, and a `@param` on it describes
-// nothing.
+// NOTE: The value shapes that can not be a Function, whatever they are made
+// of. A List of Functions is still a List, and takes no Parameters itself.
+const parameterlessValues = new Set([
+	"RecordValue",
+	"StringValue",
+	"IntegerValue",
+	"RationalValue",
+	"BooleanValue",
+	"NothingValue",
+	"ListValue",
+	"CaseValue",
+])
+
+// NOTE: The Parameters the value of a Declaration holds, or null where they
+// can not be read off it. A `§§` block above a `constant` documents whatever
+// it holds, so a `@param` there names a Parameter of a Function written as its
+// value — that much is visible here.
+//
+// `constant alias = greet` is function-valued too, and is exactly why the
+// answer is nullable: its Parameters live in a resolved Type, which keeps only
+// the external names, so a `@param` naming an internal one could not be told
+// from a typo. Answering null leaves such a Declaration unchecked, which is
+// the honest outcome — the alternative was telling it that it takes no
+// Parameters while Hover showed them.
 function heldParameters(
 	value: parser.ExpressionNode | null,
-): Array<parser.ParameterNode> {
-	return value?.nodeType === "FunctionValue" ? value.value.parameters : []
+): Array<parser.ParameterNode> | null {
+	if (value === null) {
+		return null
+	}
+
+	if (value.nodeType === "FunctionValue") {
+		return value.value.parameters
+	}
+
+	return parameterlessValues.has(value.nodeType) ? [] : null
+}
+
+function reportUnknownDocumentationOfValue(
+	documentation: common.Documentation | null,
+	value: parser.ExpressionNode | null,
+): void {
+	let parameters = heldParameters(value)
+
+	if (parameters !== null) {
+		reportUnknownDocumentationParameters(documentation, [parameters])
+	}
 }
 
 export function enrichConstantDeclarationStatement(
 	node: parser.ConstantDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.ConstantDeclarationStatementNode {
-	reportUnknownDocumentationParameters(node.documentation, [
-		heldParameters(node.value),
-	])
+	reportUnknownDocumentationOfValue(node.documentation, node.value)
 
 	// NOTE: The annotation is the value's expected Type — a bare Case in the
 	// value resolves against it before the scope scan.
@@ -1194,9 +1232,7 @@ export function enrichVariableDeclarationStatement(
 	node: parser.VariableDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.typed.VariableDeclarationStatementNode {
-	reportUnknownDocumentationParameters(node.documentation, [
-		heldParameters(node.value),
-	])
+	reportUnknownDocumentationOfValue(node.documentation, node.value)
 
 	// NOTE: The annotation is the value's expected Type — a bare Case in the
 	// value resolves against it before the scope scan.
@@ -1290,9 +1326,10 @@ export function enrichNamespaceDefinitionStatement(
 				continue
 			}
 
-			reportUnknownDocumentationParameters(propertyValue.documentation, [
-				heldParameters(propertyValue.value),
-			])
+			reportUnknownDocumentationOfValue(
+				propertyValue.documentation,
+				propertyValue.value,
+			)
 
 			let type: common.Type
 			let value: common.typed.ExpressionNode = enrichExpression(
@@ -2899,6 +2936,7 @@ function reportUnknownMethod(
 								.join(", ")}.`,
 						],
 			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+			...suggestionData(suggestion),
 		},
 	)
 }
@@ -3818,6 +3856,9 @@ export function resolveCaseReference(
 				code: "unknown-type",
 				labels: [primary(choice.position, "no such Type")],
 				helps: suggestionHelps(choice.content, scope, "types"),
+				...suggestionData(
+					suggestionInScope(choice.content, scope, "types"),
+				),
 			},
 		)
 
@@ -3863,10 +3904,11 @@ export function resolveCaseReference(
 // resolves its Namespace — every Choice in Type scope is scanned for the
 // Case, and only actual ambiguity asks for the prefix. Shadowed Type names
 // are skipped, mirroring `getAllNamespacesInScope`.
-function findCaseTypesInScope(
-	name: string,
-	scope: enricher.Scope,
-): Array<common.CaseType> {
+//
+// NOTE: Every Case rather than only the ones spelled a given way, because the
+// near miss a failed resolution offers is drawn from the same scan — a
+// candidate set narrowed to exact matches has nothing left to suggest from.
+function findCaseTypesInScope(scope: enricher.Scope): Array<common.CaseType> {
 	let seenTypeNames = new Set<string>()
 	let cases = new Map<string, common.CaseType>()
 	let searchScope: enricher.Scope | null = scope
@@ -3891,7 +3933,7 @@ function findCaseTypesInScope(
 						: [type]
 
 			for (let member of members) {
-				if (member.type === "Case" && member.name === name) {
+				if (member.type === "Case") {
 					cases.set(`${member.choice}#${member.name}`, member)
 				}
 			}
@@ -3907,7 +3949,10 @@ export function resolveBareCaseReference(
 	caseName: parser.IdentifierNode,
 	scope: enricher.Scope,
 ): common.CaseType | common.ErrorType {
-	let candidates = findCaseTypesInScope(caseName.content, scope)
+	let casesInScope = findCaseTypesInScope(scope)
+	let candidates = casesInScope.filter(
+		(candidate) => candidate.name === caseName.content,
+	)
 
 	if (candidates.length === 1) {
 		return candidates[0]
@@ -3920,6 +3965,15 @@ export function resolveBareCaseReference(
 			{
 				code: "unknown-case",
 				labels: [primary(caseName.position, "no such Case")],
+				// NOTE: Drawn from every Choice in scope, which is exactly what
+				// the message says was searched. The Cases are NOT listed as a
+				// note the way a named Choice's are: the scan reaches the whole
+				// prelude, and a Diagnostic that prints every Case in the
+				// language buries the one line worth reading.
+				...caseSuggestion(
+					caseName.content,
+					casesInScope.map((candidate) => candidate.name),
+				),
 			},
 		)
 	} else {
@@ -4067,12 +4121,41 @@ export function resolveCaseMatcherType(
 	}
 
 	if (candidates.length === 0) {
+		// NOTE: De-duplicated by name, because the matched Union may be
+		// `A | B` with both Choices declaring the same Case — which is the
+		// `ambiguous-case` branch below when it IS the name written, and
+		// nothing but a repeated entry in this list when it is not.
+		let memberCaseNames = [
+			...new Set(
+				members.flatMap((member) =>
+					member.type === "Case" ? [member.name] : [],
+				),
+			),
+		]
+
+		// NOTE: The name alone, not the whole Matcher — a Quick Fix rewrites
+		// exactly what the Diagnostic underlines, and the `#` the reader
+		// already wrote is not part of the near miss.
 		reportError(
 			`The matched value has no Case '#${node.caseName.content}'`,
-			node.position,
+			node.caseName.position,
 			{
 				code: "unknown-case",
-				labels: [primary(node.position, "no such Case in this Union")],
+				labels: [
+					primary(
+						node.caseName.position,
+						"no such Case in this Union",
+					),
+				],
+				notes:
+					memberCaseNames.length === 0
+						? []
+						: [
+								`The matched value declares ${memberCaseNames
+									.map((name) => `'#${name}'`)
+									.join(", ")}.`,
+							],
+				...caseSuggestion(node.caseName.content, memberCaseNames),
 			},
 		)
 	} else {
@@ -4524,13 +4607,33 @@ function reportAmbiguousCase(
 	)
 }
 
+// NOTE: An unknown Case is reported from three places — a named Choice, the
+// matched value's Union, and the scan of every Choice in scope — which differ
+// in what they can say about where the Case was looked for, but not in what
+// they offer instead. Computing the near miss once is what keeps the terminal
+// and the editor in step: the Help is the Quick Fix's title, and a site that
+// wrote only one of them would show a suggestion nothing applies, or apply one
+// nothing announced.
+function caseSuggestion(
+	name: string,
+	candidateNames: Array<string>,
+): { helps: Array<string>; data?: common.DiagnosticData } {
+	let suggestion = closestMatch(name, candidateNames)
+
+	return {
+		helps: suggestion === null ? [] : [`Did you mean '#${suggestion}'?`],
+		// NOTE: The bare name, without the `#` the Help renders it with —
+		// a Quick Fix replaces the Case's name, and the `#` beside it is
+		// not part of what the Diagnostic underlines.
+		...suggestionData(suggestion),
+	}
+}
+
 function reportUnknownCase(
 	caseName: parser.IdentifierNode,
 	choiceDescription: string,
 	declaredCaseNames: Array<string>,
 ): void {
-	let suggestion = closestMatch(caseName.content, declaredCaseNames)
-
 	reportError(
 		`${choiceDescription} has no Case '#${caseName.content}'`,
 		caseName.position,
@@ -4545,8 +4648,7 @@ function reportUnknownCase(
 								.map((name) => `'#${name}'`)
 								.join(", ")}.`,
 						],
-			helps:
-				suggestion === null ? [] : [`Did you mean '#${suggestion}'?`],
+			...caseSuggestion(caseName.content, declaredCaseNames),
 		},
 	)
 }
