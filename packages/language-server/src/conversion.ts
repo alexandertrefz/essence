@@ -11,6 +11,13 @@ export function toCursor(position: Position): common.Cursor {
 	return { line: position.line + 1, column: position.character + 1 }
 }
 
+// NOTE: A whole Range rather than the two Cursors separately — a request that
+// carries a selection (Code Actions) reads it as one span, and `toLspRange`
+// below is already the way back.
+export function toRange(range: Range): common.Position {
+	return { start: toCursor(range.start), end: toCursor(range.end) }
+}
+
 // NOTE: Compiler Positions are 1-based, LSP Ranges are 0-based. Diagnostics
 // without a Position are mapped to the very start of the document.
 export function toLspRange(position: common.Position | null): Range {
