@@ -70,36 +70,22 @@ function buildStdlibArtifacts(
 				continue
 			}
 
-			// NOTE: A bodied static Property can NOT be merged, and is refused
-			// here rather than emitted wrongly. Its initialiser would be
-			// evaluated inside the const's own object literal — and every
-			// Essence literal compiles to a call on a Namespace, so
-			// `static YES: Boolean = true` emits
-			// `const Boolean = { …, YES: Boolean.createBoolean(true) }`, which
-			// reads `Boolean` before the const it is initialising exists. The
-			// cross-Namespace spelling is no better: the const that needs the
-			// value may be emitted above the one that provides it. Neither
-			// produces a Diagnostic — it type checks, compiles, and crashes at
-			// import — so the compiler developer who writes the first one has to
-			// be stopped here.
-			//
-			// NOTE: `Number.PI` and `Number.TAU` are the proof this refusal is
-			// narrow rather than a wall: a value-LESS `static PI:
-			// Transcendental` is a native, never reaches this Node, and arrives
-			// at a call site through the spread — which is how the numeric tower
-			// converted with its constants intact. Giving one a value needs the
-			// Rewriter to emit Properties as assignments AFTER every const —
-			// `Number.PI = …` — at which point the ordering between two
-			// Properties that name each other becomes the next thing to answer.
-			let bodiedProperties = Object.keys(node.properties)
+			// NOTE: A Method and a static Property of one Namespace are emitted
+			// under the SAME `$es_<Namespace>_<member>` const name, so a
+			// Namespace that spells both alike would declare that name twice.
+			// Nothing upstream refuses it — the two live in records of their own,
+			// so `static yes: Boolean = true` beside `yes() -> Boolean` type
+			// checks — and what it produces is a JavaScript file that will not
+			// parse, so the compiler developer who writes it is stopped here.
+			let shadowedMethods = Object.keys(node.properties).filter(
+				(name) => node.methods[name] !== undefined,
+			)
 
-			if (bodiedProperties.length > 0) {
+			if (shadowedMethods.length > 0) {
 				throw new Error(
-					`The standard library Namespace '${node.name.name}' gives a value to the static ${
-						bodiedProperties.length === 1
-							? "Property"
-							: "Properties"
-					} ${bodiedProperties.map((name) => `'${name}'`).join(", ")}, which the Rewriter can not emit yet — declare it without a value, so it binds to the runtime`,
+					`The standard library Namespace '${node.name.name}' spells the static ${
+						shadowedMethods.length === 1 ? "Property" : "Properties"
+					} ${shadowedMethods.map((name) => `'${name}'`).join(", ")} exactly like a Method of its own, and the two are emitted under the one const — rename one of them`,
 				)
 			}
 
@@ -108,7 +94,17 @@ function buildStdlibArtifacts(
 			// here empty and is dropped. Merging it would emit a const that
 			// spreads the runtime module and adds nothing, which is only a
 			// slower way of importing it.
-			if (Object.keys(node.methods).length === 0) {
+			//
+			// NOTE: A bodied static Property counts as a member here, so a
+			// Namespace whose every Method is native but which gives one Property
+			// a value still belongs in the prelude. Its value is emitted as a
+			// const of its own, in the band the Rewriter orders AFTER every
+			// Function-valued one — a Property initialiser runs where its const
+			// is emitted, not when something calls it.
+			if (
+				Object.keys(node.methods).length === 0 &&
+				Object.keys(node.properties).length === 0
+			) {
 				continue
 			}
 
@@ -208,6 +204,36 @@ export function essenceMethodName(
 	}
 
 	return cachedEssenceMethodNames.has(`${namespaceName} ${memberName}`)
+		? essenceMethodIdentifier(namespaceName, memberName)
+		: null
+}
+
+// NOTE: The same answer for a static Property the prelude gives a VALUE to. It
+// is asked separately from the Methods, and not because the emitted name differs
+// — it is the one `essenceMethodIdentifier` spells, and a member is a Method or
+// a Property but never both (`buildStdlibArtifacts` refuses the overlap) — but
+// because the KIND decides where the const is emitted: a Method's holds a
+// Function expression and may sit anywhere, a Property's holds the value itself
+// and is ordered against the other Properties it reads. A value-LESS
+// `static PI: Transcendental` is a native, reaches no typed Node, and stays the
+// plain `Number.PI` member read off the runtime module.
+let cachedEssencePropertyNames: Set<string> | null = null
+
+export function essencePropertyName(
+	namespaceName: string,
+	memberName: string,
+): string | null {
+	if (cachedEssencePropertyNames === null) {
+		cachedEssencePropertyNames = new Set(
+			stdlibPrelude().flatMap((namespace) =>
+				Object.keys(namespace.node.properties).map(
+					(name) => `${namespace.name} ${name}`,
+				),
+			),
+		)
+	}
+
+	return cachedEssencePropertyNames.has(`${namespaceName} ${memberName}`)
 		? essenceMethodIdentifier(namespaceName, memberName)
 		: null
 }

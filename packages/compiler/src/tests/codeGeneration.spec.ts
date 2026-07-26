@@ -19,7 +19,9 @@ import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {
 	checkEssenceMethodsAreDeclared,
+	type EssenceMember,
 	essenceMethodReferences,
+	orderEssenceMembers,
 	reachableEssenceMethods,
 	rewrite,
 } from "../rewriter/index"
@@ -27,6 +29,7 @@ import {
 	buildStdlibPrelude,
 	essenceMethodIdentifier,
 	essenceMethodName,
+	essencePropertyName,
 	nativeFreeFunctionNames,
 	type PreludeFreeFunction,
 	stdlibFreeFunctions,
@@ -1008,6 +1011,22 @@ describe("Code Generation", () => {
 				"$es_Number_sum__overload$2",
 			)
 		})
+
+		// NOTE: The Properties are asked for separately, because a Property's const
+		// is emitted in a band of its own — but under the same name, so the two
+		// tables must not both answer for one member. No standard library Property
+		// has a value today, so every one of them is a member read.
+		it("returns null for a static Property the library gives no value", () => {
+			expect(essencePropertyName("Number", "PI")).toBeNull()
+			expect(essencePropertyName("Number", "TAU")).toBeNull()
+		})
+
+		it("keeps a Method out of the Property table", () => {
+			expect(essencePropertyName("Boolean", "isNot")).toBeNull()
+			expect(essenceMethodName("Boolean", "isNot")).toBe(
+				"$es_Boolean_isNot",
+			)
+		})
 	})
 
 	describe("Reserved-word identifiers", () => {
@@ -1078,6 +1097,17 @@ describe("Code Generation", () => {
 	})
 
 	describe("Standard Library Prelude", () => {
+		// NOTE: A synthetic standard library, so a shape the real one does not
+		// have yet can be handed to the Rewriter — the edges are read off the
+		// prelude that comes back, so a prelude the process-wide one knows nothing
+		// about is exactly what these must answer for.
+		function preludeOf(source: string) {
+			return buildStdlibPrelude(
+				loadStdlibFrom([parseStdlibSource("Synthetic.es", source)])
+					.typedPrograms,
+			)
+		}
+
 		it("emits an Essence-implemented Method as its own const", () => {
 			const code = generate(`implementation {
 				__print(true::isNot(false))
@@ -1328,9 +1358,9 @@ describe("Code Generation", () => {
 			expect(neither).not.toContain("$es_Boolean_isNot")
 		})
 
-		// NOTE: A value-LESS `static PI: Transcendental` is a native — it never
-		// reaches the prelude's bodied-Property refusal — so it stays a plain
-		// member read off the runtime module, `Number.PI`, like every native.
+		// NOTE: A value-LESS `static PI: Transcendental` is a native — it reaches
+		// no typed Node, so the prelude has nothing to emit for it — and it stays a
+		// plain member read off the runtime module, `Number.PI`, like every native.
 		it("reads PI and TAU as native member reads", async () => {
 			const source = `implementation {
 				__print(Number.PI::toString())
@@ -1492,13 +1522,6 @@ describe("Code Generation", () => {
 		}
 	}
 }`
-
-			function preludeOf(source: string) {
-				return buildStdlibPrelude(
-					loadStdlibFrom([parseStdlibSource("Pair.es", source)])
-						.typedPrograms,
-				)
-			}
 
 			// NOTE: An Essence Method is reached as a bare `$es_…` Identifier —
 			// the same shape the user Program's emitted calls take.
@@ -1679,13 +1702,13 @@ describe("Code Generation", () => {
 						freeFunctionsOf(crossing),
 					)
 
-					expect(reachable.get("double")).toMatchObject({
+					expect(reachable.get("double")?.declaration).toMatchObject({
 						type: "FunctionDeclaration",
 						id: { type: "Identifier", name: "double" },
 					})
-					expect(reachable.get("$es_Inner_twice")?.type).toBe(
-						"VariableDeclaration",
-					)
+					expect(
+						reachable.get("$es_Inner_twice")?.declaration.type,
+					).toBe("VariableDeclaration")
 				})
 
 				// NOTE: The set handed in is what decides an edge, exactly as
@@ -1831,7 +1854,12 @@ describe("Code Generation", () => {
 						implemented,
 					)
 
-					expect([...refs]).toEqual(["$es_Target_instance"])
+					expect([...refs.references]).toEqual([
+						"$es_Target_instance",
+					])
+					expect([...refs.evaluatedReferences]).toEqual([
+						"$es_Target_instance",
+					])
 				})
 
 				it("follows a static Lookup, as callee and as a bare value", () => {
@@ -1845,26 +1873,111 @@ describe("Code Generation", () => {
 						member: { nodeType: "Identifier", name: "static" },
 					}
 
-					expect([
-						...essenceMethodReferences(
-							{
-								nodeType: "FunctionInvocation",
-								name: lookup,
-								arguments: [],
-							},
-							implemented,
-						),
-					]).toEqual(["$es_Target_static"])
+					let called = essenceMethodReferences(
+						{
+							nodeType: "FunctionInvocation",
+							name: lookup,
+							arguments: [],
+						},
+						implemented,
+					)
+
+					expect([...called.references]).toEqual([
+						"$es_Target_static",
+					])
+					expect([...called.evaluatedReferences]).toEqual([
+						"$es_Target_static",
+					])
 
 					// NOTE: A static Method passed as a value, not called — the
 					// shape an earlier version missed by only inspecting a
-					// `FunctionInvocation`'s callee.
+					// `FunctionInvocation`'s callee. It is an edge for
+					// reachability, since the const is named, and NOT an ordering
+					// constraint on the value band: the body it names runs
+					// whenever whoever was handed it calls it.
+					let handedOn = essenceMethodReferences(
+						{ nodeType: "Argument", value: lookup },
+						implemented,
+					)
+
+					expect([...handedOn.references]).toEqual([
+						"$es_Target_static",
+					])
+					expect([...handedOn.evaluatedReferences]).toEqual([])
+				})
+
+				// NOTE: A static Property READ is the same Node shape as a static
+				// Method reference, so which table holds the pair is the whole of
+				// the difference — and a native Property is in neither, which is why
+				// `Number.PI` draws no edge to a const nothing emitted.
+				it("follows a read of a static Property the prelude gives a value", () => {
+					const lookup = {
+						nodeType: "Lookup",
+						base: {
+							nodeType: "Identifier",
+							name: "Target",
+							type: { type: "Namespace" },
+						},
+						member: { nodeType: "Identifier", name: "CONSTANT" },
+					}
+
+					let refs = essenceMethodReferences(
+						lookup,
+						implemented,
+						new Set(),
+						new Set(["Target CONSTANT"]),
+					)
+
+					expect([...refs.references]).toEqual([
+						"$es_Target_CONSTANT",
+					])
+					// NOTE: A Property read is evaluated wherever it stands —
+					// reading the const IS taking the value, so there is no
+					// handing it on the way a Method reference is.
+					expect([...refs.evaluatedReferences]).toEqual([
+						"$es_Target_CONSTANT",
+					])
+
 					expect([
-						...essenceMethodReferences(
-							{ nodeType: "Argument", value: lookup },
-							implemented,
-						),
-					]).toEqual(["$es_Target_static"])
+						...essenceMethodReferences(lookup, implemented)
+							.references,
+					]).toEqual([])
+				})
+
+				// NOTE: A Method handed to a call is a Method that call may run at
+				// once — `items::map(Boolean.isNot)` and every native taking a
+				// callback — so it counts as evaluated where a stored one does
+				// not. Without this a Property could be emitted above a Property
+				// the Method it passed along reads.
+				it("evaluates a static Method given to a call as an Argument", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "NativeFunctionInvocation",
+							name: { nodeType: "Identifier", name: "$_map" },
+							arguments: [
+								{
+									nodeType: "Argument",
+									value: {
+										nodeType: "Lookup",
+										base: {
+											nodeType: "Identifier",
+											name: "Target",
+											type: { type: "Namespace" },
+										},
+										member: {
+											nodeType: "Identifier",
+											name: "static",
+										},
+									},
+								},
+							],
+						},
+						implemented,
+					)
+
+					expect([...refs.evaluatedReferences]).toEqual([
+						"$es_Target_static",
+					])
 				})
 
 				it("follows a conformance witness's method map", () => {
@@ -1878,7 +1991,13 @@ describe("Code Generation", () => {
 						implemented,
 					)
 
-					expect([...refs]).toEqual(["$es_Target_witnessed"])
+					expect([...refs.references]).toEqual([
+						"$es_Target_witnessed",
+					])
+					// NOTE: A witness holds its Methods, it does not run them —
+					// whoever is handed the witness calls them, later — so the
+					// value band is not ordered against what they read.
+					expect([...refs.evaluatedReferences]).toEqual([])
 				})
 
 				it("follows a Union dispatch case", () => {
@@ -1898,7 +2017,9 @@ describe("Code Generation", () => {
 						implemented,
 					)
 
-					expect([...refs]).toEqual(["$es_Target_dispatched"])
+					expect([...refs.references]).toEqual([
+						"$es_Target_dispatched",
+					])
 				})
 
 				// NOTE: The one shape that draws a free-Function edge instead of a
@@ -1921,7 +2042,7 @@ describe("Code Generation", () => {
 						new Set(["loop__overload$2"]),
 					)
 
-					expect([...refs]).toEqual(["loop__overload$2"])
+					expect([...refs.references]).toEqual(["loop__overload$2"])
 				})
 
 				// NOTE: A native free Function is reached off `$_`, and a call on a
@@ -1942,7 +2063,7 @@ describe("Code Generation", () => {
 						new Set(["loop__overload$2"]),
 					)
 
-					expect([...refs]).toEqual([])
+					expect([...refs.references]).toEqual([])
 				})
 
 				// NOTE: One body reaches both kinds, and the two sets decide
@@ -1976,7 +2097,7 @@ describe("Code Generation", () => {
 						new Set(["loop__overload$2"]),
 					)
 
-					expect([...refs].sort()).toEqual([
+					expect([...refs.references].sort()).toEqual([
 						"$es_Target_instance",
 						"loop__overload$2",
 					])
@@ -2001,37 +2122,336 @@ describe("Code Generation", () => {
 						implemented,
 					)
 
-					expect([...refs]).toEqual([])
+					expect([...refs.references]).toEqual([])
 				})
 			})
 		})
 
-		// NOTE: A bodied static Property would be initialised INSIDE the const's
-		// own object literal — and every Essence literal compiles to a call on a
-		// Namespace, so it would read a binding that does not exist yet. It type
-		// checks and compiles; it crashes at import. Refused where it is written
-		// rather than emitted.
-		it("refuses a bodied static Property", () => {
-			let stdlib = loadStdlibFrom([
-				parseStdlibSource(
-					"Flagged.es",
-					`declarations {
-	namespace Flagged for Boolean {
-		§§ The affirmative.
-		static YES: Boolean = true
+		// NOTE: A bodied static Property is emitted as a const of its own, in a
+		// band BELOW every Function-valued member — its value is computed where
+		// the const stands, not when something calls it, so the band is the only
+		// place from which it can read the Methods it needs. No standard library
+		// Property has a value yet, which is what keeps every golden
+		// byte-identical while the machinery below is live; the fixtures are
+		// synthetic for the same reason.
+		describe("a bodied static Property", () => {
+			// NOTE: `Constants.DOUBLE` reads `Other.BASE` and calls `Other.doubled`
+			// — one edge into the value band and one out of it. The reading
+			// Namespace is written BELOW the one it reads on purpose: a Property's
+			// value is enriched where the `namespace` stands, so it can only name a
+			// Namespace already declared, which is why no cycle among them can be
+			// written in a source at all.
+			const constants = `declarations {
+	namespace Other for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
 
-		§§ The value itself.
-		itself() -> Boolean {
+		§§ Twice the value.
+		§§
+		§§ @returns — twice the value.
+		doubled() -> Integer {
 			<- @
 		}
 	}
-}`,
-				),
-			])
 
-			expect(() => buildStdlibPrelude(stdlib.typedPrograms)).toThrow(
-				/'Flagged' gives a value to the static Property 'YES'/,
-			)
+	namespace Constants for Integer {
+		§§ Twice the base.
+		static DOUBLE: Integer = Other.BASE::doubled()
+	}
+}`
+
+			// NOTE: A read of an Essence-implemented member is a bare `$es_…`
+			// Identifier by the time the seed sees it, whether it is a Property's
+			// value or a Method passed as one.
+			function referenceOf(name: string): estree.ExpressionStatement {
+				return {
+					type: "ExpressionStatement",
+					expression: { type: "Identifier", name },
+				}
+			}
+
+			function nameOf(
+				declaration:
+					| estree.VariableDeclaration
+					| estree.FunctionDeclaration,
+			): string {
+				return declaration.type === "FunctionDeclaration"
+					? declaration.id!.name
+					: (declaration.declarations[0]!.id as estree.Identifier)
+							.name
+			}
+
+			it("keeps a Namespace whose only bodied member is a Property", () => {
+				let prelude = preludeOf(constants)
+
+				expect(prelude.map((namespace) => namespace.name)).toEqual([
+					"Other",
+					"Constants",
+				])
+				expect(Object.keys(prelude[1]!.node.methods)).toEqual([])
+				expect(Object.keys(prelude[1]!.node.properties)).toEqual([
+					"DOUBLE",
+				])
+			})
+
+			// NOTE: The fixed point runs over the Properties on the same footing as
+			// the Methods: the Program names one Property, whose value reaches the
+			// other and the Method it calls. The KIND comes back with each, because
+			// nothing about the name or the declaration tells a Method's const from
+			// a Property's.
+			it("emits the value as a const of its own, and reaches what it reads", () => {
+				let reachable = reachableEssenceMethods(preludeOf(constants), [
+					referenceOf("$es_Constants_DOUBLE"),
+				])
+
+				expect([...reachable.keys()].sort()).toEqual([
+					"$es_Constants_DOUBLE",
+					"$es_Other_BASE",
+					"$es_Other_doubled",
+				])
+				expect(reachable.get("$es_Constants_DOUBLE")).toMatchObject({
+					kind: "value",
+					declaration: {
+						type: "VariableDeclaration",
+						kind: "const",
+						declarations: [
+							{
+								id: {
+									type: "Identifier",
+									name: "$es_Constants_DOUBLE",
+								},
+							},
+						],
+					},
+				})
+				expect(reachable.get("$es_Other_doubled")?.kind).toBe(
+					"function",
+				)
+			})
+
+			it("keeps a Property nothing reads out", () => {
+				let reachable = reachableEssenceMethods(preludeOf(constants), [
+					referenceOf("$es_Other_doubled"),
+				])
+
+				expect([...reachable.keys()]).toEqual(["$es_Other_doubled"])
+			})
+
+			// NOTE: Both bands in one list. The Map is in DISCOVERY order —
+			// `DOUBLE`, then the members its value reaches — so this is exactly
+			// what the partition and the topological sort are for: every Function
+			// first, and `BASE` above the `DOUBLE` that reads it. Emitted in
+			// discovery order the value band would read `$es_Other_BASE` before its
+			// const existed.
+			it("emits the Functions first, then each Property below the one it reads", () => {
+				let ordered = orderEssenceMembers(
+					reachableEssenceMethods(preludeOf(constants), [
+						referenceOf("$es_Constants_DOUBLE"),
+					]),
+				)
+
+				expect(ordered.map(nameOf)).toEqual([
+					"$es_Other_doubled",
+					"$es_Other_BASE",
+					"$es_Constants_DOUBLE",
+				])
+			})
+
+			// NOTE: The edge that is only visible through a Method's body, and the
+			// one an earlier version of this band dropped: `Constants.DOUBLE` reads
+			// no Property at all, it CALLS `Reader.readsBase` — and that call runs
+			// where the const stands, so `Other.BASE` is read there and has to be
+			// bound first. Emitted in discovery order, or ordered on
+			// Property-to-Property edges alone, `$es_Constants_DOUBLE` comes out
+			// above the `$es_Other_BASE` its initialiser reads: a `ReferenceError`
+			// at import out of a Program that compiled green.
+			it("orders a Property below what the Method it calls reads", () => {
+				const throughAMethod = `declarations {
+	namespace Other for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+	}
+
+	namespace Reader for Integer {
+		§§ The base value, read the long way around.
+		§§
+		§§ @returns — the base value.
+		readsBase() -> Integer {
+			<- Other.BASE
+		}
+	}
+
+	namespace Constants for Integer {
+		§§ The base value, once removed.
+		static DOUBLE: Integer = 3::readsBase()
+	}
+}`
+
+				let reachable = reachableEssenceMethods(
+					preludeOf(throughAMethod),
+					[referenceOf("$es_Constants_DOUBLE")],
+				)
+
+				expect(
+					reachable.get("$es_Constants_DOUBLE")?.evaluatedReferences,
+				).toEqual(new Set(["$es_Reader_readsBase"]))
+				expect(orderEssenceMembers(reachable).map(nameOf)).toEqual([
+					"$es_Reader_readsBase",
+					"$es_Other_BASE",
+					"$es_Constants_DOUBLE",
+				])
+			})
+
+			// NOTE: The shapes the band can not survive, handed in directly because
+			// none of them can be written in a source: a Property's value only
+			// names Namespaces above it, so every edge points backwards. They are
+			// refused rather than emitted in an order that happens to run —
+			// whichever const comes first reads one that does not exist yet, which
+			// is a `ReferenceError` at import out of a Program that compiled green.
+			//
+			// NOTE: The edges are the EVALUATED ones, since those are what the
+			// ordering follows, and a name listed in `functions` is a
+			// Function-valued member — which is how a route from a Property through
+			// a Method and back is written here.
+			function band(
+				edges: Record<string, Array<string>>,
+				functions: Array<string> = [],
+			): Map<string, EssenceMember> {
+				return new Map(
+					Object.entries(edges).map(([name, references]) => [
+						name,
+						{
+							kind: functions.includes(name)
+								? "function"
+								: "value",
+							declaration: {
+								type: "VariableDeclaration",
+								kind: "const",
+								declarations: [
+									{
+										type: "VariableDeclarator",
+										id: { type: "Identifier", name },
+										init: null,
+									},
+								],
+							},
+							references: new Set(references),
+							evaluatedReferences: new Set(references),
+						},
+					]),
+				)
+			}
+
+			it("refuses two Properties that read each other", () => {
+				expect(() =>
+					orderEssenceMembers(
+						band({
+							$es_A_ONE: ["$es_B_TWO"],
+							$es_B_TWO: ["$es_A_ONE"],
+						}),
+					),
+				).toThrow("$es_A_ONE -> $es_B_TWO -> $es_A_ONE")
+			})
+
+			// NOTE: A self-edge is a cycle here, unlike among the Methods, where a
+			// Method calling itself is how recursion is written.
+			it("refuses a Property that reads itself", () => {
+				expect(() =>
+					orderEssenceMembers(band({ $es_A_ONE: ["$es_A_ONE"] })),
+				).toThrow("$es_A_ONE -> $es_A_ONE")
+			})
+
+			// NOTE: The edge a Method HIDES. `A` calls a Method that reads `B`, and
+			// the call runs inside `A`'s own initialiser, so `B` is read before `A`
+			// is bound and its const has to stand above `A`'s — the Method's own
+			// const is in the band above and constrains nothing.
+			it("orders a Property below the Properties the Method it calls reads", () => {
+				let ordered = orderEssenceMembers(
+					band(
+						{
+							$es_A_ONE: ["$es_F_reads"],
+							$es_F_reads: ["$es_B_TWO"],
+							$es_B_TWO: [],
+						},
+						["$es_F_reads"],
+					),
+				)
+
+				expect(ordered.map(nameOf)).toEqual([
+					"$es_F_reads",
+					"$es_B_TWO",
+					"$es_A_ONE",
+				])
+			})
+
+			// NOTE: The same route closing on itself — a temporal dead zone no
+			// order can fix, and the shape the band was blind to while it followed
+			// Property-to-Property edges alone. The refusal names the Methods it
+			// went through, because the two Properties on their own read nothing of
+			// each other.
+			it("refuses a Property a Method it calls reads back", () => {
+				expect(() =>
+					orderEssenceMembers(
+						band(
+							{
+								$es_A_ONE: ["$es_F_reads"],
+								$es_F_reads: ["$es_G_reads"],
+								$es_G_reads: ["$es_A_ONE"],
+							},
+							["$es_F_reads", "$es_G_reads"],
+						),
+					),
+				).toThrow(
+					"$es_A_ONE -> $es_F_reads -> $es_G_reads -> $es_A_ONE",
+				)
+			})
+
+			// NOTE: Two Methods calling each other is recursion, not a cycle of
+			// this band's kind — the walk over the Function nodes is plain
+			// reachability, so it answers what they read between them and returns.
+			it("orders a Property against what mutually recursive Methods read", () => {
+				let ordered = orderEssenceMembers(
+					band(
+						{
+							$es_A_ONE: ["$es_F_reads"],
+							$es_F_reads: ["$es_G_reads"],
+							$es_G_reads: ["$es_F_reads", "$es_B_TWO"],
+							$es_B_TWO: [],
+						},
+						["$es_F_reads", "$es_G_reads"],
+					),
+				)
+
+				expect(ordered.map(nameOf)).toEqual([
+					"$es_F_reads",
+					"$es_G_reads",
+					"$es_B_TWO",
+					"$es_A_ONE",
+				])
+			})
+
+			// NOTE: A Property and a Method of one Namespace are emitted under the
+			// one const name, and nothing upstream refuses the overlap — the two
+			// are declared in records of their own — so the prelude does.
+			it("refuses a Property spelled like a Method of its own Namespace", () => {
+				expect(() =>
+					preludeOf(`declarations {
+	namespace Clash for Boolean {
+		§§ The affirmative.
+		static yes: Boolean = true
+
+		§§ The value itself.
+		§§
+		§§ @returns — the Boolean.
+		yes() -> Boolean {
+			<- @
+		}
+	}
+}`),
+				).toThrow(
+					/'Clash' spells the static Property 'yes' exactly like a Method of its own/,
+				)
+			})
 		})
 
 		// NOTE: A Namespace whose every member is native has nothing to merge —
