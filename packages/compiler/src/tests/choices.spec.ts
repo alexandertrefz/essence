@@ -1315,6 +1315,82 @@ describe("Choices", () => {
 				})
 			})
 
+			// NOTE: What arm selection asks is asked silently, and the reading it
+			// settles on is the one that reports — so a payload that is wrong is
+			// wrong once, however many instantiations were offered, and a reading
+			// only the LOSING candidate would have complained about says nothing at
+			// all.
+			it("reports the reading it committed, and only that one", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant chosen: Box<Integer> | Box<String> =
+							Box#Full(nope)
+					}`),
+				).toEqual(["unknown-name"])
+
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant chosen: Box<String> | Box<Box<Integer>> =
+							Box#Full(Box#Full(1))
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The reading arm selection chose BY is the reading committed —
+			// it was made under the very Case the payload ends up standing in, so
+			// reading it again would read the whole subtree beneath it again. Read
+			// afresh, a nesting N deep costs 2^N readings of its innermost value:
+			// the twenty levels here took two seconds and every added level
+			// doubled it, against one reading per level.
+			//
+			// A construction nested under a position offering ONE instantiation
+			// never asks in the first place, and is here so that stays true —
+			// paying per candidate where there is nothing to choose between would
+			// be the same cost by another route.
+			//
+			// NOTE: A time, because a count of readings is not something a Program
+			// can be asked for — but a generous one: a thousandth of the ceiling
+			// when the readings are kept, four times it when they are not, and
+			// further apart with every level. Its other half is the shared-Type
+			// walk pinned in helpers.spec, which the same nesting depends on.
+			it("reads a nesting's payload once per level", () => {
+				let nesting = (level: number): string =>
+					level === 0 ? "1" : `Box#Full(${nesting(level - 1)})`
+				let offered = (levels: number): string =>
+					Array.from(
+						{ length: levels },
+						(_, level) =>
+							`type T${level + 1} = Box<T${level}> | Box<List<T${level}>>`,
+					).join("\n")
+				let decided = (level: number): string =>
+					level === 0 ? "Integer" : `Box<${decided(level - 1)}>`
+
+				let several = `implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						type T0 = Integer
+						${offered(20)}
+
+						constant nested: T20 = ${nesting(20)}
+					}`
+				let one = `implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant nested: ${decided(40)} = ${nesting(40)}
+					}`
+
+				for (let source of [several, one]) {
+					let start = performance.now()
+
+					expect(messagesOf(source)).toEqual([])
+					expect(performance.now() - start).toBeLessThan(500)
+				}
+			}, 30000)
+
 			// NOTE: An Argument is matched by a Case's MEMBERS, and a payload that
 			// does not fit them is a Diagnostic one stage later — too late to keep
 			// an overload from winning on it. So the probe answers with the
