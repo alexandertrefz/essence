@@ -1,0 +1,78 @@
+# NOTE: This builds the extension and attaches the `.vsix` to a release; it
+# does not publish to the Marketplace or to Open VSX. Publishing needs a
+# publisher account and a PAT held as a repository secret, neither of which
+# exists yet — when they do, it is an additional job here, next to `release`,
+# and nothing below has to change for it.
+#
+# NOTE: The `.vsix` is self-contained. `bun run package` bundles the Language
+# Server and the extension itself, and `--no-dependencies` stops vsce walking
+# `node_modules` — a walk that assumes npm's layout and misreads Bun's.
+name: VS Code Extension
+
+on:
+  push:
+    tags: ["vscode-extension-v*"]
+  workflow_dispatch:
+
+# NOTE: `gh release create` writes to the repository; the build itself only
+# reads it.
+permissions:
+  contents: write
+
+concurrency:
+  group: vscode-extension-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # NOTE: First, and loudly: the tag names the version users will install,
+      # but the manifest is what the `.vsix` is actually built from. A tag that
+      # disagrees with it would publish a file whose name lies about its
+      # contents, so the run stops here rather than after a successful build.
+      - name: Check the tag against the manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tagged="${GITHUB_REF_NAME#vscode-extension-v}"
+          manifest="$(jq -r .version packages/vscode-extension/package.json)"
+
+          if [ "$tagged" != "$manifest" ]; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' carries version '${tagged}', but packages/vscode-extension/package.json says '${manifest}'."
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+
+      # NOTE: The suite and the type check gate the package step rather than
+      # follow it. The `.vsix` is built out of this checkout — the Language
+      # Server is bundled into it — so whatever the checkout gets wrong is
+      # what would be attached to the release. A red run here costs a minute;
+      # a red one after `gh release create` costs a published version.
+      - run: bun test
+
+      - run: bun run typecheck
+
+      - run: bun run --cwd packages/vscode-extension package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: packages/vscode-extension/*.vsix
+          if-no-files-found: error
+
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "VS Code Extension ${GITHUB_REF_NAME#vscode-extension-}" \
+            --generate-notes \
+            packages/vscode-extension/*.vsix

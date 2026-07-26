@@ -2,15 +2,26 @@
 	"name": "essence-language",
 	"displayName": "Essence",
 	"description": "Language support for Essence: syntax highlighting, diagnostics, navigation and completion.",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"type": "module",
 	"publisher": "essence",
 	"license": "MIT",
 	"icon": "icon.png",
+	"homepage": "https://github.com/atrefz/essence/tree/master/packages/vscode-extension",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/essence-language/vscode-extension.git"
+		"url": "https://github.com/atrefz/essence.git",
+		"directory": "packages/vscode-extension"
 	},
+	"bugs": {
+		"url": "https://github.com/atrefz/essence/issues"
+	},
+	"keywords": [
+		"essence",
+		"language server",
+		"lsp",
+		"syntax highlighting"
+	],
 	"engines": {
 		"vscode": "^1.100.0"
 	},
@@ -18,6 +29,16 @@
 		"Programming Languages",
 		"Snippets"
 	],
+	"capabilities": {
+		"virtualWorkspaces": false,
+		"untrustedWorkspaces": {
+			"supported": "limited",
+			"restrictedConfigurations": [
+				"essence.server.path"
+			],
+			"description": "The bundled Language Server only reads and analyses text, and diagnostics and navigation are exactly what is wanted while auditing an unfamiliar repository, so they stay on. The single trust-sensitive setting is 'essence.server.path': it names an executable to spawn, which a workspace could point at a program it ships itself, so workspace-scoped values of it are ignored here."
+		}
+	},
 	"main": "./dist/extension.js",
 	"activationEvents": [
 		"onLanguage:essence"
@@ -27,7 +48,7 @@
 		"build:server": "bun build ../language-server/src/serverEntry.ts --target=node --format=esm --outfile=server/server.js && bun run copy:stdlib",
 		"copy:stdlib": "rm -rf server/stdlib && cp -R ../stdlib/sources server/stdlib",
 		"build:extension": "bun build extension.js --target=node --format=esm --external vscode --outfile=dist/extension.js",
-		"package": "bun run build && bunx @vscode/vsce package"
+		"package": "bun run build && vsce package --no-dependencies"
 	},
 	"contributes": {
 		"languages": [
@@ -40,7 +61,11 @@
 				"extensions": [
 					".es"
 				],
-				"configuration": "./language-configuration.json"
+				"configuration": "./language-configuration.json",
+				"icon": {
+					"light": "./icons/essence-file.svg",
+					"dark": "./icons/essence-file.svg"
+				}
 			}
 		],
 		"grammars": [
@@ -56,6 +81,40 @@
 				"path": "./snippets/essence.code-snippets"
 			}
 		],
+		"semanticTokenScopes": [
+			{
+				"language": "essence",
+				"scopes": {
+					"namespace": [
+						"entity.name.type.namespace.essence"
+					],
+					"typeParameter": [
+						"entity.name.type.parameter.essence"
+					],
+					"property": [
+						"variable.other.property.essence"
+					],
+					"method": [
+						"entity.name.function.essence"
+					],
+					"enumMember": [
+						"variable.other.enummember.essence"
+					]
+				}
+			}
+		],
+		"configurationDefaults": {
+			"[essence]": {
+				"editor.detectIndentation": false,
+				"editor.insertSpaces": false,
+				"editor.tabSize": 4,
+				"editor.rulers": [
+					80
+				],
+				"editor.defaultFormatter": "essence.essence-language",
+				"editor.semanticHighlighting.enabled": true
+			}
+		},
 		"configuration": {
 			"title": "Essence",
 			"properties": {
@@ -83,10 +142,9 @@
 			}
 		]
 	},
-	"dependencies": {
-		"vscode-languageclient": "9.0.1"
-	},
 	"devDependencies": {
-		"@essence/language-server": "workspace:*"
+		"@essence/language-server": "workspace:*",
+		"@vscode/vsce": "3.9.2",
+		"vscode-languageclient": "9.0.1"
 	}
 }
