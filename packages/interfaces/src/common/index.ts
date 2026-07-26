@@ -167,6 +167,7 @@ export type DiagnosticCode =
 	| "constant-reassignment"
 	| "missing-return"
 	| "infinite-recursion"
+	| "recursive-type-declaration"
 	| "top-level-return"
 	| "not-a-function"
 	| "record-annotation-not-record"

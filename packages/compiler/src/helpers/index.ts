@@ -1704,8 +1704,11 @@ function matchTypes(
 		// compared is the coinductive hypothesis — assume it holds. A genuine
 		// counterexample would differ at some finite member path, which is
 		// checked before the cycle can close, so assuming the cycle is sound.
-		// V1 forbids a Choice naming itself, but a mutually recursive pair is
-		// not caught there, and matching stays terminating either way.
+		// No cyclic payload should reach here at all: a recursive Type
+		// declaration, whether it names itself or goes around a cycle of them,
+		// is diagnosed before the hoist and its recursive members resolve to
+		// Error. This stays as the guard that makes matching terminate whatever
+		// a Type turns out to be built from.
 		let inProgress = activeCasePairs.get(lhs)
 
 		if (inProgress?.has(rhs)) {
