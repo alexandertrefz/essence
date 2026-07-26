@@ -325,6 +325,33 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: `Type ~> { a = b }` is one typed Record value; dropping the `~>`
+		// still parses, as a constant bound to the Identifier `Type` followed by
+		// a bare untyped Record, so only the safety gate noticed — and a gate
+		// that refuses is a Format Document that silently does nothing.
+		it("keeps the ~> of a typed record literal", () => {
+			roundTrips(
+				"implementation {\n\tconstant made = Type ~> { member = value }\n}\n",
+				"Type ~> { member = value }",
+			)
+		})
+
+		it("keeps the ~> when the typed record breaks across lines", () => {
+			roundTrips(
+				"implementation {\n\tconstant made = ConfigurationRecord ~> { firstMemberName = firstValue, secondMemberName = secondValue, thirdMemberName = thirdValue }\n}\n",
+				"ConfigurationRecord ~> {\n\t\tfirstMemberName = firstValue,",
+			)
+		})
+
+		// NOTE: The empty Record took an early return that answered `{}` before
+		// the Type prefix was ever built, which lost the Type outright.
+		it("keeps the type of an empty typed record literal", () => {
+			roundTrips(
+				"implementation {\n\tconstant made = Type ~> {}\n}\n",
+				"Type ~> {}",
+			)
+		})
+
 		it("never reflows a comment", () => {
 			let divider = "§ ——— String ———————————————————————————————————————"
 			let result = format(

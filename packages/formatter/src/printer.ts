@@ -1231,14 +1231,19 @@ export class Printer {
 	private printRecord(node: parser.RecordValueNode): Doc {
 		let members = Object.values(node.members)
 
-		if (members.length === 0) {
-			return text("{}")
-		}
-
+		// NOTE: The `~>` is load-bearing, not decoration: `Type ~> { a = b }` is
+		// one typed Record value, while `Type { a = b }` re-parses as a constant
+		// bound to the Identifier `Type` followed by a bare untyped Record. The
+		// prefix has to stay outside the group so it never breaks away from the
+		// brace it introduces.
 		let prefix =
 			node.type === null
 				? EMPTY
-				: concat([this.printType(node.type), text(" ")])
+				: concat([this.printType(node.type), text(" ~> ")])
+
+		if (members.length === 0) {
+			return concat([prefix, text("{}")])
+		}
 
 		return group(
 			concat([
