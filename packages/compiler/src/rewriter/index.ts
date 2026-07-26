@@ -10,6 +10,7 @@ import {
 	ESSENCE_METHOD_PREFIX,
 	essenceMethodIdentifier,
 	essenceMethodName,
+	essencePropertyName,
 	nativeFreeFunctionNames,
 	type PreludeFreeFunction,
 	type PreludeNamespace,
@@ -65,7 +66,7 @@ export function rewrite(program: common.typedSimple.Program): string {
 	// Namespace the moment a new one was added.
 	const freeFunctions = stdlibFreeFunctions()
 	const implementation = rewriteImplementationSection(program.implementation)
-	const essenceMethods = reachableEssenceMethods(
+	const essenceMembers = reachableEssenceMethods(
 		prelude,
 		implementation,
 		freeFunctions,
@@ -85,22 +86,18 @@ export function rewrite(program: common.typedSimple.Program): string {
 				"internalHelpers",
 			),
 			// NOTE: Imports first — an Essence Method's const reads the runtime
-			// modules those imports bind. Among themselves the consts may sit in
-			// any order, because each is a Function expression, whose body runs
-			// only when the Method is CALLED — long after every const is
-			// initialised — so one Essence Method naming another, or naming
-			// itself, resolves at call time regardless of declaration order.
-			// `buildStdlibPrelude` rejects a bodied Property precisely to keep
-			// that true: a Property initialiser would run HERE, in declaration
-			// order.
-			...essenceMethods.values(),
+			// modules those imports bind. Then the Essence-implemented members,
+			// in the two bands `orderEssenceMembers` puts them in: the
+			// Function-valued ones in any order, and the static Properties, whose
+			// values are computed HERE, after them.
+			...orderEssenceMembers(essenceMembers),
 			...implementation,
 		],
 	}
 
 	checkEssenceMethodsAreDeclared(
 		rewrittenProgram,
-		new Set(essenceMethods.keys()),
+		new Set(essenceMembers.keys()),
 	)
 
 	return generate(rewrittenProgram, {
@@ -257,6 +254,227 @@ function rewriteEssenceMethod(
 	}
 }
 
+// NOTE: One Essence-implemented standard library Property, emitted as its own
+// top-level const — the value band's counterpart of `rewriteEssenceMethod`. A
+// `static EMPTY: String = ""` becomes:
+//
+//   const $es_String_EMPTY = String.createString("")
+//
+// The name is the ONE `essenceMethodIdentifier` spells, so a read of the Property
+// and a call of a Method are indistinguishable to everything downstream — which
+// is why a Namespace may not spell a Property and a Method alike.
+//
+// NOTE: What makes this a band of its own rather than another const beside the
+// Methods: the initialiser runs where the const is emitted. A value-LESS static
+// Property is a native and never reaches here, so a Namespace's constants keep
+// binding to the runtime until someone gives one a body.
+function rewriteEssenceProperty(
+	namespaceName: string,
+	memberName: string,
+	value: common.typedSimple.ExpressionNode,
+): estree.VariableDeclaration {
+	return {
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: {
+					type: "Identifier",
+					name: essenceMethodIdentifier(namespaceName, memberName),
+				},
+				init: rewriteExpression(value),
+			},
+		],
+	}
+}
+
+// NOTE: The two edge sets one body draws. `references` is every `$es_…` const it
+// names at all, which is what reachability follows — a const named anywhere in an
+// emitted body has to be emitted. `evaluatedReferences` is the subset whose value
+// the body needs THE MOMENT IT RUNS: a static Property, read for its value, and a
+// Function it CALLS rather than hands on. That subset is what orders the value
+// band, and it is a subset because a Function named as a value runs later — a
+// conformance witness's `{ isNot: Boolean.isNot }` and a
+// `static F = Boolean.isNot` alike — so ordering against what its body reads
+// would refuse a Program that runs.
+export type EssenceMemberReferences = {
+	references: Set<string>
+	evaluatedReferences: Set<string>
+}
+
+// NOTE: One member the emitted Program needs, and the KIND that decides which
+// band it is emitted in. The kind can NOT be read back off the declaration or
+// the name: a Method's const and a Property's const are both a
+// `VariableDeclaration` named `$es_<Namespace>_<member>`, and the Map they arrive
+// in is in discovery order, which is the user Program's business rather than the
+// library's. The edges come along for the same reason — which Properties a
+// Property reads is what orders the value band.
+export type EssenceMember = {
+	kind: "function" | "value"
+	declaration: estree.VariableDeclaration | estree.FunctionDeclaration
+} & EssenceMemberReferences
+
+// NOTE: The reachable members in the order they are emitted, in two bands.
+//
+// A Function-valued member — an Essence Method's const, a bodied free Function's
+// declaration — may sit anywhere: its body runs only when something CALLS it,
+// long after every const is initialised, so one naming another, or naming
+// itself, resolves at call time regardless of declaration order. They keep
+// discovery order, which is what makes an ordinary Program's emission
+// byte-identical.
+//
+// A static Property's const holds the value itself, computed the moment the
+// const is reached, so the band is ordered: a Property that reads another must
+// be emitted below it. That ordering follows a Property's evaluated references
+// THROUGH the Function-valued members it calls: a Method called from inside a
+// Property's value runs there, in the value band, so every Property that Method
+// reads — and every Property read by the Methods it calls in turn — is read
+// before this const and has to stand above it. Only the Properties are ordered,
+// because only their consts hold a value; the route a Property took to reach one
+// is carried along for the refusal below to name.
+//
+// NOTE: A cycle is refused rather than emitted in some arbitrary order, and a
+// SELF-edge is a cycle like any other: a Property that reads itself — directly,
+// or through a Method that reads it back — is a temporal dead zone,
+// `ReferenceError` at import out of a Program that compiled green, where a
+// Method that calls itself is only recursion. Neither shape can be written in a
+// standard library source as it stands — a Property's value is enriched where its
+// `namespace` is, so it can only read a Namespace already declared, and every
+// edge therefore points backwards. This answers for the day that changes, rather
+// than for a mistake anyone has made yet.
+export function orderEssenceMembers(
+	members: Map<string, EssenceMember>,
+): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
+	let ordered: Array<
+		estree.VariableDeclaration | estree.FunctionDeclaration
+	> = []
+	let values = new Map(
+		[...members].filter(([, member]) => member.kind === "value"),
+	)
+
+	for (let member of members.values()) {
+		if (member.kind === "function") {
+			ordered.push(member.declaration)
+		}
+	}
+
+	// NOTE: Which Properties a Function-valued member reads once it is called, and
+	// the chain of Functions the read sits at the end of. Breadth first, so the
+	// chain a refusal names is the shortest one, and memoised per Function because
+	// several Properties reach the same Method. Two Methods calling each other is
+	// ordinary recursion and no cycle here — this is plain reachability over the
+	// Function nodes, which a cycle among them can not disturb.
+	let readsThroughFunctions = new Map<string, Map<string, Array<string>>>()
+
+	let readsThrough = (functionName: string): Map<string, Array<string>> => {
+		let known = readsThroughFunctions.get(functionName)
+
+		if (known !== undefined) {
+			return known
+		}
+
+		let reads = new Map<string, Array<string>>()
+		let routes = new Map<string, Array<string>>([
+			[functionName, [functionName]],
+		])
+		let pending: Array<string> = [functionName]
+
+		while (pending.length > 0) {
+			let current = pending.shift()!
+			let route = routes.get(current)!
+
+			for (let target of members.get(current)?.evaluatedReferences ??
+				[]) {
+				if (values.has(target)) {
+					if (!reads.has(target)) {
+						reads.set(target, route)
+					}
+				} else if (
+					members.get(target)?.kind === "function" &&
+					!routes.has(target)
+				) {
+					routes.set(target, [...route, target])
+					pending.push(target)
+				}
+			}
+		}
+
+		readsThroughFunctions.set(functionName, reads)
+
+		return reads
+	}
+
+	// NOTE: The Properties one Property's value reads before its own const is
+	// bound, each with the Functions it was reached through — a direct read is
+	// reached through none. A reference the value only HANDS ON rather than
+	// evaluates is not here, which is what keeps a `static F = Boolean.isNot`
+	// from being ordered against everything `isNot` reads when it is eventually
+	// called.
+	let readsOf = (
+		member: EssenceMember,
+	): Array<{ target: string; through: Array<string> }> => {
+		let reads: Array<{ target: string; through: Array<string> }> = []
+
+		for (let reference of member.evaluatedReferences) {
+			if (values.has(reference)) {
+				reads.push({ target: reference, through: [] })
+			} else if (members.get(reference)?.kind === "function") {
+				for (let [target, through] of readsThrough(reference)) {
+					reads.push({ target, through })
+				}
+			}
+		}
+
+		return reads
+	}
+
+	let finished = new Set<string>()
+	let path: Array<string> = []
+	let onPath = new Set<string>()
+
+	let walk = (name: string, through: Array<string>): void => {
+		let member = values.get(name)!
+		let depth = path.length
+
+		path.push(...through, name)
+		onPath.add(name)
+
+		for (let read of readsOf(member)) {
+			if (onPath.has(read.target)) {
+				let cycle = [
+					...path.slice(path.indexOf(read.target)),
+					...read.through,
+					read.target,
+				]
+
+				throw new Error(
+					`The standard library's static Properties read each other in a cycle, so no order of their consts can initialise them all — one of them is read before it exists:\n\n  ${cycle.join(
+						" -> ",
+					)}`,
+				)
+			}
+
+			if (!finished.has(read.target)) {
+				walk(read.target, read.through)
+			}
+		}
+
+		path.length = depth
+		onPath.delete(name)
+		finished.add(name)
+		ordered.push(member.declaration)
+	}
+
+	for (let name of values.keys()) {
+		if (!finished.has(name)) {
+			walk(name, [])
+		}
+	}
+
+	return ordered
+}
+
 // NOTE: Which Essence-implemented Methods the emitted Program actually needs,
 // and the const for each. A const is emitted only where something names it:
 // unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
@@ -277,6 +495,10 @@ function rewriteEssenceMethod(
 // Stopping at the first round would emit a const whose body names one that was
 // never declared.
 //
+// NOTE: A bodied static Property is searched for on exactly the same footing —
+// its const is emitted only where something reads it, and its own value may be
+// the only thing that reads another one.
+//
 // NOTE: Exported for the tests. The fixed point is the part of this that can
 // silently be wrong — a Method reached only through another one is exactly what
 // the standard library will produce more of as the conversion goes on.
@@ -284,11 +506,8 @@ export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
 	freeFunctions: Array<PreludeFreeFunction> = [],
-): Map<string, estree.VariableDeclaration | estree.FunctionDeclaration> {
-	let reachable = new Map<
-		string,
-		estree.VariableDeclaration | estree.FunctionDeclaration
-	>()
+): Map<string, EssenceMember> {
+	let reachable = new Map<string, EssenceMember>()
 
 	if (prelude.length === 0 && freeFunctions.length === 0) {
 		return reachable
@@ -313,6 +532,18 @@ export function reachableEssenceMethods(
 		freeFunctions.map((freeFunction) => freeFunction.name),
 	)
 
+	// NOTE: The static Properties this prelude gives a value to — the third
+	// table, keyed like `implemented` because a Property read is spelled exactly
+	// like a static Method reference and the two are told apart by which table
+	// answers. A native Property is in neither, so it stays a member read.
+	let implementedProperties = new Set(
+		prelude.flatMap((namespace) =>
+			Object.keys(namespace.node.properties).map(
+				(memberName) => `${namespace.name} ${memberName}`,
+			),
+		),
+	)
+
 	// NOTE: Each candidate carries its declaration AND the other Essence Methods
 	// its body calls, read off the TYPED body rather than the emitted const.
 	// That matters: `namespaceMember` decides an emitted call's spelling from the
@@ -320,26 +551,51 @@ export function reachableEssenceMethods(
 	// tests do this) would spell its transitive calls as native member reads and
 	// the fixed point would lose the edge. Reading the typed body keeps the
 	// reachability answer a property of the prelude it was handed.
-	type Candidate = {
-		declaration: estree.VariableDeclaration | estree.FunctionDeclaration
-		references: Set<string>
-	}
-
-	let methodCandidates: Array<[string, Candidate]> = prelude.flatMap(
+	let methodCandidates: Array<[string, EssenceMember]> = prelude.flatMap(
 		(namespace) =>
 			Object.entries(namespace.node.methods).map(
-				([memberName, method]): [string, Candidate] => [
+				([memberName, method]): [string, EssenceMember] => [
 					essenceMethodIdentifier(namespace.name, memberName),
 					{
+						kind: "function",
 						declaration: rewriteEssenceMethod(
 							namespace.name,
 							memberName,
 							method,
 						),
-						references: essenceMethodReferences(
+						...essenceMethodReferences(
 							method.method.value,
 							implemented,
 							implementedFreeFunctions,
+							implementedProperties,
+						),
+					},
+				],
+			),
+	)
+
+	// NOTE: A bodied static Property is a candidate of its own, carrying the KIND
+	// that puts its const in the value band. Its value draws edges like any body
+	// — it is written in Essence, so it reaches Methods, free Functions and other
+	// Properties — and the ones that reach another Property are what order the
+	// band.
+	let propertyCandidates: Array<[string, EssenceMember]> = prelude.flatMap(
+		(namespace) =>
+			Object.entries(namespace.node.properties).map(
+				([memberName, value]): [string, EssenceMember] => [
+					essenceMethodIdentifier(namespace.name, memberName),
+					{
+						kind: "value",
+						declaration: rewriteEssenceProperty(
+							namespace.name,
+							memberName,
+							value,
+						),
+						...essenceMethodReferences(
+							value,
+							implemented,
+							implementedFreeFunctions,
+							implementedProperties,
 						),
 					},
 				],
@@ -352,22 +608,24 @@ export function reachableEssenceMethods(
 	// Method body that calls a free Function, or a free Function body that calls
 	// another one or a Method, must pull the callee in, and only a single search
 	// over both kinds can follow an edge that crosses between them.
-	let freeFunctionCandidates: Array<[string, Candidate]> = freeFunctions.map(
-		(freeFunction): [string, Candidate] => [
+	let freeFunctionCandidates: Array<[string, EssenceMember]> =
+		freeFunctions.map((freeFunction): [string, EssenceMember] => [
 			freeFunction.name,
 			{
+				kind: "function",
 				declaration: rewriteFunctionStatement(freeFunction.node),
-				references: essenceMethodReferences(
+				...essenceMethodReferences(
 					freeFunction.node.value,
 					implemented,
 					implementedFreeFunctions,
+					implementedProperties,
 				),
 			},
-		],
-	)
+		])
 
-	let candidates = new Map<string, Candidate>([
+	let candidates = new Map<string, EssenceMember>([
 		...methodCandidates,
+		...propertyCandidates,
 		...freeFunctionCandidates,
 	])
 
@@ -381,7 +639,7 @@ export function reachableEssenceMethods(
 				continue
 			}
 
-			reachable.set(name, candidate.declaration)
+			reachable.set(name, candidate)
 			pending.push(name)
 		}
 	}
@@ -425,31 +683,63 @@ export function reachableEssenceMethods(
 // `implemented`. It is what lets a Method body reach a free Function, and a free
 // Function body reach either kind, inside the one fixed point.
 //
-// Over-collecting stays safe, as everywhere in the search: a pair the prelude
-// does not implement is filtered by `implemented` (so a Record field or a
-// static Property read falls out), and one it does only emits a const that is
-// read. Exported for a unit test that feeds it each shape directly.
+// A `Lookup` draws one more edge for the same reason it draws the Method one: a
+// read of a static Property the prelude gives a VALUE to is that Property's
+// const, filtered by `implementedProperties`. It is the same Node shape as a
+// static Method reference, so both tables are asked and either may answer.
+//
+// Over-collecting stays safe, as everywhere in the search: a pair neither table
+// implements is filtered out (so a Record field or a native Property read falls
+// away), and one they do only emits a const that is read. Exported for a unit
+// test that feeds it each shape directly.
+//
+// NOTE: Each shape also answers WHETHER this body evaluates what it names, which
+// is what `orderEssenceMembers` orders the value band by — see
+// `EssenceMemberReferences`. A call evaluates its target, a Property read
+// evaluates the Property, and a Function this body only hands on does not.
 export function essenceMethodReferences(
 	root: unknown,
 	implemented: Set<string>,
 	implementedFreeFunctions: Set<string> = new Set(),
-): Set<string> {
+	implementedProperties: Set<string> = new Set(),
+): EssenceMemberReferences {
 	let references = new Set<string>()
+	let evaluatedReferences = new Set<string>()
 
-	let consider = (namespaceName: unknown, memberName: unknown): void => {
+	let consider = (
+		namespaceName: unknown,
+		memberName: unknown,
+		members: Set<string>,
+		isEvaluated: boolean,
+	): void => {
 		if (
 			typeof namespaceName === "string" &&
 			typeof memberName === "string" &&
-			implemented.has(`${namespaceName} ${memberName}`)
+			members.has(`${namespaceName} ${memberName}`)
 		) {
-			references.add(essenceMethodIdentifier(namespaceName, memberName))
+			let name = essenceMethodIdentifier(namespaceName, memberName)
+
+			references.add(name)
+
+			if (isEvaluated) {
+				evaluatedReferences.add(name)
+			}
 		}
 	}
 
-	let visit = (node: unknown): void => {
+	// NOTE: `isStored` says what a Function-valued reference found HERE would be:
+	// a value this body hands on rather than runs. It holds at the root — a
+	// Property whose value IS `Boolean.isNot`, a Method that returns it, both only
+	// pass the Function along — and is cleared for everything under an invocation,
+	// because a Function given to a call is a Function that call may run at once
+	// (`items::map(Boolean.isNot)`, and every callback the natives take). Calls are
+	// the only shape that can run a body, which is the same closed list the edge
+	// shapes above are, so a Node kind added later inherits the safe answer:
+	// evaluated, which can only over-order the value band, never under-order it.
+	let visit = (node: unknown, isStored: boolean): void => {
 		if (Array.isArray(node)) {
 			for (let entry of node) {
-				visit(entry)
+				visit(entry, isStored)
 			}
 
 			return
@@ -461,25 +751,40 @@ export function essenceMethodReferences(
 
 		let record = node as Record<string, unknown>
 
+		if (
+			record["nodeType"] === "MethodInvocation" ||
+			record["nodeType"] === "UnionMethodInvocation" ||
+			record["nodeType"] === "FunctionInvocation" ||
+			record["nodeType"] === "NativeFunctionInvocation"
+		) {
+			isStored = false
+		}
+
 		if (record["nodeType"] === "MethodInvocation") {
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 
-			consider(base?.["name"], member?.["name"])
+			consider(base?.["name"], member?.["name"], implemented, true)
 		} else if (record["nodeType"] === "UnionMethodInvocation") {
 			for (let dispatch of (record["cases"] as Array<
 				Record<string, unknown>
 			>) ?? []) {
-				consider(dispatch["namespaceName"], dispatch["methodName"])
+				consider(
+					dispatch["namespaceName"],
+					dispatch["methodName"],
+					implemented,
+					true,
+				)
 			}
 		} else if (record["nodeType"] === "Lookup") {
 			// NOTE: A `Lookup` off an Identifier whose TYPE is a Namespace is a
-			// static-Method reference — as a call's callee or a bare value both
-			// — and is the only spelling `rewriteLookup` sends through
-			// `namespaceMember`. The Type is what decides it there, so it
-			// decides it here: a local named after a Namespace
-			// (`constant Optional = { otherwise = 5 }`) is a Record field read,
-			// and drawing an edge from it would emit a const nothing names.
+			// static-Method reference or a static-Property read — as a call's
+			// callee or a bare value both — and is the only spelling
+			// `rewriteLookup` sends through `namespaceMember`. The Type is what
+			// decides it there, so it decides it here: a local named after a
+			// Namespace (`constant Optional = { otherwise = 5 }`) is a Record
+			// field read, and drawing an edge from it would emit a const nothing
+			// names.
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 
@@ -489,7 +794,16 @@ export function essenceMethodReferences(
 					"type"
 				] === "Namespace"
 			) {
-				consider(base["name"], member?.["name"])
+				// NOTE: A static Method is evaluated where it is CALLED, a
+				// Property wherever it is named at all — reading its const is what
+				// yields the value, so there is no handing it on.
+				consider(base["name"], member?.["name"], implemented, !isStored)
+				consider(
+					base["name"],
+					member?.["name"],
+					implementedProperties,
+					true,
+				)
 			}
 		} else if (record["nodeType"] === "ConformanceValue") {
 			let methodMap = record["methodMap"] as
@@ -497,7 +811,12 @@ export function essenceMethodReferences(
 				| undefined
 
 			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
-				consider(record["namespaceName"], namespaceMethodName)
+				consider(
+					record["namespaceName"],
+					namespaceMethodName,
+					implemented,
+					!isStored,
+				)
 			}
 		} else if (record["nodeType"] === "FunctionInvocation") {
 			// NOTE: A bare free-Function call — `loop__overload$2(…)` by now,
@@ -514,17 +833,18 @@ export function essenceMethodReferences(
 				implementedFreeFunctions.has(callee["name"])
 			) {
 				references.add(callee["name"])
+				evaluatedReferences.add(callee["name"])
 			}
 		}
 
 		for (let value of Object.values(record)) {
-			visit(value)
+			visit(value, isStored)
 		}
 	}
 
-	visit(root)
+	visit(root, true)
 
-	return references
+	return { references, evaluatedReferences }
 }
 
 // NOTE: Every name the given tree READS. A dotted member and an object
@@ -892,12 +1212,12 @@ function rewriteFunctionInvocation(
 }
 
 // NOTE: One reference to a member of a standard library Namespace, in the one
-// place every emission site routes through. A native Method stays a read off
-// the plain `import * as <Namespace>` — which esbuild rewrites to a direct
-// symbol reference and can therefore tree-shake — while an Essence-implemented
-// Method is not a member of anything: it is its own top-level const, reached by
-// a bare `$es_<Namespace>_<member>` Identifier, so nothing has to materialise
-// the module namespace object to get at it. The literal constructors
+// place every emission site routes through. A native member — Method or static
+// Property — stays a read off the plain `import * as <Namespace>`, which esbuild
+// rewrites to a direct symbol reference and can therefore tree-shake, while an
+// Essence-implemented one is not a member of anything: it is its own top-level
+// const, reached by a bare `$es_<Namespace>_<member>` Identifier, so nothing has
+// to materialise the module namespace object to get at it. The literal constructors
 // (`String.createString`, `List.createList`, …) do NOT come through here: they
 // name their Namespace directly and are not declared in `packages/stdlib/sources`, so they
 // can never be Essence-implemented.
@@ -958,7 +1278,8 @@ function namespaceMember(
 	// answer decides it as decides the Identifier below.
 	let essenceName = isShadowingUserNamespace(namespaceName)
 		? null
-		: essenceMethodName(namespaceName, memberName)
+		: (essenceMethodName(namespaceName, memberName) ??
+			essencePropertyName(namespaceName, memberName))
 
 	if (essenceName !== null) {
 		return { type: "Identifier", name: essenceName }

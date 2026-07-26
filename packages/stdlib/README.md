@@ -187,10 +187,23 @@ Essence.
 
 A const is emitted only into Programs that reach it. The reachability search
 reads each Method's TYPED body, so it follows a Method reached only through
-another Essence Method's body, including through a conformance witness. A
-**bodied static Property is still refused** — its initialiser would run in
-declaration order, and ordering two Properties that name each other is not
-answered yet; declare it without a value, as `Number.PI` and `TAU` are.
+another Essence Method's body, including through a conformance witness.
+
+A **bodied static Property** is emitted the same way, as its own const — but in a
+band BELOW every Method and free Function, because its value is computed where
+its const stands rather than when something calls it. Within that band the
+Properties are emitted in the order they read each other, and a Property that
+reads itself, or a pair that read each other, is refused instead of emitted in an
+order that happens to run. That order follows a Property THROUGH the Methods and
+free Functions it calls: a Method called from inside a Property's value runs in
+the band, so the Properties it reads are read there too, and a Property that a
+Method it calls reads back is refused like any other cycle. A Method the value
+only hands on — `static F = Boolean.isNot`, or a conformance witness — is not
+followed, since its body runs whenever it is eventually called. A Property's value
+can only name a Namespace declared above its own, so backwards is the only
+direction an edge points. A value-LESS
+`static PI: Transcendental` stays a native and reaches a call site as the plain
+`Number.PI` member read — no standard library Property has a value yet.
 
 ### What to weigh before writing the next one
 

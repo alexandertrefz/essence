@@ -181,7 +181,15 @@ function invocationsIn(node: unknown): Array<string> {
 // this looks for is a cycle THROUGH another Method, which no single
 // Declaration reads as wrong and which two separate, individually reasonable
 // commits can introduce between them.
-function findCycle(graph: CallGraph): Array<string> | null {
+//
+// NOTE: `countsSelfEdges` is what the static Properties below need instead. A
+// Property's value is computed where its const is emitted rather than when
+// something calls it, so a Property that reads ITSELF is a temporal dead zone —
+// a `ReferenceError` at import — and the skip above would wave it through.
+function findCycle(
+	graph: CallGraph,
+	countsSelfEdges = false,
+): Array<string> | null {
 	let finished = new Set<string>()
 	let path: Array<string> = []
 	let onPath = new Set<string>()
@@ -191,7 +199,7 @@ function findCycle(graph: CallGraph): Array<string> | null {
 		onPath.add(method)
 
 		for (let target of graph.get(method) ?? []) {
-			if (target === method) {
+			if (target === method && !countsSelfEdges) {
 				continue
 			}
 
@@ -230,6 +238,156 @@ function findCycle(graph: CallGraph): Array<string> | null {
 	return null
 }
 
+// NOTE: The bodied static Properties are a graph beside the Methods, and its
+// edges are READS rather than calls: a `Lookup` off an Identifier whose Type is a
+// Namespace, which is the one spelling a Property's value reaches another
+// Property by. They are kept out of the call graph above because a Property has
+// nothing to do with a stack overflow — what a cycle among them is, is a const
+// read before it exists, so the walk counts a self-edge and the Methods' does
+// not.
+//
+// NOTE: A read reached THROUGH a call is an edge of this graph too, which is why
+// the call graph is built here as well. A Method called from inside a Property's
+// value runs in the value band, not at some later call time, so every Property it
+// reads — and every Property read by the Methods and free Functions it calls in
+// turn — is read before that Property's const is bound. Left out, a cycle routed
+// through one Method is invisible here, exactly as a cycle routed through a
+// static helper was invisible to the call graph before it followed them.
+//
+// NOTE: This is the complementary guard to the Rewriter's own refusal
+// (`orderEssenceMembers`): the emitter orders the value band and throws on a
+// cycle, and this reads the sources in a walker of its own, so a cycle is named
+// here whichever half is wrong.
+function buildPropertyGraph(
+	prelude: Array<PreludeNamespace>,
+	freeFunctions: Array<PreludeFreeFunction> = [],
+): CallGraph {
+	let graph: CallGraph = new Map()
+
+	for (let namespace of prelude) {
+		for (let propertyName of Object.keys(namespace.node.properties)) {
+			graph.set(`${namespace.name}.${propertyName}`, new Set())
+		}
+	}
+
+	let calls = buildCallGraph(prelude, freeFunctions)
+	let directReads = new Map<string, Set<string>>()
+
+	let readsOf = (node: unknown): Set<string> =>
+		new Set(propertyReadsIn(node).filter((target) => graph.has(target)))
+
+	for (let namespace of prelude) {
+		for (let [methodName, method] of Object.entries(
+			namespace.node.methods,
+		)) {
+			directReads.set(
+				`${namespace.name}.${methodName}`,
+				readsOf(method.method),
+			)
+		}
+	}
+
+	for (let freeFunction of freeFunctions) {
+		directReads.set(freeFunction.name, readsOf(freeFunction.node.value))
+	}
+
+	// NOTE: The Properties one callable reads once it runs, itself and everything
+	// it calls together. Two Methods calling each other is recursion rather than a
+	// cycle of this graph's kind, so this is plain reachability and `seen` is all
+	// it takes to answer for one.
+	let readsThrough = (callable: string): Set<string> => {
+		let reads = new Set<string>()
+		let seen = new Set<string>([callable])
+		let pending: Array<string> = [callable]
+
+		while (pending.length > 0) {
+			let current = pending.pop()!
+
+			for (let target of directReads.get(current) ?? []) {
+				reads.add(target)
+			}
+
+			for (let target of calls.get(current) ?? []) {
+				if (!seen.has(target)) {
+					seen.add(target)
+					pending.push(target)
+				}
+			}
+		}
+
+		return reads
+	}
+
+	for (let namespace of prelude) {
+		for (let [propertyName, value] of Object.entries(
+			namespace.node.properties,
+		)) {
+			let reads = graph.get(`${namespace.name}.${propertyName}`)!
+
+			for (let target of readsOf(value)) {
+				reads.add(target)
+			}
+
+			for (let target of invocationsIn(value)) {
+				if (!calls.has(target)) {
+					continue
+				}
+
+				for (let read of readsThrough(target)) {
+					reads.add(read)
+				}
+			}
+		}
+	}
+
+	return graph
+}
+
+// NOTE: A `Lookup` off a Record — `rec.field` — is the same Node with a Record
+// base Type, and is not a read of a Property; the base Type is what tells them
+// apart, exactly as it does in the Rewriter. A static METHOD reference is
+// collected too, and filtered out by `buildPropertyGraph`, which keeps only a
+// target that names a Property.
+function propertyReadsIn(node: unknown): Array<string> {
+	let targets: Array<string> = []
+
+	let visit = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		let candidate = value as { nodeType?: string }
+
+		if (candidate.nodeType === "Lookup") {
+			let lookup = value as common.typedSimple.LookupNode
+
+			if (
+				lookup.base.nodeType === "Identifier" &&
+				lookup.base.type.type === "Namespace" &&
+				lookup.member.nodeType === "Identifier"
+			) {
+				targets.push(`${lookup.base.name}.${lookup.member.name}`)
+			}
+		}
+
+		for (let entry of Object.values(value)) {
+			visit(entry)
+		}
+	}
+
+	visit(node)
+
+	return targets
+}
+
 // NOTE: A whole synthetic standard library rather than hand built Nodes, so
 // the walker above is exercised on the shapes the real Loader produces — a
 // hand written Node would only prove that the code agrees with the test's own
@@ -239,7 +397,10 @@ function findCycle(graph: CallGraph): Array<string> | null {
 // the real ones — the copy before the Simplifier included, since it writes into
 // the Nodes it is handed. They can not be read off `stdlibFreeFunctions`, which
 // answers for the process-wide standard library rather than for this source.
-function graphOf(source: string): CallGraph {
+function artifactsOf(source: string): {
+	prelude: Array<PreludeNamespace>
+	freeFunctions: Array<PreludeFreeFunction>
+} {
 	let typedPrograms = loadStdlibFrom([
 		parseStdlibSource("Synthetic.es", source),
 	]).typedPrograms
@@ -255,7 +416,19 @@ function graphOf(source: string): CallGraph {
 			),
 	)
 
-	return buildCallGraph(buildStdlibPrelude(typedPrograms), freeFunctions)
+	return { prelude: buildStdlibPrelude(typedPrograms), freeFunctions }
+}
+
+function graphOf(source: string): CallGraph {
+	let { prelude, freeFunctions } = artifactsOf(source)
+
+	return buildCallGraph(prelude, freeFunctions)
+}
+
+function propertyGraphOf(source: string): CallGraph {
+	let { prelude, freeFunctions } = artifactsOf(source)
+
+	return buildPropertyGraph(prelude, freeFunctions)
 }
 
 describe("Stdlib Call Graph", () => {
@@ -726,6 +899,141 @@ describe("Stdlib Call Graph", () => {
 			)
 
 			expect(cycle).toEqual(["Inner.beta", "alpha", "Inner.beta"])
+		})
+	})
+
+	// NOTE: The static Properties, whose graph answers a different question than
+	// the Methods' — not "does this recurse for ever" but "can these consts be
+	// emitted in any order at all".
+	describe("static Properties", () => {
+		// NOTE: Empty today: no standard library Property has a value yet, so the
+		// graph has no Nodes and no cycle. It goes on answering as the numeric
+		// tower's constants and the like are given bodies.
+		it("has no cycle among the Essence-implemented static Properties", () => {
+			let cycle = findCycle(
+				buildPropertyGraph(stdlibPrelude(), stdlibFreeFunctions()),
+				true,
+			)
+
+			if (cycle !== null) {
+				throw new Error(
+					`The Essence-implemented standard library Properties read each other in a cycle, so no order of their consts can initialise them all:\n\n  ${cycle.join(
+						" -> ",
+					)}`,
+				)
+			}
+		})
+
+		// NOTE: The edge the ordering rests on. A Property's value is enriched
+		// where its `namespace` stands, so it can only read a Namespace declared
+		// ABOVE it — which is why a cycle can not be written in a source at all,
+		// and why the two shapes below are handed in directly.
+		it("records a read of one static Property by another", () => {
+			let graph = propertyGraphOf(`declarations {
+	namespace Other for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+
+		§§ Twice the value.
+		§§
+		§§ @returns — twice the value.
+		doubled() -> Integer {
+			<- @
+		}
+	}
+
+	namespace Constants for Integer {
+		§§ Twice the base.
+		static DOUBLE: Integer = Other.BASE::doubled()
+	}
+}`)
+
+			expect(graph.get("Constants.DOUBLE")).toEqual(
+				new Set(["Other.BASE"]),
+			)
+			// NOTE: `Other.doubled` is a Method, so it is no Node of this graph —
+			// its own const stands above the whole value band. What it READS is
+			// another matter, which is the next test.
+			expect(graph.get("Other.BASE")).toEqual(new Set())
+		})
+
+		// NOTE: The edge that is only there in a Method's body. `Constants.DOUBLE`
+		// reads no Property itself — it calls `Reader.readsBase`, and that call runs
+		// where the const stands, so `Other.BASE` is read before `Constants.DOUBLE`
+		// is bound and the two are an edge after all. Cycles routed this way are
+		// what this half of the guard would otherwise wave through.
+		it("records a read of a static Property through a Method it calls", () => {
+			let graph = propertyGraphOf(`declarations {
+	namespace Other for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+	}
+
+	namespace Reader for Integer {
+		§§ The base value, read the long way around.
+		§§
+		§§ @returns — the base value.
+		readsBase() -> Integer {
+			<- Other.BASE
+		}
+	}
+
+	namespace Constants for Integer {
+		§§ The base value, once removed.
+		static DOUBLE: Integer = 3::readsBase()
+	}
+}`)
+
+			expect(graph.get("Constants.DOUBLE")).toEqual(
+				new Set(["Other.BASE"]),
+			)
+		})
+
+		// NOTE: The same edge one step longer, through a free Function — which is
+		// why the two graphs are built together rather than the Methods' alone.
+		it("records a read of a static Property through a free Function it calls", () => {
+			let graph = propertyGraphOf(`declarations {
+	namespace Other for Integer {
+		§§ The base value.
+		static BASE: Integer = 2
+	}
+
+	§§ The base value, read the long way around.
+	§§
+	§§ @returns — the base value.
+	function readsBase() -> Integer {
+		<- Other.BASE
+	}
+
+	namespace Constants for Integer {
+		§§ The base value, once removed.
+		static DOUBLE: Integer = readsBase()
+	}
+}`)
+
+			expect(graph.get("Constants.DOUBLE")).toEqual(
+				new Set(["Other.BASE"]),
+			)
+		})
+
+		it("reports a cycle between two static Properties", () => {
+			expect(
+				findCycle(
+					new Map([
+						["A.ONE", new Set(["B.TWO"])],
+						["B.TWO", new Set(["A.ONE"])],
+					]),
+					true,
+				),
+			).toEqual(["A.ONE", "B.TWO", "A.ONE"])
+		})
+
+		// NOTE: The one place this walk parts from the Methods' — a Property that
+		// reads itself is the cycle, where a Method that calls itself is recursion.
+		it("reports a static Property that reads itself", () => {
+			expect(
+				findCycle(new Map([["A.ONE", new Set(["A.ONE"])]]), true),
+			).toEqual(["A.ONE", "A.ONE"])
 		})
 	})
 
