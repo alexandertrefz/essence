@@ -4,7 +4,7 @@
 § generic-Choice slice, so that the Compiler's error output can be read end to
 § end in one run:
 §
-§     bun bin/esc check testFiles/diagnostics/GenericChoice.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/GenericChoice.es
 §
 § The value-level Diagnostics of the same slice live one stage later, in
 § GenericChoiceValues.es — the Validator never runs once the Enricher has

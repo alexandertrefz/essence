@@ -4,7 +4,7 @@
 § generic-Choice slice — the value-level ones, raised once a value has a Type
 § but does not fit where it is put:
 §
-§     bun bin/esc check testFiles/diagnostics/GenericChoiceValues.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/GenericChoiceValues.es
 §
 § Its Enricher-stage companion is GenericChoice.es. Nothing here may trip the
 § Enricher, or the Validator would never run and none of these would show.
