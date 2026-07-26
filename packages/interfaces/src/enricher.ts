@@ -18,8 +18,11 @@ export type Scope = {
 	protocols: Record<string, common.ProtocolType>
 	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
 	// Function bodies and Match Handler bodies. Bare Case Expressions
-	// (`<- #Less`) consult it before falling back to the scope scan.
-	expectedReturnType?: common.Type
+	// (`<- #Less`) consult it before falling back to the scope scan. Null is a
+	// BARRIER rather than the mere absence of one: the search walks outwards,
+	// and a Scope whose `<-` belongs to a Function that has no expected return
+	// Type yet must not answer with the enclosing Function's.
+	expectedReturnType?: common.Type | null
 	// NOTE: Set on a static Method's body Scope, where `@` means nothing: a
 	// static Method is called on the Namespace and is emitted without the
 	// receiver Parameter `@` lowers to. It is a BARRIER rather than the mere

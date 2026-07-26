@@ -2399,6 +2399,9 @@ export function enrichReturnStatement(
 	}
 }
 
+// NOTE: The nearest Scope that has an answer, which a Scope carrying the
+// barrier `null` is — a `<-` inside a Function whose own return Type is still
+// being worked out has no expected Type, and the enclosing Function's is not it.
 function findExpectedReturnType(scope: enricher.Scope): common.Type | null {
 	let searchScope: enricher.Scope | null = scope
 
@@ -2973,6 +2976,17 @@ function inferReturnTypeFromBody(
 		// is the whole reason this runs. A bare Case in return position has
 		// nothing to resolve against and stays unresolved, so a literal
 		// returning one still has to write its `-> Type`.
+		//
+		// Null rather than left out, because leaving it out is not the absence
+		// of one: the search walks out to the ENCLOSING Function, whose
+		// expected return Type this literal's `<-` has nothing to do with —
+		// `<-` returns from the callback, never from the walk around it. A
+		// `loop` nested in another `loop`'s `step` read the outer callback's
+		// `Step<State, Result>` that way and decided its own `#Done` payload
+		// against it, so the inner call finished with the OUTER's Result Type
+		// while the value it actually carried was the inner one's.
+		inferenceScope.expectedReturnType = null
+
 		let types: Array<common.Type> = []
 
 		collectReturnedTypes(
@@ -3131,15 +3145,21 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// NOTE: Only a Function literal with omitted annotations reacts to
 			// the expected Type, and it may resolve differently per probe — so it
 			// is resolved fresh here rather than enriched once.
-			// `resolveFunctionValueType` records the resolution, which the final
-			// enriched Node reads back. Every other Expression ignores the
+			// `resolveFunctionValueType` records the resolution AND the position
+			// it was resolved against, which the final enriched Node reads back
+			// as the finished call decided it. Every other Expression ignores the
 			// expected Type, so its one enriched Type serves every probe.
 			if (
 				value.nodeType === "FunctionValue" &&
 				needsContext(value.value)
 			) {
 				return noteErrors(
-					resolveFunctionValueType(value, scope, expectedType),
+					resolveFunctionValueType(
+						value,
+						scope,
+						expectedType,
+						bindings,
+					),
 				)
 			}
 
@@ -3199,15 +3219,18 @@ function resolveFunctionDefinitionType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	bindings: GenericBindings | null = null,
 ): common.FunctionType {
 	if (!needsContext(node)) {
 		return resolveFunctionSignatureType(node, scope)
 	}
 
-	let recorded = recordedContextualFunctionType(node)
+	if (expectedType === null) {
+		let recorded = recordedContextualFunctionType(node)
 
-	if (expectedType === null && recorded !== undefined) {
-		return recorded
+		if (recorded !== undefined) {
+			return decidedContextualFunctionType(node, scope, recorded)
+		}
 	}
 
 	let functionScope = scopeWithGenerics(node.generics, scope)
@@ -3235,7 +3258,11 @@ function resolveFunctionDefinitionType(
 		documentation: node.documentation ?? undefined,
 	}
 
-	recordContextualFunctionType(node, resolved)
+	recordContextualFunctionType(node, {
+		resolved,
+		expectedType: expectedFunction,
+		bindings,
+	})
 
 	return resolved
 }
@@ -5442,8 +5469,14 @@ export function resolveFunctionValueType(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	bindings: GenericBindings | null = null,
 ): common.FunctionType {
-	return resolveFunctionDefinitionType(node.value, scope, expectedType)
+	return resolveFunctionDefinitionType(
+		node.value,
+		scope,
+		expectedType,
+		bindings,
+	)
 }
 
 // NOTE: The Enricher builds a Function literal's typed Nodes in a separate
@@ -5461,7 +5494,7 @@ export function contextualFunctionTypeOf(
 	let recorded = recordedContextualFunctionType(node)
 
 	if (recorded !== undefined) {
-		return recorded
+		return decidedContextualFunctionType(node, scope, recorded)
 	}
 
 	if (!needsContext(node)) {
@@ -5471,14 +5504,76 @@ export function contextualFunctionTypeOf(
 	return resolveFunctionDefinitionType(node, scope)
 }
 
-// NOTE: What a contextually typed Function literal resolved to. It is worked
-// out while the invocation's signature is being matched — the only moment the
-// expected Type is known — and read back when the same Node is enriched, which
-// happens separately and without that context. Keyed by the Node, so a
-// re-parse starts empty and nothing has to be invalidated.
+// NOTE: The literal read back as the FINISHED call decided its position, rather
+// than as the match could see it while it was still running. A callback is
+// matched before the call has solved every Type Parameter — the general `loop`
+// entry's `step` is matched against `(_: State) -> Step<State, Result>` with
+// `Result` bound by nothing but this very literal — and a return Type that still
+// carries one is no context at all, so the literal fell back to reading its own
+// body. Reading it off the body loses whatever the position DID say: a `<-
+// #Done(item)` decided `Step`'s `Result` from its payload and left `State`
+// standing as the Choice's own Parameter, which is the undecided Type the body
+// then enriched against.
+//
+// So the position is re-read once the call has committed and its bindings are
+// final, and only when they turn a position the match left open into a decided
+// one — the literal is resolved again against that, and the second resolution is
+// what the enrichment pass reads. Silent, because everything a resolution of
+// this literal can report was reported when it was matched: a decided expected
+// Type resolves a superset of the annotations the open one did, so this pass has
+// only fewer things to say, never more.
+function decidedContextualFunctionType(
+	node: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+	recorded: RecordedContextualFunctionType,
+): common.FunctionType {
+	if (
+		recorded.expectedType === null ||
+		recorded.bindings === null ||
+		!mentionsUnsolvedTypeParameter(recorded.expectedType)
+	) {
+		return recorded.resolved
+	}
+
+	let decided = applyGenericBindings(recorded.expectedType, recorded.bindings)
+
+	// NOTE: Still open, so the call never decided it and the body stays the only
+	// thing that could — `map`'s `(_ item: ItemType) -> Result` where the literal
+	// itself is what binds `Result`.
+	if (mentionsUnsolvedTypeParameter(decided)) {
+		return recorded.resolved
+	}
+
+	let { result } = collectDiagnostics(() =>
+		resolveFunctionDefinitionType(node, scope, decided, recorded.bindings),
+	)
+
+	return result
+}
+
+// NOTE: What a contextually typed Function literal resolved to, and the position
+// it was resolved against. It is worked out while the invocation's signature is
+// being matched — the only moment the expected Type is known — and read back
+// when the same Node is enriched, which happens separately and without that
+// context. Keyed by the Node, so a re-parse starts empty and nothing has to be
+// invalidated.
+//
+// NOTE: The position is kept with the call's bindings rather than substituted on
+// the spot, for the same reason a prefixed Case construction's is: the Map is
+// the one the match keeps filling, so reading the record back once the call has
+// finished reads the position as the call finally decided it. `expectedType` is
+// null for a literal no invocation matched, and `bindings` for one matched
+// against a signature with no Generics to solve — neither has anything left to
+// decide.
+type RecordedContextualFunctionType = {
+	resolved: common.FunctionType
+	expectedType: common.FunctionType | null
+	bindings: GenericBindings | null
+}
+
 const contextualFunctionTypes = new WeakMap<
 	parser.FunctionDefinitionNode,
-	common.FunctionType
+	RecordedContextualFunctionType
 >()
 
 // NOTE: The Parameter Type an Argument was matched against, for the prefixed
@@ -5510,7 +5605,10 @@ const contextualCaseValueTypes = new WeakMap<
 // Both are only right for the candidate that wins, so both are held aside
 // together and committed together.
 type ContextualFunctionTypeRecording = {
-	functions: Map<parser.FunctionDefinitionNode, common.FunctionType>
+	functions: Map<
+		parser.FunctionDefinitionNode,
+		RecordedContextualFunctionType
+	>
 	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
 }
 
@@ -5530,14 +5628,14 @@ let probeRecordings: Array<ContextualFunctionTypeRecording> = []
 // discarded when the outer candidate it was probed for loses.
 function recordContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
-	resolved: common.FunctionType,
+	recorded: RecordedContextualFunctionType,
 ): void {
 	let innermost = probeRecordings[probeRecordings.length - 1]
 
 	if (innermost === undefined) {
-		contextualFunctionTypes.set(node, resolved)
+		contextualFunctionTypes.set(node, recorded)
 	} else {
-		innermost.functions.set(node, resolved)
+		innermost.functions.set(node, recorded)
 	}
 }
 
@@ -5545,7 +5643,7 @@ function recordContextualFunctionType(
 // enclosing one recorded, and the committed record answers when no probe did.
 function recordedContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
-): common.FunctionType | undefined {
+): RecordedContextualFunctionType | undefined {
 	for (let index = probeRecordings.length - 1; index >= 0; index--) {
 		let recorded = probeRecordings[index].functions.get(node)
 
