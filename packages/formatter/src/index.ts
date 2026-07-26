@@ -98,7 +98,10 @@ function unsafe(source: string, message: string): FormatResult {
 // is not — a printer thrown off by an AST shape it has never seen must still
 // hand the original bytes back, not take the process down. Exported so the
 // catch path can be tested without engineering a real crash.
-export function guarded(source: string, work: () => FormatResult): FormatResult {
+export function guarded(
+	source: string,
+	work: () => FormatResult,
+): FormatResult {
 	try {
 		return work()
 	} catch (error) {
