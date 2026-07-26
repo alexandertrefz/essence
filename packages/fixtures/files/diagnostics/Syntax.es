@@ -3,7 +3,7 @@
 § It ends in the middle of a block, so that the Parser's report can be read
 § end to end in one run:
 §
-§     bun bin/esc check testFiles/diagnostics/Syntax.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/Syntax.es
 §
 § Keep it broken. If a change makes this compile, the Diagnostic it was
 § showcasing no longer has a home.

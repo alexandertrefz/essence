@@ -3,7 +3,7 @@
 § Every statement below triggers a different Diagnostic, so that the
 § Compiler's error output can be read end to end in one run:
 §
-§     bun bin/esc check testFiles/diagnostics/Match.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/Match.es
 §
 § Keep it broken. If a change makes one of these compile, the Diagnostic it
 § was showcasing no longer has a home.

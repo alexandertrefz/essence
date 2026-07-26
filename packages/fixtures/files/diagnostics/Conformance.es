@@ -3,7 +3,7 @@
 § Every declaration below triggers a different conditional-conformance
 § Diagnostic, so that the Compiler's error output can be read end to end:
 §
-§     bun bin/esc check testFiles/diagnostics/Conformance.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/Conformance.es
 §
 § Keep it broken. If a change makes one of these compile, the Diagnostic it
 § was showcasing no longer has a home.

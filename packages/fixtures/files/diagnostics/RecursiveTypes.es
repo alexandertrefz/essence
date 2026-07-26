@@ -4,7 +4,7 @@
 § a recursion can take is below, so that the Compiler's error output for them can
 § be read end to end in one run:
 §
-§     bun bin/esc check testFiles/diagnostics/RecursiveTypes.es
+§     bun packages/cli/bin/esc check packages/fixtures/files/diagnostics/RecursiveTypes.es
 §
 § What is being showcased as much as the Diagnostics is what is NOT reported:
 § every name in a cycle stays declared, so `Alongside` below — which names one of
