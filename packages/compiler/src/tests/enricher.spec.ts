@@ -830,6 +830,47 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The same collision one rail over — this time between a CHOICE's
+		// own Type Parameters and the caller's. `Step`'s first Parameter is
+		// spelled `State`, and so is `myCount`'s, and the payload handed to
+		// `#Done` is Typed as the caller's: matched by name, that payload bound
+		// `Step`'s `State` to the whole `{ value: Result }` Record and left
+		// `Result` — the Parameter it was there to decide — bound by nothing at
+		// all. The construction's own match freshens too now, so the `Done`
+		// carries the caller's `State` as its Result and the loop finishes with
+		// it.
+		it("freshens a Choice's own Generics against a same-named caller Generic", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function myCount<State>(
+					startingWith state: State,
+					step advance: (_: State) -> State,
+				) -> State {
+					<- loop(startingWith { carried = state }, step (current) {
+						<- #Done(current.carried)
+					})
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+			expect(collectCaseTypes(program)).toEqual([
+				{
+					type: "Case",
+					choice: "Step",
+					name: "Done",
+					members: { value: { type: "GenericUse", name: "State" } },
+					typeArguments: [
+						{
+							type: "Record",
+							members: {
+								carried: { type: "GenericUse", name: "State" },
+							},
+						},
+						{ type: "GenericUse", name: "State" },
+					],
+				},
+			])
+		})
+
 		it("should bind Method Generics from Function Argument return Types", () => {
 			expect(
 				typeOfFirstConstant(`implementation {

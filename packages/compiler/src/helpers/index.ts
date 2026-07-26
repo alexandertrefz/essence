@@ -469,6 +469,52 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	}
 }
 
+// NOTE: The construction-side twin of `createFreshenedInference` — a Choice's
+// own Type Parameters, alpha-renamed for the span of the one payload match that
+// binds them. The collision it settles is the same one, one rail over: a
+// callback inside `myCount<State>` answering `#Done(current.carried)` hands a
+// payload Typed as the CALLER's opaque `State` to `Step<State, Result>`, and by
+// name alone that payload matched `Step`'s own bindable `State` — so `State`
+// bound to the whole Record and `Result`, the Parameter the payload was there to
+// decide, bound to nothing at all.
+//
+// A Parameter the payload never binds is left standing under its FRESH name
+// rather than restored, deliberately: it is a Type Argument nothing decided, and
+// `mentionsUnsolvedTypeParameter` is what the construction rail asks to tell one
+// from an enclosing Function's own Type Parameter, which is a decision (a
+// generic one) and reads as a source name. `displayGenericName` shows it under
+// the spelling the Choice declares, so a reader never sees the counter.
+export function createFreshenedChoiceInference(
+	choiceGenerics: Array<common.GenericDeclaration>,
+): {
+	rename: GenericBindings
+	freshNames: Array<common.GenericName>
+	context: GenericInferenceContext
+} {
+	let rename: GenericBindings = new Map()
+	let freshNames: Array<common.GenericName> = []
+
+	for (let generic of choiceGenerics) {
+		let freshName = `${generic.name}${freshGenericSeparator}${(freshGenericCounter += 1)}`
+
+		freshNames.push(freshName)
+		rename.set(generic.name, { type: "GenericUse", name: freshName })
+	}
+
+	return {
+		rename,
+		freshNames,
+		context: {
+			// NOTE: Every one of them, unlike a signature's, where only an
+			// `infer` Parameter binds — a Choice's Type Parameters are applied
+			// rather than declared bindable, and the payload match is the one
+			// place they are worked out from a value at all.
+			bindableNames: new Set(freshNames),
+			bindings: new Map(),
+		},
+	}
+}
+
 // NOTE: The name a FABRICATED signature borrows a Type Parameter under. A
 // derived Method takes its Parameters from the Type it was fabricated for, so
 // their names are that Type's own — and `createFreshenedInference` can not undo
