@@ -213,6 +213,11 @@ export interface CombinationNode {
 // are what make a Handler *conditional*: it can decline a value whose Type the
 // Matcher accepted, so it covers only part of `matcher` and can never make a
 // Union exhaustive on its own.
+//
+// A Handler owns Expressions outside `body`: `literal`, every value in
+// `memberLiterals`, and `guard`. A walker that visits only `body` goes blind
+// inside `case 1 where …` — `typedHandlerExpressions` in the Language Server's
+// `matchHandlerChildren` returns exactly those, in source order.
 export interface MatchNode {
 	nodeType: "Match"
 	value: ExpressionNode

@@ -6,6 +6,8 @@ import {
 } from "@essence/compiler/enricher/builtins"
 import type { common, parser } from "@essence/interfaces"
 
+import { typedHandlerExpressions } from "./matchHandlerChildren"
+
 // NOTE: Renaming is resolved on the Parser AST with a lexical Scope model
 // that mirrors the Enricher's binding rules — `values` corresponds to the
 // Enricher's `members`, `types` to its `types`.
@@ -1572,6 +1574,10 @@ function walkTypedNode(
 			walkTypedNode(node.value, context)
 
 			for (let handler of node.handlers) {
+				for (let expression of typedHandlerExpressions(handler)) {
+					walkTypedNode(expression, context)
+				}
+
 				walkTypedBody(handler.body, context)
 			}
 

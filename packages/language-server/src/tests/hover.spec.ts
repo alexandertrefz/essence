@@ -615,6 +615,44 @@ describe("Hover inside a declaration's body", () => {
 	})
 })
 
+// NOTE: A Handler is not only its body — the value a literal Matcher compares
+// against, a Record Matcher's by-value members and the Guard are Expressions
+// like any other, and every one of them used to answer with the whole Match.
+describe("Hover inside a Match Handler", () => {
+	let source = [
+		"implementation {",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tfunction describe (_ value: Integer | Point) -> String {",
+		"\t\t<- match value -> String {",
+		'\t\t\tcase 0 { <- "zero" }',
+		'\t\t\tcase Integer where @::isNegative() { <- "negative" }',
+		'\t\t\tcase Integer { <- "positive" }',
+		'\t\t\tcase { x = 0, y: Integer } { <- "the y axis" }',
+		'\t\t\tcase { x: Integer, y: Integer } { <- "elsewhere" }',
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should describe a literal Matcher's value", () => {
+		expect(hover(source, { line: 6, column: 9 })).toBe("Integer")
+	})
+
+	it("should describe a Record Matcher's member literal", () => {
+		expect(hover(source, { line: 9, column: 15 })).toBe("Integer")
+	})
+
+	it("should describe a Guard's scrutinee and the Method it invokes", () => {
+		// NOTE: `@` is narrowed to what the Matcher established, which is what
+		// makes the Guard's Method resolve at all.
+		expect(hover(source, { line: 7, column: 23 })).toBe("@: Integer")
+		expect(hover(source, { line: 7, column: 30 })).toBe(
+			"isNegative() -> Boolean",
+		)
+	})
+})
+
 // NOTE: A Protocol's requirements and a Choice's payload members survive
 // enrichment as plain Type Records with no Position in them, so every name
 // inside either declaration used to answer with the declaration itself. Inside

@@ -584,6 +584,78 @@ describe("Rename of Methods and Record members", () => {
 
 		expect(findOccurrence(source, { line: 2, column: 31 })).toBeNull()
 	})
+
+	// NOTE: Both bind in the typed pass, which used to see nothing but a
+	// Handler's body — a Method invoked only from a Guard renamed at its
+	// declaration and nowhere else, which silently broke the Program.
+	it("should rename a Method invoked from a Match Guard", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Checks for Integer {",
+			"\t\tisSmall() -> Boolean {",
+			"\t\t\t<- @::isLessThan(10)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant amount: Integer | String = 4",
+			"\tconstant label = match amount -> String {",
+			'\t\tcase Integer where @::isSmall() { <- "small" }',
+			'\t\tcase Integer { <- "big" }',
+			"\t\tcase String { <- @ }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let renamed = [
+			"implementation {",
+			"\tnamespace Checks for Integer {",
+			"\t\tisTiny() -> Boolean {",
+			"\t\t\t<- @::isLessThan(10)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant amount: Integer | String = 4",
+			"\tconstant label = match amount -> String {",
+			'\t\tcase Integer where @::isTiny() { <- "small" }',
+			'\t\tcase Integer { <- "big" }',
+			"\t\tcase String { <- @ }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 3, column: 4 }, "isTiny")).toBe(renamed)
+		expect(rename(source, { line: 10, column: 25 }, "isTiny")).toBe(renamed)
+	})
+
+	it("should rename a Record member looked up in a Match Guard", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tconstant point: Point | String = { x = 0, y = 7 }",
+			"\tconstant label = match point -> String {",
+			'\t\tcase Point where @.x::isNegative() { <- "left of the axis" }',
+			'\t\tcase Point { <- "on it or right of it" }',
+			"\t\tcase String { <- @ }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 17 }, "horizontal")).toBe(
+			[
+				"implementation {",
+				"\ttype Point = { horizontal: Integer, y: Integer }",
+				"",
+				"\tconstant point: Point | String = { horizontal = 0, y = 7 }",
+				"\tconstant label = match point -> String {",
+				'\t\tcase Point where @.horizontal::isNegative() { <- "left of the axis" }',
+				'\t\tcase Point { <- "on it or right of it" }',
+				"\t\tcase String { <- @ }",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+	})
 })
 
 describe("findDefinition", () => {

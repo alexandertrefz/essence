@@ -131,6 +131,12 @@ function collectFromNode(
 			collectFromNode(node.value, ranges)
 
 			for (let handler of node.handlers) {
+				// NOTE: A Guard is an ordinary Expression and can be spelled
+				// across as many lines as any other call.
+				if (handler.guard !== null) {
+					collectFromNode(handler.guard, ranges)
+				}
+
 				collectFromBody(handler.body, ranges)
 			}
 

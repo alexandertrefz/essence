@@ -1,5 +1,6 @@
 import type { common } from "@essence/interfaces"
 
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 
 // NOTE: Two completion contexts need to know what is *expected* at the
@@ -192,6 +193,13 @@ function visitNode(
 			visitNode(node.value, null, state)
 
 			for (let handler of node.handlers) {
+				// NOTE: A Guard is a Boolean and a Matcher's literals are plain
+				// values — neither expects a Record shape of its own, so what
+				// the Match is expected to produce says nothing about them.
+				for (let expression of typedHandlerExpressions(handler)) {
+					visitNode(expression, null, state)
+				}
+
 				visitBody(handler.body, expected, state)
 			}
 

@@ -7,8 +7,9 @@ import {
 import type { common } from "@essence/interfaces"
 
 import { describe, documentationOf } from "./documentation"
+import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { matchingNamespaces } from "./namespaces"
-import { contains, isSmaller } from "./positions"
+import { contains, isAtOrBefore, isSmaller } from "./positions"
 import { buildProbeSource, stripNoise } from "./probe"
 
 // NOTE: Signature Help resolves the enclosing invocation the same way
@@ -16,7 +17,8 @@ import { buildProbeSource, stripNoise } from "./probe"
 // padded back into a valid Program (`probe.ts`), enriched, and the smallest
 // FunctionInvocation or MethodInvocation node that now contains the padded
 // cursor point is the one being typed into — this also handles nested calls
-// for free, since the innermost one wins.
+// for free, since the innermost one wins, and closing a nested call hands the
+// outer one back (see `consider`).
 //
 // The active Parameter is *not* read off the parsed Arguments — a call like
 // `greet(1, )` drops the empty trailing slot entirely, so it is counted
@@ -61,7 +63,16 @@ export function findSignatureHelp(
 	].join("\n")
 
 	let probeSource = buildProbeSource(headText)
-	let cursorPoint: common.Position = { start: cursor, end: cursor }
+
+	// NOTE: The searched point is the end of `headText`, not the requested
+	// cursor — that is where the Probe's padding starts, and the two differ
+	// whenever the requested column runs past the end of its own line.
+	let headLines = headText.split("\n")
+	let probeCursor: common.Cursor = {
+		line: headLines.length,
+		column: (headLines.at(-1) ?? "").length + 1,
+	}
+	let cursorPoint: common.Position = { start: probeCursor, end: probeCursor }
 
 	let enrichedProgram: common.typed.Program | null = null
 
@@ -331,6 +342,16 @@ function findEnclosingInvocation(
 			return
 		}
 
+		// NOTE: A cursor sitting exactly at an Invocation's end has just closed
+		// it — `outer(first inner(value 1)` with the caret after the inner `)`.
+		// That Invocation is finished, so what is still being written is the
+		// call AROUND it, which is what typing `)` has to leave on screen.
+		// `contains` counts the end as inside, which is what every other reader
+		// of it wants and the one thing this one must not do.
+		if (isAtOrBefore(node.position.end, cursor.start)) {
+			return
+		}
+
 		if (bestPosition === null || isSmaller(node.position, bestPosition)) {
 			best = node
 			bestPosition = node.position
@@ -412,6 +433,10 @@ function findEnclosingInvocation(
 				visitNode(node.value)
 
 				for (let handler of node.handlers) {
+					for (let expression of typedHandlerExpressions(handler)) {
+						visitNode(expression)
+					}
+
 					visitBody(handler.body)
 				}
 

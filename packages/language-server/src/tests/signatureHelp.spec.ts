@@ -92,6 +92,46 @@ describe("Signature Help", () => {
 		expect(help?.activeParameter).toBe(1)
 	})
 
+	// NOTE: What `)` as a retrigger character is for — the closed call is done,
+	// so the one still being written is the one around it.
+	it("should hand the outer call back once a nested call is closed", () => {
+		let source = [
+			"implementation {",
+			"\tfunction inner (value: Integer) -> Integer {",
+			"\t\t<- value",
+			"\t}",
+			"\tfunction outer (first: Integer, second: Integer) -> Integer {",
+			"\t\t<- first",
+			"\t}",
+			"\touter(first inner(value 1)",
+			"}",
+		].join("\n")
+
+		let inside = findSignatureHelp(source, { line: 8, column: 27 })
+		let closed = findSignatureHelp(source, { line: 8, column: 28 })
+
+		expect(inside?.signatures[0].label).toBe(
+			"inner(value: Integer) -> Integer",
+		)
+		expect(closed?.signatures[0].label).toBe(
+			"outer(first: Integer, second: Integer) -> Integer",
+		)
+		expect(closed?.activeParameter).toBe(0)
+	})
+
+	it("should return null once the only call on the line is closed", () => {
+		let source = [
+			"implementation {",
+			"\tfunction greet (subject: String) -> String {",
+			"\t\t<- subject",
+			"\t}",
+			'\tgreet(subject "World")',
+			"}",
+		].join("\n")
+
+		expect(findSignatureHelp(source, { line: 5, column: 24 })).toBeNull()
+	})
+
 	it("should show every Overload and mark the resolved one active", () => {
 		let source = [
 			"implementation {",
