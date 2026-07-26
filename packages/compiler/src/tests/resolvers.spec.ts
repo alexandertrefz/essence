@@ -164,6 +164,71 @@ describe("Resolvers", () => {
 		})
 	})
 
+	// NOTE: A Namespace's own name is in Scope inside every body it holds, which
+	// is what the emitted `class` says too — its binding is in scope in its own
+	// static initialisers, and its Methods are installed before any of them run.
+	// A static Property's value was the one body that could not see it: it is
+	// enriched while the Namespace Type is still being built, so `Reader.base`
+	// inside `namespace Reader` reported `unknown-name` where the identical
+	// spelling outside resolved.
+	describe("A Namespace naming itself", () => {
+		it("reads a static Property written above it", async () => {
+			expect(
+				await run(`implementation {
+					namespace Reader {
+						static base = 10
+						static doubled = Reader.base::multiply(with 2)
+					}
+
+					__print(Reader.doubled)
+				}`),
+			).toEqual(["20"])
+		})
+
+		it("calls a Method of its own Namespace from a static Property", async () => {
+			expect(
+				await run(`implementation {
+					namespace Reader {
+						static doubled = Reader.computed()::multiply(with 2)
+
+						static computed() -> Integer { <- 10 }
+					}
+
+					__print(Reader.doubled)
+				}`),
+			).toEqual(["20"])
+		})
+
+		it("reads its own static Property from a Method body", async () => {
+			expect(
+				await run(`implementation {
+					namespace Reader for Integer {
+						static base = 10
+
+						scaled() -> Integer { <- Reader.base::multiply(with @) }
+					}
+
+					__print(2::scaled())
+				}`),
+			).toEqual(["20"])
+		})
+
+		it("names itself from a generic Namespace's static Property", async () => {
+			expect(
+				await run(`implementation {
+					namespace Boxes<infer Item> for List<Item> {
+						static empty = "none"
+						static label = Boxes.empty
+
+						first() -> Optional<Item> { <- @::firstItem() }
+					}
+
+					__print(Boxes.label)
+				}`),
+			).toEqual(['"none"'])
+		})
+	})
+
 	describe("Namespace Specifiers", () => {
 		// NOTE: The shadow is the whole point — the specifier used to walk past
 		// the Constant to the Namespace outside, so the call type-checked

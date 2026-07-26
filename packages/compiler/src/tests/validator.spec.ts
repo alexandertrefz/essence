@@ -1652,6 +1652,136 @@ describe("Validator", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// NOTE: A Namespace names itself from its own body, so the order its
+		// static Properties are written in became something a Program can feel:
+		// they are emitted as static fields, initialised top to bottom, and a
+		// read of one below answers `undefined` out of a Program that compiled
+		// green — the same fault as naming a Namespace above its Declaration,
+		// one level in.
+		describe("inside the Namespace's own body", () => {
+			it("accepts a static Property reading one written above it", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Reader {
+							static base = 10
+							static doubled = Reader.base::multiply(with 2)
+						}
+
+						__print(Reader.doubled)
+					}`),
+				).toEqual([])
+			})
+
+			it("reports a static Property reading one written below it", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Reader {
+						static doubled = Reader.base::multiply(with 2)
+						static base = 10
+					}
+
+					__print(Reader.doubled)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].severity).toBe("error")
+				expect(diagnostics[0].code).toBe("use-before-declaration")
+				expect(diagnostics[0].message).toBe(
+					"Property 'Reader.base' is read before it has a value",
+				)
+				expect(diagnostics[0].labels[0]?.message).toBe("this reads it")
+				expect(diagnostics[0].labels[0]?.position.start.line).toBe(3)
+				expect(diagnostics[0].labels[1]?.message).toBe(
+					"it is given its value here",
+				)
+				expect(diagnostics[0].labels[1]?.position.start.line).toBe(4)
+				expect(diagnostics[0].helps).toEqual([
+					"Move this Declaration below the one it reads.",
+				])
+			})
+
+			it("reports a static Property reading itself", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Reader {
+						static base = Reader.base
+					}
+
+					__print(Reader.base)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("use-before-declaration")
+				expect(diagnostics[0].message).toBe(
+					"Property 'Reader.base' is read before it has a value",
+				)
+			})
+
+			it("accepts a static Property calling a Method written below it", () => {
+				// NOTE: A Method is installed with the class, ahead of every
+				// static initialiser, so it answers whichever order the two are
+				// written in.
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Reader {
+							static base = Reader.computed()
+
+							static computed() -> Integer { <- 10 }
+						}
+
+						__print(Reader.base)
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The one read that reaches no `validateExpression` of its own
+			// — a Property holding a Function is CALLED through the very Lookup
+			// that reads it, and the callee of a call is examined by the call.
+			it("reports a static Property calling one written below it", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Reader {
+						static base = Reader.compute()
+						static compute = () -> Integer { <- 10 }
+					}
+
+					__print(Reader.base)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("use-before-declaration")
+				expect(diagnostics[0].message).toBe(
+					"Property 'Reader.compute' is read before it has a value",
+				)
+			})
+
+			it("accepts a Function literal in an initialiser reading a Property written below it", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Reader {
+							static reader = () -> Integer { <- Reader.base }
+							static base = 10
+						}
+
+						__print(Reader.reader())
+					}`),
+				).toEqual([])
+			})
+
+			it("accepts a Method body reading a Property written above it", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Reader for Integer {
+							static base = 10
+
+							doubled() -> Integer {
+								<- Reader.base::multiply(with @)
+							}
+						}
+
+						__print(2::doubled())
+					}`),
+				).toEqual([])
+			})
+		})
 	})
 
 	// NOTE: The two cross-checks are about the COMPILER rather than about a
