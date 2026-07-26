@@ -93,5 +93,5 @@ export function bigRationalOf(value: IntegerType | RationalType): BigRational {
 		return { numerator: value.value, denominator: 1n }
 	}
 
-	return reduced(value.rational.numerator, value.rational.denominator)
+	return reduced(value.numerator, value.denominator)
 }
