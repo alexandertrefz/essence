@@ -1,13 +1,14 @@
-import type { AlgebraicType, BigRational } from "./Algebraic"
+import type { AlgebraicType } from "./Algebraic"
+import { scaledIntervalOf } from "./Algebraic"
+import type { BigRational } from "./bigRational"
 import {
 	addRationals,
 	bigRationalOf,
 	divideRationals,
 	multiplyRationals,
 	reduced,
-	scaledIntervalOf,
 	subtractRationals,
-} from "./Algebraic"
+} from "./bigRational"
 import type { IntegerType } from "./Integer"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
