@@ -249,6 +249,57 @@ function nodeDefinitelyReturns(node: common.typed.ImplementationNode): boolean {
 	return false
 }
 
+// NOTE: A structural walk over a Type, visiting each object it is built from
+// exactly once. Types are plain data, so walking them covers every shape —
+// including ones added later — without enumerating any, which is why the four
+// questions below are all asked this way.
+//
+// A resolved Type is a DAG, though, not a tree: `type Nested = Box<Inner> |
+// Box<List<Inner>>` names the ONE `Inner` object from four places, its Type
+// Arguments and its Cases' members among them, and each level of nesting
+// multiplies that sharing again. Followed reference by reference, a Type a few
+// hundred objects large is walked exponentially many times — asking whether an
+// eight-level nesting mentions an unsolved Type Parameter took thirty-seven
+// million steps, and twelve levels never finished. Remembering what has been
+// visited makes the walk linear in the Type as it is actually held, and answers
+// where a Type that named itself would have hung.
+//
+// Every question asked this way is monotone — "is there an X anywhere" or
+// "collect every X" — so a second visit to a shared object could only find what
+// the first one already did.
+function typeWalkFinds(
+	type: common.Type,
+	found: (record: Record<string, unknown>) => boolean,
+): boolean {
+	let visited = new Set<object>()
+
+	let walk = (value: unknown): boolean => {
+		if (value === null || typeof value !== "object") {
+			return false
+		}
+
+		if (visited.has(value)) {
+			return false
+		}
+
+		visited.add(value)
+
+		if (Array.isArray(value)) {
+			return value.some(walk)
+		}
+
+		let record = value as Record<string, unknown>
+
+		if (found(record)) {
+			return true
+		}
+
+		return Object.values(record).some(walk)
+	}
+
+	return walk(type)
+}
+
 // #region Generic Inference
 
 export type GenericBindings = Map<common.GenericName, common.Type>
@@ -314,29 +365,13 @@ const freshGenericSeparator = "\u200B"
 // reads as a source name, while a callee's unsolved one is no decision at all
 // and must never be recorded as one.
 export function mentionsUnsolvedTypeParameter(type: common.Type): boolean {
-	let walk = (value: unknown): boolean => {
-		if (value === null || typeof value !== "object") {
-			return false
-		}
-
-		if (Array.isArray(value)) {
-			return value.some(walk)
-		}
-
-		let record = value as Record<string, unknown>
-
-		if (
+	return typeWalkFinds(
+		type,
+		(record) =>
 			record.type === "GenericUse" &&
 			typeof record.name === "string" &&
-			record.name.includes(freshGenericSeparator)
-		) {
-			return true
-		}
-
-		return Object.values(record).some(walk)
-	}
-
-	return walk(type)
+			record.name.includes(freshGenericSeparator),
+	)
 }
 
 // NOTE: Alpha-renames a signature's own Generics to fresh, collision-proof names
@@ -885,29 +920,13 @@ function typeMentionsAnyGeneric(
 	type: common.Type,
 	genericNames: ReadonlySet<common.GenericName>,
 ): boolean {
-	let walk = (value: unknown): boolean => {
-		if (value === null || typeof value !== "object") {
-			return false
-		}
-
-		if (Array.isArray(value)) {
-			return value.some(walk)
-		}
-
-		let record = value as Record<string, unknown>
-
-		if (
+	return typeWalkFinds(
+		type,
+		(record) =>
 			record.type === "GenericUse" &&
 			typeof record.name === "string" &&
-			genericNames.has(record.name)
-		) {
-			return true
-		}
-
-		return Object.values(record).some(walk)
-	}
-
-	return walk(type)
+			genericNames.has(record.name),
+	)
 }
 
 // NOTE: Whether an Error Type sits anywhere in this one — the same structural
@@ -916,25 +935,7 @@ function typeMentionsAnyGeneric(
 // or a Record's members must not be diagnosed a second time for whatever it
 // then fails to do.
 export function typeContainsError(type: common.Type): boolean {
-	let walk = (value: unknown): boolean => {
-		if (value === null || typeof value !== "object") {
-			return false
-		}
-
-		if (Array.isArray(value)) {
-			return value.some(walk)
-		}
-
-		let record = value as Record<string, unknown>
-
-		if (record.type === "Error") {
-			return true
-		}
-
-		return Object.values(record).some(walk)
-	}
-
-	return walk(type)
+	return typeWalkFinds(type, (record) => record.type === "Error")
 }
 
 // NOTE: Whether a slot nothing has decided yet sits anywhere in this Type. It
@@ -1841,26 +1842,15 @@ export type ArgumentMatchResult =
 // or a nested signature counts as much as one written at the top. Generics of
 // an enclosing definition are opaque symbols here and are not collected: they
 // are not what an Argument could bind.
+//
+// Asked as a search that never finds anything, so that the whole Type is walked
+// — collecting is what it is here for, and answering would stop it early.
 function collectBindableGenerics(
 	type: common.Type,
 	context: GenericInferenceContext,
 	into: Set<common.GenericName>,
 ): void {
-	let walk = (value: unknown): void => {
-		if (value === null || typeof value !== "object") {
-			return
-		}
-
-		if (Array.isArray(value)) {
-			for (let item of value) {
-				walk(item)
-			}
-
-			return
-		}
-
-		let record = value as Record<string, unknown>
-
+	typeWalkFinds(type, (record) => {
 		if (
 			record.type === "GenericUse" &&
 			typeof record.name === "string" &&
@@ -1869,12 +1859,8 @@ function collectBindableGenerics(
 			into.add(record.name)
 		}
 
-		for (let item of Object.values(record)) {
-			walk(item)
-		}
-	}
-
-	walk(type)
+		return false
+	})
 }
 
 // NOTE: Whether a callback Parameter's own PARAMETERS mention a Type Parameter
