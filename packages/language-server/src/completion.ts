@@ -1,5 +1,8 @@
 import { enrichDocument, parseDocument } from "@essence/compiler/documents"
-import { flattenUnionMembers } from "@essence/compiler/helpers"
+import {
+	filterMostSpecificByTarget,
+	flattenUnionMembers,
+} from "@essence/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
@@ -617,15 +620,41 @@ function callableEntries({
 }
 
 function methodDeclarationKind(method: common.MethodType): DeclarationKind {
-	return method.type === "StaticMethod" ||
+	return isStaticMethod(method) ? "staticMethod" : "method"
+}
+
+// NOTE: Static Methods take no receiver — they are not invocable through `::`,
+// only through `.` on the Namespace itself.
+function isStaticMethod(method: common.MethodType): boolean {
+	return (
+		method.type === "StaticMethod" ||
 		method.type === "OverloadedStaticMethod"
-		? "staticMethod"
-		: "method"
+	)
 }
 
 /*********************/
 /* Method completion */
 /*********************/
+
+// NOTE: Overlapping Namespaces declare the same Method name — a user
+// `for List<Integer>` beside the builtin `for List<ItemType>` — and the one
+// listed first is not the one the call resolves to: the Enricher dispatches to
+// the most specific target. Completion runs the same shared order per Method
+// name so the signature it shows is the signature that will be invoked. A tie
+// is left as it is found, the way the Enricher leaves it to be reported.
+function mostSpecificMethod(
+	namespaces: Array<common.NamespaceType>,
+	name: string,
+): common.MethodType | undefined {
+	let declaring = namespaces.filter((namespace) => {
+		let method = namespace.methods[name]
+
+		return method !== undefined && !isStaticMethod(method)
+	})
+
+	return filterMostSpecificByTarget(declaring, (namespace) => namespace)[0]
+		?.methods[name]
+}
 
 function methodCompletions(
 	documentText: string,
@@ -644,12 +673,7 @@ function methodCompletions(
 
 	for (let namespace of namespaces) {
 		for (let [name, method] of Object.entries(namespace.methods)) {
-			// NOTE: Static Methods take no receiver — they are not invocable
-			// through `::`, only through `.` on the Namespace itself.
-			if (
-				method.type === "StaticMethod" ||
-				method.type === "OverloadedStaticMethod"
-			) {
+			if (isStaticMethod(method)) {
 				continue
 			}
 
@@ -659,13 +683,15 @@ function methodCompletions(
 
 			seen.add(name)
 
+			let resolved = mostSpecificMethod(namespaces, name) ?? method
+
 			entries.push(
 				...callableEntries({
 					name,
 					kind: "method",
-					snippets: callSnippetsFor(name, method),
-					detail: printInvokedSignature(method),
-					documentation: describe(documentationOf(method)) || null,
+					snippets: callSnippetsFor(name, resolved),
+					detail: printInvokedSignature(resolved),
+					documentation: describe(documentationOf(resolved)) || null,
 					tier: completionTiers.member,
 				}),
 			)

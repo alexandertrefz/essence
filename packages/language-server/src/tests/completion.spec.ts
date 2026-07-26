@@ -141,6 +141,52 @@ describe("Completion", () => {
 			expect(labels).toContain("add")
 		})
 
+		// NOTE: The builtin `for List<ItemType>` is listed first, but the call
+		// dispatches to the narrower `for List<Integer>` — so listing the
+		// builtin's `Optional<ItemType>` signature would describe a Method
+		// that is never the one invoked.
+		it("should show the signature of the Namespace the call resolves to", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace IntegerList for List<Integer> {",
+				"\t\tfirstItem() -> Integer {",
+				"\t\t\t<- 0",
+				"\t\t}",
+				"\t}",
+				"\tconstant numbers: List<Integer> = [1, 2]",
+				"\tnumbers::",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, {
+				line: 8,
+				column: 11,
+			}).filter((entry) => entry.label === "firstItem")
+
+			expect(entries.map((entry) => entry.detail)).toEqual([
+				"() -> Integer",
+			])
+		})
+
+		it("should keep every Overload where no Namespace is more specific", () => {
+			let source = [
+				"implementation {",
+				"\tconstant numbers: List<Integer> = [1, 2]",
+				"\tnumbers::",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, {
+				line: 3,
+				column: 11,
+			}).filter((entry) => entry.label === "firstItem")
+
+			expect(entries.map((entry) => entry.detail)).toEqual([
+				"<ItemType>() -> Optional<ItemType>",
+				"<ItemType>(where: (_ ItemType) -> Boolean) -> Optional<ItemType>",
+			])
+		})
+
 		it("should see a Namespace declared after the cursor", () => {
 			let source = [
 				"implementation {",
