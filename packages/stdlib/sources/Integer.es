@@ -98,7 +98,7 @@ declarations {
 		§ `Integer.isLessThan` → `compareTo`, and WHICH `compareTo` is the
 		§ whole point: the one below is Integer's own, a bigint comparison,
 		§ while `Number`'s is the sixteen-cell cross-kind table that reaches
-		§ Rational, Algebraic, Transcendental and `bigint-fraction`. Routing
+		§ Rational, Algebraic and Transcendental. Routing
 		§ two Integers through it made `HelloWorld.es` bundle the machinery for
 		§ comparing an Integer with π, and nearly doubled it — 18,271 → 35,729
 		§ bytes. `src/tests/bundleSize.spec.ts` is the guard.

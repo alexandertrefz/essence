@@ -85,8 +85,8 @@ at `index`" — the item is the direct object, the index is reached through *at*
 inequalities on `Integer` and `Rational` AND on the covering `Number`, and that
 is not duplication to collapse — it is a performance stratification. The
 same-kind entry is written on the member's own `compareTo`; `Number`'s is the
-sixteen-cell cross-kind table that reaches `bigint-fraction` and the whole
-tower. Deleting the member entries would route two Integers through it and
+sixteen-cell cross-kind table that reaches the whole numeric tower. Deleting
+the member entries would route two Integers through it and
 nearly double a Program that only prints a greeting. The reasoning is written
 above `Integer::isLessThan`, and `packages/compiler/src/tests/bundleSize.spec.ts` is the guard.
 Before collapsing anything that looks repeated here, check whether the repeat
@@ -198,9 +198,9 @@ Composition is not free, and two costs are easy to miss because no test fails:
 
 - **A body pulls in everything it transitively reaches.** `Integer.compareTo`
   once delegated to the covering `Number.compareTo`; that made comparing two
-  Integers drag the Algebraic, Transcendental and Rational machinery — and
-  `bigint-fraction` — into any Program that compared two Integers, nearly
-  doubling `HelloWorld.es`. Same-kind ordering is native again for that reason.
+  Integers drag the Algebraic, Transcendental and Rational machinery into any
+  Program that compared two Integers, nearly doubling `HelloWorld.es`.
+  Same-kind ordering is native again for that reason.
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is

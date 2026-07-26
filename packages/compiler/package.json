@@ -40,7 +40,6 @@
 	"devDependencies": {
 		"@essence/fixtures": "workspace:*",
 		"@types/escodegen": "0.0.10",
-		"@types/estree": "1.0.9",
-		"bigint-fraction": "1.0.6"
+		"@types/estree": "1.0.9"
 	}
 }

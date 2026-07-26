@@ -49,10 +49,9 @@ export async function bundle(
 			stdin: {
 				contents: code,
 				loader: "ts",
-				// NOTE: The runtime's own directory, because the bare
-				// specifiers to resolve from here are the runtime modules' —
-				// `bigint-fraction` is imported by `Number.ts` and `Rational.ts`
-				// and by nothing the user wrote.
+				// NOTE: The runtime's own directory, so any specifier a
+				// runtime module spells resolves from the runtime, not from
+				// wherever the user's Program happens to live.
 				resolveDir: RUNTIME_DIRECTORY,
 				sourcefile: options.sourceFileName,
 			},

@@ -16,7 +16,7 @@ import { validate } from "../validator/index"
 // Program does not use stays shakeable. These two files in
 // `packages/fixtures/files/` are the ones that reach an Essence-implemented
 // Method AND a large runtime module — Everyday and Irrational both use
-// `Number`, whose module drags in the numeric tower and `bigint-fraction`.
+// `Number`, whose module drags in the numeric tower.
 // Before the change each carried ~13 kB it never used; the ceilings here are a
 // few kB above the measured sizes, low enough that a reintroduced spread (which
 // would add those kilobytes straight back) trips them, high enough not to churn
@@ -61,14 +61,17 @@ describe("Bundle Size", () => {
 	// back to 55,163 when List's equality Methods took an `Equatable` bound:
 	// `contains`, `removeDuplicates` and the by-value `count`/`removeEvery`
 	// lost their natives, and what replaced them is written on chains the
-	// Program already carried. It now measures 55,407: anchoring esbuild's
+	// Program already carried. It fell to 55,407 when anchoring esbuild's
 	// working directory to the runtime took the checkout's path back out of
 	// every inlined module's label, which is worth about 370 bytes here and
-	// over a kilobyte to anyone whose checkout sits deeper. Still below the
-	// spread figure, so the guard holds — the headroom is ~590 bytes, so the
-	// next conversion that touches List will want this ceiling raised with it.
+	// over a kilobyte to anyone whose checkout sits deeper. It now measures
+	// 44,190: the in-house bigint-rational core replaced `bigint-fraction`,
+	// whose CJS-only bundle — ~9.4 kB no tree shaking could reach, plus the
+	// interop wrappers esbuild grew around it — rode in every Program that
+	// touched a Rational. The ceiling moved down with it, keeping ~1.3 kB of
+	// headroom.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(56_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(45_500)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -77,9 +80,10 @@ describe("Bundle Size", () => {
 	// instead of falling off its end and answering `undefined`, and that helper
 	// — like the rest of the runtime's Type Module — is carried by every
 	// Program. The ceiling moved with it, keeping the same order of headroom;
-	// it is still eleven kB below the spread figure this guard is about. It now
-	// measures 43,851, for the same reason Everyday's figure fell.
+	// it fell to 43,851 when the module labels lost the checkout's path, for
+	// the same reason Everyday's figure did. It now measures 32,717, down
+	// 11 kB with `bigint-fraction`'s departure — same story as Everyday's.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(45_500)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(34_000)
 	})
 })
