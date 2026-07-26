@@ -1,9 +1,30 @@
 import { describe, expect, it } from "bun:test"
 
+import { buildCallSnippet } from "../callSnippets"
 import { findCompletions } from "../completion"
 
 function labelsOf(source: string, cursor: { line: number; column: number }) {
 	return findCompletions(source, cursor).map((entry) => entry.label)
+}
+
+function entryFor(
+	source: string,
+	cursor: { line: number; column: number },
+	label: string,
+) {
+	return findCompletions(source, cursor).find(
+		(entry) => entry.label === label,
+	)
+}
+
+function kindsOf(source: string, cursor: { line: number; column: number }) {
+	return findCompletions(source, cursor).map((entry) => entry.kind)
+}
+
+function keywordsOf(source: string, cursor: { line: number; column: number }) {
+	return findCompletions(source, cursor)
+		.filter((entry) => entry.kind === "keyword")
+		.map((entry) => entry.label)
 }
 
 describe("Completion", () => {
@@ -66,6 +87,7 @@ describe("Completion", () => {
 				label: "firstName",
 				kind: "member",
 				detail: "String",
+				tier: 2,
 			})
 		})
 	})
@@ -471,6 +493,34 @@ describe("Completion", () => {
 			).toEqual(["Red", "Green"])
 		})
 
+		it("should preselect the first Case once an expectation names one Choice", () => {
+			let source = [
+				...boxChoice,
+				"\tconstant b: Box<Integer> = #",
+				"}",
+			].join("\n")
+
+			let entries = findCompletions(source, { line: 6, column: 30 })
+
+			expect(entries.map((entry) => entry.preselect)).toEqual([
+				true,
+				false,
+			])
+		})
+
+		// NOTE: A scan over every Choice in scope has no basis for a
+		// preselection — the first entry is the first Choice's first Case,
+		// which is nothing but declaration order.
+		it("should preselect nothing for a bare # with no expectation", () => {
+			let source = [...boxChoice, "\tconstant b = #", "}"].join("\n")
+
+			expect(
+				findCompletions(source, { line: 6, column: 16 }).some(
+					(entry) => entry.preselect,
+				),
+			).toBe(false)
+		})
+
 		it("should offer Cases from every Choice in scope for a bare #", () => {
 			let source = [
 				"implementation {",
@@ -508,6 +558,44 @@ describe("Completion", () => {
 
 			expect(
 				findCompletions(source, { line: 6, column: 24 }).map(
+					(entry) => entry.label,
+				),
+			).toEqual(["Red", "Green"])
+		})
+
+		// NOTE: A Guard is an ordinary Expression, so the Argument it is being
+		// written into pins the Choice down just as it would anywhere else —
+		// `Shape` is in scope and stays out of the list.
+		it("should narrow to the expected Choice inside a Match Guard", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"\tchoice Shape {",
+				"\t\tCircle,",
+				"\t\tSquare,",
+				"\t}",
+				"",
+				"\tfunction isRed (_ colour: Colour) -> Boolean {",
+				"\t\t<- match colour -> Boolean {",
+				"\t\t\tcase #Red { <- true }",
+				"\t\t\tcase _    { <- false }",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant amount: Integer | String = 4",
+				"\tconstant label = match amount -> String {",
+				'\t\tcase Integer where isRed(#) { <- "red" }',
+				'\t\tcase Integer { <- "other" }',
+				"\t\tcase String { <- @ }",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(
+				findCompletions(source, { line: 20, column: 29 }).map(
 					(entry) => entry.label,
 				),
 			).toEqual(["Red", "Green"])
@@ -683,6 +771,460 @@ describe("Completion", () => {
 			expect(labelsOf(source, { line: 7, column: 11 })).not.toContain(
 				"Stringify",
 			)
+		})
+	})
+
+	describe("Call snippets", () => {
+		let thing = [
+			"implementation {",
+			"\tnamespace Thing {",
+			"\t\tstatic create() -> Integer {",
+			"\t\t\t<- 42",
+			"\t\t}",
+			"\t\tstatic greet(subject: String) -> String {",
+			"\t\t\t<- subject",
+			"\t\t}",
+			"\t\tstatic show(_ value: Integer) -> Integer {",
+			"\t\t\t<- value",
+			"\t\t}",
+			"\t\tstatic pair(_ first: Integer, and second: Integer) -> Integer {",
+			"\t\t\t<- first",
+			"\t\t}",
+			"\t}",
+			"\tThing.",
+			"}",
+		].join("\n")
+		let afterThing = { line: 16, column: 8 }
+
+		it("should write a labelled Parameter's label and leave its value a tabstop", () => {
+			expect(entryFor(thing, afterThing, "greet")?.snippet).toBe(
+				"greet(subject ${1})",
+			)
+		})
+
+		it("should write a label-less Parameter as a bare tabstop", () => {
+			expect(entryFor(thing, afterThing, "show")?.snippet).toBe(
+				"show(${1})",
+			)
+		})
+
+		it("should write a mixed Parameter list", () => {
+			expect(entryFor(thing, afterThing, "pair")?.snippet).toBe(
+				"pair(${1}, and ${2})",
+			)
+		})
+
+		it("should write bare parentheses for a callable without Parameters", () => {
+			expect(entryFor(thing, afterThing, "create")?.snippet).toBe(
+				"create()",
+			)
+		})
+
+		// NOTE: `Number.isBetween(5, 1, and 10)` — reached through the
+		// Namespace the receiver rides along as the first Argument, so the
+		// Self Parameter a `::` call site never writes is written here.
+		it("should keep the receiver Parameter when a Method is reached through the Namespace", () => {
+			let source = ["implementation {", "\tNumber.", "}"].join("\n")
+
+			expect(
+				entryFor(source, { line: 2, column: 9 }, "isBetween")?.snippet,
+			).toBe("isBetween(${1}, ${2}, and ${3})")
+		})
+
+		it("should strip the receiver Parameter for the same Method through ::", () => {
+			let source = ["implementation {", "\t5::", "}"].join("\n")
+
+			expect(
+				entryFor(source, { line: 2, column: 5 }, "isBetween")?.snippet,
+			).toBe("isBetween(${1}, and ${2})")
+		})
+
+		it("should write the labels of a Function in Scope", () => {
+			let source = [
+				"implementation {",
+				"\tfunction greet (subject: String) -> String {",
+				"\t\t<- subject",
+				"\t}",
+				"\t",
+				"}",
+			].join("\n")
+
+			expect(entryFor(source, { line: 5, column: 2 }, "greet")).toEqual({
+				label: "greet",
+				kind: "function",
+				detail: "(subject: String) -> String",
+				documentation: null,
+				snippet: "greet(subject ${1})",
+				labelDetail: null,
+				tier: 3,
+			})
+		})
+
+		// NOTE: A Constant may hold a Function Value, but its name is as often
+		// passed on as it is called — nothing is inserted for it.
+		it("should not write a call for a Constant holding a Function", () => {
+			let source = [
+				"implementation {",
+				"\tconstant greet = (subject: String) -> String {",
+				"\t\t<- subject",
+				"\t}",
+				"\t",
+				"}",
+			].join("\n")
+
+			expect(
+				entryFor(source, { line: 5, column: 2 }, "greet")?.snippet,
+			).toBe(null)
+		})
+
+		it("should escape the snippet syntax a name could contain", () => {
+			expect(
+				buildCallSnippet("call", {
+					generics: [],
+					parameterTypes: [
+						{ name: "with$}", type: { type: "String" } },
+					],
+					returnType: { type: "String" },
+				}),
+			).toBe("call(with\\$\\} ${1})")
+		})
+
+		describe("Overloads", () => {
+			let shout = [
+				"implementation {",
+				"\tnamespace Shout for String {",
+				"\t\toverload twice {",
+				"\t\t\t() -> String {",
+				"\t\t\t\t<- @",
+				"\t\t\t}",
+				"",
+				"\t\t\t(with separator: String) -> String {",
+				"\t\t\t\t<- @",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				'\t"hi"::',
+				"}",
+			].join("\n")
+
+			it("should offer one item per Overload, each with its own snippet", () => {
+				let entries = findCompletions(shout, {
+					line: 13,
+					column: 8,
+				}).filter((entry) => entry.label === "twice")
+
+				expect(entries.map((entry) => entry.snippet)).toEqual([
+					"twice()",
+					"twice(with ${1})",
+				])
+			})
+
+			// NOTE: The label is the same on purpose — the Editor filters both
+			// on what was typed — so the signature tail is the only thing that
+			// can tell them apart in the list.
+			it("should tell the Overloads apart by their signature tails", () => {
+				let entries = findCompletions(shout, {
+					line: 13,
+					column: 8,
+				}).filter((entry) => entry.label === "twice")
+
+				expect(entries.map((entry) => entry.labelDetail)).toEqual([
+					"() -> String",
+					"(with: String) -> String",
+				])
+			})
+
+			it("should leave a Method with one signature without a label detail", () => {
+				expect(entryFor(thing, afterThing, "greet")?.labelDetail).toBe(
+					null,
+				)
+			})
+		})
+	})
+
+	describe("Keywords", () => {
+		it("should offer the Statement Keywords at the start of a Statement", () => {
+			let source = ["implementation {", "\t", "}"].join("\n")
+
+			let keywords = keywordsOf(source, { line: 2, column: 2 })
+
+			expect(keywords).toContain("constant")
+			expect(keywords).toContain("function")
+			expect(keywords).toContain("match")
+			expect(keywords).not.toContain("true")
+		})
+
+		it("should offer the Expression Keywords inside an Expression", () => {
+			let source = ["implementation {", "\tconstant value = ", "}"].join(
+				"\n",
+			)
+
+			expect(keywordsOf(source, { line: 2, column: 19 })).toEqual([
+				"match",
+				"true",
+				"false",
+				"nothing",
+			])
+		})
+
+		it("should not offer Keywords after a dot", () => {
+			let source = [
+				"implementation {",
+				'\tconstant person = { firstName = "Ada" }',
+				"\tperson.",
+				"}",
+			].join("\n")
+
+			expect(kindsOf(source, { line: 3, column: 9 })).not.toContain(
+				"keyword",
+			)
+		})
+
+		it("should not offer Keywords after ::", () => {
+			let source = ["implementation {", '\t"Hello"::', "}"].join("\n")
+
+			expect(kindsOf(source, { line: 2, column: 11 })).not.toContain(
+				"keyword",
+			)
+		})
+
+		it("should not offer Keywords after #", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Colour {",
+				"\t\tRed,",
+				"\t\tGreen,",
+				"\t}",
+				"\tconstant c: Colour = #",
+				"}",
+			].join("\n")
+
+			expect(kindsOf(source, { line: 6, column: 24 })).not.toContain(
+				"keyword",
+			)
+		})
+
+		// NOTE: No Keyword names a Type, so the Type space offers none.
+		it("should not offer Keywords in the Type space", () => {
+			let source = ["implementation {", "\tconstant value: ", "}"].join(
+				"\n",
+			)
+
+			expect(keywordsOf(source, { line: 2, column: 18 })).toEqual([])
+		})
+	})
+
+	describe("The Type space", () => {
+		it("should switch after a conformance clause's 'is'", () => {
+			let source = [
+				"implementation {",
+				"\ttype Name = String",
+				"\tnamespace Thing for Integer is ",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 33 })
+
+			expect(labels).toContain("Printable")
+			expect(labels).not.toContain("__print")
+		})
+
+		it("should switch after a Generic bound's 'is'", () => {
+			let source = [
+				"implementation {",
+				"\tfunction show <infer Value is ",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 2, column: 32 })).toContain(
+				"Printable",
+			)
+		})
+
+		// NOTE: `parseType` is the only place the Parser consumes a Pipe, so
+		// one can never mean anything but a Union.
+		it("should switch after a Union's pipe", () => {
+			let source = [
+				"implementation {",
+				"\ttype Name = String",
+				"\tconstant value: Integer | ",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 28 })
+
+			expect(labels).toContain("Name")
+			expect(labels).not.toContain("__print")
+		})
+
+		it("should switch after a comma inside a Generic Argument list", () => {
+			let source = [
+				"implementation {",
+				"\ttype Name = String",
+				"\tconstant pair: Dictionary<String, ",
+				"}",
+			].join("\n")
+
+			let labels = labelsOf(source, { line: 3, column: 36 })
+
+			expect(labels).toContain("Name")
+			expect(labels).not.toContain("__print")
+		})
+
+		it("should stay in the value space after a comma inside an Argument list", () => {
+			let source = [
+				"implementation {",
+				"\tfunction pair (first: Integer, second: Integer) -> Integer {",
+				"\t\t<- first",
+				"\t}",
+				"\tpair(first 1, ",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 5, column: 16 })).toContain(
+				"__print",
+			)
+		})
+
+		// NOTE: A Comment runs to the end of its line and a String may span
+		// several, so both are blanked out before anything is read off the
+		// text — otherwise the `is` of a sentence would switch spaces.
+		it("should ignore an 'is' written inside a Comment", () => {
+			let source = [
+				"implementation {",
+				"\tconstant value = 1 § which is ",
+				"\t",
+				"}",
+			].join("\n")
+
+			expect(labelsOf(source, { line: 3, column: 2 })).toContain(
+				"__print",
+			)
+		})
+	})
+
+	describe("Scope entry detail and documentation", () => {
+		it("should carry a Constant's Type and its §§ description", () => {
+			let source = [
+				"implementation {",
+				"\t§§ The name of the world.",
+				'\tconstant worldName = "World"',
+				"\t",
+				"}",
+			].join("\n")
+
+			expect(
+				entryFor(source, { line: 4, column: 2 }, "worldName"),
+			).toEqual({
+				label: "worldName",
+				kind: "constant",
+				detail: "String",
+				documentation: "The name of the world.",
+				snippet: null,
+				labelDetail: null,
+				tier: 3,
+			})
+		})
+
+		it("should carry a Parameter's Type and its @param text", () => {
+			let source = [
+				"implementation {",
+				"\t§§ Greets someone.",
+				"\t§§",
+				"\t§§ @param subject — who to greet",
+				"\tfunction greet (subject: String) -> String {",
+				"\t\t<- ",
+				"\t}",
+				"}",
+			].join("\n")
+
+			let entry = entryFor(source, { line: 6, column: 6 }, "subject")
+
+			expect(entry?.kind).toBe("parameter")
+			expect(entry?.detail).toBe("String")
+			expect(entry?.documentation).toBe("who to greet")
+		})
+
+		// NOTE: A Namespace prints as its own name, which the label already
+		// says — its target Type is what a single line can add instead.
+		it("should carry a Namespace's target Type", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Stringify for Integer {",
+				"\t\tstring() -> String {",
+				'\t\t\t<- "one"',
+				"\t\t}",
+				"\t}",
+				"\t",
+				"}",
+			].join("\n")
+
+			expect(
+				entryFor(source, { line: 7, column: 2 }, "Stringify")?.detail,
+			).toBe("for Integer")
+		})
+
+		it("should carry a Type Alias's aliased Type", () => {
+			let source = [
+				"implementation {",
+				"\ttype Name = String",
+				"\tconstant value: ",
+				"}",
+			].join("\n")
+
+			expect(
+				entryFor(source, { line: 3, column: 18 }, "Name")?.detail,
+			).toBe("String")
+		})
+
+		// NOTE: A Namespace Type keeps only each Property's Type, so a
+		// Property's `§§` block has to be read off the declaration itself.
+		it("should carry a Namespace Property's §§ description", () => {
+			let source = [
+				"implementation {",
+				"\tnamespace Thing {",
+				"\t\t§§ What to greet with.",
+				'\t\tstatic label = "hi"',
+				"\t}",
+				"\tThing.",
+				"}",
+			].join("\n")
+
+			let entry = entryFor(source, { line: 6, column: 8 }, "label")
+
+			expect(entry?.kind).toBe("property")
+			expect(entry?.documentation).toBe("What to greet with.")
+		})
+	})
+
+	describe("Sorting tiers", () => {
+		let source = [
+			"implementation {",
+			'\tconstant worldName = "World"',
+			"\tfunction greet (subject: String) -> String {",
+			"\t\t<- ",
+			"\t}",
+			"}",
+		].join("\n")
+		let inBody = { line: 4, column: 6 }
+
+		it("should rank a Parameter above a top level Declaration above a builtin", () => {
+			expect(entryFor(source, inBody, "subject")?.tier).toBe(1)
+			expect(entryFor(source, inBody, "worldName")?.tier).toBe(3)
+			expect(entryFor(source, inBody, "greet")?.tier).toBe(3)
+			expect(entryFor(source, inBody, "__print")?.tier).toBe(4)
+		})
+
+		it("should rank Keywords last", () => {
+			expect(entryFor(source, inBody, "match")?.tier).toBe(5)
+		})
+
+		it("should rank a Method beside the Scope it was reached through", () => {
+			let receiver = ["implementation {", '\t"Hello"::', "}"].join("\n")
+
+			expect(
+				entryFor(receiver, { line: 2, column: 11 }, "append")?.tier,
+			).toBe(2)
 		})
 	})
 })
