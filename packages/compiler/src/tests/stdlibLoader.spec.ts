@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import type { common, enricher } from "@essence/interfaces"
 
+import { collectDiagnostics } from "../diagnostics/index"
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"
 import { enrichPrograms } from "../enricher/index"
 import { primitiveTypes } from "../enricher/primitives"
@@ -411,6 +412,105 @@ describe("Standard Library Loader", () => {
 		expect(namespaceNamed(stdlib, "Sized").conformsTo).toEqual([
 			"Measurable",
 		])
+	})
+
+	// NOTE: The hoist spans every file, so it runs before any of their
+	// collections is open — and the recursive Type pre-pass reports from inside
+	// it. Unrouted, those Diagnostics landed in whatever collection surrounded
+	// the LOAD: the standard library loads lazily inside the first compile of a
+	// process, so a cycle in a library file would enrich "cleanly" file by file
+	// and stamp its library positioned errors onto an unrelated user Program.
+	it("reports a cycle spanning two files into each file's own Diagnostics", () => {
+		let left = parseWithDiagnostics(`implementation {
+			type Left = { right: Right, nope: Nope }
+		}`)
+		let right = parseWithDiagnostics(`implementation {
+			type Right = { left: Left }
+		}`)
+		let scope: enricher.Scope = {
+			parent: null,
+			members: {},
+			declarations: {},
+			constants: new Set(),
+			types: { ...primitiveTypes },
+			protocols: {},
+		}
+
+		let { result, diagnostics } = collectDiagnostics(() =>
+			enrichPrograms([left.program, right.program], scope),
+		)
+
+		// NOTE: Nothing at all in the surrounding collection — the one that
+		// would be the user's Program.
+		expect(diagnostics).toEqual([])
+
+		// NOTE: The `unknown-type` comes from the re-resolve that runs AFTER the
+		// hoist rounds, which is routed the same way the pre-pass is.
+		expect(
+			result.map((enriched) =>
+				enriched.diagnostics.map((diagnostic) => diagnostic.code),
+			),
+		).toEqual([
+			["recursive-type-declaration", "unknown-type"],
+			["recursive-type-declaration"],
+		])
+
+		expect(
+			result.map((enriched) =>
+				enriched.diagnostics.map((diagnostic) => diagnostic.message),
+			),
+		).toEqual([
+			[
+				"Type 'Left' names itself through 'Right'",
+				"Type 'Nope' is not declared",
+			],
+			["Type 'Right' names itself through 'Left'"],
+		])
+	})
+
+	// NOTE: The same routing for what the hoist ROUNDS report. A Warning does
+	// not disqualify a speculative resolution — the Type hoists — and since a
+	// hoisted Type is reused rather than resolved a second time, the round is
+	// the only place that Warning is ever seen. Unrouted it landed in whatever
+	// collection surrounded the load, which is how a '@param' typo in a
+	// standard library file would have been reported against a user Program.
+	it("reports a hoist round's Warning into the file it was written in", () => {
+		let left = parseWithDiagnostics(`implementation {
+			function greet(subject: String) -> String { <- subject }
+		}`)
+		let right = parseWithDiagnostics(`implementation {
+			§§ Farewells.
+			§§ @param subjekt — who to part from
+			function part(subject: String) -> String { <- subject }
+		}`)
+		let scope: enricher.Scope = {
+			parent: null,
+			members: {},
+			declarations: {},
+			constants: new Set(),
+			types: { ...primitiveTypes },
+			protocols: {},
+		}
+
+		let { result, diagnostics } = collectDiagnostics(() =>
+			enrichPrograms([left.program, right.program], scope),
+		)
+
+		expect(diagnostics).toEqual([])
+
+		expect(
+			result.map((enriched) =>
+				enriched.diagnostics.map((diagnostic) => diagnostic.code),
+			),
+		).toEqual([[], ["unknown-documentation-parameter"]])
+
+		// NOTE: Positioned in the file it came from, which is the whole point
+		// of handing it over per Node.
+		expect(result[1].diagnostics[0].severity).toBe("warning")
+		expect(result[1].diagnostics[0].position).toEqual({
+			start: { line: 3, column: 14 },
+			end: { line: 3, column: 21 },
+		})
 	})
 
 	// NOTE: A Method with a body survives into the typed tree — that is what

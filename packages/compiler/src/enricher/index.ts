@@ -133,22 +133,53 @@ export const enrichPrograms = (
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
 }> => {
+	// NOTE: The hoist spans every file, so it runs BEFORE any Program's
+	// collection is open — a Diagnostic reported from inside it would land in
+	// whatever collection happens to surround the load instead. The standard
+	// library loads lazily, inside the first compile of a process, so "whatever
+	// surrounds it" is a user Program: a cycle in a library file would load
+	// without a single per-file Diagnostic and stamp its own, library
+	// positioned, errors onto that compile. The hoist hands them over per Node
+	// here, and each is replayed into the collection of the Program its Node
+	// was written in.
+	let hoistDiagnostics = new Map<
+		parser.ImplementationNode,
+		Array<common.Diagnostic>
+	>()
+
 	let hoistedTypes = hoistDeclarations(
 		programs.flatMap((program) => program.implementation.nodes),
 		scope,
+		(node, diagnostics) => {
+			let collected = hoistDiagnostics.get(node)
+
+			if (collected === undefined) {
+				hoistDiagnostics.set(node, [...diagnostics])
+			} else {
+				collected.push(...diagnostics)
+			}
+		},
 	)
 
 	return programs.map((program) => {
 		let { result, diagnostics } = collectDiagnostics(
-			(): common.typed.Program => ({
-				nodeType: "Program",
-				implementation: enrichImplementation(
-					program.implementation,
-					scope,
-					hoistedTypes,
-				),
-				position: program.position,
-			}),
+			(): common.typed.Program => {
+				for (let node of program.implementation.nodes) {
+					for (let diagnostic of hoistDiagnostics.get(node) ?? []) {
+						report(diagnostic)
+					}
+				}
+
+				return {
+					nodeType: "Program",
+					implementation: enrichImplementation(
+						program.implementation,
+						scope,
+						hoistedTypes,
+					),
+					position: program.position,
+				}
+			},
 		)
 
 		return { program: result, diagnostics }
@@ -181,6 +212,22 @@ function isHoistable(
 type HoistableTypeNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
+
+// NOTE: Where the Diagnostics the hoist itself reports go. A lone Program
+// hoists inside its own collection and the default sink just reports them on;
+// `enrichPrograms` hoists every file at once, before any collection is open,
+// and needs each one attributed to the Node's own Program — which is why the
+// Node comes along.
+type HoistDiagnosticSink = (
+	node: parser.ImplementationNode,
+	diagnostics: Array<common.Diagnostic>,
+) => void
+
+const reportOnwards: HoistDiagnosticSink = (_node, diagnostics) => {
+	for (let diagnostic of diagnostics) {
+		report(diagnostic)
+	}
+}
 
 // NOTE: The Type names a Type declaration mentions. The body — an alias' Type,
 // a Choice's payloads — is read minus the declaration's own Type Parameters:
@@ -433,6 +480,7 @@ function recursiveTypeDeclarationGroups(
 function reportRecursiveTypeDeclarations(
 	nodes: Array<HoistableTypeNode>,
 	scope: enricher.Scope,
+	sink: HoistDiagnosticSink,
 ): Array<HoistableTypeNode> {
 	let recursiveNodes: Array<HoistableTypeNode> = []
 
@@ -477,28 +525,31 @@ function reportRecursiveTypeDeclarations(
 				notes.unshift(`${sentence} again.`)
 			}
 
-			reportError(
-				through.length === 0
-					? `${kind} '${name}' names itself`
-					: `${kind} '${name}' names itself through '${through[0]}'`,
-				reference.position,
-				{
-					code: "recursive-type-declaration",
-					labels: [
-						primary(
-							reference.position,
-							through.length === 0
-								? "this names the declaration being made"
-								: `this names '${through[0]}'`,
-						),
-					],
-					notes,
-					helps: [
-						"Recursive Type declarations are not part of the language yet — break the cycle.",
-					],
-				},
-			)
+			let { diagnostics } = collectDiagnostics((): void => {
+				reportError(
+					through.length === 0
+						? `${kind} '${name}' names itself`
+						: `${kind} '${name}' names itself through '${through[0]}'`,
+					reference.position,
+					{
+						code: "recursive-type-declaration",
+						labels: [
+							primary(
+								reference.position,
+								through.length === 0
+									? "this names the declaration being made"
+									: `this names '${through[0]}'`,
+							),
+						],
+						notes,
+						helps: [
+							"Recursive Type declarations are not part of the language yet — break the cycle.",
+						],
+					},
+				)
+			})
 
+			sink(node, diagnostics)
 			recursiveNodes.push(node)
 		}
 	}
@@ -519,6 +570,7 @@ function reportRecursiveTypeDeclarations(
 function hoistDeclarations(
 	nodes: Array<parser.ImplementationNode>,
 	scope: enricher.Scope,
+	sink: HoistDiagnosticSink = reportOnwards,
 ): HoistedTypes {
 	let hoistedTypes: HoistedTypes = new Map()
 	let pendingNodes = nodes.filter(isHoistable)
@@ -538,6 +590,7 @@ function hoistDeclarations(
 				node.nodeType === "ChoiceDeclarationStatement",
 		),
 		scope,
+		sink,
 	)
 
 	if (recursiveNodes.length > 0) {
@@ -642,17 +695,19 @@ function hoistDeclarations(
 			// report `unknown-name` — a typo in a Comment breaking the Program
 			// underneath it.
 			//
-			// The Warnings the kept reading found are reported here, since a
-			// hoisted Type is reused rather than resolved a second time and
-			// they would otherwise be dropped with the collection. `report`
-			// deduplicates, so the paths that DO resolve again cost nothing.
+			// The Warnings the kept reading found are handed to the sink here,
+			// since a hoisted Type is reused rather than resolved a second time
+			// and they would otherwise be dropped with the collection. They go
+			// through the sink for the same reason the pre-pass' Diagnostics
+			// do: a Warning about the Documentation in a standard library file
+			// belongs to THAT file, not to whichever Program the lazy load
+			// happened to sit inside. `report` deduplicates, so the paths that
+			// DO resolve again cost nothing.
 			if (
 				!containsErrors(speculation.diagnostics) &&
 				targetMap[node.name.content] == null
 			) {
-				for (let diagnostic of speculation.diagnostics) {
-					report(diagnostic)
-				}
+				sink(node, speculation.diagnostics)
 
 				targetMap[node.name.content] = speculation.result
 
@@ -688,16 +743,39 @@ function hoistDeclarations(
 	// cycle still surfaces. Handing the Type over as a hoisted one is what keeps
 	// the in-order enrichment from resolving — and re-declaring — it again.
 	for (let node of recursiveNodes) {
-		let { result, diagnostics } = collectDiagnostics(
-			(): common.Type =>
-				node.nodeType === "TypeAliasStatement"
+		let { result, diagnostics } = collectDiagnostics((): common.Type => {
+			// NOTE: The same guard the rounds above keep, for the same reason:
+			// resolving a declaration is expected to report and recover, so
+			// anything thrown past here is a Compiler bug — and one that would
+			// otherwise escape `enrich` altogether rather than becoming a
+			// Diagnostic. The seeded Error stays in its place, which is what
+			// the rest of the Program is enriched against.
+			try {
+				return node.nodeType === "TypeAliasStatement"
 					? resolveTypeAliasStatementType(node, scope)
-					: resolveChoiceDeclarationStatementType(node, scope),
-		)
+					: resolveChoiceDeclarationStatementType(node, scope)
+			} catch (error) {
+				reportError(
+					`Internal Compiler Error: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+					node.position,
+					{
+						code: "internal-error",
+						labels: [
+							primary(node.position, "the Compiler threw here"),
+						],
+						notes: [
+							"This is a bug in the Compiler, not in the Program.",
+						],
+					},
+				)
 
-		for (let diagnostic of diagnostics) {
-			report(diagnostic)
-		}
+				return { type: "Error" }
+			}
+		})
+
+		sink(node, diagnostics)
 
 		scope.types[node.name.content] = result
 		hoistedTypes.set(node, result)
