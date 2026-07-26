@@ -343,6 +343,120 @@ describe("Validator", () => {
 		})
 	})
 
+	// NOTE: A free Function's Arguments are matched by their LABELS before their
+	// Types, exactly as a Method's are. A callee with one signature has no
+	// Overload to choose, so a call that matches nothing lands here rather than
+	// on the Enricher's `no-matching-overload` — and what it did wrong is the
+	// label, which a Type mismatch would say nothing about. The note carries the
+	// whole signature, the same thing the overloaded rail lists per candidate.
+	describe("Labelled Arguments", () => {
+		it("should accept a call that writes the labels the signature declares", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function shout (about topic: String, times count: Integer) -> String {
+						<- topic
+					}
+
+					__print(shout(about "hi", times 2))
+				}`),
+			).toEqual([])
+		})
+
+		it("should report an Argument labelled with something else", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shout (about topic: String) -> String {
+					<- topic
+				}
+
+				__print(shout(regarding "hi"))
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-label-mismatch")
+			expect(diagnostics[0].message).toBe(
+				"This Argument is not labelled 'about'",
+			)
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this is labelled 'regarding'",
+			)
+			expect(diagnostics[0].notes).toEqual([
+				"The signature takes 1 Argument: Parameter 'about' is String.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'about' before the value.",
+			])
+		})
+
+		it("should report an Argument that carries no label at all", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shout (about topic: String) -> String {
+					<- topic
+				}
+
+				__print(shout("hi"))
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-label-mismatch")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this Argument carries no label",
+			)
+		})
+
+		it("should report a label on a Parameter that takes none", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shout (_ topic: String) -> String {
+					<- topic
+				}
+
+				__print(shout(about "hi"))
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-label-mismatch")
+			expect(diagnostics[0].message).toBe(
+				"This Argument is labelled where Parameter 1 takes no label",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Pass the value with no label.",
+			])
+		})
+
+		// NOTE: The label is answered first — an Argument that agrees with
+		// NEITHER half of its Parameter is told about the label, because the
+		// Type it should have had is the Type of whichever Parameter it was
+		// meant for, and until the label says which one that is there is
+		// nothing to compare.
+		it("should report the label before the Type where both are wrong", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shout (about topic: String) -> String {
+					<- topic
+				}
+
+				__print(shout(regarding 2))
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-label-mismatch")
+		})
+
+		it("should still report a Type mismatch under the right label", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shout (about topic: String) -> String {
+					<- topic
+				}
+
+				__print(shout(about 2))
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-type-mismatch")
+			expect(diagnostics[0].message).toBe(
+				"This Argument does not fit Parameter 'about'",
+			)
+		})
+	})
+
 	// NOTE: A value position is not a leaf — a List item, a Record member and
 	// either side of a Combination hold whole Expressions, and everything the
 	// Validator says about a Statement has to hold there too. These check that
@@ -2056,6 +2170,44 @@ describe("Validator", () => {
 			expect(diagnostics[0].code).toBe("internal-error")
 			expect(diagnostics[0].message).toContain(
 				"This call was committed to the overload that takes 1 Argument: Parameter 1 is Boolean, which does not accept the Arguments it passes",
+			)
+		})
+
+		// NOTE: The check matches the Arguments against the committed Signature
+		// again, LABELS and all. `loop` is the standard library's overloaded free
+		// Function and its `while` and `until` entries are told apart by nothing
+		// BUT the middle label — identical Types, identical arity — so committing
+		// the `while` call to the `until` entry is a shape only a label-aware
+		// re-match can refuse. A check that dropped the labels would wave it
+		// through and the Program would be emitted against the other entry.
+		it("re-matches a labelled free-Function call by its labels", () => {
+			let program = enrichedProgram(`implementation {
+				__print(loop(
+					startingWith 1,
+					while (n) { <- n::isLessThan(4) },
+					step (n) { <- n::add(1) },
+				))
+			}`)
+			let calls = overloadedCalls(program)
+
+			expect(
+				calls.map((call) =>
+					call.arguments.map((argument) => argument.name),
+				),
+			).toEqual([["startingWith", "while", "step"]])
+			expect(calls.map((call) => call.overloadedMethodIndex)).toEqual([0])
+			expect(validate(program)).toEqual([])
+
+			for (let call of calls) {
+				call.overloadedMethodIndex = 1
+			}
+
+			let diagnostics = validate(program)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("internal-error")
+			expect(diagnostics[0].message).toContain(
+				"'loop' was committed to the overload that takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is (_: State) -> Boolean",
 			)
 		})
 

@@ -204,6 +204,16 @@ Error: This value does not fit Variable 'count'
 An Argument does not match its Parameter's declared Type. The message names
 the Parameter, the Type it wants, and the Type it got.
 
+### `argument-label-mismatch`
+
+An Argument carries a label its Parameter does not — a different one, none
+where the Parameter declares one, or one where the Parameter takes none. A
+label is part of how an Argument is matched, at a free Function's call as much
+as at a Method's: `loop(startingWith 1, …)` reads its labels the way
+`things::sort(by …)` does. The note lists the whole signature, so the labels
+the call was supposed to write are all in one place; an overloaded callee is
+told the same thing by `no-matching-overload`, once per candidate.
+
 ### `argument-count-mismatch`
 
 More or fewer Arguments were passed than the signature declares.

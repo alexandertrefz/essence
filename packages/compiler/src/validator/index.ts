@@ -832,7 +832,7 @@ function validateFunctionInvocation(
 			if (matchResult.type === "ArgumentMismatch") {
 				for (let i of matchResult.mismatchedArgumentIndices) {
 					reportArgumentMismatch(
-						functionType.parameterTypes[i],
+						functionType.parameterTypes,
 						i,
 						node.arguments[i],
 					)
@@ -2178,11 +2178,62 @@ function reportArityMismatch(
 	})
 }
 
-function reportArgumentMismatch(
-	parameter: common.Parameter | undefined,
+// NOTE: A LABEL is what an Argument is matched by before its Type is looked at
+// — a free Function's Arguments carry them exactly as a Method's do, `loop(
+// startingWith 1, …)` as much as `things::sort(by …)` — so a label that does
+// not agree leaves `matchArguments` with the same mismatching index a wrong
+// Type does. Reported as a Type mismatch it said "this is an Integer" under
+// "Parameter 'around' is Integer", which names nothing the call did wrong; the
+// label is what it did. An overloaded callee is told the same thing by
+// `no-matching-overload`'s per-candidate notes, so the signature is the note
+// here too.
+function reportArgumentLabelMismatch(
+	parameterTypes: Array<common.Parameter>,
+	parameter: common.Parameter,
 	index: number,
 	argumentNode: common.typed.ArgumentNode,
 ): void {
+	let carried =
+		argumentNode.name === null
+			? "this Argument carries no label"
+			: `this is labelled '${argumentNode.name}'`
+
+	reportError(
+		parameter.name === null
+			? `This Argument is labelled where ${describeParameter(parameter, index)} takes no label`
+			: `This Argument is not labelled '${parameter.name}'`,
+		argumentNode.value.position,
+		{
+			code: "argument-label-mismatch",
+			labels: [primary(argumentNode.value.position, carried)],
+			notes: [`The signature ${describeSignature(parameterTypes)}.`],
+			helps: [
+				parameter.name === null
+					? "Pass the value with no label."
+					: `Write '${parameter.name}' before the value.`,
+			],
+		},
+	)
+}
+
+function reportArgumentMismatch(
+	parameterTypes: Array<common.Parameter>,
+	index: number,
+	argumentNode: common.typed.ArgumentNode,
+): void {
+	let parameter = parameterTypes[index]
+
+	if (parameter !== undefined && parameter.name !== argumentNode.name) {
+		reportArgumentLabelMismatch(
+			parameterTypes,
+			parameter,
+			index,
+			argumentNode,
+		)
+
+		return
+	}
+
 	let name = describeParameter(parameter, index)
 
 	reportError(
@@ -2236,7 +2287,7 @@ function validateSimpleFunctionInvocation(
 	if (matchResult.type === "ArgumentMismatch") {
 		for (let i of matchResult.mismatchedArgumentIndices) {
 			reportArgumentMismatch(
-				functionType.parameterTypes[i],
+				functionType.parameterTypes,
 				i,
 				argumentNodes[i],
 			)
