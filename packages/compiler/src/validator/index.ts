@@ -1971,9 +1971,10 @@ function validateFunctionStatement(
 // #region Helpers
 
 // NOTE: One check for every way a Namespace can be named — a Method's home, a
-// dispatch branch's target, a static member's base, a bare reference — because
-// what makes them wrong is the same thing: the Declaration is BELOW the
-// statement that runs the use. `useLabel` is what the arrow at the use says.
+// dispatch branch's target, a static member's base, a bare reference, a
+// conformance witness a call curries in — because what makes them wrong is the
+// same thing: the Declaration is BELOW the statement that runs the use.
+// `useLabel` is what the arrow at the use says.
 //
 // NOTE: Silent for a Namespace that is not top-level (nothing records where a
 // nested one is declared) and for every builtin, none of which is in the map at
