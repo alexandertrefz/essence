@@ -457,6 +457,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					helps: [
 						`Add ${descriptions.map((description) => `'case ${description}'`).join(", ")}, or a 'case _' that covers the rest.`,
 					],
+					// NOTE: The same spellings once more, in declaration
+					// order, for the Quick Fix that writes the Handlers out.
+					data: { kind: "missing-case", unhandled: descriptions },
 				},
 			)
 		}

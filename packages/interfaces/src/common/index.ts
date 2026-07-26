@@ -93,6 +93,18 @@ export type Diagnostic = {
 	// NOTE: Situational metadata. Optional because its absence is
 	// unambiguous — unlike a missing Label, it costs the reader nothing.
 	tags?: Array<DiagnosticTag>
+	// NOTE: The facts a Quick Fix needs, in a form it does not have to read
+	// out of a sentence. Set by the few Diagnostics whose fix is mechanical
+	// and absent everywhere else — a Quick Fix keys off `code` first and only
+	// then asks for the payload that code implies.
+	//
+	// Re-deriving these in the Language Server was rejected twice over: the
+	// unhandled members of a Match are the output of the exhaustiveness
+	// algorithm, which would have to be written a second time and kept in step
+	// with this one, and a near miss is only recoverable from the Help that
+	// names it — whose wording this file explicitly reserves the right to
+	// change. A Quick Fix built on either would break silently.
+	data?: DiagnosticData
 } & (
 	| {
 			// NOTE: THE place the Diagnostic is about — what the Language
@@ -107,6 +119,16 @@ export type Diagnostic = {
 	// sole exemption.
 	| { position: null; labels: [] }
 )
+
+// NOTE: Keyed by `kind` rather than by the Diagnostic's code, because several
+// codes carry the same payload — every "did you mean" is one `suggestion`,
+// whichever kind of name was misspelled. `unhandled` holds `describeType`
+// spellings in declaration order, which is the order the Cases are written
+// in; `suggestion` holds the bare name, so the Case one renders as `#Add` and
+// replaces only `Add`.
+export type DiagnosticData =
+	| { kind: "missing-case"; unhandled: Array<string> }
+	| { kind: "suggestion"; suggestion: string }
 
 // NOTE: Every Diagnostic carries one, and `docs/diagnostics.md` documents
 // every one of these — a code with no entry there is a code nobody can look

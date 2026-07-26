@@ -19,6 +19,26 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
 }
 
+// NOTE: The characters a Diagnostic's Position covers — which is the text a
+// Quick Fix replaces with the suggestion the same Diagnostic carries. Spelling
+// them out is the only way to assert that a `#Case` span stops short of the
+// sigil without counting columns by hand. Single line spans only; every
+// Diagnostic asked this reports on one name.
+function underlinedText(source: string, diagnostic: common.Diagnostic): string {
+	let position = diagnostic.position
+
+	if (position === null) {
+		throw new Error("Diagnostic has no Position.")
+	}
+
+	return source
+		.split("\n")
+		[position.start.line - 1].slice(
+			position.start.column - 1,
+			position.end.column - 1,
+		)
+}
+
 // NOTE: The typed Invocation a Program's LAST Constant was declared from —
 // which is how a test asks what a call resolved to: which Namespace won, which
 // Overload, which dispatch branches, and what the Arguments were typed as. The
@@ -178,6 +198,116 @@ describe("Enricher", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("unknown-method")
+		})
+
+		// NOTE: The Help and the `data` must name the same thing — the Help is
+		// what the reader is told and the `data` is what a Quick Fix writes,
+		// and a fix that inserts a different name than the Diagnostic offered
+		// is worse than no fix at all.
+		it("should carry a near miss as data as well as a Help", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = "value"::lenth()
+			}`)
+
+			expect(diagnostics[0].code).toBe("unknown-method")
+			expect(diagnostics[0].helps).toEqual(["Did you mean 'length'?"])
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "length",
+			})
+		})
+
+		it("should carry no data when nothing is close enough to suggest", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant a = "value"::undeclaredMethod()
+			}`)
+
+			expect(diagnostics[0].helps).toEqual([])
+			expect(diagnostics[0].data).toBeUndefined()
+		})
+
+		// NOTE: The bare name, so the Case Quick Fix replaces exactly what the
+		// Diagnostic underlines — the `#` belongs to the Help's rendering.
+		it("should carry an unknown Case's near miss without its sigil", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Operation { Add, Subtract }
+				constant chosen = Operation#Ad
+			}`)
+
+			expect(diagnostics[0].code).toBe("unknown-case")
+			expect(diagnostics[0].helps).toEqual(["Did you mean '#Add'?"])
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "Add",
+			})
+		})
+
+		// NOTE: The bare form is the spelling this codebase prefers, so it is
+		// the one a near miss matters most for — and it is reported from its
+		// own site, which once offered nothing while the documentation
+		// promised a Quick Fix for every unknown Case.
+		it("should carry a bare Case reference's near miss", () => {
+			let source = `implementation {
+				choice Operation { Add, Subtract }
+				constant chosen: Operation = #Ad
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics[0].code).toBe("unknown-case")
+			expect(diagnostics[0].helps).toEqual(["Did you mean '#Add'?"])
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "Add",
+			})
+			expect(underlinedText(source, diagnostics[0])).toBe("Ad")
+		})
+
+		it("should carry no data for a bare Case nothing is close to", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Operation { Add, Subtract }
+				constant chosen: Operation = #Zzzzzzzz
+			}`)
+
+			expect(diagnostics[0].code).toBe("unknown-case")
+			expect(diagnostics[0].helps).toEqual([])
+			expect(diagnostics[0].data).toBeUndefined()
+		})
+
+		it("should carry a bare Case Matcher's near miss", () => {
+			let source = `implementation {
+				choice Operation { Add, Subtract }
+				constant chosen: Operation = Operation#Add
+
+				match chosen -> Nothing {
+					case #Ad { <- nothing }
+					case _ { <- nothing }
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics[0].code).toBe("unknown-case")
+			expect(diagnostics[0].helps).toEqual(["Did you mean '#Add'?"])
+			expect(diagnostics[0].data).toEqual({
+				kind: "suggestion",
+				suggestion: "Add",
+			})
+			expect(underlinedText(source, diagnostics[0])).toBe("Ad")
+		})
+
+		it("should carry no data for a Case Matcher nothing is close to", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Operation { Add, Subtract }
+				constant chosen: Operation = Operation#Add
+
+				match chosen -> Nothing {
+					case #Zzzzzzzz { <- nothing }
+					case _ { <- nothing }
+				}
+			}`)
+
+			expect(diagnostics[0].code).toBe("unknown-case")
+			expect(diagnostics[0].helps).toEqual([])
+			expect(diagnostics[0].data).toBeUndefined()
 		})
 
 		it("should report Method Invocations whose arguments match no overload", () => {
@@ -3128,6 +3258,41 @@ describe("Enricher", () => {
 					constant greet = (subject: String) -> String { <- subject }
 				}`),
 			).toHaveLength(1)
+		})
+
+		it("should not keep a Function it warns about out of Scope", () => {
+			// NOTE: Hoisting kept a speculative resolution only when it
+			// reported nothing at all, and every Diagnostic reachable from it
+			// used to be an error. A Warning about the `§§` block above a
+			// Function would leave that Function unhoisted, so every call
+			// ABOVE it reported `unknown-name` — a typo in a Comment breaking
+			// the Program underneath it.
+			let diagnostics = diagnosticsFor(`implementation {
+				constant greeting = greet(subject "World")
+
+				§§ Greets.
+				§§ @param subjekt — who to greet
+				function greet(subject: String) -> String { <- subject }
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unknown-documentation-parameter")
+		})
+
+		it("should leave a Declaration whose Parameters it cannot see unchecked", () => {
+			// NOTE: `alias` is function-valued, but its Parameters survive only
+			// in a resolved Type, which keeps no internal names — so a `@param`
+			// here cannot be told from a typo. Reporting it said "takes no
+			// Parameters" about a Declaration whose Hover showed them.
+			expect(
+				diagnosticsFor(`implementation {
+					function greet(_ subject: String) -> String { <- subject }
+
+					§§ The greeting to use.
+					§§ @param subject — who to greet
+					constant alias = greet
+				}`),
+			).toEqual([])
 		})
 
 		it("should report nothing for the Documentation of a builtin", () => {
