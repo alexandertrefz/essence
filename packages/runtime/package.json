@@ -13,7 +13,6 @@
 	"author": "Alexander Trefz",
 	"license": "MIT",
 	"dependencies": {
-		"@essence/interfaces": "workspace:*",
-		"bigint-fraction": "1.0.6"
+		"@essence/interfaces": "workspace:*"
 	}
 }
