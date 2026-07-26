@@ -1,5 +1,3 @@
-import type { StringType } from "./String"
-import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
 export type BooleanType = { [typeKeySymbol]: "Boolean"; value: boolean }
