@@ -217,7 +217,7 @@ export function essenceMethodIdentifier(
 // stable the moment any prelude body is rewritten.
 let cachedEssenceMethodNames: Set<string> | null = null
 
-// NOTE: The ` ` join can not occur inside either name, so the pair is
+// NOTE: The `\u0000` join can not occur inside either name, so the pair is
 // keyed without an escape.
 export function essenceMethodName(
 	namespaceName: string,
@@ -227,13 +227,13 @@ export function essenceMethodName(
 		cachedEssenceMethodNames = new Set(
 			stdlibPrelude().flatMap((namespace) =>
 				Object.keys(namespace.node.methods).map(
-					(name) => `${namespace.name} ${name}`,
+					(name) => `${namespace.name}\u0000${name}`,
 				),
 			),
 		)
 	}
 
-	return cachedEssenceMethodNames.has(`${namespaceName} ${memberName}`)
+	return cachedEssenceMethodNames.has(`${namespaceName}\u0000${memberName}`)
 		? essenceMethodIdentifier(namespaceName, memberName)
 		: null
 }
