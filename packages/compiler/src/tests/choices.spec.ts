@@ -50,6 +50,10 @@ function helpsOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.helps)
 }
 
+function notesOf(source: string): Array<string> {
+	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
+}
+
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
 // its top-level `__print` calls run — the counterpart of `generate`, mirroring
 // codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
@@ -1769,6 +1773,102 @@ describe("Choices", () => {
 							Box<String>#Empty
 					}`),
 				).toEqual([])
+			})
+
+			// NOTE: An Argument's position is a Parameter Type, and a Parameter
+			// Type is only decided once the call is: `id(Box<Integer>#Empty, 1)`
+			// is matched while `T` is still open and the Argument beside it is
+			// what decides it. Compared against the position as it stood at that
+			// moment, every one of these was refused for disagreeing with a `T`
+			// the caller can not even name — and the help said to write it.
+			it("compares against the position the call finally decided", async () => {
+				let box = `choice Box<Value> { Full { value: Value }, Empty }`
+				let tagged = `choice Tagged<Value> {
+					Full { value: Value },
+					Tag { name: String },
+				}`
+
+				expect(
+					await run(`implementation { ${box}
+						function id<infer T>(_ b: Box<T>, _ seed: T) -> String {
+							<- "ok"
+						}
+
+						__print(id(Box<Integer>#Empty, 1))
+					}`),
+				).toEqual(['"ok"'])
+
+				expect(
+					await run(`implementation { ${box}
+						namespace Nums for Integer {
+							id<infer T>(_ b: Box<T>, _ seed: T) -> String {
+								<- "ok"
+							}
+						}
+
+						__print(1::id(Box<Integer>#Empty, 1))
+					}`),
+				).toEqual(['"ok"'])
+
+				expect(
+					await run(`implementation { ${tagged}
+						function id<infer T>(_ b: Tagged<T>, _ seed: T) -> String {
+							<- "ok"
+						}
+
+						__print(id(Tagged<Integer>#Tag("x"), 1))
+					}`),
+				).toEqual(['"ok"'])
+
+				expect(
+					await run(`implementation { ${box}
+						function id<infer T>(with b: Box<T>, seed s: T) -> String {
+							<- "ok"
+						}
+
+						__print(id(with Box<Integer>#Empty, seed 1))
+					}`),
+				).toEqual(['"ok"'])
+			})
+
+			// NOTE: And still disagrees where the decided position says so — with
+			// a note and a help naming the Type the call decided, which is a
+			// spelling the caller can write.
+			it("says which Arguments the call decided on", () => {
+				let source = `implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+
+					function id<infer T>(_ b: Box<T>, _ seed: T) -> String {
+						<- "ok"
+					}
+
+					__print(id(Box<String>#Empty, 1))
+				}`
+
+				expect(codesOf(source)).toEqual(["argument-type-mismatch"])
+				expect(notesOf(source)).toEqual([
+					"The position decided Box<Integer>.",
+				])
+				expect(helpsOf(source)).toEqual([
+					"Write 'Box<Integer>#Empty'.",
+					"Or leave the Type Arguments out, and let the position decide them.",
+				])
+			})
+
+			// NOTE: A Type Parameter nothing ever decided is left standing, and
+			// left to the call to report — one Diagnostic saying nothing inferred
+			// it, rather than that one and a disagreement with the undecided
+			// Parameter on top of it.
+			it("leaves an undecided call its own Diagnostic", () => {
+				expect(
+					codesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						function id<infer T>(_ b: Box<T>) -> Box<T> { <- b }
+
+						constant b: Box<Integer> = id(Box<Integer>#Empty)
+					}`),
+				).toEqual(["uninferable-type-parameter"])
 			})
 
 			it("applies a Type Parameter of the enclosing Function", async () => {

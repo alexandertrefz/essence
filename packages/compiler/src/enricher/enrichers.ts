@@ -336,12 +336,26 @@ function reportUncarriedTypeArgumentDisagreement(
 	// NOTE: An instantiation the position offers that keeps no Type Arguments of
 	// its own is one joined across several, which agrees with nothing and
 	// disagrees with nothing — there is no spelling left in it to compare.
+	//
+	// NOTE: Nor does one the call this stands in never decided. An Argument's
+	// position is a Parameter Type, and a Parameter Type still carrying a Type
+	// Parameter the call left unsolved is exactly what 80899b7 refuses to treat as
+	// a decision — disagreeing with it here would refuse `id(Box<Integer>#Empty,
+	// 1)`, whose `T` the Argument beside it decides, and the help would name a `T`
+	// that exists in no scope the caller can see. Everything the call DID decide
+	// was substituted in on the way here, so what is left standing is the
+	// undecided state the call reports for itself.
 	let offered = unionArmsOf(expectedType).flatMap((member) =>
 		member.type === "Case" &&
 		member.name === written.name &&
 		member.choice === written.choice &&
-		member.typeArguments !== undefined
-			? [member as common.CaseType & { typeArguments: Array<common.Type> }]
+		member.typeArguments !== undefined &&
+		!mentionsUnsolvedTypeParameter(member)
+			? [
+					member as common.CaseType & {
+						typeArguments: Array<common.Type>
+					},
+				]
 			: [],
 	)
 
@@ -376,7 +390,10 @@ function reportUncarriedTypeArgumentDisagreement(
 					? "argument-type-mismatch"
 					: "assignment-type-mismatch",
 				labels: [
-					primary(node.position, `this is ${spell(writtenArguments)}`),
+					primary(
+						node.position,
+						`this is ${spell(writtenArguments)}`,
+					),
 				],
 				notes: [
 					`The position decided ${offered
@@ -2945,6 +2962,7 @@ type ArgumentTyper = {
 	getType: (
 		value: parser.ExpressionNode,
 		expectedType: common.Type,
+		bindings?: GenericBindings | null,
 	) => common.Type
 	enrichArgumentNode: (
 		argument: parser.ArgumentNode,
@@ -3014,6 +3032,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
+		bindings: GenericBindings | null,
 	): common.Type {
 		let { result } = collectDiagnostics(() =>
 			resolveCaseValueType(node, scope, expectedType, (expected) =>
@@ -3026,7 +3045,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				return { type: "Error" }
 			}
 
-			recordContextualCaseValueType(node, expectedType)
+			recordContextualCaseValueType(node, { expectedType, bindings })
 
 			// NOTE: Read under what this candidate decided, which is the Type
 			// the real enrichment will read it under too — a nested construction
@@ -3052,7 +3071,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	}
 
 	return {
-		getType(value, expectedType) {
+		getType(value, expectedType, bindings = null) {
 			// NOTE: Only a Function literal with omitted annotations reacts to
 			// the expected Type, and it may resolve differently per probe — so it
 			// is resolved fresh here rather than enriched once.
@@ -3072,7 +3091,9 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// construction of a generic Choice. The bare form resolves through the
 			// scope scan and needs nothing from here.
 			if (value.nodeType === "CaseValue" && value.choice !== null) {
-				return noteErrors(probedCaseValueType(value, expectedType))
+				return noteErrors(
+					probedCaseValueType(value, expectedType, bindings),
+				)
 			}
 
 			return noteErrors(enrichOnce(value).type)
@@ -3310,8 +3331,8 @@ function resolveInferredReturnType(
 	let matchableArguments: Array<MatchableArgument> = invocationArguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
-			getType: (expectedType) =>
-				typer.getType(argument.value, expectedType),
+			getType: (expectedType, bindings) =>
+				typer.getType(argument.value, expectedType, bindings),
 			bindsNothing: bindsNoTypeParameter(argument),
 		}),
 	)
@@ -3403,8 +3424,8 @@ function resolveInvokedMethodInNamespace(
 	let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 		(argument) => ({
 			name: argument.name?.content ?? null,
-			getType: (expectedType) =>
-				typer.getType(argument.value, expectedType),
+			getType: (expectedType, bindings) =>
+				typer.getType(argument.value, expectedType, bindings),
 			bindsNothing: bindsNoTypeParameter(argument),
 		}),
 	)
@@ -4368,8 +4389,8 @@ function resolveFunctionInvocation(
 		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 			(argument) => ({
 				name: argument.name?.content ?? null,
-				getType: (expectedType) =>
-					typer.getType(argument.value, expectedType),
+				getType: (expectedType, bindings) =>
+					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
 			}),
 		)
@@ -4436,8 +4457,8 @@ function resolveFunctionInvocation(
 		const matchableArguments: Array<MatchableArgument> = node.arguments.map(
 			(argument) => ({
 				name: argument.name?.content ?? null,
-				getType: (expectedType) =>
-					typer.getType(argument.value, expectedType),
+				getType: (expectedType, bindings) =>
+					typer.getType(argument.value, expectedType, bindings),
 				bindsNothing: bindsNoTypeParameter(argument),
 			}),
 		)
@@ -5182,9 +5203,23 @@ const contextualFunctionTypes = new WeakMap<
 // Case constructions that read their Choice's Type Arguments off it — the
 // Argument counterpart of an annotation, and the reason `take(Holder#Bare)`
 // needs no application of its own.
+//
+// NOTE: Kept with the call's bindings rather than substituted on the spot,
+// because an Argument is matched before the Arguments after it have bound
+// anything: the Parameter Type of `id(Box<Integer>#Empty, 1)` against
+// `id<infer T>(_ b: Box<T>, _ seed: T)` is recorded while `T` is still open, and
+// only `1` decides it. The Map is the one the match keeps filling, so reading
+// the record back once the call has finished reads the position as the call
+// finally decided it — `Box<Integer>`, agreeing with what was written — rather
+// than as a `T` that exists in no scope the caller can see.
+type RecordedCaseValueContext = {
+	expectedType: common.Type
+	bindings: GenericBindings | null
+}
+
 const contextualCaseValueTypes = new WeakMap<
 	parser.CaseValueNode,
-	common.Type
+	RecordedCaseValueContext
 >()
 
 // NOTE: What ONE probe of a candidate resolved for the Nodes that react to an
@@ -5194,7 +5229,7 @@ const contextualCaseValueTypes = new WeakMap<
 // together and committed together.
 type ContextualFunctionTypeRecording = {
 	functions: Map<parser.FunctionDefinitionNode, common.FunctionType>
-	cases: Map<parser.CaseValueNode, common.Type>
+	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
 }
 
 // NOTE: The recordings of the probes currently running, innermost last. An
@@ -5242,20 +5277,38 @@ function recordedContextualFunctionType(
 
 function recordContextualCaseValueType(
 	node: parser.CaseValueNode,
-	expectedType: common.Type,
+	recorded: RecordedCaseValueContext,
 ): void {
 	let innermost = probeRecordings[probeRecordings.length - 1]
 
 	if (innermost === undefined) {
-		contextualCaseValueTypes.set(node, expectedType)
+		contextualCaseValueTypes.set(node, recorded)
 	} else {
-		innermost.cases.set(node, expectedType)
+		innermost.cases.set(node, recorded)
 	}
 }
 
+// NOTE: The recorded Parameter Type with the call's bindings substituted in —
+// the position as the finished call decided it. A Type Parameter that nothing
+// ever bound is left standing, which is the undecided state
+// `mentionsUnsolvedTypeParameter` answers for and the call reports for itself.
 export function recordedContextualCaseValueType(
 	node: parser.CaseValueNode,
 ): common.Type | undefined {
+	let recorded = recordedCaseValueContext(node)
+
+	if (recorded === undefined) {
+		return undefined
+	}
+
+	return recorded.bindings === null
+		? recorded.expectedType
+		: applyGenericBindings(recorded.expectedType, recorded.bindings)
+}
+
+function recordedCaseValueContext(
+	node: parser.CaseValueNode,
+): RecordedCaseValueContext | undefined {
 	for (let index = probeRecordings.length - 1; index >= 0; index--) {
 		let recorded = probeRecordings[index].cases.get(node)
 
@@ -5296,8 +5349,8 @@ function commitContextualFunctionTypes(
 		recordContextualFunctionType(node, resolved)
 	}
 
-	for (let [node, expectedType] of recording.cases) {
-		recordContextualCaseValueType(node, expectedType)
+	for (let [node, recorded] of recording.cases) {
+		recordContextualCaseValueType(node, recorded)
 	}
 }
 

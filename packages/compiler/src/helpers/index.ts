@@ -1812,9 +1812,16 @@ function matchTypes(
 // `expectedType` is the parameter's Type with whatever has been inferred so
 // far substituted in. A Function literal that omitted its annotations reads
 // them off it; every other Argument ignores it entirely.
+// `bindings` is the very Map that substitution came from, still being filled —
+// what an Argument matched BEFORE the Type Parameters it mentions were decided
+// needs, to read its position as it finally stands rather than as it stood the
+// moment it was matched. `null` where nothing is being inferred at all.
 export type MatchableArgument = {
 	name: string | null
-	getType: (expectedType: common.Type) => common.Type
+	getType: (
+		expectedType: common.Type,
+		bindings: GenericBindings | null,
+	) => common.Type
 	// NOTE: Set on an Argument that can bind no Type Parameter of the call it
 	// stands in — a prefixed Case construction with no Type Arguments of its own,
 	// which is DECIDED by the Parameter it is matched against and decides nothing
@@ -2072,7 +2079,10 @@ export function matchArguments(
 			parameter.name !== argument.name ||
 			!matchTypes(
 				parameter.type,
-				argument.getType(expectedType),
+				argument.getType(
+					expectedType,
+					inferenceContext?.bindings ?? null,
+				),
 				inferenceContext,
 			)
 		) {
