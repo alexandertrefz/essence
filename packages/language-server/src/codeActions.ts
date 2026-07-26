@@ -111,10 +111,11 @@ function actionFor(
 // #region Fixes
 
 // NOTE: `describeType` is a Diagnostic's spelling of a Type, not the source's
-// — it collapses every Signature to `Function` and prints a Namespace as
-// `Namespace 'X'`, neither of which is anything a Matcher can be written
-// with. A member spelled that way is covered by a `case _` instead, which is
-// what the reader would have to write themselves.
+// — it prints an Overload set as `Function` and a Namespace as
+// `Namespace 'X'`, neither of which is anything a Matcher can be written with,
+// and a Signature under a shape the checks below turn away. A member spelled
+// that way is covered by a `case _` instead, which is what the reader would
+// have to write themselves.
 function isWritableMatcher(spelling: string): boolean {
 	if (/\bFunction\b/.test(spelling)) {
 		return false

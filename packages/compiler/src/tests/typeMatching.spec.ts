@@ -244,6 +244,31 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
+		// NOTE: The receiver Parameter is the whole reason the Method below
+		// does not fit, so both sides of the Diagnostic spell their signature
+		// out. Both used to read the bare word "Function", which named the tag
+		// and said nothing about why the two did not meet.
+		it("should name both signatures where a Method does not fit", () => {
+			let errors = errorsFor(`implementation {
+				namespace Doubler for Integer {
+					double() -> Integer {
+						<- @::add(@)
+					}
+				}
+
+				constant double: () -> Integer = Doubler.double
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("assignment-type-mismatch")
+			expect(errors[0].labels[0]?.message).toBe(
+				"this is a (_: Integer) -> Integer",
+			)
+			expect(errors[0].notes).toEqual([
+				"'double' is declared as () -> Integer.",
+			])
+		})
+
 		it("should let a Method stand in a Function-typed static Property", () => {
 			expect(
 				errorsFor(`implementation {

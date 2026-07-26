@@ -204,16 +204,16 @@ Error: Type Parameter 'Result' could not be inferred
 ────╯
 
 [unsatisfied-bound]
-Error: Function does not conform to 'Equatable'
+Error: (_: Integer) -> Integer does not conform to 'Equatable'
     ╭─┤ GenericChoice.es:39:18 │
     │
  39 │     constant same = boxed::is(boxed)
     │                     ────────┬───────  
     │                             ╰───────── this binds a Type Parameter bound to 'Equatable'
     │ 
-    │ Help: Declare a Namespace 'for Function is Equatable'.
+    │ Help: Declare a Namespace 'for (_: Integer) -> Integer is Equatable'.
     │ 
-    │ Note: No Namespace in scope makes Function conform to 'Equatable'.
+    │ Note: No Namespace in scope makes (_: Integer) -> Integer conform to 'Equatable'.
 ────╯
 
 ─── 4 errors

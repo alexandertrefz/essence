@@ -99,6 +99,11 @@ export function describeType(type: common.Type): string {
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
+			return describeFunctionSignature(type)
+		// NOTE: An Overload set has no ONE signature to print, and spelling
+		// every Overload out would drown the message it sits in — it stays the
+		// bare word. A Diagnostic that has an Overload set in hand names the
+		// Overloads itself, as per-candidate notes.
 		case "OverloadedMethod":
 		case "OverloadedStaticMethod":
 			return "Function"
@@ -110,6 +115,27 @@ export function describeType(type: common.Type): string {
 		default:
 			return type.type
 	}
+}
+
+// NOTE: A function-ish Type spelled the way a Type Annotation spells it —
+// `(_: Integer) -> Integer`, a labelled Parameter under its label. The bare
+// word "Function" named every one of them alike, which made a mismatch read as
+// "this is a Function, and it is declared as Function"; the signature is the
+// part that differs, so it is the part a Diagnostic has to show. The internal
+// name a Declaration may write (`_ x: Integer`) documents the Parameter and is
+// not part of the Type, so it can not be printed back.
+// A Method NAMED rather than called carries its receiver as the first
+// Parameter (see `matchTypes`), and it is printed there — that receiver is
+// exactly what makes it not fit a Function of one Argument fewer.
+function describeFunctionSignature(functionType: common.BaseFunction): string {
+	let parameters = functionType.parameterTypes
+		.map(
+			(parameter) =>
+				`${parameter.name ?? "_"}: ${describeType(parameter.type)}`,
+		)
+		.join(", ")
+
+	return `(${parameters}) -> ${describeType(functionType.returnType)}`
 }
 
 // NOTE: A Parameter is identified by its label where it has one, and by its

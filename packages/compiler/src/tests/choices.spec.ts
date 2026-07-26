@@ -1311,7 +1311,7 @@ describe("Choices", () => {
 
 			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
 			expect(messagesOf(source)).toEqual([
-				"Function does not conform to 'Equatable'",
+				"(_: Integer) -> Integer does not conform to 'Equatable'",
 			])
 		})
 
@@ -1891,7 +1891,7 @@ describe("Choices", () => {
 
 				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
 				expect(messagesOf(source)).toEqual([
-					"Function does not conform to 'Equatable'",
+					"(_: Integer) -> Integer does not conform to 'Equatable'",
 				])
 			})
 
@@ -2024,7 +2024,7 @@ describe("Choices", () => {
 
 				expect(codesOf(source)).toEqual(["unsatisfied-bound"])
 				expect(messagesOf(source)).toEqual([
-					"Function does not conform to 'Equatable'",
+					"(_: Integer) -> Integer does not conform to 'Equatable'",
 				])
 			})
 
