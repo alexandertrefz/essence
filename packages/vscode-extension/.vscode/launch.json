@@ -1,18 +1,18 @@
-// A launch configuration that launches the extension inside a new window
-// Use IntelliSense to learn about possible attributes.
-// Hover to view descriptions of existing attributes.
-// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 {
 	"version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Extension",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}"
-            ],
-            "preLaunchTask": "build:extension"
-        }
-    ]
+	"configurations": [
+		{
+			// `--extensionDevelopmentPath` loads this folder into a second
+			// window as an extension, which is the only way to run one that is
+			// not installed.
+			//
+			// `preLaunchTask` builds the bundle `main` points at, so F5 runs
+			// the current source rather than whatever was built last.
+			"name": "Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+			"preLaunchTask": "build:extension"
+		}
+	]
 }

@@ -1,5 +1,50 @@
 # Change Log
 
+## [0.2.0]
+
+Quick Fixes, call hierarchy, and an editor that knows what Essence looks like.
+
+- Quick Fixes, keyed off the stable Diagnostic codes: scaffold the arms a Match
+  is missing, remove a Case that can never match, take the spelling a "Did you
+  mean" suggests, turn a reassigned Constant into a Variable, drop a redundant
+  Parameter label, and add the `else` a Function needs to return on every path.
+  Writing out an inferred Type is offered as a refactoring wherever an inlay
+  hint sits.
+- Call hierarchy (`Shift+Alt+H`) over the current file, incoming and outgoing.
+- Completion inserts the whole call, argument labels and all — accepting
+  `replaceFirst` writes `replaceFirst(of , with )` with a stop at each value.
+  Overloads are offered one item apiece, so the labels inserted are the ones
+  that Overload actually takes. Keywords are offered, `#` opens Case completion
+  on its own, and the names in Scope now carry their Types and documentation
+  the way Methods already did.
+- Doc comments are highlighted as documentation: `@param` and `@returns` read
+  as tags, the Parameter they name reads as a Parameter, and backtick spans
+  read as code — so a `§§` block no longer looks like a `§` note. Pressing
+  Enter inside one continues it.
+- The grammar also learned `declarations`, `is` and `where`, the `~>` of a
+  typed Record literal, wildcards, generic brackets and Namespace properties;
+  a capitalised name followed by `(` is a Type again rather than a Function.
+- Semantic tokens mark Choice Cases as enum members and everything from the
+  standard library as a default-library name.
+- Hover, completion, signature help, inlay hints, renaming and the outline now
+  see inside a Match Case's guard and its literals. They previously stopped at
+  the Case body, so a name written in `case X where …` was invisible to all of
+  them.
+- Inlay hints can be double-clicked to write the Type they show into the
+  source. The outline reaches declarations nested inside Functions and `if`
+  blocks, and labels each with its Type.
+- Formatting no longer refuses on a file containing a typed Record literal.
+  `Type ~> { … }` printed without its `~>`, which changed what the file meant,
+  which the formatter's safety gate correctly caught — leaving Format Document
+  doing nothing at all, silently.
+- Snippets cover the whole language, tabstops included: `namespace`,
+  `protocol`, `choice`, `overload`, `match`, `doc` and the rest.
+- The status bar shows whether the Language Server is running and restarts it
+  on click; a failure to start now says what failed and why. Untitled buffers
+  set to Essence get the full feature set.
+- Tabs, a ruler at column 80 and `esfmt` as the formatter are set as defaults
+  for Essence files, matching what the formatter itself does.
+
 ## [0.1.0]
 
 Adds the Essence Language Server, bundled into the extension — it runs on the

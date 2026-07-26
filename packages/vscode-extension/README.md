@@ -2,9 +2,9 @@
 
 Language support for [Essence](https://github.com/atrefz/essence). Syntax
 highlighting comes from a TextMate grammar refined by semantic tokens;
-diagnostics, renaming, go-to-definition, hovers, references, an outline,
-completion, signature help, folding, selection ranges and inlay hints all come
-from the Essence Language Server.
+diagnostics, Quick Fixes, renaming, go-to-definition, hovers, references, an
+outline, call hierarchy, completion, signature help, formatting, folding,
+selection ranges and inlay hints all come from the Essence Language Server.
 
 ## Features
 
@@ -16,13 +16,36 @@ roughly 200ms. Each carries a stable code (`missing-case`, `unreachable-case`,
 Match case that can never match is greyed out rather than underlined — it is
 dead, not wrong.
 
+### Quick Fixes
+
+Every Diagnostic carries a stable code, and the ones with a mechanical fix
+offer it under the lightbulb (`Ctrl+.`):
+
+- `missing-case` scaffolds an arm for each Case the Match does not handle. The
+  bodies are left empty on purpose — the `missing-return` behind each one is
+  the hole to fill. A member no Matcher can name shares a trailing `case _`,
+  which goes last so it cannot shadow an arm above it.
+- `unreachable-case` removes the Case that can never match.
+- The "did you mean" Diagnostics — an unknown name, Type, Protocol, member,
+  Method or Case — take the suggested spelling.
+- `constant-reassignment` turns the Constant into a Variable.
+- `redundant-parameter-label` drops the label.
+- `missing-return` adds the `else` a Function needs to return on every path.
+
+Writing out an inferred Type is offered as a refactoring wherever an inlay hint
+sits, and an inlay hint can be double-clicked to the same end.
+
 ### Navigation
 
 Go-to-definition (`F12`), Find All References (`Shift+F12`) and document
 highlight work on every name that resolves, including Methods, Namespace
 properties and Record members. Highlighting distinguishes the occurrences that
-bind a name from those that read it. The outline (`Ctrl+Shift+O`) lists top
-level declarations, with Namespaces expanding to their Properties and Methods.
+bind a name from those that read it. The outline (`Ctrl+Shift+O`) lists
+declarations with their Types, reaching the ones nested inside Functions and
+`if` blocks, and Namespaces expand to their Properties and Methods.
+
+Call hierarchy (`Shift+Alt+H`) shows what calls a Function or Method and what
+it calls, within the file. Overloads aggregate under the name they share.
 
 ### Renaming
 
@@ -39,10 +62,16 @@ invoking rename at all.
 ### Completion & signature help
 
 Completion offers the names in lexical Scope, Record members and Namespace
-properties after `.`, Methods after `::`, Namespaces after `::<`, argument
-labels, and the members of the Record Type a literal is being written for.
-Names are only offered where they actually resolve — Constants and Variables
-do not hoist, so they appear only after their declaring Statement.
+properties after `.`, Methods after `::`, Namespaces after `::<`, Cases after
+`#`, keywords, argument labels, and the members of the Record Type a literal is
+being written for. Names are only offered where they actually resolve —
+Constants and Variables do not hoist, so they appear only after their declaring
+Statement.
+
+Accepting a Function or Method writes the whole call, argument labels and all,
+with a stop at each value: `replaceFirst` inserts as
+`replaceFirst(of , with )`. An overloaded name is offered once per Overload, so
+the labels inserted are the ones that Overload actually takes.
 
 Signature help shows the invoked signature and advances the active Parameter
 as Arguments are typed, listing every Overload where a Method is overloaded.
@@ -51,13 +80,30 @@ as Arguments are typed, listing every Overload where a Method is overloaded.
 
 Hovering shows the inferred Type of any Expression, with full signatures for
 Functions and Methods. Semantic tokens classify each Identifier by what it
-resolves to, which a grammar alone cannot determine. Inlay hints annotate
-declarations written without a Type annotation.
+resolves to, which a grammar alone cannot determine — including which names
+come from the standard library. Inlay hints annotate declarations written
+without a Type annotation, and double-clicking one writes it into the source.
+
+### Editing
+
+`§§` documentation is highlighted as documentation rather than as a comment:
+`@param` and `@returns` read as tags, the Parameter they name reads as a
+Parameter, and backtick spans read as code. Pressing Enter inside a `§§` block
+continues it; a `§` note is left alone, since most of them are one line.
+
+Format Document runs `esfmt`. Essence files default to tabs, a ruler at column
+80 and `esfmt` as their formatter, which is what the formatter itself assumes.
+
+Snippets cover the language: `namespace`, `protocol`, `choice`, `overload`,
+`match`, `doc` and the rest.
 
 ## Requirements
 
 None. The Language Server is bundled and runs on the Node that ships with
 VS Code.
+
+The status bar shows whether the server is running; clicking it restarts it.
+`Essence` in the Output panel carries the server's log and any startup failure.
 
 ## Development
 
