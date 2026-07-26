@@ -3,11 +3,11 @@ import { Fraction } from "bigint-fraction"
 import type { AlgebraicType } from "./Algebraic"
 import {
 	add as algebraicAdd,
-	bigRationalOf,
 	dividedInto as algebraicDividedInto,
 	multiply as algebraicMultiplyWith,
 	squareRootOfRational,
 } from "./Algebraic"
+import { bigRationalOf } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"

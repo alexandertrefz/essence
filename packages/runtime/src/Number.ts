@@ -1,7 +1,8 @@
 import { Fraction } from "bigint-fraction"
 
 import type { AlgebraicType } from "./Algebraic"
-import { compareTo as compareAlgebraicTo, reduced } from "./Algebraic"
+import { compareTo as compareAlgebraicTo } from "./Algebraic"
+import { reduced } from "./bigRational"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import { isFirstRationalBigger } from "./internalHelpers"
