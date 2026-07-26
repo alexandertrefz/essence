@@ -215,6 +215,24 @@ has no base case and can never return. Reported only when the recursion is
 unconditional — a call reached through a `match` that narrows the receiver, or
 guarded by a branch that returns a base value, is left alone.
 
+### `recursive-type-declaration`
+
+A Type Alias or a Choice names itself — directly (`type Node = { next: Node }`),
+or around a cycle of declarations (`type A = { b: B }` with `type B = { a: A }`).
+A Type declaration is substituted wherever it is named, so resolving one that
+reaches itself would never finish. Recursive Type declarations are not part of
+the language yet; the cycle has to be broken.
+
+Every declaration in the cycle reports, each pointing at the name that carries
+it onwards, and a note spells the whole way round. A Generic's default Type
+counts as naming — `type A<Item = A<Integer>>` is a cycle of one.
+
+Each name in the cycle is still declared, as a Type nothing else can be checked
+against, so the rest of the Program is reported on its own terms rather than as
+a pile of Types that "are not declared". The one recursive shape reported
+differently is a GENERIC Choice naming itself in a payload, which has its own
+code, `recursive-generic-choice`.
+
 ### `top-level-return`
 
 A `<-` outside of any Function.

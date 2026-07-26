@@ -618,6 +618,198 @@ describe("Choices", () => {
 		})
 	})
 
+	// NOTE: Everything the direct check above does NOT catch — a mutual pair, a
+	// non-generic Choice, a Type Alias — is caught by the cycle pre-pass before
+	// the hoist rounds. `toEqual` throughout, because the point of the pre-pass
+	// is as much what it does NOT report: each of these used to be a pile of
+	// `unknown-type` Diagnostics about names the Program does declare.
+	describe("Recursive Type Declarations", () => {
+		it("names the cycle of a mutually recursive Choice pair", () => {
+			let source = `implementation {
+				choice Signal { Wrapped { command: Command } }
+				choice Command { Wrapping { signal: Signal } }
+			}`
+
+			expect(codesOf(source)).toEqual([
+				"recursive-type-declaration",
+				"recursive-type-declaration",
+			])
+
+			expect(messagesOf(source)).toEqual([
+				"Choice 'Signal' names itself through 'Command'",
+				"Choice 'Command' names itself through 'Signal'",
+			])
+		})
+
+		it("names a non-generic Choice that names itself", () => {
+			let source = `implementation {
+				choice Tree { Leaf, Node { child: Tree } }
+			}`
+
+			expect(codesOf(source)).toEqual(["recursive-type-declaration"])
+			expect(messagesOf(source)).toEqual(["Choice 'Tree' names itself"])
+		})
+
+		it("names a Type Alias that names itself", () => {
+			let source = `implementation {
+				type Node = { next: Node }
+			}`
+
+			expect(codesOf(source)).toEqual(["recursive-type-declaration"])
+			expect(messagesOf(source)).toEqual(["Type 'Node' names itself"])
+		})
+
+		it("names a Type Alias that names itself through a Union arm", () => {
+			expect(
+				messagesOf(`implementation {
+					type Node = Integer | Node
+				}`),
+			).toEqual(["Type 'Node' names itself"])
+		})
+
+		it("names a cycle that runs through both an Alias and a Choice", () => {
+			let source = `implementation {
+				type Wrapper = Wrapped
+				choice Wrapped { Inner { wrapper: Wrapper } }
+			}`
+
+			expect(messagesOf(source)).toEqual([
+				"Type 'Wrapper' names itself through 'Wrapped'",
+				"Choice 'Wrapped' names itself through 'Wrapper'",
+			])
+		})
+
+		// NOTE: A Generic's default Type is resolved along with the declaration
+		// it belongs to, so a cycle through one is just as unresolvable — and it
+		// is the position the direct check never looked at.
+		it("names a cycle closed by a Generic's default Type", () => {
+			expect(
+				messagesOf(`implementation {
+					type Boxed<Item = Boxed<Integer>> = { value: Item }
+				}`),
+			).toEqual(["Type 'Boxed' names itself"])
+		})
+
+		// NOTE: A default Type resolves in the Scope AROUND the declaration,
+		// where the Parameter it belongs to is not visible yet — so the `B` in
+		// `type B<B = B>` is the declaration being made, and the shadowing the
+		// body enjoys must not be applied here.
+		it("names a cycle a Parameter's own name closes in its default Type", () => {
+			expect(
+				messagesOf(`implementation {
+					type B<B = B> = { x: Integer }
+				}`),
+			).toEqual(["Type 'B' names itself"])
+		})
+
+		it("names the same cycle on a generic Choice", () => {
+			expect(
+				messagesOf(`implementation {
+					choice B<B = B> { Full { value: Integer } }
+				}`),
+			).toEqual(["Choice 'B' names itself"])
+		})
+
+		it("names a mutual cycle a Parameter's name would have hidden", () => {
+			expect(
+				messagesOf(`implementation {
+					type A<B = B> = { x: B }
+					type B = { a: A }
+				}`),
+			).toEqual([
+				"Type 'A' names itself through 'B'",
+				"Type 'B' names itself through 'A'",
+			])
+		})
+
+		// NOTE: The other side of the same coin — a default Type naming what its
+		// Parameter shadows in the body is no cycle at all, and stays silent.
+		it("reads a default Type as the declaration its Parameter shadows", () => {
+			expect(
+				messagesOf(`implementation {
+					type Item = Integer
+					type Boxed<Item = Item> = { value: Item }
+					constant boxed: Boxed = { value = 1 }
+				}`),
+			).toEqual([])
+		})
+
+		it("spells the whole way round a longer cycle in a note", () => {
+			expect(
+				notesOf(`implementation {
+					type A = B
+					type B = C
+					type C = A
+				}`).filter((note) => note.startsWith("'A'")),
+			).toEqual([
+				"'A' names 'B', which names 'C', which names 'A' again.",
+			])
+		})
+
+		it("leaves a generic Choice naming itself in a payload to its own code", () => {
+			expect(
+				codesOf(`implementation {
+					choice Bad<T> { A { next: Bad<T> } }
+				}`),
+			).toEqual(["recursive-generic-choice"])
+		})
+
+		// NOTE: The cascade the pre-pass exists to prevent: every name in the
+		// cycle stays declared — as an Error — so a declaration naming one of
+		// them, above or below, is not reported at all.
+		it("leaves declarations that merely name a cycle member alone", () => {
+			expect(
+				codesOf(`implementation {
+					type Head = Body
+					type Body = { tail: Tail }
+					type Tail = { body: Body }
+					type Alongside = { body: Body }
+				}`),
+			).toEqual([
+				"recursive-type-declaration",
+				"recursive-type-declaration",
+			])
+		})
+
+		it("still reports a genuine unknown Type inside a cycle", () => {
+			expect(
+				codesOf(`implementation {
+					type Left = { right: Right, nope: Nope }
+					type Right = { left: Left }
+				}`),
+			).toEqual([
+				"recursive-type-declaration",
+				"recursive-type-declaration",
+				"unknown-type",
+			])
+		})
+
+		it("resolves a name a cycle member only reaches after the rounds", () => {
+			expect(
+				codesOf(`implementation {
+					type Left = { right: Right, count: Counter }
+					type Right = { left: Left }
+					type Counter = Integer
+				}`),
+			).toEqual([
+				"recursive-type-declaration",
+				"recursive-type-declaration",
+			])
+		})
+
+		// NOTE: A Type Parameter is not the Type its name may also spell
+		// further out — the graph resolves the shadowing, so this is no cycle.
+		it("does not read a Type Parameter as naming the declaration it shadows", () => {
+			expect(
+				messagesOf(`implementation {
+					type Item = Integer
+					choice Holder<Item> { Full { value: Item } }
+					constant held: Holder<String> = #Full({ value = "x" })
+				}`),
+			).toEqual([])
+		})
+	})
+
 	// NOTE: `infer` marks a Type Parameter a USE works out for itself. A Choice
 	// and a Type Alias have no such use — every one of theirs applies its
 	// Arguments outright — so the marker is refused rather than accepted and

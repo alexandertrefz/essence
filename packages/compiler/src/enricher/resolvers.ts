@@ -233,72 +233,54 @@ export function combinationTypeOf(
 	}
 }
 
-// NOTE: A syntactic scan for the recursion restriction below — it walks a
-// payload's Type declaration Nodes (before any of them is resolved) for a bare
-// mention of `choiceName`, recursing through Records, Lists / applications,
-// Unions and Functions. Returns the offending Identifier Node so the Diagnostic
-// can point at it, or null when the payload does not name the Choice.
+// NOTE: Every Type name a Type declaration Node mentions, as the Identifier
+// Nodes that spell them so a Diagnostic can point at one, in written order —
+// walking Records, Lists / applications, Unions and Functions. The scan is
+// SYNTACTIC and runs before any of the Nodes is resolved, which is what the
+// recursion checks need: a Declaration that names itself can not be resolved
+// first and inspected afterwards.
+export function referencedTypeNames(
+	node: parser.TypeDeclarationNode,
+): Array<parser.IdentifierNode> {
+	switch (node.nodeType) {
+		case "IdentifierTypeDeclaration":
+			return [node.type]
+		case "GenericTypeDeclaration":
+			return [
+				...referencedTypeNames(node.baseType),
+				...node.generics.flatMap((argument) =>
+					referencedTypeNames(argument),
+				),
+			]
+		case "UnionTypeDeclaration":
+			return node.types.flatMap((member) => referencedTypeNames(member))
+		case "RecordTypeDeclaration":
+			return Object.values(node.members).flatMap((member) =>
+				referencedTypeNames(member.type),
+			)
+		case "FunctionTypeDeclaration":
+			return [
+				...node.parameterTypes.flatMap((parameter) =>
+					referencedTypeNames(parameter.type),
+				),
+				...referencedTypeNames(node.returnType),
+			]
+	}
+}
+
+// NOTE: The first mention of `choiceName` in a payload's Type declaration, for
+// the recursion restriction below, or null when the payload does not name the
+// Choice. Name-based on purpose: during speculative hoisting the Choice's own
+// name is not yet in scope, so a resolved-Type check could not see it.
 function typeDeclarationNamesChoice(
 	node: parser.TypeDeclarationNode,
 	choiceName: string,
 ): parser.IdentifierNode | null {
-	switch (node.nodeType) {
-		case "IdentifierTypeDeclaration":
-			return node.type.content === choiceName ? node.type : null
-		case "GenericTypeDeclaration": {
-			let inBase = typeDeclarationNamesChoice(node.baseType, choiceName)
-
-			if (inBase !== null) {
-				return inBase
-			}
-
-			for (let argument of node.generics) {
-				let found = typeDeclarationNamesChoice(argument, choiceName)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "UnionTypeDeclaration": {
-			for (let member of node.types) {
-				let found = typeDeclarationNamesChoice(member, choiceName)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "RecordTypeDeclaration": {
-			for (let member of Object.values(node.members)) {
-				let found = typeDeclarationNamesChoice(member.type, choiceName)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "FunctionTypeDeclaration": {
-			for (let parameter of node.parameterTypes) {
-				let found = typeDeclarationNamesChoice(
-					parameter.type,
-					choiceName,
-				)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return typeDeclarationNamesChoice(node.returnType, choiceName)
-		}
-	}
+	return (
+		referencedTypeNames(node).find(
+			(reference) => reference.content === choiceName,
+		) ?? null
+	)
 }
 
 // NOTE: A generic Choice's Case payload, resolved with the Choice's Type
@@ -306,10 +288,11 @@ function typeDeclarationNamesChoice(
 // The recursion restriction (decision e) is applied member by member and
 // syntactically: a member that names the Choice being declared would, when
 // substituted eagerly at a use site, never finish substituting, so it is
-// diagnosed and resolved to Error rather than to a real Type. The check must be
-// syntactic because during speculative hoisting the Choice's own name is not
-// yet in scope, so a resolved-Type check could not see the self-reference. V1
-// forbids direct self-naming only.
+// diagnosed and resolved to Error rather than to a real Type. This owns the
+// DIRECT self-naming of a generic Choice and nothing else — every other
+// recursive shape is caught before the hoist rounds by the cycle pre-pass in
+// `enricher/index.ts`, which reports `recursive-type-declaration` and leaves
+// this one shape alone.
 function resolveGenericCaseMembers(
 	payload: parser.RecordTypeDeclarationNode | null,
 	choiceName: string,
