@@ -585,6 +585,28 @@ describe("Choices", () => {
 			).toContain("recursive-generic-choice")
 		})
 
+		it("points a self-naming generic Choice at breaking the cycle", () => {
+			expect(
+				helpsOf(`implementation {
+					choice Bad<T> { A { next: Bad<T> } }
+				}`),
+			).toEqual([
+				"Recursive Type declarations are not part of the language yet — break the cycle.",
+			])
+		})
+
+		// NOTE: A Type Parameter may spell the Choice's own name, and then the
+		// payload names the Parameter — no recursion, and as silent as the
+		// plain `type Bad<Bad> = { next: Bad }` the same shadowing makes.
+		it("reads a payload as the Type Parameter shadowing the Choice's name", () => {
+			expect(
+				messagesOf(`implementation {
+					choice Bad<Bad> { A { next: Bad } }
+					constant boxed: Bad<Integer> = Bad#A({ next = 1 })
+				}`),
+			).toEqual([])
+		})
+
 		it("rejects too few Type Arguments to a generic Choice", () => {
 			expect(
 				codesOf(`implementation { ${progressChoice}

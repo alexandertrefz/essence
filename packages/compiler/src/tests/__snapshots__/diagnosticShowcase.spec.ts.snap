@@ -186,7 +186,7 @@ Error: A generic Choice can not name itself in a payload
     │                      ───┬──  
     │                         ╰──── this names the Choice being declared
     │ 
-    │ Help: Introduce a separate non-generic Choice or Type for the recursive part.
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
     │ 
     │ Note: A generic Choice's payloads are substituted eagerly at each use, so a self-reference would never finish substituting.
 ────╯

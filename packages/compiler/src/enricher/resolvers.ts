@@ -297,17 +297,28 @@ function typeDeclarationNamesChoice(
 // this one shape alone.
 function resolveGenericCaseMembers(
 	payload: parser.RecordTypeDeclarationNode | null,
-	choiceName: string,
+	choice: parser.ChoiceDeclarationStatementNode,
 	genericScope: enricher.Scope,
 ): Record<string, common.Type> {
 	if (payload === null) {
 		return {}
 	}
 
+	// NOTE: A Type Parameter may spell the Choice's own name
+	// (`choice Bad<Bad> { A { next: Bad } }`) — then a payload naming it names
+	// the Parameter, which is in scope and substitutes fine, and there is no
+	// recursion to report. The name-based scan can not see that on its own; the
+	// cycle pre-pass resolves the same shadowing and stays silent too.
+	let shadowsOwnName = choice.generics.some(
+		(generic) => generic.name.content === choice.name.content,
+	)
+
 	let members: Record<string, common.Type> = {}
 
 	for (let [name, member] of Object.entries(payload.members)) {
-		let selfReference = typeDeclarationNamesChoice(member.type, choiceName)
+		let selfReference = shadowsOwnName
+			? null
+			: typeDeclarationNamesChoice(member.type, choice.name.content)
 
 		if (selfReference !== null) {
 			reportError(
@@ -325,7 +336,7 @@ function resolveGenericCaseMembers(
 						"A generic Choice's payloads are substituted eagerly at each use, so a self-reference would never finish substituting.",
 					],
 					helps: [
-						"Introduce a separate non-generic Choice or Type for the recursive part.",
+						"Recursive Type declarations are not part of the language yet — break the cycle.",
 					],
 				},
 			)
@@ -400,7 +411,7 @@ export function resolveChoiceDeclarationStatementType(
 				name: choiceCase.name.content,
 				members: resolveGenericCaseMembers(
 					choiceCase.type,
-					node.name.content,
+					node,
 					genericScope,
 				),
 				choiceGenerics: generics,
