@@ -1275,6 +1275,152 @@ describe("Validator", () => {
 		})
 	})
 
+	// NOTE: A Namespace is emitted as a `class`, so its name holds nothing until
+	// the Declaration runs — every case here compiled green and failed at run
+	// time before the check existed.
+	describe("Use Before Declaration", () => {
+		it("reports a Method call whose Namespace is declared below it", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				__print(21::doubled())
+
+				namespace Doubling for Integer {
+					doubled() -> Integer { <- @::multiply(with 2) }
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'Doubling' is used before it is declared",
+			)
+			expect(diagnostics[0].labels[1]?.message).toBe(
+				"declared here, below the use",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Move the use below the Declaration.",
+			])
+		})
+
+		it("reports a static Property read above the Namespace", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				__print(Greeter.greeting)
+
+				namespace Greeter {
+					static greeting = "hello"
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+			expect(diagnostics[0].position?.start.line).toBe(2)
+		})
+
+		it("reports a static Method call above the Namespace", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				__print(Greeter.greet())
+
+				namespace Greeter {
+					static greet() -> String { <- "hello" }
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+		})
+
+		it("reports a use in the body of a top-level If, which runs where it is written", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				if true {
+					__print(Greeter.greeting)
+				}
+
+				namespace Greeter {
+					static greeting = "hello"
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+		})
+
+		it("reports a static Property initialiser naming a Namespace declared below", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace First {
+					static value = Second.value
+				}
+
+				namespace Second {
+					static value = 5
+				}
+
+				__print(First.value)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("use-before-declaration")
+			expect(diagnostics[0].message).toBe(
+				"Namespace 'Second' is used before it is declared",
+			)
+		})
+
+		it("reports every dispatch branch whose Namespace is declared below", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant value: Integer | String = 5
+
+				__print(value::described())
+
+				namespace Ints for Integer {
+					described() -> String { <- "an Integer" }
+				}
+
+				namespace Strings for String {
+					described() -> String { <- "a String" }
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				[
+					"Namespace 'Ints' is used before it is declared",
+					"Namespace 'Strings' is used before it is declared",
+				],
+			)
+		})
+
+		it("accepts a Function body that names a Namespace declared below it", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function greeting () -> String {
+						<- Greeter.greeting
+					}
+
+					namespace Greeter {
+						static greeting = "hello"
+					}
+
+					__print(greeting())
+				}`),
+			).toEqual([])
+		})
+
+		it("accepts a use below the Declaration", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Greeter {
+						static greeting = "hello"
+					}
+
+					namespace Doubling for Integer {
+						doubled() -> Integer { <- @::multiply(with 2) }
+					}
+
+					__print(Greeter.greeting)
+					__print(21::doubled())
+				}`),
+			).toEqual([])
+		})
+	})
+
 	// NOTE: The two cross-checks are about the COMPILER rather than about a
 	// Program — while the Compiler is right, nothing anyone can write reaches
 	// them — so each failing case is a typed Program put by hand into the state a

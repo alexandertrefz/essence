@@ -109,6 +109,18 @@ dropped.
 `Self` is reserved — it is what a Protocol calls its conforming Type, and no
 declaration may take that name.
 
+### `use-before-declaration`
+
+A Namespace is named by something that runs above the Declaration of it — a
+Method call whose Namespace is written further down, a static Property read, a
+bare reference. A Namespace comes into being where it is written, so a use that
+runs first has nothing to reach.
+
+Only what RUNS at the top level counts. A Function's or a Method's body runs when
+it is called, so it may name a Namespace declared below it; a static Property's
+initialiser runs with its own Namespace's Declaration, so it may not. The body of
+a top-level `if` runs at the top level like everything around it.
+
 ### `unknown-name`
 
 A Variable or Constant that was never declared. The Diagnostic suggests the

@@ -37,6 +37,25 @@ type MatchHandler = common.typed.MatchNode["handlers"][number]
 // validated at a time.
 let witnessScopes: Array<Set<string>> = []
 
+// NOTE: Where each top-level Namespace is declared — its index in the top-level
+// statement list, and the Position of its name. A Namespace is emitted as a
+// `class`, whose binding does not exist until the Declaration itself runs, so a
+// use that RUNS above it compiles clean and then fails. Read off the typed
+// statement list rather than out of a Scope: a hoisted Namespace never enters
+// the Enricher's declarations, and its Type carries no Position.
+// Module state for the reason `witnessScopes` is.
+let topLevelNamespaces: Map<
+	string,
+	{ index: number; position: common.Position }
+> = new Map()
+
+// NOTE: The index of the top-level statement whose execution is being
+// validated, or null where what is being validated does not run yet — a
+// Function body, which is emitted hoisted and runs whenever it is called. A
+// static Property's initialiser is not such a place: it runs when its
+// Namespace's Declaration does, so it keeps the index it is written under.
+let executingTopLevelIndex: number | null = null
+
 export const validate = (
 	program: common.typed.Program,
 ): Array<common.Diagnostic> => {
@@ -44,9 +63,13 @@ export const validate = (
 	// is the guarantee rather than the mechanism: no Program is ever checked
 	// against a Type Parameter that another Program declared.
 	witnessScopes = []
+	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
+	executingTopLevelIndex = null
 
 	let { diagnostics } = collectDiagnostics(() => {
-		for (let node of program.implementation.nodes) {
+		for (let [index, node] of program.implementation.nodes.entries()) {
+			executingTopLevelIndex = index
+
 			// NOTE: Expected errors are reported as Diagnostics and recovered
 			// from in place — anything thrown past this point is a Compiler
 			// bug. It is reported as a Diagnostic as well, so that a single
@@ -75,6 +98,32 @@ export const validate = (
 	})
 
 	return diagnostics
+}
+
+function collectTopLevelNamespaces(
+	nodes: Array<common.typed.ImplementationNode>,
+): Map<string, { index: number; position: common.Position }> {
+	let namespaces = new Map<
+		string,
+		{ index: number; position: common.Position }
+	>()
+
+	for (let [index, node] of nodes.entries()) {
+		// NOTE: The FIRST Declaration of a name is the one recorded — a name
+		// declared twice is the Enricher's report to make, and until the second
+		// one is removed it is the first that a use between them reaches.
+		if (
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			!namespaces.has(node.name.content)
+		) {
+			namespaces.set(node.name.content, {
+				index,
+				position: node.name.position,
+			})
+		}
+	}
+
+	return namespaces
 }
 
 function validateImplementationNode(
@@ -129,6 +178,8 @@ function validateExpression(
 			return validateFunctionInvocation(node)
 		case "Lookup":
 			return validateLookup(node)
+		case "Identifier":
+			return validateIdentifier(node)
 		case "Match":
 			return validateMatch(node)
 		case "CaseValue":
@@ -147,7 +198,6 @@ function validateExpression(
 		case "IntegerValue":
 		case "BooleanValue":
 		case "NothingValue":
-		case "Identifier":
 		case "Self":
 			// these nodes dont need any validation
 			return node
@@ -501,12 +551,22 @@ function validateMethodInvocation(
 			describeCallee,
 		)
 		checkWitnessScope(node.conformances, describeCallee)
+		checkNamespaceIsDeclared(
+			node.namespace.name,
+			node.member.position,
+			"this Method comes from it",
+		)
 	} else {
 		for (let dispatchCase of node.dispatch) {
 			checkWitnessScope(
 				dispatchCase.conformances,
 				() =>
 					`'${dispatchCase.namespaceName}::${node.member.name}', the branch for ${describeType(dispatchCase.memberType)},`,
+			)
+			checkNamespaceIsDeclared(
+				dispatchCase.namespaceName,
+				node.member.position,
+				`the branch for ${describeType(dispatchCase.memberType)} takes this Method from it`,
 			)
 		}
 	}
@@ -597,6 +657,22 @@ function validateFunctionInvocation(
 	for (let argumentNode of node.arguments) {
 		validateExpression(argumentNode.value)
 		validateNoBoundFunctionValue(argumentNode.value)
+	}
+
+	// NOTE: The callee is not walked as an Expression of its own — a static call
+	// (`Namespace.method(…)`) is the one shape whose callee names something that
+	// can be too early, so it is asked about here rather than through
+	// `validateIdentifier`, which would never see it.
+	if (
+		node.name.nodeType === "Lookup" &&
+		node.name.base.nodeType === "Identifier" &&
+		node.name.base.type.type === "Namespace"
+	) {
+		checkNamespaceIsDeclared(
+			node.name.base.content,
+			node.name.base.position,
+			"this names it",
+		)
 	}
 
 	// NOTE: An Identifier callee names itself; a Lookup and an Expression that
@@ -701,9 +777,18 @@ function validateFunctionDefinition(
 		),
 	)
 
+	// NOTE: A body does not run where it is written — it runs when the Function
+	// is called, which is at the earliest the statement that calls it — so
+	// nothing inside it is a top-level use, however far above a Declaration it
+	// stands.
+	let enclosingIndex = executingTopLevelIndex
+
+	executingTopLevelIndex = null
+
 	try {
 		node.body.map((bodyNode) => validateImplementationNode(bodyNode, node))
 	} finally {
+		executingTopLevelIndex = enclosingIndex
 		witnessScopes.pop()
 	}
 
@@ -716,6 +801,20 @@ function validateLookup(
 	node: common.typed.LookupNode,
 ): common.typed.LookupNode {
 	validateExpression(node.base)
+
+	return node
+}
+
+// NOTE: A name is nothing but a name in every other respect — the one thing it
+// can be wrong about on its own is naming a Namespace from above the Declaration
+// of it. A static Method call and a static Property read both reach here through
+// the base of their Lookup, which is where the Namespace is written.
+function validateIdentifier(
+	node: common.typed.IdentifierNode,
+): common.typed.IdentifierNode {
+	if (node.type.type === "Namespace") {
+		checkNamespaceIsDeclared(node.content, node.position, "this names it")
+	}
 
 	return node
 }
@@ -1804,6 +1903,51 @@ function validateFunctionStatement(
 // #endregion
 
 // #region Helpers
+
+// NOTE: One check for every way a Namespace can be named — a Method's home, a
+// dispatch branch's target, a static member's base, a bare reference — because
+// what makes them wrong is the same thing: the Declaration is BELOW the
+// statement that runs the use. `useLabel` is what the arrow at the use says.
+//
+// NOTE: Silent for a Namespace that is not top-level (nothing records where a
+// nested one is declared) and for every builtin, none of which is in the map at
+// all — so a name the standard library owns is only ever reported where the
+// Program itself declares it, which is exactly where it can be too late.
+function checkNamespaceIsDeclared(
+	namespaceName: string,
+	position: common.Position,
+	useLabel: string,
+): void {
+	if (executingTopLevelIndex === null) {
+		return
+	}
+
+	let declaration = topLevelNamespaces.get(namespaceName)
+
+	if (
+		declaration === undefined ||
+		declaration.index <= executingTopLevelIndex
+	) {
+		return
+	}
+
+	reportError(
+		`Namespace '${namespaceName}' is used before it is declared`,
+		position,
+		{
+			code: "use-before-declaration",
+			labels: [
+				primary(position, useLabel),
+				secondary(declaration.position, "declared here, below the use"),
+			],
+			notes: [
+				"A Namespace comes into being where it is written, so nothing that runs above it can reach it.",
+				"A Function's or a Method's body is not run where it is written, so a body may name a Namespace declared below it.",
+			],
+			helps: ["Move the use below the Declaration."],
+		},
+	)
+}
 
 // NOTE: An `if`, an `else if` and a Match Handler's Guard all pick a path from
 // a value, and Essence has no truthiness — only a Boolean can decide. One

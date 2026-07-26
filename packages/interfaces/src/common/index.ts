@@ -152,6 +152,7 @@ export type DiagnosticCode =
 	| "duplicate-property"
 	| "duplicate-member"
 	| "reserved-type-name"
+	| "use-before-declaration"
 	| "unknown-name"
 	| "unknown-type"
 	| "unknown-protocol"
