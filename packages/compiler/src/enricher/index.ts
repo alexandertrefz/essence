@@ -16,6 +16,7 @@ import {
 	resolveNamespaceDefinitionStatementType,
 } from "./enrichers"
 import {
+	invalidateNamespacesInScope,
 	referencedTypeNames,
 	resolveChoiceDeclarationStatementType,
 	resolveFunctionSignatureType,
@@ -710,6 +711,25 @@ function hoistDeclarations(
 				sink(node, speculation.diagnostics)
 
 				targetMap[node.name.content] = speculation.result
+
+				// NOTE: "Which Namespaces can this Scope see" is memoised
+				// against a version that every declaration bumps, and the hoist
+				// writes into the Scope DIRECTLY rather than through
+				// `declareVariableInScope`, which is what usually bumps it. It
+				// has to bump it itself, because something DOES ask during the
+				// rounds: a bodied static Property's value is enriched while its
+				// Namespace resolves. Without this the first such value memoises
+				// the Namespaces hoisted SO FAR, and every Method call resolved
+				// afterwards — in every file — is answered from that half-built
+				// table, so a whole standard library fails to enrich over one
+				// Property that reads a Method.
+				if (targetMap === scope.members) {
+					invalidateNamespacesInScope(
+						scope,
+						node.name.content,
+						speculation.result as common.Type,
+					)
+				}
 
 				if (
 					node.nodeType === "FunctionStatement" ||

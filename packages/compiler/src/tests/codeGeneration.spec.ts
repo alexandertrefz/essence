@@ -1,10 +1,11 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, beforeAll, describe, expect, it } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
 import type { common } from "@essence/interfaces"
+import { readStdlibFiles } from "@essence/stdlib"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"
@@ -13,6 +14,8 @@ import {
 	loadStdlib,
 	loadStdlibFrom,
 	parseStdlibSource,
+	type Stdlib,
+	useStdlib,
 } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import { optimise } from "../optimiser/index"
@@ -2606,6 +2609,114 @@ describe("Code Generation", () => {
 					"Holder",
 					"Asker",
 				])
+			})
+
+			// NOTE: Everything above hands the prelude in and reads the answer
+			// back. This block reaches the same machinery the way a PROGRAM
+			// reaches it — the whole standard library with one more file on the
+			// end, installed as THE library for the length of the block, so a
+			// user Program can be compiled and run against a Property that has a
+			// value. No library on disk gives one a value yet (`Number.PI` is the
+			// primitive every other Transcendental is written from, and nothing
+			// in Essence produces one), so a source of its own is the only way to
+			// compile against the band at all.
+			describe("read from a user Program", () => {
+				// NOTE: The three shapes the band has to get right in one file:
+				// a Property whose value CALLS a Method, a Property that reads
+				// another one of its OWN Namespace, and a Namespace declared
+				// below every one it names.
+				const constants = `declarations {
+
+	§ A Namespace whose static Properties carry values.
+	namespace Constants for Integer {
+		§§ The base value.
+		static BASE: Integer = 21
+
+		§§ Twice the base, read through the Namespace's own name.
+		static DOUBLE: Integer = Constants.BASE::doubled()
+
+		§§ Doubles the Integer.
+		§§
+		§§ @returns — twice the Integer.
+		doubled() -> Integer {
+			<- @::add(@)
+		}
+	}
+}
+`
+
+				let replacedStdlib: Stdlib | null = null
+
+				beforeAll(() => {
+					let sources = readStdlibFiles().map(
+						({ filePath, sourceText }) =>
+							parseStdlibSource(filePath, sourceText),
+					)
+
+					sources.push(parseStdlibSource("Constants.es", constants))
+
+					replacedStdlib = useStdlib(loadStdlibFrom(sources))
+				})
+
+				// NOTE: Put back, rather than dropped: every consumer of the
+				// standard library reads the one process-wide object, so a test
+				// that left its own in place would compile every file after it
+				// against a library the repository does not have.
+				afterAll(() => {
+					useStdlib(replacedStdlib)
+				})
+
+				it("answers with the const for a Property that has a value", () => {
+					expect(essencePropertyName("Constants", "DOUBLE")).toBe(
+						"$es_Constants_DOUBLE",
+					)
+					expect(essencePropertyName("Constants", "BASE")).toBe(
+						"$es_Constants_BASE",
+					)
+					expect(essenceMethodName("Constants", "doubled")).toBe(
+						"$es_Constants_doubled",
+					)
+				})
+
+				it("routes a Property read to its const, in a band below the Functions", () => {
+					let code = generate(`implementation {
+	__print(Constants.DOUBLE::toString())
+}`)
+
+					// NOTE: The read is the bare const, not the
+					// `Constants.DOUBLE` member read a native Property emits —
+					// and no import for the Namespace is emitted at all, since
+					// nothing about it is native.
+					expect(code).toContain(
+						"$_.__print(Integer.toString($es_Constants_DOUBLE));",
+					)
+					expect(code).not.toContain("Constants.DOUBLE")
+					expect(code).not.toContain('import * as Constants from "')
+
+					// NOTE: The order the initialisers need: the Method's const
+					// stands above the whole value band, `BASE` above the
+					// `DOUBLE` whose value reads it. Emitted in discovery order
+					// this is a `ReferenceError` at import out of a Program that
+					// compiled green.
+					expect(
+						code.indexOf("const $es_Constants_doubled ="),
+					).toBeLessThan(code.indexOf("const $es_Constants_BASE ="))
+					expect(
+						code.indexOf("const $es_Constants_BASE ="),
+					).toBeLessThan(code.indexOf("const $es_Constants_DOUBLE ="))
+				})
+
+				// NOTE: And the proof that the order is not just written down but
+				// runs: the values are computed at import, so a band in the wrong
+				// order throws before the first line of the Program.
+				it("runs the value band", async () => {
+					expect(
+						await run(`implementation {
+	__print(Constants.DOUBLE)
+	__print(Constants.BASE)
+}`),
+					).toEqual(["42", "21"])
+				})
 			})
 		})
 

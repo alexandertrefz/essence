@@ -711,6 +711,48 @@ describe("Standard Library Loader", () => {
 		})
 	})
 
+	// NOTE: A Property's value is the one Expression enriched while the hoist
+	// rounds are still running, which makes it the one place a half-built Scope
+	// is observable. The memoised "which Namespaces can this Scope see" answer
+	// was recorded there, from the Namespaces hoisted SO FAR, and nothing in the
+	// rounds bumped the version that would have retired it — so every Method
+	// call in every file afterwards was answered from that table, and a library
+	// failed to enrich, in files that had nothing to do with the Property, over
+	// one Property that calls a Method. It takes two files to see: the value
+	// below names a Namespace the round has not reached yet.
+	it("loads a static Property whose value calls a Method hoisted after it", () => {
+		let stdlib = load(
+			[
+				"Constants.es",
+				`declarations {
+				§ The constants.
+				namespace Constants {
+					§§ The base value, read the long way around.
+					static ECHO: Integer = 2::echoed()
+				}
+			}`,
+			],
+			[
+				"Echoing.es",
+				`declarations {
+				§ The echoing.
+				namespace Echoing for Integer {
+					§§ The Integer itself.
+					§§
+					§§ @returns — the Integer.
+					echoed() -> Integer {
+						<- @
+					}
+				}
+			}`,
+			],
+		)
+
+		expect(namespaceNamed(stdlib, "Constants").properties).toEqual({
+			ECHO: { type: "Integer" },
+		})
+	})
+
 	// NOTE: The consts are emitted in the order the Properties are written, so a
 	// read of one below is a read of a const that does not exist yet. The
 	// Validator refuses it, and the standard library's zero-Diagnostic gate

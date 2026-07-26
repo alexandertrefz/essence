@@ -478,3 +478,21 @@ export function loadStdlib(): Stdlib {
 
 	return cachedStdlib
 }
+
+// NOTE: The one seam through which the process-wide standard library becomes a
+// different one — a test compiling a user Program against sources it wrote
+// itself, which is the only way to reach behaviour that no library ON DISK
+// exercises yet (a static Property with a value is the first). It answers with
+// the library that was installed before, so a caller puts it back by handing
+// that straight back in rather than dropping it and paying for a second load.
+//
+// NOTE: Everything derived from the library downstream — the Rewriter's prelude
+// and its name tables — is keyed by this OBJECT, so swapping it here is the
+// whole of the swap. There is deliberately no second cache to remember to clear.
+export function useStdlib(stdlib: Stdlib | null): Stdlib | null {
+	let previous = cachedStdlib
+
+	cachedStdlib = stdlib
+
+	return previous
+}
