@@ -91,6 +91,41 @@ ${entries.map((entry) => overloadEntries[entry]).join("\n")}
 	])
 }
 
+// NOTE: The same three spellings for a free Function's `overload` block. A free
+// Function has no receiver, so the entries are told apart by their Argument
+// LABEL — which is what a call site picks the overload by.
+const freeOverloadEntries = {
+	native: "\t\t(first value: Integer) -> Integer",
+	bodiedString:
+		"\t\t(second value: String) -> String {\n\t\t\t<- value\n\t\t}",
+	bodiedBoolean:
+		"\t\t(third value: Boolean) -> Boolean {\n\t\t\t<- value\n\t\t}",
+}
+
+function overloadFunction(
+	entries: Array<keyof typeof freeOverloadEntries>,
+): Stdlib {
+	return load([
+		"Combine.es",
+		`declarations {
+	§§ Combines two values.
+	overload function combine {
+${entries.map((entry) => freeOverloadEntries[entry]).join("\n")}
+	}
+}`,
+	])
+}
+
+// NOTE: The typed Nodes a bodied `overload function` block leaves behind, by the
+// name each answers to. A free Function is its own top-level Node rather than an
+// entry in a Namespace's table, so the numbering is observable directly on the
+// typed Program — no simplification needed, the Enricher already named them.
+function typedFunctionNames(stdlib: Stdlib): Array<string> {
+	return stdlib.typedPrograms[0]!.implementation.nodes.flatMap((node) =>
+		node.nodeType === "FunctionStatement" ? [node.name.content] : [],
+	)
+}
+
 describe("Standard Library Loader", () => {
 	// NOTE: The whole point of the `declarations { … }` form — a signature with
 	// no body IS the declaration. Every shape the Enricher needs of a builtin
@@ -885,6 +920,121 @@ describe("Standard Library Loader", () => {
 			expect(
 				functionInvocations(simplified).map((node) => node.name.name),
 			).toEqual(["combine__overload$1", "combine__overload$2"])
+		})
+
+		// NOTE: The free-Function twin of the Method numbering above, and the
+		// reason it needs its own proof: a bodied entry becomes a top-level
+		// `FunctionStatement` of its own, named by its position in the FUNCTION
+		// TYPE rather than by its position among the bodied entries. A native
+		// entry's slot is already answered by the runtime export
+		// `nativeFreeFunctionNames` spells the same way, so emitting a bodied
+		// entry under a filtered index would both answer to a name no call site
+		// resolves to and shadow that export.
+		describe("numbers a bodied Overload by its position in the Function Type", () => {
+			it("skips the slot a leading native occupies", () => {
+				let stdlib = overloadFunction(["native", "bodiedString"])
+
+				expect(stdlib.functionBindings["combine"]).toEqual([
+					true,
+					false,
+				])
+				expect(typedFunctionNames(stdlib)).toEqual([
+					"combine__overload$2",
+				])
+			})
+
+			it("skips the slot a native between two bodied Overloads occupies", () => {
+				let stdlib = overloadFunction([
+					"bodiedString",
+					"native",
+					"bodiedBoolean",
+				])
+
+				expect(stdlib.functionBindings["combine"]).toEqual([
+					false,
+					true,
+					false,
+				])
+				expect(typedFunctionNames(stdlib)).toEqual([
+					"combine__overload$1",
+					"combine__overload$3",
+				])
+			})
+
+			it("skips the slots two leading natives occupy", () => {
+				let stdlib = overloadFunction([
+					"native",
+					"native",
+					"bodiedString",
+				])
+
+				expect(typedFunctionNames(stdlib)).toEqual([
+					"combine__overload$3",
+				])
+			})
+
+			// NOTE: The Node carries the Type of the slot it was NUMBERED for, not
+			// of the first overload nor of the filtered position — the Type a call
+			// site that resolved to that index has already committed to.
+			it("gives the Node the Type of its own slot", () => {
+				let stdlib = overloadFunction(["native", "bodiedString"])
+				let [node] = stdlib.typedPrograms[0]!.implementation.nodes
+
+				expect(node?.nodeType).toBe("FunctionStatement")
+
+				if (node?.nodeType === "FunctionStatement") {
+					expect(node.type.type).toBe("Function")
+
+					if (node.type.type === "Function") {
+						expect(node.type.returnType).toEqual({
+							type: "String",
+						})
+					}
+				}
+			})
+
+			// NOTE: The failure the numbering exists to prevent, stated over the
+			// mixed shapes: no bodied entry ever takes a native entry's name, and
+			// exactly the bodied ones are emitted.
+			it("never emits a definition under a native's export name", () => {
+				for (let entries of [
+					["native", "bodiedString"],
+					["bodiedString", "native", "bodiedBoolean"],
+					["native", "native", "bodiedString"],
+				] as const) {
+					let stdlib = overloadFunction([...entries])
+					let flags = stdlib.functionBindings["combine"]!
+					let emitted = new Set(typedFunctionNames(stdlib))
+
+					flags.forEach((native, index) => {
+						if (native) {
+							expect(
+								emitted.has(`combine__overload$${index + 1}`),
+							).toBe(false)
+						}
+					})
+
+					expect(emitted.size).toBe(
+						flags.filter((native) => !native).length,
+					)
+				}
+			})
+
+			// NOTE: The other half of the invariant — where nothing is native the
+			// indices are the identity, which is the shape `loop`'s two bodied
+			// entries and every user-written `overload function` rely on.
+			it("numbers an all bodied block from one, in order", () => {
+				let stdlib = overloadFunction(["bodiedString", "bodiedBoolean"])
+
+				expect(stdlib.functionBindings["combine"]).toEqual([
+					false,
+					false,
+				])
+				expect(typedFunctionNames(stdlib)).toEqual([
+					"combine__overload$1",
+					"combine__overload$2",
+				])
+			})
 		})
 
 		// NOTE: A bare reference to an overloaded free Function names every

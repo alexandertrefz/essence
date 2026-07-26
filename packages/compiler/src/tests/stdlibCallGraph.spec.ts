@@ -3,11 +3,15 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence/interfaces"
 
 import { loadStdlibFrom, parseStdlibSource } from "../enricher/stdlib"
+import { optimise } from "../optimiser/index"
 import {
 	buildStdlibPrelude,
+	type PreludeFreeFunction,
 	type PreludeNamespace,
+	stdlibFreeFunctions,
 	stdlibPrelude,
 } from "../rewriter/stdlibPrelude"
+import { simplify } from "../simplifier/index"
 
 // NOTE: The graph is built from the PRELUDE Nodes — `common.typedSimple`,
 // after the Simplifier and the Optimiser — and not from the typed Nodes the
@@ -25,13 +29,28 @@ type CallGraph = Map<string, Set<string>>
 // can not begin a cycle of Essence Methods — the cycle this test is planted to
 // catch is `Boolean.isNot` -> `Boolean.is` -> `Boolean.isNot`, where every step
 // is a Method someone wrote in `packages/stdlib/sources`.
-function buildCallGraph(prelude: Array<PreludeNamespace>): CallGraph {
+//
+// NOTE: The bodied free Functions are Nodes on the same footing, keyed by the
+// bare `<name>__overload$N` name they are emitted under — a name that can carry
+// no `.`, so it can not collide with a Method's key. They belong in the SAME
+// graph rather than in one of their own: a bodied `loop` entry is written on
+// another entry of its own family, and a cycle that leaves a Method for a free
+// Function and comes back is a stack overflow like any other. Kept out, every
+// edge through one of them is invisible.
+function buildCallGraph(
+	prelude: Array<PreludeNamespace>,
+	freeFunctions: Array<PreludeFreeFunction> = [],
+): CallGraph {
 	let graph: CallGraph = new Map()
 
 	for (let namespace of prelude) {
 		for (let methodName of Object.keys(namespace.node.methods)) {
 			graph.set(`${namespace.name}.${methodName}`, new Set())
 		}
+	}
+
+	for (let freeFunction of freeFunctions) {
+		graph.set(freeFunction.name, new Set())
 	}
 
 	for (let namespace of prelude) {
@@ -44,6 +63,16 @@ function buildCallGraph(prelude: Array<PreludeNamespace>): CallGraph {
 				if (graph.has(target)) {
 					callers.add(target)
 				}
+			}
+		}
+	}
+
+	for (let freeFunction of freeFunctions) {
+		let callers = graph.get(freeFunction.name)!
+
+		for (let target of invocationsIn(freeFunction.node.value)) {
+			if (graph.has(target)) {
+				callers.add(target)
 			}
 		}
 	}
@@ -65,7 +94,16 @@ function buildCallGraph(prelude: Array<PreludeNamespace>): CallGraph {
 //                          Namespace Type and whose member names the static
 //                          Method. (A `Lookup` off a Record — `rec.field` — is
 //                          the same Node with a Record base Type, and is not an
-//                          edge.)
+//                          edge.) Off a bare Identifier it is a FREE Function
+//                          call instead — `loop__overload$1(…)` by now — and the
+//                          name IS the graph key. A call on a Function-typed
+//                          local or Parameter (`advance(current)`, which every
+//                          `loop` body makes) is the same Node shape; it names no
+//                          Node, so the `graph.has` filter drops it, and a local
+//                          that SHADOWS a bodied free Function's name would draw
+//                          an edge that is not there — an over-approximation, so
+//                          it can only report a cycle for a developer to read,
+//                          never hide one.
 //
 // Missing the third is what an earlier version of this file did: a cycle routed
 // through a static helper — and the stdlib is full of static calls — was
@@ -121,6 +159,10 @@ function invocationsIn(node: unknown): Array<string> {
 				callee.member.nodeType === "Identifier"
 			) {
 				targets.push(`${callee.base.name}.${callee.member.name}`)
+			}
+
+			if (callee.nodeType === "Identifier") {
+				targets.push(callee.name)
 			}
 		}
 
@@ -192,10 +234,28 @@ function findCycle(graph: CallGraph): Array<string> | null {
 // the walker above is exercised on the shapes the real Loader produces — a
 // hand written Node would only prove that the code agrees with the test's own
 // idea of what a Node looks like.
-function preludeOf(source: string): Array<PreludeNamespace> {
-	let stdlib = loadStdlibFrom([parseStdlibSource("Synthetic.es", source)])
+//
+// NOTE: The free Functions are collected the way `buildStdlibArtifacts` collects
+// the real ones — the copy before the Simplifier included, since it writes into
+// the Nodes it is handed. They can not be read off `stdlibFreeFunctions`, which
+// answers for the process-wide standard library rather than for this source.
+function graphOf(source: string): CallGraph {
+	let typedPrograms = loadStdlibFrom([
+		parseStdlibSource("Synthetic.es", source),
+	]).typedPrograms
 
-	return buildStdlibPrelude(stdlib.typedPrograms)
+	let freeFunctions: Array<PreludeFreeFunction> = typedPrograms.flatMap(
+		(typedProgram) =>
+			optimise(
+				simplify(structuredClone(typedProgram)),
+			).implementation.nodes.flatMap((node) =>
+				node.nodeType === "FunctionStatement"
+					? [{ name: node.name.name, node }]
+					: [],
+			),
+	)
+
+	return buildCallGraph(buildStdlibPrelude(typedPrograms), freeFunctions)
 }
 
 describe("Stdlib Call Graph", () => {
@@ -206,8 +266,15 @@ describe("Stdlib Call Graph", () => {
 	// exactly what this catches before it ships. A Choice's `is`/`isNot` are
 	// no longer among them: they are derived, so they are not written in
 	// Essence and have no edges to cycle through.
+	//
+	// NOTE: The free Functions are in the same graph, which is what makes `loop`'s
+	// two bodied entries answerable for: each is written on the native primitive
+	// of its family today, and an entry written on ANOTHER bodied entry tomorrow
+	// is a cycle two individually reasonable commits can close between them.
 	it("has no cycle among the Essence-implemented Methods", () => {
-		let cycle = findCycle(buildCallGraph(stdlibPrelude()))
+		let cycle = findCycle(
+			buildCallGraph(stdlibPrelude(), stdlibFreeFunctions()),
+		)
 
 		if (cycle !== null) {
 			throw new Error(
@@ -218,8 +285,8 @@ describe("Stdlib Call Graph", () => {
 		}
 	})
 
-	it("names every Essence-implemented Method as a Node", () => {
-		let graph = buildCallGraph(stdlibPrelude())
+	it("names every Essence-implemented Method and free Function as a Node", () => {
+		let graph = buildCallGraph(stdlibPrelude(), stdlibFreeFunctions())
 
 		expect([...graph.keys()].sort()).toEqual([
 			"Algebraic.absolute",
@@ -355,12 +422,16 @@ describe("Stdlib Call Graph", () => {
 			"Transcendental.subtract__overload$1",
 			"Transcendental.subtract__overload$2",
 			"Transcendental.subtract__overload$3",
+			// NOTE: The bodied free Functions, keyed by the bare name they are
+			// emitted under. `loop`'s other two entries are native — there is no
+			// body to walk, exactly as for a native Method.
+			"loop__overload$2",
+			"loop__overload$3",
 		])
 	})
 
 	it("records the Methods a body calls, native ones aside", () => {
-		let graph = buildCallGraph(
-			preludeOf(`declarations {
+		let graph = graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
@@ -389,8 +460,7 @@ describe("Stdlib Call Graph", () => {
 		§§ @returns — the negation.
 		negate() -> Boolean
 	}
-}`),
-		)
+}`)
 
 		// NOTE: `negate` and `and` are natives — invoked, but not Nodes.
 		expect(graph.get("Boolean.isNot")).toEqual(new Set(["Boolean.is"]))
@@ -402,8 +472,7 @@ describe("Stdlib Call Graph", () => {
 	// records the edge for a bodied instance Method that calls a bodied static
 	// helper, and for one static calling another.
 	it("records an edge to a static Method a body calls", () => {
-		let graph = buildCallGraph(
-			preludeOf(`declarations {
+		let graph = graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean matches, the long way around.
 		§§
@@ -431,8 +500,7 @@ describe("Stdlib Call Graph", () => {
 			<- boxed.field
 		}
 	}
-}`),
-		)
+}`)
 
 		expect(graph.get("Boolean.alpha")).toEqual(new Set(["Boolean.beta"]))
 		expect(graph.get("Boolean.beta")).toEqual(new Set(["Boolean.gamma"]))
@@ -446,8 +514,7 @@ describe("Stdlib Call Graph", () => {
 	// on passing if `findCycle` returned null unconditionally.
 	it("reports a cycle as the path around it", () => {
 		let cycle = findCycle(
-			buildCallGraph(
-				preludeOf(`declarations {
+			graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Whether the Boolean is not the other one.
 		§§
@@ -466,7 +533,6 @@ describe("Stdlib Call Graph", () => {
 		}
 	}
 }`),
-			),
 		)
 
 		expect(cycle).toEqual(["Boolean.isNot", "Boolean.is", "Boolean.isNot"])
@@ -477,8 +543,7 @@ describe("Stdlib Call Graph", () => {
 	// each other are a stack overflow just as surely as two instance Methods.
 	it("reports a cycle between two static Methods", () => {
 		let cycle = findCycle(
-			buildCallGraph(
-				preludeOf(`declarations {
+			graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Beta defers to gamma.
 		§§
@@ -497,7 +562,6 @@ describe("Stdlib Call Graph", () => {
 		}
 	}
 }`),
-			),
 		)
 
 		expect(cycle).toEqual(["Boolean.beta", "Boolean.gamma", "Boolean.beta"])
@@ -510,8 +574,7 @@ describe("Stdlib Call Graph", () => {
 	// be seen; missing either hides the cycle.
 	it("reports a cycle across the instance/static boundary", () => {
 		let cycle = findCycle(
-			buildCallGraph(
-				preludeOf(`declarations {
+			graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Alpha defers to the static beta.
 		§§
@@ -530,7 +593,6 @@ describe("Stdlib Call Graph", () => {
 		}
 	}
 }`),
-			),
 		)
 
 		expect(cycle).toEqual([
@@ -540,16 +602,142 @@ describe("Stdlib Call Graph", () => {
 		])
 	})
 
+	// NOTE: The free Functions, which are Nodes of the same graph. `loop`'s bodied
+	// entries are both written on the family's native `while`, so the real library
+	// draws no edge between two Nodes here yet — these fixtures are what answer
+	// for the day it does.
+	describe("free Functions", () => {
+		// NOTE: Both directions across the boundary at once, which is what makes
+		// the shared graph worth having: a free Function's body reaching a Method,
+		// and a Method's body reaching a free Function.
+		it("records an edge in either direction across the boundary", () => {
+			let graph = graphOf(`declarations {
+	§§ Doubles the value.
+	§§
+	§§ @param value — the Integer to double.
+	§§ @returns — twice the value.
+	function double(_ value: Integer) -> Integer {
+		<- value::twice()
+	}
+
+	namespace Inner for Integer {
+		§§ Four times the value, by way of the free Function.
+		§§
+		§§ @returns — four times the value.
+		fourTimes() -> Integer {
+			<- double(double(@))
+		}
+
+		§§ Twice the value.
+		§§
+		§§ @returns — twice the value.
+		twice() -> Integer {
+			<- @
+		}
+	}
+}`)
+
+			expect(graph.get("double")).toEqual(new Set(["Inner.twice"]))
+			expect(graph.get("Inner.fourTimes")).toEqual(new Set(["double"]))
+			expect(graph.get("Inner.twice")).toEqual(new Set())
+		})
+
+		// NOTE: The edge the acyclicity check was blind to until the free
+		// Functions became Nodes — one entry of an `overload function` block
+		// written on another, which is exactly how `loop`'s bodied entries are
+		// written on the family's native `while`.
+		it("records an edge between two entries of one overload block", () => {
+			let graph = graphOf(`declarations {
+	§§ Combines a value with itself.
+	§§
+	§§ @param value — the Integer.
+	§§ @returns — the Integer.
+	overload function combine {
+		§§ The plain entry.
+		§§
+		§§ @param value — the Integer.
+		§§ @returns — the Integer.
+		(first value: Integer) -> Integer {
+			<- value
+		}
+
+		§§ The entry written on the first.
+		§§
+		§§ @param value — the Integer.
+		§§ @returns — the Integer.
+		(second value: Integer) -> Integer {
+			<- combine(first value)
+		}
+	}
+}`)
+
+			expect(graph.get("combine__overload$2")).toEqual(
+				new Set(["combine__overload$1"]),
+			)
+			expect(graph.get("combine__overload$1")).toEqual(new Set())
+		})
+
+		it("reports a cycle between two free Functions", () => {
+			let cycle = findCycle(
+				graphOf(`declarations {
+	§§ Alpha defers to beta.
+	§§
+	§§ @param value — the Integer.
+	§§ @returns — the Integer.
+	function alpha(_ value: Integer) -> Integer {
+		<- beta(value)
+	}
+
+	§§ Beta defers back to alpha.
+	§§
+	§§ @param value — the Integer.
+	§§ @returns — the Integer.
+	function beta(_ value: Integer) -> Integer {
+		<- alpha(value)
+	}
+}`),
+			)
+
+			expect(cycle).toEqual(["alpha", "beta", "alpha"])
+		})
+
+		// NOTE: A cycle that leaves a Method for a free Function and comes back —
+		// the shape neither half of the graph could see on its own.
+		it("reports a cycle across the Method boundary", () => {
+			let cycle = findCycle(
+				graphOf(`declarations {
+	§§ Alpha calls the Method back on its argument.
+	§§
+	§§ @param value — the Integer.
+	§§ @returns — the Integer.
+	function alpha(_ value: Integer) -> Integer {
+		<- value::beta()
+	}
+
+	namespace Inner for Integer {
+		§§ Beta defers to the free Function.
+		§§
+		§§ @returns — the Integer.
+		beta() -> Integer {
+			<- alpha(@)
+		}
+	}
+}`),
+			)
+
+			expect(cycle).toEqual(["Inner.beta", "alpha", "Inner.beta"])
+		})
+	})
+
 	// NOTE: A Method that calls itself is a recursive Method, not a mistake —
 	// the standard library will have them, and a cycle among DIFFERENT Methods
 	// is what this walker is for. The self-call here sits behind a base case on
 	// purpose: an UNCONDITIONAL self-call never returns, and that is caught by
-	// the `infinite-recursion` Diagnostic — which `preludeOf` runs through
+	// the `infinite-recursion` Diagnostic — which `graphOf` runs through
 	// validation, so the fixture has to be a Method that actually terminates.
 	it("leaves direct self-recursion alone", () => {
 		let cycle = findCycle(
-			buildCallGraph(
-				preludeOf(`declarations {
+			graphOf(`declarations {
 	namespace Boolean for Boolean {
 		§§ Whether both Booleans are the same, the long way around.
 		§§
@@ -564,7 +752,6 @@ describe("Stdlib Call Graph", () => {
 		}
 	}
 }`),
-			),
 		)
 
 		expect(cycle).toBeNull()
