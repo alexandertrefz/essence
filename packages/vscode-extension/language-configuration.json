@@ -13,6 +13,10 @@
 		{ "open": "(", "close": ")" },
 		{ "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
 	],
+	// NOTE: `<>` is deliberately absent from autoClosingPairs. `<-` is the
+	// return Statement and one of the most-typed tokens there is, so closing a
+	// `<` would turn every `<- x` into `<>- x`. Wrapping a selection in them is
+	// still worth having, hence the entry below.
 	"surroundingPairs": [
 		["{", "}"],
 		["[", "]"],
@@ -21,10 +25,21 @@
 		["\"", "\""]
 	],
 	"wordPattern": "(-?[0-9][0-9_]*)|([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
+	// NOTE: Only `§§` doc comments continue on Enter. Plain `§` comments trail
+	// live code throughout this codebase, where continuing one would make
+	// ending it a delete-chore — the same line VS Code draws between `/**` and
+	// `//`.
 	"onEnterRules": [
 		{
-			"beforeText": "^\\s*§§ .*$",
+			"beforeText": "^\\s*§§.*$",
 			"action": { "indent": "none", "appendText": "§§ " }
 		}
-	]
+	],
+	// NOTE: The tempered `^((?!§).)*` prefix is load-bearing: without it an
+	// opening brace inside a comment would indent the line after it. The
+	// character classes rule the same thing out inside a String.
+	"indentationRules": {
+		"increaseIndentPattern": "^((?!§).)*(\\{[^}\"§]*|\\([^)\"§]*|\\[[^\\]\"§]*)$",
+		"decreaseIndentPattern": "^\\s*[}\\])]"
+	}
 }

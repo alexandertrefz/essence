@@ -4,7 +4,7 @@
 	"scopeName": "source.essence",
 	"patterns": [
 		{
-			"include": "#documentation"
+			"include": "#docComment"
 		},
 		{
 			"include": "#comment"
@@ -23,6 +23,9 @@
 		},
 		{
 			"include": "#controlKeyword"
+		},
+		{
+			"include": "#contextualKeyword"
 		},
 		{
 			"include": "#declarationKeyword"
@@ -46,16 +49,22 @@
 			"include": "#nativeInvocation"
 		},
 		{
-			"include": "#methodInvocation"
+			"include": "#wildcard"
 		},
 		{
-			"include": "#functionInvocation"
+			"include": "#methodInvocation"
 		},
 		{
 			"include": "#caseReference"
 		},
 		{
+			"include": "#property"
+		},
+		{
 			"include": "#type"
+		},
+		{
+			"include": "#functionInvocation"
 		},
 		{
 			"include": "#operator"
@@ -65,33 +74,26 @@
 		}
 	],
 	"repository": {
-		"documentation": {
+		"docComment": {
+			"comment": "A `§§` block documents whatever is declared below it, where a `§` block stays a private note. The tags, Parameter names and code spans are what make the two read differently even in a theme that colours every comment alike. `\\G` anchors a tag to the head of the line, exactly as the Compiler's own grammar does, so an `@param` written in prose stays prose.",
+			"begin": "§§",
+			"end": "$",
+			"name": "comment.block.documentation.essence",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.comment.documentation.essence"
+				}
+			},
 			"patterns": [
 				{
-					"match": "(§§)[ \\t]*(@param)[ \\t]+([^\\s—]+)[ \\t]*(—)?.*$",
-					"name": "comment.line.documentation.essence",
+					"comment": "A `@param` naming nothing documents nothing and is left in the prose by the Compiler, so it is left unlit here too. The em-dash is what the Compiler requires between a tag and its text, so it reads as the separator it is rather than as prose.",
+					"match": "\\G ?(@param)[ \\t]+([^\\s—]+)[ \\t]*(—)?",
 					"captures": {
 						"1": {
-							"name": "punctuation.definition.comment.essence"
-						},
-						"2": {
 							"name": "keyword.other.documentation.essence"
 						},
-						"3": { "name": "variable.parameter.essence" },
-						"4": {
-							"name": "punctuation.separator.documentation.essence"
-						}
-					}
-				},
-				{
-					"match": "(§§)[ \\t]*(@returns)\\b[ \\t]*(—)?.*$",
-					"name": "comment.line.documentation.essence",
-					"captures": {
-						"1": {
-							"name": "punctuation.definition.comment.essence"
-						},
 						"2": {
-							"name": "keyword.other.documentation.essence"
+							"name": "variable.parameter.essence"
 						},
 						"3": {
 							"name": "punctuation.separator.documentation.essence"
@@ -99,19 +101,47 @@
 					}
 				},
 				{
-					"match": "§§.*$",
-					"name": "comment.line.documentation.essence"
+					"match": "\\G ?(@returns)\\b[ \\t]*(—)?",
+					"captures": {
+						"1": {
+							"name": "keyword.other.documentation.essence"
+						},
+						"2": {
+							"name": "punctuation.separator.documentation.essence"
+						}
+					}
+				},
+				{
+					"match": "`[^`]*`",
+					"name": "markup.inline.raw.string.essence"
 				}
 			]
 		},
 		"comment": {
-			"match": "§.*$",
-			"name": "comment.line.essence"
+			"comment": "The `(?!§)` keeps a Documentation block out of here on its own, so that the order of the two rules is not what tells them apart.",
+			"match": "(§)(?!§).*$",
+			"name": "comment.line.essence",
+			"captures": {
+				"1": {
+					"name": "punctuation.definition.comment.essence"
+				}
+			}
 		},
 		"string": {
+			"comment": "A String legitimately spans lines, so running on past the end of the line is the correct reading of an unterminated quote rather than a bug.",
 			"begin": "\"",
 			"end": "\"",
-			"name": "string.quoted.double.essence"
+			"name": "string.quoted.double.essence",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.begin.essence"
+				}
+			},
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.end.essence"
+				}
+			}
 		},
 		"valueDeclaration": {
 			"match": "\\b(constant|variable)[ \\t]+([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
@@ -150,8 +180,13 @@
 			"match": "\\b(if|else|match|case|for|with)\\b",
 			"name": "keyword.control.essence"
 		},
+		"contextualKeyword": {
+			"comment": "`is` is also a Method name — `@::is(other)` — and `where` is also an Argument label — `keepEvery(where check:)` — so neither can be lit on the word alone. What follows decides: a conformance bound and a Match guard are followed by a Type or by `@`, a call and a label never are. The known miss is a guard on a bare lowercase name, `case Integer where isNegative()`, which stays unlit.",
+			"match": "\\b(is|where)\\b(?=[ \\t]+(@|[A-Z]))",
+			"name": "keyword.other.essence"
+		},
 		"declarationKeyword": {
-			"match": "\\b(implementation|constant|variable|function|namespace|type|choice|protocol)\\b",
+			"match": "\\b(declarations|implementation|constant|variable|function|namespace|type|choice|protocol)\\b",
 			"name": "storage.type.essence"
 		},
 		"modifierKeyword": {
@@ -163,11 +198,12 @@
 			"name": "constant.language.essence"
 		},
 		"fraction": {
-			"match": "-?[0-9][0-9_]*/-?[0-9][0-9_]*",
+			"comment": "The sign carries the lookbehind rather than the whole Literal: `<-5` returns a five, and reading the `-` of `<-` as its sign would leave the digit unlit.",
+			"match": "(?:(?<![<~-])-)?[0-9][0-9_]*/-?[0-9][0-9_]*",
 			"name": "constant.numeric.fraction.essence"
 		},
 		"number": {
-			"match": "-?[0-9][0-9_]*",
+			"match": "(?:(?<![<~-])-)?[0-9][0-9_]*",
 			"name": "constant.numeric.integer.essence"
 		},
 		"self": {
@@ -177,6 +213,11 @@
 		"nativeInvocation": {
 			"match": "(__)([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
 			"name": "support.function.native.essence"
+		},
+		"wildcard": {
+			"comment": "What follows is what separates the wildcard from the `__` a native invocation opens with, which is never followed by any of these.",
+			"match": "_(?=[\\s,):])",
+			"name": "variable.language.wildcard.essence"
 		},
 		"methodInvocation": {
 			"match": "(::)(?:(<)([^>]+)(>))?([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)?",
@@ -192,10 +233,6 @@
 				}
 			}
 		},
-		"functionInvocation": {
-			"match": "([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)(?=\\()",
-			"name": "entity.name.function.essence"
-		},
 		"caseReference": {
 			"match": "(#)([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",
 			"captures": {
@@ -207,15 +244,43 @@
 				}
 			}
 		},
+		"property": {
+			"comment": "Ahead of `type`, because a member is not a Type however it is spelled — `Number.PI` names a member of `Number`. The `(?!\\()` is what leaves a CALLED member to `functionInvocation`; ordering alone can not do it, since both rules would start at the same character. The quantifier is possessive so that the name can not give a character back to satisfy that lookahead — `.forCrowd(` would otherwise match `forCrow` and leave the `d` behind.",
+			"match": "(?<=\\.)[^\\s\"§(){}\\[\\]<>|/@,.:=~#-]++(?!\\()",
+			"name": "variable.other.property.essence"
+		},
 		"type": {
+			"comment": "Ahead of `functionInvocation`, so that `Foo(` reads as the Type it names rather than as a Function — both start at the same character, and the earlier rule wins that tie. A lowercase call is untouched, since this rule needs a capital.",
 			"match": "\\b[A-Z][^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]*",
 			"name": "entity.name.type.essence"
 		},
+		"functionInvocation": {
+			"match": "([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)(?=\\()",
+			"name": "entity.name.function.essence"
+		},
 		"operator": {
-			"match": "<-|->|[=|~]",
-			"name": "keyword.operator.essence"
+			"patterns": [
+				{
+					"comment": "The language's only return form, which is control flow rather than arithmetic.",
+					"match": "<-",
+					"name": "keyword.control.return.essence"
+				},
+				{
+					"match": "->|~>",
+					"name": "keyword.operator.arrow.essence"
+				},
+				{
+					"match": "=",
+					"name": "keyword.operator.assignment.essence"
+				},
+				{
+					"match": "\\|",
+					"name": "keyword.operator.union.essence"
+				}
+			]
 		},
 		"punctuation": {
+			"comment": "Essence has no comparison Operators, so an angle bracket the Operator and Method rules above have left alone is unambiguously a Type Parameter's.",
 			"patterns": [
 				{
 					"match": "\\{|\\}",
@@ -226,8 +291,20 @@
 					"name": "meta.brace.round.essence"
 				},
 				{
+					"match": "\\[|\\]",
+					"name": "meta.brace.square.essence"
+				},
+				{
+					"match": "<|>",
+					"name": "punctuation.definition.typeparameters.essence"
+				},
+				{
 					"match": ",",
 					"name": "punctuation.separator.comma.essence"
+				},
+				{
+					"match": ":",
+					"name": "punctuation.separator.type.essence"
 				},
 				{
 					"match": "\\.",
