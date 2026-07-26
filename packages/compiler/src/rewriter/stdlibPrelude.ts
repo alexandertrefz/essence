@@ -1,22 +1,28 @@
 import type { common } from "@essence/interfaces"
 
+import type { NativeBindings, Stdlib } from "../enricher/stdlib"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
 import { optimise } from "../optimiser/index"
 import { simplify } from "../simplifier/index"
 
-// NOTE: A standard library Namespace is now written in TWO languages at once:
-// some of its Methods are bound to a runtime module in `__internal/`, the rest
-// are implemented in Essence in `packages/stdlib/sources/`. Emitted user code can not tell
-// the two apart — it says `Boolean.isNot(…)` either way — so the Rewriter has
-// to hand it ONE object that answers to both halves. That object is the prelude:
-// the runtime module spread into an object literal, with the Essence-implemented
-// Methods laid on top.
+// NOTE: A standard library Namespace is written in TWO languages at once: some
+// of its members are bound to a runtime module in `__internal/`, the rest are
+// implemented in Essence in `packages/stdlib/sources/`. Emitted user code can
+// not tell the two apart — it says `Boolean.isNot(…)` either way — so this
+// module is what the Rewriter asks which half a member belongs to. The prelude
+// is the Essence-implemented half: the typed Nodes of the BODIED members,
+// simplified and optimised once per process.
 //
-// NOTE: An object literal rather than a class, because a class body can not
-// spread anything, and every alternative (assigning onto the imported module
-// namespace, subclassing, a Proxy) either mutates a frozen module object or
-// costs a lookup on every call.
+// NOTE: The two halves are not merged into one object. A native member stays a
+// read off the plain `import * as <Namespace>`, which esbuild can rewrite to a
+// direct symbol reference and therefore tree-shake; an Essence-implemented one
+// is emitted as its OWN top-level const, named by `essenceMethodIdentifier`, so
+// nothing has to materialise the module namespace object to reach it. A
+// Method's const holds a Function expression and may sit anywhere; a static
+// Property's const holds the value itself, so those are emitted in a band of
+// their own, after the Function-valued consts and ordered against each other by
+// what they read.
 
 // NOTE: The Namespaces the prelude has anything to say about — the ones with at
 // least one Essence-implemented member. A Namespace whose every member is
@@ -43,13 +49,32 @@ type StdlibArtifacts = {
 	freeFunctions: Array<PreludeFreeFunction>
 }
 
-function buildStdlibArtifacts(
-	typedPrograms: Array<common.typed.Program>,
-): StdlibArtifacts {
+// NOTE: The member names a Namespace spells BOTH as a Method and as a static
+// Property. The typed Node can not answer this on its own — only the BODIED
+// members reach it, so a native `yes() -> Boolean` beside a bodied
+// `static yes: Boolean = true` looks like a lone Property there, and the clash
+// would slip through to be emitted. The loader's `nativeBindings` lists every
+// DECLARED member of both kinds, native or not, so the intersection is taken
+// over that; the typed Node stands in for a Namespace the bindings do not know,
+// which no loaded standard library produces.
+function clashingMemberNames(
+	node: common.typedSimple.NamespaceDefinitionStatementNode,
+	nativeBindings: NativeBindings,
+): Array<string> {
+	let bindings = nativeBindings[node.name.name]
+
+	let methodNames = new Set(Object.keys(bindings?.methods ?? node.methods))
+
+	return Object.keys(bindings?.properties ?? node.properties).filter((name) =>
+		methodNames.has(name),
+	)
+}
+
+function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	let namespaces: Array<PreludeNamespace> = []
 	let freeFunctions: Array<PreludeFreeFunction> = []
 
-	for (let typedProgram of typedPrograms) {
+	for (let typedProgram of stdlib.typedPrograms) {
 		let program = optimise(simplify(structuredClone(typedProgram)))
 
 		for (let node of program.implementation.nodes) {
@@ -71,14 +96,19 @@ function buildStdlibArtifacts(
 			}
 
 			// NOTE: A Method and a static Property of one Namespace are emitted
-			// under the SAME `$es_<Namespace>_<member>` const name, so a
-			// Namespace that spells both alike would declare that name twice.
-			// Nothing upstream refuses it — the two live in records of their own,
-			// so `static yes: Boolean = true` beside `yes() -> Boolean` type
-			// checks — and what it produces is a JavaScript file that will not
-			// parse, so the compiler developer who writes it is stopped here.
-			let shadowedMethods = Object.keys(node.properties).filter(
-				(name) => node.methods[name] !== undefined,
+			// under the SAME `$es_<Namespace>_<member>` const name. Nothing
+			// upstream refuses it — the two live in records of their own, so
+			// `static yes: Boolean = true` beside `yes() -> Boolean` type checks
+			// — and what it produces is not a file that fails to parse but one
+			// that is silently wrong: the Rewriter keys its candidates by that
+			// const name, so the two collapse into ONE entry, and every call
+			// site of the Method reads the Property's value instead. The
+			// compiler developer who writes it is stopped here. Which half is
+			// native does not matter — either kind of read is misrouted — so the
+			// clash is looked for over the DECLARED members, not the bodied ones.
+			let shadowedMethods = clashingMemberNames(
+				node,
+				stdlib.nativeBindings,
 			)
 
 			if (shadowedMethods.length > 0) {
@@ -91,9 +121,9 @@ function buildStdlibArtifacts(
 
 			// NOTE: Only the BODIED members reach the typed Node — a native has
 			// no body to emit — so a Namespace that is entirely native arrives
-			// here empty and is dropped. Merging it would emit a const that
-			// spreads the runtime module and adds nothing, which is only a
-			// slower way of importing it.
+			// here empty and is dropped. Keeping it would put a Namespace in the
+			// prelude that has no const to contribute, and every read of it is
+			// already the plain member read off the imported runtime module.
 			//
 			// NOTE: A bodied static Property counts as a member here, so a
 			// Namespace whose every Method is native but which gives one Property
@@ -115,13 +145,13 @@ function buildStdlibArtifacts(
 	return { namespaces, freeFunctions }
 }
 
-// NOTE: The prelude proper — the Essence-implemented Namespace members — keeps
-// its name and shape now that free Functions are collected beside it, so every
-// existing caller and test reads the Namespaces exactly as before.
-export function buildStdlibPrelude(
-	typedPrograms: Array<common.typed.Program>,
-): Array<PreludeNamespace> {
-	return buildStdlibArtifacts(typedPrograms).namespaces
+// NOTE: The prelude proper — the Essence-implemented Namespace members — kept
+// beside the free Functions collected in the same pass. It is handed a WHOLE
+// standard library rather than its typed Programs alone, because the clash
+// refusal above has to read the loader's `nativeBindings` to see the members no
+// typed Program carries.
+export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
+	return buildStdlibArtifacts(stdlib).namespaces
 }
 
 // NOTE: Built once per process, exactly like the standard library it is built
@@ -133,7 +163,7 @@ let cachedArtifacts: StdlibArtifacts | null = null
 
 function stdlibArtifacts(): StdlibArtifacts {
 	if (cachedArtifacts === null) {
-		cachedArtifacts = buildStdlibArtifacts(loadStdlib().typedPrograms)
+		cachedArtifacts = buildStdlibArtifacts(loadStdlib())
 	}
 
 	return cachedArtifacts

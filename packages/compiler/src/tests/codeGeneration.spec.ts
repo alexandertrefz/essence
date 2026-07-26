@@ -1103,8 +1103,7 @@ describe("Code Generation", () => {
 		// about is exactly what these must answer for.
 		function preludeOf(source: string) {
 			return buildStdlibPrelude(
-				loadStdlibFrom([parseStdlibSource("Synthetic.es", source)])
-					.typedPrograms,
+				loadStdlibFrom([parseStdlibSource("Synthetic.es", source)]),
 			)
 		}
 
@@ -1387,7 +1386,7 @@ describe("Code Generation", () => {
 		it("leaves the standard library's typed Programs untouched", () => {
 			let before = JSON.stringify(loadStdlib().typedPrograms)
 
-			buildStdlibPrelude(loadStdlib().typedPrograms)
+			buildStdlibPrelude(loadStdlib())
 
 			expect(JSON.stringify(loadStdlib().typedPrograms)).toBe(before)
 		})
@@ -1416,7 +1415,7 @@ describe("Code Generation", () => {
 				),
 			])
 
-			let prelude = buildStdlibPrelude(stdlib.typedPrograms)
+			let prelude = buildStdlibPrelude(stdlib)
 
 			expect(prelude).toHaveLength(1)
 			expect(prelude[0]!.name).toBe("Mixed")
@@ -2452,6 +2451,80 @@ describe("Code Generation", () => {
 					/'Clash' spells the static Property 'yes' exactly like a Method of its own/,
 				)
 			})
+
+			// NOTE: The Method is NATIVE here, so it reaches no typed Node — the
+			// clash is invisible to the prelude's own tables and has to be read
+			// off the loader's `nativeBindings`. Emitted, this is the worse half
+			// of the two: the Method's call sites find no Essence Method of that
+			// name, fall through to the static Property, and call its value.
+			it("refuses a Property spelled like a native Method of its own Namespace", () => {
+				expect(() =>
+					preludeOf(`declarations {
+	namespace Clash for Boolean {
+		§§ The affirmative.
+		static yes: Boolean = true
+
+		§§ The value itself.
+		§§
+		§§ @returns — the Boolean.
+		yes() -> Boolean
+	}
+}`),
+				).toThrow(
+					/'Clash' spells the static Property 'yes' exactly like a Method of its own/,
+				)
+			})
+
+			// NOTE: And the mirror — a value-LESS static Property is native, so it
+			// reaches no typed Node either, while the Method beside it does. A read
+			// of `Clash.PI` would be routed to the Method's const and hand back the
+			// Function itself.
+			it("refuses a native Property spelled like a Method of its own Namespace", () => {
+				expect(() =>
+					preludeOf(`declarations {
+	namespace Clash for Integer {
+		§§ The ratio.
+		static PI: Integer
+
+		§§ The ratio, computed.
+		§§
+		§§ @returns — the ratio.
+		PI() -> Integer {
+			<- 3
+		}
+	}
+}`),
+				).toThrow(
+					/'Clash' spells the static Property 'PI' exactly like a Method of its own/,
+				)
+			})
+
+			// NOTE: The clash is looked for inside ONE Namespace — the const name
+			// carries the Namespace, so a Property and a Method of the same name in
+			// two different Namespaces are two different consts and collide with
+			// nothing.
+			it("allows a Property spelled like another Namespace's Method", () => {
+				let prelude = preludeOf(`declarations {
+	namespace Holder for Boolean {
+		§§ The affirmative.
+		static yes: Boolean = true
+	}
+
+	namespace Asker for Boolean {
+		§§ The value itself.
+		§§
+		§§ @returns — the Boolean.
+		yes() -> Boolean {
+			<- @
+		}
+	}
+}`)
+
+				expect(prelude.map((namespace) => namespace.name)).toEqual([
+					"Holder",
+					"Asker",
+				])
+			})
 		})
 
 		// NOTE: A Namespace whose every member is native has nothing to merge —
@@ -2469,7 +2542,7 @@ describe("Code Generation", () => {
 				),
 			])
 
-			expect(buildStdlibPrelude(stdlib.typedPrograms)).toEqual([])
+			expect(buildStdlibPrelude(stdlib)).toEqual([])
 		})
 	})
 })
