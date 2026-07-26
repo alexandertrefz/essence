@@ -14,6 +14,7 @@ import {
 	loadStdlibFrom,
 	parseStdlibSource,
 } from "../enricher/stdlib"
+import { resolveOverloadedMethodName } from "../helpers/index"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {
@@ -26,6 +27,9 @@ import {
 	buildStdlibPrelude,
 	essenceMethodIdentifier,
 	essenceMethodName,
+	nativeFreeFunctionNames,
+	type PreludeFreeFunction,
+	stdlibFreeFunctions,
 	stdlibPrelude,
 } from "../rewriter/stdlibPrelude"
 import { simplify } from "../simplifier/index"
@@ -1391,6 +1395,79 @@ describe("Code Generation", () => {
 			])
 		})
 
+		// NOTE: The two tables the Rewriter reads a free Function off. They are
+		// complementary and both derived from the loader's `functionBindings`, so
+		// they can only be right together: a bodied entry is emitted as a
+		// declaration of its own and a native one is a read off the runtime
+		// `functions` module, and an entry that landed in both — or in neither —
+		// is either a name emitted twice or a `ReferenceError` at run time.
+		describe("the standard library's free Functions", () => {
+			it("collects the Essence-bodied entries by their emitted name", () => {
+				expect(
+					stdlibFreeFunctions().map(
+						(freeFunction) => freeFunction.name,
+					),
+				).toEqual(["loop__overload$2", "loop__overload$3"])
+			})
+
+			// NOTE: The name the Rewriter keys a candidate by has to be the name
+			// the emitted declaration answers to, or the fixed point would pull in
+			// a declaration that defines something else.
+			it("names each one after the Node it hands over", () => {
+				for (let freeFunction of stdlibFreeFunctions()) {
+					expect(freeFunction.node.nodeType).toBe("FunctionStatement")
+					expect(freeFunction.node.name.name).toBe(freeFunction.name)
+				}
+			})
+
+			it("builds them once per process, beside the prelude", () => {
+				expect(stdlibFreeFunctions()).toBe(stdlibFreeFunctions())
+			})
+
+			it("names every native entry, one per native slot", () => {
+				expect([...nativeFreeFunctionNames()].sort()).toEqual([
+					"__print",
+					"loop__overload$1",
+					"loop__overload$4",
+				])
+			})
+
+			it("memoises the native names", () => {
+				expect(nativeFreeFunctionNames()).toBe(
+					nativeFreeFunctionNames(),
+				)
+			})
+
+			// NOTE: The invariant the two tables exist to keep, read off the
+			// loader's flags rather than off a list written by hand — every
+			// declared entry is accounted for by exactly one of them, under the
+			// `__overload$N` name its SLOT gives it.
+			it("accounts for every declared entry exactly once", () => {
+				let stdlib = loadStdlib()
+				let bodied = new Set(
+					stdlibFreeFunctions().map(
+						(freeFunction) => freeFunction.name,
+					),
+				)
+				let natives = nativeFreeFunctionNames()
+
+				for (let [name, flags] of Object.entries(
+					stdlib.functionBindings,
+				)) {
+					flags.forEach((native, index) => {
+						let emitted =
+							stdlib.members[name]?.type ===
+							"OverloadedStaticMethod"
+								? resolveOverloadedMethodName(name, index)
+								: name
+
+						expect(natives.has(emitted)).toBe(native)
+						expect(bodied.has(emitted)).toBe(!native)
+					})
+				}
+			})
+		})
+
 		// NOTE: The search has to run to a FIXED POINT: an Essence Method may be
 		// reached only through the BODY of another one. Both Essence Methods today
 		// call natives only, so this is driven directly over a synthetic prelude
@@ -1471,6 +1548,160 @@ describe("Code Generation", () => {
 				])
 
 				expect([...reachable.keys()]).toEqual(["$es_Inner_double"])
+			})
+
+			// NOTE: The free Functions share the ONE fixed point with the
+			// Methods, so an edge that crosses between the two kinds has to be
+			// followed like any other. Driven over a synthetic library whose
+			// chain crosses the boundary twice — Method to free Function, free
+			// Function to free Function, free Function back to Method — because
+			// the real library's two bodied entries call a native `while` and
+			// nothing else, so it exercises no crossing edge at all yet.
+			describe("free Functions", () => {
+				const crossing = `declarations {
+	§§ Doubles the value.
+	§§
+	§§ @param value — the Integer to double.
+	§§ @returns — twice the value.
+	function double(_ value: Integer) -> Integer {
+		<- value::twice()
+	}
+
+	§§ Quadruples the value.
+	§§
+	§§ @param value — the Integer to quadruple.
+	§§ @returns — four times the value.
+	function quadruple(_ value: Integer) -> Integer {
+		<- double(double(value))
+	}
+
+	namespace Inner for Integer {
+		§§ Twice the value.
+		§§
+		§§ @returns — twice the value.
+		twice() -> Integer {
+			<- @
+		}
+
+		§§ Four times the value, by way of the free Function.
+		§§
+		§§ @returns — four times the value.
+		fourTimes() -> Integer {
+			<- quadruple(@)
+		}
+	}
+}`
+
+				// NOTE: The free-Function half of a synthetic prelude, built the
+				// way `buildStdlibArtifacts` builds the real one — the copy
+				// before the Simplifier included, since it writes into the Nodes
+				// it is handed. It can not be read off `stdlibFreeFunctions`,
+				// which answers for the process-wide standard library.
+				function freeFunctionsOf(
+					source: string,
+				): Array<PreludeFreeFunction> {
+					return loadStdlibFrom([
+						parseStdlibSource("Crossing.es", source),
+					]).typedPrograms.flatMap((typedProgram) =>
+						optimise(
+							simplify(structuredClone(typedProgram)),
+						).implementation.nodes.flatMap((node) =>
+							node.nodeType === "FunctionStatement"
+								? [{ name: node.name.name, node }]
+								: [],
+						),
+					)
+				}
+
+				// NOTE: A free Function is reached as a bare Identifier call —
+				// the emitted spelling of `quadruple(…)`, and of an overloaded
+				// entry's `quadruple__overload$2(…)` alike.
+				function callOfFunction(
+					name: string,
+				): estree.ExpressionStatement {
+					return {
+						type: "ExpressionStatement",
+						expression: {
+							type: "CallExpression",
+							optional: false,
+							callee: { type: "Identifier", name },
+							arguments: [],
+						},
+					}
+				}
+
+				it("follows the chain across both boundaries", () => {
+					let reachable = reachableEssenceMethods(
+						preludeOf(crossing),
+						[callOf("Inner", "fourTimes")],
+						freeFunctionsOf(crossing),
+					)
+
+					expect([...reachable.keys()].sort()).toEqual([
+						"$es_Inner_fourTimes",
+						"$es_Inner_twice",
+						"double",
+						"quadruple",
+					])
+				})
+
+				it("follows a free Function's own edges when the Program names it", () => {
+					let reachable = reachableEssenceMethods(
+						preludeOf(crossing),
+						[callOfFunction("double")],
+						freeFunctionsOf(crossing),
+					)
+
+					expect([...reachable.keys()].sort()).toEqual([
+						"$es_Inner_twice",
+						"double",
+					])
+				})
+
+				it("keeps a free Function nothing names out", () => {
+					let reachable = reachableEssenceMethods(
+						preludeOf(crossing),
+						[callOf("Inner", "twice")],
+						freeFunctionsOf(crossing),
+					)
+
+					expect([...reachable.keys()]).toEqual(["$es_Inner_twice"])
+				})
+
+				// NOTE: A free Function is emitted as a declaration of its own
+				// rather than as a const — nothing has to hold a Function
+				// expression for it, and the name it answers to is the bare one a
+				// call site resolved to.
+				it("emits a free Function as its own declaration", () => {
+					let reachable = reachableEssenceMethods(
+						preludeOf(crossing),
+						[callOfFunction("double")],
+						freeFunctionsOf(crossing),
+					)
+
+					expect(reachable.get("double")).toMatchObject({
+						type: "FunctionDeclaration",
+						id: { type: "Identifier", name: "double" },
+					})
+					expect(reachable.get("$es_Inner_twice")?.type).toBe(
+						"VariableDeclaration",
+					)
+				})
+
+				// NOTE: The set handed in is what decides an edge, exactly as
+				// `implemented` does for a Method — so a NATIVE free Function,
+				// which is a read off `$_` and reaches no const, drops out along
+				// with everything it would have pulled in.
+				it("draws no edge to a free Function this run does not implement", () => {
+					let reachable = reachableEssenceMethods(
+						preludeOf(crossing),
+						[callOf("Inner", "fourTimes")],
+					)
+
+					expect([...reachable.keys()]).toEqual([
+						"$es_Inner_fourTimes",
+					])
+				})
 			})
 
 			// NOTE: The sweep the emitted Program is held to after every rewrite
@@ -1668,6 +1899,87 @@ describe("Code Generation", () => {
 					)
 
 					expect([...refs]).toEqual(["$es_Target_dispatched"])
+				})
+
+				// NOTE: The one shape that draws a free-Function edge instead of a
+				// Method one — a `FunctionInvocation` off a bare Identifier, which
+				// is what an overloaded free Function's call site looks like once
+				// the Simplifier has mangled the callee. The reference IS the bare
+				// name, because that is the key the free Function's own
+				// declaration is emitted under.
+				it("follows a bare free-Function call", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "FunctionInvocation",
+							name: {
+								nodeType: "Identifier",
+								name: "loop__overload$2",
+							},
+							arguments: [],
+						},
+						implemented,
+						new Set(["loop__overload$2"]),
+					)
+
+					expect([...refs]).toEqual(["loop__overload$2"])
+				})
+
+				// NOTE: A native free Function is reached off `$_`, and a call on a
+				// Function-typed local or Parameter is the very same Node shape —
+				// neither is in the set, so neither draws an edge to a const that
+				// was never emitted for it.
+				it("draws no edge to a free Function the run does not implement", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "FunctionInvocation",
+							name: {
+								nodeType: "Identifier",
+								name: "loop__overload$1",
+							},
+							arguments: [],
+						},
+						implemented,
+						new Set(["loop__overload$2"]),
+					)
+
+					expect([...refs]).toEqual([])
+				})
+
+				// NOTE: One body reaches both kinds, and the two sets decide
+				// independently — the free-Function edge is keyed by the bare name
+				// and the Method edge by the `$es_…` one, so neither filter can
+				// answer for the other.
+				it("follows a Method and a free Function out of one body", () => {
+					let refs = essenceMethodReferences(
+						{
+							nodeType: "FunctionInvocation",
+							name: {
+								nodeType: "Identifier",
+								name: "loop__overload$2",
+							},
+							arguments: [
+								{
+									nodeType: "Argument",
+									value: {
+										nodeType: "MethodInvocation",
+										base: {
+											nodeType: "Identifier",
+											name: "Target",
+										},
+										member: { name: "instance" },
+										arguments: [],
+									},
+								},
+							],
+						},
+						implemented,
+						new Set(["loop__overload$2"]),
+					)
+
+					expect([...refs].sort()).toEqual([
+						"$es_Target_instance",
+						"loop__overload$2",
+					])
 				})
 
 				it("draws no edge to a Method the prelude does not implement", () => {
