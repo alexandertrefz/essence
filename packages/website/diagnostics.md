@@ -311,6 +311,18 @@ either in a Type position (`Holder<Integer>`) or at a construction
 (`Holder<Integer>#Bare`). Drop the `infer`; the bound and the default, if the
 Parameter carries them, stay exactly as written.
 
+### `uninferred-namespace-parameter`
+
+A Namespace declared a Type Parameter without `infer`. A Namespace is the
+mirror of the case above: it has nothing BUT a use to work its Parameters out
+from, because every receiver it answers for hands the Arguments over
+(`namespace Boxes<infer Item> for { value: Item }` reads `Item` off each value
+it is called on). Written without the marker the Parameter is opaque and can
+never bind, so the target Type matches no receiver at all and the Namespace is
+never found — a `namespace Maybe<T> for Maybe<T> is Equatable` was passed over
+in silence, and the derived equality of `choice Maybe<T>` answered `is` instead
+of the Method written right beside it. Write `infer Item`.
+
 ### `zero-denominator`
 
 A Rational Literal with a denominator of zero.

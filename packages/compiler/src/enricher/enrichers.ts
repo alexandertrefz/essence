@@ -1848,6 +1848,37 @@ export function enrichNamespaceDefinitionStatement(
 
 	let checkedConformances = checkProtocolConformance(node, type, scope)
 
+	// NOTE: The mirror of `infer-on-applied-parameter`: a Namespace is the one
+	// declaration whose Type Parameters have nothing BUT a use to work them out
+	// from — every receiver hands the Arguments over, and the marker is what says
+	// so. Written without it the Parameter is opaque and can never bind, so the
+	// target Type matches no receiver at all and the Namespace is simply never
+	// found: `namespace Maybe<T> for Maybe<T> is Equatable` was passed over in
+	// silence and a generic Choice's DERIVED equality answered `is` instead,
+	// contradicting the Methods right there in the file. Refused rather than
+	// quietly re-read as `infer`, so the two spellings never mean the same thing.
+	for (let generic of node.generics) {
+		if (!generic.inferred) {
+			reportError(
+				"A Namespace's Type Parameters must be inferred",
+				generic.position,
+				{
+					code: "uninferred-namespace-parameter",
+					labels: [
+						primary(
+							generic.position,
+							"nothing can ever bind this Parameter",
+						),
+					],
+					notes: [
+						"A Namespace's Type Parameters are worked out from the receiver at every call, which is what 'infer' says.",
+					],
+					helps: [`Declare it as 'infer ${generic.name.content}'.`],
+				},
+			)
+		}
+	}
+
 	// NOTE: A bound on a Namespace's own Type Parameter is still rejected — a
 	// conditional conformance (`is Comparable where Item is Comparable`) is
 	// where a Namespace-level bound belongs, so its conformance parameter can

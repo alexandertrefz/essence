@@ -138,7 +138,7 @@ describe("Standard Library Loader", () => {
 			[
 				"Boxes.es",
 				`declarations {
-				namespace Boxes <ItemType> for List<ItemType> {
+				namespace Boxes <infer ItemType> for List<ItemType> {
 					§§ The first item, if there is one.
 					§§ @returns — the first item.
 					firstItem() -> Optional<ItemType>

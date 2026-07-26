@@ -2756,6 +2756,137 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
+		// NOTE: The shape the derive was written for and could not answer: a
+		// generic helper over a generic Choice, both spelling their Type
+		// Parameter `T`. The derived Methods borrowed the Choice's names, so the
+		// caller's `T` and the Choice's were one symbol, and the receiver's Type
+		// Argument — pinned as a `defaultType` — was alpha-renamed along with the
+		// Parameter it pinned, pinning `T` to itself. The derive then matched
+		// nothing and the call reported `no-matching-overload` naming a Case
+		// nobody wrote a Method for, for the likeliest name in the language.
+		it("derives for a caller whose Type Parameter shares the Choice's name", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					function same<infer T is Equatable>(_ a: Maybe<T>, _ b: Maybe<T>) -> Boolean {
+						<- a::is(b)
+					}
+
+					function differs<infer T is Equatable>(_ a: Maybe<T>, _ b: Maybe<T>) -> Boolean {
+						<- a::isNot(b)
+					}
+
+					constant x: Maybe<Rational> = #Some({ value = 1/2 })
+					constant y: Maybe<Rational> = #Some({ value = 2/4 })
+					constant z: Maybe<Rational> = #Some({ value = 1/3 })
+
+					__print(same(x, y)::toString())
+					__print(same(x, z)::toString())
+					__print(differs(x, z)::toString())
+					__print(same(x, #None)::toString())
+				}`),
+			).toEqual(['"true"', '"false"', '"true"', '"false"'])
+		})
+
+		// NOTE: Per NAME, not per position — one Parameter colliding was enough
+		// to lose the whole derive, so the mixed case is pinned rather than only
+		// the all-colliding one.
+		it("derives where only some of the caller's names collide", async () => {
+			expect(
+				await run(`implementation {
+					choice Pair<A, B> { Both { a: A, b: B }, Neither }
+
+					function same<infer A is Equatable, infer Z is Equatable>(
+						_ x: Pair<A, Z>,
+						_ y: Pair<A, Z>,
+					) -> Boolean {
+						<- x::is(y)
+					}
+
+					constant p: Pair<Rational, String> = #Both({ a = 1/2, b = "x" })
+					constant q: Pair<Rational, String> = #Both({ a = 2/4, b = "x" })
+					constant r: Pair<Rational, String> = #Both({ a = 2/4, b = "y" })
+
+					__print(same(p, q)::toString())
+					__print(same(p, r)::toString())
+				}`),
+			).toEqual(['"true"', '"false"'])
+		})
+
+		// NOTE: And the Diagnostic the missing bound gets is the same one it gets
+		// under any other name. The collision degraded it to a
+		// `no-matching-overload` about `Maybe#Some`, which points nowhere near
+		// the `is Equatable` the declaration is missing.
+		it("names the missing bound the same way under a colliding name", () => {
+			const unbounded = (parameter: string) =>
+				`implementation { ${maybe}
+					function same<infer ${parameter}>(
+						_ a: Maybe<${parameter}>,
+						_ b: Maybe<${parameter}>,
+					) -> Boolean {
+						<- a::is(b)
+					}
+				}`
+
+			expect(codesOf(unbounded("T"))).toEqual(["unsatisfied-bound"])
+			expect(messagesOf(unbounded("T"))).toEqual([
+				"Type Parameter 'T' does not conform to 'Equatable'",
+			])
+			expect(codesOf(unbounded("Elem"))).toEqual(["unsatisfied-bound"])
+		})
+
+		// NOTE: The nested-witness rail carried the collision all along — it is
+		// pinned beside the direct one so the two can not drift apart again.
+		it("takes a colliding name through the List witness too", async () => {
+			expect(
+				await run(`implementation { ${maybe}
+					function has<infer T is Equatable>(_ xs: List<Maybe<T>>, _ b: Maybe<T>) -> Boolean {
+						<- xs::contains(b)
+					}
+
+					constant x: Maybe<Rational> = #Some({ value = 1/2 })
+					constant y: Maybe<Rational> = #Some({ value = 2/4 })
+					constant z: Maybe<Rational> = #Some({ value = 1/3 })
+
+					__print(has([x], y)::toString())
+					__print(has([x], z)::toString())
+				}`),
+			).toEqual(['"true"', '"false"'])
+		})
+
+		// NOTE: The written Namespace above wins because it is written with
+		// `infer`. Without the marker it is not a competitor at all — its Type
+		// Parameter binds to nothing, so the Namespace matches no receiver and
+		// the derive answered `is` in its place, contradicting the Method in the
+		// file with no Diagnostic anywhere. That spelling is refused at the
+		// declaration now, which is what keeps the fallback rule honest.
+		it("refuses a written Namespace that forgot 'infer' rather than deriving past it", () => {
+			expect(
+				codesOf(`implementation { ${maybe}
+					namespace Maybe<T> for Maybe<T> is Equatable {
+						§§ Every Maybe is the same Maybe.
+						§§
+						§§ @param other — the Maybe to compare with
+						§§ @returns — always true.
+						is(_ other: Maybe<T>) -> Boolean {
+							<- true
+						}
+
+						§§ The negation.
+						§§
+						§§ @param other — the Maybe to compare with
+						§§ @returns — always false.
+						isNot(_ other: Maybe<T>) -> Boolean {
+							<- false
+						}
+					}
+
+					constant a: Maybe<Integer> = #Some({ value = 1 })
+
+					__print(a::is(a)::toString())
+				}`),
+			).toEqual(["uninferred-namespace-parameter"])
+		})
+
 		// NOTE: A generic RECORD needs none of this. Its equality is the
 		// runtime's structural one, which reads each member's own Type key and
 		// answers by it — so a Rational member is compared as a Rational without
@@ -2830,9 +2961,10 @@ describe("Choices", () => {
 			// NOTE: Written inside generic code, because that is the only place
 			// left where a Choice's Type Argument IS a Type Parameter — a
 			// construction can not leave one undecided any more. The whole set is
-			// asserted, not just the refusal: the `unsatisfied-bound` beside it is
-			// the derived witness finding the Matcher's `@` carrying `T` without
-			// the bound its declaration wrote, which a `toContain` would have hidden.
+			// asserted, not just the refusal: the caller's `T` carries the bound
+			// its declaration wrote and the derive has to see THAT `T` rather than
+			// the Choice's same-named one, so anything beside the refusal here
+			// would be the borrowed names failing, which a `toContain` would hide.
 			it("refuses the comparison where no Type Argument tells them apart", () => {
 				expect(
 					codesOf(`implementation { ${wrapped}
@@ -2843,7 +2975,7 @@ describe("Choices", () => {
 							}
 						}
 					}`),
-				).toEqual(["unsatisfied-bound", "indistinguishable-union-arms"])
+				).toEqual(["indistinguishable-union-arms"])
 			})
 
 			// NOTE: One generic arm is the fallback it always was, and the
