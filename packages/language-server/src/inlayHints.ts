@@ -1,6 +1,8 @@
 import { printType } from "@essence/compiler/printType"
 import type { common } from "@essence/interfaces"
 
+import { typedHandlerExpressions } from "./matchHandlerChildren"
+
 // NOTE: Inlay Hints annotate whatever carries no Type annotation with the Type
 // it was inferred as — Constant and Variable declarations, and the Parameters
 // and return Type of a contextually typed Function literal, which take their
@@ -16,6 +18,28 @@ export type InlayHint = {
 	position: common.Cursor
 	label: string
 	kind: "type"
+	textEdit: InlayHintEdit
+}
+
+// NOTE: An insertion, so a Cursor rather than a Position — the annotation goes
+// where the Hint is shown and replaces nothing.
+export type InlayHintEdit = {
+	position: common.Cursor
+	newText: string
+}
+
+// NOTE: Every Hint's label is the annotation the source left out, spelled
+// exactly as it would have been written, and every Hint sits exactly where
+// that annotation belongs — so accepting a Hint is inserting its own label at
+// its own position, and building the two together is what keeps them from
+// drifting apart.
+function typeHint(position: common.Cursor, label: string): InlayHint {
+	return {
+		position,
+		label,
+		kind: "type",
+		textEdit: { position, newText: label },
+	}
 }
 
 export function findInlayHints(
@@ -61,11 +85,12 @@ function visitNode(
 				node.type.type !== "Error" &&
 				!writesItsOwnType(node.value)
 			) {
-				hints.push({
-					position: node.name.position.end,
-					label: `: ${printType(node.type)}`,
-					kind: "type",
-				})
+				hints.push(
+					typeHint(
+						node.name.position.end,
+						`: ${printType(node.type)}`,
+					),
+				)
 			}
 
 			visitNode(node.value, hints)
@@ -128,6 +153,10 @@ function visitNode(
 			visitNode(node.value, hints)
 
 			for (let handler of node.handlers) {
+				for (let expression of typedHandlerExpressions(handler)) {
+					visitNode(expression, hints)
+				}
+
 				visitBody(handler.body, hints)
 			}
 
@@ -200,11 +229,12 @@ function visitFunctionDefinition(
 			parameter.inferredType !== null &&
 			parameter.inferredType.type !== "Error"
 		) {
-			hints.push({
-				position: parameter.position.end,
-				label: `: ${printType(parameter.inferredType)}`,
-				kind: "type",
-			})
+			hints.push(
+				typeHint(
+					parameter.position.end,
+					`: ${printType(parameter.inferredType)}`,
+				),
+			)
 		}
 	}
 
@@ -212,11 +242,12 @@ function visitFunctionDefinition(
 		definition.inferredReturnType !== null &&
 		definition.inferredReturnType.type !== "Error"
 	) {
-		hints.push({
-			position: definition.parameterListPosition.end,
-			label: ` -> ${printType(definition.inferredReturnType)}`,
-			kind: "type",
-		})
+		hints.push(
+			typeHint(
+				definition.parameterListPosition.end,
+				` -> ${printType(definition.inferredReturnType)}`,
+			),
+		)
 	}
 
 	visitBody(definition.body, hints)

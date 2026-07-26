@@ -5,11 +5,15 @@ import { type DeclarationKind, indexProgram } from "./rename"
 // NOTE: Semantic Tokens classify Identifiers by what they actually resolve
 // to, which the TextMate grammar cannot do — it has no way to tell a
 // Namespace from a Type from a Constant. Every Occurrence the rename index
-// already collects carries its Declaration's kind, so this is a projection of
-// that index rather than a separate walk.
+// already collects carries its Declaration's kind, so this is mostly a
+// projection of that index rather than a separate walk.
 //
 // Identifiers the Enricher cannot resolve are absent from the index and get
 // no Token, leaving the TextMate grammar's guess in place.
+//
+// Case names are the one construct the index cannot answer for — they resolve
+// through their Choice instead of through a Scope, so nothing ever binds them
+// to a Declaration. They are collected from the Parser AST instead.
 
 export type SemanticTokenType =
 	| "namespace"
@@ -20,11 +24,18 @@ export type SemanticTokenType =
 	| "property"
 	| "function"
 	| "method"
+	| "enumMember"
 
-export type SemanticTokenModifier = "declaration" | "readonly" | "static"
+export type SemanticTokenModifier =
+	| "declaration"
+	| "readonly"
+	| "static"
+	| "defaultLibrary"
 
-// NOTE: The order here is the protocol's legend — Tokens are encoded as
-// indices into it, so it must stay in sync with `tokenTypeIndices`.
+// NOTE: These two arrays ARE the legend the server hands the client — a Token
+// carries indices into them, never names. New entries therefore go at the END:
+// inserting one anywhere else silently recolours every Token past it in
+// editors that are still holding a response encoded against the old legend.
 export const semanticTokenTypes: Array<SemanticTokenType> = [
 	"namespace",
 	"type",
@@ -34,12 +45,14 @@ export const semanticTokenTypes: Array<SemanticTokenType> = [
 	"property",
 	"function",
 	"method",
+	"enumMember",
 ]
 
 export const semanticTokenModifiers: Array<SemanticTokenModifier> = [
 	"declaration",
 	"readonly",
 	"static",
+	"defaultLibrary",
 ]
 
 export type SemanticToken = {
@@ -88,15 +101,10 @@ export function findSemanticTokens(
 	let { index } = indexProgram(program, enrichedProgram)
 	let tokens: Array<SemanticToken> = []
 
+	collectCases(program.implementation.nodes, tokens)
+
 	for (let occurrence of index) {
 		let { position, declaration } = occurrence
-
-		// NOTE: Identifiers never span lines — a multi-line Position would be
-		// a Parser bug, and encoding it would corrupt every following Token.
-		if (position.start.line !== position.end.line) {
-			continue
-		}
-
 		let modifiers: Array<SemanticTokenModifier> = []
 
 		if (
@@ -115,16 +123,221 @@ export function findSemanticTokens(
 			modifiers.push("static")
 		}
 
-		tokens.push({
-			line: position.start.line,
-			column: position.start.column,
-			length: position.end.column - position.start.column,
-			type: tokenTypes[declaration.kind],
-			modifiers,
-		})
+		// NOTE: What separates a name the standard library gave the user from
+		// one the user wrote. Builtins reach here because the index has to hold
+		// them for shadowing to resolve, even though it rejects them as rename
+		// targets.
+		if (declaration.builtin) {
+			modifiers.push("defaultLibrary")
+		}
+
+		pushToken(tokens, position, tokenTypes[declaration.kind], modifiers)
 	}
 
 	return sortTokens(tokens)
+}
+
+// NOTE: Identifiers never span lines — a multi-line Position would be a
+// Parser bug, and encoding it would corrupt every following Token.
+function pushToken(
+	tokens: Array<SemanticToken>,
+	position: common.Position,
+	type: SemanticTokenType,
+	modifiers: Array<SemanticTokenModifier>,
+) {
+	if (position.start.line !== position.end.line) {
+		return
+	}
+
+	tokens.push({
+		line: position.start.line,
+		column: position.start.column,
+		length: position.end.column - position.start.column,
+		type,
+		modifiers,
+	})
+}
+
+// NOTE: The three places a Case is named: its declaration, the `#Case` value
+// that constructs it and the `case #Case` Matcher. The `#` sigil is not part
+// of the name's Position and deliberately keeps its grammar scope — a Case
+// reads the same at its declaration, where no sigil is written at all, and the
+// sigil is punctuation the way `::` and `.` are.
+//
+// These Tokens are merged into the same list the index fills before it is
+// sorted, which is what keeps the encoding well formed: nothing here can
+// collide with an indexed Position, because a Case name is precisely what the
+// index cannot bind. The `Choice` prefix of a qualified Case is a Type
+// reference the index does hold, and it sits before the `#`.
+function collectCases(
+	nodes: Array<parser.ImplementationNode>,
+	tokens: Array<SemanticToken>,
+) {
+	for (let node of nodes) {
+		collectCasesFromNode(node, tokens)
+	}
+}
+
+function collectCasesFromNode(
+	node: parser.ImplementationNode,
+	tokens: Array<SemanticToken>,
+) {
+	switch (node.nodeType) {
+		case "ChoiceDeclarationStatement":
+			for (let choiceCase of node.cases) {
+				pushToken(tokens, choiceCase.name.position, "enumMember", [
+					"declaration",
+				])
+			}
+
+			return
+		case "CaseValue":
+			pushToken(tokens, node.caseName.position, "enumMember", [])
+
+			if (node.value !== null) {
+				collectCasesFromNode(node.value, tokens)
+			}
+
+			return
+		case "Match":
+			collectCasesFromNode(node.value, tokens)
+
+			for (let handler of node.handlers) {
+				if (handler.matcher.nodeType === "CaseMatcher") {
+					pushToken(
+						tokens,
+						handler.matcher.caseName.position,
+						"enumMember",
+						[],
+					)
+				}
+
+				if (handler.guard !== null) {
+					collectCasesFromNode(handler.guard, tokens)
+				}
+
+				collectCases(handler.body, tokens)
+			}
+
+			return
+		case "NamespaceDefinitionStatement":
+			for (let property of Object.values(node.properties)) {
+				// NOTE: A native static Property has no value.
+				if (property.value !== null) {
+					collectCasesFromNode(property.value, tokens)
+				}
+			}
+
+			for (let member of Object.values(node.methods)) {
+				if (
+					member.nodeType === "SimpleMethod" ||
+					member.nodeType === "StaticMethod"
+				) {
+					collectCases(member.method.value.body, tokens)
+				} else if (
+					member.nodeType === "OverloadedMethod" ||
+					member.nodeType === "OverloadedStaticMethod"
+				) {
+					for (let method of member.methods) {
+						collectCases(method.value.body, tokens)
+					}
+				} else if (
+					member.nodeType === "OverloadedMethodSignatures" ||
+					member.nodeType === "OverloadedStaticMethodSignatures"
+				) {
+					// NOTE: An `overload` block in declarations mode mixes
+					// bodied Methods with body-less native signatures.
+					for (let method of member.methods) {
+						if (method.nodeType === "FunctionValue") {
+							collectCases(method.value.body, tokens)
+						}
+					}
+				}
+			}
+
+			return
+		case "FunctionStatement":
+			collectCases(node.value.body, tokens)
+			return
+		case "OverloadedFunctionStatement":
+			for (let method of node.methods) {
+				if (method.nodeType === "FunctionValue") {
+					collectCases(method.value.body, tokens)
+				}
+			}
+
+			return
+		case "FunctionValue":
+			collectCases(node.value.body, tokens)
+			return
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+			collectCasesFromNode(node.value, tokens)
+			return
+		case "ReturnStatement":
+			collectCasesFromNode(node.expression, tokens)
+			return
+		case "IfStatement":
+			collectCasesFromNode(node.condition, tokens)
+			collectCases(node.body, tokens)
+			return
+		case "IfElseStatement":
+			collectCasesFromNode(node.condition, tokens)
+			collectCases(node.trueBody, tokens)
+			collectCases(node.falseBody, tokens)
+			return
+		case "MethodInvocation":
+			collectCasesFromNode(node.base, tokens)
+			collectCasesFromArguments(node.arguments, tokens)
+			return
+		case "FunctionInvocation":
+			collectCasesFromNode(node.name, tokens)
+			collectCasesFromArguments(node.arguments, tokens)
+			return
+		case "NativeFunctionInvocation":
+			collectCasesFromArguments(node.arguments, tokens)
+			return
+		case "RecordValue":
+			for (let member of Object.values(node.members)) {
+				collectCasesFromNode(member.value, tokens)
+			}
+
+			return
+		case "ListValue":
+			for (let value of node.values) {
+				collectCasesFromNode(value, tokens)
+			}
+
+			return
+		case "Combination":
+			collectCasesFromNode(node.lhs, tokens)
+			collectCasesFromNode(node.rhs, tokens)
+			return
+		case "Lookup":
+			collectCasesFromNode(node.base, tokens)
+			return
+		case "ProtocolDeclarationStatement":
+		case "TypeAliasStatement":
+		case "NativeFunctionStatement":
+		case "Identifier":
+		case "Self":
+		case "StringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
+		case "NothingValue":
+			return
+	}
+}
+
+function collectCasesFromArguments(
+	nodeArguments: Array<parser.ArgumentNode>,
+	tokens: Array<SemanticToken>,
+) {
+	for (let argument of nodeArguments) {
+		collectCasesFromNode(argument.value, tokens)
+	}
 }
 
 // NOTE: The protocol forbids overlapping Tokens, and the index can hold the

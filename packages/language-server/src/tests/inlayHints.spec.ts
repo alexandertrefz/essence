@@ -5,11 +5,44 @@ import { parseWithDiagnostics } from "@essence/compiler/parser"
 
 import { findInlayHints } from "../inlayHints"
 
-function hintsOf(source: string) {
+function allHintsOf(source: string) {
 	let { program } = parseWithDiagnostics(source)
 	let { program: enrichedProgram } = enrich(program)
 
 	return findInlayHints(enrichedProgram)
+}
+
+// NOTE: What a Hint SHOWS. The `textEdit` every Hint carries is asserted on
+// its own further down rather than repeated in each expectation here.
+function hintsOf(source: string) {
+	return allHintsOf(source).map((hint) => ({
+		position: hint.position,
+		label: hint.label,
+		kind: hint.kind,
+	}))
+}
+
+// NOTE: Applied back to front, so that an earlier insertion on a line does not
+// shift the column a later one was measured at.
+function applyHints(source: string): string {
+	let lines = source.split("\n")
+	let edits = allHintsOf(source)
+		.map((hint) => hint.textEdit)
+		.sort(
+			(a, b) =>
+				b.position.line - a.position.line ||
+				b.position.column - a.position.column,
+		)
+
+	for (let edit of edits) {
+		let index = edit.position.line - 1
+		let column = edit.position.column - 1
+		let line = lines[index] ?? ""
+
+		lines[index] = line.slice(0, column) + edit.newText + line.slice(column)
+	}
+
+	return lines.join("\n")
 }
 
 describe("Inlay Hints", () => {
@@ -205,6 +238,40 @@ describe("Inlay Hints", () => {
 			expect(labels).toContain(" -> Number | Nothing")
 			expect(labels).toContain(": Number | Nothing")
 		})
+
+		// NOTE: A Guard is where a contextually typed literal is hardest to
+		// read back — `@` is narrowed by the Matcher, so the literal's Types
+		// come from a signature the line does not mention.
+		it("should annotate a Function literal inside a Match Guard", () => {
+			let source = [
+				"implementation {",
+				"\tconstant numbers: List<Integer> | String = [1, 2, 3]",
+				"\tconstant label = match numbers -> String {",
+				'\t\tcase List<Integer> where @::anyItem(matches (item) { <- item::isGreaterThan(2) }) { <- "long" }',
+				'\t\tcase List<Integer> { <- "short" }',
+				"\t\tcase String { <- @ }",
+				"\t}",
+				"}",
+			].join("\n")
+
+			expect(hintsOf(source)).toEqual([
+				{
+					position: { line: 3, column: 16 },
+					label: ": String",
+					kind: "type",
+				},
+				{
+					position: { line: 4, column: 52 },
+					label: ": Integer",
+					kind: "type",
+				},
+				{
+					position: { line: 4, column: 53 },
+					label: " -> Boolean",
+					kind: "type",
+				},
+			])
+		})
 	})
 
 	describe("Optional", () => {
@@ -329,6 +396,61 @@ describe("Inlay Hints", () => {
 				": Optional<Integer | Rational>",
 				": Integer | Rational",
 			])
+		})
+	})
+
+	// NOTE: A Hint's label is the annotation the source left out, and the Hint
+	// sits where that annotation belongs — which is what makes accepting one a
+	// plain insertion rather than an inference of its own.
+	describe("Accepting a Hint", () => {
+		it("should insert its own label at its own position", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (item) { <- true })",
+				"}",
+			].join("\n")
+
+			let hints = allHintsOf(source)
+
+			expect(hints.map((hint) => hint.label)).toEqual([
+				": List<Integer>",
+				": Integer",
+				" -> Boolean",
+			])
+
+			for (let hint of hints) {
+				expect(hint.textEdit).toEqual({
+					position: hint.position,
+					newText: hint.label,
+				})
+			}
+		})
+
+		it("should leave a source that needs no Hints at all", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (item) { <- true })",
+				"}",
+			].join("\n")
+
+			expect(applyHints(source)).toBe(
+				[
+					"implementation {",
+					"\tconstant kept: List<Integer> = [1]::removeEvery(where (item: Integer) -> Boolean { <- true })",
+					"}",
+				].join("\n"),
+			)
+			expect(hintsOf(applyHints(source))).toEqual([])
+		})
+
+		it("should annotate the underscore spelling after the name", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (_ item) { <- true })",
+				"}",
+			].join("\n")
+
+			expect(applyHints(source)).toContain("(_ item: Integer) -> Boolean")
 		})
 	})
 
