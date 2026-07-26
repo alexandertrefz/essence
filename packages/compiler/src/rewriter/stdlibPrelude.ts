@@ -154,20 +154,35 @@ export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
 	return buildStdlibArtifacts(stdlib).namespaces
 }
 
-// NOTE: Built once per process, exactly like the standard library it is built
-// from. Simplifying and optimising six Programs for every user file compiled in
-// a worker would be paid over and over for a result that can not differ. The
+// NOTE: A value read off the standard library and kept, so that walking the
+// library again is paid once per process rather than once per file compiled in a
+// worker. It is keyed by the Stdlib OBJECT and not by a flag some caller has to
+// clear: `useStdlib` can put a DIFFERENT library in place — a test's, built from
+// sources of its own — and a cache someone has to remember to invalidate is one
+// that will one day answer for a library that is no longer loaded. `loadStdlib`
+// is a null check and a return once the library is in hand, so asking it on
+// every lookup costs nothing.
+function derivedFromStdlib<Value>(
+	build: (stdlib: Stdlib) => Value,
+): () => Value {
+	let cache: { stdlib: Stdlib; value: Value } | null = null
+
+	return () => {
+		let stdlib = loadStdlib()
+
+		if (cache === null || cache.stdlib !== stdlib) {
+			cache = { stdlib, value: build(stdlib) }
+		}
+
+		return cache.value
+	}
+}
+
+// NOTE: Simplifying and optimising the standard library's Programs for every
+// user file would be paid over and over for a result that can not differ. The
 // Namespaces and the free Functions come out of the one simplify pass, so both
 // accessors share this cache rather than each walking the library again.
-let cachedArtifacts: StdlibArtifacts | null = null
-
-function stdlibArtifacts(): StdlibArtifacts {
-	if (cachedArtifacts === null) {
-		cachedArtifacts = buildStdlibArtifacts(loadStdlib())
-	}
-
-	return cachedArtifacts
-}
+const stdlibArtifacts = derivedFromStdlib(buildStdlibArtifacts)
 
 export function stdlibPrelude(): Array<PreludeNamespace> {
 	return stdlibArtifacts().namespaces
@@ -215,7 +230,16 @@ export function essenceMethodIdentifier(
 // construction. The prelude is fully built before the first `rewrite` runs
 // (`buildStdlibPrelude` never calls the Rewriter), so this is complete and
 // stable the moment any prelude body is rewritten.
-let cachedEssenceMethodNames: Set<string> | null = null
+const essenceMethodNames = derivedFromStdlib(
+	() =>
+		new Set(
+			stdlibPrelude().flatMap((namespace) =>
+				Object.keys(namespace.node.methods).map(
+					(name) => `${namespace.name}\u0000${name}`,
+				),
+			),
+		),
+)
 
 // NOTE: The `\u0000` join can not occur inside either name, so the pair is
 // keyed without an escape.
@@ -223,17 +247,7 @@ export function essenceMethodName(
 	namespaceName: string,
 	memberName: string,
 ): string | null {
-	if (cachedEssenceMethodNames === null) {
-		cachedEssenceMethodNames = new Set(
-			stdlibPrelude().flatMap((namespace) =>
-				Object.keys(namespace.node.methods).map(
-					(name) => `${namespace.name}\u0000${name}`,
-				),
-			),
-		)
-	}
-
-	return cachedEssenceMethodNames.has(`${namespaceName}\u0000${memberName}`)
+	return essenceMethodNames().has(`${namespaceName}\u0000${memberName}`)
 		? essenceMethodIdentifier(namespaceName, memberName)
 		: null
 }
@@ -247,23 +261,22 @@ export function essenceMethodName(
 // and is ordered against the other Properties it reads. A value-LESS
 // `static PI: Transcendental` is a native, reaches no typed Node, and stays the
 // plain `Number.PI` member read off the runtime module.
-let cachedEssencePropertyNames: Set<string> | null = null
-
-export function essencePropertyName(
-	namespaceName: string,
-	memberName: string,
-): string | null {
-	if (cachedEssencePropertyNames === null) {
-		cachedEssencePropertyNames = new Set(
+const essencePropertyNames = derivedFromStdlib(
+	() =>
+		new Set(
 			stdlibPrelude().flatMap((namespace) =>
 				Object.keys(namespace.node.properties).map(
 					(name) => `${namespace.name} ${name}`,
 				),
 			),
-		)
-	}
+		),
+)
 
-	return cachedEssencePropertyNames.has(`${namespaceName} ${memberName}`)
+export function essencePropertyName(
+	namespaceName: string,
+	memberName: string,
+): string | null {
+	return essencePropertyNames().has(`${namespaceName} ${memberName}`)
 		? essenceMethodIdentifier(namespaceName, memberName)
 		: null
 }
@@ -278,29 +291,22 @@ export function essencePropertyName(
 // one `__overload$N` name per native entry — the very numbering the Simplifier
 // mangled the call site to, so the two agree by construction. `__print` appears
 // here too, though it reaches the runtime through the `__` sigil instead.
-let cachedNativeFreeFunctionNames: Set<string> | null = null
+export const nativeFreeFunctionNames = derivedFromStdlib((stdlib) => {
+	let names = new Set<string>()
 
-export function nativeFreeFunctionNames(): Set<string> {
-	if (cachedNativeFreeFunctionNames === null) {
-		let stdlib = loadStdlib()
-		let names = new Set<string>()
+	for (let [name, flags] of Object.entries(stdlib.functionBindings)) {
+		let member = stdlib.members[name]
 
-		for (let [name, flags] of Object.entries(stdlib.functionBindings)) {
-			let member = stdlib.members[name]
-
-			if (member?.type === "OverloadedStaticMethod") {
-				flags.forEach((native, index) => {
-					if (native) {
-						names.add(resolveOverloadedMethodName(name, index))
-					}
-				})
-			} else if (flags[0]) {
-				names.add(name)
-			}
+		if (member?.type === "OverloadedStaticMethod") {
+			flags.forEach((native, index) => {
+				if (native) {
+					names.add(resolveOverloadedMethodName(name, index))
+				}
+			})
+		} else if (flags[0]) {
+			names.add(name)
 		}
-
-		cachedNativeFreeFunctionNames = names
 	}
 
-	return cachedNativeFreeFunctionNames
-}
+	return names
+})
