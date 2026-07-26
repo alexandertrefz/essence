@@ -69,6 +69,13 @@ A file opened with `declarations { … }`, the standard library's private
 Program form for body-less native Method signatures. Only the standard library
 may open one — write `implementation { … }` instead.
 
+### `overload-function-outside-stdlib`
+
+An `overload function … { … }` block was written outside a `declarations { … }`
+Program. Free-Function Overloads are a standard-library form; a free Function
+in a Program carries one signature. Write the Overloads as an `overload` Method
+block inside a Namespace instead.
+
 ## Names
 
 ### `duplicate-variable`
