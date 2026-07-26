@@ -3,6 +3,7 @@ import type { common, enricher, parser } from "@essence/interfaces"
 import {
 	collectDiagnostics,
 	primary,
+	report,
 	reportError,
 	secondary,
 } from "../diagnostics/index"
@@ -237,12 +238,12 @@ export function enrichCaseValue(
 	// A position offering SEVERAL instantiations of the one Case — `Box<Integer>
 	// | Box<String>` — is the one place that order can not hold: which of them is
 	// meant is what the payload says. There the payload is read once per
-	// candidate, silently and under that candidate's own members, and enriched
-	// for real afterwards under the one that won. It still never DECIDES a Type
-	// Argument; it only chooses among the ones the context already decided.
-	let type = resolveCaseValueType(node, scope, context, (expected) =>
-		silentPayloadTypeOf(node, scope, expected),
-	)
+	// candidate, silently and under that candidate's own members, and the reading
+	// the winner was chosen BY is the one committed afterwards. It still never
+	// DECIDES a Type Argument; it only chooses among the ones the context already
+	// decided.
+	let payload = makePayloadReadings(node, scope)
+	let type = resolveCaseValueType(node, scope, context, payload.typeUnder)
 
 	if (context !== null) {
 		reportUncarriedTypeArgumentDisagreement(
@@ -253,10 +254,7 @@ export function enrichCaseValue(
 		)
 	}
 
-	let value =
-		node.value === null
-			? null
-			: enrichExpression(node.value, scope, expectedPayloadType(type))
+	let value = payload.commit(type)
 
 	if (type.type === "Case") {
 		// NOTE: The one-member shorthand rewraps first, so the instantiation
@@ -459,29 +457,77 @@ function bindsNoTypeParameter(argument: parser.ArgumentNode): boolean {
 	)
 }
 
-// NOTE: What the payload's Type comes out as under a given expectation, with
-// nothing reported — the reading arm selection asks for while the Case it
-// belongs to is still being resolved. Silent because the payload is enriched
-// again for real once the Case IS resolved, under what it decided, and that is
-// the pass the reader hears from; said here too, everything would be said twice.
-// Read afresh per candidate rather than once and cached, because each candidate
-// expects something different of it, which is the whole reason it is being asked.
-function silentPayloadTypeOf(
+// NOTE: One reading of a construction's payload per Case it is read under, for
+// the span of the one construction being enriched. Arm selection asks what the
+// payload comes out as under each instantiation the position offers, and the
+// instantiation that WINS is the one the payload finally stands under — so the
+// winning reading is the real one, already made, and reading it again re-reads
+// the whole subtree beneath it.
+//
+// Read afresh every time, that re-reading multiplied: a construction nested N
+// deep under a position offering two instantiations at each level cost 2^N
+// readings of its innermost value, and twelve levels took seven minutes where
+// the same nesting under a position offering ONE takes ten milliseconds. Each
+// reading is kept under the Case it was read for, which is what lets the commit
+// find the winner's: `decideCaseFromExpectedType` hands back the very candidate
+// it asked about, so the two are the same key.
+//
+// The Diagnostics are kept WITH the reading rather than reported where it is
+// made. Arm selection has to stay silent — every candidate it asks about would
+// otherwise be reported on, including the ones it rejects — and the reading that
+// is committed says them then, which is the pass the reader hears from.
+type PayloadReading = {
+	value: common.typed.ExpressionNode
+	diagnostics: Array<common.Diagnostic>
+}
+
+function makePayloadReadings(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
-	expectedType: common.Type | null,
-): common.Type | null {
-	let payload = node.value
+): {
+	typeUnder: PayloadReader
+	commit: (under: common.Type) => common.typed.ExpressionNode | null
+} {
+	let readings = new Map<common.Type, PayloadReading>()
 
-	if (payload === null) {
-		return null
+	function read(under: common.Type): PayloadReading | null {
+		let payload = node.value
+
+		if (payload === null) {
+			return null
+		}
+
+		let reading = readings.get(under)
+
+		if (reading === undefined) {
+			let { result, diagnostics } = collectDiagnostics(() =>
+				enrichExpression(payload, scope, expectedPayloadType(under)),
+			)
+
+			reading = { value: result, diagnostics }
+
+			readings.set(under, reading)
+		}
+
+		return reading
 	}
 
-	let { result } = collectDiagnostics(
-		() => enrichExpression(payload, scope, expectedType).type,
-	)
+	return {
+		typeUnder: (under) => read(under)?.value.type ?? null,
+		commit: (under) => {
+			let reading = read(under)
 
-	return result
+			if (reading === null) {
+				return null
+			}
+
+			for (let diagnostic of reading.diagnostics) {
+				report(diagnostic)
+			}
+
+			return reading.value
+		},
+	}
 }
 
 // NOTE: `#Case(value)` on a single-member Case may hand the member's value
@@ -3034,10 +3080,9 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
 	): common.Type {
+		let payload = makePayloadReadings(node, scope)
 		let { result } = collectDiagnostics(() =>
-			resolveCaseValueType(node, scope, expectedType, (expected) =>
-				silentPayloadTypeOf(node, scope, expected),
-			),
+			resolveCaseValueType(node, scope, expectedType, payload.typeUnder),
 		)
 
 		if (result.type === "Case") {
@@ -3049,12 +3094,10 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 
 			// NOTE: Read under what this candidate decided, which is the Type
 			// the real enrichment will read it under too — a nested construction
-			// is only itself once its own position is decided.
-			let payloadType = silentPayloadTypeOf(
-				node,
-				scope,
-				expectedPayloadType(result),
-			)
+			// is only itself once its own position is decided. Where arm
+			// selection already read it under this very Case, that reading
+			// answers.
+			let payloadType = payload.typeUnder(result)
 
 			if (payloadType === null || payloadFitsCase(result, payloadType)) {
 				return result
@@ -4719,10 +4762,11 @@ function resolveCaseInExpectedType(
 // NOTE: The payload's Type is asked for rather than handed over, because
 // resolving the Case is what decides the Type the payload should be READ under
 // — a question only the one position that offers several instantiations of the
-// same Case has to ask, and then once per candidate.
-export type PayloadReader = (
-	expectedType: common.Type | null,
-) => common.Type | null
+// same Case has to ask, and then once per candidate. Asked about the CASE rather
+// than about the Type its payload is expected to be, so that the answer can be
+// kept per candidate and the candidate that wins can be committed without
+// reading its payload a second time.
+export type PayloadReader = (under: common.Type) => common.Type | null
 
 export function resolveCaseValueType(
 	node: parser.CaseValueNode,
@@ -4910,7 +4954,7 @@ function decideCaseFromExpectedType(
 
 	return (
 		candidates.find((candidate) => {
-			let payloadType = payloadTypeUnder(expectedPayloadType(candidate))
+			let payloadType = payloadTypeUnder(candidate)
 
 			if (payloadType === null) {
 				return true
