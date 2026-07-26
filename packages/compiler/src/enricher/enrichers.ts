@@ -4562,6 +4562,22 @@ function isRuntimeCatchAllType(type: common.Type): boolean {
 	return type.type === "GenericUse" || type.type === "Unknown"
 }
 
+// NOTE: An Identifier callee names itself and a `Namespace.method` Lookup
+// spells both halves; anything else that answers with a Function has no one
+// name to give, and the Position the Diagnostic carries says which call is
+// meant either way. The Validator describes a callee by the same rule.
+function describeInvocationCallee(name: parser.ExpressionNode): string {
+	if (name.nodeType === "Identifier") {
+		return `'${name.content}'`
+	}
+
+	if (name.nodeType === "Lookup" && name.base.nodeType === "Identifier") {
+		return `'${name.base.content}.${name.member.content}'`
+	}
+
+	return "This callee"
+}
+
 function resolveFunctionInvocation(
 	node: parser.FunctionInvocationNode,
 	nameType: common.Type,
@@ -4583,11 +4599,6 @@ function resolveFunctionInvocation(
 		type.type === "SimpleMethod" ||
 		type.type === "StaticMethod"
 	) {
-		// NOTE: Mirrors resolveInferredReturnType, additionally keeping the
-		// bindings — conformance resolution for Protocol bounds needs to know
-		// what each Type Parameter was bound to. Argument mismatches are the
-		// Validator's to report; "Could not infer" and conformance Diagnostics
-		// only fire when the Arguments actually matched.
 		let matchableArguments: Array<MatchableArgument> = node.arguments.map(
 			(argument) => ({
 				name: argument.name?.content ?? null,
@@ -4597,59 +4608,66 @@ function resolveFunctionInvocation(
 			}),
 		)
 
-		if (type.generics.length === 0) {
-			// NOTE: Nothing is inferred here, but the Arguments are still
-			// matched: a Function literal that omitted its annotations takes
-			// them from the Parameter it is passed to, and matching is what
-			// hands each Argument the Parameter's Type to read them off. Handing
-			// back the return Type without matching left such a literal with no
-			// context at all, and it was reported as uninferable — while the
-			// identical literal passed to a non-generic METHOD resolved fine,
-			// because Method resolution matches its Arguments on every path.
-			// The result is discarded — a mismatch is the Validator's to report
-			// — and every Argument is asked for its Type, so one mismatching
-			// Argument does not leave the literals after it without a context.
-			matchArguments(type.parameterTypes, matchableArguments, {
-				collectAllMismatches: true,
-			})
-
-			return {
-				type: type.returnType,
-				conformances: [],
-				overloadedMethodIndex: null,
-			}
-		}
-
-		let { parameterTypes, context, freshToOriginal } =
-			createFreshenedInference(type)
-		let matchResult = matchArguments(parameterTypes, matchableArguments, {
-			inference: context,
-		})
-
-		let inferred = substituteInferredReturnType(
-			type,
-			unfreshenBindings(context.bindings, freshToOriginal),
+		// NOTE: A callee without an `overload` block is its own single
+		// candidate — one signature to match, one set of bounds to solve and
+		// one set of bindings to keep is what `selectOverload` does for one
+		// Overload, so both callee shapes take the same path and can not drift.
+		// The same reasoning already puts a SimpleMethod through it, see
+		// `resolveInvokedMethodInNamespace`.
+		let selected = selectOverload(
+			[type],
+			matchableArguments,
+			scope,
+			node.position,
+			typer,
 		)
-		let conformances: Array<common.Conformance> = []
 
-		if (matchResult.type === "Match") {
+		if (selected !== undefined) {
 			reportUnboundGenerics(
-				inferred.unboundGenerics,
+				selected.inferred.unboundGenerics,
 				node.position,
 				typer,
 			)
 
-			conformances = resolveConformances(
-				type.generics,
-				inferred.bindings,
-				scope,
-				node.position,
-			)
+			// NOTE: What selecting this candidate reported was held back until
+			// it was known to be the selection; it is the call's to report now.
+			for (let diagnostic of selected.diagnostics) {
+				report(diagnostic)
+			}
+
+			return {
+				type: selected.inferred.returnType,
+				conformances: selected.conformances,
+				overloadedMethodIndex: null,
+			}
 		}
 
+		// NOTE: With one candidate a mismatch is not "no Overload accepts these
+		// Arguments" but a plain Argument mismatch, which is the Validator's to
+		// report against the one signature there is. The Arguments are matched
+		// once more all the same: a Function literal that omitted its
+		// annotations takes them from the Parameter it is passed to, and
+		// matching is what hands each Argument the Parameter's Type to read them
+		// off. Every Argument is asked — a probe stops at the first mismatch, so
+		// without this the literals behind it were left with no context at all
+		// and reported as uninferable, while the identical literal passed to a
+		// METHOD resolved fine. The Type Parameters nothing bound are
+		// substituted as Errors rather than handed on as Generics no Scope
+		// declares.
+		let { parameterTypes, context, freshToOriginal } =
+			createFreshenedInference(type)
+
+		matchArguments(parameterTypes, matchableArguments, {
+			collectAllMismatches: true,
+			inference: context,
+		})
+
 		return {
-			type: inferred.returnType,
-			conformances,
+			type: substituteInferredReturnType(
+				type,
+				unfreshenBindings(context.bindings, freshToOriginal),
+			).returnType,
+			conformances: [],
 			overloadedMethodIndex: null,
 		}
 	} else if (
@@ -4693,6 +4711,12 @@ function resolveFunctionInvocation(
 			}
 		}
 
+		// NOTE: Every candidate is listed the way THIS call writes it — a Method
+		// reached through its Namespace passes its receiver as an ordinary first
+		// Argument, so unlike the `::` twin nothing is dropped from the
+		// signature.
+		let callee = describeInvocationCallee(node.name)
+
 		reportError("No overload accepts these Arguments", node.position, {
 			code: "no-matching-overload",
 			labels: [
@@ -4701,6 +4725,10 @@ function resolveFunctionInvocation(
 					`this call passes ${countOf(node.arguments.length, "Argument")}`,
 				),
 			],
+			notes: type.overloads.map(
+				(overload) =>
+					`${callee} ${describeSignature(overload.parameterTypes)}.`,
+			),
 		})
 
 		return {

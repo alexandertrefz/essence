@@ -1138,6 +1138,28 @@ describe("Enricher", () => {
 					}`),
 				).toEqual({ type: "String" })
 			})
+
+			// NOTE: The same, past an Argument that does not fit: matching a
+			// GENERIC free Function stopped at the first mismatch, so the
+			// literal behind it was left with no context and reported as
+			// uninferable — burying the Argument mismatch the Validator was
+			// about to report under a Diagnostic about a literal that is
+			// written perfectly well.
+			it("keeps its context behind a mismatching Argument", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function apply<infer Item>(
+							_ value: Item,
+							_ label: String,
+							_ transform: (_ item: Integer) -> Integer,
+						) -> Integer {
+							<- transform(1)
+						}
+
+						constant applied = apply(1, 2, (item) { <- item::add(1) })
+					}`),
+				).toEqual([])
+			})
 		})
 
 		it("should infer Generic Functions from their Arguments", () => {
@@ -2699,6 +2721,17 @@ describe("Enricher", () => {
 				expect(diagnostics[0].message).toBe(
 					"Boolean does not conform to 'Showable'",
 				)
+				// NOTE: The kept Diagnostic whole, Note and Help included —
+				// telling the reader how to satisfy the bound is the entire
+				// reason it is kept over "no Overload accepts these Arguments",
+				// so a report stripped down to its code would pass a test that
+				// only asked for the code.
+				expect(diagnostics[0].notes).toEqual([
+					"No Namespace in scope makes Boolean conform to 'Showable'.",
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Declare a Namespace 'for Boolean is Showable'.",
+				])
 			})
 
 			// NOTE: A candidate whose bound could not be DECIDED must not drop
@@ -2731,6 +2764,13 @@ describe("Enricher", () => {
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("ambiguous-conformance")
+				expect(diagnostics[0].message).toBe(
+					"More than one Namespace makes { x: Number, y: Number } conform to 'Showable'",
+				)
+				expect(diagnostics[0].notes).toEqual([
+					"'VectorShowable' conforms to 'Showable'.",
+					"'VectorShowableToo' conforms to 'Showable'.",
+				])
 			})
 
 			it("should still report no matching Overload when the Arguments match none", () => {
@@ -2753,6 +2793,62 @@ describe("Enricher", () => {
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("no-matching-overload")
+				expect(diagnostics[0].message).toBe(
+					"No overload accepts these Arguments",
+				)
+				// NOTE: Every candidate, in the order they are written — a call
+				// that matched none is told what it could have passed, which is
+				// what the `::` twin has always said and what this site
+				// promised without saying it.
+				expect(diagnostics[0].notes).toEqual([
+					"'Renderer.render' takes 1 Argument: Parameter 1 is Value.",
+					"'Renderer.render' takes 2 Arguments: Parameter 1 is Boolean, Parameter 2 is Boolean.",
+				])
+				expect(diagnostics[0].helps).toEqual([])
+			})
+
+			// NOTE: One entry is the shape a reader is likeliest to meet — an
+			// `overload` block being grown, or a call that simply passed the
+			// wrong thing — and "no overload accepts these Arguments" about a
+			// block with a single entry says nothing at all without the Note
+			// spelling that entry out.
+			it("should list the one signature a single entry Overload block declares", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Renderer for Nothing {
+						overload static render {
+							(_ value: Boolean) -> String {
+								<- "boolean"
+							}
+						}
+					}
+
+					constant text = Renderer.render("nope")
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("no-matching-overload")
+				expect(diagnostics[0].notes).toEqual([
+					"'Renderer.render' takes 1 Argument: Parameter 1 is Boolean.",
+				])
+			})
+
+			// NOTE: The free-Function half of the same site, which only the
+			// standard library can declare — and the half whose Notes carry the
+			// most, since an `overload function`'s entries are told apart by
+			// their Argument LABELS rather than by a receiver.
+			it("should name a free Function's Overloads by the labels they read", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant state = loop(startingWith 1)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("no-matching-overload")
+				expect(diagnostics[0].notes).toEqual([
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'while' is Function, Parameter 'step' is Function.",
+					"'loop' takes 3 Arguments: Parameter 'startingWith' is State, Parameter 'until' is Function, Parameter 'step' is Function.",
+					"'loop' takes 4 Arguments: Parameter 'from' is Integer, Parameter 'through' is Integer, Parameter 'startingWith' is State, Parameter 'step' is Function.",
+					"'loop' takes 2 Arguments: Parameter 'startingWith' is State, Parameter 'step' is Function.",
+				])
 			})
 
 			// NOTE: Reaching past a candidate whose bound failed means typing the
