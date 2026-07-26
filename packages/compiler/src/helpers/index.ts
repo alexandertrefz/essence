@@ -1881,8 +1881,23 @@ function matchTypes(
 		return true
 	}
 
+	// NOTE: A Method NAMED rather than called — `Reader.readsBase`,
+	// `Doubler.double` — is a Function value like any other: its receiver
+	// already stands as the first Parameter of the Type, and it is emitted as a
+	// plain function taking it there. The `SimpleMethod`/`StaticMethod` tag
+	// only records where the signature was written down, and no annotation can
+	// spell either one, so an expected `Function` accepts all three. The
+	// reverse direction is unreachable and stays out.
 	if (
-		(lhs.type === "Function" && rhs.type === "Function") ||
+		lhs.type === "Function" &&
+		(rhs.type === "Function" ||
+			rhs.type === "SimpleMethod" ||
+			rhs.type === "StaticMethod")
+	) {
+		return signatureMatches(lhs, rhs, context)
+	}
+
+	if (
 		(lhs.type === "SimpleMethod" && rhs.type === "SimpleMethod") ||
 		(lhs.type === "StaticMethod" && rhs.type === "StaticMethod")
 	) {

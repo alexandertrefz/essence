@@ -202,4 +202,126 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 	})
+
+	describe("Methods read as values", () => {
+		// NOTE: `Reader.readsBase` names a Method without calling it, and a
+		// named Method is typed `StaticMethod`/`SimpleMethod` rather than
+		// `Function` — a tag saying where the signature was written, not a
+		// different kind of value. Matched by tag alone, EVERY Function
+		// annotation refused one: `constant`, `variable`, static Property,
+		// Argument and List item alike, while the identical unannotated
+		// binding was accepted and ran fine.
+		it("should let a static Method stand in a Function-typed Constant", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Reader {
+						static readsBase(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					constant read: (_ x: Integer) -> Integer = Reader.readsBase
+					__print(read(1)::toString())
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: An instance Method carries its receiver as the first Parameter
+		// of its Type, and is emitted taking it there — so it fits the
+		// Function Type that spells the receiver out.
+		it("should let an instance Method stand in a Function that takes its receiver", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Doubler for Integer {
+						double() -> Integer {
+							<- @::add(@)
+						}
+					}
+
+					constant double: (_ x: Integer) -> Integer = Doubler.double
+					__print(double(21)::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("should let a Method stand in a Function-typed static Property", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Reader {
+						static readsBase(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					namespace Holder {
+						static READER: (_ x: Integer) -> Integer = Reader.readsBase
+					}
+
+					__print(Holder.READER(1)::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("should let a Method stand in a Function Argument and a List of Functions", () => {
+			expect(
+				errorsFor(`implementation {
+					namespace Reader {
+						static readsBase(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					function apply(_ fn: (_ x: Integer) -> Integer, to value: Integer) -> Integer {
+						<- fn(value)
+					}
+
+					constant readers: List<(_ x: Integer) -> Integer> = [Reader.readsBase]
+					__print(apply(Reader.readsBase, to 1)::toString())
+					__print(readers::length()::toString())
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Only the tag is waved through — the signature is judged
+		// exactly as one Function against another.
+		it("should still reject a Method whose signature disagrees", () => {
+			let errors = errorsFor(`implementation {
+				namespace Reader {
+					static readsBase(_ x: Integer) -> Integer {
+						<- x
+					}
+				}
+
+				constant read: (_ x: String) -> Integer = Reader.readsBase
+			}`)
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("assignment-type-mismatch")
+		})
+
+		// NOTE: An overloaded Method is a SET of signatures and is refused in
+		// every value position by the Validator, annotation or not.
+		it("should still refuse an overloaded Method as a value", () => {
+			let errors = errorsFor(`implementation {
+				namespace Reader {
+					overload static readsBase {
+						(_ x: Integer) -> Integer {
+							<- x
+						}
+
+						(_ x: Integer, and y: Integer) -> Integer {
+							<- x::add(y)
+						}
+					}
+				}
+
+				constant read: (_ x: Integer) -> Integer = Reader.readsBase
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"assignment-type-mismatch",
+				"overloaded-function-value",
+			])
+		})
+	})
 })

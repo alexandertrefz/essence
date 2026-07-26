@@ -4565,7 +4565,10 @@ function isRuntimeCatchAllType(type: common.Type): boolean {
 // NOTE: An Identifier callee names itself and a `Namespace.method` Lookup
 // spells both halves; anything else that answers with a Function has no one
 // name to give, and the Position the Diagnostic carries says which call is
-// meant either way. The Validator describes a callee by the same rule.
+// meant either way. The Validator's own `describeCallee` stops at the
+// Identifier and says "This call" for everything else — it names a callee only
+// inside "This is a bug in the Compiler" messages, which nobody reads for the
+// signature they should have passed.
 function describeInvocationCallee(name: parser.ExpressionNode): string {
 	if (name.nodeType === "Identifier") {
 		return `'${name.content}'`
