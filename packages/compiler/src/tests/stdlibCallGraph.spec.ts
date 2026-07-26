@@ -401,12 +401,10 @@ function artifactsOf(source: string): {
 	prelude: Array<PreludeNamespace>
 	freeFunctions: Array<PreludeFreeFunction>
 } {
-	let typedPrograms = loadStdlibFrom([
-		parseStdlibSource("Synthetic.es", source),
-	]).typedPrograms
+	let stdlib = loadStdlibFrom([parseStdlibSource("Synthetic.es", source)])
 
-	let freeFunctions: Array<PreludeFreeFunction> = typedPrograms.flatMap(
-		(typedProgram) =>
+	let freeFunctions: Array<PreludeFreeFunction> =
+		stdlib.typedPrograms.flatMap((typedProgram) =>
 			optimise(
 				simplify(structuredClone(typedProgram)),
 			).implementation.nodes.flatMap((node) =>
@@ -414,9 +412,9 @@ function artifactsOf(source: string): {
 					? [{ name: node.name.name, node }]
 					: [],
 			),
-	)
+		)
 
-	return { prelude: buildStdlibPrelude(typedPrograms), freeFunctions }
+	return { prelude: buildStdlibPrelude(stdlib), freeFunctions }
 }
 
 function graphOf(source: string): CallGraph {
