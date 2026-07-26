@@ -275,7 +275,7 @@ export function enrichCaseValue(
 
 		type = instantiateCaseFromPayload(type, value, scope, node.position)
 
-		if (choiceGenerics !== undefined) {
+		if (choiceGenerics !== undefined && payloadStandsForCase(type, value)) {
 			type = reportUndecidedPayloadTypeArguments(
 				node,
 				type,
@@ -499,13 +499,21 @@ type PayloadReading = {
 	diagnostics: Array<common.Diagnostic>
 }
 
+type PayloadReadings = {
+	typeUnder: PayloadReader
+	// NOTE: The reading itself, still unreported — what a probe hands to
+	// `instantiateCaseFromPayload` to ask what the payload ALONE makes of the
+	// construction, which needs the typed Node and not only its Type. `commit` is
+	// the same reading with its Diagnostics said, and there is exactly one pass
+	// that may say them.
+	valueUnder: (under: common.Type) => common.typed.ExpressionNode | null
+	commit: (under: common.Type) => common.typed.ExpressionNode | null
+}
+
 function makePayloadReadings(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
-): {
-	typeUnder: PayloadReader
-	commit: (under: common.Type) => common.typed.ExpressionNode | null
-} {
+): PayloadReadings {
 	let readings = new Map<common.Type, PayloadReading>()
 
 	function read(under: common.Type): PayloadReading | null {
@@ -532,6 +540,7 @@ function makePayloadReadings(
 
 	return {
 		typeUnder: (under) => read(under)?.value.type ?? null,
+		valueUnder: (under) => read(under)?.value ?? null,
 		commit: (under) => {
 			let reading = read(under)
 
@@ -760,6 +769,28 @@ function reportUndecidedPayloadTypeArguments(
 		node.position,
 		undecided,
 	)
+}
+
+// NOTE: Whether there is a payload here to ask about the Type Arguments at all.
+// The refusal above is about the Parameters a payload that STOOD leaves behind,
+// so a payload that never stood is none of its business: a Case that carries one
+// and was written without (`missing-payload`) and one whose payload is not the
+// Case's Record (`payload-type-mismatch`) are the Validator's to report against
+// a Case whose Type resolves either way, and standing in front of them with a
+// message about Type Arguments hid the mistake the reader actually made — `#Full`
+// alone was told its payload decides none of them, about a payload it never
+// wrote and a `(…)` it never spelled. An Error payload is the third: it binds
+// nothing, so every Type Parameter would report as undecided on top of the
+// Diagnostic that is the whole reason none of them are.
+function payloadStandsForCase(
+	caseType: common.CaseType,
+	value: common.typed.ExpressionNode | null,
+): boolean {
+	if (value === null || typeContainsError(value.type)) {
+		return false
+	}
+
+	return payloadFitsCase(caseType, value.type)
 }
 
 export function enrichNativeFunctionInvocation(
@@ -3293,16 +3324,16 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// altogether, on the grounds that its payload decides — but a payload decides
 	// only what it MENTIONS, so `steps::contains(#Done(2))` leaked the `State`
 	// its prefixed twin reads straight off the Parameter Type and was refused
-	// for it. `null` is how the two answers "the position decided nothing" and
-	// "the position is undecided itself" come back, and its caller falls back to
-	// the payload reading — the recording is left unmade with it, since the
-	// enrichment pass reads that recording back and a position that decided
-	// nothing must not be what it reads.
+	// for it. Where the position decides nothing — an unrelated Parameter Type, an
+	// instantiation the payload does not fit, one still mentioning the call's own
+	// unsolved Parameters — `payloadDecidedCaseType` answers instead, and no
+	// recording is left behind: the enrichment pass reads that recording back, and
+	// a position that decided nothing must not be what it reads.
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
-	): common.Type | null {
+	): common.Type {
 		let payload = makePayloadReadings(node, scope)
 		let { result } = collectDiagnostics(() =>
 			resolveCaseValueType(node, scope, expectedType, payload.typeUnder),
@@ -3318,7 +3349,9 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				mentionsUnsolvedTypeParameter(result) ||
 				result.choiceGenerics !== undefined
 			) {
-				return payloadDecides ? null : { type: "Error" }
+				return payloadDecides
+					? payloadDecidedCaseType(node, payload)
+					: { type: "Error" }
 			}
 
 			// NOTE: Read under what this candidate decided, which is the Type
@@ -3348,7 +3381,7 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		}
 
 		if (payloadDecides) {
-			return null
+			return payloadDecidedCaseType(node, payload)
 		}
 
 		let { result: declared } = collectDiagnostics(() =>
@@ -3358,6 +3391,52 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		)
 
 		return declared
+	}
+
+	// NOTE: What the payload ALONE makes of a bare construction — the fallback for
+	// the candidate whose position decided nothing. Read here, silently and kept
+	// nowhere, rather than by enriching the construction for real: that enrichment
+	// is the one the committed Argument Node is built from and it happens exactly
+	// once, so a probe that ran it early reported from a position no candidate
+	// committed to and handed its answer to every candidate after. A `take(_:
+	// String)` Overload declared ahead of a `take(_: Pair<Integer, Integer>)` one
+	// refused `#Left({ a = 1 })` for the `B` its payload leaves standing that way,
+	// while the very Overload that decides both went on to win — a call that
+	// resolved or not by the order the Overloads were written in.
+	//
+	// A Parameter the payload left standing is answered as an Error, which is what
+	// the prefixed rail answers an undecided position with and for the same reason:
+	// the candidate must not win on a reading nothing decided, and the unsolved
+	// Parameter must not report a second time as uninferable. The refusal itself is
+	// the enrichment pass's, under whatever the committed call decided.
+	function payloadDecidedCaseType(
+		node: parser.CaseValueNode,
+		payload: PayloadReadings,
+	): common.Type {
+		let { result } = collectDiagnostics(() => {
+			let declared = resolveBareCaseReference(node.caseName, scope)
+
+			if (declared.type !== "Case") {
+				return declared
+			}
+
+			let value = payload.valueUnder(declared)
+
+			if (value === null) {
+				return declared
+			}
+
+			return instantiateCaseFromPayload(
+				declared,
+				wrapSingleMemberShorthand(declared, value),
+				scope,
+				node.position,
+			)
+		})
+
+		return mentionsUnsolvedTypeParameter(result)
+			? { type: "Error" }
+			: result
 	}
 
 	return {
@@ -3387,13 +3466,12 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// whichever way it is spelled. The prefixed form and the bare unit
 			// sigil have nothing of their own to read their Choice's Type
 			// Arguments off and take the position's answer whatever it is; the
-			// bare form carrying a payload asks the position first and falls back
-			// on reading its payload where the position decided nothing, which is
-			// what `null` says.
+			// bare form carrying a payload asks the position first and reads its
+			// payload where the position decided nothing.
 			if (value.nodeType === "CaseValue") {
-				let probed = probedCaseValueType(value, expectedType, bindings)
-
-				return noteErrors(probed ?? enrichOnce(value).type)
+				return noteErrors(
+					probedCaseValueType(value, expectedType, bindings),
+				)
 			}
 
 			return noteErrors(enrichOnce(value).type)
