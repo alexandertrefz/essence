@@ -837,6 +837,56 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A free Function's Arguments carry labels exactly as a Method's do —
+	// the standard library's `loop` family is told apart by nothing else — and a
+	// label is spent entirely at compile time: what it decides is which
+	// Parameter, and which Overload, an Argument is matched against, after which
+	// the emitted call is positional and the label appears nowhere in it.
+	describe("Labelled Arguments", () => {
+		it("spends the label at compile time and emits the call positionally", async () => {
+			const source = `implementation {
+				function shout (about topic: String, times count: Integer) -> String {
+					<- topic::append("!")::repeat(times count)
+				}
+
+				__print(shout(about "hi", times 2))
+			}`
+
+			const code = generate(source)
+
+			// NOTE: The internal names survive as the emitted Parameters; the
+			// LABELS are not names the JavaScript has anything to do with.
+			expect(code).toContain("function shout(topic, count)")
+			expect(code).not.toContain("about")
+			expect(code).not.toContain("times")
+
+			expect(await run(source)).toEqual(['"hi!hi!"'])
+		})
+
+		// NOTE: The one thing a free Function has instead of a receiver. Both
+		// calls pass the same three Arguments in the same order, and the middle
+		// label is the whole of the difference: `while` steps until the predicate
+		// stops holding, `until` steps until it starts. The predicate holds on the
+		// seed, so a Program that picked the wrong entry prints the other number.
+		it("picks the Overload the label names", async () => {
+			expect(
+				await run(`implementation {
+					__print(loop(
+						startingWith 1,
+						while (n) { <- n::isLessThan(4) },
+						step (n) { <- n::add(1) },
+					))
+
+					__print(loop(
+						startingWith 1,
+						until (n) { <- n::isLessThan(4) },
+						step (n) { <- n::add(1) },
+					))
+				}`),
+			).toEqual(["4", "1"])
+		})
+	})
+
 	// NOTE: A user's `overload` block defines every Overload itself, so the
 	// emitted names run 1, 2, 3 in written order — the same numbering the call
 	// site resolves against the Method Type. Only the Namespaces the standard
