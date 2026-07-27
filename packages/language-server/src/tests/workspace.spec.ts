@@ -329,6 +329,107 @@ describe("Workspace", () => {
 			)
 		})
 
+		// NOTE: `namespace Rectangle for Rectangle` is how the corpus writes a
+		// Namespace over a Type, and one entry publishes both of them — so a
+		// rename has to move both, from whichever side it is asked. Moving one
+		// leaves the export entry publishing a name only the other still
+		// answers to, which is a workspace that no longer compiles.
+		describe("a Type and the Namespace written under its name", () => {
+			let shapes = {
+				"Geometry.es": [
+					"implementation {",
+					"",
+					"\ttype Rectangle = { width: Integer, height: Integer }",
+					"",
+					"\tnamespace Rectangle for Rectangle {",
+					"\t\tstatic of(width: Integer, height: Integer) -> Rectangle {",
+					"\t\t\t<- { width = width, height = height }",
+					"\t\t}",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tRectangle",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tRectangle from "./Geometry.es"',
+					"}",
+					"",
+					"implementation {",
+					"\tconstant made = Rectangle.of(width 3, height 4)",
+					"",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			}
+
+			let expectAllOfItMoved = (
+				renamed: Record<string, string> | null,
+			): void => {
+				expect(Object.keys(renamed ?? {}).sort()).toEqual([
+					"Geometry.es",
+					"Main.es",
+				])
+				expect(renamed?.["Geometry.es"]).toContain(
+					"\ttype Box = { width: Integer, height: Integer }",
+				)
+				expect(renamed?.["Geometry.es"]).toContain(
+					"\tnamespace Box for Box {",
+				)
+				expect(renamed?.["Geometry.es"]).toContain("-> Box {")
+				expect(renamed?.["Geometry.es"]).toContain("\tBox\n")
+				expect(renamed?.["Geometry.es"]).not.toContain("Rectangle")
+				expect(renamed?.["Main.es"]).toContain(
+					'\tBox from "./Geometry.es"',
+				)
+				expect(renamed?.["Main.es"]).toContain(
+					"Box.of(width 3, height 4)",
+				)
+				expect(renamed?.["Main.es"]).toContain("_ shape: Box")
+				expect(renamed?.["Main.es"]).not.toContain("Rectangle")
+			}
+
+			it("should move as one from the file that imports them", () => {
+				let { workspace, pathOf } = makeWorkspace(shapes)
+
+				expectAllOfItMoved(
+					renameAcross(
+						workspace,
+						pathOf("Main.es"),
+						cursorAt(
+							workspace.sourceOf(pathOf("Main.es")) ?? "",
+							8,
+							"Rectangle",
+						),
+						"Box",
+					),
+				)
+			})
+
+			it("should move as one from the Type's own declaration", () => {
+				let { workspace, pathOf } = makeWorkspace(shapes)
+
+				expectAllOfItMoved(
+					renameAcross(
+						workspace,
+						pathOf("Geometry.es"),
+						cursorAt(
+							workspace.sourceOf(pathOf("Geometry.es")) ?? "",
+							3,
+							"Rectangle",
+						),
+						"Box",
+					),
+				)
+			})
+		})
+
 		// NOTE: An aliased import's local name is a symbol of this file alone —
 		// what the other Module publishes is not renamed by renaming it, and
 		// nothing else in the workspace has ever seen the alias.

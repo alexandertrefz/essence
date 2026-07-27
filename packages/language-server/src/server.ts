@@ -250,6 +250,17 @@ export function startServer() {
 				workspace.changed(filePath)
 			}
 		}
+
+		// NOTE: A file changing on disk changes the graph every open document
+		// sits in, and an analysis is the only thing that ever publishes: the
+		// Diagnostics an importer owns for a dependency nobody has open are
+		// cleared by that importer being analysed again, which no keystroke is
+		// going to ask for. Every open document, rather than the importers of
+		// what changed, because a file that did not exist a moment ago is
+		// exactly what an unresolved import was waiting for.
+		for (let document of documents.all()) {
+			scheduleAnalysis(document.uri)
+		}
 	})
 
 	// NOTE: Requests are resolved on a fresh parse of the current document

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
@@ -20,29 +20,31 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		source: file.sourceText,
 	}))
 
-	// NOTE: The Module fixtures live in subdirectories of their own — a Module
-	// Diagnostic takes more than one file to provoke — and are listed here so
-	// they join the corpus, since they are the only sources in the repository
-	// carrying the two Module sections.
-	for (let directory of [
-		fixturePath(),
-		fixturePath("diagnostics"),
-		fixturePath("modules"),
-		fixturePath("modules", "math"),
-		fixturePath("diagnostics", "modules"),
-	]) {
-		for (let fileName of readdirSync(directory).sort()) {
-			if (!fileName.endsWith(".es")) {
-				continue
-			}
+	// NOTE: Every fixture directory, walked rather than listed: the Module
+	// fixtures live in subdirectories of their own — a Module Diagnostic takes
+	// more than one file to provoke — and a directory nobody thought to add
+	// here would be a corner of the repository the formatter is never held to.
+	for (let filePath of essenceFilesUnder(fixturePath())) {
+		files.push({
+			name: path.relative(fixturePath(), filePath),
+			filePath,
+			source: readFileSync(filePath, "utf8"),
+		})
+	}
 
-			let filePath = path.join(directory, fileName)
+	return files
+}
 
-			files.push({
-				name: path.relative(fixturePath(), filePath),
-				filePath,
-				source: readFileSync(filePath, "utf8"),
-			})
+function essenceFilesUnder(directory: string): Array<string> {
+	let files: Array<string> = []
+
+	for (let entry of readdirSync(directory).sort()) {
+		let filePath = path.join(directory, entry)
+
+		if (statSync(filePath).isDirectory()) {
+			files.push(...essenceFilesUnder(filePath))
+		} else if (entry.endsWith(".es")) {
+			files.push(filePath)
 		}
 	}
 
