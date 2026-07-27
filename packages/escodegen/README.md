@@ -1,3 +1,13 @@
+# @essence/escodegen
+
+The [Essence](https://github.com/alexandertrefz/essence) compiler's vendored
+fork of [escodegen 2.1.0](https://github.com/estools/escodegen): upstream,
+plus a twelve-line patch adding the `PropertyDefinition` case the compiler
+emits for Namespace properties. `PATCHES.md` records the exact provenance and
+the patch itself. Everything below is upstream's own README, kept verbatim.
+
+---
+
 ## Escodegen
 [![npm version](https://badge.fury.io/js/escodegen.svg)](http://badge.fury.io/js/escodegen)
 [![Build Status](https://secure.travis-ci.org/estools/escodegen.svg)](http://travis-ci.org/estools/escodegen)
