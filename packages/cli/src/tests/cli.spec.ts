@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -9,9 +16,10 @@ import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence/fixtures"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
-import { parseArguments, UsageError } from "../args"
+import { runCheck } from "../actions"
+import { type OptionValues, parseArguments, UsageError } from "../args"
 import { commands, findCommand, globalOptions, PROGRAM } from "../commands"
-import { colorChoiceFor, version } from "../context"
+import { colorChoiceFor, createContext, version } from "../context"
 import {
 	renderCommandHelp,
 	renderOverview,
@@ -25,7 +33,7 @@ import {
 	resolveInputFiles,
 	resolveOutputFiles,
 } from "../inputs"
-import { toJSONReport } from "../json"
+import { type JSONReport, toJSONReport } from "../json"
 import { type CompileOutcome, compileFile } from "../pipeline"
 import { defaultWorkerCount, shouldUseWorkers } from "../pool"
 import {
@@ -33,8 +41,10 @@ import {
 	formatBytes,
 	formatDuration,
 	pluralise,
+	renderDiagnosticsFor,
 } from "../report"
-import { isInteractive, truncate } from "../terminal"
+import { createCompileSession, groupEntries } from "../session"
+import { isInteractive, type Terminal, truncate } from "../terminal"
 import {
 	createPalette,
 	createTheme,
@@ -86,6 +96,7 @@ function outcome(overrides: Partial<CompileOutcome> = {}): CompileOutcome {
 		outputFileName: "Source.js",
 		ok: true,
 		sourceText: "",
+		modules: [],
 		diagnostics: [],
 		timings: [{ name: "parse", duration: 1.5 }],
 		duration: 12.25,
@@ -1090,5 +1101,365 @@ describe("delegation stays lazy", () => {
 
 		expect(source).toContain('await import("@essence/formatter/cli")')
 		expect(source).toContain('await import("@essence/language-server")')
+	})
+})
+
+// NOTE: A Module graph belongs to a directory rather than to a file — a
+// specifier is a path from one Module to another — so a test that needs one
+// writes it outside the repository and takes it down again afterwards.
+async function withModules<Value>(
+	files: Record<string, string>,
+	body: (directory: string) => Promise<Value>,
+): Promise<Value> {
+	let directory = mkdtempSync(path.join(tmpdir(), "esc-modules-"))
+
+	try {
+		for (let [fileName, source] of Object.entries(files)) {
+			let filePath = path.join(directory, fileName)
+
+			mkdirSync(path.dirname(filePath), { recursive: true })
+			writeFileSync(filePath, source)
+		}
+
+		return await body(directory)
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+function captureTerminal(): { terminal: Terminal; lines: Array<string> } {
+	let lines: Array<string> = []
+
+	return {
+		lines,
+		terminal: {
+			stdout: process.stdout,
+			stderr: process.stderr,
+			isInteractive: false,
+			width: 80,
+			out: (text: string) => {
+				lines.push(text)
+			},
+			err: () => {},
+		},
+	}
+}
+
+// NOTE: One job, so that a test compiles in this process: a worker would
+// answer the same and boot a second copy of the Compiler to do it.
+function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
+	return {
+		help: false,
+		version: false,
+		verbose: false,
+		quiet: false,
+		json: false,
+		color: false,
+		noColor: true,
+		out: undefined,
+		watch: false,
+		execute: false,
+		clear: false,
+		sourcemap: false,
+		minify: false,
+		jobs: 1,
+		...overrides,
+	}
+}
+
+async function checkAsJSON(files: Array<string>): Promise<JSONReport> {
+	let { terminal, lines } = captureTerminal()
+	let context = createContext(testOptions({ json: true }), "esc", terminal)
+
+	await runCheck(
+		context,
+		findCommand("check") as NonNullable<ReturnType<typeof findCommand>>,
+		files,
+	)
+
+	return JSON.parse(lines.join("\n")) as JSONReport
+}
+
+function plainReport() {
+	let theme = createTheme(false, false)
+
+	return {
+		terminal: captureTerminal().terminal,
+		theme,
+		palette: createPalette(theme),
+		verbose: false,
+		quiet: false,
+	}
+}
+
+// NOTE: The bundle is imported rather than started as a program, which is what
+// `esc run` does with this very file: a child process inherits the test
+// runner's streams, so what it printed could not be read back here.
+async function runBundle(fileName: string): Promise<Array<string>> {
+	let printed: Array<string> = []
+	let log = console.log
+
+	console.log = (...values: Array<unknown>) => {
+		printed.push(values.map((value) => String(value)).join(" "))
+	}
+
+	try {
+		await import(fileName)
+	} finally {
+		console.log = log
+	}
+
+	return printed
+}
+
+const brokenDependency = {
+	"Dep.es": [
+		"implementation {",
+		"",
+		"\tfunction halve(_ amount: Integer) -> Integer {",
+		'\t\t<- "not a Number"',
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\thalve",
+		"}",
+		"",
+	].join("\n"),
+	"Main.es": [
+		"import {",
+		'\thalve from "./Dep.es"',
+		"}",
+		"",
+		"implementation {",
+		"",
+		"\t__print(halve(4)::toString())",
+		"}",
+		"",
+	].join("\n"),
+}
+
+const sharedDependency = {
+	"Dep.es": [
+		"implementation {",
+		"",
+		"\tfunction halve(_ amount: Integer) -> Integer {",
+		"\t\t<- amount::divide(by 2)::otherwise(0/1)::truncate()",
+		"\t}",
+		"}",
+		"",
+		"export {",
+		"\thalve",
+		"}",
+		"",
+	].join("\n"),
+	"Main.es": [
+		"import {",
+		'\thalve from "./Dep.es"',
+		"}",
+		"",
+		"implementation {",
+		"",
+		"\t__print(halve(9)::toString())",
+		"}",
+		"",
+	].join("\n"),
+}
+
+describe("CLI on a Module graph", () => {
+	// NOTE: The whole graph as one bundle, run. Five files, a cycle among them
+	// and a Namespace reached only through implicit dispatch — and three lines
+	// of output, which is what says every Module body ran exactly once: a
+	// Module the bundle carries two copies of prints six.
+	it("compiles the Module fixtures into one standalone file and runs it", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "esc-bundle-"))
+
+		try {
+			let outputFileName = path.join(directory, "Main.js")
+			let compiled = await compileFile({
+				inputFileName: fixturePath("modules", "Main.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: false,
+			})
+
+			expect(compiled.diagnostics).toEqual([])
+			expect(compiled.ok).toBe(true)
+			expect(
+				compiled.modules.map((module) =>
+					path.basename(module.fileName),
+				),
+			).toEqual(["A.es", "B.es", "Geometry.es", "Math.es", "Main.es"])
+			expect(readdirSync(directory)).toEqual(["Main.js"])
+
+			let emitted = readFileSync(outputFileName, "utf8")
+
+			// NOTE: Standalone: the runtime is inlined and nothing is left to
+			// resolve at run time.
+			expect(emitted).not.toMatch(/^import\s/m)
+			expect(emitted).not.toContain("require(")
+
+			// NOTE: The Bundler labels each Module it inlines with the
+			// specifier it came in under, so the labels are the bundle's own
+			// account of what it carries: five Modules and one prelude, one
+			// copy each.
+			expect(
+				[...emitted.matchAll(/^\/\/ (essence:\S+)$/gm)].map(
+					(match) => match[1],
+				),
+			).toEqual([
+				"essence:$prelude",
+				"essence:./B.es",
+				"essence:./A.es",
+				"essence:./Geometry.es",
+				"essence:./math/Math.es",
+				"essence:./Main.es",
+			])
+
+			expect(await runBundle(outputFileName)).toEqual([
+				'"area: 12"',
+				'"25"',
+				'"157/1"',
+			])
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// NOTE: A Diagnostic is rendered against the source it was reported in.
+	// The importer's text at the dependency's line numbers would underline
+	// whatever happens to be written there, which is why every Module carries
+	// its own source through the outcome.
+	it("reports a dependency's Diagnostics under the dependency's own name", async () => {
+		await withModules(brokenDependency, async (directory) => {
+			let outcome = await compileFile({
+				inputFileName: path.join(directory, "Main.es"),
+				outputFileName: null,
+				minify: false,
+				sourcemap: false,
+			})
+
+			expect(outcome.ok).toBe(false)
+			expect(
+				outcome.modules.map((module) => path.basename(module.fileName)),
+			).toEqual(["Dep.es", "Main.es"])
+
+			let [dependency, entry] = outcome.modules
+
+			expect(
+				dependency?.diagnostics.map((diagnostic) => diagnostic.code),
+			).toEqual(["return-type-mismatch"])
+			expect(entry?.diagnostics).toEqual([])
+			expect(outcome.diagnostics).toHaveLength(1)
+
+			let rendered = stripAnsi(
+				renderDiagnosticsFor(outcome, plainReport()) ?? "",
+			)
+
+			expect(rendered).toContain("Dep.es")
+			expect(rendered).toContain('<- "not a Number"')
+			expect(rendered).not.toContain("__print")
+		})
+	})
+
+	// NOTE: `esc check Dep.es Main.es`, where the second imports the first.
+	// Both are entries, so both are compiled — but the graph is one graph, and
+	// the file they share is reported by the outcome that owns it. Counted per
+	// entry instead, a batch says two errors where the reader finds one.
+	it("reports a file that is both an entry and a dependency exactly once", async () => {
+		await withModules(brokenDependency, async (directory) => {
+			let report = await checkAsJSON([
+				path.join(directory, "Dep.es"),
+				path.join(directory, "Main.es"),
+			])
+
+			expect(report.ok).toBe(false)
+			expect(report.errors).toBe(1)
+			expect(report.files).toHaveLength(2)
+
+			let diagnostics = report.files.flatMap((file) => file.diagnostics)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(path.basename(diagnostics[0]!.file)).toBe("Dep.es")
+			expect(report.files.map((file) => file.ok)).toEqual([false, false])
+		})
+	})
+
+	// NOTE: The file a Diagnostic belongs to is the file it was written in,
+	// which with Modules is regularly not the file that was compiled.
+	it("names the file each Diagnostic was written in under --json", async () => {
+		await withModules(brokenDependency, async (directory) => {
+			let report = await checkAsJSON([path.join(directory, "Main.es")])
+
+			expect(report.files).toHaveLength(1)
+			expect(path.basename(report.files[0]!.input)).toBe("Main.es")
+			expect(report.files[0]!.diagnostics).toHaveLength(1)
+			expect(path.basename(report.files[0]!.diagnostics[0]!.file)).toBe(
+				"Dep.es",
+			)
+			expect(report.files[0]!.diagnostics[0]!.line).toBe(4)
+		})
+	})
+
+	// NOTE: Both files built in one invocation, so the dependency's typed
+	// Program is the one the entry's graph holds. It may be emitted from twice
+	// and simplified once: the Simplifier writes an overloaded Method's mangled
+	// name onto the typed Node it read it off, and a second pass mangles it
+	// again into a Method nothing declares — which surfaced as a bundle
+	// importing a name the runtime does not export.
+	it("emits a Module twice over without simplifying it twice", async () => {
+		await withModules(sharedDependency, async (directory) => {
+			let session = createCompileSession([
+				path.join(directory, "Main.es"),
+				path.join(directory, "Dep.es"),
+			])
+			let compile = (fileName: string) =>
+				compileFile(
+					{
+						inputFileName: path.join(directory, `${fileName}.es`),
+						outputFileName: path.join(directory, `${fileName}.js`),
+						minify: false,
+						sourcemap: false,
+					},
+					undefined,
+					session,
+				)
+
+			let main = await compile("Main")
+			let dependency = await compile("Dep")
+
+			expect(main.diagnostics).toEqual([])
+			expect(dependency.diagnostics).toEqual([])
+			expect(dependency.ok).toBe(true)
+
+			expect(await runBundle(path.join(directory, "Main.js"))).toEqual([
+				'"4"',
+			])
+		})
+	})
+
+	// NOTE: Which entries a worker is handed together. Workers share nothing,
+	// so an entry that imports another entry belongs in one of them, while an
+	// unrelated file is free to go anywhere.
+	it("gathers the entries whose graphs overlap", async () => {
+		await withModules(
+			{
+				...brokenDependency,
+				"Other.es": ["implementation {", "}", ""].join("\n"),
+			},
+			async (directory) => {
+				let groups = groupEntries([
+					path.join(directory, "Main.es"),
+					path.join(directory, "Other.es"),
+					path.join(directory, "Dep.es"),
+				]).map((group) =>
+					group.map((fileName) => path.basename(fileName)).sort(),
+				)
+
+				expect(groups).toHaveLength(2)
+				expect(groups).toContainEqual(["Dep.es", "Main.es"])
+				expect(groups).toContainEqual(["Other.es"])
+			},
+		)
 	})
 })

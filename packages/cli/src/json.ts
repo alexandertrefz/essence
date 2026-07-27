@@ -1,6 +1,7 @@
 import type { common } from "@essence/interfaces"
 
-import type { CompileOutcome } from "./pipeline"
+import { type CompileOutcome, ownDiagnostics } from "./pipeline"
+import { displayPath } from "./report"
 
 // NOTE: The machine-readable form of a run. Positions are flattened to plain
 // line and column numbers — a consumer should not have to know the Compiler's
@@ -89,9 +90,23 @@ export function toJSONReport(
 			gzipBytes: outcome.gzipBytes,
 			durationMs: round(outcome.duration),
 			stages,
-			diagnostics: outcome.diagnostics.map((diagnostic) =>
-				toJSONDiagnostic(diagnostic, outcome.inputFileName),
-			),
+			// NOTE: Every Diagnostic under the file it was written in, which
+			// with Modules is regularly not the file that was compiled. An
+			// Editor jumping to `input` for a dependency's error would open the
+			// wrong file at a line number that means nothing there.
+			diagnostics: [
+				...outcome.modules.flatMap((module) =>
+					module.diagnostics.map((diagnostic) =>
+						toJSONDiagnostic(
+							diagnostic,
+							displayPath(module.fileName),
+						),
+					),
+				),
+				...ownDiagnostics(outcome).map((diagnostic) =>
+					toJSONDiagnostic(diagnostic, outcome.inputFileName),
+				),
+			],
 		}
 	})
 

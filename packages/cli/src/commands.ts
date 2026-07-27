@@ -153,6 +153,10 @@ export const commands: Array<CommandSpec> = [
 				"ES module: the parts of the Essence runtime a program actually " +
 				"uses are bundled into it, so it can be executed by Bun or Node, " +
 				"or loaded in a browser, without further installation.",
+			"Every Module a source imports is compiled with it and bundled into " +
+				"the same file, and its Diagnostics are reported under its own " +
+				"name. A dependency named on the command line as well is " +
+				"compiled once and gets an output of its own.",
 			"Compilation stops at the first stage that reports an Error, and " +
 				"every Diagnostic that stage found is shown. Warnings never stop " +
 				"a build.",
@@ -245,7 +249,11 @@ export const commands: Array<CommandSpec> = [
 			"This is the fastest way to find out whether a Program is valid, " +
 				"and the form intended for editors, pre-commit hooks and CI. " +
 				"Combined with --json it produces a Diagnostic list that can be " +
-				"consumed by other tools.",
+				"consumed by other tools, each Diagnostic under the file it was " +
+				"written in.",
+			"Every Module a source imports is checked with it. A file given " +
+				"twice over — named on the command line and imported by another " +
+				"file that was — is checked once and reported once.",
 		],
 		usage: [`${PROGRAM} check <file...> [options]`],
 		options: [jobsOption],
@@ -268,6 +276,9 @@ export const commands: Array<CommandSpec> = [
 			"Compiles the given sources, then stays running and recompiles " +
 				"each one as it is saved. Rebuilds reuse warm worker threads, so " +
 				"they are noticeably faster than repeated one-shot builds.",
+			"Every Module the sources import is watched as well, and saving one " +
+				"rebuilds the sources that import it rather than the Module " +
+				"itself.",
 			"While watching, press r to force a rebuild, c to clear the " +
 				"screen and q — or Ctrl+C — to quit.",
 		],
