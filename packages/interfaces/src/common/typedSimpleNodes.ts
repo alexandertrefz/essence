@@ -9,6 +9,7 @@ import type {
 	ListType,
 	NamespaceType,
 	NothingType,
+	Position,
 	RecordType,
 	StringType,
 	Type,
@@ -68,6 +69,12 @@ export type ImplementationNode = ExpressionNode | StatementNode
 
 // #region Expressions
 
+// NOTE: Every Expression and Statement carries the `position` of the typed
+// node it was simplified from, so code generation can map what it emits back
+// onto the source. It is optional because the Simplifier also synthesizes
+// nodes no source was written for — a Nothing-returning function's trailing
+// Return, a conformance witness — and those stay unset, which emits no
+// mapping.
 export type ExpressionNode =
 	| NativeFunctionInvocationNode
 	| FunctionInvocationNode
@@ -89,6 +96,7 @@ export interface CaseValueNode {
 	tag: string
 	value: ExpressionNode | null
 	type: CaseType | ErrorType
+	position?: Position
 }
 
 // NOTE: The value passed for a Protocol-bounded Type Parameter — rewritten
@@ -107,6 +115,7 @@ export interface ConformanceValueNode {
 	// for each mapped Method instead of the plain `choiceIs`.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	type: Type
+	position?: Position
 }
 
 export interface NativeFunctionInvocationNode {
@@ -114,6 +123,7 @@ export interface NativeFunctionInvocationNode {
 	name: IdentifierNode
 	arguments: Array<ArgumentNode>
 	type: Type
+	position?: Position
 }
 
 export interface FunctionInvocationNode {
@@ -121,6 +131,7 @@ export interface FunctionInvocationNode {
 	name: ExpressionNode
 	arguments: Array<ArgumentNode>
 	type: Type
+	position?: Position
 }
 
 export interface MethodInvocationNode {
@@ -135,6 +146,7 @@ export interface MethodInvocationNode {
 	// in place of the plain `choiceIs` member read.
 	derivedDescriptor?: DerivedEquatableDescriptor
 	type: Type
+	position?: Position
 }
 
 // NOTE: A Method Invocation on a Union-typed receiver — one statically
@@ -147,6 +159,7 @@ export interface UnionMethodInvocationNode {
 	cases: Array<UnionMethodDispatchCase>
 	arguments: Array<ArgumentNode>
 	type: Type
+	position?: Position
 }
 
 export type UnionMethodDispatchCase = {
@@ -181,12 +194,14 @@ export type RecordValueNode = {
 	nodeType: "RecordValue"
 	type: RecordType
 	members: Record<string, ExpressionNode>
+	position?: Position
 }
 
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
 	type: StringType
+	position?: Position
 }
 
 // NOTE: The interpolated String reduced to what codegen needs: the text runs,
@@ -206,12 +221,14 @@ export type InterpolatedStringValueNode = {
 	nodeType: "InterpolatedStringValue"
 	segments: Array<InterpolationSegmentNode>
 	type: StringType
+	position?: Position
 }
 
 export type IntegerValueNode = {
 	nodeType: "IntegerValue"
 	value: string
 	type: IntegerType
+	position?: Position
 }
 
 export type RationalValueNode = {
@@ -219,29 +236,34 @@ export type RationalValueNode = {
 	numerator: string
 	denominator: string
 	type: RationalType
+	position?: Position
 }
 
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
 	type: BooleanType
+	position?: Position
 }
 
 export type NothingValueNode = {
 	nodeType: "NothingValue"
 	type: NothingType
+	position?: Position
 }
 
 export type FunctionValueNode = {
 	nodeType: "FunctionValue"
 	value: FunctionDefinitionNode
 	type: FunctionType
+	position?: Position
 }
 
 export type ListValueNode = {
 	nodeType: "ListValue"
 	values: Array<ExpressionNode>
 	type: ListType
+	position?: Position
 }
 
 export interface LookupNode {
@@ -249,12 +271,14 @@ export interface LookupNode {
 	base: ExpressionNode
 	member: IdentifierNode
 	type: Type
+	position?: Position
 }
 
 export interface IdentifierNode {
 	nodeType: "Identifier"
 	name: string
 	type: Type
+	position?: Position
 }
 
 // NOTE: `type` is only a Record Type for valid Programs — invalid
@@ -265,6 +289,7 @@ export interface CombinationNode {
 	lhs: ExpressionNode
 	rhs: ExpressionNode
 	type: Type
+	position?: Position
 }
 
 export interface MatchNode {
@@ -278,6 +303,7 @@ export interface MatchNode {
 		body: Array<ImplementationNode>
 	}>
 	type: Type
+	position?: Position
 }
 
 // #endregion
@@ -300,12 +326,14 @@ export interface VariableDeclarationStatementNode {
 	value: ExpressionNode
 	type: Type
 	isConstant: boolean
+	position?: Position
 }
 
 export interface VariableAssignmentStatementNode {
 	nodeType: "VariableAssignmentStatement"
 	name: IdentifierNode
 	value: ExpressionNode
+	position?: Position
 }
 
 export interface Method {
@@ -321,17 +349,20 @@ export interface NamespaceDefinitionStatementNode {
 	properties: Record<string, ExpressionNode>
 	methods: Methods
 	type: NamespaceType
+	position?: Position
 }
 
 export interface ProtocolDeclarationStatementNode {
 	nodeType: "ProtocolDeclarationStatement"
 	name: IdentifierNode
+	position?: Position
 }
 
 export interface TypeAliasStatementNode {
 	nodeType: "TypeAliasStatement"
 	name: IdentifierNode
 	type: Type
+	position?: Position
 }
 
 export interface ConditionalStatementNode {
@@ -339,17 +370,20 @@ export interface ConditionalStatementNode {
 	condition: ExpressionNode
 	trueBody: Array<ImplementationNode>
 	falseBody: Array<ImplementationNode>
+	position?: Position
 }
 
 export interface ReturnStatementNode {
 	nodeType: "ReturnStatement"
 	expression: ExpressionNode
+	position?: Position
 }
 
 export interface FunctionStatementNode {
 	nodeType: "FunctionStatement"
 	name: IdentifierNode
 	value: FunctionDefinitionNode
+	position?: Position
 }
 
 // #endregion
