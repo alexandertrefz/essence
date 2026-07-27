@@ -146,6 +146,23 @@ describe("a debug session", () => {
 		expect(top.source?.path).toBe(programPath)
 		expect(top.line).toBe(4)
 
+		// NOTE: The Variables view must speak Essence too — the paused
+		// `greet("")` holds its Parameter as a quoted String, not as a tagged
+		// object's innards.
+		let scopes = await client.scopesRequest({ frameId: top.id })
+		let local = scopes.body.scopes.find((scope) => scope.name === "Local")
+
+		expect(local).toBeDefined()
+
+		let variables = await client.variablesRequest({
+			variablesReference: local!.variablesReference,
+		})
+		let greetee = variables.body.variables.find(
+			(variable) => variable.name === "greetee",
+		)
+
+		expect(greetee?.value).toBe('""')
+
 		// NOTE: `greet` runs three times; clearing the breakpoint before
 		// resuming is what lets one continue reach the end of the program.
 		await client.setBreakpointsRequest({
