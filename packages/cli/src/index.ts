@@ -134,6 +134,46 @@ async function runLanguageServer(): Promise<number> {
 	return EXIT_SUCCESS
 }
 
+async function runDebugAdapter(): Promise<number> {
+	let { startAdapter } = await import("@essence/debug-adapter")
+	let { compileFile } = await import("./pipeline")
+
+	// NOTE: The Adapter does not know how to compile — it is handed what
+	// compiling MEANS, and here that is this CLI's own in-process pipeline,
+	// answering in the Adapter's report shape. stdout belongs to the protocol
+	// from this point on, which is why the command is a passthrough that
+	// prints nothing.
+	startAdapter({
+		compile: async (programPath: string, outputFile: string) => {
+			let outcome = await compileFile({
+				inputFileName: programPath,
+				outputFileName: outputFile,
+				minify: false,
+				sourcemap: true,
+			})
+
+			return {
+				ok: outcome.ok,
+				bundlePath: outcome.ok
+					? (outcome.outputFileName ?? outputFile)
+					: null,
+				diagnostics: outcome.modules.flatMap((module) =>
+					module.diagnostics.map((diagnostic) => ({
+						file: module.fileName,
+						severity: diagnostic.severity,
+						message: diagnostic.message,
+						code: diagnostic.code ?? null,
+						line: diagnostic.position?.start.line ?? null,
+						column: diagnostic.position?.start.column ?? null,
+					})),
+				),
+			}
+		},
+	})
+
+	return EXIT_SUCCESS
+}
+
 async function dispatch(
 	context: CLIContext,
 	invocation: Invocation,
@@ -158,6 +198,9 @@ async function dispatch(
 
 		case "lsp":
 			return runLanguageServer()
+
+		case "dap":
+			return runDebugAdapter()
 
 		default:
 			if (options.watch) {
