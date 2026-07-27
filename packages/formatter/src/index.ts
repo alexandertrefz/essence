@@ -1,8 +1,9 @@
 import { parseDocument } from "@essence/compiler/documents"
-import type { common } from "@essence/interfaces"
+import type { common, parser } from "@essence/interfaces"
 
 import { printDoc } from "./doc"
 import { Printer } from "./printer"
+import { canonicalSections, sectionSpans } from "./sections"
 import { SourceText } from "./source"
 import { collectComments, commentAnchors, TriviaCursor } from "./trivia"
 
@@ -75,14 +76,20 @@ function stripPositions(value: unknown): unknown {
 	return result
 }
 
-function astOf(source: string, documentPath?: string): unknown | null {
+function parsed(source: string, documentPath?: string): parser.Program | null {
 	let { program, diagnostics } = parseDocument(source, documentPath)
 
 	if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
 		return null
 	}
 
-	return stripPositions(program)
+	return program
+}
+
+// NOTE: Both Module sections are brought into canonical order first, because
+// sorting a block is the one reordering the Formatter is allowed to make.
+function astOf(program: parser.Program): unknown {
+	return stripPositions(canonicalSections(program))
 }
 
 function unsafe(source: string, message: string): FormatResult {
@@ -148,14 +155,14 @@ function formatUnguarded(
 	}
 
 	if (verify) {
-		let before = astOf(source, documentPath)
-		let after = astOf(formatted, documentPath)
+		let before = parsed(source, documentPath)
+		let after = parsed(formatted, documentPath)
 
-		if (after === null) {
+		if (before === null || after === null) {
 			return unsafe(source, "The formatted output no longer parses.")
 		}
 
-		if (JSON.stringify(before) !== JSON.stringify(after)) {
+		if (JSON.stringify(astOf(before)) !== JSON.stringify(astOf(after))) {
 			return unsafe(
 				source,
 				"Formatting would have changed what this file means.",
@@ -165,9 +172,11 @@ function formatUnguarded(
 		// NOTE: Compares each Comment's place among the Tokens around it, not
 		// just the Comments themselves — a Comment that moved across a brace is
 		// still present and still in order, and only its anchor gives it away.
+		// Inside a Module section the comparison is per entry rather than per
+		// Token, since the block comes out sorted.
 		if (
-			commentAnchors(source).join("\n") !==
-			commentAnchors(formatted).join("\n")
+			commentAnchors(source, sectionSpans(before)).join("\n") !==
+			commentAnchors(formatted, sectionSpans(after)).join("\n")
 		) {
 			return unsafe(
 				source,

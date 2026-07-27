@@ -1,5 +1,5 @@
 import { Lexer } from "@essence/compiler/lexer"
-import { lexer } from "@essence/interfaces"
+import { type common, lexer } from "@essence/interfaces"
 
 const TokenType = lexer.TokenType
 
@@ -60,6 +60,30 @@ export function collectComments(source: string): Array<Comment> {
 	return comments
 }
 
+// NOTE: Where one Module section stands, and where each of its entries was
+// written — in written order, which is the order the Comments around them were
+// claimed in.
+export type SectionSpan = {
+	position: common.Position
+	entries: Array<common.Position>
+}
+
+// NOTE: One entry's share of a Module section: its own Tokens together with the
+// Comments that ride with it. The chunks of a section are compared as a set,
+// which is what lets the block be sorted while still catching a Comment that
+// changed which entry it belongs to.
+type SectionChunks = {
+	span: SectionSpan
+	chunks: Array<Array<string>>
+	loose: Array<Array<string>>
+}
+
+function compareCursors(left: common.Cursor, right: common.Cursor): number {
+	return left.line === right.line
+		? left.column - right.column
+		: left.line - right.line
+}
+
 // NOTE: Where each Comment sits among the code around it, as one flat
 // sequence: every Token in order, with Comments in their places.
 //
@@ -71,26 +95,96 @@ export function collectComments(source: string): Array<Comment> {
 // Commas are dropped because formatting legitimately adds one when it breaks a
 // list, and that is the only Token it ever adds — everything else about the
 // code is already held identical by the AST comparison.
-export function commentAnchors(source: string): Array<string> {
+//
+// `sections` names the Module sections, the one place where the sequence is
+// deliberately allowed to change: those blocks are written in canonical order,
+// so their entries come out sorted rather than as they were read. Each entry is
+// compared as one chunk carrying the Comments written around it, and the chunks
+// as a set — a Comment that moved to another entry, or off the entry it was
+// written against, still fails.
+export function commentAnchors(
+	source: string,
+	sections: Array<SectionSpan> = [],
+): Array<string> {
 	let sourceLexer = new Lexer()
 	sourceLexer.reset(source)
 
+	let pending = [...sections].sort((left, right) =>
+		compareCursors(left.position.start, right.position.start),
+	)
+	let open: SectionChunks | null = null
+
 	let anchors: Array<string> = []
+	let lastCodeLine = 0
+
+	// NOTE: Sorted, so that the block having been reordered does not show up as a
+	// difference, and joined per chunk, so that a Comment moving from one entry to
+	// another does.
+	let closeSection = (section: SectionChunks) => {
+		let written = [...section.chunks, ...section.loose].map((chunk) =>
+			chunk.join(" · "),
+		)
+
+		written.sort()
+		anchors.push(...written)
+	}
 
 	try {
 		let token = sourceLexer.next()
 
 		while (token !== undefined) {
 			if (
+				token.type === TokenType.Linebreak ||
+				token.type === TokenType.SymbolComma
+			) {
+				token = sourceLexer.next()
+
+				continue
+			}
+
+			if (
+				open !== null &&
+				compareCursors(token.position.end, open.span.position.end) >= 0
+			) {
+				closeSection(open)
+				open = null
+			}
+
+			let next = pending[0]
+
+			if (
+				open === null &&
+				next !== undefined &&
+				compareCursors(token.position.start, next.position.start) >= 0
+			) {
+				pending.shift()
+				open = {
+					span: next,
+					chunks: next.entries.map(() => []),
+					loose: [],
+				}
+			}
+
+			let isComment =
 				token.type === TokenType.Comment ||
 				token.type === TokenType.DocComment
-			) {
-				anchors.push("§" + token.value)
-			} else if (
-				token.type !== TokenType.Linebreak &&
-				token.type !== TokenType.SymbolComma
-			) {
-				anchors.push(token.type + " " + token.value)
+			let anchor = isComment
+				? "§" + token.value
+				: token.type + " " + token.value
+
+			let chunk =
+				open === null
+					? null
+					: chunkFor(open, token, isComment, lastCodeLine)
+
+			if (chunk === null) {
+				anchors.push(anchor)
+			} else {
+				chunk.push(anchor)
+			}
+
+			if (!isComment) {
+				lastCodeLine = token.position.end.line
 			}
 
 			token = sourceLexer.next()
@@ -99,7 +193,70 @@ export function commentAnchors(source: string): Array<string> {
 		// NOTE: See `collectComments` — unreachable for a source that parsed.
 	}
 
+	if (open !== null) {
+		closeSection(open)
+	}
+
 	return anchors
+}
+
+// NOTE: Which entry a Token inside a Module section rides with, or null for one
+// that keeps its place in the sequence — the `import` Keyword, the braces, and a
+// Comment trailing the `{` itself, none of which the sort can move.
+//
+// The rule is the printer's own: a Comment that starts its line belongs to the
+// entry below it, one that follows code belongs to the entry ending on its line.
+function chunkFor(
+	section: SectionChunks,
+	token: lexer.Token,
+	isComment: boolean,
+	lastCodeLine: number,
+): Array<string> | null {
+	let entries = section.span.entries
+	let start = token.position.start
+
+	if (!isComment) {
+		for (let index = 0; index < entries.length; index++) {
+			let entry = entries[index] as common.Position
+
+			if (
+				compareCursors(start, entry.start) >= 0 &&
+				compareCursors(start, entry.end) < 0
+			) {
+				return section.chunks[index] as Array<string>
+			}
+		}
+
+		return null
+	}
+
+	if (lastCodeLine === start.line) {
+		for (let index = entries.length - 1; index >= 0; index--) {
+			let entry = entries[index] as common.Position
+
+			if (entry.end.line === start.line) {
+				return section.chunks[index] as Array<string>
+			}
+		}
+
+		return null
+	}
+
+	for (let index = 0; index < entries.length; index++) {
+		let entry = entries[index] as common.Position
+
+		if (compareCursors(entry.start, start) > 0) {
+			return section.chunks[index] as Array<string>
+		}
+	}
+
+	// NOTE: A Comment written below the last entry belongs to no entry at all —
+	// the printer flushes it before the closing brace, and it is still held to
+	// being present.
+	let loose: Array<string> = []
+	section.loose.push(loose)
+
+	return loose
 }
 
 // NOTE: A cursor over the Comments in written order. The printer walks the AST

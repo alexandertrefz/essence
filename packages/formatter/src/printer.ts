@@ -14,6 +14,7 @@ import {
 	text,
 	type TextDoc,
 } from "./doc"
+import { compareExportEntries, compareImportEntries } from "./sections"
 import type { SourceText } from "./source"
 import type { Comment, TriviaCursor } from "./trivia"
 
@@ -210,11 +211,43 @@ export class Printer {
 
 	// #region Program
 
+	// NOTE: The whole file, in the order it is written: the `import { … }` block,
+	// the implementation, the `export { … }` block. The trivia cursor walks the
+	// source, so every Comment has to be claimed in that same order — which is
+	// why each section is printed where it stands rather than assembled at the
+	// end.
 	printProgram(program: parser.Program): Doc {
 		let keyword =
 			program.kind === "declarations" ? "declarations" : "implementation"
 
-		let leading = this.trivia.takeBefore(program.position.start.line)
+		let parts: Array<Doc> = []
+
+		if (program.imports !== null) {
+			parts.push(
+				concat(this.headingComments(program.imports.position)),
+				this.printModuleSection(
+					"import",
+					program.imports.position,
+					program.imports.entries,
+					compareImportEntries,
+				),
+				hardline,
+			)
+
+			if (
+				this.source.hasBlankLineBetween(
+					program.imports.position.end.line,
+					program.position.start.line,
+				)
+			) {
+				parts.push(hardline)
+			}
+		}
+
+		// NOTE: A file may open with Comments above its `implementation {` —
+		// they are outside the Program's own Position, so they have to be
+		// written before the keyword rather than flushed into the block.
+		let heading = this.headingComments(program.position)
 		let opening = this.trivia.claimTrailingOn(program.position.start.line)
 
 		let entries = this.entriesFor(
@@ -226,30 +259,16 @@ export class Printer {
 		this.flushBefore(program.position.end.line, entries)
 
 		// NOTE: Whatever is left has nowhere else to go — a Comment below the
-		// last Statement, or one the AST simply has no node near.
-		for (let comment of this.trivia.takeRemaining()) {
-			entries.push(this.commentEntry(comment))
-		}
-
-		// NOTE: A file may open with Comments above its `implementation {` —
-		// they are outside the Program's own Position, so they have to be
-		// written before the keyword rather than flushed into the block.
-		let heading: Array<Doc> = []
-
-		for (let comment of leading) {
-			heading.push(text(comment.text), hardline)
-
-			if (
-				this.source.hasBlankLineBetween(
-					comment.endLine,
-					program.position.start.line,
-				)
-			) {
-				heading.push(hardline)
+		// last Statement, or one the AST simply has no node near. With an
+		// `export { … }` block below, the block is still to be printed, so the
+		// leftovers are gathered after it instead.
+		if (program.exports === null) {
+			for (let comment of this.trivia.takeRemaining()) {
+				entries.push(this.commentEntry(comment))
 			}
 		}
 
-		return concat([
+		parts.push(
 			concat(heading),
 			text(keyword + " "),
 			this.block(
@@ -259,7 +278,158 @@ export class Printer {
 				false,
 				opening,
 			),
-			hardline,
+		)
+
+		if (program.exports !== null) {
+			parts.push(hardline)
+
+			if (
+				this.source.hasBlankLineBetween(
+					program.position.end.line,
+					program.exports.position.start.line,
+				)
+			) {
+				parts.push(hardline)
+			}
+
+			parts.push(
+				concat(this.headingComments(program.exports.position)),
+				this.printModuleSection(
+					"export",
+					program.exports.position,
+					program.exports.entries,
+					compareExportEntries,
+				),
+			)
+
+			let previousEnd = program.exports.position.end.line
+
+			for (let comment of this.trivia.takeRemaining()) {
+				parts.push(hardline)
+
+				if (
+					this.source.hasBlankLineBetween(
+						previousEnd,
+						comment.startLine,
+					)
+				) {
+					parts.push(hardline)
+				}
+
+				parts.push(text(comment.text))
+				previousEnd = comment.endLine
+			}
+		}
+
+		parts.push(hardline)
+
+		return concat(parts)
+	}
+
+	// NOTE: The Comments written above a block's own keyword. They sit outside
+	// the block's Position, so they are written before it rather than flushed
+	// into it, and a blank line the author left between a Comment and the keyword
+	// it introduces is kept.
+	private headingComments(position: common.Position): Array<Doc> {
+		let line = position.start.line
+		let parts: Array<Doc> = []
+
+		for (let comment of this.trivia.takeBefore(line)) {
+			parts.push(text(comment.text), hardline)
+
+			if (this.source.hasBlankLineBetween(comment.endLine, line)) {
+				parts.push(hardline)
+			}
+		}
+
+		return parts
+	}
+
+	// NOTE: One Module section, written in canonical order with every `from` in
+	// one column. The entries are read in WRITTEN order — that is the order the
+	// trivia cursor hands Comments out in — and only sorted afterwards, so a
+	// Comment travels with the entry it was written against.
+	//
+	// Alignment is one space past the widest left-hand side among the entries
+	// that carry a `from`, and no other entry counts: an `export { … }` block
+	// lists what a Module declares alongside what it forwards, and padding a
+	// re-export out to the widest local name would push its `from` halfway across
+	// the line rather than line anything up.
+	private printModuleSection<
+		Node extends parser.ImportNode | parser.ExportNode,
+	>(
+		keyword: string,
+		position: common.Position,
+		nodes: Array<Node>,
+		compare: (left: Node, right: Node) => number,
+	): Doc {
+		let opening = this.trivia.claimTrailingOn(position.start.line)
+
+		let entries = nodes.map((node): SectionEntry<Node> => {
+			let leading = this.trivia.takeBefore(node.position.start.line)
+			let trailing = this.trivia.claimTrailingOn(node.position.end.line)
+
+			return { node, leading, trailing, head: entryHead(node) }
+		})
+
+		let loose = this.trivia.takeBefore(position.end.line)
+
+		entries.sort((left, right) => compare(left.node, right.node))
+
+		let widest = 0
+
+		for (let entry of entries) {
+			if (entry.node.source !== null) {
+				widest = Math.max(widest, entry.head.length)
+			}
+		}
+
+		let lines: Array<Doc> = []
+
+		for (let entry of entries) {
+			for (let comment of entry.leading) {
+				lines.push(text(comment.text))
+			}
+
+			let written = entry.head
+
+			// NOTE: The specifier is written back from the source rather than
+			// from the node, for the same reason every String Literal is — the
+			// Lexer strips the quotes and leaves the escapes unprocessed.
+			if (entry.node.source !== null) {
+				written +=
+					" ".repeat(widest - entry.head.length) +
+					" from " +
+					this.source.slice(entry.node.source.position)
+			}
+
+			if (entry.trailing !== null) {
+				written += " " + entry.trailing.text
+			}
+
+			lines.push(text(written))
+		}
+
+		// NOTE: A Comment written below the last entry belongs to no entry, so
+		// nothing carries it — it is written where it stands, above the block's
+		// closing brace.
+		for (let comment of loose) {
+			lines.push(text(comment.text))
+		}
+
+		// NOTE: Every line is laid out as if it were on line 0, which leaves
+		// `layout` no blank line to find between any two of them. A Module section
+		// is one sorted list: which two entries a gap the author left would end up
+		// between is decided by the sort rather than by anything the author said.
+		return concat([
+			text(keyword + " "),
+			this.block(
+				lines.map((doc): Entry => ({ startLine: 0, endLine: 0, doc })),
+				0,
+				0,
+				false,
+				opening,
+			),
 		])
 	}
 
@@ -1510,6 +1680,23 @@ export class Printer {
 type AlignedHandler = {
 	matcherWidth: number
 	padding: TextDoc
+}
+
+// NOTE: One entry of a Module section with everything that rides along when the
+// block is sorted: the Comments written above it, the one trailing it, and
+// `head` — everything written left of the `from`, which is what the block's
+// column is measured against, `PI as Pi` at its full spelling.
+type SectionEntry<Node> = {
+	node: Node
+	leading: Array<Comment>
+	trailing: Comment | null
+	head: string
+}
+
+function entryHead(entry: parser.ImportNode | parser.ExportNode): string {
+	return entry.alias === null
+		? entry.name.content
+		: entry.name.content + " as " + entry.alias.content
 }
 
 type NamespaceMember =
