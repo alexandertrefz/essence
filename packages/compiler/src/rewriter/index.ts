@@ -111,20 +111,89 @@ export function rewrite(program: common.typedSimple.Program): string {
 	return generateProgram(rewrittenProgram)
 }
 
-function generateProgram(program: estree.Program): string {
-	return generate(program, {
-		format: {
-			indent: {
-				style: "\t",
-				base: 0,
-				adjustMultilineComment: false,
-			},
-			newline: "\n",
-			space: " ",
-			quotes: "double",
-		},
-	})
+const generateFormat = {
+	indent: {
+		style: "\t",
+		base: 0,
+		adjustMultilineComment: false,
+	},
+	newline: "\n",
+	space: " ",
+	quotes: "double",
 }
+
+// NOTE: What `generateProgram` needs to emit a real source map — the Essence
+// text of every Module a `loc.source` can name, keyed by canonical path, so
+// the map carries the sources verbatim as `sourcesContent` and a debugger
+// needs nothing of the machine that compiled.
+export type SourceMapOptions = {
+	sourceTexts: ReadonlyMap<string, string>
+}
+
+// NOTE: The shape `sourceMapWithCode` answers with. `@types/escodegen`
+// predates both the `sourceMap: true` mode — each emitted node reads its
+// source off its own `loc.source`, which is what lets one Module's map name
+// several real files — and this return shape, so the one call is cast, here
+// and nowhere else.
+type GeneratedWithSourceMap = {
+	code: string
+	map: {
+		toJSON(): {
+			version: number
+			sources: Array<string>
+			names: Array<string>
+			mappings: string
+			file?: string
+			sourcesContent?: Array<string | null>
+		}
+	}
+}
+
+function generateProgram(
+	program: estree.Program,
+	sourceMap?: SourceMapOptions,
+): string {
+	if (sourceMap === undefined) {
+		return generate(program, { format: generateFormat })
+	}
+
+	let { code, map } = generate(program, {
+		format: generateFormat,
+		sourceMap: true,
+		sourceMapWithCode: true,
+	} as never) as unknown as GeneratedWithSourceMap
+
+	let json = map.toJSON()
+
+	json.sourcesContent = json.sources.map(
+		(source) => sourceMap.sourceTexts.get(source) ?? null,
+	)
+
+	return `${code}\n${sourceMapComment(json)}`
+}
+
+// NOTE: The map rides INSIDE the module's text, as an inline data URL —
+// esbuild reads a `sourceMappingURL` comment off the contents a plugin serves
+// and composes it into the bundle's map, which is the one seam the in-memory
+// `essence:` scheme offers; a file next to something that never touches disk
+// does not exist.
+function sourceMapComment(map: object): string {
+	let encoded = Buffer.from(JSON.stringify(map)).toString("base64")
+
+	return `//# sourceMappingURL=data:application/json;base64,${encoded}`
+}
+
+// NOTE: The prelude gets an EMPTY map rather than none: unmapped, esbuild
+// would map its every line back onto the generated JavaScript under the
+// synthetic specifier, and a debugger would step "into" prelude internals as
+// if they were source. An empty map declares the whole Module unmappable,
+// which reads as library code to skip.
+const emptySourceMapComment = sourceMapComment({
+	version: 3,
+	sources: [],
+	names: [],
+	mappings: "",
+})
 
 // NOTE: One Module of a bundle: the canonical path it is keyed by — which is
 // also what the Choices it declares take their identity from — and the Program
@@ -156,6 +225,7 @@ export type ModuleInput = {
 export function rewriteModules(
 	modules: Array<ModuleInput>,
 	entryPath: string,
+	options?: { sourcemap?: boolean },
 ): ModuleSources {
 	let entryDirectory = path.dirname(entryPath)
 	let spellings = new Map(
@@ -164,6 +234,16 @@ export function rewriteModules(
 			moduleSpelling(entryDirectory, module.filePath),
 		]),
 	)
+	let sourceTexts: ReadonlyMap<string, string> | null =
+		options?.sourcemap === true
+			? new Map(
+					modules.flatMap((module) =>
+						module.sourceText === undefined
+							? []
+							: [[module.filePath, module.sourceText] as const],
+					),
+				)
+			: null
 
 	return withModuleSpellings(spellings, () => {
 		let prelude = stdlibPrelude()
@@ -186,7 +266,12 @@ export function rewriteModules(
 		let preludeProgram = preludeModule(essenceMembers)
 
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
-		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
+		sources.set(
+			PRELUDE_SPECIFIER,
+			sourceTexts === null
+				? generateProgram(preludeProgram)
+				: `${generateProgram(preludeProgram)}\n${emptySourceMapComment}`,
+		)
 
 		for (let { module, body } of bodies) {
 			let names = referencedNames(body)
@@ -216,7 +301,10 @@ export function rewriteModules(
 			checkEssenceMethodsAreDeclared(moduleProgram, declared)
 			sources.set(
 				moduleSpecifier(spellings.get(module.filePath)!),
-				generateProgram(moduleProgram),
+				generateProgram(
+					moduleProgram,
+					sourceTexts === null ? undefined : { sourceTexts },
+				),
 			)
 		}
 
