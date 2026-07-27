@@ -163,12 +163,58 @@ describe("a debug session", () => {
 
 		expect(greetee?.value).toBe('""')
 
+		// NOTE: One step over `variable message = …` lands on the `if` two
+		// source lines down — the interpolation glue between them is carried
+		// over, and never surfaces as a landing place.
+		let steppedStop = client.waitForEvent("stopped")
+
+		await client.nextRequest({ threadId: 1 })
+		expect((await steppedStop).body.reason).toBe("step")
+
+		let steppedStack = await client.stackTraceRequest({ threadId: 1 })
+
+		expect(steppedStack.body.stackFrames[0]!.name).toBe("greet")
+		expect(steppedStack.body.stackFrames[0]!.line).toBe(6)
+
 		// NOTE: `greet` runs three times; clearing the breakpoint before
 		// resuming is what lets one continue reach the end of the program.
 		await client.setBreakpointsRequest({
 			source: { path: programPath },
 			breakpoints: [],
 		})
+
+		await Promise.all([
+			client.continueRequest({ threadId: 1 }),
+			client.waitForEvent("terminated"),
+		])
+	}, 60_000)
+
+	it("stops on entry at the first line the author wrote", async () => {
+		client = await startedClient()
+
+		let programPath = fixturePath("HelloWorld.es")
+		let initialized = client.waitForEvent("initialized")
+		let launched = client.launch({
+			program: programPath,
+			stopOnEntry: true,
+		} as never)
+
+		await initialized
+
+		let stopped = client.waitForEvent("stopped")
+
+		await client.configurationDoneRequest()
+		await launched
+
+		expect((await stopped).body.reason).toBe("entry")
+
+		// NOTE: Line 17 is `greet("")` — the entry's first statement. The raw
+		// entry pause sits in runtime glue far above it; the user never sees
+		// that.
+		let stack = await client.stackTraceRequest({ threadId: 1 })
+
+		expect(stack.body.stackFrames[0]!.line).toBe(17)
+		expect(stack.body.stackFrames[0]!.name).toBe("HelloWorld.es")
 
 		await Promise.all([
 			client.continueRequest({ threadId: 1 }),

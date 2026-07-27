@@ -99,15 +99,27 @@ export function presentFrames(
 		index += 1
 	}
 
-	return merged
-		.filter((frame) => glueFrames === "subtle" || frame.kind !== "glue")
-		.map((frame) => ({
-			...frame,
-			name:
-				frame.name === ""
-					? "match"
-					: frame.kind === "glue"
-						? frame.name
-						: demangleName(frame.name),
-		}))
+	let presented = merged.filter(
+		(frame) => glueFrames === "subtle" || frame.kind !== "glue",
+	)
+
+	// NOTE: What is left anonymous after the merge is one of two things: a
+	// module's own top level — the LAST user frame there is, best named after
+	// its file — or a match sitting over glue, which reads as the construct
+	// it is.
+	let lastUserIndex = presented.findLastIndex(
+		(frame) => frame.kind === "user",
+	)
+
+	return presented.map((frame, index) => ({
+		...frame,
+		name:
+			frame.name === ""
+				? index === lastUserIndex
+					? (frame.source?.source.split("/").pop() ?? "match")
+					: "match"
+				: frame.kind === "glue"
+					? frame.name
+					: demangleName(frame.name),
+	}))
 }
