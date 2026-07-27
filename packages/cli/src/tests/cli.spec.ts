@@ -295,6 +295,7 @@ describe("CLI", () => {
 			expect(() => parseArguments(["format", "--check"])).not.toThrow()
 			expect(() => parseArguments(["fmt", "--nonsense"])).not.toThrow()
 			expect(() => parseArguments(["lsp", "--stdio"])).not.toThrow()
+			expect(() => parseArguments(["dap", "--anything"])).not.toThrow()
 			expect(parseArguments(["fmt", "--check"]).command.name).toBe(
 				"format",
 			)
@@ -428,8 +429,10 @@ describe("CLI", () => {
 
 			expect(overview).toContain("format")
 			expect(overview).toContain("lsp")
+			expect(overview).toContain("dap")
 			expect(overview).toContain("Format Essence sources in place")
 			expect(overview).toContain("Start the Essence Language Server")
+			expect(overview).toContain("Start the Essence Debug Adapter")
 		})
 
 		// NOTE: The same table is rendered under whichever name the binary was
@@ -1065,10 +1068,23 @@ describe("essence lsp", () => {
 	})
 })
 
-// NOTE: `essence check` must not pay for tools it never calls. The Formatter
-// and the Language Server are reached through `import(…)` at the point of use,
-// and a static import anywhere in the package would load both — with everything
-// they import — before the first argument had been read.
+// NOTE: The same holds for the Debug Adapter, for the same reason.
+describe("essence dap", () => {
+	it("documents itself without starting an Adapter", async () => {
+		let { code, out } = await capture(() => run(["help", "dap"], "essence"))
+
+		expect(code).toBe(0)
+		expect(out).toContain("essence dap")
+		expect(out).toContain("Debug Adapter Protocol")
+		expect(out).not.toContain("GLOBAL OPTIONS")
+	})
+})
+
+// NOTE: `essence check` must not pay for tools it never calls. The Formatter,
+// the Language Server and the Debug Adapter are reached through `import(…)` at
+// the point of use, and a static import anywhere in the package would load all
+// of them — with everything they import — before the first argument had been
+// read.
 describe("delegation stays lazy", () => {
 	let sourceDirectory = path.resolve(
 		path.dirname(fileURLToPath(import.meta.url)),
@@ -1090,7 +1106,9 @@ describe("delegation stays lazy", () => {
 
 			expect([
 				fileName,
-				/from\s+"@essence\/(?:formatter|language-server)/.test(source),
+				/from\s+"@essence\/(?:formatter|language-server|debug-adapter)/.test(
+					source,
+				),
 			]).toEqual([fileName, false])
 		}
 	})
@@ -1103,6 +1121,7 @@ describe("delegation stays lazy", () => {
 
 		expect(source).toContain('await import("@essence/formatter/cli")')
 		expect(source).toContain('await import("@essence/language-server")')
+		expect(source).toContain('await import("@essence/debug-adapter")')
 	})
 })
 

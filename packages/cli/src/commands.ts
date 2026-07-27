@@ -400,6 +400,25 @@ export const commands: Array<CommandSpec> = [
 		passthrough: true,
 	},
 	{
+		name: "dap",
+		aliases: [],
+		summary: "Start the Essence Debug Adapter, speaking over stdio",
+		description: [
+			"Serves breakpoints, stepping, call stacks, variables and " +
+				"evaluation to an Editor over the Debug Adapter Protocol, " +
+				"reading requests from standard input and writing responses to " +
+				"standard output. Programs are compiled with this compiler " +
+				"before they are launched.",
+			"This is started by an Editor rather than by hand: it prints " +
+				"nothing a person would want to read, and stays running until " +
+				"the debug session ends.",
+		],
+		usage: [`${PROGRAM} dap`],
+		options: [],
+		examples: [],
+		passthrough: true,
+	},
+	{
 		name: "help",
 		aliases: [],
 		summary: `Show help for ${PROGRAM} or for a single command`,

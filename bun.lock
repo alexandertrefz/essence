@@ -25,6 +25,7 @@
       "dependencies": {
         "@essence/ariadne": "workspace:*",
         "@essence/compiler": "workspace:*",
+        "@essence/debug-adapter": "workspace:*",
         "@essence/formatter": "workspace:*",
         "@essence/interfaces": "workspace:*",
         "@essence/language-server": "workspace:*",
