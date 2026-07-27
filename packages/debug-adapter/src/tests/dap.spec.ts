@@ -109,6 +109,47 @@ describe("a debug session", () => {
 		expect(joined).toContain('"Hello, Universe!"')
 	}, 60_000)
 
+	it("binds a breakpoint on a source line and stops on it", async () => {
+		client = await startedClient()
+
+		let programPath = fixturePath("HelloWorld.es")
+		let initialized = client.waitForEvent("initialized")
+		let launched = client.launch({ program: programPath } as never)
+
+		await initialized
+
+		// NOTE: Line 4 is `variable message = …`, the first statement of
+		// `greet` — a statement the map carries.
+		let breakpointResponse = await client.setBreakpointsRequest({
+			source: { path: programPath },
+			breakpoints: [{ line: 4 }],
+		})
+
+		expect(breakpointResponse.body.breakpoints[0]!.verified).toBe(true)
+		expect(breakpointResponse.body.breakpoints[0]!.line).toBe(4)
+
+		// NOTE: Subscribed BEFORE configurationDone — the stop lands moments
+		// after the resume, and an event nobody was listening for is gone.
+		let stopped = client.waitForEvent("stopped")
+
+		await client.configurationDoneRequest()
+		await launched
+
+		expect((await stopped).body.reason).toBe("breakpoint")
+
+		// NOTE: `greet` runs three times; clearing the breakpoint before
+		// resuming is what lets one continue reach the end of the program.
+		await client.setBreakpointsRequest({
+			source: { path: programPath },
+			breakpoints: [],
+		})
+
+		await Promise.all([
+			client.continueRequest({ threadId: 1 }),
+			client.waitForEvent("terminated"),
+		])
+	}, 60_000)
+
 	it("fails the launch of a program that does not compile", async () => {
 		client = await startedClient()
 
