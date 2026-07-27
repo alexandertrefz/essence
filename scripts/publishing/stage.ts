@@ -197,8 +197,12 @@ function publishedManifest(
 	if (real.bin !== undefined) {
 		bin = {}
 
+		// NOTE: Spelled without `./` — npm 11 rejects a dot-slashed bin path
+		// outright and publishes the package with no commands at all. The
+		// `--dry-run` in PUBLISHING.md's checklist is what catches this class
+		// of thing; the smoke test calls the bin files by path and cannot.
 		for (let [name, filePath] of Object.entries(real.bin)) {
-			bin[name] = `./${filePath}.js`
+			bin[name] = `${filePath}.js`
 		}
 	}
 
