@@ -491,6 +491,23 @@ export function startServer() {
 	)
 
 	connection.onDefinition((params) => {
+		// NOTE: The workspace join answers first, because the local index
+		// stops at the import entry — the entry IS this file's declaration of
+		// the name, and a reader asking from it (or from any use bound through
+		// it) is pointing at the declaration in whichever Module writes it.
+		let symbol = workspaceSymbolAt(params.textDocument.uri, params.position)
+
+		if (
+			symbol !== null &&
+			symbol.filePath !== null &&
+			symbol.definition !== null
+		) {
+			return {
+				uri: uriOf(symbol.filePath),
+				range: toLspRange(symbol.definition),
+			}
+		}
+
 		let parsed = parseAndEnrich(params.textDocument.uri)
 
 		if (parsed === null) {
