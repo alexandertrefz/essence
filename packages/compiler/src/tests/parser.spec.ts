@@ -2176,4 +2176,517 @@ describe("Parser", () => {
 			expect(containsErrors(diagnostics)).toBe(true)
 		})
 	})
+
+	describe("Module Sections", () => {
+		function importEntries(source: string): Array<parser.ImportNode> {
+			let { program, diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toEqual([])
+
+			return program.imports?.entries ?? []
+		}
+
+		function exportEntries(source: string): Array<parser.ExportNode> {
+			let { program, diagnostics } = parseWithDiagnostics(source)
+
+			expect(diagnostics).toEqual([])
+
+			return program.exports?.entries ?? []
+		}
+
+		it("should leave both sections null when a Program writes neither", () => {
+			let program = parse("implementation { constant x = 1 }")
+
+			expect(program.imports).toBeNull()
+			expect(program.exports).toBeNull()
+			expect(program.position).toEqual(program.implementation.position)
+		})
+
+		it("should parse an import section above the implementation", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`import {
+					Rectangle from "./Geometry.es"
+					Circle from "./Geometry.es"
+				}
+
+				implementation {
+					constant x = 1
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(program.imports?.nodeType).toBe("ImportSection")
+			expect(program.imports?.entries).toHaveLength(2)
+			expect(program.implementation.nodes).toHaveLength(1)
+			expect(program.exports).toBeNull()
+		})
+
+		it("should parse an export section below the implementation", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant x = 1
+				}
+
+				export {
+					x
+				}`,
+			)
+
+			expect(diagnostics).toEqual([])
+			expect(program.exports?.nodeType).toBe("ExportSection")
+			expect(program.exports?.entries).toHaveLength(1)
+			expect(program.imports).toBeNull()
+		})
+
+		// NOTE: The Formatter reads a Program's Position as the span of the block
+		// it writes `implementation {` and its closing brace for, so the sections
+		// framing it may not widen it — each carries its own span instead.
+		it("should keep the Program's Position on the implementation block", () => {
+			let program = parse(
+				`import { Rectangle from "./Geometry.es" }
+implementation { }
+export { Rectangle from "./Geometry.es" }`,
+			)
+
+			expect(program.position).toEqual(program.implementation.position)
+			expect(program.position.start).toEqual({ line: 2, column: 1 })
+			expect(program.imports?.position.start).toEqual({
+				line: 1,
+				column: 1,
+			})
+			expect(program.exports?.position.end).toEqual({
+				line: 3,
+				column: 42,
+			})
+		})
+
+		it("should read an import entry's name, source and Position", () => {
+			let entries = importEntries(
+				`import { Rectangle from "./Geometry.es" }
+				implementation { }`,
+			)
+
+			expect(entries[0].name.content).toBe("Rectangle")
+			expect(entries[0].alias).toBeNull()
+			expect(entries[0].source.nodeType).toBe("ModuleSpecifier")
+			expect(entries[0].source.path).toBe("./Geometry.es")
+			expect(entries[0].position).toEqual({
+				start: { line: 1, column: 10 },
+				end: { line: 1, column: 40 },
+			})
+		})
+
+		it("should read an import entry's alias", () => {
+			let entries = importEntries(
+				`import { PI as Pi from "../math/Math.es" }
+				implementation { }`,
+			)
+
+			expect(entries[0].name.content).toBe("PI")
+			expect(entries[0].alias?.content).toBe("Pi")
+			expect(entries[0].source.path).toBe("../math/Math.es")
+		})
+
+		it("should read an export entry that names a local declaration", () => {
+			let entries = exportEntries(
+				`implementation { }
+				export { describe }`,
+			)
+
+			expect(entries[0].name.content).toBe("describe")
+			expect(entries[0].alias).toBeNull()
+			expect(entries[0].source).toBeNull()
+		})
+
+		it("should read an export entry's alias", () => {
+			let entries = exportEntries(
+				`implementation { }
+				export { Described as RectangleDescribed }`,
+			)
+
+			expect(entries[0].name.content).toBe("Described")
+			expect(entries[0].alias?.content).toBe("RectangleDescribed")
+			expect(entries[0].source).toBeNull()
+		})
+
+		it("should read a re-export entry's source", () => {
+			let entries = exportEntries(
+				`implementation { }
+				export { Rectangle from "./Geometry.es" }`,
+			)
+
+			expect(entries[0].name.content).toBe("Rectangle")
+			expect(entries[0].alias).toBeNull()
+			expect(entries[0].source?.path).toBe("./Geometry.es")
+		})
+
+		it("should read a renamed re-export entry", () => {
+			let entries = exportEntries(
+				`implementation { }
+				export { Rectangle as Box from "./Geometry.es" }`,
+			)
+
+			expect(entries[0].name.content).toBe("Rectangle")
+			expect(entries[0].alias?.content).toBe("Box")
+			expect(entries[0].source?.path).toBe("./Geometry.es")
+		})
+
+		it("should tell a local export from a re-export written below it", () => {
+			let entries = exportEntries(
+				`implementation { }
+				export {
+					describe
+					Rectangle from "./Geometry.es"
+				}`,
+			)
+
+			expect(entries).toHaveLength(2)
+			expect(entries[0].name.content).toBe("describe")
+			expect(entries[0].source).toBeNull()
+			expect(entries[1].name.content).toBe("Rectangle")
+			expect(entries[1].source?.path).toBe("./Geometry.es")
+		})
+
+		// NOTE: `as` is an Identifier everywhere but an entry's alias position, so
+		// a Module may export something called `as` — and rename it to `as`.
+		it("should read an entry named after a Module Keyword", () => {
+			let entries = importEntries(
+				`import {
+					as as as from "./Names.es"
+					from from "./Names.es"
+				}
+				implementation { }`,
+			)
+
+			expect(entries).toHaveLength(2)
+			expect(entries[0].name.content).toBe("as")
+			expect(entries[0].alias?.content).toBe("as")
+			expect(entries[1].name.content).toBe("from")
+			expect(entries[1].alias).toBeNull()
+		})
+
+		it("should accept an import section written on one line", () => {
+			let entries = importEntries(
+				`import { A from "./A.es" B from "./B.es" }
+				implementation { }`,
+			)
+
+			expect(entries.map((entry) => entry.name.content)).toEqual([
+				"A",
+				"B",
+			])
+		})
+
+		describe("Recovery", () => {
+			it("should keep the entries above a broken one and the implementation below it", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`import {
+						Rectangle from "./Geometry.es"
+						Circle "./Geometry.es"
+					}
+
+					implementation {
+						constant x = 1
+					}`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("syntax-error")
+				expect(program.imports?.entries).toHaveLength(1)
+				expect(program.implementation.nodes).toHaveLength(1)
+			})
+
+			it("should report an export entry whose 'from' carries no specifier", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation { }
+					export { Rectangle from }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("syntax-error")
+				expect(program.exports?.entries).toEqual([])
+			})
+
+			it("should report a section that is never closed", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`import {
+						Rectangle from "./Geometry.es"`,
+				)
+
+				expect(diagnostics[0].code).toBe("unclosed-block")
+			})
+
+			it("should report a Token after the export section", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { }
+					export { x }
+					1`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("unexpected-token")
+				expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
+			})
+		})
+
+		describe("Misplaced sections", () => {
+			it("should report an export section above the implementation", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`export { x }
+
+					implementation {
+						constant x = 1
+					}`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(diagnostics[0].message).toBe(
+					"The 'export { … }' block belongs below the implementation",
+				)
+				expect(diagnostics[0].position).toEqual({
+					start: { line: 1, column: 1 },
+					end: { line: 1, column: 7 },
+				})
+				expect(diagnostics[0].labels[0]?.kind).toBe("primary")
+				expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
+				expect(diagnostics[0].labels[1]?.position).toEqual(
+					program.implementation.position,
+				)
+				expect(program.exports).toBeNull()
+			})
+
+			it("should report an import section below the implementation", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation { }
+
+					import { Rectangle from "./Geometry.es" }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(diagnostics[0].message).toBe(
+					"The 'import { … }' block belongs above the implementation",
+				)
+				expect(program.imports).toBeNull()
+			})
+
+			// NOTE: A block on the wrong side is still parsed where it stands, so
+			// what is inside it is read rather than cascading into the Diagnostics
+			// about the Program's shape.
+			it("should read a misplaced section's entries rather than cascade", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`implementation { }
+
+					import { Rectangle "./Geometry.es" }`,
+				)
+
+				expect(diagnostics).toHaveLength(2)
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["syntax-error", "misplaced-module-section"])
+			})
+
+			it("should keep a well-placed section beside a misplaced one", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`import { A from "./A.es" }
+					implementation { }
+					import { B from "./B.es" }`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(program.imports?.entries).toHaveLength(1)
+				expect(program.imports?.entries[0].name.content).toBe("A")
+			})
+		})
+
+		describe("Declarations Programs", () => {
+			it("should refuse an import section in a standard library file", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`import { Rectangle from "./Geometry.es" }
+
+					declarations { }`,
+					{ allowDeclarationsHeader: true },
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(diagnostics[0].message).toBe(
+					"The standard library may not carry an 'import { … }' block",
+				)
+				expect(program.kind).toBe("declarations")
+				expect(program.imports).toBeNull()
+			})
+
+			it("should refuse an export section in a standard library file", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`declarations { }
+
+					export { Number }`,
+					{ allowDeclarationsHeader: true },
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(diagnostics[0].message).toBe(
+					"The standard library may not carry an 'export { … }' block",
+				)
+				expect(program.exports).toBeNull()
+			})
+
+			it("should refuse both sections of a standard library file at once", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`import { A from "./A.es" }
+					declarations { }
+					export { B }`,
+					{ allowDeclarationsHeader: true },
+				)
+
+				expect(diagnostics).toHaveLength(2)
+				expect(
+					diagnostics.every(
+						(diagnostic) =>
+							diagnostic.code === "misplaced-module-section",
+					),
+				).toBe(true)
+			})
+		})
+
+		// NOTE: All four Module Keywords stay valid Identifiers — `from` and `as`
+		// are Argument labels the standard library already writes, so making them
+		// Keywords outright would have broken `slice(from 1, to 3)`.
+		describe("Contextual Keywords", () => {
+			it("should read a Module Keyword as an Argument label", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					"implementation { numbers::slice(from 1, to 3) }",
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				expect(node.nodeType).toBe("MethodInvocation")
+
+				if (node.nodeType === "MethodInvocation") {
+					expect(
+						node.arguments.map(
+							(argument) => argument.name?.content ?? null,
+						),
+					).toEqual(["from", "to"])
+				}
+			})
+
+			it("should read a Module Keyword as an Argument label and its value", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					"implementation { text::slice(from from, to as) }",
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				expect(node.nodeType).toBe("MethodInvocation")
+
+				if (node.nodeType === "MethodInvocation") {
+					expect(node.arguments[0].name?.content).toBe("from")
+					expect(node.arguments[0].value).toMatchObject({
+						nodeType: "Identifier",
+						content: "from",
+					})
+					expect(node.arguments[1].value).toMatchObject({
+						nodeType: "Identifier",
+						content: "as",
+					})
+				}
+			})
+
+			it("should read a Module Keyword as a declared name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						constant import = 1
+						constant export = 2
+						variable from = 3
+						variable as = 4
+						from = 5
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+				expect(
+					program.implementation.nodes.map((node) => node.nodeType),
+				).toEqual([
+					"ConstantDeclarationStatement",
+					"ConstantDeclarationStatement",
+					"VariableDeclarationStatement",
+					"VariableDeclarationStatement",
+					"VariableAssignmentStatement",
+				])
+			})
+
+			it("should read a Module Keyword as a Parameter label and name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						function slice(from start: Integer, as end: Integer) -> Integer {
+							<- start
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+
+				let node = program.implementation.nodes[0]
+
+				expect(node.nodeType).toBe("FunctionStatement")
+
+				if (node.nodeType === "FunctionStatement") {
+					expect(
+						node.value.parameters.map(
+							(parameter) => parameter.externalName?.content,
+						),
+					).toEqual(["from", "as"])
+					expect(
+						node.value.parameters.map(
+							(parameter) => parameter.internalName?.content,
+						),
+					).toEqual(["start", "end"])
+				}
+			})
+
+			it("should read a Module Keyword as a Type and Namespace name", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation {
+						type from = Integer
+						namespace as for from {
+							double() -> from {
+								<- @
+							}
+						}
+					}`,
+				)
+
+				expect(diagnostics).toEqual([])
+				expect(
+					program.implementation.nodes.map((node) => node.nodeType),
+				).toEqual([
+					"TypeAliasStatement",
+					"NamespaceDefinitionStatement",
+				])
+			})
+
+			// NOTE: A section is recognised by its Keyword AND its `{`, so a lone
+			// Keyword below the implementation is a Token where the Program had
+			// ended rather than a section whose block went missing.
+			it("should not read a bare Keyword below the implementation as a section", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`implementation { }
+					export`,
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("unexpected-token")
+				expect(program.exports).toBeNull()
+			})
+		})
+	})
 })

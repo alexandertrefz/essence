@@ -78,6 +78,10 @@ const keywords = [
 	"for",
 	"infer",
 	"choice",
+	"import",
+	"export",
+	"from",
+	"as",
 ]
 const symbols = [
 	"(",
@@ -160,6 +164,14 @@ const getKeywordType = (value: string) => {
 		return TokenType.KeywordInfer
 	} else if (value === "choice") {
 		return TokenType.KeywordChoice
+	} else if (value === "import") {
+		return TokenType.KeywordImport
+	} else if (value === "export") {
+		return TokenType.KeywordExport
+	} else if (value === "from") {
+		return TokenType.KeywordFrom
+	} else if (value === "as") {
+		return TokenType.KeywordAs
 	} else {
 		// Pleasing istanbul here
 		/* istanbul ignore else */

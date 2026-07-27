@@ -76,6 +76,18 @@ Program. Free-Function Overloads are a standard-library form; a free Function
 in a Program carries one signature. Write the Overloads as an `overload` Method
 block inside a Namespace instead.
 
+### `misplaced-module-section`
+
+A Module section was written where it does not belong. A Program reads top to
+bottom — `import { … }`, then `implementation { … }`, then `export { … }` — so
+an `import` block below the implementation or an `export` block above it is
+reported here, with the implementation block labelled as well.
+
+The same code covers a section in a standard library file. The standard library
+is one shared declaration space rather than a graph of Modules: every one of its
+files sees every other, and none of them is importable, so none of them may
+carry either section.
+
 ## Names
 
 ### `duplicate-variable`
