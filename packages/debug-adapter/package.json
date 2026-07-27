@@ -1,0 +1,26 @@
+{
+	"name": "@essence/debug-adapter",
+	"version": "0.0.1",
+	"description": "The Essence Debug Adapter, spoken over stdio by esdap.",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"esdap": "bin/esdap"
+	},
+	"exports": {
+		".": "./src/adapter.ts",
+		"./*": "./src/*.ts"
+	},
+	"author": "Alexander Trefz",
+	"license": "MIT",
+	"dependencies": {
+		"@vscode/debugadapter": "1.68.0",
+		"@vscode/debugprotocol": "1.68.0",
+		"source-map": "0.6.1"
+	},
+	"devDependencies": {
+		"@essence/fixtures": "workspace:*",
+		"@essence/runtime": "workspace:*",
+		"@vscode/debugadapter-testsupport": "1.68.0"
+	}
+}

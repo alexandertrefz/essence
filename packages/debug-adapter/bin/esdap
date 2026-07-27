@@ -1,0 +1,6 @@
+#!/usr/bin/env bun
+
+import { startAdapter } from "../src/adapter"
+import { compileViaCli } from "../src/compile"
+
+startAdapter({ compile: compileViaCli() })
