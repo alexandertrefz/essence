@@ -13,6 +13,13 @@ export type CdpCallFrame = {
 	callFrameId: string
 	functionName: string
 	location: { scriptId: string; lineNumber: number; columnNumber?: number }
+	// NOTE: Carried by every real pause and read by `scopes`; the frame
+	// presentation itself never looks inside.
+	scopeChain?: Array<{
+		type: string
+		name?: string
+		object: { objectId?: string }
+	}>
 }
 
 export type PresentedFrame = {

@@ -7,8 +7,10 @@ import { pathToFileURL } from "node:url"
 import {
 	DebugSession,
 	ExitedEvent,
+	Handles,
 	InitializedEvent,
 	OutputEvent,
+	Scope,
 	StoppedEvent,
 	TerminatedEvent,
 	Thread,
@@ -25,6 +27,14 @@ import {
 } from "./frames"
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
+import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "./render"
+import {
+	fallbackDisplay,
+	isPresentableScope,
+	presentScopeVariableName,
+	type RemoteObject,
+	toCallArgument,
+} from "./variables"
 
 // NOTE: Module-level and exported, so the spec can read what the adapter
 // promises without starting one — the same shape `serverCapabilities` has in
@@ -91,6 +101,14 @@ type PausedParameters = {
 	callFrames: Array<CdpCallFrame>
 	hitBreakpoints?: Array<string>
 	data?: unknown
+}
+
+// NOTE: What a `variablesReference` stands for: a scope's bindings, an
+// object's own members, or a List — whose items live one hop away, inside its
+// inner array.
+type VariableContainer = {
+	kind: "scope" | "members" | "list"
+	objectId: string
 }
 
 export class EssenceDebugSession extends DebugSession {
@@ -471,6 +489,199 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
+	private variableHandles = new Handles<VariableContainer>()
+
+	protected override scopesRequest(
+		response: DebugProtocol.ScopesResponse,
+		args: DebugProtocol.ScopesArguments,
+	): void {
+		let frame = this.presentedFrames[args.frameId]
+		let raw =
+			frame === undefined
+				? undefined
+				: this.lastPause?.callFrames[frame.callFrameIndex]
+
+		response.body = {
+			scopes: (raw?.scopeChain ?? [])
+				.filter(
+					(scope) =>
+						isPresentableScope(scope.type) &&
+						scope.object.objectId !== undefined,
+				)
+				.map(
+					(scope) =>
+						new Scope(
+							scope.type === "local"
+								? "Local"
+								: scope.type === "closure"
+									? "Closure"
+									: scope.type === "block"
+										? "Block"
+										: "Catch",
+							this.variableHandles.create({
+								kind: "scope",
+								objectId: scope.object.objectId!,
+							}),
+							false,
+						),
+				),
+		}
+		this.sendResponse(response)
+	}
+
+	protected override async variablesRequest(
+		response: DebugProtocol.VariablesResponse,
+		args: DebugProtocol.VariablesArguments,
+	): Promise<void> {
+		let container = this.variableHandles.get(args.variablesReference)
+		let debuggee = this.debuggee
+
+		if (container === undefined || debuggee === null) {
+			response.body = { variables: [] }
+			this.sendResponse(response)
+
+			return
+		}
+
+		let entries = await this.ownProperties(container.objectId)
+
+		if (container.kind === "scope") {
+			entries = entries.flatMap((entry) => {
+				let name = presentScopeVariableName(entry.name)
+
+				return name === null ? [] : [{ ...entry, name }]
+			})
+		} else if (container.kind === "members") {
+			// NOTE: The tag rides on a symbol — reported by `getProperties`
+			// as a `Symbol($type)` row — and the display already spelled it.
+			entries = entries.filter(
+				(entry) => !entry.name.startsWith("Symbol("),
+			)
+		} else {
+			// NOTE: A List holds its items one hop down, in its inner array.
+			let inner = entries.find((entry) => entry.name === "value")
+
+			entries =
+				inner?.value.objectId === undefined
+					? []
+					: (await this.ownProperties(inner.value.objectId)).filter(
+							(entry) => /^\d+$/.test(entry.name),
+						)
+		}
+
+		let described = await this.describeValues(container.objectId, entries)
+
+		response.body = {
+			variables: entries.map((entry, index) => {
+				let description =
+					described[index] ??
+					({ display: null, kind: "leaf" } as DescribedValue)
+				let reference = 0
+
+				if (entry.value.objectId !== undefined) {
+					if (description.kind === "list") {
+						reference = this.variableHandles.create({
+							kind: "list",
+							objectId: entry.value.objectId,
+						})
+					} else if (
+						description.kind === "record" ||
+						description.kind === "plain"
+					) {
+						reference = this.variableHandles.create({
+							kind: "members",
+							objectId: entry.value.objectId,
+						})
+					}
+				}
+
+				return {
+					name: entry.name,
+					value: description.display ?? fallbackDisplay(entry.value),
+					variablesReference: reference,
+				}
+			}),
+		}
+		this.sendResponse(response)
+	}
+
+	private async ownProperties(
+		objectId: string,
+	): Promise<Array<{ name: string; value: RemoteObject }>> {
+		let debuggee = this.debuggee
+
+		if (debuggee === null) {
+			return []
+		}
+
+		try {
+			let result = await debuggee.cdp.send<{
+				result: Array<{ name: string; value?: RemoteObject }>
+			}>("Runtime.getProperties", {
+				objectId,
+				ownProperties: true,
+			})
+
+			return result.result.flatMap((entry) =>
+				entry.value === undefined
+					? []
+					: [{ name: entry.name, value: entry.value }],
+			)
+		} catch {
+			return []
+		}
+	}
+
+	// NOTE: One round trip per container: every value goes over as a live
+	// argument, one JSON answer comes back. A scope object sometimes refuses
+	// to be a call target, so the first member that IS an object stands in;
+	// and a batch that fails entirely degrades to default descriptions, never
+	// to a failed request.
+	private async describeValues(
+		targetObjectId: string,
+		entries: Array<{ name: string; value: RemoteObject }>,
+	): Promise<Array<DescribedValue>> {
+		let debuggee = this.debuggee
+
+		if (debuggee === null || entries.length === 0) {
+			return []
+		}
+
+		let targets = [
+			targetObjectId,
+			...entries.flatMap((entry) =>
+				entry.value.objectId === undefined
+					? []
+					: [entry.value.objectId],
+			),
+		]
+
+		for (let target of targets.slice(0, 2)) {
+			try {
+				let result = await debuggee.cdp.send<{
+					result: { value?: string }
+				}>("Runtime.callFunctionOn", {
+					objectId: target,
+					functionDeclaration: DESCRIBE_BATCH_SOURCE,
+					arguments: entries.map((entry) =>
+						toCallArgument(entry.value),
+					),
+					returnByValue: true,
+				})
+
+				if (typeof result.result.value === "string") {
+					return JSON.parse(
+						result.result.value,
+					) as Array<DescribedValue>
+				}
+			} catch {
+				// NOTE: Fall through to the next target, then to defaults.
+			}
+		}
+
+		return entries.map(() => ({ display: null, kind: "leaf" }))
+	}
+
 	protected override terminateRequest(
 		response: DebugProtocol.TerminateResponse,
 	): void {
@@ -488,6 +699,7 @@ export class EssenceDebugSession extends DebugSession {
 	private async resumeDebuggee(): Promise<void> {
 		this.lastPause = null
 		this.presentedFrames = []
+		this.variableHandles.reset()
 		await this.debuggee?.cdp.send("Debugger.resume").catch(() => {
 			// NOTE: A resume can race the program's own exit; the exit path
 			// already reports what happened.
