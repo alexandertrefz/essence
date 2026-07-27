@@ -79,6 +79,7 @@ export async function planCompilation(
 export async function runCompilation(
 	context: CLIContext,
 	plan: CompilationPlan,
+	options?: { sourcemapMode?: "linked" | "inline" },
 ): Promise<CompilationResult> {
 	let started = performance.now()
 	let progress = new Progress({
@@ -116,6 +117,7 @@ export async function runCompilation(
 					outputFileName: plan.outputs?.get(inputFileName) ?? null,
 					minify: context.options.minify,
 					sourcemap: context.options.sourcemap,
+					sourcemapMode: options?.sourcemapMode,
 				},
 				(stage) => {
 					progress.update(inputFileName, {

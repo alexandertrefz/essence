@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -26,6 +27,7 @@ import {
 	renderUsageLine,
 	wrap,
 } from "../help"
+import { runtimeArguments } from "../execute"
 import { run } from "../index"
 import {
 	defaultOutputFor,
@@ -1461,5 +1463,72 @@ describe("CLI on a Module graph", () => {
 				expect(groups).toContainEqual(["Other.es"])
 			},
 		)
+	})
+})
+
+// NOTE: The two homes a map can have, driven through the same `compileFile`
+// the commands run: `build` writes it beside the output, while `run`'s
+// scratch directory is deleted the moment the program exits — so `run` rides
+// the map inside the bundle, where a stack trace can still be read through
+// it. Either way the map holds Essence sources alone.
+describe("source maps", () => {
+	it("adds --enable-source-maps exactly for Node with a map", () => {
+		expect(runtimeArguments(true, false)).toEqual(["--enable-source-maps"])
+		expect(runtimeArguments(true, true)).toEqual([])
+		expect(runtimeArguments(false, false)).toEqual([])
+		expect(runtimeArguments(false, true)).toEqual([])
+	})
+
+	it("writes a linked map holding only Essence sources beside the output", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-sourcemap-"))
+
+		try {
+			let outputFileName = path.join(directory, "HelloWorld.js")
+			let outcome = await compileFile({
+				inputFileName: fixturePath("HelloWorld.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: true,
+			})
+
+			expect(outcome.ok).toBe(true)
+
+			let map = JSON.parse(
+				readFileSync(`${outputFileName}.map`, "utf-8"),
+			) as { sources: Array<string>; sourcesContent: Array<string> }
+
+			expect(map.sources.length).toBeGreaterThan(0)
+			expect(
+				map.sources.filter((source) => !source.endsWith(".es")),
+			).toEqual([])
+			expect(readFileSync(outputFileName, "utf-8")).toContain(
+				"sourceMappingURL=HelloWorld.js.map",
+			)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	it("rides the map inside the bundle when asked to", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-sourcemap-"))
+
+		try {
+			let outputFileName = path.join(directory, "HelloWorld.js")
+			let outcome = await compileFile({
+				inputFileName: fixturePath("HelloWorld.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: true,
+				sourcemapMode: "inline",
+			})
+
+			expect(outcome.ok).toBe(true)
+			expect(existsSync(`${outputFileName}.map`)).toBe(false)
+			expect(readFileSync(outputFileName, "utf-8")).toContain(
+				"sourceMappingURL=data:application/json;base64,",
+			)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	})
 })
