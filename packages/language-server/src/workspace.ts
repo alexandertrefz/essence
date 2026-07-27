@@ -145,6 +145,10 @@ type FileEntry = {
 	// NOTE: Enrichment can legitimately answer with nothing — a Compiler bug
 	// must not take the Server down — so "was it tried" is its own question.
 	enrichmentAttempted: boolean
+	// NOTE: The written annotations of THIS file, resolved against its graph —
+	// null until a Hover asks, because collecting them costs a collection per
+	// enrichment and every other request reads Types off the typed Program.
+	annotations: Array<common.TypeAnnotation> | null
 }
 
 const diskVersion = -1
@@ -195,6 +199,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			entry.index = null
 			entry.enriched = null
 			entry.enrichmentAttempted = false
+			entry.annotations = null
 		}
 	}
 
@@ -268,6 +273,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 			index: null,
 			enriched: null,
 			enrichmentAttempted: false,
+			annotations: null,
 		}
 
 		files.set(filePath, entry)
@@ -322,6 +328,56 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		} catch {}
 
 		return entry.enriched
+	}
+
+	// NOTE: The Hover seam. The same linked enrichment `enrichedOf` runs, with
+	// the annotation collector open for this one file — an annotation resolved
+	// WITHOUT the graph answers 'Error' for every imported name it uses, which
+	// is exactly the Hover this exists to prevent. The enrichment it produces
+	// is kept for the whole graph, so an `enrichedOf` that follows reads cache.
+	function annotationsOf(filePath: string): Array<common.TypeAnnotation> {
+		let entry = fileOf(filePath)
+
+		if (entry === null) {
+			return []
+		}
+
+		// NOTE: A file without sections is enriched by `enrichDocument`, whose
+		// Choices stay unqualified — linking it here would cache a typed
+		// Program with DIFFERENT identities than every other request sees.
+		if (entry.program.imports === null && entry.program.exports === null) {
+			return []
+		}
+
+		if (entry.annotations !== null) {
+			return entry.annotations
+		}
+
+		try {
+			let linked = linkModuleGraph(loadModuleGraph(filePath, host), {
+				annotationsFor: filePath,
+			})
+
+			for (let [modulePath, module] of linked.modules) {
+				let moduleEntry = fileOf(modulePath)
+
+				if (
+					moduleEntry === null ||
+					moduleEntry.sourceText !== module.module.sourceText
+				) {
+					continue
+				}
+
+				moduleEntry.enriched = module.program
+				moduleEntry.enrichmentAttempted = true
+
+				if (modulePath === filePath) {
+					moduleEntry.annotations = module.annotations
+				}
+			}
+		} catch {}
+
+		return entry.annotations ?? []
 	}
 
 	function indexOf(filePath: string): ProgramIndex | null {
@@ -741,6 +797,7 @@ export function createWorkspace(options: WorkspaceOptions = {}) {
 		sourceOf,
 		indexOf,
 		enrichedOf,
+		annotationsOf,
 		dependenciesOf,
 		componentOf,
 		exportsOf,

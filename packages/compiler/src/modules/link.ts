@@ -61,6 +61,10 @@ export type LinkedModule = {
 	// shared collection would swallow a second Module's identical error.
 	diagnostics: Array<common.Diagnostic>
 	surface: ExportSurface
+	// NOTE: The written annotations paired with what each resolved to — empty
+	// unless this is the Module `annotationsFor` asked about. Only a Hover ever
+	// wants them, and only for the file under the cursor.
+	annotations: Array<common.TypeAnnotation>
 }
 
 export type LinkedGraph = {
@@ -242,6 +246,16 @@ function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
 // Only an entry that bound is carried. One that did not names something the
 // Module can not reach, which is a Diagnostic already — and code generation
 // never runs over a Module that reported one.
+// NOTE: What a Hover over an entry prints — the member bound under the local
+// name, or the Type where only a Type came across. A name bound in both tables
+// answers with the member, which is what the name means in expression position.
+function boundEntryType(
+	scope: enricher.Scope,
+	name: string,
+): common.Type | null {
+	return scope.members[name] ?? scope.types[name] ?? null
+}
+
 function moduleSections(
 	state: ModuleState,
 	surface: ExportSurface,
@@ -280,6 +294,10 @@ function moduleSections(
 									runtime: isRuntimeName(
 										surfaceFor(binding.dependencyPath),
 										binding.entry.name.content,
+									),
+									type: boundEntryType(
+										state.scope,
+										binding.localName,
 									),
 									position: binding.entry.position,
 								},
@@ -320,6 +338,13 @@ function moduleSections(
 											surface,
 											publicName,
 										),
+										type:
+											entry.source === null
+												? boundEntryType(
+														state.scope,
+														entry.name.content,
+													)
+												: null,
 										position: entry.position,
 									},
 								]
@@ -473,7 +498,14 @@ function reportMissingExport(
 	)
 }
 
-export function linkModuleGraph(graph: ModuleGraph): LinkedGraph {
+export function linkModuleGraph(
+	graph: ModuleGraph,
+	options: {
+		// NOTE: The canonical path of the one Module whose written annotations
+		// are wanted alongside its typed Program — the Hover seam.
+		annotationsFor?: string
+	} = {},
+): LinkedGraph {
 	// NOTE: Every Module's declarations up front, because a Diagnostic about an
 	// entry has to tell "that Module does not export this" from "that Module has
 	// no such name" — and the second question is about a file the entry's own
@@ -488,7 +520,12 @@ export function linkModuleGraph(graph: ModuleGraph): LinkedGraph {
 	let linked = new Map<string, LinkedModule>()
 
 	for (let group of graph.groups) {
-		for (let result of linkGroup(group, declarations, surfaces)) {
+		for (let result of linkGroup(
+			group,
+			declarations,
+			surfaces,
+			options.annotationsFor,
+		)) {
 			surfaces.set(result.module.filePath, result.surface)
 			linked.set(result.module.filePath, result)
 		}
@@ -511,6 +548,7 @@ function linkGroup(
 	group: Array<Module>,
 	declarations: Map<string, Map<string, Declaration>>,
 	surfaces: Map<string, ExportSurface>,
+	annotationsFor?: string,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
 	let declares = (filePath: string, name: string): boolean =>
@@ -572,12 +610,20 @@ function linkGroup(
 	// leaves pending.
 	seedRound(false)
 
+	let annotationsIndex = [...states.values()].findIndex(
+		(state) => state.module.filePath === annotationsFor,
+	)
+
 	let enriched = enrichPrograms(
 		[...states.values()].map((state) => ({
 			program: state.module.program,
 			scope: state.scope,
 		})),
-		{ seedRound },
+		{
+			seedRound,
+			annotationsFor:
+				annotationsIndex === -1 ? undefined : annotationsIndex,
+		},
 	)
 
 	return [...states.values()].map((state, index) => {
@@ -605,6 +651,7 @@ function linkGroup(
 				...diagnostics,
 			],
 			surface,
+			annotations: enriched[index]!.annotations,
 		}
 	})
 }

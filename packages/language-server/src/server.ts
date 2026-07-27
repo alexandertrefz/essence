@@ -287,15 +287,18 @@ export function startServer() {
 
 		// NOTE: A Module is enriched against the whole graph it reaches, or
 		// every name an entry brought in resolves to nothing and every Method
-		// dispatching through an imported Namespace stays unbound. The exception
-		// is Hover, which needs the Type annotations collected as enrichment
-		// runs, and the graph does not collect them — so a Hover over a written
-		// Type inside a Module still reads the file on its own.
-		if (
-			options.annotations !== true &&
-			(program.imports !== null || program.exports !== null)
-		) {
-			enrichedProgram = workspace.enrichedOf(documentFilePath(uri))
+		// dispatching through an imported Namespace stays unbound. Hover's
+		// annotations come from the same linked enrichment, collected for this
+		// one file — resolved without the graph, an annotation answers 'Error'
+		// for every imported name it writes.
+		if (program.imports !== null || program.exports !== null) {
+			let filePath = documentFilePath(uri)
+
+			if (options.annotations === true) {
+				annotations = workspace.annotationsOf(filePath)
+			}
+
+			enrichedProgram = workspace.enrichedOf(filePath)
 		}
 
 		if (enrichedProgram !== null) {
