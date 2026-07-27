@@ -1,8 +1,8 @@
 import * as path from "node:path"
 
+import { generate } from "@essence/escodegen"
 import type { common } from "@essence/interfaces"
 import { RUNTIME_DIRECTORY } from "@essence/runtime"
-import { generate } from "escodegen"
 import type * as estree from "estree"
 
 import {
@@ -130,11 +130,11 @@ export type SourceMapOptions = {
 	sourceTexts: ReadonlyMap<string, string>
 }
 
-// NOTE: The shape `sourceMapWithCode` answers with. `@types/escodegen`
-// predates both the `sourceMap: true` mode — each emitted node reads its
-// source off its own `loc.source`, which is what lets one Module's map name
-// several real files — and this return shape, so the one call is cast, here
-// and nowhere else.
+// NOTE: The shape `sourceMapWithCode` answers with. The fork's own
+// declarations keep to upstream's documented surface, which predates both the
+// `sourceMap: true` mode — each emitted node reads its source off its own
+// `loc.source`, which is what lets one Module's map name several real files —
+// and this return shape, so the one call is cast, here and nowhere else.
 type GeneratedWithSourceMap = {
 	code: string
 	map: {

@@ -20,6 +20,15 @@ mocha and chai are not: the compiler calls exactly one function, `generate`,
 from exactly one place, and a git dependency was installing seventeen
 megabytes to provide it.
 
+The manifest and the declarations are ours, not upstream's. The package is
+published as `@essence/escodegen` — the `escodegen` name on npm is upstream's,
+and this fork must not squat it — with `escodegen.d.ts` written by hand
+(upstream never shipped types, and `@types/escodegen` types the package
+*named* `escodegen`). Its dependencies are pinned exactly, as everything in
+this repository is, and `source-map` is a real dependency rather than an
+optional one: the compiler uses the `sourceMap: true` mode, so an optional
+dependency that failed to install would be a crash, not a degradation.
+
 `esprima` is dropped along with them. It is upstream's test dependency and
 `escodegen.js` never requires it.
 
