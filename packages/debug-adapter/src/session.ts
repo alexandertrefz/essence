@@ -1,7 +1,8 @@
 import type { ChildProcess } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
+import { pathToFileURL } from "node:url"
 
 import {
 	DebugSession,
@@ -14,9 +15,11 @@ import {
 } from "@vscode/debugadapter"
 import type { DebugProtocol } from "@vscode/debugprotocol"
 
+import { planBreakpoints } from "./breakpoints"
 import { CdpConnection } from "./cdp"
 import type { CompileDiagnostic, CompileFunction } from "./compile"
 import { launchProgram } from "./launcher"
+import { BundleMap } from "./maps"
 
 // NOTE: Module-level and exported, so the spec can read what the adapter
 // promises without starting one — the same shape `serverCapabilities` has in
@@ -70,6 +73,10 @@ type Debuggee = {
 	child: ChildProcess
 	cdp: CdpConnection
 	bundlePath: string
+	// NOTE: The URL Node knows the bundle's script under — what a CDP
+	// breakpoint is addressed to.
+	bundleUrl: string
+	map: BundleMap | null
 	scratchDirectory: string | null
 	keepArtifacts: boolean
 }
@@ -143,6 +150,8 @@ export class EssenceDebugSession extends DebugSession {
 				child: launched.child,
 				cdp: await CdpConnection.connect(launched.webSocketUrl),
 				bundlePath: bundlePath!,
+				bundleUrl: pathToFileURL(bundlePath!).href,
+				map: BundleMap.load(bundlePath!),
 				scratchDirectory,
 				keepArtifacts: args.keepArtifacts === true,
 			}
@@ -265,6 +274,108 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
+	// NOTE: What is currently set per client source — DAP's `setBreakpoints`
+	// REPLACES a source's set wholesale, so the previous CDP breakpoints are
+	// removed before the new ones are planted.
+	private breakpointLedger = new Map<string, Array<string>>()
+
+	protected override async setBreakPointsRequest(
+		response: DebugProtocol.SetBreakpointsResponse,
+		args: DebugProtocol.SetBreakpointsArguments,
+	): Promise<void> {
+		let clientPath = args.source.path ?? ""
+		let requestedLines = (args.breakpoints ?? []).map(
+			(breakpoint) => breakpoint.line,
+		)
+		let debuggee = this.debuggee
+
+		if (debuggee === null) {
+			response.body = {
+				breakpoints: requestedLines.map((line) => ({
+					verified: false,
+					line,
+					message: "no program is running yet",
+				})),
+			}
+			this.sendResponse(response)
+
+			return
+		}
+
+		for (let breakpointId of this.breakpointLedger.get(clientPath) ?? []) {
+			await debuggee.cdp
+				.send("Debugger.removeBreakpoint", { breakpointId })
+				.catch(() => {})
+		}
+
+		this.breakpointLedger.delete(clientPath)
+
+		let identifiers: Array<string> = []
+		let breakpoints: Array<DebugProtocol.Breakpoint> = []
+
+		for (let plan of planBreakpoints(
+			debuggee.map,
+			clientPath,
+			requestedLines,
+		)) {
+			if (plan.generated === null) {
+				breakpoints.push({
+					verified: false,
+					line: plan.requestedLine,
+					message: plan.message ?? undefined,
+				})
+
+				continue
+			}
+
+			try {
+				let result = await debuggee.cdp.send<{
+					breakpointId: string
+					locations: Array<{
+						lineNumber: number
+						columnNumber?: number
+					}>
+				}>("Debugger.setBreakpointByUrl", {
+					url: debuggee.bundleUrl,
+					lineNumber: plan.generated.line,
+					columnNumber: plan.generated.column,
+				})
+
+				identifiers.push(result.breakpointId)
+
+				// NOTE: V8 may itself slide the breakpoint to the nearest
+				// breakable position; where THAT came from is the line the
+				// red dot belongs on.
+				let actual = result.locations[0]
+				let line = plan.line
+
+				if (actual !== undefined) {
+					let original = debuggee.map?.originalPositionFor({
+						line: actual.lineNumber,
+						column: actual.columnNumber ?? 0,
+					})
+
+					if (original != null) {
+						line = original.line
+					}
+				}
+
+				breakpoints.push({ verified: true, line })
+			} catch (error) {
+				breakpoints.push({
+					verified: false,
+					line: plan.requestedLine,
+					message:
+						error instanceof Error ? error.message : String(error),
+				})
+			}
+		}
+
+		this.breakpointLedger.set(clientPath, identifiers)
+		response.body = { breakpoints }
+		this.sendResponse(response)
+	}
+
 	protected override setExceptionBreakPointsRequest(
 		response: DebugProtocol.SetExceptionBreakpointsResponse,
 		args: DebugProtocol.SetExceptionBreakpointsArguments,
@@ -333,7 +444,7 @@ export class EssenceDebugSession extends DebugSession {
 	}> {
 		if (typeof args.artifact === "string") {
 			return {
-				bundlePath: path.resolve(args.artifact),
+				bundlePath: realpathSync(path.resolve(args.artifact)),
 				scratchDirectory: null,
 			}
 		}
@@ -354,8 +465,12 @@ export class EssenceDebugSession extends DebugSession {
 			}
 		}
 
-		let scratchDirectory = mkdtempSync(
-			path.join(tmpdir(), "essence-dap-"),
+		// NOTE: Canonicalised the moment it exists. On macOS the temporary
+		// directory is a symlink — `/var/folders/…` for `/private/var/…` — and
+		// Node registers the script under its REAL path, so a breakpoint
+		// addressed to the symlinked spelling would never match its URL.
+		let scratchDirectory = realpathSync(
+			mkdtempSync(path.join(tmpdir(), "essence-dap-")),
 		)
 		let outputFile = path.join(
 			scratchDirectory,
