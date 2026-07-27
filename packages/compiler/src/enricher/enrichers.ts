@@ -11,12 +11,14 @@ import {
 import {
 	applyGenericBindings,
 	buildUnion,
+	choiceIdentity,
 	closestMatch,
 	countOf,
 	createFreshenedChoiceInference,
 	createFreshenedInference,
 	describeSignature,
 	describeType,
+	displayChoiceName,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
@@ -70,7 +72,7 @@ import {
 	suggestionHelps,
 	suggestionInScope,
 } from "./resolvers"
-import { childScope, scopeMap } from "./scope"
+import { childScope, modulePathOf, scopeMap } from "./scope"
 
 // NOTE: Hoisting resolves each order-independent declaration's Type up front
 // (see `hoistDeclarations`) and hands it back keyed by its Node. The in-order
@@ -394,7 +396,7 @@ function reportUncarriedTypeArgumentDisagreement(
 	// wanted and what it got.
 	if (offered.some((candidate) => matchesType(candidate, written))) {
 		let spell = (typeArguments: Array<common.Type>) =>
-			`${written.choice}<${typeArguments.map(describeType).join(", ")}>`
+			`${displayChoiceName(written.choice)}<${typeArguments.map(describeType).join(", ")}>`
 
 		reportError(
 			"These Type Arguments are not the ones this position decided",
@@ -763,7 +765,7 @@ function reportUndecidedPayloadTypeArguments(
 
 	return reportUndecidedTypeArguments(
 		`#${node.caseName.content}(…)`,
-		caseType.choice,
+		displayChoiceName(caseType.choice),
 		node.caseName.content,
 		choiceGenerics,
 		node.position,
@@ -2522,7 +2524,7 @@ export function enrichChoiceDeclarationStatement(
 				(candidate) => candidate.name === choiceCase.name.content,
 			) ?? {
 				type: "Case" as const,
-				choice: node.name.content,
+				choice: choiceIdentity(modulePathOf(scope), node.name.content),
 				name: choiceCase.name.content,
 				members: {},
 			}
@@ -5405,7 +5407,7 @@ export function resolveCaseValueType(
 		) {
 			return reportUndecidedTypeArguments(
 				`#${node.caseName.content}`,
-				bareCase.choice,
+				displayChoiceName(bareCase.choice),
 				node.caseName.content,
 				bareCase.choiceGenerics,
 				node.position,
@@ -6499,11 +6501,18 @@ export function resolveNamespaceDefinitionStatementType(
 // with its Choice's name" leaves the reader to work out what that looks like,
 // and the whole point of the Diagnostic is that they can not tell the two
 // Choices apart.
+//
+// NOTE: Handed the Choices' identities, since every caller has Cases rather than
+// written names in hand, and spelling them out is this function's business: what
+// a reader has to write to pick one is the Choice's name, never the Module path
+// its identity carries in front of it.
 function reportAmbiguousCase(
 	caseName: parser.IdentifierNode,
-	choiceNames: Array<string>,
+	choiceIdentities: Array<string>,
 	where: string,
 ): void {
+	let choiceNames = choiceIdentities.map(displayChoiceName)
+
 	reportError(
 		`Case '#${caseName.content}' is declared by more than one Choice`,
 		caseName.position,

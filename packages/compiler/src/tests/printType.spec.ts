@@ -103,6 +103,39 @@ describe("printType", () => {
 		})
 	})
 
+	// NOTE: A Case declared in a Module is identified by the Module's canonical
+	// path, and a Hover is the last place that path belongs — this is the funnel
+	// every Hover, Completion detail and Document Symbol reads a Case's head
+	// through, so the Choice is named as the declaration wrote it.
+	describe("Cases of a Module's Choice", () => {
+		it("should print the Choice's name without its Module path", () => {
+			let red: common.CaseType = {
+				type: "Case",
+				choice: "/modules/Colour.es#Colour",
+				name: "Red",
+				members: {},
+			}
+
+			expect(printType(red)).toBe("Colour#Red")
+			expect(caseHeader(red)).toBe("Colour#Red")
+			expect(printCaseWithPayload(red)).toBe("Colour#Red")
+		})
+
+		it("should print an instantiated Case of one under its applied spelling", () => {
+			let full: common.CaseType = {
+				type: "Case",
+				choice: "/modules/Box.es#Box",
+				name: "Full",
+				members: { value: integer },
+				typeArguments: [integer],
+			}
+
+			expect(printCaseWithPayload(full)).toBe(
+				"Box<Integer>#Full { value: Integer }",
+			)
+		})
+	})
+
 	// NOTE: An overloaded native free Function (WP5) resolves at a call site to
 	// an `OverloadedStaticMethod` callee — the same shape a future `loop` has.
 	// Hover and Signature Help both render it through these, so they must spell

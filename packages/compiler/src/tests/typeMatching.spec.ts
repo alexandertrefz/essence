@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence/interfaces"
+
 import { enrich } from "../enricher/index"
+import { describeType, matchesType } from "../helpers/index"
 import { parse } from "../parser/index"
+import { printCaseWithPayload, printType } from "../printType"
 import { validate } from "../validator/index"
 
 // NOTE: These are end-to-end, because each of these bugs only became visible
@@ -409,6 +413,188 @@ describe("Type matching", () => {
 				"assignment-type-mismatch",
 				"overloaded-function-value",
 			])
+		})
+	})
+
+	// NOTE: A Case is nominal by `(choice, name)`, and with Modules the Choice's
+	// written name is no longer unique in a Program: two files each declaring
+	// `choice Result` used to make interchangeable Types AND the same runtime
+	// tag, so `is` and `match` confused them with no Diagnostic anywhere. The
+	// identity is the declaring Module's canonical path and the name, and a
+	// Program that is no Module keeps the bare name — which is why every Program
+	// in every other spec, `__golden__` file and snapshot is untouched.
+	describe("Module-qualified Choice identity", () => {
+		const RESULT = `implementation {
+			choice Result {
+				Ok { value: Integer },
+				Failed,
+			}
+		}`
+
+		const BOX = `implementation {
+			choice Box<Value> {
+				Full { value: Value },
+			}
+
+			constant full: Box<Integer> = Box<Integer>#Full({ value = 1 })
+		}`
+
+		// NOTE: The Choice a Program declares, enriched as the Module at
+		// `modulePath` — or, for null, as no Module at all, which is what a single
+		// file compile does.
+		function choiceDeclaredIn(
+			modulePath: string | null,
+			source: string = RESULT,
+		): common.typed.ChoiceDeclarationStatementNode {
+			let { program, diagnostics } = enrich(
+				parse(source),
+				modulePath === null ? {} : { modulePath },
+			)
+
+			expect(diagnostics).toEqual([])
+
+			let declaration = program.implementation.nodes.find(
+				(node) => node.nodeType === "ChoiceDeclarationStatement",
+			)
+
+			if (declaration?.nodeType !== "ChoiceDeclarationStatement") {
+				throw new Error("The Program declares no Choice.")
+			}
+
+			return declaration
+		}
+
+		// NOTE: The Type of the Program's last Constant, which is how the applied
+		// spelling of a generic Choice is asked for: `applyGenericBindings` builds
+		// a fresh Case for every instantiation, and the identity has to survive
+		// that as much as the declaration does.
+		function lastConstantTypeIn(
+			modulePath: string,
+			source: string,
+		): common.Type {
+			let { program, diagnostics } = enrich(parse(source), { modulePath })
+
+			expect(diagnostics).toEqual([])
+
+			let constants = program.implementation.nodes.filter(
+				(node) => node.nodeType === "ConstantDeclarationStatement",
+			)
+
+			return constants[constants.length - 1].value.type
+		}
+
+		it("should refuse a Case of another Module's Choice, both ways round", () => {
+			let left = choiceDeclaredIn("/modules/left/Result.es")
+			let right = choiceDeclaredIn("/modules/right/Result.es")
+
+			expect(matchesType(left.cases[0].type, right.cases[0].type)).toBe(
+				false,
+			)
+			expect(matchesType(right.cases[0].type, left.cases[0].type)).toBe(
+				false,
+			)
+			expect(matchesType(left.type, right.type)).toBe(false)
+			expect(matchesType(right.type, left.type)).toBe(false)
+		})
+
+		it("should refuse an instantiated Case of another Module's generic Choice", () => {
+			let left = lastConstantTypeIn("/modules/left/Box.es", BOX)
+			let right = lastConstantTypeIn("/modules/right/Box.es", BOX)
+
+			expect(matchesType(left, right)).toBe(false)
+			expect(matchesType(right, left)).toBe(false)
+			expect(
+				matchesType(
+					left,
+					lastConstantTypeIn("/modules/left/Box.es", BOX),
+				),
+			).toBe(true)
+		})
+
+		it("should still match the Cases of one Module's Choice", () => {
+			let one = choiceDeclaredIn("/modules/left/Result.es")
+			let same = choiceDeclaredIn("/modules/left/Result.es")
+
+			expect(matchesType(one.cases[0].type, same.cases[0].type)).toBe(
+				true,
+			)
+			expect(matchesType(same.cases[0].type, one.cases[0].type)).toBe(
+				true,
+			)
+			expect(matchesType(one.type, same.type)).toBe(true)
+		})
+
+		it("should identify a Program that is no Module by name alone", () => {
+			expect(choiceDeclaredIn(null).cases[0].type.choice).toBe("Result")
+		})
+
+		it("should identify a Module's Choice by its path and its name", () => {
+			expect(
+				choiceDeclaredIn("/modules/left/Result.es").cases[0].type
+					.choice,
+			).toBe("/modules/left/Result.es#Result")
+		})
+
+		it("should print a Module's Choice under the name it was declared with", () => {
+			let declaration = choiceDeclaredIn("/modules/left/Result.es")
+
+			expect(describeType(declaration.cases[0].type)).toBe("Result#Ok")
+			expect(printType(declaration.cases[0].type)).toBe("Result#Ok")
+			expect(printCaseWithPayload(declaration.cases[0].type)).toBe(
+				"Result#Ok { value: Integer }",
+			)
+			expect(printType(declaration.type)).toBe("Result")
+		})
+
+		it("should name the Choices a Diagnostic asks a reader to pick between", () => {
+			let { diagnostics } = enrich(
+				parse(`implementation {
+					choice Left {
+						Shared,
+					}
+
+					choice Right {
+						Shared,
+					}
+
+					constant which = #Shared
+				}`),
+				{ modulePath: "/modules/Ambiguity.es" },
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("ambiguous-case")
+			expect(diagnostics[0].notes).toEqual([
+				"'Left' declares '#Shared'.",
+				"'Right' declares '#Shared'.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'Left#Shared' to pick one.",
+			])
+		})
+
+		it("should name a Module's Case as written where a Diagnostic is about it", () => {
+			let { program, diagnostics } = enrich(
+				parse(`implementation {
+					choice Result {
+						Ok { value: Integer },
+						Failed,
+					}
+
+					constant ok = Result#Ok({ value = 1 })
+					constant missing = ok.absent
+				}`),
+				{ modulePath: "/modules/Result.es" },
+			)
+
+			let errors = [...diagnostics, ...validate(program)]
+
+			expect(errors).toHaveLength(1)
+			expect(errors[0].code).toBe("unknown-member")
+			expect(errors[0].message).toBe(
+				"Case 'Result#Ok' has no member 'absent'",
+			)
+			expect(errors[0].notes).toEqual(["Case 'Result#Ok' has 'value'."])
 		})
 	})
 })

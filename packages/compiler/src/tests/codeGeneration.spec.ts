@@ -43,12 +43,19 @@ import { validate } from "../validator/index"
 
 // NOTE: Runs the same stages the CLI runs, minus bundling — enough to assert
 // on the shape of the emitted JavaScript without touching the file system.
-function generate(source: string): string {
+//
+// NOTE: `modulePath` enriches the source as a Module, which identifies its
+// Choices by that path — left out, the Program is no Module and its Cases carry
+// the bare tags every other test here asserts on.
+function generate(source: string, modulePath?: string): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
 
-	let enriched = enrich(parsed.program)
+	let enriched = enrich(
+		parsed.program,
+		modulePath === undefined ? {} : { modulePath },
+	)
 
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
@@ -60,8 +67,11 @@ function generate(source: string): string {
 // its top-level `__print` calls run. The emitted imports are absolute paths
 // into this repo's runtime, so the module resolves from anywhere; `console.log`
 // is captured to collect the output, then restored.
-async function run(source: string): Promise<Array<string>> {
-	let js = generate(source)
+async function run(
+	source: string,
+	modulePath?: string,
+): Promise<Array<string>> {
+	let js = generate(source, modulePath)
 	let directory = mkdtempSync(join(tmpdir(), "essence-e2e-"))
 	let file = join(directory, "program.ts")
 
@@ -2736,6 +2746,58 @@ describe("Code Generation", () => {
 			])
 
 			expect(buildStdlibPrelude(stdlib)).toEqual([])
+		})
+	})
+
+	// NOTE: A Case's tag is its Choice's identity and its name, so a Module's
+	// Cases are tagged with the Module's path — which is what keeps two files'
+	// same-named Choices apart at runtime as well as in the Type checker, since
+	// `isValueOfType` compares nothing but that tag. Rendering the path
+	// entry-relative is the bundler's business; what is asserted here is that
+	// qualifying a Program changes the tags and NOTHING else about what is
+	// emitted, and that the tags still agree with themselves when the Program
+	// runs.
+	describe("Module-qualified Case tags", () => {
+		const MODULE_PATH = "/modules/Colour.es"
+
+		const SOURCE = `implementation {
+	choice Colour {
+		Red,
+		Green { shade: Integer },
+	}
+
+	constant red: Colour = #Red
+	constant green: Colour = #Green({ shade = 2 })
+
+	__print(match green -> String {
+		case #Red { <- "red" }
+		case #Green { <- @.shade::toString() }
+	})
+
+	__print(red::is(green)::toString())
+	__print(red::is(#Red)::toString())
+}`
+
+		it("tags a Module's Cases with the Module's path", () => {
+			let generated = generate(SOURCE, MODULE_PATH)
+
+			expect(generated).toContain(`"${MODULE_PATH}#Colour#Red"`)
+			expect(generated).toContain(`"${MODULE_PATH}#Colour#Green"`)
+			expect(generate(SOURCE)).toContain('"Colour#Red"')
+		})
+
+		it("emits the same Program but for the tags", () => {
+			expect(
+				generate(SOURCE, MODULE_PATH).replaceAll(`${MODULE_PATH}#`, ""),
+			).toBe(generate(SOURCE))
+		})
+
+		it("matches a Module's own Cases at runtime", async () => {
+			expect(await run(SOURCE, MODULE_PATH)).toEqual([
+				'"2"',
+				'"false"',
+				'"true"',
+			])
 		})
 	})
 })

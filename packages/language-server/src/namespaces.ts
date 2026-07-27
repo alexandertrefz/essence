@@ -164,11 +164,14 @@ function derivedNamespaceFor(
 		return null
 	}
 
-	let isChoiceOf = (type: common.Type, choiceName: string): boolean =>
+	// NOTE: Recovered by the Cases' identity, which is what the Enricher matches
+	// them by — two Modules declaring the same Choice name declare two Choices,
+	// and a Union of one of them is not the other's.
+	let isChoiceOf = (type: common.Type, identity: string): boolean =>
 		type.type === "UnionType" &&
 		type.types.length > 0 &&
 		type.types.every(
-			(member) => member.type === "Case" && member.choice === choiceName,
+			(member) => member.type === "Case" && member.choice === identity,
 		)
 
 	if (baseType.type === "UnionType") {
@@ -187,12 +190,12 @@ function derivedNamespaceFor(
 		return null
 	}
 
-	let choiceName = baseType.choice
+	let identity = baseType.choice
 	let choiceType = allNamespaces
 		.map((namespace) => namespace.targetType)
 		.find(
 			(targetType): targetType is common.Type =>
-				targetType != null && isChoiceOf(targetType, choiceName),
+				targetType != null && isChoiceOf(targetType, identity),
 		)
 
 	return choiceType === undefined

@@ -12,6 +12,7 @@ import {
 	applyGenericBindings,
 	borrowedGenericName,
 	buildUnion,
+	choiceIdentity,
 	computeConformanceMethodMap,
 	closestMatch,
 	conformanceKey,
@@ -19,6 +20,7 @@ import {
 	countOf,
 	createInferenceContext,
 	describeType,
+	displayChoiceName,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	type GenericBindings,
@@ -30,7 +32,7 @@ import {
 	withArticle,
 } from "../helpers/index"
 import { recordAnnotation } from "./annotations"
-import { childScope } from "./scope"
+import { childScope, modulePathOf } from "./scope"
 
 // NOTE: Type-declaration and signature resolution. Expressions are no longer
 // typed here — enrichment is the only Expression walker, and a Node's Type is
@@ -379,6 +381,11 @@ export function resolveChoiceDeclarationStatementType(
 	let generics = isGeneric
 		? resolveGenericDeclarations(node.generics, scope)
 		: []
+	// NOTE: The Cases are identified by the Module this declaration is in, while
+	// the Union and the Generic Alias below stay named as written — their name is
+	// a key in the Type Scope and the spelling every Hover shows, and neither is
+	// an identity.
+	let identity = choiceIdentity(modulePathOf(scope), node.name.content)
 
 	let caseTypes: Array<common.CaseType> = []
 
@@ -408,7 +415,7 @@ export function resolveChoiceDeclarationStatementType(
 		if (isGeneric) {
 			caseTypes.push({
 				type: "Case",
-				choice: node.name.content,
+				choice: identity,
 				name: choiceCase.name.content,
 				members: resolveGenericCaseMembers(
 					choiceCase.type,
@@ -420,7 +427,7 @@ export function resolveChoiceDeclarationStatementType(
 		} else {
 			caseTypes.push({
 				type: "Case",
-				choice: node.name.content,
+				choice: identity,
 				name: choiceCase.name.content,
 				members:
 					choiceCase.type === null
@@ -561,7 +568,7 @@ export function lookupTypeOf(
 			reportUnknownMember(
 				memberName,
 				positions.member,
-				`Case '${baseType.choice}#${baseType.name}'`,
+				`Case '${displayChoiceName(baseType.choice)}#${baseType.name}'`,
 				Object.keys(baseType.members),
 			)
 
@@ -1043,10 +1050,12 @@ function conformanceStateFor(scope: enricher.Scope): ScopeConformanceState {
 // of a member read — there is no object anywhere with this name.
 export const derivedEquatableNamespaceName = "Choice_Equatable"
 
-// NOTE: The name of the Choice a receiver belongs to, or null when it belongs
-// to none — a single Case names its own Choice, and a Union names one only when
-// every member is a Case of it.
-function choiceNameOf(baseType: common.Type): string | null {
+// NOTE: The identity of the Choice a receiver belongs to, or null when it
+// belongs to none — a single Case names its own Choice, and a Union names one
+// only when every member is a Case of it. The IDENTITY rather than the written
+// name, so a Union built from two Modules' same-named Choices answers null the
+// way a Union of two Choices always has.
+function choiceIdentityOf(baseType: common.Type): string | null {
 	if (baseType.type === "Case") {
 		return baseType.choice
 	}
@@ -1144,13 +1153,18 @@ function declaredChoiceAliasOf(
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): common.GenericAliasType | null {
-	let choiceName = choiceNameOf(baseType)
+	let identity = choiceIdentityOf(baseType)
 
-	if (choiceName === null) {
+	if (identity === null) {
 		return null
 	}
 
-	let declared = findTypeInScope(choiceName, scope)
+	// NOTE: Looked up under the name the Choice was DECLARED with, which is the
+	// key it occupies in the Type Scope — the identity in front of it is the
+	// Module's path, and no Scope is keyed by that. What the name answers with is
+	// then held to the identity below, so a name that resolves to another
+	// Module's same-named Choice is no more this Choice than a shadowed one is.
+	let declared = findTypeInScope(displayChoiceName(identity), scope)
 
 	if (declared === null || declared.type !== "GenericAlias") {
 		return null
@@ -1167,7 +1181,7 @@ function declaredChoiceAliasOf(
 	if (
 		bodyMembers.length === 0 ||
 		!bodyMembers.every(
-			(member) => member.type === "Case" && member.choice === choiceName,
+			(member) => member.type === "Case" && member.choice === identity,
 		)
 	) {
 		return null
@@ -1187,9 +1201,9 @@ function choiceTypeOf(
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): common.Type | null {
-	let choiceName = choiceNameOf(baseType)
+	let identity = choiceIdentityOf(baseType)
 
-	if (choiceName === null) {
+	if (identity === null) {
 		return null
 	}
 
@@ -1197,8 +1211,10 @@ function choiceTypeOf(
 	// Case still compares against the whole Choice, so `case #Red { @::is(c) }`
 	// takes any Colour rather than only another `#Red`. A Choice whose name no
 	// longer resolves to it has been shadowed; deriving off the wrong Type
-	// would be worse than not deriving, so it answers null.
-	let declared = findTypeInScope(choiceName, scope)
+	// would be worse than not deriving, so it answers null. The name is the
+	// Scope's key and the identity is what the Cases are held to, exactly as in
+	// `declaredChoiceAliasOf`.
+	let declared = findTypeInScope(displayChoiceName(identity), scope)
 
 	if (declared === null) {
 		return null
@@ -1226,7 +1242,7 @@ function choiceTypeOf(
 	if (
 		declaredMembers.length === 0 ||
 		!declaredMembers.every(
-			(member) => member.type === "Case" && member.choice === choiceName,
+			(member) => member.type === "Case" && member.choice === identity,
 		)
 	) {
 		return null

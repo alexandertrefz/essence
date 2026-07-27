@@ -65,6 +65,33 @@ export function displayGenericName(name: common.GenericName): string {
 	return name.replace(/\u200B\d+$/, "")
 }
 
+// NOTE: The nominal identity of a Choice — what tells two Modules' same-named
+// Choices apart, and the whole of what `matchTypes` compares a Case by. It is
+// the Module's canonical path and the name the declaration wrote, because the
+// path alone would join every Choice in one file and the name alone joins the
+// two files. The path rather than anything entry-relative: a file reached from
+// two entries must not split into two Types, and the Language Server's index
+// has no entry at all.
+// `modulePath` is null for a Program that is no Module — a single file compile
+// and every standard library file identify a Choice by its bare name, which is
+// the spelling every emitted tag, `__golden__` file and Diagnostic has carried
+// since before Modules.
+export function choiceIdentity(
+	modulePath: string | null,
+	name: string,
+): string {
+	return modulePath === null ? name : `${modulePath}#${name}`
+}
+
+// NOTE: The Choice name a reader wrote, recovered from the identity above:
+// everything after the LAST separator, since a Module path may well contain one
+// and a Choice's name can not. Every site that PRINTS a Choice goes through
+// here — a Diagnostic, Hover or Completion naming the path would be naming
+// something the source does not say.
+export function displayChoiceName(identity: string): string {
+	return identity.slice(identity.lastIndexOf("#") + 1)
+}
+
 // NOTE: A compact, one-line description of a Type for Diagnostics — the
 // spelling a reader would recognise from their own source, not the internal
 // Type tag. `printType` in the Language Server is its Hover-oriented sibling;
@@ -84,7 +111,7 @@ export function describeType(type: common.Type): string {
 
 			return type.types.map(describeType).join(" | ")
 		case "Case":
-			return `${type.choice}#${type.name}`
+			return `${displayChoiceName(type.choice)}#${type.name}`
 		case "List":
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
@@ -1870,14 +1897,18 @@ function matchTypes(
 
 	// NOTE: Cases are nominal — a Case only matches its own Choice's Case of
 	// the same name, never a structurally identical Record (and vice versa).
-	// That identity is the entire point of declaring a Choice. Under generics
-	// the tag alone is not enough: two instantiations of the same Case
-	// (`Step<Integer, …>#Done` vs `Step<String, …>#Done`) share a tag but must
-	// not be interchangeable, so once the tags agree the payload members are
-	// recursed. `typeArguments` are ignored — they are display spelling; the
-	// members decide assignability, and recursing them is also what routes a
-	// bindable Generic member through `matchGenericUse` (the whole Result
-	// inference story).
+	// That identity is the entire point of declaring a Choice. Compared by
+	// `choiceIdentity` rather than by the Choice's written name, so that two
+	// Modules each declaring `choice Result` declare two Types: matched by name
+	// their Cases were interchangeable in both directions, with `is` and `match`
+	// confusing them and no Diagnostic anywhere.
+	// Under generics the tag alone is not enough either: two instantiations of
+	// the same Case (`Step<Integer, …>#Done` vs `Step<String, …>#Done`) share a
+	// tag but must not be interchangeable, so once the tags agree the payload
+	// members are recursed. `typeArguments` are ignored — they are display
+	// spelling; the members decide assignability, and recursing them is also
+	// what routes a bindable Generic member through `matchGenericUse` (the whole
+	// Result inference story).
 	if (lhs.type === "Case" && rhs.type === "Case") {
 		if (lhs.choice !== rhs.choice || lhs.name !== rhs.name) {
 			return false

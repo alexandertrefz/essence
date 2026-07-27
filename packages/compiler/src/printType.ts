@@ -1,6 +1,6 @@
 import type { common } from "@essence/interfaces"
 
-import { displayGenericName } from "./helpers/index"
+import { displayChoiceName, displayGenericName } from "./helpers/index"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one
@@ -90,19 +90,26 @@ export function printConformanceClauses(
 // with. A DECLARED Case (`choiceGenerics`, no `typeArguments`) and a fully
 // unbound instantiation (every Argument still its own same-named GenericUse)
 // stay terse as `Step#Done`, where a `<…>` would only echo the header.
+//
+// NOTE: The Choice is named as it was declared, never by the identity a Case
+// carries — this is the one funnel every Hover, Completion detail and Document
+// Symbol reads a Case's head through, so a Module path can not reach an editor
+// from here.
 export function caseHeader(caseType: common.CaseType): string {
+	let choiceName = displayChoiceName(caseType.choice)
+
 	if (
 		caseType.typeArguments !== undefined &&
 		caseType.typeArguments.some(
 			(argument) => argument.type !== "GenericUse",
 		)
 	) {
-		return `${caseType.choice}<${caseType.typeArguments
+		return `${choiceName}<${caseType.typeArguments
 			.map(printType)
 			.join(", ")}>#${caseType.name}`
 	}
 
-	return `${caseType.choice}#${caseType.name}`
+	return `${choiceName}#${caseType.name}`
 }
 
 // NOTE: A Case with its payload shape spelled out — for Hovers where the
