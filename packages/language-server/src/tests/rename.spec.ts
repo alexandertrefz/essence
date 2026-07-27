@@ -1014,3 +1014,111 @@ describe("Rename through where clauses", () => {
 		)
 	})
 })
+
+// NOTE: One file's own view of the two Module sections. What crosses a file
+// boundary is the workspace index's business — `workspace.spec.ts` — and what
+// is asserted here is the half that has to hold without one: an entry binds a
+// name, uses of it resolve to that entry, and an export entry reads the
+// declaration it publishes.
+describe("Rename through the Module sections", () => {
+	it("should rename an import entry together with every use of it", () => {
+		let source = [
+			"import {",
+			'\tRectangle from "./Geometry.es"',
+			"}",
+			"implementation {",
+			"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+			"\t\t<- shape.width",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 5, column: 29 }, "Box")).toBe(
+			source.replaceAll("Rectangle", "Box"),
+		)
+	})
+
+	it("should rename from the entry as well as from a use", () => {
+		let source = [
+			"import {",
+			'\tsquare from "./Math.es"',
+			"}",
+			"implementation {",
+			"\tconstant nine = square(3)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 3 }, "squared")).toBe(
+			source.replaceAll("square", "squared"),
+		)
+	})
+
+	// NOTE: An aliased entry binds the alias and nothing else — the name on the
+	// other side of the `as` is what the exporting Module publishes, and one
+	// file has no business renaming that.
+	it("should bind an aliased import under its alias alone", () => {
+		let source = [
+			"import {",
+			'\tPI as Pi from "./Math.es"',
+			"}",
+			"implementation {",
+			"\tconstant doubled = Pi::multiply(with 2/1)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 5, column: 22 }, "Ratio")).toBe(
+			[
+				"import {",
+				'\tPI as Ratio from "./Math.es"',
+				"}",
+				"implementation {",
+				"\tconstant doubled = Ratio::multiply(with 2/1)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("should rename an export entry with the declaration it publishes", () => {
+		let source = [
+			"implementation {",
+			"\tfunction squared(_ value: Integer) -> Integer {",
+			"\t\t<- value::multiply(with value)",
+			"\t}",
+			"}",
+			"export {",
+			"\tsquared",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 7, column: 3 }, "powered")).toBe(
+			source.replaceAll("squared", "powered"),
+		)
+	})
+
+	// NOTE: A local declaration wins the name over an entry that also binds it —
+	// the Compiler refuses that entry, so a use of the name resolves to the
+	// declaration, and renaming it must not reach into the import block.
+	it("should let a declaration of the same name win over an entry", () => {
+		let source = [
+			"import {",
+			'\tvalue from "./Other.es"',
+			"}",
+			"implementation {",
+			"\tconstant value = 1",
+			"\tconstant doubled = value",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 6, column: 21 }, "amount")).toBe(
+			[
+				"import {",
+				'\tvalue from "./Other.es"',
+				"}",
+				"implementation {",
+				"\tconstant amount = 1",
+				"\tconstant doubled = amount",
+				"}",
+			].join("\n"),
+		)
+	})
+})

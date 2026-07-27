@@ -121,3 +121,33 @@ describe("Folding Ranges", () => {
 		})
 	})
 })
+
+describe("Folding the Module sections", () => {
+	it("should fold an import block and an export block", () => {
+		let ranges = foldingRangesOf(
+			[
+				"import {",
+				'\tRectangle from "./Geometry.es"',
+				'\tCircle from "./Geometry.es"',
+				"}",
+				"implementation {",
+				"\tconstant one = 1",
+				"}",
+				"export {",
+				"\tone",
+				"}",
+			].join("\n"),
+		)
+
+		expect(ranges).toContainEqual({ startLine: 1, endLine: 3 })
+		expect(ranges).toContainEqual({ startLine: 8, endLine: 9 })
+	})
+
+	it("should leave a Program that writes neither section alone", () => {
+		let ranges = foldingRangesOf(
+			["implementation {", "\tconstant one = 1", "}"].join("\n"),
+		)
+
+		expect(ranges).toEqual([{ startLine: 1, endLine: 2 }])
+	})
+})

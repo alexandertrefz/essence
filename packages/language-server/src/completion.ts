@@ -12,6 +12,7 @@ import {
 import type { common } from "@essence/interfaces"
 
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
+import { type ImportEdit, insertImportEdit } from "./autoImport"
 import {
 	type CallSnippet,
 	callSnippetsFor,
@@ -30,6 +31,7 @@ import {
 	type ScopeRange,
 	type SymbolSpace,
 } from "./rename"
+import type { WorkspaceOffer } from "./workspace"
 
 // NOTE: Completion has three modes, told apart by the text immediately
 // before the cursor:
@@ -65,6 +67,11 @@ export const completionTiers = {
 	document: 3,
 	builtin: 4,
 	keyword: 5,
+	// NOTE: Last, and by a rule rather than by taste: everything above is
+	// already reachable where the cursor is, while accepting one of these edits
+	// the file's import block as well. An offer that changes two places belongs
+	// below every offer that changes one.
+	workspace: 6,
 } as const
 
 export type CompletionEntry = {
@@ -85,6 +92,22 @@ export type CompletionEntry = {
 	labelDetail?: string | null
 	tier: number
 	preselect?: boolean
+	// NOTE: What accepting the entry changes ELSEWHERE — the `import { … }`
+	// entry that makes the name resolve at all. The Editor applies these
+	// together with the insertion at the cursor, in one undo step.
+	additionalEdits?: Array<ImportEdit>
+}
+
+// NOTE: What a Module the document has not imported offers, and the Namespace
+// Types behind the ones that are Namespaces — the second is what a Method
+// Completion matches against a receiver, and it costs an enrichment per
+// exporting Module, so the two are asked for separately.
+export type WorkspaceCompletions = {
+	offers: Array<WorkspaceOffer>
+	namespaces: Array<{
+		offer: WorkspaceOffer
+		namespace: common.NamespaceType
+	}>
 }
 
 // NOTE: Must be a valid Identifier on its own — `_` and `-` are Symbols, and
@@ -141,6 +164,7 @@ export function findCompletions(
 	documentText: string,
 	cursor: common.Cursor,
 	documentPath?: string,
+	workspace: WorkspaceCompletions = { offers: [], namespaces: [] },
 ): Array<CompletionEntry> {
 	let lines = documentText.split("\n")
 	let currentLine = lines[cursor.line - 1] ?? ""
@@ -177,6 +201,7 @@ export function findCompletions(
 					base.type,
 					methodMatch[1] ?? null,
 					documentPath,
+					workspace.namespaces,
 				)
 			: memberCompletions(base.type, base.program)
 	}
@@ -210,7 +235,13 @@ export function findCompletions(
 	// space, since no Keyword names a Type.
 	return [
 		...contextualCompletions(lines, cursor, documentPath),
-		...scopeCompletions(documentText, cursor, space, documentPath),
+		...scopeCompletions(
+			documentText,
+			cursor,
+			space,
+			documentPath,
+			workspace.offers,
+		),
 		...(space === "values" ? keywordCompletions(headText) : []),
 	]
 }
@@ -661,17 +692,45 @@ function methodCompletions(
 	baseType: common.Type,
 	specifierName: string | null,
 	documentPath?: string,
+	workspaceNamespaces: Array<{
+		offer: WorkspaceOffer
+		namespace: common.NamespaceType
+	}> = [],
 ): Array<CompletionEntry> {
-	let namespaces = matchingNamespaces(
+	// NOTE: The Namespaces in scope are offered first and the unimported ones
+	// after them, so a Method that resolves today wins the name over one that
+	// would need an entry added — the same first-wins dedupe, ordered by what
+	// costs the reader least.
+	let offers = new Map(
+		workspaceNamespaces.map(({ offer, namespace }) => [
+			namespace.name,
+			offer,
+		]),
+	)
+	let inScope = matchingNamespaces(
 		documentText,
 		baseType,
 		specifierName,
 		documentPath,
 	)
+	let namespaces = [
+		...inScope,
+		...matchingNamespaces(
+			documentText,
+			baseType,
+			specifierName,
+			documentPath,
+			workspaceNamespaces.map((candidate) => candidate.namespace),
+		).filter((namespace) => offers.has(namespace.name)),
+	]
 	let seen = new Set<string>()
 	let entries: Array<CompletionEntry> = []
 
 	for (let namespace of namespaces) {
+		let offer = offers.get(namespace.name)
+		let importEdit =
+			offer === undefined ? null : importEditFor(documentText, offer)
+
 		for (let [name, method] of Object.entries(namespace.methods)) {
 			if (isStaticMethod(method)) {
 				continue
@@ -690,15 +749,42 @@ function methodCompletions(
 					name,
 					kind: "method",
 					snippets: callSnippetsFor(name, resolved),
-					detail: printInvokedSignature(resolved),
+					detail:
+						offer === undefined
+							? printInvokedSignature(resolved)
+							: `${printInvokedSignature(resolved)} — ${offer.specifier}`,
 					documentation: describe(documentationOf(resolved)) || null,
-					tier: completionTiers.member,
-				}),
+					tier:
+						offer === undefined
+							? completionTiers.member
+							: completionTiers.workspace,
+				}).map((entry) =>
+					importEdit === null
+						? entry
+						: { ...entry, additionalEdits: [importEdit] },
+				),
 			)
 		}
 	}
 
 	return entries
+}
+
+// NOTE: Built against the document as it is now, like every other edit this
+// Server hands out. Null where the block already holds the entry, which is what
+// an offer whose name is somehow already bound would produce — the offer is not
+// dropped for it, since the Method IS reachable once the entry is there.
+function importEditFor(
+	documentText: string,
+	offer: WorkspaceOffer,
+): ImportEdit | null {
+	let { program } = parseDocument(documentText)
+
+	return insertImportEdit(documentText, program, {
+		name: offer.name,
+		alias: null,
+		specifier: offer.specifier,
+	})
 }
 
 // NOTE: Inside `::<…>` only Namespaces that could actually disambiguate the
@@ -1034,11 +1120,34 @@ function analyseCaseProbe(program: common.typed.Program): {
 /* Scope completion */
 /********************/
 
+// NOTE: Which symbol space an offer belongs in, by what the other Module
+// declared it as. A Type Alias, a Choice and a Protocol are only nameable where
+// a Type is; everything else is a value. A name bound in both tables at home —
+// a `type Foo` beside a `namespace Foo` — is one entry either way, so offering
+// it in one space is enough to bring the other along.
+const offerSpaces: Record<DeclarationKind, SymbolSpace> = {
+	constant: "values",
+	variable: "values",
+	function: "values",
+	parameter: "values",
+	namespace: "values",
+	protocol: "types",
+	type: "types",
+	generic: "types",
+	method: "values",
+	staticMethod: "values",
+	property: "values",
+	member: "values",
+	label: "values",
+	import: "values",
+}
+
 function scopeCompletions(
 	documentText: string,
 	cursor: common.Cursor,
 	space: SymbolSpace,
 	documentPath?: string,
+	offers: Array<WorkspaceOffer> = [],
 ): Array<CompletionEntry> {
 	let { program } = parseDocument(documentText, documentPath)
 	let enrichedProgram: common.typed.Program | null = null
@@ -1100,6 +1209,31 @@ function scopeCompletions(
 		}
 
 		searchScope = searchScope.parent
+	}
+
+	// NOTE: After the whole Scope chain, and only for names nothing in it
+	// already answers with — an offer that shadows something reachable would
+	// insert an entry the Compiler refuses as a duplicate.
+	for (let offer of offers) {
+		if (entries.has(offer.name) || offerSpaces[offer.kind] !== space) {
+			continue
+		}
+
+		let edit = insertImportEdit(documentText, program, {
+			name: offer.name,
+			alias: null,
+			specifier: offer.specifier,
+		})
+
+		entries.set(offer.name, [
+			{
+				label: offer.name,
+				kind: offer.kind,
+				detail: `from ${offer.specifier}`,
+				tier: completionTiers.workspace,
+				...(edit === null ? {} : { additionalEdits: [edit] }),
+			},
+		])
 	}
 
 	return [...entries.values()].flat()

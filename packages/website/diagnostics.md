@@ -855,6 +855,18 @@ all. The check deliberately over-counts elsewhere — a name that only appears a
 a Method name is treated as a use — because a Warning that fires on a name the
 Module does need is worse than one that stays silent.
 
+### `dependency-has-errors`
+
+A Module this one names reported errors of its own. What a Module exports is
+read off a Module that compiled, so until that one does, a name an entry here
+asks for may resolve to an Error or not resolve at all — and the mistake is in a
+file that is very likely not open.
+
+Reported by the Language Server, on the specifier of the first entry naming the
+Module: six names imported from one file are one thing to go and fix. A terminal
+report has every file's Diagnostics side by side already and does not repeat
+itself this way.
+
 ## The Compiler as a program
 
 These are not about a Program at all — they are about the run. They carry no

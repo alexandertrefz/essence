@@ -1,8 +1,10 @@
 import type { common, parser } from "@essence/interfaces"
 
-import { analyseDocument } from "./analyse"
+import { analyseDocument, documentFilePath } from "./analyse"
+import { insertImportEdit, relativeSpecifier } from "./autoImport"
 import { findInlayHints } from "./inlayHints"
 import { isSamePosition } from "./positions"
+import type { Workspace } from "./workspace"
 
 // NOTE: Every edit here is computed from the text handed in, on a fresh
 // analysis — never from a Diagnostic the client echoed back. Published
@@ -35,6 +37,7 @@ export function findCodeActions(
 	documentText: string,
 	range: common.Position,
 	documentPath?: string,
+	workspace?: Workspace,
 ): Array<CodeActionEntry> {
 	// NOTE: ONE run of the pipeline per request — the analysis hands back both
 	// the Parser AST an edit is measured against and the enriched Program the
@@ -45,6 +48,7 @@ export function findCodeActions(
 	let { program, enrichedProgram, diagnostics } = analyseDocument(
 		documentText,
 		documentPath,
+		{ host: workspace?.host },
 	)
 
 	if (program === null) {
@@ -53,6 +57,15 @@ export function findCodeActions(
 
 	let lines = documentText.split("\n")
 	let entries: Array<CodeActionEntry> = []
+	let imports: ImportContext | null =
+		workspace === undefined || documentPath === undefined
+			? null
+			: {
+					workspace,
+					filePath: documentFilePath(documentPath),
+					documentText,
+					program,
+				}
 
 	for (let diagnostic of diagnostics) {
 		if (
@@ -62,11 +75,7 @@ export function findCodeActions(
 			continue
 		}
 
-		let entry = actionFor(diagnostic, program, lines)
-
-		if (entry !== null) {
-			entries.push(entry)
-		}
+		entries.push(...actionsFor(diagnostic, program, lines, imports))
 	}
 
 	if (enrichedProgram !== null) {
@@ -76,36 +85,56 @@ export function findCodeActions(
 	return entries
 }
 
-function actionFor(
+function actionsFor(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
 	lines: Array<string>,
-): CodeActionEntry | null {
+	imports: ImportContext | null,
+): Array<CodeActionEntry> {
 	switch (diagnostic.code) {
 		case "missing-case":
-			return missingCaseAction(diagnostic, program, lines)
+			return listed(missingCaseAction(diagnostic, program, lines))
 		case "unreachable-case":
-			return unreachableCaseAction(diagnostic, program, lines)
+			return listed(unreachableCaseAction(diagnostic, program, lines))
 		case "unknown-name":
 		case "unknown-type":
 		case "unknown-protocol":
+			return [
+				...importActions(diagnostic, lines, imports),
+				...listed(
+					suggestionAction(diagnostic, (suggestion) => suggestion),
+				),
+			]
 		case "unknown-member":
+			return listed(
+				suggestionAction(diagnostic, (suggestion) => suggestion),
+			)
 		case "unknown-method":
-			return suggestionAction(diagnostic, (suggestion) => suggestion)
+			return [
+				...namespaceImportActions(diagnostic, imports),
+				...listed(
+					suggestionAction(diagnostic, (suggestion) => suggestion),
+				),
+			]
 		case "unknown-case":
-			return suggestionAction(
-				diagnostic,
-				(suggestion) => `#${suggestion}`,
+			return listed(
+				suggestionAction(diagnostic, (suggestion) => `#${suggestion}`),
 			)
 		case "constant-reassignment":
-			return constantToVariableAction(diagnostic, program, lines)
+			return listed(constantToVariableAction(diagnostic, program, lines))
 		case "redundant-parameter-label":
-			return removeLabelAction(diagnostic, lines)
+			return listed(removeLabelAction(diagnostic, lines))
 		case "missing-return":
-			return elseBranchAction(diagnostic, program, lines)
+			return listed(elseBranchAction(diagnostic, program, lines))
+		case "unused-import":
+			return listed(removeImportAction(diagnostic, program, lines))
 		default:
-			return null
+			return []
 	}
+}
+
+function listed(entry: CodeActionEntry | null): Array<CodeActionEntry> {
+	return entry === null ? [] : [entry]
 }
 
 // #region Fixes
@@ -250,6 +279,176 @@ function suggestionAction(
 		edits: [
 			{ range: diagnostic.position, newText: diagnostic.data.suggestion },
 		],
+	}
+}
+
+// NOTE: What an import fix needs of the world: which Modules publish a name,
+// and where this file is, so that a specifier can be written from one to the
+// other. Absent whenever the document is not part of a workspace — a test
+// analysing a String, or an Editor with no folder open — and every action below
+// then simply is not offered.
+type ImportContext = {
+	workspace: Workspace
+	filePath: string
+	documentText: string
+	program: parser.Program
+}
+
+// NOTE: One action per exporting Module rather than a guess between them. Two
+// Modules exporting one name is a real shape — a facade and the Module behind
+// it — and which of them a reader means is not something a Diagnostic can say.
+function importActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+	imports: ImportContext | null,
+): Array<CodeActionEntry> {
+	if (imports === null) {
+		return []
+	}
+
+	let name = sliceOf(lines, diagnostic.position)
+	let exporters = imports.workspace
+		.exportersOf(name)
+		.filter((exported) => exported.filePath !== imports.filePath)
+
+	return exporters.flatMap((exported) => {
+		let specifier = relativeSpecifier(imports.filePath, exported.filePath)
+		let edit = insertImportEdit(imports.documentText, imports.program, {
+			name,
+			alias: null,
+			specifier,
+		})
+
+		if (edit === null) {
+			return []
+		}
+
+		return [
+			{
+				title: `Import '${name}' from ${specifier}`,
+				kind: "quickfix" as const,
+				diagnosticCode: diagnostic.code,
+				diagnosticPosition: diagnostic.position,
+				// NOTE: Preferred only where there is one place it could come
+				// from — an Editor applies the preferred fix without asking, and
+				// choosing a Module for the reader is exactly what this must not
+				// do.
+				isPreferred: exporters.length === 1,
+				edits: [edit],
+			},
+		]
+	})
+}
+
+// NOTE: Read off the Diagnostic's own helps rather than worked out again here.
+// The Enricher knows which unimported Namespaces declare the Method AND which of
+// them target the receiver's Type — the rule dispatch is decided by — and
+// re-deriving that from a Method name alone would offer imports that would not
+// make the call resolve. The shape of the help is the contract between the two;
+// it is written in exactly one place, `unimportedNamespaceHelps`.
+const namespaceHelpPattern = /^'([^']+)' in (\S+) declares '/
+
+function namespaceImportActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	imports: ImportContext | null,
+): Array<CodeActionEntry> {
+	if (imports === null) {
+		return []
+	}
+
+	return diagnostic.helps.flatMap((help) => {
+		let match = namespaceHelpPattern.exec(help)
+
+		if (match === null) {
+			return []
+		}
+
+		let name = match[1] as string
+		let specifier = match[2] as string
+		let edit = insertImportEdit(imports.documentText, imports.program, {
+			name,
+			alias: null,
+			specifier,
+		})
+
+		if (edit === null) {
+			return []
+		}
+
+		return [
+			{
+				title: `Import '${name}' from ${specifier}`,
+				kind: "quickfix" as const,
+				diagnosticCode: diagnostic.code,
+				diagnosticPosition: diagnostic.position,
+				isPreferred: true,
+				edits: [edit],
+			},
+		]
+	})
+}
+
+// NOTE: The whole line, and the break that ends it — an entry list has no
+// delimiters, so what is left behind by deleting the name alone is a blank line
+// in the middle of the block. The Warning points at the LOCAL name, which is the
+// alias where there is one, so the entry is found by that Position rather than
+// by the name it reads.
+function removeImportAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let entry = (program.imports?.entries ?? []).find((candidate) =>
+		isSamePosition(
+			(candidate.alias ?? candidate.name).position,
+			diagnostic.position,
+		),
+	)
+
+	if (entry === undefined) {
+		return null
+	}
+
+	let start = { line: entry.position.start.line, column: 1 }
+	let end = { line: entry.position.end.line + 1, column: 1 }
+
+	// NOTE: A last entry has no following line to reach into, so the break
+	// BEFORE it is taken instead — otherwise the deletion ends past the end of
+	// the document.
+	if (end.line > lines.length) {
+		return {
+			title: `Remove the unused import of '${sliceOf(lines, diagnostic.position)}'`,
+			kind: "quickfix",
+			diagnosticCode: diagnostic.code,
+			diagnosticPosition: diagnostic.position,
+			isPreferred: true,
+			edits: [
+				{
+					range: {
+						start: {
+							line: entry.position.start.line,
+							column: 1,
+						},
+						end: {
+							line: entry.position.end.line,
+							column:
+								lineAt(lines, entry.position.end.line).length +
+								1,
+						},
+					},
+					newText: "",
+				},
+			],
+		}
+	}
+
+	return {
+		title: `Remove the unused import of '${sliceOf(lines, diagnostic.position)}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: { start, end }, newText: "" }],
 	}
 }
 

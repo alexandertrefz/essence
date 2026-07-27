@@ -1,4 +1,8 @@
-import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import {
+	enrichDocument,
+	isStdlibDocument,
+	parseDocument,
+} from "@essence/compiler/documents"
 import { loadStdlib } from "@essence/compiler/enricher/stdlib"
 import type { common } from "@essence/interfaces"
 import { TextDocument } from "vscode-languageserver-textdocument"
@@ -10,9 +14,11 @@ import {
 	type CompletionItem,
 	CompletionItemKind,
 	createConnection,
+	DidChangeWatchedFilesNotification,
 	DocumentHighlightKind,
 	type DocumentSymbol,
 	ErrorCodes,
+	FileChangeType,
 	InlayHintKind,
 	InsertTextFormat,
 	type MarkupContent,
@@ -23,11 +29,13 @@ import {
 	type SelectionRange,
 	type ServerCapabilities,
 	SymbolKind,
+	type TextEdit,
 	TextDocumentSyncKind,
 	TextDocuments,
+	type WorkspaceSymbol as LspWorkspaceSymbol,
 } from "vscode-languageserver/node"
 
-import { analyse } from "./analyse"
+import { analyseDocument, documentFilePath } from "./analyse"
 import {
 	type CallHierarchyItem,
 	type CallHierarchyItemKind,
@@ -55,7 +63,6 @@ import { isSamePosition } from "./positions"
 import {
 	findDefinition,
 	findOccurrence,
-	findOccurrences,
 	findRenameableOccurrence,
 	identifierPattern,
 	isValidIdentifierName,
@@ -68,6 +75,11 @@ import {
 	semanticTokenTypes,
 } from "./semanticTokens"
 import { findSignatureHelp } from "./signatureHelp"
+import {
+	createWorkspace,
+	type WorkspaceOccurrence,
+	type WorkspaceSymbolEntry,
+} from "./workspace"
 
 const analysisDebounceInMilliseconds = 200
 
@@ -100,6 +112,20 @@ export const serverCapabilities: ServerCapabilities = {
 	},
 	completionProvider: {
 		triggerCharacters: [".", ":", "<", "#"],
+		// NOTE: Announced although every entry is complete when it is handed
+		// over: a client that knows the Server resolves may send back an item it
+		// trimmed for the wire, and the round trip is what returns it intact.
+		resolveProvider: true,
+	},
+	// NOTE: Answered from the workspace index, which is why this could not be
+	// announced before Modules — a symbol worth finding across files is a symbol
+	// files can share, and until an entry could carry one, none could.
+	workspaceSymbolProvider: true,
+	workspace: {
+		workspaceFolders: {
+			supported: true,
+			changeNotifications: true,
+		},
 	},
 	signatureHelpProvider: {
 		triggerCharacters: ["(", ","],
@@ -144,15 +170,86 @@ export function startServer() {
 	let connection = createConnection(ProposedFeatures.all)
 	let documents = new TextDocuments(TextDocument)
 	let pendingAnalyses = new Map<string, ReturnType<typeof setTimeout>>()
+	// NOTE: An open document by its canonical path, which is what the workspace
+	// and the Module graph both key on. Maintained alongside `documents` rather
+	// than searched for on every read: the graph asks for a file once per Module
+	// per analysis, and an Editor's unsaved buffer must win every one of them.
+	let openPaths = new Map<string, string>()
+	let workspace = createWorkspace({
+		openDocument: (filePath) => {
+			let uri = openPaths.get(filePath)
+			let document = uri === undefined ? undefined : documents.get(uri)
+
+			return document === undefined
+				? undefined
+				: { text: document.getText(), version: document.version }
+		},
+	})
+	// NOTE: Which URIs this Server has published Diagnostics to, by the document
+	// whose analysis produced them. Publishing a dependency's Diagnostics means
+	// owning them: nothing else will clear a squiggle in a file nobody has open,
+	// so a URI that drops out of an analysis is sent an explicitly empty set —
+	// unless another open document still reports on it.
+	let publishedByEntry = new Map<string, Set<string>>()
 
 	// NOTE: The standard library is read, hoisted, enriched and validated once
 	// per process. Doing it here — while the client is still setting up —
 	// means the first Hover does not pay for it, and a Diagnostic in the
 	// library itself surfaces at startup rather than on a keystroke.
-	connection.onInitialize(() => {
+	// NOTE: The folders come from the client and from nowhere else. This Server
+	// ships as a single bundled file inside the VS Code extension, so a path
+	// relative to its own location names somewhere inside the extension rather
+	// than anywhere in the workspace.
+	connection.onInitialize((params) => {
 		loadStdlib()
+		workspace.setFolders(
+			params.workspaceFolders?.map((folder) =>
+				documentFilePath(folder.uri),
+			) ??
+				(params.rootUri === null || params.rootUri === undefined
+					? []
+					: [documentFilePath(params.rootUri)]),
+		)
 
 		return { capabilities: serverCapabilities }
+	})
+
+	connection.onInitialized(() => {
+		// NOTE: A file changing on disk is the half of the workspace the
+		// document events can not see — a branch switch, a file another tool
+		// wrote, a Module deleted. Registered dynamically because the glob is
+		// the Server's business rather than the extension manifest's.
+		connection.client
+			.register(DidChangeWatchedFilesNotification.type, {
+				watchers: [{ globPattern: "**/*.es" }],
+			})
+			.catch(() => {})
+
+		connection.workspace.onDidChangeWorkspaceFolders((event) => {
+			let folders = new Set(workspace.folders())
+
+			for (let removed of event.removed) {
+				folders.delete(documentFilePath(removed.uri))
+			}
+
+			for (let added of event.added) {
+				folders.add(documentFilePath(added.uri))
+			}
+
+			workspace.setFolders([...folders])
+		})
+	})
+
+	connection.onDidChangeWatchedFiles((params) => {
+		for (let change of params.changes) {
+			let filePath = documentFilePath(change.uri)
+
+			if (change.type === FileChangeType.Deleted) {
+				workspace.removed(filePath)
+			} else {
+				workspace.changed(filePath)
+			}
+		}
 	})
 
 	// NOTE: Requests are resolved on a fresh parse of the current document
@@ -176,6 +273,23 @@ export function startServer() {
 		// NOTE: Only Hover asks for these. Every other request enriches without
 		// a collector and pays nothing for it.
 		let annotations: Array<common.TypeAnnotation> = []
+
+		// NOTE: A Module is enriched against the whole graph it reaches, or
+		// every name an entry brought in resolves to nothing and every Method
+		// dispatching through an imported Namespace stays unbound. The exception
+		// is Hover, which needs the Type annotations collected as enrichment
+		// runs, and the graph does not collect them — so a Hover over a written
+		// Type inside a Module still reads the file on its own.
+		if (
+			options.annotations !== true &&
+			(program.imports !== null || program.exports !== null)
+		) {
+			enrichedProgram = workspace.enrichedOf(documentFilePath(uri))
+		}
+
+		if (enrichedProgram !== null) {
+			return { program, enrichedProgram, annotations }
+		}
 
 		try {
 			let enriched = enrichDocument(program, uri, options)
@@ -219,20 +333,92 @@ export function startServer() {
 		)
 	}
 
-	connection.onPrepareRename((params) => {
-		let occurrence = renameableOccurrenceAt(
-			params.textDocument.uri,
-			params.position,
-		)
-
-		if (occurrence === null) {
+	// NOTE: The workspace's answer where there is one, the document's own where
+	// there is not — an untitled buffer, or a file outside every folder, is
+	// still one file whose names rename among themselves. The standard library
+	// refusal is checked first for the reason it exists in `rename.ts`: a rename
+	// there is silently destructive, and the workspace has no idea.
+	function workspaceSymbolAt(
+		uri: string,
+		position: Position,
+		options: { localOnly?: boolean } = {},
+	) {
+		if (isStdlibDocument(uri)) {
 			return null
 		}
 
-		return {
-			range: toLspRange(occurrence.position),
-			placeholder: occurrence.name,
+		return workspace.symbolAt(
+			documentFilePath(uri),
+			toCursor(position),
+			options,
+		)
+	}
+
+	// NOTE: The occurrence a rename would be anchored at, as the workspace sees
+	// it — the Identifier under the cursor, which for a Method dispatching
+	// through an imported Namespace is in no local Scope at all and is still
+	// what the reader is pointing at.
+	function renameAnchorAt(uri: string, position: Position) {
+		let symbol = workspaceSymbolAt(uri, position)
+
+		if (symbol === null) {
+			return null
 		}
+
+		let filePath = documentFilePath(uri)
+		let cursor = toCursor(position)
+		let here = symbol.occurrences.find(
+			(entry) =>
+				entry.filePath === filePath &&
+				entry.position.start.line === cursor.line &&
+				entry.position.start.column <= cursor.column &&
+				cursor.column <= entry.position.end.column,
+		)
+
+		return here === undefined ? null : { symbol, position: here.position }
+	}
+
+	connection.onPrepareRename((params) => {
+		let anchor = renameAnchorAt(params.textDocument.uri, params.position)
+		let occurrence =
+			anchor === null
+				? renameableOccurrenceAt(
+						params.textDocument.uri,
+						params.position,
+					)
+				: null
+
+		if (anchor === null && occurrence === null) {
+			return null
+		}
+
+		let folders = workspace.folders()
+
+		// NOTE: Refused rather than half-applied. A declaration outside every
+		// workspace folder is one whose other occurrences this Server was never
+		// asked to index, so renaming it would rewrite the uses it happens to
+		// have found and leave the rest naming something that no longer exists.
+		if (
+			anchor !== null &&
+			folders.length > 0 &&
+			anchor.symbol.filePath !== null &&
+			!workspace.isInWorkspace(anchor.symbol.filePath)
+		) {
+			return new ResponseError(
+				ErrorCodes.InvalidRequest,
+				`'${anchor.symbol.name}' is declared outside this workspace, so its other uses can not be found.`,
+			)
+		}
+
+		return anchor === null
+			? {
+					range: toLspRange(occurrence!.position),
+					placeholder: occurrence!.name,
+				}
+			: {
+					range: toLspRange(anchor.position),
+					placeholder: anchor.symbol.name,
+				}
 	})
 
 	connection.onRenameRequest((params) => {
@@ -243,27 +429,55 @@ export function startServer() {
 			)
 		}
 
-		let occurrence = renameableOccurrenceAt(
-			params.textDocument.uri,
-			params.position,
-		)
+		let anchor = renameAnchorAt(params.textDocument.uri, params.position)
+		let occurrence =
+			anchor === null
+				? renameableOccurrenceAt(
+						params.textDocument.uri,
+						params.position,
+					)
+				: null
 
-		if (occurrence === null) {
+		if (anchor === null && occurrence === null) {
 			return null
 		}
 
-		return {
-			changes: {
-				[params.textDocument.uri]:
-					occurrence.declaration.occurrences.map((position) => {
-						return {
-							range: toLspRange(position),
-							newText: params.newName,
-						}
-					}),
-			},
+		let occurrences: Array<WorkspaceOccurrence> =
+			anchor?.symbol.occurrences ??
+			occurrence!.declaration.occurrences.map((position) => ({
+				filePath: documentFilePath(params.textDocument.uri),
+				position,
+				access: "read" as const,
+			}))
+		let changes: Record<string, Array<TextEdit>> = {}
+
+		for (let entry of occurrences) {
+			// NOTE: The URI the request came in under wins for the document it
+			// names, so the edit lands on the buffer the Editor is holding
+			// rather than on a second spelling of the same path.
+			let uri =
+				entry.filePath === documentFilePath(params.textDocument.uri)
+					? params.textDocument.uri
+					: uriOf(entry.filePath)
+			let edits = changes[uri]
+
+			if (edits === undefined) {
+				edits = []
+				changes[uri] = edits
+			}
+
+			edits.push({
+				range: toLspRange(entry.position),
+				newText: params.newName,
+			})
 		}
+
+		return { changes }
 	})
+
+	connection.onWorkspaceSymbol((params) =>
+		workspace.symbols(params.query).map(toLspWorkspaceSymbol),
+	)
 
 	connection.onDefinition((params) => {
 		let parsed = parseAndEnrich(params.textDocument.uri)
@@ -324,59 +538,85 @@ export function startServer() {
 		}
 	})
 
+	// NOTE: Every file, not only this one — a name an entry carries is one
+	// symbol, and half its uses being findable is the failure mode References
+	// exists to prevent.
 	connection.onReferences((params) => {
-		let occurrence = occurrenceAt(params.textDocument.uri, params.position)
+		let symbol = workspaceSymbolAt(params.textDocument.uri, params.position)
 
-		if (occurrence === null) {
-			return null
-		}
-
-		let definition = occurrence.declaration.definition
-
-		return occurrence.declaration.occurrences
-			.filter(
-				(position) =>
-					params.context.includeDeclaration ||
-					definition === null ||
-					!isSamePosition(position, definition),
+		if (symbol === null) {
+			let occurrence = occurrenceAt(
+				params.textDocument.uri,
+				params.position,
 			)
-			.map((position) => {
-				return {
+
+			if (occurrence === null) {
+				return null
+			}
+
+			let definition = occurrence.declaration.definition
+
+			return occurrence.declaration.occurrences
+				.filter(
+					(position) =>
+						params.context.includeDeclaration ||
+						definition === null ||
+						!isSamePosition(position, definition),
+				)
+				.map((position) => ({
 					uri: params.textDocument.uri,
 					range: toLspRange(position),
-				}
-			})
+				}))
+		}
+
+		let definition = symbol.definition
+
+		return symbol.occurrences
+			.filter(
+				(entry) =>
+					params.context.includeDeclaration ||
+					definition === null ||
+					entry.filePath !== symbol.filePath ||
+					!isSamePosition(entry.position, definition),
+			)
+			.map((entry) => ({
+				uri: uriOf(entry.filePath),
+				range: toLspRange(entry.position),
+			}))
 	})
 
+	// NOTE: The same join, restricted to this one file — Document Highlight is
+	// per-file by protocol and fires on every cursor move, so it must not be the
+	// request that enriches a workspace. What the join still buys here is the
+	// two Module sections: highlighting a name in the body lights up the entry
+	// that brought it in.
 	connection.onDocumentHighlight((params) => {
-		let parsed = parseAndEnrich(params.textDocument.uri)
+		let symbol = workspaceSymbolAt(
+			params.textDocument.uri,
+			params.position,
+			{ localOnly: true },
+		)
 
-		if (parsed === null) {
+		if (symbol === null) {
 			return null
 		}
 
-		// NOTE: Highlighting is the one feature that cares whether an
-		// occurrence binds the name or reads it, so it goes back to the index
-		// entries rather than the Declaration's flat Position list.
-		let occurrences = findOccurrences(
-			parsed.program,
-			toCursor(params.position),
-			parsed.enrichedProgram,
+		let filePath = documentFilePath(params.textDocument.uri)
+		let occurrences = symbol.occurrences.filter(
+			(entry) => entry.filePath === filePath,
 		)
 
 		if (occurrences.length === 0) {
 			return null
 		}
 
-		return occurrences.map((entry) => {
-			return {
-				range: toLspRange(entry.position),
-				kind:
-					entry.access === "write"
-						? DocumentHighlightKind.Write
-						: DocumentHighlightKind.Read,
-			}
-		})
+		return occurrences.map((entry) => ({
+			range: toLspRange(entry.position),
+			kind:
+				entry.access === "write"
+					? DocumentHighlightKind.Write
+					: DocumentHighlightKind.Read,
+		}))
 	})
 
 	connection.languages.semanticTokens.on((params) => {
@@ -525,6 +765,7 @@ export function startServer() {
 			document.getText(),
 			toRange(params.range),
 			params.textDocument.uri,
+			workspace,
 		).map((entry) => toLspCodeAction(entry, params))
 	})
 
@@ -615,14 +856,33 @@ export function startServer() {
 			return null
 		}
 
+		// NOTE: The offers cost a walk of what the workspace publishes, which is
+		// read off parses; the Namespace half enriches the Modules that publish
+		// one, and only those. A document outside every folder gets neither, and
+		// the list is exactly what it was before there were Modules.
+		let filePath = documentFilePath(params.textDocument.uri)
+		let inWorkspace = workspace.isInWorkspace(filePath)
+
 		let entries = findCompletions(
 			document.getText(),
 			toCursor(params.position),
 			params.textDocument.uri,
+			inWorkspace
+				? {
+						offers: workspace.offersFor(filePath),
+						namespaces: workspace.namespaceOffersFor(filePath),
+					}
+				: { offers: [], namespaces: [] },
 		)
 
 		return entries.map(toLspCompletionItem)
 	})
+
+	// NOTE: Every entry is complete when it is handed over — the detail, the
+	// documentation and the import edit are all computed against the buffer the
+	// request was answered on, and a second pass over a buffer that has moved on
+	// would be worse than no pass at all.
+	connection.onCompletionResolve((item) => item)
 
 	connection.onSignatureHelp((params) => {
 		let document = documents.get(params.textDocument.uri)
@@ -659,6 +919,44 @@ export function startServer() {
 		}
 	})
 
+	// NOTE: A URI is cleared only once NO open document's analysis still reports
+	// on it. Two importers of one broken Module both publish its Diagnostics,
+	// and closing one of them must not wipe the squiggles the other is still
+	// answering for.
+	function claimedElsewhere(entryUri: string, targetUri: string): boolean {
+		for (let [otherUri, published] of publishedByEntry) {
+			if (otherUri !== entryUri && published.has(targetUri)) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	function publishAnalysis(
+		entryUri: string,
+		results: Map<string, Array<common.Diagnostic>>,
+	) {
+		for (let [targetUri, diagnostics] of results) {
+			connection.sendDiagnostics({
+				uri: targetUri,
+				diagnostics: diagnostics.map((diagnostic) =>
+					toLspDiagnostic(diagnostic, targetUri),
+				),
+			})
+		}
+
+		for (let staleUri of publishedByEntry.get(entryUri) ?? []) {
+			if (results.has(staleUri) || claimedElsewhere(entryUri, staleUri)) {
+				continue
+			}
+
+			connection.sendDiagnostics({ uri: staleUri, diagnostics: [] })
+		}
+
+		publishedByEntry.set(entryUri, new Set(results.keys()))
+	}
+
 	function scheduleAnalysis(uri: string) {
 		let pendingTimer = pendingAnalyses.get(uri)
 
@@ -678,20 +976,39 @@ export function startServer() {
 				}
 
 				// NOTE: The Diagnostics collector is module-level state, so
-				// documents are analysed strictly one at a time — `analyse`
+				// documents are analysed strictly one at a time — the analysis
 				// is synchronous, which guarantees that here.
-				connection.sendDiagnostics({
-					uri,
-					diagnostics: analyse(document.getText(), uri).map(
-						(diagnostic) => toLspDiagnostic(diagnostic, uri),
-					),
+				let analysis = analyseDocument(document.getText(), uri, {
+					host: workspace.host,
 				})
+				let results = new Map<string, Array<common.Diagnostic>>([
+					[uri, analysis.diagnostics],
+				])
+
+				// NOTE: A dependency's Diagnostics are published under ITS OWN
+				// URI, which is what makes a mistake in a file nobody has open
+				// visible at all. An open document reports on itself, so its own
+				// entry is left to its own analysis rather than overwritten by
+				// an importer's view of it.
+				for (let [filePath, diagnostics] of analysis.dependencies) {
+					let dependencyUri = uriOf(filePath)
+
+					if (documents.get(dependencyUri) === undefined) {
+						results.set(dependencyUri, diagnostics)
+					}
+				}
+
+				publishAnalysis(uri, results)
 			}, analysisDebounceInMilliseconds),
 		)
 	}
 
 	// NOTE: `onDidChangeContent` also fires when a document is opened.
 	documents.onDidChangeContent((event) => {
+		let filePath = documentFilePath(event.document.uri)
+
+		openPaths.set(filePath, event.document.uri)
+		workspace.changed(filePath)
 		scheduleAnalysis(event.document.uri)
 	})
 
@@ -703,14 +1020,49 @@ export function startServer() {
 			pendingAnalyses.delete(event.document.uri)
 		}
 
+		let filePath = documentFilePath(event.document.uri)
+
+		openPaths.delete(filePath)
+		// NOTE: The buffer is gone, so what the workspace holds for it was built
+		// from text that no longer exists anywhere — the file on disk is the
+		// truth again.
+		workspace.changed(filePath)
+
+		// NOTE: Everything this document's analysis was publishing goes with it,
+		// its own URI included — an empty set for each, unless another open
+		// document still reports on it.
+		publishAnalysis(event.document.uri, new Map())
 		connection.sendDiagnostics({
 			uri: event.document.uri,
 			diagnostics: [],
 		})
+		publishedByEntry.delete(event.document.uri)
 	})
 
 	documents.listen(connection)
 	connection.listen()
+}
+
+// NOTE: The inverse of the decoding `documentFilePath` does. Each segment is
+// encoded on its own so that the separators survive — a file named `a b.es`
+// becomes `a%20b.es`, and the client matches the URI it handed over.
+export function uriOf(filePath: string): string {
+	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
+}
+
+// NOTE: A workspace symbol IS a document symbol whose document is not open, so
+// it renders under the same kinds — there is one table, and the outline and the
+// search can not disagree about what a Namespace looks like.
+function toLspWorkspaceSymbol(entry: WorkspaceSymbolEntry): LspWorkspaceSymbol {
+	return {
+		name: entry.name,
+		kind: symbolKinds[entry.kind],
+		containerName: entry.container ?? undefined,
+		location: {
+			uri: uriOf(entry.filePath),
+			range: toLspRange(entry.selectionRange),
+		},
+	}
 }
 
 function toMarkdown(documentation: string | null): MarkupContent | undefined {
@@ -734,6 +1086,7 @@ const symbolKinds: Record<DocumentSymbolEntry["kind"], SymbolKind> = {
 	method: SymbolKind.Method,
 	staticMethod: SymbolKind.Method,
 	property: SymbolKind.Property,
+	export: SymbolKind.Key,
 }
 
 function toLspDocumentSymbol(entry: DocumentSymbolEntry): DocumentSymbol {
@@ -831,6 +1184,7 @@ const completionItemKinds: Record<CompletionKind, CompletionItemKind> = {
 	staticMethod: CompletionItemKind.Method,
 	property: CompletionItemKind.Property,
 	member: CompletionItemKind.Field,
+	import: CompletionItemKind.Reference,
 	label: CompletionItemKind.Text,
 	case: CompletionItemKind.EnumMember,
 	keyword: CompletionItemKind.Keyword,
@@ -887,5 +1241,11 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 						command: "editor.action.triggerParameterHints",
 					}
 				: undefined,
+		// NOTE: The `import { … }` entry that makes the name resolve, applied in
+		// the same undo step as the insertion at the cursor.
+		additionalTextEdits: entry.additionalEdits?.map((edit) => ({
+			range: toLspRange(edit.range),
+			newText: edit.newText,
+		})),
 	}
 }

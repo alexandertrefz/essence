@@ -15,9 +15,19 @@ export function findFoldingRanges(
 ): Array<FoldingRange> {
 	let ranges: Array<FoldingRange> = []
 
-	// NOTE: The `implementation { … }` block itself is foldable too.
+	// NOTE: The `implementation { … }` block itself is foldable too, and so are
+	// the two Module sections framing it — an entry list is the one part of a
+	// file a reader is done with once they know what it says.
+	if (program.imports !== null) {
+		addRange(ranges, program.imports.position)
+	}
+
 	addRange(ranges, program.implementation.position)
 	collectFromBody(program.implementation.nodes, ranges)
+
+	if (program.exports !== null) {
+		addRange(ranges, program.exports.position)
+	}
 
 	return ranges
 }

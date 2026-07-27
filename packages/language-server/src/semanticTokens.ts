@@ -63,7 +63,14 @@ export type SemanticToken = {
 	modifiers: Array<SemanticTokenModifier>
 }
 
-const tokenTypes: Record<DeclarationKind, SemanticTokenType> = {
+// NOTE: `import` carries no Token of its own. What an entry binds is whatever
+// the exporting Module declared — a Type, a Namespace, a Function — and one
+// file's index can not say which, so colouring it as any one of them would be
+// wrong wherever the guess missed. Nothing is emitted instead, and the
+// TextMate grammar's own reading of the name stands, exactly as it does for
+// every Identifier the Enricher could not resolve.
+const tokenTypes: Record<DeclarationKind, SemanticTokenType | null> = {
+	import: null,
 	constant: "variable",
 	variable: "variable",
 	function: "function",
@@ -105,6 +112,12 @@ export function findSemanticTokens(
 
 	for (let occurrence of index) {
 		let { position, declaration } = occurrence
+		let type = tokenTypes[declaration.kind]
+
+		if (type === null) {
+			continue
+		}
+
 		let modifiers: Array<SemanticTokenModifier> = []
 
 		if (
@@ -131,7 +144,7 @@ export function findSemanticTokens(
 			modifiers.push("defaultLibrary")
 		}
 
-		pushToken(tokens, position, tokenTypes[declaration.kind], modifiers)
+		pushToken(tokens, position, type, modifiers)
 	}
 
 	return sortTokens(tokens)
