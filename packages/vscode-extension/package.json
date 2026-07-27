@@ -34,14 +34,17 @@
 		"untrustedWorkspaces": {
 			"supported": "limited",
 			"restrictedConfigurations": [
-				"essence.server.path"
+				"essence.server.path",
+				"essence.cli.path"
 			],
-			"description": "The bundled Language Server only reads and analyses text, and diagnostics and navigation are exactly what is wanted while auditing an unfamiliar repository, so they stay on. The single trust-sensitive setting is 'essence.server.path': it names an executable to spawn, which a workspace could point at a program it ships itself, so workspace-scoped values of it are ignored here."
+			"description": "The bundled Language Server only reads and analyses text, and diagnostics and navigation are exactly what is wanted while auditing an unfamiliar repository, so they stay on. The trust-sensitive settings are 'essence.server.path' and 'essence.cli.path': each names an executable to spawn, which a workspace could point at a program it ships itself, so workspace-scoped values of them are ignored here. Debugging itself is unavailable in Restricted Mode either way — VS Code blocks debug sessions there."
 		}
 	},
 	"main": "./dist/extension.js",
 	"activationEvents": [
-		"onLanguage:essence"
+		"onLanguage:essence",
+		"onDebugResolve:essence",
+		"onDebugDynamicConfigurations:essence"
 	],
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
@@ -132,9 +135,111 @@
 					],
 					"default": "off",
 					"description": "Log the traffic between VS Code and the Essence Language Server."
+				},
+				"essence.cli.path": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Absolute path to the `essence` CLI the debugger compiles with. A built `.js` bundle is run with `node`; anything else — a checkout's `packages/cli/bin/essence` — is run with `bun`. Left empty, a checkout open in the workspace is used if one is found, and `essence` on PATH otherwise."
 				}
 			}
 		},
+		"breakpoints": [
+			{
+				"language": "essence"
+			}
+		],
+		"debuggers": [
+			{
+				"type": "essence",
+				"label": "Essence",
+				"languages": [
+					"essence"
+				],
+				"configurationAttributes": {
+					"launch": {
+						"required": [
+							"program"
+						],
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "The .es source file to compile and debug.",
+								"default": "${file}"
+							},
+							"args": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "Arguments passed to the program.",
+								"default": []
+							},
+							"cwd": {
+								"type": "string",
+								"description": "The working directory the program runs in.",
+								"default": "${workspaceFolder}"
+							},
+							"stopOnEntry": {
+								"type": "boolean",
+								"description": "Pause on the first statement.",
+								"default": false
+							},
+							"console": {
+								"type": "string",
+								"enum": [
+									"internalConsole",
+									"integratedTerminal"
+								],
+								"description": "Where the program's output goes.",
+								"default": "internalConsole"
+							},
+							"runtimeExecutable": {
+								"type": "string",
+								"description": "The executable that runs the compiled JavaScript. Debugging requires Node — the debugger speaks its inspector protocol.",
+								"default": "node"
+							},
+							"smartStep": {
+								"type": "boolean",
+								"description": "Step over compiler-generated code with no source mapping instead of into it.",
+								"default": true
+							},
+							"skipFiles": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "Glob patterns of files never stepped into.",
+								"default": []
+							},
+							"outDir": {
+								"type": "string",
+								"description": "Keep the compiled JavaScript and its map here instead of the extension's storage."
+							}
+						}
+					}
+				},
+				"initialConfigurations": [
+					{
+						"type": "essence",
+						"request": "launch",
+						"name": "Debug current Essence file",
+						"program": "${file}"
+					}
+				],
+				"configurationSnippets": [
+					{
+						"label": "Essence: Launch",
+						"description": "Compile an Essence source file and debug it",
+						"body": {
+							"type": "essence",
+							"request": "launch",
+							"name": "Debug ${1:Program}",
+							"program": "^\"\\${workspaceFolder}/${1:Program}.es\""
+						}
+					}
+				]
+			}
+		],
 		"commands": [
 			{
 				"command": "essence.restartServer",

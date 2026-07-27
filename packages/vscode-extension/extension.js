@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -6,6 +7,14 @@ import * as vscode from "vscode"
 // extensionless specifier is not resolved, and vscode-languageclient ships no
 // `exports` map that would map one.
 import { LanguageClient, State } from "vscode-languageclient/node.js"
+
+import {
+	compileArguments,
+	createNodeDebugConfiguration,
+	debugBuildSlug,
+	resolveCli,
+	summariseFailure,
+} from "./debug.js"
 
 let client
 // NOTE: `onDidChangeState` belongs to the client, and a restart builds a new
@@ -273,6 +282,180 @@ function queue(work) {
 	return lifecycle
 }
 
+// NOTE: The CLI half of `resolveServer`'s answer, for the debugger — which
+// executable compiles, described so the output channel can name it. The
+// resolution itself is pure and lives in `debug.js`; this reads the setting
+// and the workspace and reports the one failure that has a user fix.
+function resolveCliForDebugging() {
+	let configuredPath = vscode.workspace
+		.getConfiguration("essence")
+		.get("cli.path")
+	let workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+	let cli = resolveCli(configuredPath, workspaceRoot, fs.existsSync)
+
+	if (cli.error !== undefined) {
+		reportFailure(cli.error)
+
+		return null
+	}
+
+	return cli
+}
+
+// NOTE: One compile, one JSON report. The report arrives on stdout — that is
+// what `--json` promises — while stderr only ever carries the CLI's own
+// failures, which go to the output channel where every other failure detail
+// already lives.
+function compileForDebugging(cli, programPath, outputFile) {
+	return new Promise((resolve) => {
+		let child = spawn(
+			cli.command,
+			[...cli.args, ...compileArguments(programPath, outputFile)],
+			{
+				cwd: path.dirname(programPath),
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		)
+		let stdout = ""
+
+		child.stdout.on("data", (chunk) => {
+			stdout += chunk
+		})
+		child.stderr.on("data", (chunk) => {
+			outputChannel.append(String(chunk))
+		})
+		child.on("error", (error) =>
+			resolve({
+				ok: false,
+				report: null,
+				detail:
+					`could not run the ${cli.description} — ${error.message}. ` +
+					"Set 'essence.cli.path', open an Essence checkout, or install 'essence' on PATH.",
+			}),
+		)
+		child.on("close", (code) => {
+			let report = null
+
+			try {
+				report = JSON.parse(stdout)
+			} catch {
+				// NOTE: A CLI that died before printing leaves stdout empty or
+				// partial; `summariseFailure(null)` words exactly that.
+			}
+
+			resolve({
+				ok: code === 0 && report?.ok === true,
+				report,
+				detail: null,
+			})
+		})
+	})
+}
+
+async function resolveEssenceDebugConfiguration(context, folder, config) {
+	// NOTE: The empty object is what F5 sends with no launch.json — the
+	// zero-configuration path. It becomes the same launch the contribution's
+	// `initialConfigurations` writes, built from the active editor.
+	if (
+		config.type === undefined &&
+		config.request === undefined &&
+		config.name === undefined
+	) {
+		let editor = vscode.window.activeTextEditor
+
+		if (
+			editor === undefined ||
+			editor.document.languageId !== "essence" ||
+			editor.document.uri.scheme !== "file"
+		) {
+			reportFailure(
+				"open an Essence file to debug it, or add an 'essence' configuration to launch.json.",
+			)
+
+			return undefined
+		}
+
+		config = {
+			type: "essence",
+			request: "launch",
+			name: `Debug ${path.basename(editor.document.uri.fsPath)}`,
+			program: editor.document.uri.fsPath,
+			noDebug: config.noDebug,
+		}
+	}
+
+	if (typeof config.program !== "string" || !config.program.endsWith(".es")) {
+		reportFailure("'program' must name a '.es' source file to debug.")
+
+		return undefined
+	}
+
+	if (!fs.existsSync(config.program)) {
+		reportFailure(`'${config.program}' does not exist.`)
+
+		return undefined
+	}
+
+	let cli = resolveCliForDebugging()
+
+	if (cli === null) {
+		return undefined
+	}
+
+	// NOTE: Debug builds live in the extension's per-workspace storage rather
+	// than beside the source — no `.gitignore` churn, no artefact to commit by
+	// accident — with `outDir` as the escape hatch for anyone who wants to
+	// read the emitted JavaScript. One directory per program, overwritten on
+	// every launch. `globalStorageUri` carries the folderless window, where
+	// `storageUri` is undefined.
+	let storageRoot = context.storageUri?.fsPath ?? context.globalStorageUri.fsPath
+	let directory =
+		typeof config.outDir === "string" && config.outDir.trim() !== ""
+			? config.outDir.trim()
+			: path.join(
+					storageRoot,
+					"debug-builds",
+					debugBuildSlug(config.program),
+				)
+
+	fs.mkdirSync(directory, { recursive: true })
+
+	let program = path.join(
+		directory,
+		`${path.basename(config.program, ".es")}.js`,
+	)
+
+	outputChannel.appendLine(
+		`Compiling '${config.program}' for debugging with the ${cli.description}.`,
+	)
+
+	let compiled = await compileForDebugging(cli, config.program, program)
+
+	if (!compiled.ok) {
+		reportFailure(compiled.detail ?? summariseFailure(compiled.report))
+
+		return undefined
+	}
+
+	await vscode.debug.startDebugging(
+		folder,
+		createNodeDebugConfiguration(config, {
+			program,
+			directory,
+			defaultCwd: folder?.uri.fsPath ?? path.dirname(config.program),
+		}),
+	)
+
+	// NOTE: `undefined` aborts THIS session silently — the `pwa-node` session
+	// started above is the one that lives on. Returning the rewritten
+	// configuration directly is not an option: VS Code ignores a resolver that
+	// changes a configuration's `type` (microsoft/vscode#54213), so the
+	// handoff is a fresh `startDebugging`, the same shim the js-debug
+	// redirects themselves use. `null` would open launch.json instead, which
+	// is the wrong answer everywhere a failure was already reported.
+	return undefined
+}
+
 export async function activate(context) {
 	// NOTE: One channel for both halves of the story. The client writes its
 	// own traffic wherever `outputChannel` says, and the extension writes which
@@ -296,6 +479,12 @@ export async function activate(context) {
 				await startClient(context)
 			}),
 		),
+		vscode.debug.registerDebugConfigurationProvider("essence", {
+			resolveDebugConfigurationWithSubstitutedVariables: (
+				folder,
+				config,
+			) => resolveEssenceDebugConfiguration(context, folder, config),
+		}),
 		// NOTE: Only the spawn path is worth interrupting for, and only by
 		// asking — a restart drops every open document's diagnostics for a
 		// moment. `essence.trace.server` is deliberately absent:
