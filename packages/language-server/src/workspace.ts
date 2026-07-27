@@ -955,10 +955,28 @@ function joinComponent(
 			let target: string | undefined
 
 			if (entry.source === null) {
-				let local = occurrenceAt(index.index, cursorOf(entry.name))
+				// NOTE: One entry carries the name across every table this
+				// Module binds it in, so a `type Foo` and a Namespace `Foo` are
+				// one exported symbol however separately the file declares
+				// them. Joined here rather than left as two: a rename that
+				// moved one of them would leave the other published under a
+				// name nothing declares any more.
+				for (let declaration of exportedDeclarations(
+					index,
+					entry.name,
+				)) {
+					let key = keys.get(declaration)
 
-				target =
-					local === null ? undefined : keys.get(local.declaration)
+					if (key === undefined) {
+						continue
+					}
+
+					if (target === undefined) {
+						target = key
+					} else {
+						union(target, key)
+					}
+				}
 			} else {
 				let dependencyPath = dependencies.get(entry.source.path)
 
@@ -1099,6 +1117,30 @@ function joinComponent(
 			return null
 		},
 	}
+}
+
+// NOTE: Every Declaration an export entry with no 'from' names. The local index
+// binds the entry's Identifier to whichever symbol space answered first, so the
+// other one is read off the top level Scope — where a Namespace sits under the
+// same name as the Type it is written for.
+function exportedDeclarations(
+	index: ProgramIndex,
+	name: parser.IdentifierNode,
+): Array<Declaration> {
+	let found: Array<Declaration> = []
+	let remember = (declaration: Declaration | undefined): void => {
+		if (declaration !== undefined && !found.includes(declaration)) {
+			found.push(declaration)
+		}
+	}
+
+	let topLevel = index.scopes.find((entry) => entry.range === null)?.scope
+
+	remember(occurrenceAt(index.index, cursorOf(name))?.declaration)
+	remember(topLevel?.values.get(name.content))
+	remember(topLevel?.types.get(name.content))
+
+	return found
 }
 
 // NOTE: The one site of a joined symbol that is a declaration in a file rather

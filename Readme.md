@@ -41,6 +41,45 @@ syntax is meant to be viewed with a font with code ligatures, like FiraCode.
 The standard library is written in Essence and lives in [packages/stdlib/sources](packages/stdlib/sources); its
 [README](packages/stdlib/README.md) is the most substantial writing about the language there is.
 
+# Modules
+A file is a module. Everything it declares is private until its `export { … }` block lists it, and an
+`import { … }` block above the implementation names what it takes from other files. A specifier is a relative
+path, extension included; `as` renames an entry on either side.
+
+```
+import {
+	Rectangle           from "./Geometry.es"
+	RectangleMeasurable from "./Geometry.es"
+	PI as Pi            from "./math/Math.es"
+}
+
+implementation {
+
+	function describe(_ shape: Rectangle) -> String {
+		<- "area: "::append(shape::area()::multiply(with Pi)::toString())
+	}
+
+	__print(describe({ width = 3, height = 4 }))
+}
+
+export {
+	describe
+	Rectangle from "./Geometry.es" § re-exported, never bound locally
+}
+```
+
+Namespaces are imported by name like everything else: importing `Rectangle` alone does not make `shape::area()`
+resolve, so which methods a receiver has is decided by what the file itself wrote and can never change because
+a dependency grew a namespace. `esfmt` sorts both blocks and lines the `from` keywords up, and dispatch is
+defined over exactly that sorted order, so formatting can not change what a program means.
+
+A module body runs once, on first import, dependency first. Cycles are allowed for everything that hoists —
+functions, type aliases, choices, protocols and namespaces. A constant imported across one is refused: its
+value exists only once its module's body has run, and inside a cycle which body runs first is not something
+the source states. Compiling an entry compiles every module it reaches into one bundle, and `essence check` on a
+whole directory builds one graph for the invocation, so a shared dependency is compiled once and its errors
+are reported once, under its own file name.
+
 # The Toolchain
 One executable does all of it: `essence`, in [packages/cli/bin](packages/cli/bin). Compiling a file produces a
 self-contained ES module next to it — the parts of the runtime the program actually uses are bundled in, so the
