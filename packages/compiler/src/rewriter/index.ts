@@ -1414,6 +1414,8 @@ function rewriteExpression(
 			return rewriteRecordValue(node)
 		case "StringValue":
 			return rewriteStringValue(node)
+		case "InterpolatedStringValue":
+			return rewriteInterpolatedStringValue(node)
 		case "IntegerValue":
 			return rewriteIntegerValue(node)
 		case "RationalValue":
@@ -1875,6 +1877,56 @@ function rewriteStringValue(
 				value: node.value,
 			},
 		],
+	}
+}
+
+// NOTE: An interpolated String folds into one `String.createString(<concat>)`,
+// where the concatenation `+`-joins the text runs (plain JS string Literals)
+// with each hole rendered by its witness — `<witness>.toString(<hole>).value`,
+// the JS string the Printable conformance produces. The whole thing is string
+// concatenation because `segments` always begins with a text run (`""` when the
+// first thing written is a hole), so the fold starts from a Literal. No runtime
+// helper is added: this is the same `toString` call `List::join` makes at run
+// time, inlined per hole.
+function rewriteInterpolatedStringValue(
+	node: common.typedSimple.InterpolatedStringValueNode,
+): estree.CallExpression {
+	let parts: Array<estree.Expression> = node.segments.map((segment) => {
+		if (segment.kind === "text") {
+			return { type: "Literal", value: segment.value }
+		}
+
+		return memberRead(
+			{
+				type: "CallExpression",
+				optional: false,
+				callee: memberRead(
+					rewriteExpression(segment.witness),
+					"toString",
+				),
+				arguments: [rewriteExpression(segment.expression)],
+			},
+			"value",
+		)
+	})
+
+	let concatenated = parts.reduce(
+		(left, right): estree.Expression => ({
+			type: "BinaryExpression",
+			operator: "+",
+			left,
+			right,
+		}),
+	)
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "String" },
+			"createString",
+		),
+		arguments: [concatenated],
 	}
 }
 

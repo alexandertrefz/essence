@@ -297,6 +297,74 @@ describe("Parser", () => {
 		})
 
 		describe("Literals", () => {
+			describe("StringInterpolation", () => {
+				let onlyExpression = (
+					source: string,
+				): parser.ExpressionNode => {
+					let node = parse(`implementation { ${source} }`)
+						.implementation.nodes[0]
+
+					return node as parser.ExpressionNode
+				}
+
+				it("should parse a hole as its own Expression segment", () => {
+					let node = onlyExpression('"a {name} b"')
+
+					expect(node.nodeType).toBe("InterpolatedStringValue")
+
+					let interpolated =
+						node as parser.InterpolatedStringValueNode
+
+					expect(
+						interpolated.segments.map((segment) => segment.kind),
+					).toEqual(["text", "expression", "text"])
+					expect(
+						(interpolated.segments[0] as { value: string }).value,
+					).toBe("a ")
+					expect(
+						(interpolated.segments[2] as { value: string }).value,
+					).toBe(" b")
+
+					let hole = interpolated.segments[1] as {
+						expression: parser.ExpressionNode
+					}
+					expect(hole.expression.nodeType).toBe("Identifier")
+					expect(
+						(hole.expression as parser.IdentifierNode).content,
+					).toBe("name")
+				})
+
+				it("should parse a full Expression inside a hole", () => {
+					let node = onlyExpression(
+						'"total {price::add(tax)}"',
+					) as parser.InterpolatedStringValueNode
+
+					let hole = node.segments[1] as {
+						expression: parser.ExpressionNode
+					}
+					expect(hole.expression.nodeType).toBe("MethodInvocation")
+				})
+
+				it("should keep a String with no hole a plain StringValue", () => {
+					expect(onlyExpression('"no holes"').nodeType).toBe(
+						"StringValue",
+					)
+				})
+
+				it("should refuse an interpolated String in a Matcher", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						`implementation {
+							constant x = match "a" -> String {
+								case "h{x}i" { <- "y" }
+								case _ { <- "n" }
+							}
+						}`,
+					)
+
+					expect(containsErrors(diagnostics)).toBe(true)
+				})
+			})
+
 			describe("FunctionLiterals", () => {
 				it("should parse FunctionLiterals with no parameters", () => {
 					let input: parser.Program = parse(

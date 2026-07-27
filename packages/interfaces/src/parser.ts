@@ -141,6 +141,7 @@ export interface FunctionInvocationNode {
 export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
+	| InterpolatedStringValueNode
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
@@ -165,6 +166,22 @@ export type RecordValueNode = {
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
+	position: Position
+}
+
+// NOTE: A String Literal that carries `{ … }` holes. `segments` alternates a
+// (possibly empty) text run with the Expression of each hole, in written order,
+// starting and ending with a text run — so `"a{x}b"` is text-hole-text and
+// `"{x}"` is text(empty)-hole-text(empty). `text` values are already escape-
+// decoded by the Lexer. A String with no holes stays a plain `StringValue`, so
+// this node only ever holds at least one hole.
+export type InterpolationSegmentNode =
+	| { kind: "text"; value: string }
+	| { kind: "expression"; expression: ExpressionNode }
+
+export type InterpolatedStringValueNode = {
+	nodeType: "InterpolatedStringValue"
+	segments: Array<InterpolationSegmentNode>
 	position: Position
 }
 

@@ -76,6 +76,38 @@ describe("Parser Diagnostics", () => {
 		})
 	})
 
+	describe("String escapes", () => {
+		it("should report an unknown escape without truncating the String", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant x = "bad \\q here"
+					constant y = 5
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("invalid-escape")
+
+			// NOTE: The bad escape ends nothing — the character is read as itself
+			// and the Statements around it are read as written.
+			let nodes = program.implementation.nodes
+			expect(nodes).toHaveLength(2)
+			expect(declaredValue(nodes[0])).toMatchObject({
+				nodeType: "StringValue",
+				value: "bad q here",
+			})
+		})
+
+		it("should not report a known escape", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				'implementation { constant x = "a\\nb\\t\\"c\\\\d\\{e\\}" }',
+			)
+
+			expect(diagnostics).toEqual([])
+		})
+	})
+
 	describe("Number Literal joining", () => {
 		it("should not join a '_' group on the next line", () => {
 			let { program, diagnostics } = parseWithDiagnostics(

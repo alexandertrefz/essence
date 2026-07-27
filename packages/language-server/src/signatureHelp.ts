@@ -453,6 +453,14 @@ function findEnclosingInvocation(
 				}
 
 				return
+			case "InterpolatedStringValue":
+				for (let segment of node.segments) {
+					if (segment.kind === "expression") {
+						visitNode(segment.expression)
+					}
+				}
+
+				return
 			case "FunctionValue":
 				visitBody(node.value.body)
 				return

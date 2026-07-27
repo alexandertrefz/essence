@@ -141,6 +141,143 @@ describe("Lexer", () => {
 
 			expect(() => lexer.next()).toThrow()
 		})
+
+		it("should decode escapes into the value", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"a\\nb\\t\\"c\\\\d"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: 'a\nb\t"c\\d',
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors).toEqual([])
+		})
+
+		it("should report an unknown escape but keep lexing", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"bad \\q here"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "bad q here",
+				type: TokenType.LiteralString,
+			})
+			expect(lexer.errors).toHaveLength(1)
+			expect(lexer.errors[0].code).toBe("invalid-escape")
+		})
+
+		it("should read an escaped brace as a literal brace, not a hole", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"a \\{ b \\} c"')
+
+			expect(stripPosition(lexer.next())).toEqual({
+				value: "a { b } c",
+				type: TokenType.LiteralString,
+			})
+		})
+
+		it("should split a hole into Start/Expression/End tokens", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"Hello, {name}!"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "Hello, ", type: TokenType.LiteralStringStart },
+				{ value: "name", type: TokenType.Identifier },
+				{ value: "!", type: TokenType.LiteralStringEnd },
+			])
+		})
+
+		it("should mark chunks between holes as Middle", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"{a} and {b}"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "", type: TokenType.LiteralStringStart },
+				{ value: "a", type: TokenType.Identifier },
+				{ value: " and ", type: TokenType.LiteralStringMiddle },
+				{ value: "b", type: TokenType.Identifier },
+				{ value: "", type: TokenType.LiteralStringEnd },
+			])
+		})
+
+		it("should balance Record braces inside a hole against the hole's own", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"outer { {a = 1} } end"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "outer ", type: TokenType.LiteralStringStart },
+				{ value: "{", type: TokenType.SymbolLeftBrace },
+				{ value: "a", type: TokenType.Identifier },
+				{ value: "=", type: TokenType.SymbolEqual },
+				{ value: "1", type: TokenType.LiteralNumber },
+				{ value: "}", type: TokenType.SymbolRightBrace },
+				{ value: " end", type: TokenType.LiteralStringEnd },
+			])
+			expect(lexer.next()).toBeUndefined()
+		})
+
+		it("should lex a String nested inside a hole", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"outer {"inner {x}"} done"')
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual([
+				{ value: "outer ", type: TokenType.LiteralStringStart },
+				{ value: "inner ", type: TokenType.LiteralStringStart },
+				{ value: "x", type: TokenType.Identifier },
+				{ value: "", type: TokenType.LiteralStringEnd },
+				{ value: " done", type: TokenType.LiteralStringEnd },
+			])
+		})
+
+		it("should throw on a hole that is never closed", () => {
+			let lexer = new Lexer()
+
+			lexer.reset('"open {x')
+
+			expect(() => {
+				lexer.next()
+				lexer.next()
+				lexer.next()
+			}).toThrow()
+		})
 	})
 
 	describe("Comments", () => {

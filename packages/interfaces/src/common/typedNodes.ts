@@ -174,6 +174,7 @@ export interface FunctionInvocationNode {
 export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
+	| InterpolatedStringValueNode
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
@@ -192,6 +193,26 @@ export type RecordValueNode = {
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
+	position: Position
+	type: StringType
+}
+
+// NOTE: The typed form of an interpolated String. Each hole keeps its own
+// enriched Expression — real Positions, so the Language Server walks the hole
+// as itself — alongside the `Printable` Conformance the Enricher resolved for
+// it: the same witness `List::join(with:)` threads for its items, called to
+// turn the hole's value into text. The whole node is always a `String`.
+export type InterpolationSegmentNode =
+	| { kind: "text"; value: string }
+	| {
+			kind: "expression"
+			expression: ExpressionNode
+			conformance: Conformance
+	  }
+
+export type InterpolatedStringValueNode = {
+	nodeType: "InterpolatedStringValue"
+	segments: Array<InterpolationSegmentNode>
 	position: Position
 	type: StringType
 }

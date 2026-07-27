@@ -24,6 +24,14 @@ export enum TokenType {
 	LiteralTrue = "LiteralTrue",
 	LiteralFalse = "LiteralFalse",
 	LiteralString = "LiteralString",
+	// NOTE: The three pieces an interpolated String Literal lexes into — the
+	// text before the first hole (`Start`), the text between two holes
+	// (`Middle`) and the text after the last hole (`End`), with the hole's own
+	// Tokens lexed in place between them. A String with no holes stays a single
+	// `LiteralString`, so nothing that reads a plain String has to change.
+	LiteralStringStart = "LiteralStringStart",
+	LiteralStringMiddle = "LiteralStringMiddle",
+	LiteralStringEnd = "LiteralStringEnd",
 	LiteralNumber = "LiteralNumber",
 	LiteralNothing = "LiteralNothing",
 	//

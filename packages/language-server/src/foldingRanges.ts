@@ -171,6 +171,14 @@ function collectFromNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					collectFromNode(segment.expression, ranges)
+				}
+			}
+
+			return
 		case "MethodInvocation":
 			addRange(ranges, node.position)
 			collectFromNode(node.base, ranges)

@@ -162,6 +162,14 @@ function collectFromNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					descend(segment.expression, cursor, chain)
+				}
+			}
+
+			return
 		case "MethodInvocation":
 			descend(node.base, cursor, chain)
 			descendArguments(node.arguments, cursor, chain)

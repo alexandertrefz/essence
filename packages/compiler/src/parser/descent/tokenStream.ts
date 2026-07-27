@@ -114,12 +114,28 @@ export function describeTokenType(tokenType: lexer.TokenType): string {
 		return "a String"
 	}
 
+	if (
+		tokenType === TokenType.LiteralStringStart ||
+		tokenType === TokenType.LiteralStringMiddle ||
+		tokenType === TokenType.LiteralStringEnd
+	) {
+		return "an interpolated String"
+	}
+
 	return tokenType
 }
 
 export function describeToken(token: Token): string {
 	if (token.type === TokenType.LiteralString) {
 		return `'"${token.value}"'`
+	}
+
+	if (
+		token.type === TokenType.LiteralStringStart ||
+		token.type === TokenType.LiteralStringMiddle ||
+		token.type === TokenType.LiteralStringEnd
+	) {
+		return "an interpolated String"
 	}
 
 	return `'${token.value}'`
@@ -210,11 +226,28 @@ export class TokenStream {
 			this.hadLexerError = true
 		}
 
-		// NOTE: A malformed Number Literal does not truncate the stream — the
-		// Token is there, it just can not hold the text that was written — so
-		// it is reported without setting `hadLexerError`: every Diagnostic
-		// after it is about a Statement that was read in full.
+		// NOTE: A malformed Number Literal or a bad escape does not truncate the
+		// stream — the Token is there, it just can not hold the text that was
+		// written — so both are reported without setting `hadLexerError`: every
+		// Diagnostic after them is about a Statement that was read in full.
 		for (let error of sourceLexer.errors) {
+			if (error.code === "invalid-escape") {
+				reportError(error.message, error.position, {
+					code: "invalid-escape",
+					labels: [
+						primary(error.position, "this escape is not known"),
+					],
+					notes: [
+						"A String understands '\\\"', '\\\\', '\\n', '\\t', '\\{' and '\\}'; every other backslash is an error.",
+					],
+					helps: [
+						"Write '\\\\' for a literal backslash, or drop the backslash to keep the character as itself.",
+					],
+				})
+
+				continue
+			}
+
 			reportError(error.message, error.position, {
 				code: "invalid-number",
 				labels: [primary(error.position, "this is not a Number")],

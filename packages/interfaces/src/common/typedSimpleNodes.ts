@@ -169,6 +169,7 @@ export type UnionMethodDispatchCase = {
 export type ValueNode =
 	| RecordValueNode
 	| StringValueNode
+	| InterpolatedStringValueNode
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
@@ -185,6 +186,25 @@ export type RecordValueNode = {
 export type StringValueNode = {
 	nodeType: "StringValue"
 	value: string
+	type: StringType
+}
+
+// NOTE: The interpolated String reduced to what codegen needs: the text runs,
+// and for each hole its Expression paired with the `witness` its Type's
+// `Printable` conformance became — a method-map object literal or a forwarded
+// parameter, exactly like any other conformance Argument. The Rewriter calls
+// `witness.toString(expression).value` to render each hole.
+export type InterpolationSegmentNode =
+	| { kind: "text"; value: string }
+	| {
+			kind: "expression"
+			expression: ExpressionNode
+			witness: ExpressionNode
+	  }
+
+export type InterpolatedStringValueNode = {
+	nodeType: "InterpolatedStringValue"
+	segments: Array<InterpolationSegmentNode>
 	type: StringType
 }
 

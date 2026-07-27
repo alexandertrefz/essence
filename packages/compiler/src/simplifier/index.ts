@@ -80,6 +80,7 @@ function simplifyImplementationNode(
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
+		case "InterpolatedStringValue":
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
@@ -125,6 +126,8 @@ function simplifyExpression(
 			return simplifyRecordValue(node)
 		case "StringValue":
 			return simplifyStringValue(node)
+		case "InterpolatedStringValue":
+			return simplifyInterpolatedStringValue(node)
 		case "IntegerValue":
 			return simplifyIntegerValue(node)
 		case "RationalValue":
@@ -354,6 +357,31 @@ function simplifyStringValue(
 	return {
 		nodeType: "StringValue",
 		value: node.value,
+		type: node.type,
+	}
+}
+
+// NOTE: Each hole's resolved `Printable` Conformance becomes its witness
+// Expression through the same `conformanceExpression` a bounded call's hidden
+// Arguments go through — a method-map object for a Namespace source, a
+// forwarded Identifier for a parameter source. The Rewriter reads
+// `witness.toString(expression)` off it.
+function simplifyInterpolatedStringValue(
+	node: common.typed.InterpolatedStringValueNode,
+): common.typedSimple.InterpolatedStringValueNode {
+	return {
+		nodeType: "InterpolatedStringValue",
+		segments: node.segments.map((segment) => {
+			if (segment.kind === "text") {
+				return segment
+			}
+
+			return {
+				kind: "expression",
+				expression: simplifyExpression(segment.expression),
+				witness: conformanceExpression(segment.conformance),
+			}
+		}),
 		type: node.type,
 	}
 }

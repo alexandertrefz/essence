@@ -54,6 +54,13 @@ A Number Literal holds something that is not a digit — `0xFF`, `0b101`, `1e5`.
 Essence has no hexadecimal, binary or exponent form; a Number is written in
 decimal digits, grouped with `_` where that helps.
 
+### `invalid-escape`
+
+A backslash in a String Literal is followed by something that is not a known
+escape. A String understands `\"`, `\\`, `\n`, `\t`, `\{` and `\}`; every other
+backslash is an error. The character after it is read as itself so the rest of
+the String still lexes — write `\\` for a literal backslash.
+
 ### `redundant-parameter-label`
 
 A Parameter of a Function that takes its Types from the surrounding context
@@ -624,6 +631,14 @@ A Protocol name was used in a Type position, with the same reasoning.
 
 A Type Argument does not conform to the Protocol its Type Parameter is bound
 to — either it carries no such bound, or no conforming Namespace is in scope.
+
+### `interpolation-not-printable`
+
+A `{ … }` hole in a String Literal holds a value that does not conform to
+`Printable`, so it has no `toString` to turn it into text. Every builtin is
+Printable, but an `Optional` or a bare structural Union belongs to no Namespace
+and is not — match it apart first and interpolate each Case, exactly as a
+`case Nothing { … } case Value { … }` would.
 
 ### `ambiguous-conformance`
 

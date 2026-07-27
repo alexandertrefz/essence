@@ -213,6 +213,14 @@ function visitNode(
 
 			return
 		}
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					visitNode(segment.expression, null, state)
+				}
+			}
+
+			return
 		case "FunctionValue":
 			visitBody(node.value.body, null, state)
 			return
