@@ -16,6 +16,13 @@ export type Scope = {
 	// not a Type, and keeping the maps apart is what lets Type positions
 	// reject Protocol names with a dedicated Diagnostic.
 	protocols: Record<string, common.ProtocolType>
+	// NOTE: The canonical path of the Module whose declarations this Scope
+	// holds, which is what a Choice declared in it takes its nominal identity
+	// from. Absent — the default — for a Program that is no Module: the standard
+	// library and a single file compile name their Choices by name alone. Read
+	// through the parent chain, so every body Scope answers with the Module
+	// around it.
+	modulePath?: string
 	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
 	// Function bodies and Match Handler bodies. Bare Case Expressions
 	// (`<- #Less`) consult it before falling back to the scope scan. Null is a

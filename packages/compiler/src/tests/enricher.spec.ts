@@ -4407,4 +4407,139 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 	})
+
+	// NOTE: A Module's Choices are identified by its canonical path, and every
+	// rail that reaches a Choice BY NAME has to keep working: the Type Scope is
+	// keyed by the name the declaration wrote, so a lookup that went looking for
+	// the identity would find nothing — and answering nothing is not a
+	// Diagnostic anywhere, it is a Choice that silently stops deriving its
+	// equality or resolving its Cases.
+	describe("Module Identity", () => {
+		function diagnosticsForModule(
+			source: string,
+		): Array<common.Diagnostic> {
+			return enrich(parse(source), {
+				modulePath: "/modules/Choices.es",
+			}).diagnostics
+		}
+
+		it("should resolve a Choice's Cases named, bare and matched", () => {
+			expect(
+				diagnosticsForModule(`implementation {
+					choice Colour {
+						Red,
+						Green { shade: Integer },
+					}
+
+					constant named: Colour = Colour#Red
+					constant bare: Colour = #Green({ shade = 1 })
+
+					__print(match named -> String {
+						case #Red { <- "red" }
+						case Colour#Green { <- @.shade::toString() }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		it("should derive a Choice's equality from a Module's own Choice", () => {
+			expect(
+				diagnosticsForModule(`implementation {
+					choice Colour {
+						Red,
+						Green,
+					}
+
+					constant red: Colour = #Red
+					constant same = red::is(#Green)
+
+					__print(same::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("should derive a generic Choice's equality through its Generic Alias", () => {
+			expect(
+				diagnosticsForModule(`implementation {
+					choice Box<Value> {
+						Empty,
+						Full { value: Value },
+					}
+
+					constant full: Box<Integer> = Box<Integer>#Full({ value = 1 })
+					constant same = full::is(Box<Integer>#Empty)
+
+					__print(same::toString())
+				}`),
+			).toEqual([])
+		})
+
+		it("should reach a Module's Choice through a Type Alias of it", () => {
+			expect(
+				diagnosticsForModule(`implementation {
+					choice Colour {
+						Red,
+						Green,
+					}
+
+					type Shade = Colour
+
+					constant red: Shade = Shade#Red
+
+					__print(match red -> String {
+						case #Red { <- "red" }
+						case #Green { <- "green" }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		it("should dispatch a Namespace declared for a Module's Choice", () => {
+			expect(
+				diagnosticsForModule(`implementation {
+					choice Colour {
+						Red,
+						Green,
+					}
+
+					namespace Named for Colour {
+						name() -> String {
+							<- match @ -> String {
+								case #Red { <- "red" }
+								case #Green { <- "green" }
+							}
+						}
+					}
+
+					constant red: Colour = #Red
+
+					__print(red::name())
+				}`),
+			).toEqual([])
+		})
+
+		it("should identify a Choice by its Module while naming it as written", () => {
+			let { program, diagnostics } = enrich(
+				parse(`implementation {
+					choice Colour {
+						Red,
+					}
+				}`),
+				{ modulePath: "/modules/Colour.es" },
+			)
+
+			expect(diagnostics).toEqual([])
+
+			let declaration = program.implementation.nodes[0]
+
+			if (declaration.nodeType !== "ChoiceDeclarationStatement") {
+				throw new Error("The Program declares no Choice.")
+			}
+
+			expect(declaration.cases[0].type.choice).toBe(
+				"/modules/Colour.es#Colour",
+			)
+			expect(printType(declaration.type)).toBe("Colour")
+		})
+	})
 })

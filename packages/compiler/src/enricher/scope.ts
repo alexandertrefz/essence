@@ -17,6 +17,24 @@ export function scopeMap<Value>(
 	return entries === undefined ? map : Object.assign(map, entries)
 }
 
+// NOTE: The Module a Scope belongs to, answered by the nearest Scope that names
+// one — a child Scope inherits nothing, so the walk is what makes a Handler
+// body, a Method body and the Program's top level agree on which Module they are
+// in. Null for a Program that is no Module.
+export function modulePathOf(scope: enricher.Scope): string | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.modulePath !== undefined) {
+			return current.modulePath
+		}
+	}
+
+	return null
+}
+
 // NOTE: A fresh child Scope nested under `parent`, with every map empty — the
 // shape every block, body and Handler needs before it seeds its own bindings.
 // `overrides` pre-populates the few fields a caller wants set (a seeded `types`

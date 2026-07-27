@@ -56,6 +56,18 @@ export const enrich = (
 		// NOTE: Only the Language Server sets this, for Hovers over a written
 		// Type. A compile leaves it off and the collector stays null.
 		annotations?: boolean
+		// NOTE: The canonical path of the Module this Program is, which its
+		// Choices take their nominal identity from — `choiceIdentity`. Left out
+		// by every caller that compiles one file on its own, and then the
+		// Choices are identified by name alone, exactly as they were before
+		// Modules: same Types, same Diagnostics, same emitted tags.
+		//
+		// NOTE: It names the Module on the Scope the builtins are in, which does
+		// not reach them: the standard library's Types are resolved by its own
+		// load, under no Module at all, and this Scope only holds the objects
+		// that came back. The standard library's Choices are the canonical ones
+		// and stay unqualified, tags included.
+		modulePath?: string
 	} = {},
 ): {
 	program: common.typed.Program
@@ -73,6 +85,7 @@ export const enrich = (
 
 			let topLevelScope: enricher.Scope = {
 				parent: null,
+				modulePath: options.modulePath,
 				members,
 				// NOTE: The builtins are declared in TypeScript, not in
 				// Essence — there is no source Position to point a
