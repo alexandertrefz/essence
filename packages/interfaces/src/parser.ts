@@ -7,7 +7,14 @@ export type Program = {
 	// value-less static Properties. Every user Program is `implementation { … }`
 	// and can never declare a native.
 	kind: "implementation" | "declarations"
+	// NOTE: The two Module sections framing the implementation, null when the
+	// file wrote neither — one file is one Module, and a Module with no imports
+	// and nothing exported is a complete Program. A `declarations { … }` Program
+	// never carries either: the standard library is one shared declaration
+	// space, not a graph of Modules.
+	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	exports: ExportSectionNode | null
 	position: Position
 }
 
@@ -16,6 +23,55 @@ export type Program = {
 export type ImplementationSectionNode = {
 	nodeType: "ImplementationSection"
 	nodes: Array<ImplementationNode>
+	position: Position
+}
+
+// NOTE: `import { … }`, written above the implementation. Every name a Module
+// uses from another one is listed here — including its Namespaces, since
+// importing a Type does not bring the Namespaces written for that Type along.
+export type ImportSectionNode = {
+	nodeType: "ImportSection"
+	entries: Array<ImportNode>
+	position: Position
+}
+
+// NOTE: `name as alias from "./Module.es"`. `alias` is null when the entry
+// binds the name the dependency exports it under; `name` always stays the
+// exported name, so the two sides of a rename are both still in hand.
+export type ImportNode = {
+	nodeType: "Import"
+	name: IdentifierNode
+	alias: IdentifierNode | null
+	source: ModuleSpecifierNode
+	position: Position
+}
+
+// NOTE: `export { … }`, written below the implementation. A name is private
+// unless it is listed here.
+export type ExportSectionNode = {
+	nodeType: "ExportSection"
+	entries: Array<ExportNode>
+	position: Position
+}
+
+// NOTE: A `source` makes the entry a re-export — it forwards a dependency's
+// name without ever binding it locally, so the name it carries need not be
+// declared in this Program at all. Null is the ordinary form, which exports
+// something this Program declares.
+export type ExportNode = {
+	nodeType: "Export"
+	name: IdentifierNode
+	alias: IdentifierNode | null
+	source: ModuleSpecifierNode | null
+	position: Position
+}
+
+// NOTE: The String Literal a `from` clause carries, recorded exactly as it was
+// written — whether the path is relative, reachable, or names a file at all is
+// resolution's question, not the Parser's.
+export type ModuleSpecifierNode = {
+	nodeType: "ModuleSpecifier"
+	path: string
 	position: Position
 }
 

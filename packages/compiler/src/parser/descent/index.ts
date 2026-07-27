@@ -33,8 +33,12 @@ type NamespaceBodyNode = Parameters<
 >[4][number]
 
 // NOTE: These token types form the Identifier rule of the grammar — the
-// keywords `with`, `static`, `case`, `infer` and `choice` are valid
-// Identifiers.
+// keywords `with`, `static`, `case`, `infer`, `choice`, `import`, `export`,
+// `from` and `as` are valid Identifiers. The Module keywords are on this list
+// for the same reason the rest are: `from` and `as` are Argument labels the
+// standard library already writes (`slice(from 1, to 3)`,
+// `normalized(as #ComposedCanonical)`), so they can only ever be Keywords where
+// a Module section is being read.
 const identifierTokenTypes = [
 	TokenType.Identifier,
 	TokenType.KeywordWith,
@@ -42,6 +46,10 @@ const identifierTokenTypes = [
 	TokenType.KeywordCase,
 	TokenType.KeywordInfer,
 	TokenType.KeywordChoice,
+	TokenType.KeywordImport,
+	TokenType.KeywordExport,
+	TokenType.KeywordFrom,
+	TokenType.KeywordAs,
 ]
 
 function isIdentifierToken(token: Token | undefined): boolean {
@@ -94,8 +102,22 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 export type ParserOptions = {
 	// NOTE: Opt-in that lets a Program open with `declarations { … }` — the
 	// standard library sets it, every user file leaves it off so that a
-	// `declarations` block there is diagnosed rather than parsed.
+	// `declarations` block there is diagnosed rather than parsed. It is also
+	// what refuses both Module sections: the files that set it are one shared
+	// declaration space rather than Modules, and none of them may import or
+	// export.
 	allowDeclarationsHeader?: boolean
+}
+
+// NOTE: One `import { … }` or `export { … }` block as it was read, with the
+// side of the implementation it stood on and the Keyword's own Position. The
+// node spans the whole block, which is what the Formatter and the Language
+// Server need; a Diagnostic about the side a block was written on wants to
+// point at the Keyword alone.
+type ModuleSectionRead = {
+	node: parser.ImportSectionNode | parser.ExportSectionNode
+	keywordPosition: common.Position
+	side: "above" | "below"
 }
 
 class DescentParser {
@@ -122,6 +144,7 @@ class DescentParser {
 	// #region Program & Sections
 
 	parseProgram(): parser.Program {
+		let above = this.parseModuleSections("above")
 		let header = this.parseProgramHeader()
 
 		if (header === null) {
@@ -145,8 +168,20 @@ class DescentParser {
 		)
 		let closingPosition = this.parseClosingBrace(header.leftBrace.position)
 
+		let implementation = generators.implementationSection(nodes, {
+			start: header.keyword.position.start,
+			end: closingPosition.end,
+		})
+
+		let below = this.parseModuleSections("below")
+		let { imports, exports } = this.resolveModuleSections(
+			[...above, ...below],
+			implementation.position,
+		)
+
 		if (!this.tokens.isAtEnd() && !this.suppressDiagnostics) {
 			let token = this.peekOrFail()
+			let lastSection = below[below.length - 1]
 
 			reportError(
 				`Unexpected ${describeToken(token)} after the end of the Program`,
@@ -156,27 +191,263 @@ class DescentParser {
 					labels: [
 						primary(token.position, "nothing may follow here"),
 						secondary(
-							closingPosition,
-							"the implementation block ends here",
+							lastSection?.node.position ?? closingPosition,
+							lastSection === undefined
+								? "the implementation block ends here"
+								: "the Program ends here",
 						),
 					],
 					notes: [
-						"A Program is one 'implementation { … }' block and nothing else.",
+						"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'export { … }' block below it.",
 					],
 				},
 			)
 		}
 
-		let implementation = generators.implementationSection(nodes, {
-			start: header.keyword.position.start,
-			end: closingPosition.end,
-		})
-
+		// NOTE: A Program's Position stays the implementation block's own span,
+		// sections or none — the Formatter reads it as the block it writes
+		// `implementation {` and its closing brace for, and each section carries
+		// its own span for whoever needs the file's full extent.
 		return generators.program(
 			implementation,
 			implementation.position,
 			header.kind,
+			imports,
+			exports,
 		)
+	}
+
+	// NOTE: Both blocks are read on BOTH sides of the implementation, in either
+	// order — a block written on the wrong side is parsed where it stands rather
+	// than left to cascade into "Expected 'implementation'" or "nothing may
+	// follow here", which say nothing about what the author got wrong. A second
+	// block of the same kind on one side is left to those two Diagnostics, which
+	// is where it belongs: it is not a section in the wrong place, it is a Token
+	// where the Program was supposed to have ended.
+	//
+	// The `{` is part of what is recognised, because all four Module Keywords are
+	// ordinary Identifiers everywhere else.
+	protected parseModuleSections(
+		side: ModuleSectionRead["side"],
+	): Array<ModuleSectionRead> {
+		let sections: Array<ModuleSectionRead> = []
+		let sawImport = false
+		let sawExport = false
+
+		while (true) {
+			let token = this.tokens.peek()
+
+			if (
+				token === undefined ||
+				this.tokens.peek(1)?.type !== TokenType.SymbolLeftBrace
+			) {
+				return sections
+			}
+
+			if (token.type === TokenType.KeywordImport && !sawImport) {
+				sawImport = true
+				sections.push({
+					node: this.parseImportSection(),
+					keywordPosition: token.position,
+					side,
+				})
+			} else if (token.type === TokenType.KeywordExport && !sawExport) {
+				sawExport = true
+				sections.push({
+					node: this.parseExportSection(),
+					keywordPosition: token.position,
+					side,
+				})
+			} else {
+				return sections
+			}
+		}
+	}
+
+	// NOTE: Which of the blocks read on either side the Program keeps, and which
+	// are refused. A refused block is dropped rather than carried along broken:
+	// every later stage may read the sections a Program has as the sections it
+	// meant, and a standard library Program must never carry one at all.
+	protected resolveModuleSections(
+		sections: Array<ModuleSectionRead>,
+		implementationPosition: common.Position,
+	): {
+		imports: parser.ImportSectionNode | null
+		exports: parser.ExportSectionNode | null
+	} {
+		let imports: parser.ImportSectionNode | null = null
+		let exports: parser.ExportSectionNode | null = null
+
+		for (let section of sections) {
+			if (this.allowDeclarationsHeader) {
+				this.reportSectionOutsideModule(section)
+
+				continue
+			}
+
+			if (section.node.nodeType === "ImportSection") {
+				if (section.side === "above") {
+					imports = section.node
+				} else {
+					this.reportMisplacedSection(section, implementationPosition)
+				}
+			} else {
+				if (section.side === "below") {
+					exports = section.node
+				} else {
+					this.reportMisplacedSection(section, implementationPosition)
+				}
+			}
+		}
+
+		return { imports, exports }
+	}
+
+	protected reportMisplacedSection(
+		section: ModuleSectionRead,
+		implementationPosition: common.Position,
+	): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let isImport = section.node.nodeType === "ImportSection"
+		let keyword = isImport ? "import" : "export"
+		let expectedSide = isImport ? "above" : "below"
+
+		reportError(
+			`The '${keyword} { … }' block belongs ${expectedSide} the implementation`,
+			section.keywordPosition,
+			{
+				code: "misplaced-module-section",
+				labels: [
+					primary(
+						section.keywordPosition,
+						`this block is written ${section.side} the implementation`,
+					),
+					secondary(
+						implementationPosition,
+						"the implementation block is here",
+					),
+				],
+				notes: [
+					"A Program reads top to bottom: what it imports, what it does, what it exports.",
+				],
+				helps: [
+					`Move the '${keyword} { … }' block ${expectedSide} 'implementation { … }'.`,
+				],
+			},
+		)
+	}
+
+	protected reportSectionOutsideModule(section: ModuleSectionRead): void {
+		if (this.suppressDiagnostics) {
+			return
+		}
+
+		let keyword =
+			section.node.nodeType === "ImportSection" ? "import" : "export"
+
+		reportError(
+			`The standard library may not carry an '${keyword} { … }' block`,
+			section.keywordPosition,
+			{
+				code: "misplaced-module-section",
+				labels: [
+					primary(
+						section.keywordPosition,
+						`'${keyword}' is not allowed here`,
+					),
+				],
+				notes: [
+					"The standard library is one shared declaration space rather than a graph of Modules — every one of its files sees every other, and none of them is importable.",
+				],
+				helps: [`Remove the '${keyword} { … }' block.`],
+			},
+		)
+	}
+
+	protected parseImportSection(): parser.ImportSectionNode {
+		let keyword = this.tokens.next()
+		let leftBrace = this.tokens.next()
+
+		let entries = this.parseStatementList(() => this.parseImportEntry())
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		return generators.importSection(entries, {
+			start: keyword.position.start,
+			end: closingPosition.end,
+		})
+	}
+
+	protected parseExportSection(): parser.ExportSectionNode {
+		let keyword = this.tokens.next()
+		let leftBrace = this.tokens.next()
+
+		let entries = this.parseStatementList(() => this.parseExportEntry())
+		let closingPosition = this.parseClosingBrace(leftBrace.position)
+
+		return generators.exportSection(entries, {
+			start: keyword.position.start,
+			end: closingPosition.end,
+		})
+	}
+
+	protected parseImportEntry(): parser.ImportNode {
+		let name = this.parseIdentifier()
+		let alias = this.parseOptionalAlias()
+
+		this.tokens.expect(TokenType.KeywordFrom)
+
+		let source = this.parseModuleSpecifier()
+
+		return generators.importEntry(name, alias, source, {
+			start: name.position.start,
+			end: source.position.end,
+		})
+	}
+
+	// NOTE: The `from` clause is what makes an entry a re-export, and it is
+	// optional — a plain name exports something this Program declares. Once
+	// `from` is read the specifier is required, so a `from` with nothing after it
+	// is a Diagnostic rather than a second entry that happens to be named `from`.
+	protected parseExportEntry(): parser.ExportNode {
+		let name = this.parseIdentifier()
+		let alias = this.parseOptionalAlias()
+		let end = (alias ?? name).position.end
+		let source: parser.ModuleSpecifierNode | null = null
+
+		if (this.tokens.peek()?.type === TokenType.KeywordFrom) {
+			this.tokens.next()
+
+			source = this.parseModuleSpecifier()
+			end = source.position.end
+		}
+
+		return generators.exportEntry(name, alias, source, {
+			start: name.position.start,
+			end,
+		})
+	}
+
+	// NOTE: `as` binds the entry under a local name of the author's choosing. It
+	// is only a Keyword here — everywhere else it is an ordinary Identifier, an
+	// Argument label included — so an entry may itself be named `as`, and
+	// `as as from "./Module.es"` renames the imported `as` to `as`.
+	protected parseOptionalAlias(): parser.IdentifierNode | null {
+		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
+			return null
+		}
+
+		this.tokens.next()
+
+		return this.parseIdentifier()
+	}
+
+	protected parseModuleSpecifier(): parser.ModuleSpecifierNode {
+		let token = this.tokens.expect(TokenType.LiteralString)
+
+		return generators.moduleSpecifier(token.value, token.position)
 	}
 
 	protected parseProgramHeader(): {
@@ -1474,6 +1745,10 @@ class DescentParser {
 			case TokenType.KeywordCase:
 			case TokenType.KeywordInfer:
 			case TokenType.KeywordChoice:
+			case TokenType.KeywordImport:
+			case TokenType.KeywordExport:
+			case TokenType.KeywordFrom:
+			case TokenType.KeywordAs:
 				return this.parseIdentifier()
 			default:
 				fail(

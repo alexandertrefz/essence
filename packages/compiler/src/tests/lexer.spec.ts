@@ -592,6 +592,101 @@ describe("Lexer", () => {
 
 			expect(stripPosition(lexer.next())).toEqual(output)
 		})
+
+		it("should lex import", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "import"
+			output = {
+				value: "import",
+				type: TokenType.KeywordImport,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex export", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "export"
+			output = {
+				value: "export",
+				type: TokenType.KeywordExport,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex from", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "from"
+			output = {
+				value: "from",
+				type: TokenType.KeywordFrom,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		it("should lex as", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: SimpleToken
+
+			input = "as"
+			output = {
+				value: "as",
+				type: TokenType.KeywordAs,
+			}
+
+			lexer.reset(input)
+
+			expect(stripPosition(lexer.next())).toEqual(output)
+		})
+
+		// NOTE: The four Module Keywords are contextual — `from` and `as` are
+		// Argument labels the standard library writes, so the Lexer hands them
+		// over as Keywords and the Parser reads them as Identifiers everywhere a
+		// Module section is not being parsed.
+		it("should lex a Module Keyword written as an Argument label", () => {
+			let lexer = new Lexer()
+			let input: string
+			let output: Array<SimpleToken>
+
+			input = "slice(from 1)"
+			output = [
+				{ value: "slice", type: TokenType.Identifier },
+				{ value: "(", type: TokenType.SymbolLeftParen },
+				{ value: "from", type: TokenType.KeywordFrom },
+				{ value: "1", type: TokenType.LiteralNumber },
+				{ value: ")", type: TokenType.SymbolRightParen },
+			]
+
+			lexer.reset(input)
+
+			expect(
+				stripPositionFromArray([
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+					lexer.next(),
+				]),
+			).toEqual(output)
+		})
 	})
 
 	describe("Symbols", () => {

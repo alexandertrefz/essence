@@ -2,6 +2,7 @@
 
 exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocation with one argument 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -64,6 +65,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -81,6 +83,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
 
 exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocation with one argument with trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -143,6 +146,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -160,6 +164,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
 
 exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocation with multiple arguments 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -240,6 +245,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -257,6 +263,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
 
 exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocation with multiple arguments with trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -337,6 +344,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -354,6 +362,7 @@ exports[`Parser Expressions NativeInvocations should parse NativeFunctionInvocat
 
 exports[`Parser Expressions MethodInvocations should parse MethodInvocation with 0 external parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -412,6 +421,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation with
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -429,6 +439,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation with
 
 exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -506,6 +517,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -523,6 +535,7 @@ exports[`Parser Expressions MethodInvocations should parse MethodInvocation 1`] 
 
 exports[`Parser Expressions MethodInvocations should parse chained MethodInvocations 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -648,6 +661,7 @@ exports[`Parser Expressions MethodInvocations should parse chained MethodInvocat
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -665,6 +679,7 @@ exports[`Parser Expressions MethodInvocations should parse chained MethodInvocat
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with one argument 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -727,6 +742,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -744,6 +760,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with one labelled argument 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -819,6 +836,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -836,6 +854,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is 'with' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -911,6 +930,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -928,6 +948,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is 'case' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1003,6 +1024,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1020,6 +1042,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with labelled arguments that is 'static' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1095,6 +1118,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1112,6 +1136,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse a bare Case value as a labelled argument, the space before \`#\` keeping the label distinct from a Choice prefix 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1203,6 +1228,7 @@ exports[`Parser Expressions FunctionInvocations should parse a bare Case value a
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1220,6 +1246,7 @@ exports[`Parser Expressions FunctionInvocations should parse a bare Case value a
 
 exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choice#Case\` as a prefixed Case value passed positionally 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1311,6 +1338,7 @@ exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choic
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1326,8 +1354,160 @@ exports[`Parser Expressions FunctionInvocations should parse an adjacent \`Choic
 }
 `;
 
+exports[`Parser Expressions FunctionInvocations should parse a Case value with its Choice's Type Arguments applied 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "arguments": [
+          {
+            "name": null,
+            "nodeType": "Argument",
+            "value": {
+              "caseName": {
+                "content": "Full",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 46,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 42,
+                    "line": 1,
+                  },
+                },
+              },
+              "choice": {
+                "content": "Box",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 32,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 29,
+                    "line": 1,
+                  },
+                },
+              },
+              "nodeType": "CaseValue",
+              "position": {
+                "end": {
+                  "column": 49,
+                  "line": 1,
+                },
+                "start": {
+                  "column": 29,
+                  "line": 1,
+                },
+              },
+              "typeArguments": [
+                {
+                  "nodeType": "IdentifierTypeDeclaration",
+                  "position": {
+                    "end": {
+                      "column": 40,
+                      "line": 1,
+                    },
+                    "start": {
+                      "column": 33,
+                      "line": 1,
+                    },
+                  },
+                  "type": {
+                    "content": "Integer",
+                    "nodeType": "Identifier",
+                    "position": {
+                      "end": {
+                        "column": 40,
+                        "line": 1,
+                      },
+                      "start": {
+                        "column": 33,
+                        "line": 1,
+                      },
+                    },
+                  },
+                },
+              ],
+              "value": {
+                "nodeType": "IntegerValue",
+                "position": {
+                  "end": {
+                    "column": 48,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 47,
+                    "line": 1,
+                  },
+                },
+                "value": "1",
+              },
+            },
+          },
+        ],
+        "name": {
+          "content": "invocation",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 28,
+              "line": 1,
+            },
+            "start": {
+              "column": 18,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "FunctionInvocation",
+        "position": {
+          "end": {
+            "column": 50,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 52,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 52,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with one argument and a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1390,6 +1570,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1407,6 +1588,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with two arguments 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1487,6 +1669,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1504,6 +1687,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with two arguments and a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1584,6 +1768,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1601,6 +1786,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with more than two arguments 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1699,6 +1885,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1716,6 +1903,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Identifier FunctionInvocations with more than two arguments and a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1814,6 +2002,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1831,6 +2020,7 @@ exports[`Parser Expressions FunctionInvocations should parse Identifier Function
 
 exports[`Parser Expressions FunctionInvocations should parse Lookup FunctionInvocations with more than two arguments and a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -1956,6 +2146,7 @@ exports[`Parser Expressions FunctionInvocations should parse Lookup FunctionInvo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -1973,6 +2164,7 @@ exports[`Parser Expressions FunctionInvocations should parse Lookup FunctionInvo
 
 exports[`Parser Expressions FunctionInvocations should parse multiple FunctionInvocations in a row 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2082,6 +2274,7 @@ exports[`Parser Expressions FunctionInvocations should parse multiple FunctionIn
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2099,6 +2292,7 @@ exports[`Parser Expressions FunctionInvocations should parse multiple FunctionIn
 
 exports[`Parser Expressions Lookups should parse simple Lookup 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2155,6 +2349,7 @@ exports[`Parser Expressions Lookups should parse simple Lookup 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2172,6 +2367,7 @@ exports[`Parser Expressions Lookups should parse simple Lookup 1`] = `
 
 exports[`Parser Expressions Lookups should parse complex Lookup 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2255,6 +2451,7 @@ exports[`Parser Expressions Lookups should parse complex Lookup 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2272,6 +2469,7 @@ exports[`Parser Expressions Lookups should parse complex Lookup 1`] = `
 
 exports[`Parser Expressions Identifiers should parse Identifiers 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2301,6 +2499,7 @@ exports[`Parser Expressions Identifiers should parse Identifiers 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2318,6 +2517,7 @@ exports[`Parser Expressions Identifiers should parse Identifiers 1`] = `
 
 exports[`Parser Expressions Identifiers should parse 'with' as Identifier 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2347,6 +2547,7 @@ exports[`Parser Expressions Identifiers should parse 'with' as Identifier 1`] = 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2364,6 +2565,7 @@ exports[`Parser Expressions Identifiers should parse 'with' as Identifier 1`] = 
 
 exports[`Parser Expressions Identifiers should parse 'static' as Identifier 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2393,6 +2595,7 @@ exports[`Parser Expressions Identifiers should parse 'static' as Identifier 1`] 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2410,6 +2613,7 @@ exports[`Parser Expressions Identifiers should parse 'static' as Identifier 1`] 
 
 exports[`Parser Expressions Identifiers should parse 'case' as Identifier 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2439,6 +2643,7 @@ exports[`Parser Expressions Identifiers should parse 'case' as Identifier 1`] = 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2456,6 +2661,7 @@ exports[`Parser Expressions Identifiers should parse 'case' as Identifier 1`] = 
 
 exports[`Parser Expressions Self should parse @ 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2484,6 +2690,7 @@ exports[`Parser Expressions Self should parse @ 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2501,6 +2708,7 @@ exports[`Parser Expressions Self should parse @ 1`] = `
 
 exports[`Parser Expressions Combination should parse 2 identifier combinations 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2557,6 +2765,7 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2574,6 +2783,7 @@ exports[`Parser Expressions Combination should parse 2 identifier combinations 1
 
 exports[`Parser Expressions Combination should parse inline combinations 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2662,6 +2872,7 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2679,6 +2890,7 @@ exports[`Parser Expressions Combination should parse inline combinations 1`] = `
 
 exports[`Parser Expressions Combination should parse inline combinations with trailing commas 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2767,6 +2979,7 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2784,6 +2997,7 @@ exports[`Parser Expressions Combination should parse inline combinations with tr
 
 exports[`Parser Expressions Combination should parse inline combinations with multiple keys 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2902,6 +3116,7 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -2919,6 +3134,7 @@ exports[`Parser Expressions Combination should parse inline combinations with mu
 
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with no parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -2991,6 +3207,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3008,6 +3225,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
 
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with one parameter with explicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -3178,6 +3396,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3195,6 +3414,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
 
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with one parameter with implicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -3365,6 +3585,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3382,6 +3603,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
 
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with one parameter without external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -3539,6 +3761,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3556,6 +3779,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
 
 exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiterals with two parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -3795,6 +4019,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3812,6 +4037,7 @@ exports[`Parser Expressions Literals FunctionLiterals should parse FunctionLiter
 
 exports[`Parser Expressions Literals GenericFunctionLiterals should parse GenericFunctionLiterals with no parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -3915,6 +4141,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -3932,6 +4159,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
 
 exports[`Parser Expressions Literals GenericFunctionLiterals should parse GenericFunctionLiterals with one parameter with explicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4133,6 +4361,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -4150,6 +4379,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
 
 exports[`Parser Expressions Literals GenericFunctionLiterals should parse GenericFunctionLiterals with one parameter with implicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4351,6 +4581,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -4368,6 +4599,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
 
 exports[`Parser Expressions Literals GenericFunctionLiterals should parse GenericFunctionLiterals with one parameter without external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4556,6 +4788,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -4573,6 +4806,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Generi
 
 exports[`Parser Expressions Literals GenericFunctionLiterals should parse FunctionLiterals with two parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4843,6 +5077,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -4860,6 +5095,7 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with a KeyValuePair 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4921,6 +5157,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -4938,6 +5175,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with a KeyValuePair with a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -4999,6 +5237,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5016,6 +5255,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with multiple KeyValuePairs 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5107,6 +5347,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5124,6 +5365,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with multiple KeyValuePairs with a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5215,6 +5457,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5232,6 +5475,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with nested KeyValuePairs 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5325,6 +5569,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5342,6 +5587,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with nested KeyValuePairs and some Linebreaks 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5435,6 +5681,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5452,6 +5699,7 @@ exports[`Parser Expressions Literals AnonymousRecordLiteral should parse Anonymo
 
 exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecordLiterals with a KeyValuePair 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5539,6 +5787,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5556,6 +5805,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
 
 exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecordLiterals with a KeyValuePair with a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5643,6 +5893,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5660,6 +5911,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
 
 exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecordLiterals with multiple KeyValuePairs 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5777,6 +6029,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5794,6 +6047,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
 
 exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecordLiterals with multiple KeyValuePairs with a trailing comma 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -5911,6 +6165,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -5928,6 +6183,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
 
 exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecordLiterals with nested KeyValuePairs and some Linebreaks 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6073,6 +6329,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6090,6 +6347,7 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
 
 exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6118,6 +6376,7 @@ exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6135,6 +6394,7 @@ exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 
 
 exports[`Parser Expressions Literals BooleanLiterals should parse 'true' BooleanLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6164,6 +6424,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'true' Boolean
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6181,6 +6442,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'true' Boolean
 
 exports[`Parser Expressions Literals BooleanLiterals should parse 'false' BooleanLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6210,6 +6472,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'false' Boolea
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6227,6 +6490,7 @@ exports[`Parser Expressions Literals BooleanLiterals should parse 'false' Boolea
 
 exports[`Parser Expressions Literals StringLiterals should parse empty StringLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6256,6 +6520,7 @@ exports[`Parser Expressions Literals StringLiterals should parse empty StringLit
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6273,6 +6538,7 @@ exports[`Parser Expressions Literals StringLiterals should parse empty StringLit
 
 exports[`Parser Expressions Literals StringLiterals should parse filled StringLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6302,6 +6568,7 @@ exports[`Parser Expressions Literals StringLiterals should parse filled StringLi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6319,6 +6586,7 @@ exports[`Parser Expressions Literals StringLiterals should parse filled StringLi
 
 exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6348,6 +6616,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6365,6 +6634,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
 
 exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with an underscore 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6394,6 +6664,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6411,6 +6682,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
 
 exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiterals with multiple underscores 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6440,6 +6712,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6457,6 +6730,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse IntegerLiteral
 
 exports[`Parser Expressions Literals IntegerLiterals should parse negative IntegerLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6486,6 +6760,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6503,6 +6778,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
 
 exports[`Parser Expressions Literals IntegerLiterals should parse negative IntegerLiterals with an underscore 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6532,6 +6808,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6549,6 +6826,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
 
 exports[`Parser Expressions Literals IntegerLiterals should parse negative IntegerLiterals with multiple underscores 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6578,6 +6856,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6595,6 +6874,7 @@ exports[`Parser Expressions Literals IntegerLiterals should parse negative Integ
 
 exports[`Parser Expressions Literals RationalLiterals should parse RationalLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6625,6 +6905,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6642,6 +6923,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
 
 exports[`Parser Expressions Literals RationalLiterals should parse RationalLiterals with underscores 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6672,6 +6954,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6689,6 +6972,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse RationalLiter
 
 exports[`Parser Expressions Literals RationalLiterals should parse negative numerator RationalLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6719,6 +7003,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative nume
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6736,6 +7021,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative nume
 
 exports[`Parser Expressions Literals RationalLiterals should parse negative denominator RationalLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6766,6 +7052,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative deno
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6783,6 +7070,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse negative deno
 
 exports[`Parser Expressions Literals RationalLiterals should parse fully negative RationalLiterals 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6813,6 +7101,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse fully negativ
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6830,6 +7119,7 @@ exports[`Parser Expressions Literals RationalLiterals should parse fully negativ
 
 exports[`Parser Expressions Literals ListLiterals should parse an empty List 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6859,6 +7149,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an empty List 1`]
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6876,6 +7167,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an empty List 1`]
 
 exports[`Parser Expressions Literals ListLiterals should parse an List with a single item 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -6920,6 +7212,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with a si
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -6937,6 +7230,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with a si
 
 exports[`Parser Expressions Literals ListLiterals should parse an List with multiple items 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7009,6 +7303,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with mult
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7026,6 +7321,7 @@ exports[`Parser Expressions Literals ListLiterals should parse an List with mult
 
 exports[`Parser Expressions Match should parse match expression with function invocation 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7229,6 +7525,7 @@ exports[`Parser Expressions Match should parse match expression with function in
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7246,6 +7543,7 @@ exports[`Parser Expressions Match should parse match expression with function in
 
 exports[`Parser Statements ReturnStatements should parse ReturnStatements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7288,6 +7586,7 @@ exports[`Parser Statements ReturnStatements should parse ReturnStatements 1`] = 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7305,6 +7604,7 @@ exports[`Parser Statements ReturnStatements should parse ReturnStatements 1`] = 
 
 exports[`Parser Statements IfStatements should parse IfStatements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7348,6 +7648,7 @@ exports[`Parser Statements IfStatements should parse IfStatements 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7365,6 +7666,7 @@ exports[`Parser Statements IfStatements should parse IfStatements 1`] = `
 
 exports[`Parser Statements IfStatements should parse IfElseStatements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7409,6 +7711,7 @@ exports[`Parser Statements IfStatements should parse IfElseStatements 1`] = `
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7426,6 +7729,7 @@ exports[`Parser Statements IfStatements should parse IfElseStatements 1`] = `
 
 exports[`Parser Statements IfStatements should parse IfElse-If-Statements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7499,6 +7803,7 @@ exports[`Parser Statements IfStatements should parse IfElse-If-Statements 1`] = 
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7516,6 +7821,7 @@ exports[`Parser Statements IfStatements should parse IfElse-If-Statements 1`] = 
 
 exports[`Parser Statements IfStatements should parse IfElse-IfElse-Statements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7590,6 +7896,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-Statements 1`
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7607,6 +7914,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-Statements 1`
 
 exports[`Parser Statements IfStatements should parse IfElse-IfElse-If-Statements 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7710,6 +8018,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-If-Statements
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7727,6 +8036,7 @@ exports[`Parser Statements IfStatements should parse IfElse-IfElse-If-Statements
 
 exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement without Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7785,6 +8095,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7802,6 +8113,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 
 exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7886,6 +8198,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7903,6 +8216,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 
 exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with empty Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -7975,6 +8289,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -7992,6 +8307,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 
 exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with simple Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8139,6 +8455,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8156,6 +8473,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 
 exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDeclarationStatement with complex Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8408,6 +8726,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8425,6 +8744,7 @@ exports[`Parser Statements ConstantDeclarationStatements should parse ConstantDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement without Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8483,6 +8803,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8500,6 +8821,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8584,6 +8906,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8601,6 +8924,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with empty Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8673,6 +8997,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8690,6 +9015,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with simple Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -8837,6 +9163,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -8854,6 +9181,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with complex Record Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9106,6 +9434,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9123,6 +9452,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being 'with' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9181,6 +9511,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9198,6 +9529,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being 'case' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9256,6 +9588,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9273,6 +9606,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableDeclarationStatements should parse VariableDeclarationStatement with identifier being 'static' 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9331,6 +9665,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9348,6 +9683,7 @@ exports[`Parser Statements VariableDeclarationStatements should parse VariableDe
 
 exports[`Parser Statements VariableAssignmentStatements should parse VariableAssignmentStatement 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9404,6 +9740,7 @@ exports[`Parser Statements VariableAssignmentStatements should parse VariableAss
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9421,6 +9758,7 @@ exports[`Parser Statements VariableAssignmentStatements should parse VariableAss
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse an empty untyped NamespaceDefinitionStatement 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9469,6 +9807,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9486,6 +9825,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with one Constant 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9567,6 +9907,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9584,6 +9925,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with multiple Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9697,6 +10039,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9714,6 +10057,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with one static Method 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -9935,6 +10279,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -9952,6 +10297,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with multiple static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -10345,6 +10691,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -10362,6 +10709,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with overloaded static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -10741,6 +11089,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -10758,6 +11107,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with twice overloaded static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -11292,6 +11642,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -11309,6 +11660,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces should parse untyped NamespaceDefinitionStatements with static Methods and Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -11563,6 +11915,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -11580,6 +11933,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Untyped Namespaces shou
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse an empty typed NamespaceDefinitionStatement 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -11654,6 +12008,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -11671,6 +12026,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with one Constant 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -11778,6 +12134,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -11795,6 +12152,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with multiple Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -11934,6 +12292,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -11951,6 +12310,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with one static Method 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -12198,6 +12558,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -12215,6 +12576,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with multiple static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -12634,6 +12996,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -12651,6 +13014,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with overloaded static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -13056,6 +13420,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -13073,6 +13438,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with twice overloaded static Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -13633,6 +13999,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -13650,6 +14017,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with static Methods and Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -13930,6 +14298,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -13947,6 +14316,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with one Method 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -14194,6 +14564,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -14211,6 +14582,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with multiple Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -14630,6 +15002,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -14647,6 +15020,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with overloaded Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -15052,6 +15426,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -15069,6 +15444,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with twice overloaded Methods 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -15629,6 +16005,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -15646,6 +16023,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with Methods and Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -15926,6 +16304,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -15943,6 +16322,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should parse typed NamespaceDefinitionStatements with Methods, static Methods, and Constants 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -16223,6 +16603,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -16240,6 +16621,7 @@ exports[`Parser Statements NamespaceDefinitionStatements Typed Namespaces should
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse an empty ProtocolDeclarationStatement 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -16284,6 +16666,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -16301,6 +16684,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse an empty P
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a simple Method Signature 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -16405,6 +16789,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -16422,6 +16807,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a Self Parameter 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -16699,6 +17085,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -16716,6 +17103,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with a static Method Signature 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -16820,6 +17208,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -16837,6 +17226,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded Method Signature 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -17142,6 +17532,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -17159,6 +17550,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a ProtocolDeclarationStatement with an overloaded static Method Signature 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -17365,6 +17757,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -17382,6 +17775,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a Protocol
 
 exports[`Parser Statements ProtocolDeclarationStatements should parse a documented ProtocolDeclarationStatement 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -17514,6 +17908,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -17531,6 +17926,7 @@ exports[`Parser Statements ProtocolDeclarationStatements should parse a document
 
 exports[`Parser Statements ProtocolDeclarationStatements Contextual Function literals should parse a Function literal without annotations 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -17741,6 +18137,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -17758,6 +18155,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
 
 exports[`Parser Statements ProtocolDeclarationStatements Contextual Function literals should parse the underscore spellings 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18064,6 +18462,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -18081,6 +18480,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Contextual Function lit
 
 exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic on a Function 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18379,6 +18779,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -18396,6 +18797,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
 
 exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should parse a bounded Generic with a default Type 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18637,6 +19039,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -18654,6 +19057,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
 
 exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with a Conformance Clause 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18757,6 +19161,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -18774,6 +19179,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
 
 exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse a Namespace with multiple Conformance Clauses 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18905,6 +19311,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -18922,6 +19329,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
 
 exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should parse an untyped Namespace with a Conformance Clause 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -18999,6 +19407,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -19016,6 +19425,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
 
 exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses should still parse a Method named is 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -19250,6 +19660,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -19267,6 +19678,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Conformance Clauses sho
 
 exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse a single where condition 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -19485,6 +19897,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -19502,6 +19915,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
 
 exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse several where conditions 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -19823,6 +20237,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -19840,6 +20255,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
 
 exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should parse two conditional clauses 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20160,6 +20576,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20177,6 +20594,7 @@ exports[`Parser Statements ProtocolDeclarationStatements Where Clauses should pa
 
 exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with SimpleTypes 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20248,6 +20666,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20265,6 +20684,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
 
 exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with empty Record Types 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20323,6 +20743,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20340,6 +20761,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
 
 exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with simple Record Types 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20442,6 +20864,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20459,6 +20882,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
 
 exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements with complex Record Types 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20634,6 +21058,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20651,6 +21076,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
 
 exports[`Parser Statements FunctionStatements should parse FunctionStatements with no parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20737,6 +21163,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20754,6 +21181,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionStatements wi
 
 exports[`Parser Statements FunctionStatements should parse FunctionLiterals with one parameter with explicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -20938,6 +21366,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -20955,6 +21384,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
 
 exports[`Parser Statements FunctionStatements should parse FunctionLiterals with one parameter with implicit external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -21139,6 +21569,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -21156,6 +21587,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
 
 exports[`Parser Statements FunctionStatements should parse FunctionLiterals with one parameter without external name 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -21327,6 +21759,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
@@ -21344,6 +21777,7 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
 
 exports[`Parser Statements FunctionStatements should parse FunctionLiterals with two parameters 1`] = `
 {
+  "exports": null,
   "implementation": {
     "nodeType": "ImplementationSection",
     "nodes": [
@@ -21639,161 +22073,13 @@ exports[`Parser Statements FunctionStatements should parse FunctionLiterals with
       },
     },
   },
+  "imports": null,
   "kind": "implementation",
   "nodeType": "Program",
   "position": {
     "end": {
       "column": 7,
       "line": 5,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions FunctionInvocations should parse a Case value with its Choice's Type Arguments applied 1`] = `
-{
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "arguments": [
-          {
-            "name": null,
-            "nodeType": "Argument",
-            "value": {
-              "caseName": {
-                "content": "Full",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 46,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 42,
-                    "line": 1,
-                  },
-                },
-              },
-              "choice": {
-                "content": "Box",
-                "nodeType": "Identifier",
-                "position": {
-                  "end": {
-                    "column": 32,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 29,
-                    "line": 1,
-                  },
-                },
-              },
-              "nodeType": "CaseValue",
-              "position": {
-                "end": {
-                  "column": 49,
-                  "line": 1,
-                },
-                "start": {
-                  "column": 29,
-                  "line": 1,
-                },
-              },
-              "typeArguments": [
-                {
-                  "nodeType": "IdentifierTypeDeclaration",
-                  "position": {
-                    "end": {
-                      "column": 40,
-                      "line": 1,
-                    },
-                    "start": {
-                      "column": 33,
-                      "line": 1,
-                    },
-                  },
-                  "type": {
-                    "content": "Integer",
-                    "nodeType": "Identifier",
-                    "position": {
-                      "end": {
-                        "column": 40,
-                        "line": 1,
-                      },
-                      "start": {
-                        "column": 33,
-                        "line": 1,
-                      },
-                    },
-                  },
-                },
-              ],
-              "value": {
-                "nodeType": "IntegerValue",
-                "position": {
-                  "end": {
-                    "column": 48,
-                    "line": 1,
-                  },
-                  "start": {
-                    "column": 47,
-                    "line": 1,
-                  },
-                },
-                "value": "1",
-              },
-            },
-          },
-        ],
-        "name": {
-          "content": "invocation",
-          "nodeType": "Identifier",
-          "position": {
-            "end": {
-              "column": 28,
-              "line": 1,
-            },
-            "start": {
-              "column": 18,
-              "line": 1,
-            },
-          },
-        },
-        "nodeType": "FunctionInvocation",
-        "position": {
-          "end": {
-            "column": 50,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 52,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 52,
-      "line": 1,
     },
     "start": {
       "column": 1,

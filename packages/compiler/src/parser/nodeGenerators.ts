@@ -6,11 +6,15 @@ export function program(
 	implementation: parser.ImplementationSectionNode,
 	position: common.Position,
 	kind: parser.Program["kind"] = "implementation",
+	imports: parser.ImportSectionNode | null = null,
+	exports: parser.ExportSectionNode | null = null,
 ): parser.Program {
 	return {
 		nodeType: "Program",
 		kind,
+		imports,
 		implementation,
+		exports,
 		position,
 	}
 }
@@ -22,6 +26,69 @@ export function implementationSection(
 	return {
 		nodeType: "ImplementationSection",
 		nodes: nodes ?? [],
+		position,
+	}
+}
+
+export function importSection(
+	entries: Array<parser.ImportNode>,
+	position: common.Position,
+): parser.ImportSectionNode {
+	return {
+		nodeType: "ImportSection",
+		entries,
+		position,
+	}
+}
+
+export function importEntry(
+	name: parser.IdentifierNode,
+	alias: parser.IdentifierNode | null,
+	source: parser.ModuleSpecifierNode,
+	position: common.Position,
+): parser.ImportNode {
+	return {
+		nodeType: "Import",
+		name,
+		alias,
+		source,
+		position,
+	}
+}
+
+export function exportSection(
+	entries: Array<parser.ExportNode>,
+	position: common.Position,
+): parser.ExportSectionNode {
+	return {
+		nodeType: "ExportSection",
+		entries,
+		position,
+	}
+}
+
+export function exportEntry(
+	name: parser.IdentifierNode,
+	alias: parser.IdentifierNode | null,
+	source: parser.ModuleSpecifierNode | null,
+	position: common.Position,
+): parser.ExportNode {
+	return {
+		nodeType: "Export",
+		name,
+		alias,
+		source,
+		position,
+	}
+}
+
+export function moduleSpecifier(
+	path: string,
+	position: common.Position,
+): parser.ModuleSpecifierNode {
+	return {
+		nodeType: "ModuleSpecifier",
+		path,
 		position,
 	}
 }
