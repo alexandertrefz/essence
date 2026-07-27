@@ -12,7 +12,7 @@ implementation {
 	§ `RectangleMeasurable` is never named below — `::area()` dispatches through
 	§ it, which is what makes the import a use rather than an unused entry.
 	function describe(_ shape: Rectangle) -> String {
-		<- "area: "::append(shape::area()::toString())
+		<- "area: {shape::area()}"
 	}
 
 	function scaled(_ amount: Amount) -> Rational {

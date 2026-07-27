@@ -2,24 +2,29 @@ implementation {
 
 	namespace StringForInteger for Integer {
 		string() -> String {
-			<- "stringForInteger: "::append(@::toString())
+			<- "stringForInteger: {@}"
 		}
 	}
 
 	namespace StringForRational for Rational {
 		string(_ foo: Boolean) -> String {
-			<- "stringForRational: "::append(@::toString())
+			<- "stringForRational: {@}"
 		}
 	}
 
 	namespace StringForNumber for Number {
 		string(_ foo: Boolean) -> String {
-			<- "stringForNumber: "::append(match @ -> String {
+			§ The match is named rather than written into the hole itself: a
+			§ String is reprinted exactly as it was written, so a `match` inside
+			§ one would keep whatever shape it was typed with forever.
+			constant number = match @ -> String {
 				case Integer        { <- @::toString() }
 				case Rational       { <- @::toString() }
 				case Algebraic      { <- @::toString() }
 				case Transcendental { <- @::toString() }
-			})
+			}
+
+			<- "stringForNumber: {number}"
 		}
 	}
 
