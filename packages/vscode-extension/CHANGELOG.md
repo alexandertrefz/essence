@@ -1,5 +1,25 @@
 # Change Log
 
+## [0.3.0]
+
+A debugger.
+
+- `F5` on an `.es` file compiles it and starts it under the debugger, no
+  launch.json needed — breakpoints, stepping, call stacks and watch all speak
+  in source lines, riding the compiler's new source maps.
+- The Variables view renders Essence values the way `__print` spells them —
+  `3/4`, `"text"`, `Ordering#Less`, `{ width = 3, height = 4 }` — with
+  `essenceValueRendering: false` as the way back to raw JavaScript.
+- Compiler-generated code the map leaves unmapped — the standard library
+  prelude, the inlined runtime — is stepped through rather than into.
+- "Uncaught Exceptions" pauses a failing Program on the mapped line; logpoints
+  and conditional breakpoints work, with their expressions (and the Debug
+  Console) being JavaScript in the compiled frame.
+- Compilation runs the `essence` CLI: `essence.cli.path` names it, a checkout
+  open in the workspace is found on its own, PATH is the fallback. The
+  setting joins `essence.server.path` in being ignored in untrusted
+  workspaces, for the same reason.
+
 ## [0.2.0]
 
 Quick Fixes, call hierarchy, and an editor that knows what Essence looks like.
