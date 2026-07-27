@@ -99,10 +99,39 @@ itself assumes.
 Snippets cover the language: `namespace`, `protocol`, `choice`, `overload`,
 `match`, `doc` and the rest.
 
+### Debugging
+
+`F5` on an open `.es` file compiles it and starts it under the debugger — no
+launch.json needed. Breakpoints bind on source lines, stepping lands where the
+source says, the call stack names `.es` files, and the Variables view renders
+Essence values the way `__print` spells them: `3/4`, `"text"`,
+`Ordering#Less`, `{ width = 3, height = 4 }`.
+
+The compiled program runs under Node, driven by VS Code's built-in JavaScript
+debugger reading the compiler's source maps. Code the map deliberately leaves
+unmapped — the standard library prelude and the inlined runtime — is stepped
+through rather than into.
+
+A launch configuration takes `program` (the `.es` file), `args`, `cwd`,
+`stopOnEntry`, `console`, `skipFiles`, an `outDir` to keep the compiled
+JavaScript somewhere readable, and `essenceValueRendering: false` to see raw
+JavaScript values instead. "Uncaught Exceptions" under Breakpoints pauses on
+runtime failures — a Match that no Case matched pauses on the very line.
+Logpoints and conditional breakpoints work; note that their expressions, and
+the Debug Console, are JavaScript evaluated in the compiled frame, not
+Essence.
+
+Debugging needs the `essence` CLI to compile with: `essence.cli.path` names it
+explicitly, a checkout open in the workspace is found on its own, and PATH is
+the fallback.
+
 ## Requirements
 
-None. The Language Server is bundled and runs on the Node that ships with
-VS Code.
+None for the language features. The Language Server is bundled and runs on the
+Node that ships with VS Code.
+
+Debugging additionally needs the `essence` CLI (see above) and a `node` on
+PATH to run the compiled program.
 
 The status bar shows whether the server is running; clicking it restarts it.
 `Essence` in the Output panel carries the server's log and any startup failure.
@@ -139,6 +168,28 @@ would use. That is the better loop of the two — `esls` runs the server's
 TypeScript directly, so a change needs no rebuild at all, just
 `Essence: Restart Language Server`, which picks it up without reloading the
 window.
+
+### The debugging walkthrough
+
+The debugger has no extension-host test harness, so a release is checked by
+hand, in the Extension Development Host:
+
+- `F5` on an open `.es` file with no launch.json compiles and runs it; its
+  output lands in the Debug Console; the same entry appears in the
+  Run and Debug view's picker.
+- A breakpoint set before launching binds (solid red) and is hit; the paused
+  line is the source line, and stepping over a `match` treats it as one
+  statement while stepping in enters the matching Case's body.
+- Variables and watch render Essence values (`3/4`, quoted Strings, Case
+  tags); `essenceValueRendering: false` shows raw objects again.
+- "Uncaught Exceptions" pauses a Program that fails at run time on the mapped
+  line, a logpoint prints without pausing, and `Ctrl+F5` runs without
+  debugging.
+- Cancelling the compile notification aborts the launch quietly; a Program
+  with a Diagnostic aborts with one notification and the Problems view
+  carries the details.
+- `essence.cli.path` pointed at a checkout's `packages/cli/bin/essence` is
+  used and named in the Essence output channel.
 
 ## Packaging
 
