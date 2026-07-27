@@ -1,6 +1,6 @@
 {
 	"name": "@essence/debug-adapter",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "The Essence Debug Adapter, spoken over stdio by esdap.",
 	"private": true,
 	"type": "module",

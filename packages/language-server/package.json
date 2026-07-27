@@ -1,6 +1,6 @@
 {
 	"name": "@essence/language-server",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "The Essence Language Server, spoken over stdio by esls.",
 	"private": true,
 	"type": "module",
