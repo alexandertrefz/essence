@@ -42,9 +42,7 @@
 	},
 	"main": "./dist/extension.js",
 	"activationEvents": [
-		"onLanguage:essence",
-		"onDebugResolve:essence",
-		"onDebugDynamicConfigurations:essence"
+		"onLanguage:essence"
 	],
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
@@ -214,6 +212,11 @@
 							"outDir": {
 								"type": "string",
 								"description": "Keep the compiled JavaScript and its map here instead of the extension's storage."
+							},
+							"essenceValueRendering": {
+								"type": "boolean",
+								"description": "Render Essence values in the Variables view — Rational as 3/4, Strings quoted, Choice cases by their tag — instead of their JavaScript innards.",
+								"default": true
 							}
 						}
 					}

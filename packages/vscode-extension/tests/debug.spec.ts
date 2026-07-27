@@ -5,9 +5,27 @@ import {
 	compileArguments,
 	createNodeDebugConfiguration,
 	debugBuildSlug,
+	ESSENCE_DESCRIPTION_GENERATOR,
 	resolveCli,
 	summariseFailure,
 } from "../debug.js"
+
+// NOTE: The generator travels to the debuggee as source text — evaluating it
+// here, the way js-debug does over there, is what proves it is genuinely
+// self-contained: a captured binding would throw the moment it runs outside
+// this module.
+const describeValue = (0, eval)(`(${ESSENCE_DESCRIPTION_GENERATOR})`) as (
+	this: unknown,
+	defaultValue: string,
+) => string
+
+function tagged(tag: string, fields: Record<string, unknown> = {}): object {
+	return { ...fields, [Symbol("$type")]: tag }
+}
+
+function describe$(value: unknown): string {
+	return describeValue.call(value, "«default»")
+}
 
 describe("resolveCli", () => {
 	it("runs a configured bundle with node and anything else with bun", () => {
@@ -183,5 +201,97 @@ describe("createNodeDebugConfiguration", () => {
 		expect(
 			"noDebug" in createNodeDebugConfiguration({}, artifacts),
 		).toBe(false)
+	})
+
+	it("renders Essence values unless told not to", () => {
+		expect(
+			createNodeDebugConfiguration({}, artifacts)
+				.customDescriptionGenerator,
+		).toBe(ESSENCE_DESCRIPTION_GENERATOR)
+		expect(
+			"customDescriptionGenerator" in
+				createNodeDebugConfiguration(
+					{ essenceValueRendering: false },
+					artifacts,
+				),
+		).toBe(false)
+	})
+
+	it("never overwrites a generator the user wrote", () => {
+		expect(
+			createNodeDebugConfiguration(
+				{ customDescriptionGenerator: "function (d) { return d }" },
+				artifacts,
+			).customDescriptionGenerator,
+		).toBe("function (d) { return d }")
+	})
+})
+
+describe("the description generator", () => {
+	it("renders the scalar values as the language spells them", () => {
+		expect(describe$(tagged("Integer", { value: 42n }))).toBe("42")
+		expect(
+			describe$(tagged("Rational", { numerator: 3n, denominator: 4n })),
+		).toBe("3/4")
+		expect(describe$(tagged("String", { value: "hello" }))).toBe('"hello"')
+		expect(describe$(tagged("Boolean", { value: true }))).toBe("true")
+		expect(describe$(tagged("Nothing"))).toBe("Nothing")
+	})
+
+	it("renders Records and Lists like __print does", () => {
+		expect(
+			describe$(
+				tagged("Record", {
+					width: tagged("Integer", { value: 3n }),
+					height: tagged("Integer", { value: 4n }),
+				}),
+			),
+		).toBe("{ width = 3, height = 4 }")
+		expect(
+			describe$(
+				tagged("List", {
+					value: [
+						tagged("Integer", { value: 1n }),
+						tagged("Integer", { value: 2n }),
+					],
+				}),
+			),
+		).toBe("[ 1, 2 ]")
+		expect(describe$(tagged("Record"))).toBe("{}")
+		expect(describe$(tagged("List", { value: [] }))).toBe("[]")
+	})
+
+	it("renders a Case by its tag, payload spelled like a Record", () => {
+		expect(describe$(tagged("Ordering#Less"))).toBe("Ordering#Less")
+		expect(
+			describe$(
+				tagged("Shape#Circle", {
+					radius: tagged("Integer", { value: 2n }),
+				}),
+			),
+		).toBe("Shape#Circle { radius = 2 }")
+	})
+
+	it("caps what one line can hold", () => {
+		let long = describe$(
+			tagged("Record", {
+				first: tagged("String", { value: "a very long member value" }),
+				second: tagged("String", { value: "another long member value" }),
+			}),
+		)
+
+		expect(long.endsWith("… }")).toBe(true)
+		expect(long.length).toBeLessThan(80)
+	})
+
+	it("answers the default for anything that is not an Essence value", () => {
+		expect(describe$({ plain: true })).toBe("«default»")
+		expect(describe$(null)).toBe("«default»")
+	})
+
+	// NOTE: The runtime prints a bare Function as the one word — its Type is
+	// erased and its source is compiled output, neither worth showing.
+	it("names a Function the way the runtime prints one", () => {
+		expect(describe$(() => 1)).toBe("Function")
 	})
 })

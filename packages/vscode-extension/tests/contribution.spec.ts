@@ -42,11 +42,11 @@ describe("the debugger contribution", () => {
 		}
 	})
 
-	it("wakes the extension for debugging", () => {
-		expect(manifest.activationEvents).toContain("onDebugResolve:essence")
-		expect(manifest.activationEvents).toContain(
-			"onDebugDynamicConfigurations:essence",
-		)
+	// NOTE: VS Code derives the debug activation events from the `debuggers`
+	// contribution itself, so none may be spelled out — a spelled-out one is
+	// the warning the manifest linter raises.
+	it("relies on the generated debug activation events", () => {
+		expect(manifest.activationEvents).toEqual(["onLanguage:essence"])
 	})
 
 	// NOTE: Both settings name an executable to spawn, so both are ignored in

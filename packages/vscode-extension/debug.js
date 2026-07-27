@@ -98,6 +98,123 @@ export function summariseFailure(report) {
 	return `compilation failed with ${counted} — see the Problems view or the Essence output.`
 }
 
+// NOTE: How the Variables view reads an Essence value. js-debug evaluates
+// this INSIDE the debuggee against each object it describes — `this` is the
+// object, the argument the description it would have shown — so bigints are
+// live values here, and a returned string replaces innards like
+// `{numerator: 3n, denominator: 4n}` with the `3/4` the language means.
+//
+// It is a compact retelling of the runtime's own `getStringRepresentation`
+// (runtime/src/functions.ts), and it must stay SELF-CONTAINED: it travels as
+// source text into another process, where nothing of this module exists. The
+// tag symbol is found by its description — each bundle creates its own
+// `Symbol("$type")`, so identity can never match. Anything unexpected answers
+// the default description; the debugger showing stock output is the worst
+// this function is allowed to do.
+function describeEssenceValue(defaultValue) {
+	function render(value, depth) {
+		if (typeof value === "function") {
+			return "Function"
+		}
+
+		if (value === null || typeof value !== "object") {
+			return null
+		}
+
+		let tagSymbol = Object.getOwnPropertySymbols(value).find(
+			(symbol) => symbol.description === "$type",
+		)
+
+		if (tagSymbol === undefined) {
+			return null
+		}
+
+		let tag = value[tagSymbol]
+
+		if (typeof tag !== "string") {
+			return null
+		}
+
+		if (tag === "String") {
+			return `"${value.value}"`
+		}
+
+		if (tag === "Boolean") {
+			return value.value ? "true" : "false"
+		}
+
+		if (tag === "Integer") {
+			return String(value.value)
+		}
+
+		if (tag === "Rational") {
+			return `${value.numerator}/${value.denominator}`
+		}
+
+		if (tag === "Nothing") {
+			return "Nothing"
+		}
+
+		if (tag === "Algebraic" || tag === "Transcendental") {
+			return tag
+		}
+
+		if (tag === "List") {
+			if (value.value.length === 0) {
+				return "[]"
+			}
+
+			if (depth >= 2) {
+				return "[ … ]"
+			}
+
+			let items = value.value.map(
+				(item) => render(item, depth + 1) ?? "…",
+			)
+			let rendered = `[ ${items.join(", ")} ]`
+
+			return rendered.length < 60 ? rendered : `[ ${items[0]}, … ]`
+		}
+
+		if (tag === "Record" || tag.includes("#")) {
+			let prefix = tag === "Record" ? "" : `${tag} `
+			let entries = Object.entries(value)
+
+			if (entries.length === 0) {
+				return tag === "Record" ? "{}" : tag
+			}
+
+			if (depth >= 2) {
+				return `${prefix}{ … }`
+			}
+
+			let members = entries.map(
+				([key, member]) =>
+					`${key} = ${render(member, depth + 1) ?? "…"}`,
+			)
+			let rendered = `${prefix}{ ${members.join(", ")} }`
+
+			return rendered.length < 60
+				? rendered
+				: `${prefix}{ ${members[0]}, … }`
+		}
+
+		return null
+	}
+
+	try {
+		let rendered = render(this, 0)
+
+		return rendered === null ? defaultValue : rendered
+	} catch {
+		return defaultValue
+	}
+}
+
+// NOTE: Shipped as the function's own source — one implementation, testable
+// here as a value and evaluated over there as text.
+export const ESSENCE_DESCRIPTION_GENERATOR = describeEssenceValue.toString()
+
 // NOTE: The handoff: an `essence` launch request becomes the `pwa-node`
 // session js-debug runs, pointed at the compiled bundle with its linked map.
 // `outFiles` and `resolveSourceMapLocations` are spelled absolutely because
@@ -135,6 +252,16 @@ export function createNodeDebugConfiguration(config, artifacts) {
 	// one.
 	if (config.noDebug === true) {
 		configuration.noDebug = true
+	}
+
+	// NOTE: A generator the user wrote themselves always wins, and
+	// `essenceValueRendering: false` opts out entirely — both are escape
+	// hatches for debugging the rendering itself.
+	if (typeof config.customDescriptionGenerator === "string") {
+		configuration.customDescriptionGenerator =
+			config.customDescriptionGenerator
+	} else if (config.essenceValueRendering !== false) {
+		configuration.customDescriptionGenerator = ESSENCE_DESCRIPTION_GENERATOR
 	}
 
 	return configuration
