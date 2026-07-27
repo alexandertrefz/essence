@@ -1,0 +1,34 @@
+{
+	// NOTE: The publish build — the one tsc invocation that EMITS. The
+	// workspace itself never builds; this program exists so the published
+	// packages can carry compiled JavaScript and declarations for consumers
+	// that are not running Bun over TypeScript sources. It is one program over
+	// every published package, for the same reason the dev tsconfig is one
+	// program: a cross-package import compiles against the imported package's
+	// source, and the per-package `dist/` directories are cut out of the one
+	// output tree afterwards by `scripts/publishing/stage.ts`.
+	//
+	// `allowImportingTsExtensions` turns off because emit forbids it; nothing
+	// imports a `.ts` path, so nothing changes. Tests, tools and fixtures are
+	// not part of what ships.
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"declaration": true,
+		"allowImportingTsExtensions": false,
+		"rootDir": "packages",
+		"outDir": "build/publish/compiled"
+	},
+	"include": [
+		"packages/ariadne/src/**/*",
+		"packages/cli/src/**/*",
+		"packages/compiler/src/**/*",
+		"packages/debug-adapter/src/**/*",
+		"packages/formatter/src/**/*",
+		"packages/interfaces/src/**/*",
+		"packages/language-server/src/**/*",
+		"packages/runtime/src/**/*",
+		"packages/stdlib/src/**/*"
+	],
+	"exclude": ["**/tests/**", "**/*.spec.ts", "**/tools/**"]
+}
