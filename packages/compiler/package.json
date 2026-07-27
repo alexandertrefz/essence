@@ -30,6 +30,18 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/compiler",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/compiler"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"compiler"
+	],
 	"dependencies": {
 		"@essence/ariadne": "workspace:*",
 		"@essence/escodegen": "workspace:*",

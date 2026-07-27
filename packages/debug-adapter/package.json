@@ -13,6 +13,20 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/debug-adapter",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/debug-adapter"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"dap",
+		"debug-adapter",
+		"debugger"
+	],
 	"dependencies": {
 		"@vscode/debugadapter": "1.68.0",
 		"@vscode/debugprotocol": "1.68.0",

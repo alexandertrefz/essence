@@ -16,6 +16,18 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/formatter",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/formatter"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"formatter"
+	],
 	"dependencies": {
 		"@essence/compiler": "workspace:*",
 		"@essence/interfaces": "workspace:*"

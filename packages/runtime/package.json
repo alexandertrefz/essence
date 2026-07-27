@@ -12,6 +12,18 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/runtime",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/runtime"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"runtime"
+	],
 	"dependencies": {
 		"@essence/interfaces": "workspace:*"
 	}

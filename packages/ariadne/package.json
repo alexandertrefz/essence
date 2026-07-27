@@ -10,5 +10,18 @@
 		".": "./src/index.ts"
 	},
 	"author": "Alexander Trefz",
-	"license": "MIT"
+	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/ariadne",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/ariadne"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"diagnostics",
+		"error-reporting",
+		"compiler"
+	]
 }

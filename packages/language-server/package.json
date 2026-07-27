@@ -13,6 +13,19 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/language-server",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/language-server"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"lsp",
+		"language-server"
+	],
 	"dependencies": {
 		"@essence/compiler": "workspace:*",
 		"@essence/formatter": "workspace:*",
