@@ -10,6 +10,7 @@ import { analyseDocument, documentFilePath } from "../analyse"
 import { insertImportEdit, relativeSpecifier } from "../autoImport"
 import { findCodeActions } from "../codeActions"
 import { findCompletions } from "../completion"
+import { findHover } from "../hover"
 import { uriOf } from "../server"
 import { createWorkspace, type Workspace } from "../workspace"
 
@@ -324,6 +325,60 @@ describe("Workspace", () => {
 
 			expect(symbol?.filePath).toBe(pathOf("Geometry.es"))
 			expect(symbol?.definition?.start.line).toBe(3)
+		})
+	})
+
+	// NOTE: Hover reads the linked enrichment — its annotations resolved on the
+	// file alone answer 'Error' for every imported name, and an entry's own
+	// Identifier has no typed body node to answer for it at all.
+	describe("hover through the graph", () => {
+		const main = [
+			"import {",
+			'\tRectangle from "./Geometry.es"',
+			'\tRectangleMeasurable from "./Geometry.es"',
+			"}",
+			"",
+			"implementation {",
+			"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+			"\t\t<- shape.width",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		function hoverAt(line: number, needle: string) {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": main,
+			})
+
+			let filePath = pathOf("Main.es")
+			let annotations = workspace.annotationsOf(filePath)
+			let enriched = workspace.enrichedOf(filePath)
+
+			expect(enriched).not.toBeNull()
+
+			return findHover(
+				enriched!,
+				cursorAt(main, line, needle),
+				parseDocument(main, filePath).program,
+				annotations,
+			)
+		}
+
+		it("should answer an annotation naming an imported Type with the Type, not 'Error'", () => {
+			expect(hoverAt(7, "Rectangle")?.content).toBe(
+				"{ width: Integer, height: Integer }",
+			)
+		})
+
+		it("should answer an import entry with what it bound", () => {
+			expect(hoverAt(2, "Rectangle")?.content).toBe(
+				"{ width: Integer, height: Integer }",
+			)
+			expect(hoverAt(3, "RectangleMeasurable")?.content).toBe(
+				"namespace RectangleMeasurable for { width: Integer, height: Integer }",
+			)
 		})
 	})
 

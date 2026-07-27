@@ -93,6 +93,7 @@ export function findHover(
 		visitNativeSignatures(parserProgram, program, state)
 		visitProtocolBodies(parserProgram, program, state)
 		visitChoicePayloads(parserProgram, program, state)
+		visitModuleSections(parserProgram, program, state)
 	}
 
 	visitAnnotations(annotations, state)
@@ -191,6 +192,79 @@ function documentationFor(
 // NOTE: Ties go to the newer candidate — children are visited after their
 // parents, so the deeper node wins. Every node in the Program is offered, so
 // the Type is only printed once a candidate has actually won.
+// NOTE: The entries of the two Module sections. The typed entry carries what it
+// bound but flattens its names to plain text, and the parser entry still holds
+// the Identifiers with their Positions — so the pair is matched by the entry's
+// own span, and the Identifier under the cursor answers with the bound Type.
+// An entry the linking refused (or a re-export, whose declaration lives in the
+// dependency) carries no Type and stays silent; its Diagnostic is already on it.
+function visitModuleSections(
+	parserProgram: parser.Program,
+	program: common.typed.Program,
+	state: State,
+): void {
+	let positionKey = (position: common.Position) =>
+		`${position.start.line}:${position.start.column}`
+
+	let typesByEntry = new Map<string, common.Type>()
+
+	for (let entry of [
+		...(program.imports?.entries ?? []),
+		...(program.exports?.entries ?? []),
+	]) {
+		if (entry.type !== null) {
+			typesByEntry.set(positionKey(entry.position), entry.type)
+		}
+	}
+
+	let visitEntry = (entry: {
+		name: parser.IdentifierNode
+		alias: parser.IdentifierNode | null
+		position: common.Position
+	}) => {
+		let type = typesByEntry.get(positionKey(entry.position))
+
+		if (type === undefined) {
+			return
+		}
+
+		for (let identifier of [entry.name, entry.alias]) {
+			if (identifier === null) {
+				continue
+			}
+
+			// NOTE: A Namespace prints as its bare name, which hovering that
+			// very name says nothing with — so it reads back as its
+			// declaration head instead, the way the declaring file spells it.
+			if (type.type === "Namespace") {
+				if (wins(state, identifier.position)) {
+					state.best = {
+						position: identifier.position,
+						content: `namespace ${identifier.content}${
+							type.targetType == null
+								? ""
+								: ` for ${printType(type.targetType)}`
+						}`,
+						documentation: null,
+					}
+				}
+
+				continue
+			}
+
+			consider(state, identifier.position, type, null)
+		}
+	}
+
+	for (let entry of parserProgram.imports?.entries ?? []) {
+		visitEntry(entry)
+	}
+
+	for (let entry of parserProgram.exports?.entries ?? []) {
+		visitEntry(entry)
+	}
+}
+
 function wins(state: State, position: common.Position): boolean {
 	if (!contains(position, state.cursor)) {
 		return false

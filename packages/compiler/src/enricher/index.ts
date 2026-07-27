@@ -174,23 +174,65 @@ export type EnrichedProgramInput = {
 // also the only way a cycle of Modules can be enriched: nothing inside an SCC
 // can be resolved before the rest of it. Diagnostics are collected per Program,
 // so each stays attributable to the file it came from.
+export type EnrichProgramsOptions = {
+	// NOTE: Called at the top of every hoist round, and once more after the
+	// last one, to bind whatever became bindable since — the seam a cycle of
+	// Modules needs: an import across an SCC can only be seeded once the
+	// dependency's declaration has hoisted, and the dependency's declaration
+	// may itself name something imported the other way. Answering `true`
+	// says something new was bound, which keeps the rounds going even when
+	// no declaration resolved.
+	//
+	// `final` marks the call after the last round, which is the last moment
+	// anything may be written into a Scope: the bodies are enriched next, and
+	// an entry still unbound by then has to be given up on rather than left
+	// for every use of its name to report.
+	seedRound?: (final: boolean) => boolean
+	// NOTE: Index of the one input whose written annotations are wanted — only
+	// a Hover ever asks, and only for the file under the cursor.
+	annotationsFor?: number
+}
+
+// NOTE: Annotations are collected around the WHOLE run rather than around one
+// Program's enrichment, because the hoist — which runs once over every input —
+// is where a top level declaration's written Types resolve, and they are
+// reused rather than re-resolved afterwards. A collector that wide holds every
+// input's annotations, so the entries are filtered to the Module asked about
+// by the path its Scope carries; the interleaved files of a cycle, and the
+// standard library's lazy load, record under other paths (or none at all) and
+// fall away in the same comparison.
 export const enrichPrograms = (
 	inputs: Array<EnrichedProgramInput>,
-	options: {
-		// NOTE: Called at the top of every hoist round, and once more after the
-		// last one, to bind whatever became bindable since — the seam a cycle of
-		// Modules needs: an import across an SCC can only be seeded once the
-		// dependency's declaration has hoisted, and the dependency's declaration
-		// may itself name something imported the other way. Answering `true`
-		// says something new was bound, which keeps the rounds going even when
-		// no declaration resolved.
-		//
-		// `final` marks the call after the last round, which is the last moment
-		// anything may be written into a Scope: the bodies are enriched next, and
-		// an entry still unbound by then has to be given up on rather than left
-		// for every use of its name to report.
-		seedRound?: (final: boolean) => boolean
-	} = {},
+	options: EnrichProgramsOptions = {},
+): Array<{
+	program: common.typed.Program
+	diagnostics: Array<common.Diagnostic>
+	annotations: Array<common.TypeAnnotation>
+}> => {
+	if (options.annotationsFor === undefined) {
+		return enrichProgramsInner(inputs, options).map((entry) => ({
+			...entry,
+			annotations: [],
+		}))
+	}
+
+	let { result, annotations } = collectAnnotations(
+		() => enrichProgramsInner(inputs, options),
+		{
+			modulePath:
+				inputs[options.annotationsFor]?.scope.modulePath ?? null,
+		},
+	)
+
+	return result.map((entry, index) => ({
+		...entry,
+		annotations: index === options.annotationsFor ? annotations : [],
+	}))
+}
+
+const enrichProgramsInner = (
+	inputs: Array<EnrichedProgramInput>,
+	options: EnrichProgramsOptions,
 ): Array<{
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>

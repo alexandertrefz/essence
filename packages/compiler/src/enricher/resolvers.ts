@@ -53,7 +53,7 @@ export function resolveType(
 ): common.Type {
 	let type = resolveTypeDeclaration(node, scope)
 
-	recordAnnotation(node, type)
+	recordAnnotation(node, type, scope)
 
 	return type
 }

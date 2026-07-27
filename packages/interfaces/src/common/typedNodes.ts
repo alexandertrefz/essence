@@ -65,6 +65,10 @@ export type ImportNode = {
 	source: string
 	modulePath: string | null
 	runtime: boolean
+	// NOTE: What the entry bound — the member under the local name, or the
+	// Type where only a Type came across. It is what a Hover over the entry
+	// prints; code generation never reads it.
+	type: Type | null
 	position: Position
 }
 
@@ -85,6 +89,9 @@ export type ExportNode = {
 	source: string | null
 	modulePath: string | null
 	runtime: boolean
+	// NOTE: What the entry publishes, for a Hover — null on a re-export, whose
+	// declaration lives in the dependency it forwards.
+	type: Type | null
 	position: Position
 }
 
