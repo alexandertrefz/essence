@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises"
 import { gzipSync } from "node:zlib"
 
 import { bundle, writeOutputs } from "@essence/compiler/bundler"
@@ -6,12 +5,16 @@ import {
 	containsErrors,
 	placelessDiagnostic,
 } from "@essence/compiler/diagnostics"
-import { enrichDocument, parseDocument } from "@essence/compiler/documents"
-import { optimise } from "@essence/compiler/optimiser"
-import { rewrite } from "@essence/compiler/rewriter"
-import { simplify } from "@essence/compiler/simplifier"
+import {
+	enrichDocument,
+	isStdlibDocument,
+	parseDocument,
+} from "@essence/compiler/documents"
+import { rewriteModules } from "@essence/compiler/rewriter"
 import { validate } from "@essence/compiler/validator"
 import type { common } from "@essence/interfaces"
+
+import { type CompileSession, createCompileSession } from "./session"
 
 // NOTE: One description of the Compiler pipeline, used by both the in-process
 // path and the worker path. Everything the CLI reports — stage timings, output
@@ -56,11 +59,27 @@ export type CompileRequest = {
 	sourcemap: boolean
 }
 
+// NOTE: One file of the compiled graph, with the text its Diagnostics are
+// rendered against. `Diagnostic` is deliberately not widened with a file of its
+// own: which file a Diagnostic belongs to is a property of the collection it
+// was gathered into, and every collection here is one Module's.
+export type CompiledModule = {
+	fileName: string
+	sourceText: string
+	diagnostics: Array<common.Diagnostic>
+}
+
+// NOTE: `diagnostics` is every Module's, in the order the Modules are listed,
+// and then whatever belongs to the compilation itself rather than to a source
+// file — an unreadable entry, a failed bundle, a Compiler that threw. The
+// layout is what `ownDiagnostics` reads the tail off, so a Module dropped from
+// a batch takes its own Diagnostics with it and leaves the rest standing.
 export type CompileOutcome = {
 	inputFileName: string
 	outputFileName: string | null
 	ok: boolean
 	sourceText: string
+	modules: Array<CompiledModule>
 	diagnostics: Array<common.Diagnostic>
 	timings: Array<StageTiming>
 	duration: number
@@ -71,6 +90,70 @@ export type CompileOutcome = {
 }
 
 export type ProgressReporter = (stage: StageName) => void
+
+export function ownDiagnostics(
+	outcome: CompileOutcome,
+): Array<common.Diagnostic> {
+	return outcome.diagnostics.slice(
+		outcome.modules.reduce(
+			(total, module) => total + module.diagnostics.length,
+			0,
+		),
+	)
+}
+
+// NOTE: Every file of a batch reported by exactly one outcome. A dependency
+// that is also an entry belongs to its own outcome; every other shared file
+// goes to the first outcome that reached it. Only the Diagnostics move — the
+// Module list stays whole, because `esc watch` reads it to learn which files a
+// rebuild depends on, and a file two entries share has to wake both of them.
+export function attributeDiagnostics(
+	outcomes: Array<CompileOutcome>,
+): Array<CompileOutcome> {
+	if (outcomes.length < 2) {
+		return outcomes
+	}
+
+	let owners = new Map<string, CompileOutcome>()
+
+	for (let outcome of outcomes) {
+		// NOTE: The entry Module of an outcome is the last one — everything
+		// ahead of it is something it depends on. Read that way rather than by
+		// canonicalising the name the caller wrote, so both sides of the
+		// comparison are spellings the graph itself produced.
+		let entry = outcome.modules.at(-1)
+
+		if (entry !== undefined && !owners.has(entry.fileName)) {
+			owners.set(entry.fileName, outcome)
+		}
+	}
+
+	for (let outcome of outcomes) {
+		for (let module of outcome.modules) {
+			if (!owners.has(module.fileName)) {
+				owners.set(module.fileName, outcome)
+			}
+		}
+	}
+
+	return outcomes.map((outcome) => {
+		let own = ownDiagnostics(outcome)
+		let modules = outcome.modules.map((module) =>
+			owners.get(module.fileName) === outcome
+				? module
+				: { ...module, diagnostics: [] },
+		)
+
+		return {
+			...outcome,
+			modules,
+			diagnostics: [
+				...modules.flatMap((module) => module.diagnostics),
+				...own,
+			],
+		}
+	})
+}
 
 class Timeline {
 	private timings: Array<StageTiming> = []
@@ -101,7 +184,7 @@ class Timeline {
 }
 
 function readError(error: unknown, fileName: string): common.Diagnostic {
-	let code = (error as NodeJS.ErrnoException).code
+	let code = (error as NodeJS.ErrnoException | undefined)?.code
 
 	if (code === "ENOENT") {
 		return placelessDiagnostic(
@@ -137,13 +220,157 @@ function readError(error: unknown, fileName: string): common.Diagnostic {
 	)
 }
 
+// NOTE: What the front of the pipeline produced: the Modules to report about,
+// the typed Programs to emit from — one per Module, in the same order — and the
+// stage it stopped at, if it did. `programs` is null exactly when nothing may
+// be emitted, which is not the same as an empty graph.
+type Front = {
+	entryPath: string
+	sourceText: string
+	modules: Array<CompiledModule>
+	programs: Array<common.typed.Program> | null
+	diagnostics: Array<common.Diagnostic>
+	failedStage: StageName | null
+}
+
+function unreadableFront(
+	request: CompileRequest,
+	entryPath: string,
+	error: unknown,
+): Front {
+	return {
+		entryPath,
+		sourceText: "",
+		modules: [],
+		programs: null,
+		diagnostics: [readError(error, request.inputFileName)],
+		failedStage: "read",
+	}
+}
+
+// NOTE: The graph the entry names, enriched. Every file it reaches is read,
+// parsed and linked through the Session, so a batch loads each of them once
+// however many of its entries reach it.
+async function linkGraph(
+	request: CompileRequest,
+	timeline: Timeline,
+	session: CompileSession,
+): Promise<Front> {
+	let read = await timeline.run("read", () =>
+		session.read(request.inputFileName),
+	)
+
+	if ("error" in read) {
+		return unreadableFront(request, read.filePath, read.error)
+	}
+
+	let parsed = await timeline.run("parse", () =>
+		session.modules(request.inputFileName),
+	)
+	let modules = parsed.map<CompiledModule>((module) => ({
+		fileName: module.filePath,
+		sourceText: module.sourceText,
+		diagnostics: [...module.diagnostics],
+	}))
+	let front: Front = {
+		entryPath: read.filePath,
+		sourceText: read.sourceText,
+		modules,
+		programs: null,
+		diagnostics: [],
+		failedStage: null,
+	}
+
+	// NOTE: A specifier that names nothing is a parse-stage answer as much as a
+	// syntax error is: the graph resolved every entry while it was reading the
+	// files, and linking a graph with a hole in it would report the same
+	// mistake again as a name that is not in scope.
+	if (containsErrors(modules.flatMap((module) => module.diagnostics))) {
+		return { ...front, failedStage: "parse" }
+	}
+
+	let linked = await timeline.run("enrich", () =>
+		session.linked(request.inputFileName),
+	)
+
+	front.modules = linked.map<CompiledModule>((module) => ({
+		fileName: module.module.filePath,
+		sourceText: module.module.sourceText,
+		diagnostics: [...module.diagnostics],
+	}))
+
+	if (containsErrors(front.modules.flatMap((module) => module.diagnostics))) {
+		return { ...front, failedStage: "enrich" }
+	}
+
+	return { ...front, programs: linked.map((module) => module.program) }
+}
+
+// NOTE: A standard library source, which is not a Module: it is one shared
+// declaration space, its `declarations { … }` header is a permission no other
+// file has, and its own names are already builtins by the time it is read.
+// `enrichDocument` is what knows all three, and it takes one Program — so this
+// file is compiled the way it was before Modules, alone.
+//
+// The seam matters beyond the standard library itself: `esc check` on one of
+// its sources and the Editor's view of the same file have to agree, or a
+// Compiler developer can not check their own transcription.
+async function enrichDeclarations(
+	request: CompileRequest,
+	timeline: Timeline,
+	session: CompileSession,
+): Promise<Front> {
+	let read = await timeline.run("read", () =>
+		session.read(request.inputFileName),
+	)
+
+	if ("error" in read) {
+		return unreadableFront(request, read.filePath, read.error)
+	}
+
+	let parsed = await timeline.run("parse", () =>
+		parseDocument(read.sourceText, request.inputFileName),
+	)
+	let module: CompiledModule = {
+		fileName: read.filePath,
+		sourceText: read.sourceText,
+		diagnostics: [...parsed.diagnostics],
+	}
+	let front: Front = {
+		entryPath: read.filePath,
+		sourceText: read.sourceText,
+		modules: [module],
+		programs: null,
+		diagnostics: [],
+		failedStage: null,
+	}
+
+	if (containsErrors(module.diagnostics)) {
+		return { ...front, failedStage: "parse" }
+	}
+
+	let enriched = await timeline.run("enrich", () =>
+		enrichDocument(parsed.program, request.inputFileName),
+	)
+
+	module.diagnostics.push(...enriched.diagnostics)
+
+	if (containsErrors(module.diagnostics)) {
+		return { ...front, failedStage: "enrich" }
+	}
+
+	return { ...front, programs: [enriched.program] }
+}
+
 export async function compileFile(
 	request: CompileRequest,
 	report?: ProgressReporter,
+	session: CompileSession = createCompileSession([request.inputFileName]),
 ): Promise<CompileOutcome> {
 	let started = performance.now()
 	let timeline = new Timeline(report)
-	let diagnostics: Array<common.Diagnostic> = []
+	let modules: Array<CompiledModule> = []
+	let own: Array<common.Diagnostic> = []
 	let sourceText = ""
 
 	let finish = (
@@ -155,7 +382,11 @@ export async function compileFile(
 		outputFileName: request.outputFileName,
 		ok,
 		sourceText,
-		diagnostics,
+		modules,
+		diagnostics: [
+			...modules.flatMap((module) => module.diagnostics),
+			...own,
+		],
 		timings: timeline.entries,
 		duration: performance.now() - started,
 		bytes: null,
@@ -166,49 +397,31 @@ export async function compileFile(
 	})
 
 	try {
-		try {
-			sourceText = await timeline.run("read", () =>
-				readFile(request.inputFileName, "utf8"),
-			)
-		} catch (error) {
-			diagnostics.push(readError(error, request.inputFileName))
+		let front = await (isStdlibDocument(request.inputFileName)
+			? enrichDeclarations(request, timeline, session)
+			: linkGraph(request, timeline, session))
 
-			return finish(false, "read")
+		modules = front.modules
+		own.push(...front.diagnostics)
+		sourceText = front.sourceText
+
+		if (front.failedStage !== null || front.programs === null) {
+			return finish(false, front.failedStage)
 		}
 
-		// NOTE: Routed through the same seam the Language Server uses, so that
-		// `esc check packages/stdlib/sources/List.es` and the Editor agree about the file
-		// in front of them. Without it the CLI rejected the `declarations { … }`
-		// header of the very sources it loads at startup — the exact inversion
-		// of the invariant, and a compiler developer could not check their own
-		// transcription.
-		let parsed = await timeline.run("parse", () =>
-			parseDocument(sourceText, request.inputFileName),
-		)
+		let programs = front.programs
 
-		diagnostics.push(...parsed.diagnostics)
+		// NOTE: Validation runs over the whole graph, and only once nothing in
+		// it has reported an error — a Module that failed to enrich carries
+		// Types that were never established, and validating those answers about
+		// the failure rather than about the source.
+		await timeline.run("validate", () => {
+			for (let [index, program] of programs.entries()) {
+				modules[index]?.diagnostics.push(...validate(program))
+			}
+		})
 
-		if (containsErrors(diagnostics)) {
-			return finish(false, "parse")
-		}
-
-		let enriched = await timeline.run("enrich", () =>
-			enrichDocument(parsed.program, request.inputFileName),
-		)
-
-		diagnostics.push(...enriched.diagnostics)
-
-		if (containsErrors(diagnostics)) {
-			return finish(false, "enrich")
-		}
-
-		let validated = await timeline.run("validate", () =>
-			validate(enriched.program),
-		)
-
-		diagnostics.push(...validated)
-
-		if (containsErrors(diagnostics)) {
+		if (containsErrors(modules.flatMap((module) => module.diagnostics))) {
 			return finish(false, "validate")
 		}
 
@@ -219,14 +432,26 @@ export async function compileFile(
 		}
 
 		let simplified = await timeline.run("simplify", () =>
-			simplify(enriched.program),
+			programs.map((program) => session.simplify(program)),
 		)
 
 		let optimised = await timeline.run("optimise", () =>
-			optimise(simplified),
+			simplified.map((program) => session.optimise(program)),
 		)
 
-		let generated = await timeline.run("generate", () => rewrite(optimised))
+		// NOTE: The whole graph is rewritten in one call, which is what shares
+		// the standard library prelude between its Modules — rewriting them
+		// one at a time would put a copy of every reachable Essence Method into
+		// every Module that reaches it.
+		let generated = await timeline.run("generate", () =>
+			rewriteModules(
+				optimised.map((program, index) => ({
+					filePath: modules[index]!.fileName,
+					program,
+				})),
+				front.entryPath,
+			),
+		)
 
 		let bundled = await timeline.run("bundle", () =>
 			bundle(generated, {
@@ -237,9 +462,9 @@ export async function compileFile(
 			}),
 		)
 
-		diagnostics.push(...bundled.diagnostics)
+		own.push(...bundled.diagnostics)
 
-		if (containsErrors(diagnostics)) {
+		if (containsErrors(bundled.diagnostics)) {
 			return finish(false, "bundle")
 		}
 
@@ -257,7 +482,7 @@ export async function compileFile(
 		// NOTE: A throw that reaches here is a Compiler bug rather than a
 		// problem with the source. It is reported as a Diagnostic so that a
 		// batch compile keeps going, and the stack is kept for --verbose.
-		diagnostics.push(
+		own.push(
 			placelessDiagnostic(
 				"error",
 				`Internal Compiler error: ${

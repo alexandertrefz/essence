@@ -3,7 +3,7 @@ import * as path from "node:path"
 import { renderDiagnostics } from "@essence/compiler/diagnostics/render"
 import type { common } from "@essence/interfaces"
 
-import type { CompileOutcome, StageName } from "./pipeline"
+import { type CompileOutcome, ownDiagnostics, type StageName } from "./pipeline"
 import type { Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"
 import { visibleLength } from "./theme"
@@ -101,22 +101,51 @@ function padVisibleStart(text: string, width: number): string {
 // NOTE: Diagnostics are rendered by the shared Ariadne renderer, the same one
 // the Language Server output is checked against, so a Diagnostic looks
 // identical wherever it is shown.
+//
+// One block per Module, against that Module's own source and under its own
+// name: an excerpt of the importer's text at a dependency's line numbers would
+// point at whatever happens to be written there. What is left over belongs to
+// the compilation rather than to a file — an unreadable entry, a failed bundle
+// — and is rendered against the entry, which is the file the caller named.
+//
+// NOTE: Each block closes with its own tally, because each is one file's worth
+// of problems. The compilation's total is the headline underneath them all.
 export function renderDiagnosticsFor(
 	outcome: CompileOutcome,
 	context: ReportContext,
 ): string | null {
-	if (outcome.diagnostics.length === 0) {
+	let blocks: Array<string> = []
+
+	for (let module of outcome.modules) {
+		if (module.diagnostics.length === 0) {
+			continue
+		}
+
+		blocks.push(
+			renderDiagnostics(
+				module.diagnostics,
+				module.sourceText,
+				displayPath(module.fileName),
+				{ color: context.theme.color },
+			),
+		)
+	}
+
+	let own = ownDiagnostics(outcome)
+
+	if (own.length > 0) {
+		blocks.push(
+			renderDiagnostics(own, outcome.sourceText, outcome.inputFileName, {
+				color: context.theme.color,
+			}),
+		)
+	}
+
+	if (blocks.length === 0) {
 		return null
 	}
 
-	let rendered = renderDiagnostics(
-		outcome.diagnostics,
-		outcome.sourceText,
-		outcome.inputFileName,
-		{ color: context.theme.color },
-	)
-
-	return rendered.replace(/\n$/, "")
+	return blocks.join("").replace(/\n$/, "")
 }
 
 function stageBar(

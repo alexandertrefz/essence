@@ -5,7 +5,11 @@ import {
 	resolveOutputFiles,
 	totalSourceBytes,
 } from "./inputs"
-import { type CompileOutcome, stageLabels } from "./pipeline"
+import {
+	attributeDiagnostics,
+	type CompileOutcome,
+	stageLabels,
+} from "./pipeline"
 import {
 	type CompileDispatcher,
 	createInlineDispatcher,
@@ -84,6 +88,11 @@ export async function runCompilation(
 		enabled: !context.options.json && !context.options.quiet,
 	})
 
+	// NOTE: The whole run's entries first, and only then the requests. A Module
+	// is compiled as a graph, and the graphs of a batch overlap: which files are
+	// going to be asked for decides how many times each of them is read.
+	plan.dispatcher.begin(plan.inputFileNames)
+
 	let tasks = plan.inputFileNames.map<Task>((fileName) => ({
 		id: fileName,
 		label: displayPath(fileName),
@@ -128,7 +137,10 @@ export async function runCompilation(
 	progress.stop()
 
 	return {
-		outcomes,
+		// NOTE: A file two entries reach is reported by one of them. Without
+		// this a batch counts a shared dependency's errors once per entry that
+		// imports it, and prints its excerpt as many times.
+		outcomes: attributeDiagnostics(outcomes),
 		duration: performance.now() - started,
 		workers: plan.dispatcher.size,
 	}

@@ -6,6 +6,7 @@ import * as path from "node:path"
 import { EXIT_SUCCESS } from "./actions"
 import type { CommandSpec } from "./commands"
 import {
+	type CompilationResult,
 	planCompilation,
 	printCompilationResult,
 	runCompilation,
@@ -47,7 +48,64 @@ export async function runWatch(
 	let pending = new Set<string>()
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null
 	let building = false
-	let watchers: Array<ReturnType<typeof watchPath>> = []
+	let watchers = new Map<string, ReturnType<typeof watchPath>>()
+
+	// NOTE: Every file of every entry's graph, and which entries to rebuild when
+	// it changes — a dependency is never rebuilt as an entry of its own, because
+	// what it changes is the output of the Modules that import it. A file two
+	// entries reach wakes both.
+	let dependents = new Map<string, Set<string>>()
+
+	let recordGraphs = (result: CompilationResult): void => {
+		for (let outcome of result.outcomes) {
+			let entry = path.resolve(outcome.inputFileName)
+
+			for (let files of dependents.values()) {
+				files.delete(outcome.inputFileName)
+			}
+
+			for (let fileName of [
+				entry,
+				...outcome.modules.map((module) => module.fileName),
+			]) {
+				let files = dependents.get(fileName)
+
+				if (files === undefined) {
+					dependents.set(fileName, new Set([outcome.inputFileName]))
+				} else {
+					files.add(outcome.inputFileName)
+				}
+			}
+		}
+
+		for (let [fileName, files] of dependents) {
+			if (files.size === 0) {
+				dependents.delete(fileName)
+			}
+		}
+	}
+
+	// NOTE: The entries whose graph a changed file sits in. A file nobody
+	// reached any more — a dependency an import was just deleted from — is
+	// simply not in the map, and nothing is rebuilt for it.
+	let entriesFor = (fileNames: Array<string>): Array<string> => {
+		let entries = new Set<string>()
+
+		for (let fileName of fileNames) {
+			for (let entry of dependents.get(fileName) ?? []) {
+				entries.add(entry)
+			}
+		}
+
+		return [...entries]
+	}
+
+	let watchedFiles = (): Array<string> => [
+		...new Set([
+			...plan.inputFileNames.map((fileName) => path.resolve(fileName)),
+			...dependents.keys(),
+		]),
+	]
 
 	let stopProgram = () => {
 		if (running !== null && running.exitCode === null) {
@@ -95,6 +153,9 @@ export async function runWatch(
 			...plan,
 			inputFileNames: targets,
 		})
+
+		recordGraphs(result)
+		await watchGraph()
 
 		for (let outcome of result.outcomes) {
 			let rendered = renderDiagnosticsFor(outcome, context.report)
@@ -157,11 +218,17 @@ export async function runWatch(
 		}
 	}
 
+	// NOTE: Only files not seen before. A rebuild takes long enough for a save
+	// to land while it runs, and re-reading a signature that is already held
+	// would adopt that save as the state everything is compared against — the
+	// change would be watched for and never noticed.
 	async function captureSignatures(): Promise<void> {
 		await Promise.all(
-			plan.inputFileNames.map(async (fileName) => {
-				signatures.set(fileName, await signature(fileName))
-			}),
+			watchedFiles()
+				.filter((fileName) => !signatures.has(fileName))
+				.map(async (fileName) => {
+					signatures.set(fileName, await signature(fileName))
+				}),
 		)
 	}
 
@@ -169,7 +236,7 @@ export async function runWatch(
 		let changed: Array<string> = []
 
 		await Promise.all(
-			plan.inputFileNames.map(async (fileName) => {
+			watchedFiles().map(async (fileName) => {
 				let current = await signature(fileName)
 
 				if (
@@ -184,8 +251,44 @@ export async function runWatch(
 			}),
 		)
 
-		if (changed.length > 0) {
-			schedule(changed)
+		let targets = entriesFor(changed)
+
+		if (targets.length > 0) {
+			schedule(targets)
+		}
+	}
+
+	// NOTE: One watcher per directory holding a file of some graph, added as the
+	// graphs grow — an import written during the session brings a directory with
+	// it, and a rebuild that never watched it would be the last one.
+	async function watchGraph(): Promise<void> {
+		await captureSignatures()
+
+		for (let fileName of watchedFiles()) {
+			let directory = path.dirname(fileName)
+
+			if (watchers.has(directory)) {
+				continue
+			}
+
+			try {
+				watchers.set(
+					directory,
+					watchPath(directory, () => {
+						void checkForChanges()
+					}),
+				)
+			} catch (error) {
+				terminal.err(
+					`  ${palette.warning(theme.symbols.warning)} ${palette.muted(
+						`Could not watch ${directory}: ${
+							error instanceof Error
+								? error.message
+								: String(error)
+						}`,
+					)}`,
+				)
+			}
 		}
 	}
 
@@ -207,36 +310,12 @@ export async function runWatch(
 	}
 
 	footer()
-
-	let directories = new Set(
-		plan.inputFileNames.map((fileName) =>
-			path.dirname(path.resolve(fileName)),
-		),
-	)
-
-	await captureSignatures()
-
-	for (let directory of directories) {
-		try {
-			watchers.push(
-				watchPath(directory, () => {
-					void checkForChanges()
-				}),
-			)
-		} catch (error) {
-			terminal.err(
-				`  ${palette.warning(theme.symbols.warning)} ${palette.muted(
-					`Could not watch ${directory}: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-				)}`,
-			)
-		}
-	}
+	recordGraphs(initial)
+	await watchGraph()
 
 	return new Promise<number>((resolve) => {
 		let shutdown = async () => {
-			for (let watcher of watchers) {
+			for (let watcher of watchers.values()) {
 				watcher.close()
 			}
 
