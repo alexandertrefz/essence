@@ -10,6 +10,19 @@
 	},
 	"author": "Alexander Trefz",
 	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/cli",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/cli"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"compiler",
+		"cli"
+	],
 	"dependencies": {
 		"@essence/ariadne": "workspace:*",
 		"@essence/compiler": "workspace:*",

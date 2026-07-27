@@ -14,5 +14,18 @@
 		"./parser": "./src/parser.ts"
 	},
 	"author": "Alexander Trefz",
-	"license": "MIT"
+	"license": "MIT",
+	"homepage": "https://github.com/alexandertrefz/essence/tree/master/packages/interfaces",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
+		"directory": "packages/interfaces"
+	},
+	"bugs": "https://github.com/alexandertrefz/essence/issues",
+	"keywords": [
+		"essence",
+		"language",
+		"compiler",
+		"types"
+	]
 }

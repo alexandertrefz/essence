@@ -30,7 +30,7 @@
 		"typescript": "7.0.2"
 	},
 	"repository": {
-		"url": "https://atrefz@github.com/atrefz/essence.git",
+		"url": "git+https://github.com/alexandertrefz/essence.git",
 		"type": "git"
 	},
 	"trustedDependencies": [
