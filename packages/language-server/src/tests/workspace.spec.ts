@@ -267,6 +267,64 @@ describe("Workspace", () => {
 				),
 			).toEqual(new Set(["Left.es"]))
 		})
+
+		// NOTE: What Go to Definition returns — the joined symbol's
+		// `filePath`/`definition` pair must point at the declaration BEHIND an
+		// import entry, not at the entry itself, or a definition request from
+		// the entry answers with the very line it was asked from.
+		it("should point a definition asked on an import entry at the declaration behind it", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tRectangle from "./Geometry.es"',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let main = workspace.sourceOf(pathOf("Main.es")) ?? ""
+			let symbol = workspace.symbolAt(
+				pathOf("Main.es"),
+				cursorAt(main, 2, "Rectangle"),
+			)
+
+			expect(symbol?.filePath).toBe(pathOf("Geometry.es"))
+			expect(symbol?.definition?.start.line).toBe(3)
+		})
+
+		it("should point a definition asked on a use of an imported name at the declaration too", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tRectangle from "./Geometry.es"',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction widthOf(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape.width",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let main = workspace.sourceOf(pathOf("Main.es")) ?? ""
+			let symbol = workspace.symbolAt(
+				pathOf("Main.es"),
+				cursorAt(main, 6, "Rectangle"),
+			)
+
+			expect(symbol?.filePath).toBe(pathOf("Geometry.es"))
+			expect(symbol?.definition?.start.line).toBe(3)
+		})
 	})
 
 	describe("rename", () => {
