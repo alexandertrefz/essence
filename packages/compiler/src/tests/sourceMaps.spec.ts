@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
 import { type RawSourceMap, SourceMapConsumer } from "source-map"
 
-import { moduleSpecifier, PRELUDE_SPECIFIER } from "../bundler/index"
+import { bundle, moduleSpecifier, PRELUDE_SPECIFIER } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
 import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
@@ -117,19 +119,26 @@ describe("Source Maps", () => {
 
 		for (let [specifier, plainText] of plain.sources) {
 			let mappedText = mapped.sources.get(specifier)!
-			let withoutComment = mappedText.slice(0, mappedText.lastIndexOf("\n"))
+			let commentStart = mappedText.lastIndexOf(`\n${inlineMapPrefix}`)
+			let withoutComment =
+				commentStart === -1
+					? mappedText
+					: mappedText.slice(0, commentStart)
 
 			expect([specifier, withoutComment]).toEqual([specifier, plainText])
 		}
 	})
 
-	it("declares the prelude unmappable rather than unmapped", () => {
+	// NOTE: An empty map would not help — esbuild ignores one and self-maps the
+	// module anyway — so the prelude simply carries none, and the Bundler's
+	// final pass is what strips its lines from the bundle's map.
+	it("gives the prelude no map of its own", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let { sources } = rewriteModules(inputs, entryPath, { sourcemap: true })
-		let map = decodeInlineMap(sources.get(PRELUDE_SPECIFIER)!)
 
-		expect(map.sources).toEqual([])
-		expect(map.mappings).toBe("")
+		expect(
+			sources.get(PRELUDE_SPECIFIER)!.includes("sourceMappingURL"),
+		).toBe(false)
 	})
 
 	it("emits no comment at all when no map was asked for", () => {
@@ -141,6 +150,123 @@ describe("Source Maps", () => {
 				specifier,
 				false,
 			])
+		}
+	})
+
+	// NOTE: The composition seam, pinned end to end: esbuild reads each
+	// Module's inline map off the plugin-served contents and folds it into the
+	// bundle's own, so the FINAL map — the one a debugger loads — names the
+	// on-disk `.es` files, carries their text, and lands a known Function on
+	// its declaring line. Nothing touches disk; `write: false` keeps the
+	// outputs in memory.
+	it("composes through esbuild into the bundle's final map", async () => {
+		let { inputs, entryPath, texts } = moduleInputs()
+		let generated = rewriteModules(inputs, entryPath, { sourcemap: true })
+
+		let result = await bundle(generated, {
+			sourceFileName: entryPath,
+			outputFileName: join(tmpdir(), "essence-sourcemaps", "Main.js"),
+			sourcemap: true,
+		})
+
+		expect(result.diagnostics).toEqual([])
+
+		let mapOutput = result.outputs.find((output) =>
+			output.path.endsWith(".map"),
+		)
+		let bundleOutput = result.outputs.find(
+			(output) => !output.path.endsWith(".map"),
+		)
+
+		expect(mapOutput).toBeDefined()
+		expect(bundleOutput).toBeDefined()
+
+		let map = JSON.parse(
+			new TextDecoder().decode(mapOutput!.contents),
+		) as RawSourceMap
+		let mainPath = fixturePath("modules", "Main.es")
+		let geometryPath = fixturePath("modules", "Geometry.es")
+
+		// NOTE: The absolute `.es` paths must survive esbuild verbatim — they
+		// are what a debugger binds breakpoints against, wherever the bundle
+		// itself ended up. And they must be ALONE in there: the prelude's and
+		// the inlined runtime's pseudo-sources are stripped by the Bundler, so
+		// everything that is not Essence reads as unmapped code to step over.
+		expect(map.sources).toContain(mainPath)
+		expect(map.sources).toContain(geometryPath)
+		expect(
+			map.sources.filter((source) => !source.endsWith(".es")),
+		).toEqual([])
+		expect(map.sourcesContent?.[map.sources.indexOf(geometryPath)]).toBe(
+			texts.get(geometryPath)!,
+		)
+
+		let bundleText = new TextDecoder().decode(bundleOutput!.contents)
+		let bundleLines = bundleText.split("\n")
+		let consumer = new SourceMapConsumer(map)
+
+		// NOTE: A top-level Function of the entry — `describe` survives
+		// tree-shaking because the entry calls it — lands on its declaring
+		// line, found in the text rather than hardcoded, so an edited fixture
+		// moves the expectation along with itself.
+		let describeLine =
+			bundleLines.findIndex((line) =>
+				line.includes("function describe("),
+			) + 1
+		let describeSourceLine =
+			texts
+				.get(mainPath)!
+				.split("\n")
+				.findIndex((line) => line.includes("function describe")) + 1
+
+		expect(describeLine).toBeGreaterThan(0)
+
+		let describeOriginal = consumer.originalPositionFor({
+			line: describeLine,
+			column: bundleLines[describeLine - 1]!.indexOf("function"),
+		})
+
+		expect(describeOriginal.source).toBe(mainPath)
+		expect(describeOriginal.line).toBe(describeSourceLine)
+
+		// NOTE: A Method's body reaches back into the Module that declared the
+		// Namespace — the first statement inside `area` is Geometry's, not the
+		// entry's. The Method HEAD stays unmapped (nothing rewrites it as an
+		// Expression), so the assertion reads the line after it.
+		let areaBodyLine =
+			bundleLines.findIndex((line) => line.includes("static area(")) + 2
+		let areaSourceLine =
+			texts
+				.get(geometryPath)!
+				.split("\n")
+				.findIndex((line) => line.includes("@.width::multiply")) + 1
+
+		expect(areaBodyLine).toBeGreaterThan(1)
+
+		let areaOriginal = consumer.originalPositionFor({
+			line: areaBodyLine,
+			column: Math.max(
+				bundleLines[areaBodyLine - 1]!.search(/\S/),
+				0,
+			),
+		})
+
+		expect(areaOriginal.source).toBe(geometryPath)
+		expect(areaOriginal.line).toBe(areaSourceLine)
+
+		// NOTE: The prelude's consts must stay unmapped — that is what its
+		// empty map is FOR — so no `.es` source may claim a `$es_` const's
+		// declaring line.
+		let preludeLine =
+			bundleLines.findIndex((line) => line.includes("var $es_")) + 1
+
+		if (preludeLine > 0) {
+			let preludeOriginal = consumer.originalPositionFor({
+				line: preludeLine,
+				column: 0,
+			})
+
+			expect(preludeOriginal.source).toBeNull()
 		}
 	})
 })

@@ -57,6 +57,10 @@ export type CompileRequest = {
 	outputFileName: string | null
 	minify: boolean
 	sourcemap: boolean
+	// NOTE: How the map reaches the output — `linked` beside it (the default),
+	// `inline` inside it, which is what `run`'s transient output needs. Read
+	// only when `sourcemap` is set.
+	sourcemapMode?: "linked" | "inline"
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -448,8 +452,10 @@ export async function compileFile(
 				optimised.map((program, index) => ({
 					filePath: modules[index]!.fileName,
 					program,
+					sourceText: modules[index]!.sourceText,
 				})),
 				front.entryPath,
+				{ sourcemap: request.sourcemap },
 			),
 		)
 
@@ -459,6 +465,7 @@ export async function compileFile(
 				outputFileName: request.outputFileName as string,
 				minify: request.minify,
 				sourcemap: request.sourcemap,
+				sourcemapMode: request.sourcemapMode,
 			}),
 		)
 

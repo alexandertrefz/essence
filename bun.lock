@@ -44,12 +44,12 @@
         "@essence/stdlib": "workspace:*",
         "esbuild": "0.28.1",
         "escodegen": "workspace:*",
+        "source-map": "0.6.1",
       },
       "devDependencies": {
         "@essence/fixtures": "workspace:*",
         "@types/escodegen": "0.0.10",
         "@types/estree": "1.0.9",
-        "source-map": "0.6.1",
       },
     },
     "packages/escodegen": {
