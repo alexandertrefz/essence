@@ -391,7 +391,11 @@ export function loadStdlibFrom(
 	}
 
 	let enrichStarted = performance.now()
-	let enriched = enrichPrograms(programs, scope)
+	// NOTE: The same Scope for every file — the standard library is one shared
+	// declaration space, and its sources are not Modules.
+	let enriched = enrichPrograms(
+		programs.map((program) => ({ program, scope })),
+	)
 	let enrichDuration = performance.now() - enrichStarted
 
 	throwOnAnyDiagnostics(

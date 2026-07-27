@@ -35,6 +35,27 @@ export function modulePathOf(scope: enricher.Scope): string | null {
 	return null
 }
 
+// NOTE: The Namespaces the Module around this Scope could have imported and did
+// not, answered by the nearest Scope that knows — the same parent-chain walk
+// `modulePathOf` makes, and for the same reason: a Method Invocation deep inside
+// a body has to reach what the Module's top level was told. Empty for a Program
+// that is no Module, which is every single file compile.
+export function unimportedNamespacesOf(
+	scope: enricher.Scope,
+): Array<enricher.UnimportedNamespace> {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.unimportedNamespaces !== undefined) {
+			return current.unimportedNamespaces()
+		}
+	}
+
+	return []
+}
+
 // NOTE: A fresh child Scope nested under `parent`, with every map empty — the
 // shape every block, body and Handler needs before it seeds its own bindings.
 // `overrides` pre-populates the few fields a caller wants set (a seeded `types`

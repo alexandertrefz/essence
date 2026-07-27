@@ -20,7 +20,17 @@ function corpus(): Array<{ name: string; filePath: string; source: string }> {
 		source: file.sourceText,
 	}))
 
-	for (let directory of [fixturePath(), fixturePath("diagnostics")]) {
+	// NOTE: The Module fixtures live in subdirectories of their own — a Module
+	// Diagnostic takes more than one file to provoke — and are listed here so
+	// they join the corpus, since they are the only sources in the repository
+	// carrying the two Module sections.
+	for (let directory of [
+		fixturePath(),
+		fixturePath("diagnostics"),
+		fixturePath("modules"),
+		fixturePath("modules", "math"),
+		fixturePath("diagnostics", "modules"),
+	]) {
 		for (let fileName of readdirSync(directory).sort()) {
 			if (!fileName.endsWith(".es")) {
 				continue

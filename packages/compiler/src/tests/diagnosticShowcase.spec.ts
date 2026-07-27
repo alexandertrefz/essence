@@ -8,6 +8,9 @@ import type { common } from "@essence/interfaces"
 import { containsErrors } from "../diagnostics/index"
 import { renderDiagnostics } from "../diagnostics/render"
 import { enrich } from "../enricher/index"
+import { loadModuleGraph } from "../modules/graph"
+import { diskModuleHost } from "../modules/host"
+import { linkModuleGraph } from "../modules/link"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
 
@@ -83,6 +86,84 @@ describe("Diagnostic Showcase", () => {
 						color: false,
 					}),
 				).toMatchSnapshot()
+			})
+		})
+	}
+})
+
+// NOTE: The Module showcases sit in a subdirectory of their own, because a
+// Module Diagnostic takes more than one file to provoke: a name is only
+// `not-exported` relative to the Module that kept it private. They are reached
+// through the graph and the linker rather than through `enrich`, which is the
+// only way an entry resolves to anything at all, and every Module the entry
+// reaches is rendered against its own source — the report a reader gets.
+const MODULE_SHOWCASES: Array<{ entry: string; reports: Array<string> }> = [
+	{
+		entry: "Main.es",
+		reports: ["Shapes.es", "Main.es"],
+	},
+	// NOTE: The two of them are one group, and a group has no order inside it —
+	// the entry is not last here, because nothing in a cycle is behind the rest
+	// of it.
+	{
+		entry: "Ping.es",
+		reports: ["Ping.es", "Pong.es"],
+	},
+]
+
+describe("Module Diagnostic Showcase", () => {
+	for (let showcase of MODULE_SHOWCASES) {
+		describe(showcase.entry, () => {
+			let graph = loadModuleGraph(
+				fixturePath("diagnostics", "modules", showcase.entry),
+				diskModuleHost,
+			)
+			let linked = linkModuleGraph(graph)
+			let modules = [...linked.modules.values()]
+
+			it("should reach every Module of the showcase", () => {
+				expect(
+					modules.map((module) =>
+						path.basename(module.module.filePath),
+					),
+				).toEqual(showcase.reports)
+			})
+
+			it("should stay broken", () => {
+				expect(
+					modules.flatMap((module) => module.diagnostics).length,
+				).toBeGreaterThan(0)
+			})
+
+			it("should give every Diagnostic a code and a labelled span", () => {
+				for (let module of modules) {
+					for (let diagnostic of module.diagnostics) {
+						expect(diagnostic.code).toBeString()
+						expect(diagnostic.position).not.toBeNull()
+						expect(diagnostic.labels?.length ?? 0).toBeGreaterThan(
+							0,
+						)
+					}
+				}
+			})
+
+			// NOTE: No absolute path may appear in a report — a canonical path
+			// names a place on the machine that compiled, so a Diagnostic
+			// carrying one would read differently for every reader, and this
+			// snapshot could not be committed at all.
+			it("should render the same report every time", () => {
+				for (let module of modules) {
+					let fileName = path.basename(module.module.filePath)
+					let report = renderDiagnostics(
+						module.diagnostics,
+						module.module.sourceText,
+						fileName,
+						{ color: false },
+					)
+
+					expect(report).not.toContain(fixturePath())
+					expect(report).toMatchSnapshot(fileName)
+				}
 			})
 		})
 	}

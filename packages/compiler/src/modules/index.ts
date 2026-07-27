@@ -4,6 +4,13 @@
 export { loadModuleGraph, type Module, type ModuleGraph } from "./graph"
 export { diskModuleHost, type ModuleHost } from "./host"
 export {
+	type DeclaredKind,
+	type ExportSurface,
+	linkModuleGraph,
+	type LinkedGraph,
+	type LinkedModule,
+} from "./link"
+export {
 	canonicalPath,
 	resolveSpecifier,
 	type SpecifierRejection,

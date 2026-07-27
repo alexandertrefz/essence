@@ -3846,6 +3846,69 @@ function namespaceCandidatesFor(
 	return candidates.sort((lhs, rhs) => lhs.order - rhs.order)
 }
 
+// NOTE: Which of the given Namespaces target `baseType`, in the order they were
+// given in. Separated from the Scope walk above because the graph-aware half of
+// "no such Method" asks the same question of Namespaces that are NOT in Scope —
+// the ones a dependency exports and this Module never imported — and the answer
+// has to be decided by exactly the rule dispatch is decided by, or the help
+// would name a Namespace that would not have resolved anyway.
+export function namespacesTargeting(
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+): Map<string, common.NamespaceType> {
+	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
+
+	// NOTE: Generic Namespaces match their target Type by binding the
+	// Namespace's Generics against the receiver — the bindings are only used
+	// for the selection here, Method resolution re-binds them from the
+	// receiver Argument.
+	for (let { name, namespace } of namespaceCandidatesFor(
+		namespaces,
+		baseType,
+	)) {
+		if (namespace.targetType) {
+			if (namespace.targetType.type === "UnionType") {
+				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
+				// the Union target as a whole — the per-member loop below only
+				// covers receivers of a single member Type.
+				if (
+					matchesTypeWithBindings(
+						namespace.targetType,
+						baseType,
+						createInferenceContext(namespace.generics),
+					)
+				) {
+					matchingNamespaces.set(name, namespace)
+					continue
+				}
+
+				for (let type of namespace.targetType.types) {
+					if (
+						matchesTypeWithBindings(
+							type,
+							baseType,
+							createInferenceContext(namespace.generics),
+						)
+					) {
+						matchingNamespaces.set(name, namespace)
+						break
+					}
+				}
+			} else if (
+				matchesTypeWithBindings(
+					namespace.targetType,
+					baseType,
+					createInferenceContext(namespace.generics),
+				)
+			) {
+				matchingNamespaces.set(name, namespace)
+			}
+		}
+	}
+
+	return matchingNamespaces
+}
+
 export function resolveMethodLookupNamespacesForReceiverType(
 	baseType: common.Type,
 	namespaceSpecifier: parser.MethodInvocationNode["namespaceSpecifier"],
@@ -3902,54 +3965,11 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	let namespaces = getAllNamespacesInScope(scope, namespaceSpecifier)
-
-	// NOTE: Generic Namespaces match their target Type by binding the
-	// Namespace's Generics against the receiver — the bindings are only used
-	// for the selection here, Method resolution re-binds them from the
-	// receiver Argument.
-	for (let { name, namespace } of namespaceCandidatesFor(
-		namespaces,
+	for (let [name, namespace] of namespacesTargeting(
+		getAllNamespacesInScope(scope, namespaceSpecifier),
 		baseType,
 	)) {
-		if (namespace.targetType) {
-			if (namespace.targetType.type === "UnionType") {
-				// NOTE: A Union-typed receiver (`Ordering`, `Number`) matches
-				// the Union target as a whole — the per-member loop below only
-				// covers receivers of a single member Type.
-				if (
-					matchesTypeWithBindings(
-						namespace.targetType,
-						baseType,
-						createInferenceContext(namespace.generics),
-					)
-				) {
-					matchingNamespaces.set(name, namespace)
-					continue
-				}
-
-				for (let type of namespace.targetType.types) {
-					if (
-						matchesTypeWithBindings(
-							type,
-							baseType,
-							createInferenceContext(namespace.generics),
-						)
-					) {
-						matchingNamespaces.set(name, namespace)
-						break
-					}
-				}
-			} else if (
-				matchesTypeWithBindings(
-					namespace.targetType,
-					baseType,
-					createInferenceContext(namespace.generics),
-				)
-			) {
-				matchingNamespaces.set(name, namespace)
-			}
-		}
+		matchingNamespaces.set(name, namespace)
 	}
 
 	return matchingNamespaces

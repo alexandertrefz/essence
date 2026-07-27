@@ -437,7 +437,10 @@ describe("Standard Library Loader", () => {
 		}
 
 		let { result, diagnostics } = collectDiagnostics(() =>
-			enrichPrograms([left.program, right.program], scope),
+			enrichPrograms([
+				{ program: left.program, scope },
+				{ program: right.program, scope },
+			]),
 		)
 
 		// NOTE: Nothing at all in the surrounding collection — the one that
@@ -493,7 +496,10 @@ describe("Standard Library Loader", () => {
 		}
 
 		let { result, diagnostics } = collectDiagnostics(() =>
-			enrichPrograms([left.program, right.program], scope),
+			enrichPrograms([
+				{ program: left.program, scope },
+				{ program: right.program, scope },
+			]),
 		)
 
 		expect(diagnostics).toEqual([])
@@ -956,7 +962,7 @@ describe("Standard Library Loader", () => {
 			}
 
 			let user = parseWithDiagnostics(source)
-			let [result] = enrichPrograms([user.program], scope)
+			let [result] = enrichPrograms([{ program: user.program, scope }])
 
 			expect(result!.diagnostics).toEqual([])
 
