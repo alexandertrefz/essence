@@ -1,6 +1,6 @@
 {
 	"name": "@essence/stdlib",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "The Essence standard library, written in Essence.",
 	"private": true,
 	"type": "module",
