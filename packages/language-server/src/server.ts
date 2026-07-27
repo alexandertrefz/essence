@@ -876,5 +876,16 @@ export function toLspCompletionItem(entry: CompletionEntry): CompletionItem {
 				: undefined,
 		insertTextFormat:
 			callable || fallback ? InsertTextFormat.Snippet : undefined,
+		// NOTE: Accepting a callable inserts the call's parentheses and commas
+		// as snippet text, so the trigger characters Signature Help listens
+		// for are never typed — without this nudge the parameter hints only
+		// ever appear for a call written out by hand.
+		command:
+			callable || fallback
+				? {
+						title: "Trigger parameter hints",
+						command: "editor.action.triggerParameterHints",
+					}
+				: undefined,
 	}
 }
