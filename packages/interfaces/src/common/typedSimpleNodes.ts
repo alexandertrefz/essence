@@ -18,12 +18,48 @@ import type {
 
 export type Program = {
 	nodeType: "Program"
+	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	exports: ExportSectionNode | null
 }
 
 export type ImplementationSectionNode = {
 	nodeType: "ImplementationSection"
 	nodes: Array<ImplementationNode>
+}
+
+export type ImportSectionNode = {
+	nodeType: "ImportSection"
+	entries: Array<ImportNode>
+}
+
+// NOTE: An entry reduced to what emission needs of it: the name the other
+// Module exports, the name this one binds it under, the Module it comes from
+// and whether it names anything the JavaScript binds at all. The specifier as
+// written is gone with the Positions — a Module is keyed by its canonical path
+// from here on, and nothing downstream reports about an entry.
+export type ImportNode = {
+	nodeType: "Import"
+	name: string
+	alias: string | null
+	modulePath: string | null
+	runtime: boolean
+}
+
+export type ExportSectionNode = {
+	nodeType: "ExportSection"
+	entries: Array<ExportNode>
+}
+
+// NOTE: `modulePath` is set exactly on a re-export, which forwards a name this
+// Module never bound — so emission reads it off that Module rather than out of
+// its own Scope.
+export type ExportNode = {
+	nodeType: "Export"
+	name: string
+	alias: string | null
+	modulePath: string | null
+	runtime: boolean
 }
 
 export type ImplementationNode = ExpressionNode | StatementNode

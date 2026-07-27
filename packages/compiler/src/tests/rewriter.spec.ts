@@ -23,6 +23,14 @@ import {
 	noCaseMatched,
 } from "@essence/runtime/type"
 
+import { containsErrors } from "../diagnostics/index"
+import { enrich } from "../enricher/index"
+import { optimise } from "../optimiser/index"
+import { parseWithDiagnostics } from "../parser/index"
+import { type ModuleInput, rewrite, rewriteModules } from "../rewriter/index"
+import { simplify } from "../simplifier/index"
+import { validate } from "../validator/index"
+
 const booleanTrue = () => boolean.createBoolean(true)
 const booleanFalse = () => boolean.createBoolean(false)
 const stringEmpty = () => string.createString("")
@@ -3131,6 +3139,161 @@ describe("Rewriter", () => {
 
 				expect(receivedArguments).toEqual([integerTwo(), "shared"])
 			})
+		})
+	})
+
+	// NOTE: The Modules half of emission. Everything here is about what the
+	// Rewriter does that `rewrite` on its own can not: one shared prelude
+	// instead of a copy per Module, and Case tags spelled against the entry's
+	// directory rather than against the machine that compiled.
+	describe("Modules", () => {
+		// NOTE: No graph and no file system: the paths are the Module identity
+		// and nothing reads them, so a Program that imports nothing can be
+		// enriched as a Module of a bundle straight away. What is under test is
+		// emission, and a graph here would only be a second copy of what
+		// `modules.spec.ts` pins.
+		function moduleOf(filePath: string, source: string): ModuleInput {
+			let parsed = parseWithDiagnostics(source)
+
+			expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+			let enriched = enrich(parsed.program, { modulePath: filePath })
+
+			expect(containsErrors(enriched.diagnostics)).toBe(false)
+			expect(containsErrors(validate(enriched.program))).toBe(false)
+
+			return {
+				filePath,
+				program: optimise(simplify(enriched.program)),
+			}
+		}
+
+		function declarationsOf(source: string, name: string): number {
+			return (
+				source.match(
+					new RegExp(
+						`(?:const|let|var|function)\\s+\\${name}\\b`,
+						"g",
+					),
+				) ?? []
+			).length
+		}
+
+		let printing = (value: string) =>
+			`implementation {\n\t__print(${value}::toString())\n}\n`
+
+		it("emits one copy of a standard library Method three Modules share", () => {
+			let bundle = rewriteModules(
+				[
+					moduleOf("/project/Main.es", printing("true")),
+					moduleOf("/project/Second.es", printing("false")),
+					moduleOf("/project/deep/Third.es", printing("true")),
+				],
+				"/project/Main.es",
+			)
+
+			expect([...bundle.sources.keys()]).toEqual([
+				"essence:$prelude",
+				"essence:./Main.es",
+				"essence:./Second.es",
+				"essence:./deep/Third.es",
+			])
+
+			// NOTE: `Boolean.toString` is written in Essence, so each of the
+			// three reaches the same `$es_Boolean_toString` const. Rewritten
+			// one at a time they would carry three copies of its body — which
+			// is the whole reason the reachability fixed point runs once over
+			// their union.
+			let declarations = [...bundle.sources.values()].map((source) =>
+				declarationsOf(source, "$es_Boolean_toString"),
+			)
+
+			expect(declarations).toEqual([1, 0, 0, 0])
+
+			for (let specifier of [
+				"essence:./Main.es",
+				"essence:./Second.es",
+				"essence:./deep/Third.es",
+			]) {
+				expect(bundle.sources.get(specifier)).toContain(
+					'import { $es_Boolean_toString } from "essence:$prelude"',
+				)
+			}
+
+			expect(bundle.sources.get("essence:$prelude")).toContain(
+				"$es_Boolean_toString",
+			)
+			expect(bundle.entry).toBe("essence:./Main.es")
+		})
+
+		// NOTE: A Method no Module reaches is not emitted at all, exactly as it
+		// is not for a lone Program — the prelude is one shared Module, not a
+		// standard library the bundle carries whole.
+		it("leaves out a Method no Module of the bundle reaches", () => {
+			let bundle = rewriteModules(
+				[moduleOf("/project/Main.es", printing("true"))],
+				"/project/Main.es",
+			)
+
+			expect(bundle.sources.get("essence:$prelude")).not.toContain(
+				"$es_List_sorted",
+			)
+		})
+
+		// NOTE: The identity a Choice took from its Module is a canonical path,
+		// which names the machine that compiled and must not reach the output.
+		// The emitted tag renders it against the entry's directory instead, and
+		// the Type descriptor a Match compares against renders identically —
+		// they are one answer, so a value's tag and the check that claims it can
+		// not drift apart.
+		it("spells a Case tag against the entry's directory", () => {
+			let source = `implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	constant chosen: Colour = #Red
+
+	__print(match chosen -> String {
+		case Colour { <- "a Colour" }
+	})
+}
+`
+			let bundle = rewriteModules(
+				[moduleOf("/project/deep/Main.es", source)],
+				"/project/deep/Main.es",
+			)
+			let emitted = bundle.sources.get("essence:./Main.es")!
+
+			expect(emitted).toContain(
+				'$type.createCase("./Main.es#Colour#Red")',
+			)
+			expect(emitted).toContain('choice: "./Main.es#Colour"')
+			expect(emitted).not.toContain("/project")
+		})
+
+		// NOTE: The single-file form is the default and stays byte for byte
+		// what it was: its prelude is inline, it names no Module and it spells
+		// a Case by its bare name, because a Program that is no Module has no
+		// path in its Choices' identity to render.
+		it("keeps a lone Program's prelude inline and its tags bare", () => {
+			let parsed = parseWithDiagnostics(`implementation {
+	choice Colour {
+		Red,
+	}
+
+	constant chosen: Colour = #Red
+
+	__print(true::toString())
+}
+`)
+			let enriched = enrich(parsed.program)
+			let generated = rewrite(optimise(simplify(enriched.program)))
+
+			expect(declarationsOf(generated, "$es_Boolean_toString")).toBe(1)
+			expect(generated).not.toContain("essence:")
+			expect(generated).toContain('$type.createCase("Colour#Red")')
 		})
 	})
 })

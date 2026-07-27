@@ -5,9 +5,12 @@ import { fixturePath } from "@essence/fixtures"
 
 import { bundle } from "../bundler/index"
 import { enrich } from "../enricher/index"
+import { loadModuleGraph } from "../modules/graph"
+import { diskModuleHost } from "../modules/host"
+import { linkModuleGraph } from "../modules/link"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
-import { rewrite } from "../rewriter/index"
+import { rewrite, rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
@@ -85,5 +88,59 @@ describe("Bundle Size", () => {
 	// 11 kB with `bigint-fraction`'s departure — same story as Everyday's.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(34_000)
+	})
+
+	// NOTE: The same claim for a bundle of several Modules, where it is far
+	// easier to lose: rewriting each Module on its own would give every one of
+	// them its own copy of every Essence-implemented standard library Method it
+	// reaches, and the bundle would carry as many `Optional::otherwise` as there
+	// are Modules that call it. The Module fixtures reach two of them from two
+	// files each, so a per-Module prelude shows up here as four consts and as
+	// about a kilobyte.
+	//
+	// NOTE: Counted as well as measured. The count is what the claim actually
+	// IS — one const per Method, whatever it weighs — and it is taken against
+	// the ONE prelude Module rather than against itself, because a second copy
+	// would not be spelled alike: esbuild renames a colliding top-level name,
+	// so two `$es_List_sorted` become `$es_List_sorted` and `$es_List_sorted2`
+	// and a test that only deduplicated the names would pass. The ceiling
+	// catches a copy that arrives by some other route again. Measured 12,067
+	// bytes.
+	it("carries one copy of the prelude across a bundle of Modules", async () => {
+		let linked = linkModuleGraph(
+			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
+		)
+
+		let sources = rewriteModules(
+			[...linked.modules.values()].map((module) => ({
+				filePath: module.module.filePath,
+				program: optimise(simplify(module.program)),
+			})),
+			linked.entryPath,
+		)
+
+		let result = await bundle(sources, {
+			sourceFileName: "Main.es",
+			outputFileName: "bundle.js",
+		})
+
+		expect(result.diagnostics).toEqual([])
+		expect(result.outputs).toHaveLength(1)
+
+		let essenceConsts = (text: string) =>
+			[
+				...text.matchAll(
+					/(?:const|let|var|function)\s+(\$es_[A-Za-z0-9_$]+)/g,
+				),
+			].map((match) => match[1]!)
+
+		let inPrelude = essenceConsts(sources.sources.get("essence:$prelude")!)
+		let inBundle = essenceConsts(
+			new TextDecoder().decode(result.outputs[0]!.contents),
+		)
+
+		expect(inBundle.length).toBeGreaterThan(0)
+		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(13_000)
 	})
 })

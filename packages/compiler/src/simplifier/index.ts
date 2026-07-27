@@ -11,7 +11,51 @@ export const simplify = (
 ): common.typedSimple.Program => {
 	return {
 		nodeType: "Program",
+		imports: simplifyImportSection(program.imports),
 		implementation: simplifyImplementationSection(program.implementation),
+		exports: simplifyExportSection(program.exports),
+	}
+}
+
+// NOTE: Both sections travel through untouched but for their Positions and the
+// specifiers as written — neither survives simplification anywhere else, and
+// nothing downstream reports about an entry. What emission needs is the
+// canonical path and the `runtime` flag linking annotated each entry with.
+function simplifyImportSection(
+	section: common.typed.ImportSectionNode | null,
+): common.typedSimple.ImportSectionNode | null {
+	if (section === null) {
+		return null
+	}
+
+	return {
+		nodeType: "ImportSection",
+		entries: section.entries.map((entry) => ({
+			nodeType: "Import",
+			name: entry.name,
+			alias: entry.alias,
+			modulePath: entry.modulePath,
+			runtime: entry.runtime,
+		})),
+	}
+}
+
+function simplifyExportSection(
+	section: common.typed.ExportSectionNode | null,
+): common.typedSimple.ExportSectionNode | null {
+	if (section === null) {
+		return null
+	}
+
+	return {
+		nodeType: "ExportSection",
+		entries: section.entries.map((entry) => ({
+			nodeType: "Export",
+			name: entry.name,
+			alias: entry.alias,
+			modulePath: entry.modulePath,
+			runtime: entry.runtime,
+		})),
 	}
 }
 

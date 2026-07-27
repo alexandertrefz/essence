@@ -5,6 +5,11 @@ import { RUNTIME_DIRECTORY } from "@essence/runtime"
 import { generate } from "escodegen"
 import type * as estree from "estree"
 
+import {
+	type ModuleSources,
+	moduleSpecifier,
+	PRELUDE_SPECIFIER,
+} from "../bundler/index"
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
 import {
 	ESSENCE_METHOD_PREFIX,
@@ -53,6 +58,12 @@ export const runtimeNamespaceNames = [
 // text. It does read the file system once, indirectly — the standard library
 // prelude is built from the sources the loader reads at startup — so "pure" here
 // means same input, same output, not "touches nothing".
+//
+// NOTE: This is the single-file form and stays the DEFAULT: one Program, its
+// whole prelude inline, no ESM list either way — a Program's Module sections are
+// ignored here, because a lone Program is a bundle of one and has nobody to
+// import from or publish to. `rewriteModules` is the other form, and the two
+// emit through the same helpers rather than through two copies of them.
 export function rewrite(program: common.typedSimple.Program): string {
 	const prelude = stdlibPrelude()
 
@@ -76,15 +87,12 @@ export function rewrite(program: common.typedSimple.Program): string {
 		type: "Program",
 		sourceType: "module",
 		body: [
-			...runtimeNamespaceNames.map((name) =>
-				internalImport([importNamespaceSpecifier(name)], name),
-			),
-			internalImport([importNamespaceSpecifier("$_")], "functions"),
-			internalImport([importNamespaceSpecifier("$type")], "type"),
-			internalImport(
-				[importNamespaceSpecifier("$helpers")],
-				"internalHelpers",
-			),
+			// NOTE: Every runtime module, whether this Program names it or not:
+			// esbuild shakes an unused `import * as <Name>` away, so the head of
+			// a lone Program costs nothing and stays what it always was. A
+			// Module of a bundle asks for what it names instead — there are
+			// twenty heads to read through there rather than one.
+			...runtimeImports(allRuntimeNames()),
 			// NOTE: Imports first — an Essence Method's const reads the runtime
 			// modules those imports bind. Then the Essence-implemented members,
 			// in the two bands `orderEssenceMembers` puts them in: the
@@ -100,7 +108,11 @@ export function rewrite(program: common.typedSimple.Program): string {
 		new Set(essenceMembers.keys()),
 	)
 
-	return generate(rewrittenProgram, {
+	return generateProgram(rewrittenProgram)
+}
+
+function generateProgram(program: estree.Program): string {
+	return generate(program, {
 		format: {
 			indent: {
 				style: "\t",
@@ -112,6 +124,380 @@ export function rewrite(program: common.typedSimple.Program): string {
 			quotes: "double",
 		},
 	})
+}
+
+// NOTE: One Module of a bundle: the canonical path it is keyed by — which is
+// also what the Choices it declares take their identity from — and the Program
+// that path parsed into.
+export type ModuleInput = {
+	filePath: string
+	program: common.typedSimple.Program
+}
+
+// NOTE: A whole graph of Modules, emitted as one bundle's worth of JavaScript.
+//
+// The prelude is what makes this more than N calls to `rewrite`. A Program's
+// Essence-implemented standard library Methods are emitted as top-level
+// `$es_<Namespace>_<member>` consts, and rewriting each Module on its own would
+// give every one of them its own copy — a bundle carrying as many `List::sorted`
+// as there are Modules that reach it. So the bodies are rewritten first, the
+// existing reachability fixed point is run ONCE over their union, and the
+// consts are emitted into one synthetic Module every other one imports what it
+// names from.
+//
+// NOTE: The runtime Namespace imports are per Module and per name here, where a
+// single-file Program emits all of them unconditionally. Both answers are
+// correct — esbuild shakes an unused `import * as <Name>` away — and this one
+// keeps a Module's emitted head to what its body actually reads, which is worth
+// having when there are twenty of them to read through.
+export function rewriteModules(
+	modules: Array<ModuleInput>,
+	entryPath: string,
+): ModuleSources {
+	let entryDirectory = path.dirname(entryPath)
+	let spellings = new Map(
+		modules.map((module) => [
+			module.filePath,
+			moduleSpelling(entryDirectory, module.filePath),
+		]),
+	)
+
+	return withModuleSpellings(spellings, () => {
+		let prelude = stdlibPrelude()
+		let freeFunctions = stdlibFreeFunctions()
+		let bodies = modules.map((module) => ({
+			module,
+			body: rewriteImplementationSection(module.program.implementation),
+		}))
+
+		let essenceMembers = reachableEssenceMethods(
+			prelude,
+			bodies.flatMap((rewritten) => rewritten.body),
+			freeFunctions,
+		)
+
+		let declared = new Set(essenceMembers.keys())
+		let sources = new Map<string, string>()
+		let preludeProgram = preludeModule(essenceMembers)
+
+		checkEssenceMethodsAreDeclared(preludeProgram, declared)
+		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
+
+		for (let { module, body } of bodies) {
+			let names = referencedNames(body)
+			let preludeNames = [...essenceMembers.keys()].filter((name) =>
+				names.has(name),
+			)
+
+			let moduleProgram: estree.Program = {
+				type: "Program",
+				sourceType: "module",
+				body: [
+					...runtimeImports(names),
+					...(preludeNames.length === 0
+						? []
+						: [
+								namedImport(
+									preludeNames.map((name) => [name, name]),
+									PRELUDE_SPECIFIER,
+								),
+							]),
+					...moduleImports(module.program, spellings),
+					...body,
+					...moduleExports(module.program, spellings),
+				],
+			}
+
+			checkEssenceMethodsAreDeclared(moduleProgram, declared)
+			sources.set(
+				moduleSpecifier(spellings.get(module.filePath)!),
+				generateProgram(moduleProgram),
+			)
+		}
+
+		return {
+			entry: moduleSpecifier(
+				spellings.get(entryPath) ??
+					moduleSpelling(entryDirectory, entryPath),
+			),
+			sources,
+		}
+	})
+}
+
+// NOTE: The shared prelude, as its own Module: the runtime imports its consts
+// read, the consts themselves in the two bands `orderEssenceMembers` puts them
+// in, and one export list naming every one of them. Every const is exported
+// whether or not anything imports it — esbuild shakes the unimported ones away,
+// and deciding here which are named would mean running the fixed point once per
+// Module to find out.
+function preludeModule(members: Map<string, EssenceMember>): estree.Program {
+	let declarations = orderEssenceMembers(members)
+	let names = [...members.keys()]
+
+	return {
+		type: "Program",
+		sourceType: "module",
+		body: [
+			...runtimeImports(referencedNames(declarations)),
+			...declarations,
+			...(names.length === 0
+				? []
+				: [namedExport(names.map((name) => [name, name]))]),
+		],
+	}
+}
+
+// NOTE: The three runtime modules that are not a builtin Namespace, under the
+// aliases every emission site reads them by.
+const runtimeModuleAliases = [
+	["$_", "functions"],
+	["$type", "type"],
+	["$helpers", "internalHelpers"],
+] as const
+
+function allRuntimeNames(): Set<string> {
+	return new Set([
+		...runtimeNamespaceNames,
+		...runtimeModuleAliases.map(([name]) => name),
+	])
+}
+
+// NOTE: The `import * as <Name>` head of one emitted module, restricted to the
+// runtime modules the given names mention — the whole set for a lone Program,
+// what its body reads for a Module of a bundle. `referencedNames` over-collects,
+// which is the safe direction: an import nothing reads costs a line esbuild
+// removes, while a missing one is a `ReferenceError` out of a Program that
+// compiled green.
+function runtimeImports(
+	names: ReadonlySet<string>,
+): Array<estree.ImportDeclaration> {
+	let imports: Array<estree.ImportDeclaration> = []
+
+	for (let name of runtimeNamespaceNames) {
+		if (names.has(name)) {
+			imports.push(internalImport([importNamespaceSpecifier(name)], name))
+		}
+	}
+
+	for (let [name, fileName] of runtimeModuleAliases) {
+		if (names.has(name)) {
+			imports.push(
+				internalImport([importNamespaceSpecifier(name)], fileName),
+			)
+		}
+	}
+
+	return imports
+}
+
+// NOTE: What one Module imports from the others, grouped per Module so the
+// emitted head reads like the source's own block. An entry whose name erases —
+// a Type Alias, a Choice, a Protocol — contributes nothing to bind, but the
+// Module it names still has to RUN before this one, and in the order the source
+// states: so a dependency left without a single named binding gets a bare
+// `import "…"` instead. Without it a Module whose only export is a Type would
+// have its top-level Statements run wherever the bundler happened to place it,
+// or not at all.
+function moduleImports(
+	program: common.typedSimple.Program,
+	spellings: ReadonlyMap<string, string>,
+): Array<estree.ImportDeclaration> {
+	let named = new Map<string, Array<[string, string]>>()
+	let mentioned: Array<string> = []
+
+	let mention = (specifier: string): void => {
+		if (!named.has(specifier)) {
+			named.set(specifier, [])
+			mentioned.push(specifier)
+		}
+	}
+
+	for (let entry of program.imports?.entries ?? []) {
+		let specifier = specifierOf(entry.modulePath, spellings)
+
+		if (specifier === null) {
+			continue
+		}
+
+		mention(specifier)
+
+		if (entry.runtime) {
+			named
+				.get(specifier)!
+				.push([
+					escapeName(entry.name),
+					escapeName(entry.alias ?? entry.name),
+				])
+		}
+	}
+
+	// NOTE: A re-export names a Module this one never binds anything from, and
+	// it is a dependency all the same — a facade whose only mention of a Module
+	// is one of these still has to run it.
+	for (let entry of program.exports?.entries ?? []) {
+		let specifier = specifierOf(entry.modulePath, spellings)
+
+		if (specifier !== null && !entry.runtime) {
+			mention(specifier)
+		}
+	}
+
+	return mentioned.map((specifier) =>
+		namedImport(named.get(specifier)!, specifier),
+	)
+}
+
+// NOTE: What one Module publishes, under the name its export block gave it. A
+// re-export forwards straight from the Module it names — it was never bound
+// here, so there is nothing local to forward — and an entry whose name erases
+// publishes nothing at all: `moduleImports` above is what keeps that Module's
+// body running anyway.
+function moduleExports(
+	program: common.typedSimple.Program,
+	spellings: ReadonlyMap<string, string>,
+): Array<estree.ExportNamedDeclaration> {
+	let local: Array<[string, string]> = []
+	let forwarded = new Map<string, Array<[string, string]>>()
+
+	for (let entry of program.exports?.entries ?? []) {
+		if (!entry.runtime) {
+			continue
+		}
+
+		let names: [string, string] = [
+			escapeName(entry.name),
+			escapeName(entry.alias ?? entry.name),
+		]
+		let specifier = specifierOf(entry.modulePath, spellings)
+
+		if (specifier === null) {
+			local.push(names)
+
+			continue
+		}
+
+		let entries = forwarded.get(specifier)
+
+		if (entries === undefined) {
+			forwarded.set(specifier, [names])
+		} else {
+			entries.push(names)
+		}
+	}
+
+	return [
+		...(local.length === 0 ? [] : [namedExport(local)]),
+		...[...forwarded].map(([specifier, names]) =>
+			namedExport(names, specifier),
+		),
+	]
+}
+
+function specifierOf(
+	modulePath: string | null,
+	spellings: ReadonlyMap<string, string>,
+): string | null {
+	if (modulePath === null) {
+		return null
+	}
+
+	let spelling = spellings.get(modulePath)
+
+	return spelling === undefined ? null : moduleSpecifier(spelling)
+}
+
+function namedImport(
+	names: Array<[string, string]>,
+	specifier: string,
+): estree.ImportDeclaration {
+	return {
+		type: "ImportDeclaration",
+		specifiers: names.map(([imported, local]) => ({
+			type: "ImportSpecifier",
+			imported: { type: "Identifier", name: imported },
+			local: { type: "Identifier", name: local },
+		})),
+		attributes: [],
+		source: { type: "Literal", value: specifier },
+	}
+}
+
+function namedExport(
+	names: Array<[string, string]>,
+	specifier?: string,
+): estree.ExportNamedDeclaration {
+	return {
+		type: "ExportNamedDeclaration",
+		declaration: null,
+		specifiers: names.map(([local, exported]) => ({
+			type: "ExportSpecifier",
+			local: { type: "Identifier", name: local },
+			exported: { type: "Identifier", name: exported },
+		})),
+		attributes: [],
+		...(specifier === undefined
+			? {}
+			: { source: { type: "Literal" as const, value: specifier } }),
+	}
+}
+
+// NOTE: How a Module's canonical path is spelled in emitted output — relative
+// to the ENTRY's directory, so a bundle names its own Modules the way the entry
+// would have written them and never the machine that compiled. Tags need to
+// agree within one bundle only: a bundle is standalone and can exchange no
+// value with another at run time.
+function moduleSpelling(entryDirectory: string, filePath: string): string {
+	let relative = path
+		.relative(entryDirectory, filePath)
+		.split(path.sep)
+		.join("/")
+
+	return relative.startsWith("../") ? relative : `./${relative}`
+}
+
+// NOTE: The canonical path of every Module of the bundle being emitted, and how
+// each is spelled. Empty for a single-file Program — which is why its Case tags
+// and Type descriptors come out byte for byte as they did before Modules: a
+// Choice identified by its bare name has no path in it to render.
+let moduleSpellings: ReadonlyMap<string, string> = new Map()
+
+// NOTE: `finally`, for the same reason the Namespace scope stack has one: a
+// throw out of the emission of one bundle must not leave the next Program in
+// this process rendering its tags against a graph it is not part of.
+function withModuleSpellings<Value>(
+	spellings: ReadonlyMap<string, string>,
+	emit: () => Value,
+): Value {
+	moduleSpellings = spellings
+
+	try {
+		return emit()
+	} finally {
+		moduleSpellings = new Map()
+	}
+}
+
+// NOTE: One nominal identity as the bundle spells it. A Case tag is
+// `<Choice identity>#<Case>` and a Choice identity is `<Module path>#<Choice>`,
+// so what arrives here carries the canonical path of the Module that declared
+// it — which is a place on the machine that compiled and must not be emitted.
+// The path is replaced by the entry-relative spelling and nothing else changes,
+// so the tag a value is stamped with and the tag a Type descriptor compares it
+// against are rendered by this one answer and can not disagree.
+//
+// NOTE: Every string of an emitted Type descriptor comes through here, not just
+// the ones known to be tags. Over-rendering is impossible rather than merely
+// unlikely: a Module path is absolute, and no other string a descriptor can
+// hold — a Type's `type`, a Namespace's name, a Record member — is.
+function renderIdentity(text: string): string {
+	for (let [modulePath, spelling] of moduleSpellings) {
+		if (text.startsWith(`${modulePath}#`)) {
+			return `${spelling}${text.slice(modulePath.length)}`
+		}
+	}
+
+	return text
 }
 
 function rewriteImplementationSection(
@@ -1060,7 +1446,9 @@ function rewriteExpression(
 function rewriteCaseValue(
 	node: common.typedSimple.CaseValueNode,
 ): estree.CallExpression {
-	let args: Array<estree.Expression> = [{ type: "Literal", value: node.tag }]
+	let args: Array<estree.Expression> = [
+		{ type: "Literal", value: renderIdentity(node.tag) },
+	]
 
 	if (node.value !== null) {
 		args.push(rewriteExpression(node.value))
@@ -2210,7 +2598,10 @@ function convertValueToExpression(value: unknown): estree.Expression {
 		return convertObjectToObjectExpression(value)
 	}
 
-	return { type: "Literal", value } as estree.Literal
+	return {
+		type: "Literal",
+		value: typeof value === "string" ? renderIdentity(value) : value,
+	} as estree.Literal
 }
 
 // NOTE: A derived-equality descriptor emitted as a plain JSON-shaped literal.
@@ -2233,7 +2624,7 @@ function jsonExpression(value: unknown): estree.Expression {
 			properties: Object.entries(value).map<estree.Property>(
 				([key, entry]) => ({
 					type: "Property",
-					key: { type: "Literal", value: key },
+					key: { type: "Literal", value: renderIdentity(key) },
 					value: jsonExpression(entry),
 					kind: "init",
 					computed: false,
@@ -2244,7 +2635,10 @@ function jsonExpression(value: unknown): estree.Expression {
 		}
 	}
 
-	return { type: "Literal", value } as estree.Literal
+	return {
+		type: "Literal",
+		value: typeof value === "string" ? renderIdentity(value) : value,
+	} as estree.Literal
 }
 
 // NOTE: A Type descriptor emitted as the object literal the runtime's Type
