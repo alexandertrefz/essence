@@ -58,7 +58,9 @@ implementation {
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
 	__print(match 2::squareRoot() -> String {
 		case Algebraic {
-			<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {2::isGreaterThan(@)}, 1 + √2 = {1::add(@)}"
+			<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
+				2::isGreaterThan(@)
+			}, 1 + √2 = {1::add(@)}"
 		}
 		case Integer   { <- "collapsed" }
 		case Nothing   { <- "none" }

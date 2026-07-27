@@ -14,17 +14,14 @@ implementation {
 
 	namespace StringForNumber for Number {
 		string(_ foo: Boolean) -> String {
-			§ The match is named rather than written into the hole itself: a
-			§ String is reprinted exactly as it was written, so a `match` inside
-			§ one would keep whatever shape it was typed with forever.
-			constant number = match @ -> String {
+			§ A hole holds an Expression, however big — the `match` inside this
+			§ one is laid out and aligned like any other.
+			<- "stringForNumber: {match @ -> String {
 				case Integer        { <- @::toString() }
 				case Rational       { <- @::toString() }
 				case Algebraic      { <- @::toString() }
 				case Transcendental { <- @::toString() }
-			}
-
-			<- "stringForNumber: {number}"
+			}}"
 		}
 	}
 
