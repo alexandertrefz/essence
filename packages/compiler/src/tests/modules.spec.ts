@@ -14,11 +14,19 @@ import { fixturePath } from "@essence/fixtures"
 import type { common } from "@essence/interfaces"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
+import { bundle, type ModuleSources } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
 import { loadModuleGraph, type Module } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
-import { linkModuleGraph, type LinkedModule } from "../modules/link"
+import {
+	type LinkedGraph,
+	linkModuleGraph,
+	type LinkedModule,
+} from "../modules/link"
 import { canonicalPath, resolveSpecifier } from "../modules/resolve"
+import { optimise } from "../optimiser/index"
+import { rewriteModules } from "../rewriter/index"
+import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
 // NOTE: A project on disk, in a directory of its own that is removed again. The
@@ -38,17 +46,40 @@ function withProject<T>(
 	let directory = mkdtempSync(path.join(tmpdir(), "essence-modules-"))
 
 	try {
-		for (let [name, source] of Object.entries(files)) {
-			let filePath = path.join(directory, name)
-
-			mkdirSync(path.dirname(filePath), { recursive: true })
-			writeFileSync(filePath, source)
-		}
-
-		return work(realpathSync.native(directory))
+		return work(writeProject(directory, files))
 	} finally {
 		rmSync(directory, { recursive: true, force: true })
 	}
+}
+
+// NOTE: The same, for the tests that BUILD what they wrote — bundling and
+// running are asynchronous, and a `finally` that removed the directory around a
+// Promise would take the sources away while esbuild was still reading them.
+async function withBuiltProject<T>(
+	files: Record<string, string>,
+	work: (directory: string) => Promise<T>,
+): Promise<T> {
+	let directory = mkdtempSync(path.join(tmpdir(), "essence-modules-"))
+
+	try {
+		return await work(writeProject(directory, files))
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+function writeProject(
+	directory: string,
+	files: Record<string, string>,
+): string {
+	for (let [name, source] of Object.entries(files)) {
+		let filePath = path.join(directory, name)
+
+		mkdirSync(path.dirname(filePath), { recursive: true })
+		writeFileSync(filePath, source)
+	}
+
+	return realpathSync.native(directory)
 }
 
 // NOTE: The other kind of host: files that are not on disk at all, which is what
@@ -1900,5 +1931,308 @@ export {
 					.kinds,
 			).sort(),
 		).toEqual(["Rectangle", "describe"])
+	})
+})
+
+// NOTE: Every Module of a linked graph, through the stages the CLI runs after
+// linking. A Module that reported anything fails HERE, naming itself, rather
+// than emitting JavaScript nobody can account for.
+function generateModules(linked: LinkedGraph): ModuleSources {
+	return rewriteModules(
+		[...linked.modules.values()].map((module) => {
+			let name = path.basename(module.module.filePath)
+			let diagnostics = [...module.diagnostics]
+
+			if (!containsErrors(diagnostics)) {
+				diagnostics.push(...validate(module.program))
+			}
+
+			expect([name, reportsOf(diagnostics)]).toEqual([name, []])
+
+			return {
+				filePath: module.module.filePath,
+				program: optimise(simplify(module.program)),
+			}
+		}),
+		linked.entryPath,
+	)
+}
+
+// NOTE: Bundles the whole graph and imports the result, so its top-level
+// `__print` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
+// Program. The bundle is standalone: the runtime is inlined into it, so it runs
+// from wherever it is written.
+async function runBundle(
+	sources: ModuleSources,
+	directory: string,
+): Promise<Array<string>> {
+	let file = path.join(directory, "bundle.mjs")
+	let result = await bundle(sources, {
+		sourceFileName: "Main.es",
+		outputFileName: file,
+	})
+
+	expect(result.diagnostics).toEqual([])
+	expect(result.outputs).toHaveLength(1)
+
+	writeFileSync(file, result.outputs[0]!.contents)
+
+	let output: Array<string> = []
+	let originalLog = console.log
+
+	console.log = (...args: Array<unknown>) => {
+		output.push(args.map((argument) => String(argument)).join(" "))
+	}
+
+	try {
+		await import(file)
+	} finally {
+		console.log = originalLog
+	}
+
+	return output
+}
+
+describe("Module Code Generation", () => {
+	// NOTE: The end of the road for the fixtures: five files, a cycle among
+	// them, an aliased Constant, a re-export and a Namespace reached only
+	// through implicit dispatch — compiled into ONE standalone bundle and run.
+	// The three lines are the ones the fixture annotates itself with.
+	it("compiles the Module fixtures into one bundle and runs it", async () => {
+		let linked = linkModuleGraph(
+			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
+		)
+		let sources = generateModules(linked)
+
+		// NOTE: A rename travels as an ESM `as`, on either side — the emitted
+		// name is always the one the DECLARATION wrote, so the two Modules
+		// agree without either having to know what the other called it.
+		expect(sources.sources.get("essence:./math/Math.es")).toContain(
+			"squared as square",
+		)
+		expect(sources.sources.get("essence:./Main.es")).toContain("PI as Pi")
+
+		// NOTE: A re-export is forwarded straight from the Module it names, not
+		// bound here and exported again: `Rectangle` is never a binding of
+		// `Main.es`.
+		expect(sources.sources.get("essence:./Main.es")).toContain(
+			'} from "essence:./Geometry.es"',
+		)
+
+		await withBuiltProject({}, async (directory) => {
+			expect(await runBundle(sources, directory)).toEqual([
+				'"area: 12"',
+				'"25"',
+				'"157/1"',
+			])
+		})
+	})
+
+	// NOTE: A Module whose every exported name ERASES still has to run. There
+	// is nothing to import from it — a Type Alias is no binding — so the edge
+	// that orders the two bodies would be gone with it, and the dependency
+	// would run wherever the bundler happened to place it, or not at all. A
+	// bare `import "…"` is what keeps it.
+	it("runs a Module it imports nothing bindable from", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	Amount from "./Dep.es"
+}
+
+implementation {
+	function total(_ amount: Amount) -> Integer {
+		<- amount.cents
+	}
+
+	__print(total({ cents = 7 })::toString())
+}
+`,
+				"Dep.es": `implementation {
+	__print("Dep")
+
+	type Amount = { cents: Integer }
+}
+
+export {
+	Amount
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+
+				expect(sources.sources.get("essence:./Main.es")).toContain(
+					'import "essence:./Dep.es"',
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					'"Dep"',
+					'"7"',
+				])
+			},
+		)
+	})
+
+	// NOTE: A Module body runs ONCE, on first import, however many Modules
+	// reach it — which is what an emitted ESM graph gives for free and a
+	// concatenation of the bodies would not. The diamond is what makes it
+	// observable: `Shared.es` is named by both arms and by the entry, and its
+	// line appears once, ahead of everything that imports it.
+	it("runs a Module body once however many Modules import it", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	left  from "./Left.es"
+	right from "./Right.es"
+}
+
+implementation {
+	__print("Main")
+	__print(left()::add(right())::toString())
+}
+`,
+				"Left.es": `import {
+	shared from "./Shared.es"
+}
+
+implementation {
+	__print("Left")
+
+	function left() -> Integer {
+		<- shared()
+	}
+}
+
+export {
+	left
+}
+`,
+				"Right.es": `import {
+	shared from "./Shared.es"
+}
+
+implementation {
+	__print("Right")
+
+	function right() -> Integer {
+		<- shared()::multiply(with 2)
+	}
+}
+
+export {
+	right
+}
+`,
+				"Shared.es": `implementation {
+	__print("Shared")
+
+	function shared() -> Integer {
+		<- 21
+	}
+}
+
+export {
+	shared
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+
+				expect(
+					await runBundle(generateModules(linked), directory),
+				).toEqual(['"Shared"', '"Left"', '"Right"', '"Main"', '"63"'])
+			},
+		)
+	})
+
+	// NOTE: What the Module-qualified nominal identity buys, run rather than
+	// type checked: two Modules each declaring `choice Colour { Red, Green }`
+	// are two Types, so a value of one must not be claimed by a check written
+	// for the other. Unqualified they carried the same runtime tag, and this
+	// Program printed "mine" twice with no Diagnostic anywhere.
+	//
+	// NOTE: The check is `$type.isValueOfType` against the emitted Case
+	// descriptors, which is the same comparison an `is` makes — and the one
+	// place the tag a value was stamped with and the tag a descriptor names have
+	// to agree, both being rendered against the entry's directory.
+	it("keeps two Modules' same-named Choices apart at run time", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	Colour as Theirs from "./Other.es"
+	theirRed         from "./Other.es"
+}
+
+implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	constant mine: Colour = #Red
+
+	function describe(_ value: Colour | Theirs) -> String {
+		<- match value -> String {
+			case Colour { <- "mine" }
+			case Theirs { <- "theirs" }
+		}
+	}
+
+	__print(describe(mine))
+	__print(describe(theirRed))
+}
+`,
+				"Other.es": `implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	constant theirRed: Colour = #Red
+}
+
+export {
+	Colour
+	theirRed
+}
+`,
+			},
+			async (directory) => {
+				let linked = linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				)
+				let sources = generateModules(linked)
+
+				// NOTE: The two tags differ by the Module they were declared
+				// in, and neither names the machine that compiled.
+				expect(sources.sources.get("essence:./Main.es")).toContain(
+					'$type.createCase("./Main.es#Colour#Red")',
+				)
+				expect(sources.sources.get("essence:./Other.es")).toContain(
+					'$type.createCase("./Other.es#Colour#Red")',
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					'"mine"',
+					'"theirs"',
+				])
+			},
+		)
 	})
 })

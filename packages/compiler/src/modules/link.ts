@@ -221,6 +221,115 @@ type ModuleState = {
 	diagnostics: Array<common.Diagnostic>
 }
 
+// NOTE: Whether a name the surface publishes is one the emitted JavaScript
+// binds. A Type Alias, a Choice and a Protocol erase — the Rewriter emits an
+// empty Statement where each was declared — so an entry naming one must carry
+// no ESM binding, or the bundle would import a name the dependency's JavaScript
+// never exports; a Case needs none of its own either, since its tag is a String
+// Literal. The question is asked of the `values` table rather than of the
+// declared KIND because one name travels across every table it is bound in: a
+// `type Rectangle` beside a `namespace Rectangle` is declared as a Type first
+// and is a class in the emitted output all the same.
+function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
+	return surface !== null && surface.values[name] !== undefined
+}
+
+// NOTE: The two sections as the emitted Program needs them, attached to the
+// typed Program linking hands back. Enrichment leaves both null: whether an
+// entry names something the JavaScript binds is read off the other Module's
+// export surface, and enrichment never sees one.
+//
+// Only an entry that bound is carried. One that did not names something the
+// Module can not reach, which is a Diagnostic already — and code generation
+// never runs over a Module that reported one.
+function moduleSections(
+	state: ModuleState,
+	surface: ExportSurface,
+	surfaceFor: (filePath: string) => ExportSurface | null,
+): {
+	imports: common.typed.ImportSectionNode | null
+	exports: common.typed.ExportSectionNode | null
+} {
+	let importSection = state.module.program.imports
+	let exportSection = state.module.program.exports
+
+	return {
+		imports:
+			importSection === null
+				? null
+				: {
+						nodeType: "ImportSection",
+						entries: state.imports.flatMap((binding) => {
+							if (
+								binding.state !== "bound" ||
+								binding.dependencyPath === null
+							) {
+								return []
+							}
+
+							return [
+								{
+									nodeType: "Import" as const,
+									name: binding.entry.name.content,
+									alias:
+										binding.entry.alias === null
+											? null
+											: binding.entry.alias.content,
+									source: binding.entry.source.path,
+									modulePath: binding.dependencyPath,
+									runtime: isRuntimeName(
+										surfaceFor(binding.dependencyPath),
+										binding.entry.name.content,
+									),
+									position: binding.entry.position,
+								},
+							]
+						}),
+						position: importSection.position,
+					},
+		exports:
+			exportSection === null
+				? null
+				: {
+						nodeType: "ExportSection",
+						entries: [...state.exports].flatMap(
+							([publicName, entry]) => {
+								if (surface.kinds[publicName] === undefined) {
+									return []
+								}
+
+								return [
+									{
+										nodeType: "Export" as const,
+										name: entry.name.content,
+										alias:
+											entry.alias === null
+												? null
+												: entry.alias.content,
+										source:
+											entry.source === null
+												? null
+												: entry.source.path,
+										modulePath:
+											entry.source === null
+												? null
+												: (state.module.resolutions.get(
+														entry.source.path,
+													) ?? null),
+										runtime: isRuntimeName(
+											surface,
+											publicName,
+										),
+										position: entry.position,
+									},
+								]
+							},
+						),
+						position: exportSection.position,
+					},
+	}
+}
+
 // NOTE: A Namespace import binds a shallow COPY carrying the local name, because
 // the emitted Method call reads the Namespace Type's own `name` — an alias that
 // stopped at the Scope would emit a reference to a name the bundle never binds.
@@ -481,16 +590,21 @@ function linkGroup(
 			}
 		})
 
+		let surface = surfaceFor(state.module.filePath) ?? emptySurface()
+
 		return {
 			module: state.module,
-			program: enriched[index]!.program,
+			program: {
+				...enriched[index]!.program,
+				...moduleSections(state, surface, surfaceFor),
+			},
 			diagnostics: [
 				...state.module.diagnostics,
 				...state.diagnostics,
 				...enriched[index]!.diagnostics,
 				...diagnostics,
 			],
-			surface: surfaceFor(state.module.filePath) ?? emptySurface(),
+			surface,
 		}
 	})
 }

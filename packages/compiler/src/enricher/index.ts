@@ -127,7 +127,9 @@ export const enrich = (
 			if (options.annotations !== true) {
 				return {
 					nodeType: "Program",
+					imports: null,
 					implementation: enrichSection(),
+					exports: null,
 					position: program.position,
 				}
 			}
@@ -144,7 +146,9 @@ export const enrich = (
 
 			return {
 				nodeType: "Program",
+				imports: null,
 				implementation: collected.result,
+				exports: null,
 				position: program.position,
 			}
 		},
@@ -233,11 +237,13 @@ export const enrichPrograms = (
 
 				return {
 					nodeType: "Program",
+					imports: null,
 					implementation: enrichImplementation(
 						program.implementation,
 						scope,
 						hoistedTypes,
 					),
+					exports: null,
 					position: program.position,
 				}
 			},

@@ -25,13 +25,66 @@ import type {
 
 export type Program = {
 	nodeType: "Program"
+	// NOTE: Null for a Program that is no Module, which is every single file
+	// compile — and null out of enrichment even where the file wrote both
+	// sections, because linking is what attaches them. Whether an entry names
+	// something the emitted JavaScript has to bind is an answer only the
+	// dependency's export surface holds, and enrichment never sees one of those.
+	imports: ImportSectionNode | null
 	implementation: ImplementationSectionNode
+	exports: ExportSectionNode | null
 	position: Position
 }
 
 export type ImplementationSectionNode = {
 	nodeType: "ImplementationSection"
 	nodes: Array<ImplementationNode>
+	position: Position
+}
+
+export type ImportSectionNode = {
+	nodeType: "ImportSection"
+	entries: Array<ImportNode>
+	position: Position
+}
+
+// NOTE: `runtime` says whether this entry names something the emitted
+// JavaScript binds. A Type Alias, a Protocol and a Choice erase, and a Case
+// needs no binding of its own either — its tag is a String Literal — so an
+// entry naming one of them must never reach an emitted ESM list, where it
+// would import a name the dependency's JavaScript does not export.
+//
+// NOTE: `source` is the specifier exactly as it was written, for a reader;
+// `modulePath` is the canonical path it resolved to, which is what code
+// generation keys a Module on. It is null only where the specifier resolved to
+// nothing, which is a Diagnostic the graph reported already.
+export type ImportNode = {
+	nodeType: "Import"
+	name: string
+	alias: string | null
+	source: string
+	modulePath: string | null
+	runtime: boolean
+	position: Position
+}
+
+export type ExportSectionNode = {
+	nodeType: "ExportSection"
+	entries: Array<ExportNode>
+	position: Position
+}
+
+// NOTE: A `source` makes the entry a re-export, forwarding a dependency's name
+// without ever binding it in this Module — so `name` is the name the OTHER
+// Module publishes and `modulePath` says which one. Both are null on the
+// ordinary form, which exports a declaration of this Module's own.
+export type ExportNode = {
+	nodeType: "Export"
+	name: string
+	alias: string | null
+	source: string | null
+	modulePath: string | null
+	runtime: boolean
 	position: Position
 }
 
