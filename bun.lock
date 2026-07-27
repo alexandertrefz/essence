@@ -52,6 +52,23 @@
         "@types/estree": "1.0.9",
       },
     },
+    "packages/debug-adapter": {
+      "name": "@essence/debug-adapter",
+      "version": "0.0.1",
+      "bin": {
+        "esdap": "bin/esdap",
+      },
+      "dependencies": {
+        "@vscode/debugadapter": "1.68.0",
+        "@vscode/debugprotocol": "1.68.0",
+        "source-map": "0.6.1",
+      },
+      "devDependencies": {
+        "@essence/fixtures": "workspace:*",
+        "@essence/runtime": "workspace:*",
+        "@vscode/debugadapter-testsupport": "1.68.0",
+      },
+    },
     "packages/escodegen": {
       "name": "escodegen",
       "version": "2.1.0-essence.1",
@@ -117,7 +134,7 @@
     },
     "packages/vscode-extension": {
       "name": "essence-language",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "devDependencies": {
         "@essence/language-server": "workspace:*",
         "@vscode/vsce": "3.9.2",
@@ -223,6 +240,8 @@
     "@essence/cli": ["@essence/cli@workspace:packages/cli"],
 
     "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
+
+    "@essence/debug-adapter": ["@essence/debug-adapter@workspace:packages/debug-adapter"],
 
     "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
 
@@ -409,6 +428,12 @@
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
     "@typespec/ts-http-runtime": ["@typespec/ts-http-runtime@0.3.7", "", { "dependencies": { "http-proxy-agent": "^7.0.0", "https-proxy-agent": "^7.0.0", "tslib": "^2.6.2" } }, "sha512-JVUD8X2tfDMWjcjLs4yVxxVrS8yR5vnh386GAXT9Qj79nBxxXSaHFQZg5FweLmT8HlPQ3kii6noUB+Z9RN7DvQ=="],
+
+    "@vscode/debugadapter": ["@vscode/debugadapter@1.68.0", "", { "dependencies": { "@vscode/debugprotocol": "1.68.0" } }, "sha512-D6gk5Fw2y4FV8oYmltoXpj+VAZexxJFopN/mcZ6YcgzQE9dgq2L45Aj3GLxScJOD6GeLILcxJIaA8l3v11esGg=="],
+
+    "@vscode/debugadapter-testsupport": ["@vscode/debugadapter-testsupport@1.68.0", "", { "dependencies": { "@vscode/debugprotocol": "1.68.0" } }, "sha512-UpbaPsCGMKyjIvJFtqFKDD1MVvME50xuOtRBPrqY1WdhAOLjWQN7FcKEoHv3X85twfNL21jW2M54FYwEdEQv4Q=="],
+
+    "@vscode/debugprotocol": ["@vscode/debugprotocol@1.68.0", "", {}, "sha512-2J27dysaXmvnfuhFGhfeuxfHRXunqNPxtBoR3koiTOA9rdxWNDTa1zIFLCFMSHJ9MPTPKFcBeblsyaCJCIlQxg=="],
 
     "@vscode/vsce": ["@vscode/vsce@3.9.2", "", { "dependencies": { "@azure/identity": "^4.1.0", "@secretlint/node": "^10.1.2", "@secretlint/secretlint-formatter-sarif": "^10.1.2", "@secretlint/secretlint-rule-no-dotenv": "^10.1.2", "@secretlint/secretlint-rule-preset-recommend": "^10.1.2", "@vscode/vsce-sign": "^2.0.0", "azure-devops-node-api": "^12.5.0", "chalk": "^4.1.2", "cheerio": "^1.0.0-rc.9", "cockatiel": "^3.1.2", "commander": "^12.1.0", "form-data": "^4.0.0", "glob": "^13.0.6", "hosted-git-info": "^4.0.2", "jsonc-parser": "^3.2.0", "leven": "^3.1.0", "markdown-it": "^14.1.0", "mime": "^1.3.4", "minimatch": "^10.2.2", "parse-semver": "^1.1.1", "read": "^1.0.7", "secretlint": "^10.1.2", "semver": "^7.5.2", "tmp": "^0.2.3", "typed-rest-client": "^1.8.4", "url-join": "^4.0.1", "xml2js": "^0.5.0", "yauzl": "^3.2.1", "yazl": "^2.2.2" }, "optionalDependencies": { "keytar": "^7.7.0" }, "bin": { "vsce": "vsce" } }, "sha512-XSxMosEEDO6vLxELAHVkwmhC0qe0ijZni2jB9Rcs8kQsW4lhTDQ/wMzmwFs/buotAWSnpmUp/dRWD2ufG3UYKA=="],
 
