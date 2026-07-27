@@ -19,12 +19,15 @@
       "name": "@essence/cli",
       "version": "0.0.1",
       "bin": {
+        "essence": "bin/essence",
         "esc": "bin/esc",
       },
       "dependencies": {
         "@essence/ariadne": "workspace:*",
         "@essence/compiler": "workspace:*",
+        "@essence/formatter": "workspace:*",
         "@essence/interfaces": "workspace:*",
+        "@essence/language-server": "workspace:*",
       },
       "devDependencies": {
         "@essence/fixtures": "workspace:*",

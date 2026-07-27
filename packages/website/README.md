@@ -12,7 +12,7 @@ this directory and deploys it, so the URLs are unchanged.
 
 | | |
 |---|---|
-| `index.md` | the language's pitch — goals, principles, `esc` usage |
+| `index.md` | the language's pitch — goals, principles, `essence` usage |
 | `diagnostics.md` | every Diagnostic code, one section each |
 | `tests/` | what keeps `diagnostics.md` honest, see below |
 

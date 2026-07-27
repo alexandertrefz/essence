@@ -5,7 +5,9 @@ import {
 	globalOptions,
 	type OptionSpec,
 	optionsFor,
+	PROGRAM,
 	visibleOptions,
+	withProgramName,
 } from "./commands"
 import type { Palette } from "./theme"
 import { visibleLength } from "./theme"
@@ -20,6 +22,7 @@ export type HelpContext = {
 	palette: Palette
 	width: number
 	version: string
+	programName: string
 }
 
 function measure(context: HelpContext): number {
@@ -127,6 +130,13 @@ function section(context: HelpContext, title: string): Array<string> {
 	return ["", `${INDENT}${heading(context, title)}`, ""]
 }
 
+// NOTE: The placeholder is substituted as each spec string enters the renderer
+// rather than once over the finished screen, so that wrapping and column widths
+// are measured against the name the user will actually read.
+function named(text: string, context: HelpContext): string {
+	return withProgramName(text, context.programName)
+}
+
 function renderExamples(
 	examples: CommandSpec["examples"],
 	context: HelpContext,
@@ -139,10 +149,12 @@ function renderExamples(
 			lines.push("")
 		}
 
-		lines.push(`${INDENT}${INDENT}${palette.accent(example.command)}`)
+		lines.push(
+			`${INDENT}${INDENT}${palette.accent(named(example.command, context))}`,
+		)
 
 		for (let line of wrap(
-			example.description,
+			named(example.description, context),
 			measure(context) - INDENT.length * 3,
 		)) {
 			lines.push(`${INDENT}${INDENT}${INDENT}${palette.muted(line)}`)
@@ -161,7 +173,7 @@ function renderCompactOptions(
 	return columns(
 		visibleOptions(options).map((option) => ({
 			left: signature(option, context.palette),
-			right: option.summary,
+			right: named(option.summary, context),
 		})),
 		context,
 	)
@@ -184,12 +196,12 @@ function renderDetailedOptions(
 
 		lines.push(`${INDENT}${INDENT}${signature(option, palette, false)}`)
 
-		for (let line of wrap(option.summary, width)) {
+		for (let line of wrap(named(option.summary, context), width)) {
 			lines.push(`${INDENT}${INDENT}${INDENT}${line}`)
 		}
 
 		if (option.details !== undefined) {
-			for (let line of wrap(option.details, width)) {
+			for (let line of wrap(named(option.details, context), width)) {
 				lines.push(`${INDENT}${INDENT}${INDENT}${palette.muted(line)}`)
 			}
 		}
@@ -197,7 +209,7 @@ function renderDetailedOptions(
 		if (option.defaultDescription !== undefined) {
 			lines.push(
 				`${INDENT}${INDENT}${INDENT}${palette.faint(
-					`Defaults to ${option.defaultDescription}.`,
+					named(`Defaults to ${option.defaultDescription}.`, context),
 				)}`,
 			)
 		}
@@ -212,9 +224,9 @@ export function renderOverview(context: HelpContext): string {
 
 	lines.push("")
 	lines.push(
-		`${INDENT}${palette.strong("esc")} ${palette.faint(
+		`${INDENT}${palette.strong(context.programName)} ${palette.faint(
 			context.version,
-		)} ${palette.muted("— the Essence compiler")}`,
+		)} ${palette.muted("— the Essence toolchain")}`,
 	)
 
 	lines.push(...section(context, "usage"))
@@ -222,12 +234,21 @@ export function renderOverview(context: HelpContext): string {
 		...columns(
 			[
 				{
-					left: palette.accent("esc <command> [file...] [options]"),
+					left: palette.accent(
+						named(
+							`${PROGRAM} <command> [file...] [options]`,
+							context,
+						),
+					),
 					right: "",
 				},
 				{
-					left: palette.accent("esc <file.es>"),
-					right: palette.muted("same as: esc build <file.es>"),
+					left: palette.accent(
+						named(`${PROGRAM} <file.es>`, context),
+					),
+					right: palette.muted(
+						named(`same as: ${PROGRAM} build <file.es>`, context),
+					),
 				},
 			],
 			context,
@@ -241,8 +262,10 @@ export function renderOverview(context: HelpContext): string {
 				left: palette.accent(command.name),
 				right:
 					command.name === "build"
-						? `${command.summary} ${palette.faint("(default)")}`
-						: command.summary,
+						? `${named(command.summary, context)} ${palette.faint(
+								"(default)",
+							)}`
+						: named(command.summary, context),
 			})),
 			context,
 		),
@@ -264,12 +287,16 @@ export function renderOverview(context: HelpContext): string {
 			[
 				...(buildCommand?.examples.slice(0, 2) ?? []),
 				{
-					command: "esc run HelloWorld.es",
+					command: `${PROGRAM} run HelloWorld.es`,
 					description: "Compile and execute in one step",
 				},
 				{
-					command: "esc watch src/*.es",
+					command: `${PROGRAM} watch src/*.es`,
 					description: "Rebuild automatically on every save",
+				},
+				{
+					command: `${PROGRAM} format src/*.es`,
+					description: "Format a directory of sources in place",
 				},
 			],
 			context,
@@ -278,11 +305,9 @@ export function renderOverview(context: HelpContext): string {
 
 	lines.push("")
 	lines.push(
-		`${INDENT}${palette.muted(
-			"Run",
-		)} ${palette.accent("esc help <command>")} ${palette.muted(
-			"for everything a single command can do.",
-		)}`,
+		`${INDENT}${palette.muted("Run")} ${palette.accent(
+			named(`${PROGRAM} help <command>`, context),
+		)} ${palette.muted("for everything a single command can do.")}`,
 	)
 	lines.push("")
 
@@ -299,9 +324,9 @@ export function renderCommandHelp(
 
 	lines.push("")
 	lines.push(
-		`${INDENT}${palette.strong(`esc ${command.name}`)} ${palette.muted(
-			"—",
-		)} ${command.summary}`,
+		`${INDENT}${palette.strong(
+			`${context.programName} ${command.name}`,
+		)} ${palette.muted("—")} ${named(command.summary, context)}`,
 	)
 
 	if (command.aliases.length > 0) {
@@ -313,7 +338,7 @@ export function renderCommandHelp(
 	lines.push(...section(context, "usage"))
 
 	for (let usage of command.usage) {
-		lines.push(`${INDENT}${INDENT}${palette.accent(usage)}`)
+		lines.push(`${INDENT}${INDENT}${palette.accent(named(usage, context))}`)
 	}
 
 	lines.push(...section(context, "description"))
@@ -323,7 +348,10 @@ export function renderCommandHelp(
 			lines.push("")
 		}
 
-		for (let line of wrap(paragraph, width - INDENT.length)) {
+		for (let line of wrap(
+			named(paragraph, context),
+			width - INDENT.length,
+		)) {
 			lines.push(`${INDENT}${INDENT}${line}`)
 		}
 	}
@@ -335,8 +363,13 @@ export function renderCommandHelp(
 		lines.push(...renderDetailedOptions(specificOptions, context))
 	}
 
-	lines.push(...section(context, "global options"))
-	lines.push(...renderCompactOptions(globalOptions, context))
+	// NOTE: A passthrough Command's arguments are read by the tool it delegates
+	// to, which knows nothing of --json or --quiet, so listing them here would
+	// document flags that do nothing.
+	if (command.passthrough !== true) {
+		lines.push(...section(context, "global options"))
+		lines.push(...renderCompactOptions(globalOptions, context))
+	}
 
 	if (command.examples.length > 0) {
 		lines.push(...section(context, "examples"))
@@ -353,7 +386,7 @@ export function renderUsageLine(
 	context: HelpContext,
 ): string {
 	return `${INDENT}${context.palette.muted("Usage:")} ${context.palette.accent(
-		command.usage[0],
+		named(command.usage[0], context),
 	)}`
 }
 

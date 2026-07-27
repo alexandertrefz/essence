@@ -61,7 +61,7 @@ describe("Document Formatting", () => {
 		expect(findFormattingEdits("").edits).toBeNull()
 	})
 
-	// NOTE: An `unsafe` refusal means esfmt distrusted its own output — a
+	// NOTE: An `unsafe` refusal means the formatter distrusted its own output — a
 	// formatter bug, which the editor must surface rather than swallow. No
 	// real source can produce one on demand (that is what the corpus sweep
 	// proves), so the formatter is stubbed through the seam.

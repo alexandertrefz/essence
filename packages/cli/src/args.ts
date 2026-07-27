@@ -5,6 +5,7 @@ import { closestMatch } from "@essence/compiler/helpers"
 import {
 	type CommandSpec,
 	commands,
+	DEFAULT_PROGRAM_NAME,
 	defaultCommand,
 	findCommand,
 	type OptionSpec,
@@ -55,6 +56,30 @@ export type Invocation = {
 	options: OptionValues
 	files: Array<string>
 	programArguments: Array<string>
+	// NOTE: Every token after a passthrough Command's name, exactly as it was
+	// typed — the delegate parses them itself, so nothing here is interpreted,
+	// reordered, or split on a bare `--`. Empty for every other Command.
+	rawArguments: Array<string>
+}
+
+// NOTE: The Options as they stand before anything has been read: what a
+// passthrough Command leaves them at, and what an unreadable command line is
+// reported with.
+export const emptyOptions: OptionValues = {
+	help: false,
+	version: false,
+	verbose: false,
+	quiet: false,
+	json: false,
+	color: false,
+	noColor: false,
+	out: undefined,
+	watch: false,
+	execute: false,
+	clear: false,
+	sourcemap: false,
+	minify: false,
+	jobs: undefined,
 }
 
 function toParseArgsOptions(
@@ -92,7 +117,10 @@ function splitProgramArguments(argv: Array<string>): {
 	}
 }
 
-function resolveCommand(argv: Array<string>): {
+function resolveCommand(
+	argv: Array<string>,
+	programName: string,
+): {
 	command: CommandSpec
 	explicit: boolean
 	rest: Array<string>
@@ -113,8 +141,8 @@ function resolveCommand(argv: Array<string>): {
 		return { command, explicit: true, rest: argv.slice(1) }
 	}
 
-	// NOTE: A first argument that is not a command is a file name — `esc
-	// HelloWorld.es` is the shorthand every other form is measured against.
+	// NOTE: A first argument that is not a command is a file name —
+	// `esc HelloWorld.es` is the shorthand every other form is measured against.
 	// Only something that looks like a command name but matches none is worth
 	// suggesting a correction for; a path is passed through untouched.
 	if (!first.includes(".") && !first.includes("/") && !first.includes("\\")) {
@@ -125,7 +153,7 @@ function resolveCommand(argv: Array<string>): {
 			throw new UsageError(
 				`Unknown command "${first}".`,
 				null,
-				`Did you mean "esc ${suggestion}"?`,
+				`Did you mean "${programName} ${suggestion}"?`,
 			)
 		}
 	}
@@ -140,6 +168,7 @@ function resolveCommand(argv: Array<string>): {
 function describeParseError(
 	error: NodeJS.ErrnoException,
 	command: CommandSpec,
+	programName: string,
 ): UsageError {
 	let known = visibleOptions(optionsFor(command)).map(
 		(option) => `--${option.name}`,
@@ -154,10 +183,10 @@ function describeParseError(
 		)
 
 		return new UsageError(
-			`Unknown option "${flag}" for esc ${command.name}.`,
+			`Unknown option "${flag}" for ${programName} ${command.name}.`,
 			command,
 			suggestion === null
-				? `Run "esc help ${command.name}" to see every option.`
+				? `Run "${programName} help ${command.name}" to see every option.`
 				: `Did you mean "--${suggestion}"?`,
 		)
 	}
@@ -166,7 +195,7 @@ function describeParseError(
 		return new UsageError(
 			error.message ?? "Invalid option value.",
 			command,
-			`Run "esc help ${command.name}" to see every option.`,
+			`Run "${programName} help ${command.name}" to see every option.`,
 		)
 	}
 
@@ -196,9 +225,42 @@ function readJobs(
 	return value
 }
 
-export function parseArguments(argv: Array<string>): Invocation {
+// NOTE: A passthrough Command is recognised before anything else is read: its
+// arguments belong to the tool it delegates to, and reading them here — folding
+// `--` away, or refusing a flag esc has never heard of — would break flags that
+// are perfectly good ones over there. `--help` is the one exception: it is
+// answered from esc's own Command table, so that `essence format --help` and
+// `essence help format` are the same screen, and so that `essence lsp --help`
+// cannot start a Server nobody is talking to.
+function parsePassthrough(
+	argv: Array<string>,
+	command: CommandSpec,
+): Invocation {
+	let rawArguments = argv.slice(1)
+	let help = rawArguments.includes("--help") || rawArguments.includes("-h")
+
+	return {
+		command,
+		commandWasExplicit: true,
+		options: { ...emptyOptions, help },
+		files: [],
+		programArguments: [],
+		rawArguments,
+	}
+}
+
+export function parseArguments(
+	argv: Array<string>,
+	programName: string = DEFAULT_PROGRAM_NAME,
+): Invocation {
+	let leading = argv[0] === undefined ? undefined : findCommand(argv[0])
+
+	if (leading !== undefined && leading.passthrough === true) {
+		return parsePassthrough(argv, leading)
+	}
+
 	let { own, program } = splitProgramArguments(argv)
-	let { command, explicit, rest } = resolveCommand(own)
+	let { command, explicit, rest } = resolveCommand(own, programName)
 	let parsed: ReturnType<typeof parseArgs>
 
 	try {
@@ -209,16 +271,20 @@ export function parseArguments(argv: Array<string>): Invocation {
 			strict: true,
 		})
 	} catch (error) {
-		throw describeParseError(error as NodeJS.ErrnoException, command)
+		throw describeParseError(
+			error as NodeJS.ErrnoException,
+			command,
+			programName,
+		)
 	}
 
 	let values = parsed.values as Record<string, string | boolean | undefined>
 
 	if (program.length > 0 && command.acceptsProgramArguments !== true) {
 		throw new UsageError(
-			`esc ${command.name} does not pass arguments to a program.`,
+			`${programName} ${command.name} does not pass arguments to a program.`,
 			command,
-			"Only esc run forwards arguments after --.",
+			`Only ${programName} run forwards arguments after --.`,
 		)
 	}
 
@@ -243,5 +309,6 @@ export function parseArguments(argv: Array<string>): Invocation {
 		},
 		files: parsed.positionals.map((positional) => String(positional)),
 		programArguments: program,
+		rawArguments: [],
 	}
 }

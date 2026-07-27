@@ -11,7 +11,7 @@ export type FormattingEdit = {
 }
 
 // NOTE: `warning` carries an `unsafe` refusal's message — the formatter found
-// its own output wanting and kept the file as it was, which is a bug in esfmt
+// its own output wanting and kept the file as it was, which is a formatter bug
 // and worth saying out loud. A syntax refusal stays silent: it is most
 // keystrokes and every format-on-save of a file caught mid-edit, and the
 // Diagnostics already say what is wrong.

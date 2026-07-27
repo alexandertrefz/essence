@@ -1,5 +1,6 @@
 import manifest from "../package.json" with { type: "json" }
 import type { OptionValues } from "./args"
+import { DEFAULT_PROGRAM_NAME } from "./commands"
 import type { HelpContext } from "./help"
 import type { ReportContext } from "./report"
 import { createTerminal, type Terminal } from "./terminal"
@@ -37,6 +38,7 @@ export type CLIContext = {
 	report: ReportContext
 	help: HelpContext
 	version: string
+	programName: string
 }
 
 export function colorChoiceFor(options: {
@@ -56,6 +58,7 @@ export function colorChoiceFor(options: {
 
 export function createContext(
 	options: OptionValues,
+	programName: string = DEFAULT_PROGRAM_NAME,
 	terminal: Terminal = createTerminal(),
 ): CLIContext {
 	// NOTE: Colour support is decided from stderr rather than stdout, because
@@ -73,6 +76,7 @@ export function createContext(
 		palette,
 		options,
 		version,
+		programName,
 		report: {
 			terminal,
 			theme,
@@ -84,6 +88,7 @@ export function createContext(
 			palette,
 			width: terminal.width,
 			version,
+			programName,
 		},
 	}
 }

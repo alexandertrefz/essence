@@ -4,6 +4,22 @@
 // A flag that exists but is undocumented — or documented but unparsed — is not
 // possible by construction.
 
+// NOTE: The same table is rendered under several names — the binary is
+// installed as `essence` and as `esc`, and user-facing text has to say the one
+// that was typed. Every spec string that names the program writes this
+// placeholder instead of a name, and the help renderer substitutes it; a second
+// copy of the table per name would be a second table to keep true.
+export const PROGRAM = "{program}"
+
+// NOTE: The name to render when a caller does not say which. Both executables
+// in bin/ name themselves, so this is only reached by something driving the CLI
+// in-process — a spec, or a script written before the second name existed.
+export const DEFAULT_PROGRAM_NAME = "esc"
+
+export function withProgramName(text: string, programName: string): string {
+	return text.replaceAll(PROGRAM, programName)
+}
+
 export type OptionType = "string" | "boolean"
 
 export type OptionSpec = {
@@ -32,6 +48,11 @@ export type CommandSpec = {
 	options: Array<OptionSpec>
 	examples: Array<Example>
 	acceptsProgramArguments?: boolean
+	// NOTE: A passthrough Command hands every argument after its name to another
+	// tool, which parses them itself. Its Options are documented here so that
+	// `help` can answer for it, but they are never parsed here — and the global
+	// Options are not among them, because they reach nothing that reads them.
+	passthrough?: true
 }
 
 export const globalOptions: Array<OptionSpec> = [
@@ -136,7 +157,10 @@ export const commands: Array<CommandSpec> = [
 				"every Diagnostic that stage found is shown. Warnings never stop " +
 				"a build.",
 		],
-		usage: ["esc build <file...> [options]", "esc <file...> [options]"],
+		usage: [
+			`${PROGRAM} build <file...> [options]`,
+			`${PROGRAM} <file...> [options]`,
+		],
 		options: [
 			outputOption,
 			{
@@ -157,15 +181,15 @@ export const commands: Array<CommandSpec> = [
 		],
 		examples: [
 			{
-				command: "esc HelloWorld.es",
+				command: `${PROGRAM} HelloWorld.es`,
 				description: "Compile one file to HelloWorld.js beside it",
 			},
 			{
-				command: "esc build src/*.es -o dist/",
+				command: `${PROGRAM} build src/*.es -o dist/`,
 				description: "Compile several files into a directory",
 			},
 			{
-				command: "esc build App.es -o build/app.js --minify",
+				command: `${PROGRAM} build App.es -o build/app.js --minify`,
 				description: "Compile to an explicit path, minified",
 			},
 		],
@@ -180,10 +204,11 @@ export const commands: Array<CommandSpec> = [
 				"directory that is removed once the program exits. Pass --out to " +
 				"keep the compiled file instead.",
 			"The program's output is streamed through as it is produced, and " +
-				"esc exits with the program's own exit code. Arguments after a " +
-				"bare -- are handed to the program rather than read by esc.",
+				`${PROGRAM} exits with the program's own exit code. Arguments ` +
+				"after a bare -- are handed to the program rather than read by " +
+				`${PROGRAM}.`,
 		],
-		usage: ["esc run <file> [options] [-- <program arguments...>]"],
+		usage: [`${PROGRAM} run <file> [options] [-- <program arguments...>]`],
 		options: [
 			{
 				...outputOption,
@@ -199,11 +224,11 @@ export const commands: Array<CommandSpec> = [
 		],
 		examples: [
 			{
-				command: "esc run HelloWorld.es",
+				command: `${PROGRAM} run HelloWorld.es`,
 				description: "Compile and execute in one step",
 			},
 			{
-				command: "esc run App.es -- --port 8080",
+				command: `${PROGRAM} run App.es -- --port 8080`,
 				description: "Forward arguments to the compiled program",
 			},
 		],
@@ -222,15 +247,15 @@ export const commands: Array<CommandSpec> = [
 				"Combined with --json it produces a Diagnostic list that can be " +
 				"consumed by other tools.",
 		],
-		usage: ["esc check <file...> [options]"],
+		usage: [`${PROGRAM} check <file...> [options]`],
 		options: [jobsOption],
 		examples: [
 			{
-				command: "esc check src/*.es",
+				command: `${PROGRAM} check src/*.es`,
 				description: "Type-check a whole directory of sources",
 			},
 			{
-				command: "esc check src/*.es --json",
+				command: `${PROGRAM} check src/*.es --json`,
 				description: "Produce Diagnostics for another tool to read",
 			},
 		],
@@ -246,7 +271,10 @@ export const commands: Array<CommandSpec> = [
 			"While watching, press r to force a rebuild, c to clear the " +
 				"screen and q — or Ctrl+C — to quit.",
 		],
-		usage: ["esc watch <file...> [options]", "esc build <file...> --watch"],
+		usage: [
+			`${PROGRAM} watch <file...> [options]`,
+			`${PROGRAM} build <file...> --watch`,
+		],
 		options: [
 			outputOption,
 			{
@@ -266,29 +294,114 @@ export const commands: Array<CommandSpec> = [
 		],
 		examples: [
 			{
-				command: "esc watch App.es",
+				command: `${PROGRAM} watch App.es`,
 				description: "Rebuild App.js on every save",
 			},
 			{
-				command: "esc watch App.es --execute --clear",
+				command: `${PROGRAM} watch App.es --execute --clear`,
 				description: "Rebuild, clear, and re-run on every save",
 			},
 		],
 	},
 	{
+		name: "format",
+		aliases: ["fmt"],
+		summary: "Format Essence sources in place",
+		description: [
+			"Rewrites every given source into Essence's one canonical layout: " +
+				"tabs for indentation, and lines laid out to fit a fixed measure. " +
+				"There is nothing to configure, so a formatted file reads the " +
+				"same way for everyone who opens it.",
+			"An argument may be a path, a glob, or a directory — a directory " +
+				"stands for every .es file under it. A source that does not parse " +
+				"is reported with the Diagnostic the Parser gave and left " +
+				"untouched; formatting is refused rather than guessed at.",
+		],
+		usage: [
+			`${PROGRAM} format <files...> [options]`,
+			`${PROGRAM} format --check <files...>`,
+		],
+		options: [
+			{
+				name: "check",
+				type: "boolean",
+				summary: "Name the files that are not formatted; write nothing",
+				details:
+					"Every file that would change is named, and the exit code is " +
+					"non-zero if there is one. This is the form intended for CI " +
+					"checks and pre-commit hooks.",
+			},
+			{
+				name: "stdin",
+				type: "boolean",
+				summary: "Format standard input onto standard output",
+				details:
+					"One Program is read from standard input, so no file " +
+					"arguments are taken. Combined with --check nothing is " +
+					"written and only the verdict is reported.",
+			},
+			{
+				name: "stdin-filepath",
+				type: "string",
+				placeholder: "path",
+				summary: "The path standard input should be read as",
+				details:
+					"Some sources are only themselves at a particular path — the " +
+					"standard library's declarations are — so an Editor " +
+					"formatting an unsaved buffer says where that buffer lives. " +
+					"Only meaningful together with --stdin.",
+			},
+			{
+				name: "version",
+				type: "boolean",
+				summary: "Print the Formatter's version and exit",
+			},
+		],
+		examples: [
+			{
+				command: `${PROGRAM} format src/*.es`,
+				description: "Format a directory of sources in place",
+			},
+			{
+				command: `${PROGRAM} format --check src/`,
+				description: "Fail if anything under src/ is unformatted",
+			},
+		],
+		passthrough: true,
+	},
+	{
+		name: "lsp",
+		aliases: [],
+		summary: "Start the Essence Language Server, speaking over stdio",
+		description: [
+			"Serves Diagnostics, hovers, completions, definitions, references, " +
+				"renames and formatting to an Editor over the Language Server " +
+				"Protocol, reading requests from standard input and writing " +
+				"responses to standard output.",
+			"This is started by an Editor rather than by hand: it prints nothing " +
+				"a person would want to read, and stays running until the Editor " +
+				"closes the connection. Whatever arguments the Editor's client " +
+				"passes are left for the Server to read.",
+		],
+		usage: [`${PROGRAM} lsp`],
+		options: [],
+		examples: [],
+		passthrough: true,
+	},
+	{
 		name: "help",
 		aliases: [],
-		summary: "Show help for esc or for a single command",
+		summary: `Show help for ${PROGRAM} or for a single command`,
 		description: [
 			"Without an argument this prints the command overview. With a " +
 				"command name it prints that command's full documentation, " +
 				"including every option and a set of worked examples.",
 		],
-		usage: ["esc help [command]"],
+		usage: [`${PROGRAM} help [command]`],
 		options: [],
 		examples: [
 			{
-				command: "esc help build",
+				command: `${PROGRAM} help build`,
 				description: "Everything the build command can do",
 			},
 		],
@@ -307,6 +420,10 @@ export function findCommand(name: string): CommandSpec | undefined {
 export const defaultCommand: CommandSpec = commands[0]
 
 export function optionsFor(command: CommandSpec): Array<OptionSpec> {
+	if (command.passthrough === true) {
+		return command.options
+	}
+
 	return [...command.options, ...globalOptions]
 }
 

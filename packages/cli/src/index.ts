@@ -6,8 +6,13 @@ import {
 	runCheck,
 	runRun,
 } from "./actions"
-import { type Invocation, parseArguments, UsageError } from "./args"
-import { findCommand } from "./commands"
+import {
+	emptyOptions,
+	type Invocation,
+	parseArguments,
+	UsageError,
+} from "./args"
+import { DEFAULT_PROGRAM_NAME, findCommand } from "./commands"
 import { type CLIContext, createContext, version } from "./context"
 import { renderCommandHelp, renderOverview, renderUsageLine } from "./help"
 import { toJSONUsageError } from "./json"
@@ -24,7 +29,7 @@ function printUsageError(context: CLIContext, error: UsageError): void {
 		terminal.out(
 			JSON.stringify(
 				toJSONUsageError(error.message, {
-					command: error.command?.name ?? "esc",
+					command: error.command?.name ?? context.programName,
 					version: context.version,
 				}),
 				null,
@@ -47,13 +52,15 @@ function printUsageError(context: CLIContext, error: UsageError): void {
 		terminal.err(renderUsageLine(error.command, context.help))
 		terminal.err(
 			`  ${palette.muted("Help:")}  ${palette.accent(
-				`esc help ${error.command.name}`,
+				`${context.programName} help ${error.command.name}`,
 			)}`,
 		)
 	} else {
 		terminal.err("")
 		terminal.err(
-			`  ${palette.muted("Help:")}  ${palette.accent("esc help")}`,
+			`  ${palette.muted("Help:")}  ${palette.accent(
+				`${context.programName} help`,
+			)}`,
 		)
 	}
 
@@ -79,7 +86,7 @@ function showHelp(context: CLIContext, invocation: Invocation): number {
 			throw new UsageError(
 				`Unknown command "${requested}".`,
 				null,
-				'Run "esc help" to see every command.',
+				`Run "${context.programName} help" to see every command.`,
 			)
 		}
 
@@ -101,11 +108,37 @@ function showHelp(context: CLIContext, invocation: Invocation): number {
 	return EXIT_SUCCESS
 }
 
+// NOTE: The Formatter and the Language Server are imported where they are used
+// and nowhere else. `essence check` must not pay for a Formatter it never calls
+// — a static import at the top of this module would load both packages, and
+// every module they import, before the first argument is even read.
+async function runFormat(
+	context: CLIContext,
+	rawArguments: Array<string>,
+): Promise<number> {
+	let { run: runFormatter } = await import("@essence/formatter/cli")
+
+	return runFormatter(rawArguments, {
+		programName: `${context.programName} format`,
+	})
+}
+
+async function runLanguageServer(): Promise<number> {
+	let { startServer } = await import("@essence/language-server")
+
+	// NOTE: The Server does not return: it holds stdio open and answers
+	// requests until the Editor closes the connection, which ends the process.
+	// The exit code is what a clean start reports, not what a session did.
+	startServer()
+
+	return EXIT_SUCCESS
+}
+
 async function dispatch(
 	context: CLIContext,
 	invocation: Invocation,
 ): Promise<number> {
-	let { command, files, options, programArguments } = invocation
+	let { command, files, options, programArguments, rawArguments } = invocation
 
 	switch (command.name) {
 		case "help":
@@ -120,6 +153,12 @@ async function dispatch(
 		case "watch":
 			return runWatch(context, command, files, { emit: true })
 
+		case "format":
+			return runFormat(context, rawArguments)
+
+		case "lsp":
+			return runLanguageServer()
+
 		default:
 			if (options.watch) {
 				return runWatch(context, command, files, { emit: true })
@@ -129,34 +168,25 @@ async function dispatch(
 	}
 }
 
-export async function run(argv: Array<string>): Promise<number> {
+export async function run(
+	argv: Array<string>,
+	programName: string = DEFAULT_PROGRAM_NAME,
+): Promise<number> {
 	let invocation: Invocation
 	let context: CLIContext
 
 	try {
-		invocation = parseArguments(argv)
-		context = createContext(invocation.options)
+		invocation = parseArguments(argv, programName)
+		context = createContext(invocation.options, programName)
 	} catch (error) {
 		// NOTE: The arguments could not be read, so there are no resolved
 		// options to build a context from — a default one is used purely to
 		// render the error. `--json` is read straight from the raw arguments,
 		// because a caller that asked for JSON needs the failure in JSON too.
-		let fallback = createContext({
-			help: false,
-			version: false,
-			verbose: false,
-			quiet: false,
-			json: argv.includes("--json"),
-			color: false,
-			noColor: false,
-			out: undefined,
-			watch: false,
-			execute: false,
-			clear: false,
-			sourcemap: false,
-			minify: false,
-			jobs: undefined,
-		})
+		let fallback = createContext(
+			{ ...emptyOptions, json: argv.includes("--json") },
+			programName,
+		)
 
 		if (error instanceof UsageError) {
 			printUsageError(fallback, error)

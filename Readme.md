@@ -41,40 +41,42 @@ syntax is meant to be viewed with a font with code ligatures, like FiraCode.
 The standard library is written in Essence and lives in [packages/stdlib/sources](packages/stdlib/sources); its
 [README](packages/stdlib/README.md) is the most substantial writing about the language there is.
 
-# The Compiler
-Essence is compiled with `esc`, in [packages/cli/bin](packages/cli/bin). Compiling a file produces a self-contained
-ES module next to it — the parts of the runtime the program actually uses are bundled in, so the output runs
-under Bun or Node, or in a browser, with nothing else installed.
+# The Toolchain
+One executable does all of it: `essence`, in [packages/cli/bin](packages/cli/bin). Compiling a file produces a
+self-contained ES module next to it — the parts of the runtime the program actually uses are bundled in, so the
+output runs under Bun or Node, or in a browser, with nothing else installed.
 
 ```sh
-packages/cli/bin/esc HelloWorld.es          # compile to HelloWorld.js
-packages/cli/bin/esc run HelloWorld.es      # compile and execute, emitting nothing
-packages/cli/bin/esc check *.es             # type-check only, no output
-packages/cli/bin/esc watch List.es          # recompile on every save
-packages/cli/bin/esc build *.es -o dist/    # compile a batch, in parallel
+packages/cli/bin/essence HelloWorld.es          # compile to HelloWorld.js
+packages/cli/bin/essence run HelloWorld.es      # compile and execute, emitting nothing
+packages/cli/bin/essence check *.es             # type-check only, no output
+packages/cli/bin/essence watch List.es          # recompile on every save
+packages/cli/bin/essence build *.es -o dist/    # compile a batch, in parallel
 ```
 
 Formatting is a separate command, and never something a build does to your sources:
 
 ```sh
-packages/formatter/bin/esfmt List.es           # format in place
-packages/formatter/bin/esfmt --check '*.es'    # report what is unformatted, write nothing
-packages/formatter/bin/esfmt --stdin           # format standard input onto standard output
+packages/cli/bin/essence format List.es           # format in place
+packages/cli/bin/essence format --check '*.es'    # report what is unformatted, write nothing
+packages/cli/bin/essence format --stdin           # format standard input onto standard output
 ```
 
-There is nothing to configure: Essence is written with tabs, laid out to fit 80 columns. `esfmt` refuses any
-file that does not parse, and verifies before it writes that the result means the same thing, kept every
+There is nothing to configure: Essence is written with tabs, laid out to fit 80 columns. `essence format` refuses
+any file that does not parse, and verifies before it writes that the result means the same thing, kept every
 comment where it was, and is unchanged by a second pass — so it can only improve a file or leave it alone.
 
 The Language Server offers the same formatter as a document formatting provider, so an editor's Format
 Document — and Format On Save — go through it. A file mid-edit that does not parse is left alone rather than
-reported twice.
+reported twice. `essence lsp` speaks it over stdio, and is meant for an editor to start rather than a person.
 
-`bun install` also links `esc`, `esls` and `esfmt` into `node_modules/.bin`, so `bun run esc …` works from
-anywhere in the repository.
+`bun install` links `essence` into `node_modules/.bin`, so `bun run essence …` works from anywhere in the
+repository. The three original names are linked beside it and stay supported as aliases: `esc` is `essence`
+under its old name, `esfmt` is `essence format`, and `esls` is `essence lsp`. Whichever one is typed is the one
+the help screens and error messages say back.
 
-Run `esc help` for the command overview, and `esc help <command>` for everything a single command can do.
-`--json` turns any of them into a machine-readable report for editors and CI.
+Run `essence help` for the command overview, and `essence help <command>` for everything a single command can
+do. `--json` turns any of them into a machine-readable report for editors and CI.
 
 # Repository layout
 
@@ -89,9 +91,9 @@ Bun runs the sources.
 | [`runtime`](packages/runtime) | the native halves of the standard library, inlined into every compiled program |
 | [`ariadne`](packages/ariadne) | a TypeScript port of the `ariadne` diagnostic renderer |
 | [`escodegen`](packages/escodegen) | vendored fork of the ECMAScript code generator, see its [PATCHES.md](packages/escodegen/PATCHES.md) |
-| [`cli`](packages/cli) | `esc` |
-| [`formatter`](packages/formatter) | `esfmt` — the source formatter |
-| [`language-server`](packages/language-server) | `esls`, spoken over stdio |
+| [`cli`](packages/cli) | `essence` — every command, and `esc` |
+| [`formatter`](packages/formatter) | the source formatter behind `essence format`, and `esfmt` |
+| [`language-server`](packages/language-server) | the server behind `essence lsp`, spoken over stdio, and `esls` |
 | [`vscode-extension`](packages/vscode-extension) | the VS Code extension, which bundles the language server |
 | [`website`](packages/website) | the documentation |
 | [`fixtures`](packages/fixtures) | Essence sources the test suite compiles |
@@ -109,10 +111,11 @@ Every push and every pull request runs the last two of those on GitHub Actions, 
 `.bun-version` — the one this repository is developed against, so a failure there is a failure that
 reproduces here.
 
-The Language Server is started by the `esls` executable in
+`essence lsp` starts the Language Server on stdio, as does the `esls` executable in
 [packages/language-server/bin](packages/language-server/bin). To develop the VS Code extension against a live
-server, point its `essence.server.path` setting at that file — it runs the server's TypeScript directly, so
-there is no bundle to rebuild.
+server, point its `essence.server.path` setting at that file: the setting spawns what it names with `--stdio` and
+nothing else, so it wants the server's own entry point rather than the `essence lsp` command. It runs the
+server's TypeScript directly, so there is no bundle to rebuild.
 
 # Disclaimer
 This language is still a work in progress. It is not ready for use yet and there is no documentation as most things are in flux. Generally: Here be dragons!

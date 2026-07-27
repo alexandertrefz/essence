@@ -91,8 +91,10 @@ without a Type annotation, and double-clicking one writes it into the source.
 Parameter, and backtick spans read as code. Pressing Enter inside a `§§` block
 continues it; a `§` note is left alone, since most of them are one line.
 
-Format Document runs `esfmt`. Essence files default to tabs, a ruler at column
-80 and `esfmt` as their formatter, which is what the formatter itself assumes.
+Format Document runs the same formatter as `essence format`, in the Language
+Server rather than as a second process. Essence files default to tabs, a ruler
+at column 80 and this extension as their formatter, which is what the formatter
+itself assumes.
 
 Snippets cover the language: `namespace`, `protocol`, `choice`, `overload`,
 `match`, `doc` and the rest.
@@ -131,7 +133,9 @@ Press `F5` ("Extension") to open an Extension Development Host.
 the Language Server. To skip the bundling step entirely while working on the
 server, point `essence.server.path` at `packages/language-server/bin/esls`: a
 built `.js` bundle is run with Node, and anything else is treated as source and
-run with Bun. That is the better loop of the two — `esls` runs the server's
+run with Bun. The setting spawns what it names with `--stdio` and nothing else,
+so it wants that entry point rather than the `essence lsp` command a terminal
+would use. That is the better loop of the two — `esls` runs the server's
 TypeScript directly, so a change needs no rebuild at all, just
 `Essence: Restart Language Server`, which picks it up without reloading the
 window.

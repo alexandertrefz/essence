@@ -7,27 +7,92 @@ export const EXIT_SUCCESS = 0
 export const EXIT_FAILURE = 1
 export const EXIT_USAGE = 2
 
-const USAGE = `esfmt — the Essence source formatter.
+const DEFAULT_PROGRAM_NAME = "esfmt"
 
-  esfmt <files…>           format each file in place
-  esfmt --check <files…>   report which files are not formatted; write nothing
-  esfmt --stdin            format standard input onto standard output
-                           (composes with --check; write nothing, report only)
-  esfmt --stdin-filepath <path>
-                           the path standard input should be read as, so that
-                           path-dependent sources — the standard library's
-                           declarations — parse as themselves
-  esfmt --version          print esfmt's version
+// NOTE: The width the argument lists are given, gap included: every
+// description starts three spaces past the longest one that carries its
+// description on the same line. Written as that line rather than as a number
+// so that the column follows the text it is measured from.
+const ARGUMENTS_WIDTH = "--check <files…>   ".length
+
+function usage(programName: string): string {
+	let entries: Array<{ arguments: string; description: Array<string> }> = [
+		{ arguments: "<files…>", description: ["format each file in place"] },
+		{
+			arguments: "--check <files…>",
+			description: [
+				"report which files are not formatted; write nothing",
+			],
+		},
+		{
+			arguments: "--stdin",
+			description: [
+				"format standard input onto standard output",
+				"(composes with --check; write nothing, report only)",
+			],
+		},
+		{
+			arguments: "--stdin-filepath <path>",
+			description: [
+				"the path standard input should be read as, so that",
+				"path-dependent sources — the standard library's",
+				"declarations — parse as themselves",
+			],
+		},
+		{
+			arguments: "--version",
+			description: [`print ${programName}'s version`],
+		},
+	]
+
+	// NOTE: A program name longer than `esfmt` — `essence format` under the
+	// unified binary — moves the description column right, but only until the
+	// longest description would end past the width this very screen says the
+	// formatter lays out to. Past that the column stops, and an argument list
+	// that no longer fits in front of it carries its description on the next
+	// line instead, the way `--stdin-filepath <path>` already does.
+	let widest = Math.max(
+		...entries.flatMap((entry) =>
+			entry.description.map((line) => line.length),
+		),
+	)
+	let column = Math.min(
+		2 + programName.length + 1 + ARGUMENTS_WIDTH,
+		WIDTH - widest,
+	)
+	let indent = " ".repeat(column)
+	let lines: Array<string> = []
+
+	for (let entry of entries) {
+		let invocation = `  ${programName} ${entry.arguments}`
+		let [first, ...rest] = entry.description as [string, ...Array<string>]
+
+		if (invocation.length < column) {
+			lines.push(invocation.padEnd(column) + first)
+		} else {
+			lines.push(invocation, indent + first)
+		}
+
+		for (let line of rest) {
+			lines.push(indent + line)
+		}
+	}
+
+	return `${programName} — the Essence source formatter.
+
+${lines.join("\n")}
 
 Arguments may be paths, globs, or directories — a directory is every .es file
 under it. There is nothing to configure: Essence is written with tabs, and
 lines are laid out to fit ${WIDTH} columns.`
+}
 
 type Options = {
 	check: boolean
 	stdin: boolean
 	stdinFilepath: string | null
 	version: boolean
+	help: boolean
 	patterns: Array<string>
 }
 
@@ -37,6 +102,7 @@ function parseArguments(argv: Array<string>): Options | string {
 		stdin: false,
 		stdinFilepath: null,
 		version: false,
+		help: false,
 		patterns: [],
 	}
 
@@ -58,7 +124,20 @@ function parseArguments(argv: Array<string>): Options | string {
 		} else if (argument === "--version") {
 			options.version = true
 		} else if (argument === "--help" || argument === "-h") {
-			return USAGE
+			// NOTE: Asking for help ends the parse, so that it answers rather
+			// than an argument written after it being rejected.
+			options.help = true
+
+			return options
+		} else if (argument === "--") {
+			// NOTE: Everything past an end-of-options marker is a file name, so
+			// that a path beginning with `-` is expressible at all. Reachable
+			// only through the unified binary: `esfmt -- <file>` works because
+			// bun drops a `--` sitting immediately after the script path, while
+			// `essence format -- <file>` forwards the token verbatim, by design.
+			options.patterns.push(...argv.slice(index + 1))
+
+			return options
 		} else if (argument.startsWith("-")) {
 			return `Unknown option '${argument}'.`
 		} else {
@@ -117,6 +196,7 @@ function displayPath(file: string): string {
 function reportRefusal(
 	file: string,
 	refusal: NonNullable<ReturnType<typeof format>["refusal"]>,
+	programName: string,
 ) {
 	if (refusal.kind === "syntax") {
 		for (let diagnostic of refusal.diagnostics) {
@@ -136,13 +216,14 @@ function reportRefusal(
 	}
 
 	process.stderr.write(
-		`${displayPath(file)}: ${refusal.message} The file was left unchanged; this is a bug in esfmt.\n`,
+		`${displayPath(file)}: ${refusal.message} The file was left unchanged; this is a bug in ${programName}.\n`,
 	)
 }
 
 async function runStdin(
 	check: boolean,
 	stdinFilepath: string | null,
+	programName: string,
 ): Promise<number> {
 	let source = await new Response(Bun.stdin.stream()).text()
 	let documentPath =
@@ -153,6 +234,7 @@ async function runStdin(
 		reportRefusal(
 			documentPath === undefined ? "<stdin>" : documentPath,
 			result.refusal,
+			programName,
 		)
 
 		return EXIT_FAILURE
@@ -167,21 +249,23 @@ async function runStdin(
 	return EXIT_SUCCESS
 }
 
-export async function run(argv: Array<string>): Promise<number> {
+export async function run(
+	argv: Array<string>,
+	options: { programName?: string } = {},
+): Promise<number> {
+	let programName = options.programName ?? DEFAULT_PROGRAM_NAME
 	let parsed = parseArguments(argv)
 
 	if (typeof parsed === "string") {
-		let isHelp = parsed === USAGE
-
-		if (isHelp) {
-			process.stdout.write(parsed + "\n")
-
-			return EXIT_SUCCESS
-		}
-
-		process.stderr.write(parsed + "\n\n" + USAGE + "\n")
+		process.stderr.write(parsed + "\n\n" + usage(programName) + "\n")
 
 		return EXIT_USAGE
+	}
+
+	if (parsed.help) {
+		process.stdout.write(usage(programName) + "\n")
+
+		return EXIT_SUCCESS
 	}
 
 	if (parsed.version) {
@@ -211,11 +295,11 @@ export async function run(argv: Array<string>): Promise<number> {
 			return EXIT_USAGE
 		}
 
-		return runStdin(parsed.check, parsed.stdinFilepath)
+		return runStdin(parsed.check, parsed.stdinFilepath, programName)
 	}
 
 	if (parsed.patterns.length === 0) {
-		process.stderr.write(USAGE + "\n")
+		process.stderr.write(usage(programName) + "\n")
 
 		return EXIT_USAGE
 	}
@@ -247,7 +331,7 @@ export async function run(argv: Array<string>): Promise<number> {
 		let result = format(source, { documentPath: file })
 
 		if (result.refusal !== null) {
-			reportRefusal(file, result.refusal)
+			reportRefusal(file, result.refusal, programName)
 			failed = true
 
 			continue

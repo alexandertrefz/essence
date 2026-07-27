@@ -83,7 +83,8 @@ export async function runBuild(
 		throw new UsageError(
 			"--execute can only run a single file.",
 			command,
-			"Compile the files you want, then run one of them with esc run.",
+			"Compile the files you want, then run one of them with " +
+				`${context.programName} run.`,
 		)
 	}
 
@@ -122,9 +123,9 @@ export async function runRun(
 ): Promise<number> {
 	if (files.length > 1) {
 		throw new UsageError(
-			"esc run takes a single source file.",
+			`${context.programName} run takes a single source file.`,
 			command,
-			"Use esc build to compile several files at once.",
+			`Use ${context.programName} build to compile several files at once.`,
 		)
 	}
 
@@ -135,7 +136,9 @@ export async function runRun(
 	let outputFileName = context.options.out
 
 	if (outputFileName === undefined) {
-		temporaryDirectory = await mkdtemp(path.join(tmpdir(), "esc-"))
+		temporaryDirectory = await mkdtemp(
+			path.join(tmpdir(), `${context.programName}-`),
+		)
 		outputFileName = path.join(
 			temporaryDirectory,
 			path.basename(defaultOutputFor(files[0] ?? "program.es")),
