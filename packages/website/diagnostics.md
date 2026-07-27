@@ -751,6 +751,39 @@ unchecked: `constant alias = greet` is function-valued, but its Parameters
 survive only in a resolved Type, which keeps no internal names, so a `@param`
 there cannot be told from a typo.
 
+## Modules
+
+One file is one Module, and a Module names the ones it depends on by their
+specifiers — the paths in the `from` clauses of `import { … }` and
+`export { … }`. These are reported while the graph of those files is being
+loaded, before any of them is enriched.
+
+### `invalid-module-specifier`
+
+A specifier is not a path this Compiler will read. It has to be relative,
+beginning with `./` or `../`, and to include the `.es` extension: nothing is
+appended to it, no directory is searched, and no package is looked up, so what
+it names is exactly what is read. `Geometry.es`, `/src/Geometry.es` and
+`./Geometry` are each reported here.
+
+The same code covers a specifier that names a standard library source. The
+standard library is one shared declaration space rather than a graph of
+Modules — everything it declares is already in scope in every Program, so
+there is nothing to import and no way to import it.
+
+### `module-not-found`
+
+The specifier resolved to a path nothing could be read at. The Diagnostic names
+the resolved path, since a specifier several directories deep rarely reads as
+the file it lands on. The entry file being unreadable is reported under this
+code as well, without a source location — there is no Program to point into.
+
+### `self-import`
+
+A specifier resolves to the file it is written in. Everything a Module declares
+is in scope inside it already, exported or not, so such an entry can only be a
+path that was meant to point elsewhere.
+
 ## The Compiler as a program
 
 These are not about a Program at all — they are about the run. They carry no

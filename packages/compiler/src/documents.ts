@@ -43,7 +43,12 @@ import { parseWithDiagnostics } from "./parser/index"
 // The document need not exist on disk — an Editor holds files that have never
 // been saved — so the deepest ancestor that DOES exist is canonicalised and
 // the missing tail appended lexically.
-function canonicalPath(filePath: string): string {
+//
+// Module resolution answers with this too, so that the line drawn here and the
+// identity of a Module are the same spelling of the same path: a second copy of
+// this that canonicalised differently would let a Module and a standard library
+// source disagree about which file they are.
+export function canonicalPath(filePath: string): string {
 	let resolved = path.resolve(filePath)
 	let existing = resolved
 	let missing: Array<string> = []

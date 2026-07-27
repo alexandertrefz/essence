@@ -232,6 +232,10 @@ export type DiagnosticCode =
 	// Documentation — the `§§` blocks above Declarations.
 	| "missing-documentation-separator"
 	| "unknown-documentation-parameter"
+	// Modules — the specifier, the file it names, and the graph they form.
+	| "invalid-module-specifier"
+	| "module-not-found"
+	| "self-import"
 	// The Compiler as a program — reading files, bundling the output.
 	| "file-not-found"
 	| "not-a-file"
