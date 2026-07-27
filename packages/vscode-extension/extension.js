@@ -306,7 +306,7 @@ function resolveCliForDebugging() {
 // what `--json` promises — while stderr only ever carries the CLI's own
 // failures, which go to the output channel where every other failure detail
 // already lives.
-function compileForDebugging(cli, programPath, outputFile) {
+function compileForDebugging(cli, programPath, outputFile, token) {
 	return new Promise((resolve) => {
 		let child = spawn(
 			cli.command,
@@ -318,22 +318,33 @@ function compileForDebugging(cli, programPath, outputFile) {
 		)
 		let stdout = ""
 
+		// NOTE: Cancelling the progress notification kills the compile — the
+		// promise settles once, so the `close` that follows the kill is heard
+		// by a promise that has already answered "cancelled".
+		let cancellation = token?.onCancellationRequested(() => {
+			child.kill()
+			resolve({ ok: false, report: null, detail: null, cancelled: true })
+		})
+
 		child.stdout.on("data", (chunk) => {
 			stdout += chunk
 		})
 		child.stderr.on("data", (chunk) => {
 			outputChannel.append(String(chunk))
 		})
-		child.on("error", (error) =>
+		child.on("error", (error) => {
+			cancellation?.dispose()
 			resolve({
 				ok: false,
 				report: null,
 				detail:
 					`could not run the ${cli.description} — ${error.message}. ` +
 					"Set 'essence.cli.path', open an Essence checkout, or install 'essence' on PATH.",
-			}),
-		)
+			})
+		})
 		child.on("close", (code) => {
+			cancellation?.dispose()
+
 			let report = null
 
 			try {
@@ -350,6 +361,30 @@ function compileForDebugging(cli, programPath, outputFile) {
 			})
 		})
 	})
+}
+
+// NOTE: What the Run-and-Debug view offers before any launch.json exists —
+// the same configuration the empty-config F5 path synthesizes, so the two
+// entry points cannot drift apart.
+function provideDynamicConfigurations() {
+	let editor = vscode.window.activeTextEditor
+
+	if (
+		editor === undefined ||
+		editor.document.languageId !== "essence" ||
+		editor.document.uri.scheme !== "file"
+	) {
+		return []
+	}
+
+	return [
+		{
+			type: "essence",
+			request: "launch",
+			name: `Debug ${path.basename(editor.document.uri.fsPath)}`,
+			program: editor.document.uri.fsPath,
+		},
+	]
 }
 
 async function resolveEssenceDebugConfiguration(context, folder, config) {
@@ -429,7 +464,21 @@ async function resolveEssenceDebugConfiguration(context, folder, config) {
 		`Compiling '${config.program}' for debugging with the ${cli.description}.`,
 	)
 
-	let compiled = await compileForDebugging(cli, config.program, program)
+	let compiled = await vscode.window.withProgress(
+		{
+			location: vscode.ProgressLocation.Notification,
+			title: `Compiling ${path.basename(config.program)}…`,
+			cancellable: true,
+		},
+		(_progress, token) =>
+			compileForDebugging(cli, config.program, program, token),
+	)
+
+	// NOTE: A cancelled compile is the user's own decision — the launch just
+	// stops, with nothing to report.
+	if (compiled.cancelled === true) {
+		return undefined
+	}
 
 	if (!compiled.ok) {
 		reportFailure(compiled.detail ?? summariseFailure(compiled.report))
@@ -485,6 +534,11 @@ export async function activate(context) {
 				config,
 			) => resolveEssenceDebugConfiguration(context, folder, config),
 		}),
+		vscode.debug.registerDebugConfigurationProvider(
+			"essence",
+			{ provideDebugConfigurations: provideDynamicConfigurations },
+			vscode.DebugConfigurationProviderTriggerKind.Dynamic,
+		),
 		// NOTE: Only the spawn path is worth interrupting for, and only by
 		// asking — a restart drops every open document's diagnostics for a
 		// moment. `essence.trace.server` is deliberately absent:
