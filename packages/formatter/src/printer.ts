@@ -665,6 +665,12 @@ export class Printer {
 		let written = renderFlat(concat(head))
 		let value = this.printExpression(node.value)
 
+		// NOTE: The `=` never breaks away from what it assigns. A value starts on
+		// the line its name is written on and gives way inside itself — an
+		// Argument list at its commas, a String at one of its holes — which
+		// keeps the first thing a reader looks for, the beginning of the value,
+		// where the name that introduced it is. Moving the whole value down
+		// buys one indent's worth of room and costs that.
 		return {
 			doc: concat([...head, padding, text(" = "), value]),
 			headWidth: written === null ? null : stringWidth(written),
@@ -1535,15 +1541,15 @@ export class Printer {
 			// NOTE: Reprinted from the source rather than the node. The AST
 			// normalises `1_000` to `1000`, a Rational's parts must stay flush
 			// to keep parsing as one literal, and the Lexer decodes a String's
-			// escapes and splits an interpolation into pieces — so only the
-			// source still holds a String exactly as it was written, holes and
-			// all. Reprinting it verbatim also leaves the hole Expressions as
-			// the author spaced them, which is what keeps the round-trip exact.
+			// escapes — so only the source still holds a String exactly as it
+			// was written.
 			case "IntegerValue":
 			case "RationalValue":
 			case "StringValue":
-			case "InterpolatedStringValue":
 				return text(this.source.slice(node.position))
+
+			case "InterpolatedStringValue":
+				return this.printInterpolatedString(node)
 
 			case "BooleanValue":
 				return text(node.value ? "true" : "false")
@@ -1564,6 +1570,102 @@ export class Printer {
 					true,
 				)
 		}
+	}
+
+	// NOTE: Everything outside a hole is written back from the source and
+	// everything inside one is printed like the Expression it is, so a `match`
+	// interpolated into a String has its Handlers laid out and aligned like any
+	// other instead of keeping the shape it was first typed with.
+	//
+	// The text between two holes is sliced rather than rebuilt from the
+	// segments, which carry the DECODED text and no Position of their own — the
+	// slice from one hole's end to the next one's start is `}`, the text as it
+	// was written with its escapes intact, and `{`, which is exactly what has to
+	// be written back. The same slice taken from the String's own start and to
+	// its own end carries the quotes. A String with no hole never reaches here.
+	//
+	// A hole owns its own braces, which is what lets a String that does not fit
+	// give way AT one — the padding between a brace and what it holds is inside
+	// the hole, so a line break put there is layout rather than a character of
+	// the String, and the text on either side is left whole:
+	//
+	//     "the quick brown fox {
+	//         alpha
+	//     } jumped over the lazy dog"
+	//
+	// This is the only break a String has to offer. Its text can not carry one:
+	// a newline written into THAT is a character, which is what a multi-line
+	// String Literal is made of. A hole holding an Expression that has to break
+	// anyway — a `match`, a Function with a body — keeps its braces closed up
+	// against it and lets the Expression lay itself out instead.
+	private printInterpolatedString(
+		node: parser.InterpolatedStringValueNode,
+	): Doc {
+		let parts: Array<Doc> = []
+		let cursor = node.position.start
+		let closing = false
+
+		for (let segment of node.segments) {
+			if (segment.kind !== "expression") {
+				continue
+			}
+
+			let hole = segment.expression.position
+			let written = this.source.slice({ start: cursor, end: hole.start })
+			let before = holeText(written, closing, true)
+
+			// NOTE: Only whitespace can stand between a brace and what it holds,
+			// so a slice that reads otherwise is not shaped the way this takes
+			// it to be — a Comment written inside a hole is the one way to get
+			// there. The whole String goes back verbatim rather than being taken
+			// apart on an assumption that did not hold.
+			if (before === null) {
+				return text(this.source.slice(node.position))
+			}
+
+			parts.push(text(before), this.printHole(segment.expression))
+
+			cursor = hole.end
+			closing = true
+		}
+
+		let written = this.source.slice({
+			start: cursor,
+			end: node.position.end,
+		})
+		let tail = holeText(written, closing, false)
+
+		if (tail === null) {
+			return text(this.source.slice(node.position))
+		}
+
+		parts.push(text(tail))
+
+		return concat(parts)
+	}
+
+	// NOTE: The braces are written here rather than sliced with the text, so
+	// they can be laid out with what they hold. An Expression that has to break
+	// is left against them — a `match` opens its own block on the same line, the
+	// way it would anywhere else — while one that fits on a line is offered a
+	// group, which spends the break only if the String around it has run out of
+	// room.
+	private printHole(expression: parser.ExpressionNode): Doc {
+		let doc = this.printExpression(expression)
+		let flat = renderFlat(doc)
+
+		if (flat === null) {
+			return concat([text("{"), doc, text("}")])
+		}
+
+		return group(
+			concat([
+				text("{"),
+				indent(concat([softline, text(flat)])),
+				softline,
+				text("}"),
+			]),
+		)
 	}
 
 	private printRecord(node: parser.RecordValueNode): Doc {
@@ -1856,6 +1958,48 @@ function assignmentOf(node: parser.ImplementationNode): AssignmentNode | null {
 		default:
 			return null
 	}
+}
+
+// NOTE: The String's own text out of a slice that runs between two holes, with
+// the braces at either end and the padding they hold dropped — the printer
+// writes those itself. `closes` says the slice begins by closing a hole and
+// `opens` that it ends by opening the next one; the ends of the String are the
+// two slices that do neither.
+//
+// The braces are found from the outside in: the one that closes a hole is the
+// FIRST `}` written, and the one that opens the next is the LAST `{`, because
+// only whitespace can stand between a brace and the Expression it holds. That
+// is what leaves an escaped `\{` or `\}` written in the text between them
+// alone. Null when something other than whitespace turns up in that gap, which
+// means the slice is not shaped the way this reads it.
+function holeText(
+	written: string,
+	closes: boolean,
+	opens: boolean,
+): string | null {
+	let text = written
+
+	if (closes) {
+		let brace = text.indexOf("}")
+
+		if (brace === -1 || text.slice(0, brace).trim() !== "") {
+			return null
+		}
+
+		text = text.slice(brace + 1)
+	}
+
+	if (opens) {
+		let brace = text.lastIndexOf("{")
+
+		if (brace === -1 || text.slice(brace + 1).trim() !== "") {
+			return null
+		}
+
+		text = text.slice(0, brace)
+	}
+
+	return text
 }
 
 type AssignmentKind = "declaration" | "assignment"

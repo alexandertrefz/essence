@@ -150,9 +150,10 @@ describe("formatter", () => {
 		})
 	})
 
-	// NOTE: An interpolated String is reprinted from source verbatim, holes and
-	// escapes and all — so formatting the code around it must leave the String
-	// itself byte-for-byte, and the AST-equality safety gate must accept it.
+	// NOTE: A String's own text is written back from the source byte for byte —
+	// its escapes are decoded in the AST, so only the source still holds it as
+	// it was written — while what is inside a hole is code, and is printed like
+	// any other Expression.
 	describe("string interpolation", () => {
 		let roundTrips = (line: string) => {
 			let source = `implementation {\n\t${line}\n}\n`
@@ -162,20 +163,152 @@ describe("formatter", () => {
 			expect(result.text).toContain(line)
 		}
 
-		it("leaves a hole exactly as written", () => {
+		it("leaves a hole that is already canonical alone", () => {
 			roundTrips('__print("Hello, {name}! {count} left")')
-		})
-
-		it("leaves the hole's own spacing untouched", () => {
-			roundTrips('__print("sum {1::add( 2 )}")')
 		})
 
 		it("leaves escapes and literal braces untouched", () => {
 			roundTrips('__print("a \\"b\\" \\\\ \\{c\\}")')
 		})
 
-		it("leaves a nested interpolation untouched", () => {
+		it("leaves a nested interpolation alone", () => {
 			roundTrips('__print("outer {"inner {name}"}")')
+		})
+
+		// NOTE: A hole holds an Expression, not text, so it is formatted like
+		// one — the String's own text around it is what stays as written.
+		it("formats the code inside a hole", () => {
+			expect(
+				format('implementation {\n\t__print("sum {1::add( 2 )}")\n}\n')
+					.text,
+			).toContain('"sum {1::add(2)}"')
+		})
+
+		// NOTE: The padding between a brace and what it holds is inside the
+		// hole, which makes it layout rather than a character of the String, so
+		// a hole has one spelling however it was typed.
+		it("closes the braces up against what the hole holds", () => {
+			expect(
+				format(
+					'implementation {\n\tconstant name = "x"\n\t__print("a { name } b { name}c")\n}\n',
+				).text,
+			).toContain('"a {name} b {name}c"')
+		})
+
+		// NOTE: An escaped brace is a character of the String, not a hole, so
+		// the text around it is left exactly as written — only the padding of a
+		// real hole is closed up.
+		it("leaves an escaped brace and the text around it alone", () => {
+			expect(
+				format(
+					'implementation {\n\tconstant name = "x"\n\t__print("pre \\{ lit \\} post { name } tail")\n}\n',
+				).text,
+			).toContain('"pre \\{ lit \\} post {name} tail"')
+		})
+
+		// NOTE: The reason this was worth doing. A `match` written into a hole
+		// used to keep whatever shape it was first typed with, Handler alignment
+		// and all, because the whole String was reprinted verbatim.
+		it("lays out and aligns a match written into a hole", () => {
+			let result = format(
+				"implementation {\n" +
+					"\tconstant a: Integer | Rational = 1/2\n" +
+					'\t__print("n: {match a -> String {\n' +
+					'case Integer { <- "whole" }\n' +
+					'\t\t\t\tcase Rational { <- "fraction" }\n' +
+					'}}")\n' +
+					"}\n",
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(
+				'\t\t\tcase Integer  { <- "whole" }\n' +
+					'\t\t\tcase Rational { <- "fraction" }\n',
+			)
+		})
+
+		// NOTE: The `=` never breaks away from what it assigns. A String starts
+		// on the line its name is written on however long it is, and gives way
+		// at a hole further along — the beginning of a value stays where the
+		// name that introduced it is.
+		it("keeps a long String on the line its name is on", () => {
+			let source =
+				'implementation {\n\tconstant alpha = 1\n\tconstant sentence = "the quick brown fox {alpha} jumped over the lazy dog now"\n}\n'
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(
+				'\tconstant sentence = "the quick brown fox {',
+			)
+			expect(result.text).not.toContain("constant sentence =\n")
+		})
+
+		// NOTE: A value that can give way inside itself does that, for the same
+		// reason — an Argument list breaks at its commas rather than moving off
+		// the line its name is on.
+		it("leaves a value that can break to break inside itself", () => {
+			let result = format(
+				"implementation {\n\tconstant result = someCall(alpha 1, beta 2, gamma 3, delta 4, epsilon 5, zeta 6)\n}\n",
+			)
+
+			expect(result.text).toContain("constant result = someCall(\n")
+		})
+
+		// NOTE: A String with no hole has nothing to give — its text can not
+		// carry a break — so it is left over the line rather than moved down to
+		// buy one indent's worth of room.
+		it("leaves a long String with no hole where it is", () => {
+			let result = format(
+				'implementation {\n\tconstant sentence = "the quick brown fox jumped over the very lazy dog and away"\n}\n',
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(
+				'\tconstant sentence = "the quick brown fox jumped over the very lazy dog and away"',
+			)
+		})
+
+		// NOTE: A hole is the only break a String has to offer — the padding
+		// inside its braces is layout, while a newline in the text either side
+		// would be a character. This is the shape a String too long for its line
+		// gives way in, and the text on either side stays whole.
+		it("breaks a String too long for its line at one of its holes", () => {
+			let result = format(
+				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta} and away"\n\t}\n}\n',
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(
+				'<- "the quick brown fox {alpha} jumped over the lazy dog {\n' +
+					"\t\t\tbeta\n" +
+					'\t\t} and away"',
+			)
+		})
+
+		// NOTE: Only as far as it has to — the holes that still fit are left
+		// closed up, so a String gives way at one place rather than every place.
+		it("breaks only the holes it has to", () => {
+			let result = format(
+				'implementation {\n\tfunction f() -> String {\n\t\t<- "the quick brown fox {alpha} jumped over the lazy dog {beta} and away"\n\t}\n}\n',
+			)
+
+			expect(result.text).toContain("{alpha}")
+		})
+
+		// NOTE: The hole that gives is the one the line runs out at, so the text
+		// before it — the part a reader starts on — keeps as much of the line as
+		// it can.
+		it("gives way at the hole the line runs out at", () => {
+			let result = format(
+				'implementation {\n\tconstant alpha = 1\n\tconstant beta = 2\n\tconstant sentence = "the quick brown fox {alpha} jumped over the very lazy dog {beta} and then away again"\n}\n',
+			)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(
+				'constant sentence = "the quick brown fox {\n' +
+					"\t\talpha\n" +
+					'\t} jumped over the very lazy dog {beta} and then away again"',
+			)
 		})
 	})
 
