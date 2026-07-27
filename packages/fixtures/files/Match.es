@@ -8,7 +8,7 @@ implementation {
 	__print(match amount -> String {
 		case Integer where @::isGreaterThan(100) { <- "a large whole number" }
 		case Integer  { <- "a whole number" }
-		case Rational { <- "a fraction: "::append(@::toString()) }
+		case Rational { <- "a fraction: {@}" }
 	}) § "a fraction: 1/2"
 
 	§ Literal Cases match one exact value, and read best before the Type Case
@@ -39,10 +39,8 @@ implementation {
 
 	__print(match input -> String {
 		case { x = 0, y = 0 }           { <- "clicked the origin" }
-		case { x = 0, y: Integer }      {
-			<- "clicked the y axis at "::append(@.y::toString())
-		}
+		case { x = 0, y: Integer }      { <- "clicked the y axis at {@.y}" }
 		case { x: Integer, y: Integer } { <- "clicked somewhere else" }
-		case { key: String }            { <- "pressed "::append(@.key) }
+		case { key: String }            { <- "pressed {@.key}" }
 	}) § "clicked the y axis at 7"
 }

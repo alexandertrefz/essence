@@ -23,7 +23,7 @@ implementation {
 	§§ @param subject — who to greet
 	§§ @returns — the finished greeting
 	function greet(subject: String) -> String {
-		<- "Hello, "::append(subject)::append("!")
+		<- "Hello, {subject}!"
 	}
 
 	§§ Leaves the description of each tag to the lines below it, which is the
@@ -37,13 +37,13 @@ implementation {
 	§§ @returns
 	§§ both greetings, one after the other
 	function greetTwice(first: String, second: String) -> String {
-		<- first::append(" ")::append(second)
+		<- "{first} {second}"
 	}
 
 	§ An ordinary Comment stays a private note. Nothing below it is
 	§ documented, and no Editor ever shows this text.
 	function shout(_ message: String) -> String {
-		<- message::append("!!!")
+		<- "{message}!!!"
 	}
 
 	§§ A Parameter written on a line of its own carries a block of its own,
@@ -93,7 +93,7 @@ implementation {
 		§§
 		§§ @param count — how many people are present
 		static forCrowd(count: Integer) -> String {
-			<- "Hello, all "::append(count::text())::append(" of you!")
+			<- "Hello, all {count::text()} of you!"
 		}
 	}
 

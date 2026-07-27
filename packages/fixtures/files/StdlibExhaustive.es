@@ -28,7 +28,7 @@ implementation {
 		_ label: String,
 		_ value: Value,
 	) -> Nothing {
-		__print(label::append(" => ")::append(value::toString()))
+		__print("{label} => {value}")
 		<- nothing
 	}
 

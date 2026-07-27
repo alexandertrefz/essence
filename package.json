@@ -12,7 +12,7 @@
 		"generate:natives": "bun run --cwd packages/compiler generate:natives",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
-		"format:essence": "bun packages/formatter/bin/esfmt 'packages/stdlib/sources/*.es' 'packages/fixtures/files/*.es'"
+		"format:essence": "bun packages/formatter/bin/esfmt 'packages/stdlib/sources/*.es' 'packages/fixtures/files/*.es' packages/fixtures/files/modules"
 	},
 	"keywords": [
 		"language",
