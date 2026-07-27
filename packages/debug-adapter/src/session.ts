@@ -28,6 +28,7 @@ import {
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
 import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "./render"
+import { blackboxPositions } from "./stepping"
 import {
 	fallbackDisplay,
 	isPresentableScope,
@@ -218,6 +219,36 @@ export class EssenceDebugSession extends DebugSession {
 			cdp.close()
 		})
 
+		// NOTE: The moment the bundle's script exists, everything its map
+		// does not cover is declared blackboxed — V8 then carries every step
+		// over the prelude and the runtime natively, and the manual loop in
+		// `onPaused` is only the safety net.
+		cdp.on<{ scriptId: string; url: string }>(
+			"Debugger.scriptParsed",
+			(params) => {
+				let debuggee = this.debuggee
+
+				if (
+					debuggee === null ||
+					params.url !== debuggee.bundleUrl ||
+					debuggee.map === null
+				) {
+					return
+				}
+
+				let positions = blackboxPositions(debuggee.map)
+
+				if (positions.length > 0) {
+					debuggee.cdp
+						.send("Debugger.setBlackboxedRanges", {
+							scriptId: params.scriptId,
+							positions,
+						})
+						.catch(() => {})
+				}
+			},
+		)
+
 		// NOTE: The entry pause: `--inspect-brk` holds the program before its
 		// first statement, and the engine only starts once
 		// `Runtime.runIfWaitingForDebugger` is sent — so the pause that
@@ -251,6 +282,19 @@ export class EssenceDebugSession extends DebugSession {
 	// swallowed here — `lastPause` is only ever a pause the program earned.
 	private entryPauseSeen = false
 
+	// NOTE: The manual smart step, alive between a step request and the stop
+	// it earns. Blackboxing does most of the carrying; this loop covers what
+	// it cannot — a landing in unmapped code is stepped onwards, a `next`
+	// that lands on the SAME `.es` line goes again (one source line can be
+	// several generated statements) — and a spent budget stops right where it
+	// is, so a user is never silently run away from.
+	private pendingStep: {
+		kind: "next" | "stepIn" | "stepOut"
+		stopReason: "step" | "entry"
+		origin: { source: string; line: number } | null
+		budget: number
+	} | null = null
+
 	private onPaused(params: PausedParameters): void {
 		if (!this.entryPauseSeen) {
 			this.entryPauseSeen = true
@@ -260,6 +304,7 @@ export class EssenceDebugSession extends DebugSession {
 		}
 
 		this.lastPause = params
+		this.variableHandles.reset()
 
 		let reason =
 			params.reason === "exception"
@@ -268,7 +313,106 @@ export class EssenceDebugSession extends DebugSession {
 					? "breakpoint"
 					: "step"
 
-		this.sendEvent(new StoppedEvent(reason, MAIN_THREAD_ID))
+		if (reason !== "step" || this.pendingStep === null) {
+			this.pendingStep = null
+			this.sendEvent(new StoppedEvent(reason, MAIN_THREAD_ID))
+
+			return
+		}
+
+		let step = this.pendingStep
+		let top = params.callFrames[0]
+		let original =
+			top === undefined
+				? null
+				: (this.debuggee?.map?.originalPositionFor({
+						line: top.location.lineNumber,
+						column: top.location.columnNumber ?? 0,
+					}) ?? null)
+
+		if (step.budget > 0) {
+			step.budget -= 1
+
+			if (original === null) {
+				// NOTE: Unmapped ground. A step-in keeps drilling forward; a
+				// next or step-out climbs back out of the glue it landed in.
+				this.debuggee?.cdp
+					.send(
+						step.kind === "stepIn"
+							? "Debugger.stepInto"
+							: "Debugger.stepOut",
+					)
+					.catch(() => {})
+
+				return
+			}
+
+			if (
+				step.kind === "next" &&
+				step.origin !== null &&
+				original.source === step.origin.source &&
+				original.line === step.origin.line
+			) {
+				this.debuggee?.cdp.send("Debugger.stepOver").catch(() => {})
+
+				return
+			}
+		}
+
+		let stopReason = step.stopReason
+
+		this.pendingStep = null
+		this.sendEvent(new StoppedEvent(stopReason, MAIN_THREAD_ID))
+	}
+
+	private beginStep(
+		kind: "next" | "stepIn" | "stepOut",
+		stopReason: "step" | "entry" = "step",
+	): void {
+		let top = this.lastPause?.callFrames[0]
+		let origin =
+			top === undefined
+				? null
+				: (this.debuggee?.map?.originalPositionFor({
+						line: top.location.lineNumber,
+						column: top.location.columnNumber ?? 0,
+					}) ?? null)
+
+		this.pendingStep = {
+			kind,
+			stopReason,
+			origin:
+				origin === null
+					? null
+					: { source: origin.source, line: origin.line },
+			budget: 50,
+		}
+		this.lastPause = null
+		this.presentedFrames = []
+	}
+
+	protected override async nextRequest(
+		response: DebugProtocol.NextResponse,
+	): Promise<void> {
+		this.beginStep("next")
+		await this.debuggee?.cdp.send("Debugger.stepOver").catch(() => {})
+		this.sendResponse(response)
+	}
+
+	protected override async stepInRequest(
+		response: DebugProtocol.StepInResponse,
+	): Promise<void> {
+		this.beginStep("stepIn")
+		await this.debuggee?.cdp.send("Debugger.stepInto").catch(() => {})
+		this.sendResponse(response)
+	}
+
+	protected override async stepOutRequest(
+		response: DebugProtocol.StepOutResponse,
+	): Promise<void> {
+		this.beginStep("stepOut")
+		await this.debuggee?.cdp.send("Debugger.stepOut").catch(() => {})
+		this.sendResponse(response)
 	}
 
 	protected override async configurationDoneRequest(
@@ -276,7 +420,15 @@ export class EssenceDebugSession extends DebugSession {
 	): Promise<void> {
 		if (this.debuggee !== null) {
 			if (this.stopOnEntry) {
-				this.sendEvent(new StoppedEvent("entry", MAIN_THREAD_ID))
+				// NOTE: The raw entry pause sits at the bundle's first
+				// statement — runtime glue. "Stop on entry" means the first
+				// statement the AUTHOR wrote, so the entry is a smart step:
+				// blackboxing carries it over the glue, and the pending step's
+				// reason makes the landing read as `entry`, not `step`.
+				this.beginStep("stepIn", "entry")
+				await this.debuggee.cdp
+					.send("Debugger.stepInto")
+					.catch(() => {})
 			} else {
 				await this.resumeDebuggee()
 			}
