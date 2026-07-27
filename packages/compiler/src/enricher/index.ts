@@ -49,6 +49,47 @@ const withoutShadowed = <Value>(
 				Object.entries(table).filter(([name]) => !names.has(name)),
 			)
 
+export type TopLevelScopeOptions = {
+	shadowedBuiltins?: ShadowedBuiltins
+	modulePath?: string
+	unimportedNamespaces?: () => Array<enricher.UnimportedNamespace>
+}
+
+// NOTE: The Scope a Program's top level is enriched in: the builtins first, and
+// then whatever the Program declares itself, in ONE table per kind. One Scope
+// rather than a builtin Scope with a child holding the declarations, because a
+// duplicate is an occupied slot in the same table — a Program declaring over a
+// builtin has to stay a `duplicate-variable`, and a child Scope would silently
+// shadow it instead.
+//
+// Linking seeds a Module's imports into it BETWEEN the two, which is what makes
+// `getAllNamespacesInScope` — insertion order over one table with no parent —
+// answer builtins, then imports, then local declarations, the dispatch order
+// Modules are defined over.
+export function topLevelScope(
+	options: TopLevelScopeOptions = {},
+): enricher.Scope {
+	let shadowed = options.shadowedBuiltins
+	let members: Record<string, common.Type> = scopeMap(
+		withoutShadowed(builtinMembers(), shadowed?.members),
+	)
+
+	return {
+		parent: null,
+		modulePath: options.modulePath,
+		unimportedNamespaces: options.unimportedNamespaces,
+		members,
+		// NOTE: The builtins are declared in TypeScript, not in Essence —
+		// there is no source Position to point a Diagnostic at.
+		declarations: scopeMap(),
+		constants: new Set(Object.keys(members)),
+		types: scopeMap(withoutShadowed(builtinTypes(), shadowed?.types)),
+		protocols: scopeMap(
+			withoutShadowed(builtinProtocols(), shadowed?.protocols),
+		),
+	}
+}
+
 export const enrich = (
 	program: parser.Program,
 	options: {
@@ -74,34 +115,14 @@ export const enrich = (
 	diagnostics: Array<common.Diagnostic>
 	annotations: Array<common.TypeAnnotation>
 } => {
-	let shadowed = options.shadowedBuiltins
 	let annotations: Array<common.TypeAnnotation> = []
 
 	let { result, diagnostics } = collectDiagnostics(
 		(): common.typed.Program => {
-			let members: Record<string, common.Type> = scopeMap(
-				withoutShadowed(builtinMembers(), shadowed?.members),
-			)
-
-			let topLevelScope: enricher.Scope = {
-				parent: null,
-				modulePath: options.modulePath,
-				members,
-				// NOTE: The builtins are declared in TypeScript, not in
-				// Essence — there is no source Position to point a
-				// Diagnostic at.
-				declarations: scopeMap(),
-				constants: new Set(Object.keys(members)),
-				types: scopeMap(
-					withoutShadowed(builtinTypes(), shadowed?.types),
-				),
-				protocols: scopeMap(
-					withoutShadowed(builtinProtocols(), shadowed?.protocols),
-				),
-			}
+			let scope = topLevelScope(options)
 
 			let enrichSection = () =>
-				enrichImplementation(program.implementation, topLevelScope)
+				enrichImplementation(program.implementation, scope)
 
 			if (options.annotations !== true) {
 				return {
@@ -132,17 +153,40 @@ export const enrich = (
 	return { program: result, diagnostics, annotations }
 }
 
-// NOTE: Several Programs enriched into ONE shared Scope, which is how the
-// standard library is read: its files are one declaration space, not a chain
-// of imports. Hoisting runs ONCE over every file's Nodes concatenated, so the
-// speculative rounds resolve across file boundaries too — a Protocol declared
-// in one file and a Namespace conforming to it in another hoist in whichever
-// order they happen to resolve, exactly as two Statements in one file do.
-// Diagnostics are collected per Program, so each stays attributable to the
-// file it came from.
+// NOTE: One Program and the Scope its top level is enriched in. The standard
+// library hands the SAME Scope for every one of its files — they are one
+// declaration space, not a chain of imports — while a group of Modules hands one
+// Scope each, so that a name is only visible where it was imported.
+export type EnrichedProgramInput = {
+	program: parser.Program
+	scope: enricher.Scope
+}
+
+// NOTE: Several Programs enriched with hoisting run ONCE over every file's Nodes
+// concatenated, so the speculative rounds resolve across file boundaries — a
+// Protocol declared in one file and a Namespace conforming to it in another
+// hoist in whichever order they happen to resolve, exactly as two Statements in
+// one file do. That is what the standard library's load relies on, and it is
+// also the only way a cycle of Modules can be enriched: nothing inside an SCC
+// can be resolved before the rest of it. Diagnostics are collected per Program,
+// so each stays attributable to the file it came from.
 export const enrichPrograms = (
-	programs: Array<parser.Program>,
-	scope: enricher.Scope,
+	inputs: Array<EnrichedProgramInput>,
+	options: {
+		// NOTE: Called at the top of every hoist round, and once more after the
+		// last one, to bind whatever became bindable since — the seam a cycle of
+		// Modules needs: an import across an SCC can only be seeded once the
+		// dependency's declaration has hoisted, and the dependency's declaration
+		// may itself name something imported the other way. Answering `true`
+		// says something new was bound, which keeps the rounds going even when
+		// no declaration resolved.
+		//
+		// `final` marks the call after the last round, which is the last moment
+		// anything may be written into a Scope: the bodies are enriched next, and
+		// an entry still unbound by then has to be given up on rather than left
+		// for every use of its name to report.
+		seedRound?: (final: boolean) => boolean
+	} = {},
 ): Array<{
 	program: common.typed.Program
 	diagnostics: Array<common.Diagnostic>
@@ -162,8 +206,10 @@ export const enrichPrograms = (
 	>()
 
 	let hoistedTypes = hoistDeclarations(
-		programs.flatMap((program) => program.implementation.nodes),
-		scope,
+		inputs.map((input) => ({
+			nodes: input.program.implementation.nodes,
+			scope: input.scope,
+		})),
 		(node, diagnostics) => {
 			let collected = hoistDiagnostics.get(node)
 
@@ -173,9 +219,10 @@ export const enrichPrograms = (
 				collected.push(...diagnostics)
 			}
 		},
+		options.seedRound,
 	)
 
-	return programs.map((program) => {
+	return inputs.map(({ program, scope }) => {
 		let { result, diagnostics } = collectDiagnostics(
 			(): common.typed.Program => {
 				for (let node of program.implementation.nodes) {
@@ -198,6 +245,14 @@ export const enrichPrograms = (
 
 		return { program: result, diagnostics }
 	})
+}
+
+// NOTE: A Program's Nodes and the Scope they hoist into. Several units may share
+// one Scope — the standard library's files do — or hold one each, which is what
+// keeps a group of Modules from seeing each other's declarations unimported.
+type HoistUnit = {
+	nodes: Array<parser.ImplementationNode>
+	scope: enricher.Scope
 }
 
 type HoistableStatementNode =
@@ -226,6 +281,14 @@ function isHoistable(
 type HoistableTypeNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
+
+// NOTE: One declaration still waiting for a round, with the Scope it resolves and
+// is declared in. The Scope travels with the Node rather than with the round,
+// because a round spans every unit.
+type PendingDeclaration = {
+	node: HoistableStatementNode
+	scope: enricher.Scope
+}
 
 // NOTE: Where the Diagnostics the hoist itself reports go. A lone Program
 // hoists inside its own collection and the default sink just reports them on;
@@ -582,12 +645,16 @@ function reportRecursiveTypeDeclarations(
 // not hoisted) is left to the in-order enrichment, which reports its
 // Diagnostics.
 function hoistDeclarations(
-	nodes: Array<parser.ImplementationNode>,
-	scope: enricher.Scope,
+	units: Array<HoistUnit>,
 	sink: HoistDiagnosticSink = reportOnwards,
+	seedRound?: (final: boolean) => boolean,
 ): HoistedTypes {
 	let hoistedTypes: HoistedTypes = new Map()
-	let pendingNodes = nodes.filter(isHoistable)
+	let pendingNodes: Array<PendingDeclaration> = units.flatMap((unit) =>
+		unit.nodes
+			.filter(isHoistable)
+			.map((node) => ({ node, scope: unit.scope })),
+	)
 
 	// NOTE: The recursive Type declarations are diagnosed and taken out of the
 	// rounds BEFORE they start, and the name of each is seeded as an Error in
@@ -597,42 +664,76 @@ function hoistDeclarations(
 	// Program does declare, instead of the one about the cycle. The seed is
 	// written straight into the map rather than through `declareTypeInScope`,
 	// whose occupied-slot check would report a duplicate declaration.
-	let recursiveNodes = reportRecursiveTypeDeclarations(
-		pendingNodes.filter(
-			(node): node is HoistableTypeNode =>
-				node.nodeType === "TypeAliasStatement" ||
-				node.nodeType === "ChoiceDeclarationStatement",
-		),
-		scope,
-		sink,
-	)
+	//
+	// NOTE: Once per Scope, never once over all of them: the cycle search is a
+	// graph over Type NAMES, and two Modules of one group each declaring `type
+	// Foo` declare two different Types. Sharing the graph would join them into a
+	// cycle neither file wrote. The standard library hands one Scope for every
+	// file, so its search stays the single cross-file one it has always been.
+	let recursiveNodes: Array<{
+		node: HoistableTypeNode
+		scope: enricher.Scope
+	}> = []
 
-	if (recursiveNodes.length > 0) {
-		let recursive = new Set<parser.ImplementationNode>(recursiveNodes)
+	for (let scope of new Set(units.map((unit) => unit.scope))) {
+		let scopedTypeNodes = pendingNodes
+			.filter((pending) => pending.scope === scope)
+			.map((pending) => pending.node)
+			.filter(
+				(node): node is HoistableTypeNode =>
+					node.nodeType === "TypeAliasStatement" ||
+					node.nodeType === "ChoiceDeclarationStatement",
+			)
 
-		for (let node of recursiveNodes) {
+		for (let node of reportRecursiveTypeDeclarations(
+			scopedTypeNodes,
+			scope,
+			sink,
+		)) {
+			recursiveNodes.push({ node, scope })
 			scope.types[node.name.content] = { type: "Error" }
 		}
+	}
 
-		pendingNodes = pendingNodes.filter((node) => !recursive.has(node))
+	if (recursiveNodes.length > 0) {
+		let recursive = new Set<parser.ImplementationNode>(
+			recursiveNodes.map((entry) => entry.node),
+		)
+
+		pendingNodes = pendingNodes.filter(
+			(pending) => !recursive.has(pending.node),
+		)
 	}
 
 	while (pendingNodes.length > 0) {
-		let remainingNodes: Array<HoistableStatementNode> = []
-		// NOTE: The Protocols this round can still hoist. A Namespace conforming
-		// to one of them can not have its conditional bounds woven yet — and a
-		// Namespace Type reaching Scope without them is exactly what let a use
-		// site above the declaration solve against an unbounded Method — so it
-		// throws instead and lands in `remainingNodes` for the next round.
-		let pendingProtocols = new Set(
-			pendingNodes
-				.filter(
-					(node) => node.nodeType === "ProtocolDeclarationStatement",
-				)
-				.map((node) => node.name.content),
-		)
+		// NOTE: Before the resolution rounds rather than after, so a Module whose
+		// import became bindable by the previous round has it in Scope while its
+		// own declarations are resolved.
+		let seeded = seedRound?.(false) ?? false
+		let remainingNodes: Array<PendingDeclaration> = []
+		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
+		// conforming to one of them can not have its conditional bounds woven yet
+		// — and a Namespace Type reaching Scope without them is exactly what let
+		// a use site above the declaration solve against an unbounded Method — so
+		// it throws instead and lands in `remainingNodes` for the next round.
+		let pendingProtocols = new Map<enricher.Scope, Set<string>>()
 
-		for (let node of pendingNodes) {
+		for (let { node, scope } of pendingNodes) {
+			if (node.nodeType !== "ProtocolDeclarationStatement") {
+				continue
+			}
+
+			let names = pendingProtocols.get(scope)
+
+			if (names === undefined) {
+				pendingProtocols.set(scope, new Set([node.name.content]))
+			} else {
+				names.add(node.name.content)
+			}
+		}
+
+		for (let pending of pendingNodes) {
+			let { node, scope } = pending
 			let speculation: {
 				result: common.Type | common.ProtocolType
 				diagnostics: Array<common.Diagnostic>
@@ -681,14 +782,16 @@ function hoistDeclarations(
 								node,
 								scope,
 								{
-									deferOnPendingConformance: pendingProtocols,
+									deferOnPendingConformance:
+										pendingProtocols.get(scope) ??
+										new Set(),
 								},
 							)
 						}
 					},
 				)
 			} catch {
-				remainingNodes.push(node)
+				remainingNodes.push(pending)
 				continue
 			}
 
@@ -755,16 +858,22 @@ function hoistDeclarations(
 
 				hoistedTypes.set(node, speculation.result)
 			} else {
-				remainingNodes.push(node)
+				remainingNodes.push(pending)
 			}
 		}
 
-		if (remainingNodes.length === pendingNodes.length) {
+		if (remainingNodes.length === pendingNodes.length && !seeded) {
 			break
 		}
 
 		pendingNodes = remainingNodes
 	}
+
+	// NOTE: The rounds stop the moment nothing is left to hoist, which is one
+	// round before the last hoisted declaration has been offered to the seeding —
+	// so it is offered here. Nothing can hoist off the back of it any more, but
+	// an import naming it still has to bind before the bodies are enriched.
+	seedRound?.(true)
 
 	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
 	// in Scope: the back edges of the cycle resolve to Error silently, so what
@@ -775,7 +884,7 @@ function hoistDeclarations(
 	// by then, and its Diagnostics are re-reported so a genuine typo inside a
 	// cycle still surfaces. Handing the Type over as a hoisted one is what keeps
 	// the in-order enrichment from resolving — and re-declaring — it again.
-	for (let node of recursiveNodes) {
+	for (let { node, scope } of recursiveNodes) {
 		let { result, diagnostics } = collectDiagnostics((): common.Type => {
 			// NOTE: The same guard the rounds above keep, for the same reason:
 			// resolving a declaration is expected to report and recover, so
@@ -823,7 +932,9 @@ function hoistDeclarations(
 const enrichImplementation = (
 	implementation: parser.ImplementationSectionNode,
 	scope: enricher.Scope,
-	hoistedTypes: HoistedTypes = hoistDeclarations(implementation.nodes, scope),
+	hoistedTypes: HoistedTypes = hoistDeclarations([
+		{ nodes: implementation.nodes, scope },
+	]),
 ): common.typed.ImplementationSectionNode => {
 	return {
 		nodeType: "ImplementationSection",

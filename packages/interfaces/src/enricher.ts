@@ -1,5 +1,16 @@
 import type * as common from "./common/index"
 
+// NOTE: A Namespace another Module in the graph exports and this one has not
+// imported, under the name that Module exports it as, with the specifier an
+// import of it would write. A Namespace has to be imported before a Method can
+// dispatch through it, so this is the useful half of "no such Method": which
+// Namespace that was never brought in declares the Method being asked for.
+export type UnimportedNamespace = {
+	name: string
+	specifier: string
+	namespace: common.NamespaceType
+}
+
 export type Scope = {
 	parent: Scope | null
 	members: Record<string, common.Type>
@@ -23,6 +34,12 @@ export type Scope = {
 	// through the parent chain, so every body Scope answers with the Module
 	// around it.
 	modulePath?: string
+	// NOTE: Asked on demand rather than handed over as an Array, because only a
+	// Diagnostic ever reads it: building the answer walks every dependency's
+	// export surface, and a Program with no mistake in it would pay for that per
+	// Module and never look. Absent for a Program that is no Module, and read
+	// through the parent chain like `modulePath`.
+	unimportedNamespaces?: () => Array<UnimportedNamespace>
 	// NOTE: The Type a `<-` in this Scope is expected to produce — set by
 	// Function bodies and Match Handler bodies. Bare Case Expressions
 	// (`<- #Less`) consult it before falling back to the scope scan. Null is a

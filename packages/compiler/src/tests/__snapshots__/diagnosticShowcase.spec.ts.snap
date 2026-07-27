@@ -489,3 +489,164 @@ Error: Type 'Boxed' names itself
 ─── 6 errors
 "
 `;
+
+exports[`Module Diagnostic Showcase Main.es should render the same report every time: Shapes.es 1`] = `
+"[export-of-variable]
+Error: Variable 'counter' can not be exported
+    ╭─┤ Shapes.es:18:2 │
+    │
+  8 │     variable counter = 0
+    │              ───┬───  
+    │                 ╰───── declared here
+    │ 
+ 18 │     counter
+    │     ───┬───  
+    │        ╰───── this is a Variable
+    │ 
+    │ Help: Declare it as a Constant, or export a Function that answers with its value.
+    │ 
+    │ Note: A Variable another Module can read is state two files share and neither owns — which of them last wrote it is not something either one states.
+────╯
+
+[export-of-unknown-name]
+Error: 'nowhere' is not declared in this Module
+    ╭─┤ Shapes.es:19:2 │
+    │
+ 19 │     nowhere
+    │     ───┬───  
+    │        ╰───── nothing here declares this name
+    │ 
+    │ Help: Write 'nowhere from "…"' to forward it from the Module that declares it.
+    │ 
+    │ Note: An entry with no 'from' clause exports something this Module's implementation declares.
+────╯
+
+─── 2 errors
+"
+`;
+
+exports[`Module Diagnostic Showcase Main.es should render the same report every time: Main.es 1`] = `
+"[not-exported]
+Error: 'Circle' is not exported by ./Shapes.es
+   ╭─┤ Main.es:2:2 │
+   │
+ 2 │     Circle          from "./Shapes.es"
+   │     ───┬──  
+   │        ╰──── declared in that Module, but private
+   │ 
+   │ Help: Add 'Circle' to the 'export { … }' block of ./Shapes.es.
+   │ 
+   │ Note: A name is private unless the Module's 'export { … }' block lists it.
+───╯
+
+[unknown-export]
+Error: ./Shapes.es declares nothing named 'Ellipse'
+   ╭─┤ Main.es:3:2 │
+   │
+ 3 │     Ellipse         from "./Shapes.es"
+   │     ───┬───  
+   │        ╰───── no such name in that Module
+   │ 
+   │ Help: Check the spelling, and that the specifier names the file you meant.
+   │ 
+   │ Note: The name is matched against what that Module exports, under the names it exports them as — an 'as' on its export entry renames it for everyone.
+───╯
+
+[duplicate-import]
+Error: 'measure' is already declared here
+    ╭─┤ Main.es:6:10 │
+    │
+  6 │     area as measure from "./Shapes.es"
+    │             ───┬───  
+    │                ╰───── this binds 'measure' a second time
+    │ 
+ 13 │     function measure(_ shape: Rectangle) -> Integer {
+    │              ───┬───  
+    │                 ╰───── first declared here
+    │ 
+    │ Help: Write 'as' on the entry to bind it under another name — 'area as …'.
+    │ 
+    │ Note: An import binds a name in this Module exactly as a declaration does, so two of them can not share one.
+────╯
+
+[not-exported]
+Error: 'Circle' is not exported by ./Shapes.es
+    ╭─┤ Main.es:20:2 │
+    │
+ 20 │     Circle from "./Shapes.es"
+    │     ───┬──  
+    │        ╰──── declared in that Module, but private
+    │ 
+    │ Help: Add 'Circle' to the 'export { … }' block of ./Shapes.es.
+    │ 
+    │ Note: A name is private unless the Module's 'export { … }' block lists it.
+────╯
+
+[unused-import]
+Warning: 'area' is imported and never used
+   ╭─┤ Main.es:5:2 │
+   │
+ 5 │     area            from "./Shapes.es"
+   │     ──┬─  
+   │       ╰─── nothing reads this name
+   │ 
+   │ Help: Remove the entry.
+   │ 
+   │ Note: A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.
+───╯
+
+─── 4 errors, 1 warning
+"
+`;
+
+exports[`Module Diagnostic Showcase Ping.es should render the same report every time: Ping.es 1`] = `
+"[cyclic-constant-import]
+Error: Constant 'STEP' is imported across a cycle
+   ╭─┤ Ping.es:2:2 │
+   │
+ 2 │     STEP from "./Pong.es"
+   │     ──┬─  
+   │       ╰─── this Constant is not readable here
+   │ 
+   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+   │ 
+   │ Note 1: ./Pong.es imports this Module back, directly or through further Modules.
+   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+───╯
+
+[cyclic-side-effects]
+Warning: This Statement runs in an order the cycle does not state
+    ╭─┤ Ping.es:11:2 │
+    │
+ 11 │     __print(stepped(1)::toString())
+    │     ───────────────┬───────────────  
+    │                    ╰───────────────── this runs when the Module body runs
+    │ 
+    │ Help: Break the cycle, or move the Statement into a Module outside it.
+    │ 
+    │ Note 1: This Module is in a cycle with ./Pong.es.
+    │ Note 2: A Module body runs once, on first import. Inside a cycle there is no first — whichever Module is reached first runs first, and that is decided by the entry point rather than by any of them.
+────╯
+
+─── 1 error, 1 warning
+"
+`;
+
+exports[`Module Diagnostic Showcase Ping.es should render the same report every time: Pong.es 1`] = `
+"[cyclic-side-effects]
+Warning: This Statement runs in an order the cycle does not state
+   ╭─┤ Pong.es:9:2 │
+   │
+ 9 │     __print(stepped(0)::toString())
+   │     ───────────────┬───────────────  
+   │                    ╰───────────────── this runs when the Module body runs
+   │ 
+   │ Help: Break the cycle, or move the Statement into a Module outside it.
+   │ 
+   │ Note 1: This Module is in a cycle with ./Ping.es.
+   │ Note 2: A Module body runs once, on first import. Inside a cycle there is no first — whichever Module is reached first runs first, and that is decided by the entry point rather than by any of them.
+───╯
+
+─── 1 warning
+"
+`;

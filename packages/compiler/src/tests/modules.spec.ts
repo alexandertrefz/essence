@@ -10,11 +10,16 @@ import {
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { fixturePath } from "@essence/fixtures"
+import type { common } from "@essence/interfaces"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
+import { containsErrors } from "../diagnostics/index"
 import { loadModuleGraph, type Module } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
+import { linkModuleGraph, type LinkedModule } from "../modules/link"
 import { canonicalPath, resolveSpecifier } from "../modules/resolve"
+import { validate } from "../validator/index"
 
 // NOTE: A project on disk, in a directory of its own that is removed again. The
 // files are written rather than taken from `packages/fixtures`, because what is
@@ -750,5 +755,1150 @@ ${moduleProgram()}`,
 				(module) => module.diagnostics.length === 0,
 			),
 		).toBe(true)
+	})
+})
+
+// NOTE: The whole stage, entry in and one linked Module per file out — the graph
+// and the linker are never used apart, and a test that ran only half of it would
+// be testing an arrangement no caller makes.
+function linkProject(directory: string, entry: string) {
+	return linkModuleGraph(
+		loadModuleGraph(path.join(directory, entry), diskModuleHost),
+	)
+}
+
+function linkedAt(
+	directory: string,
+	linked: { modules: Map<string, LinkedModule> },
+	name: string,
+): LinkedModule {
+	let module = linked.modules.get(path.join(directory, name))
+
+	if (module === undefined) {
+		throw new Error(`no Module '${name}' in the linked graph`)
+	}
+
+	return module
+}
+
+function codesOf(diagnostics: Array<common.Diagnostic>) {
+	return diagnostics.map((diagnostic) => diagnostic.code)
+}
+
+function reportsOf(diagnostics: Array<common.Diagnostic>) {
+	return diagnostics.map((diagnostic) => [
+		diagnostic.code,
+		diagnostic.message,
+	])
+}
+
+describe("Module Linking", () => {
+	// NOTE: One entry carries its name across every table it is bound in, so a
+	// `type Shape` and a Namespace `Shape` travel as one — which is what makes
+	// `Shape.of(…)` and `shape: Shape` both work off a single import.
+	it("reads an export surface off the Module's own declarations", () => {
+		withProject(
+			{
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer }
+
+	namespace Rectangle for Rectangle {
+		static of(width: Integer) -> Rectangle {
+			<- { width = width }
+		}
+	}
+
+	protocol Sized {
+		size() -> Integer
+	}
+
+	constant ORIGIN = 0
+
+	function widen(_ shape: Rectangle) -> Rectangle {
+		<- Rectangle.of(width shape.width::add(1))
+	}
+}
+
+export {
+	ORIGIN
+	Rectangle
+	Sized
+	widen
+}
+`,
+			},
+			(directory) => {
+				let { surface } = linkedAt(
+					directory,
+					linkProject(directory, "Geometry.es"),
+					"Geometry.es",
+				)
+
+				expect(surface.kinds).toEqual({
+					ORIGIN: "constant",
+					Rectangle: "type",
+					Sized: "protocol",
+					widen: "function",
+				})
+				expect(Object.keys(surface.values).sort()).toEqual([
+					"ORIGIN",
+					"Rectangle",
+					"widen",
+				])
+				expect(Object.keys(surface.types)).toEqual(["Rectangle"])
+				expect(Object.keys(surface.protocols)).toEqual(["Sized"])
+				expect(surface.values["Rectangle"]?.type).toBe("Namespace")
+				expect([...surface.constants].sort()).toEqual([
+					"ORIGIN",
+					"Rectangle",
+					"widen",
+				])
+			},
+		)
+	})
+
+	// NOTE: Private by default. `hidden` is declared and reachable inside its own
+	// Module and nowhere else, which is the whole of the visibility rule.
+	it("keeps a declaration the export block does not list out of the surface", () => {
+		withProject(
+			{
+				"Library.es": `implementation {
+	function shown() -> Integer {
+		<- 1
+	}
+
+	function hidden() -> Integer {
+		<- 2
+	}
+}
+
+export {
+	shown
+}
+`,
+			},
+			(directory) => {
+				expect(
+					Object.keys(
+						linkedAt(
+							directory,
+							linkProject(directory, "Library.es"),
+							"Library.es",
+						).surface.kinds,
+					),
+				).toEqual(["shown"])
+			},
+		)
+	})
+
+	it("applies an 'as' on the export side and on the import side", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	measure as area from "./Geometry.es"
+}
+
+implementation {
+	__print(area(3)::toString())
+}
+`,
+				"Geometry.es": `implementation {
+	function widthOf(_ width: Integer) -> Integer {
+		<- width
+	}
+}
+
+export {
+	widthOf as measure
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+
+				expect(
+					Object.keys(
+						linkedAt(directory, linked, "Geometry.es").surface
+							.kinds,
+					),
+				).toEqual(["measure"])
+
+				let main = linkedAt(directory, linked, "Main.es")
+
+				expect(main.diagnostics).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: A facade never binds what it forwards — `Rectangle` is not in scope
+	// inside `Facade.es` at all, and a chain of them still answers with the one
+	// Type the declaring Module made.
+	it("forwards a name through a chain of re-exports", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Shape from "./Facade.es"
+}
+
+implementation {
+	function widthOf(_ shape: Shape) -> Integer {
+		<- shape.width
+	}
+
+	__print(widthOf({ width = 2 })::toString())
+}
+`,
+				"Facade.es": `implementation {}
+
+export {
+	Rectangle as Shape from "./Inner.es"
+}
+`,
+				"Inner.es": `implementation {
+	type Rectangle = { width: Integer }
+}
+
+export {
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+
+				expect(
+					linkedAt(directory, linked, "Facade.es").surface.kinds,
+				).toEqual({ Shape: "type" })
+				expect(
+					linkedAt(directory, linked, "Main.es").diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	it("refuses an import of a name the dependency keeps private", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	hidden from "./Library.es"
+	absent from "./Library.es"
+}
+
+implementation {}
+`,
+				"Library.es": `implementation {
+	function hidden() -> Integer {
+		<- 1
+	}
+}
+
+export {}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					// NOTE: `absent` first, although `hidden` was written first
+					// — the entries are read in canonical order.
+					[
+						"unknown-export",
+						"./Library.es declares nothing named 'absent'",
+					],
+					[
+						"not-exported",
+						"'hidden' is not exported by ./Library.es",
+					],
+				])
+			},
+		)
+	})
+
+	// NOTE: All three collisions are the one Diagnostic, because they are the one
+	// mistake: the name an entry binds is taken. The entry is what gives way, so
+	// whatever held the name still means what it did — a builtin stays the
+	// builtin, and the local declaration is not reported as a duplicate of the
+	// import that lost.
+	it("refuses an import that shadows a builtin, a declaration or another import", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	String from "./Library.es"
+	local from "./Library.es"
+	first from "./Library.es"
+	second as first from "./Library.es"
+}
+
+implementation {
+	function local() -> Integer {
+		<- 0
+	}
+
+	__print(local()::toString())
+	__print("literal"::append(""))
+}
+`,
+				"Library.es": `implementation {
+	function String() -> Integer {
+		<- 1
+	}
+
+	function local() -> Integer {
+		<- 2
+	}
+
+	function first() -> Integer {
+		<- 3
+	}
+
+	function second() -> Integer {
+		<- 4
+	}
+}
+
+export {
+	String
+	first
+	local
+	second
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(codesOf(main.diagnostics)).toEqual([
+					"duplicate-import",
+					"duplicate-import",
+					"duplicate-import",
+					"unused-import",
+				])
+				expect(
+					main.diagnostics
+						.filter(
+							(diagnostic) =>
+								diagnostic.code === "duplicate-import",
+						)
+						.map((diagnostic) => diagnostic.message),
+				).toEqual([
+					"'String' is already declared here",
+					"'local' is already declared here",
+					// NOTE: The entry that loses is the one read LATER, which is
+					// the aliased one — `first` itself binds, and `second as
+					// first` is what collides with it.
+					"'first' is already declared here",
+				])
+			},
+		)
+	})
+
+	// NOTE: The Rewriter emits a Method call as `<Namespace name>.method(…)`, so
+	// an alias has to reach the emitted code: the import binds a shallow copy of
+	// the Namespace Type carrying the local name. The declaring Module's own copy
+	// keeps its own name, which is what its emission needs.
+	it("binds an aliased Namespace under the name the import gave it", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Measurable as Sizing from "./Geometry.es"
+	Rectangle from "./Geometry.es"
+}
+
+implementation {
+	function areaOf(_ shape: Rectangle) -> Integer {
+		<- shape::area()
+	}
+
+	__print(areaOf({ width = 2, height = 3 })::toString())
+}
+`,
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	namespace Measurable for Rectangle {
+		area() -> Integer {
+			<- @.width::multiply(with @.height)
+		}
+	}
+}
+
+export {
+	Measurable
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+				let main = linkedAt(directory, linked, "Main.es")
+
+				expect(main.diagnostics).toEqual([])
+
+				let namespaceNames = new Set<string>()
+				let visit = (node: unknown): void => {
+					if (node === null || typeof node !== "object") {
+						return
+					}
+
+					let record = node as Record<string, unknown>
+
+					if (record["nodeType"] === "MethodInvocation") {
+						namespaceNames.add(
+							(record["namespace"] as Record<string, unknown>)[
+								"name"
+							] as string,
+						)
+					}
+
+					for (let value of Object.values(record)) {
+						visit(value)
+					}
+				}
+
+				visit(main.program)
+
+				expect(namespaceNames).toContain("Sizing")
+				expect(namespaceNames).not.toContain("Measurable")
+				expect(
+					linkedAt(directory, linked, "Geometry.es").surface.values[
+						"Measurable"
+					],
+				).toMatchObject({ type: "Namespace", name: "Measurable" })
+			},
+		)
+	})
+
+	// NOTE: The single hoisting pass over the whole group, which is the only way
+	// this resolves: `A` needs `halved` typed to type `averaged`, and `B` needs
+	// `Amount` and `doubled` to type `halved`. Neither can go first, so the rounds
+	// bind the entries as the declarations they name come up.
+	it("enriches a cycle of hoistable declarations in one pass", () => {
+		withProject(
+			{
+				"A.es": `import {
+	halved from "./B.es"
+}
+
+implementation {
+	type Amount = { cents: Integer }
+
+	function doubled(_ amount: Amount) -> Amount {
+		<- { cents = amount.cents::multiply(with 2) }
+	}
+
+	function averaged(_ amount: Amount) -> Amount {
+		<- halved(doubled(amount))
+	}
+}
+
+export {
+	Amount
+	averaged
+	doubled
+}
+`,
+				"B.es": `import {
+	Amount from "./A.es"
+	doubled from "./A.es"
+}
+
+implementation {
+	function halved(_ amount: Amount) -> Amount {
+		<- { cents = amount.cents::divide(by 2)::otherwise(0/1)::truncate() }
+	}
+
+	function quadrupled(_ amount: Amount) -> Amount {
+		<- doubled(doubled(amount))
+	}
+}
+
+export {
+	halved
+	quadrupled
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+
+				for (let name of ["A.es", "B.es"]) {
+					expect([
+						name,
+						linkedAt(directory, linked, name).diagnostics,
+					]).toEqual([name, []])
+				}
+
+				expect(
+					linkedAt(directory, linked, "B.es").surface.kinds,
+				).toEqual({ halved: "function", quadrupled: "function" })
+			},
+		)
+	})
+
+	// NOTE: The one kind a cycle can not carry, because it is the one kind that
+	// does not hoist — and it is genuinely broken at runtime, not merely
+	// unsupported: the emitted binding is read in its temporal dead zone.
+	it("refuses a Constant imported across a cycle", () => {
+		withProject(
+			{
+				"A.es": `import {
+	SCALE from "./B.es"
+}
+
+implementation {
+	function scaled(_ value: Integer) -> Integer {
+		<- value::multiply(with SCALE)
+	}
+}
+
+export {
+	scaled
+}
+`,
+				"B.es": `import {
+	scaled from "./A.es"
+}
+
+implementation {
+	constant SCALE = 3
+
+	function stepped(_ value: Integer) -> Integer {
+		<- scaled(value)
+	}
+}
+
+export {
+	SCALE
+	stepped
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+				let a = linkedAt(directory, linked, "A.es")
+
+				expect(reportsOf(a.diagnostics)).toEqual([
+					[
+						"cyclic-constant-import",
+						"Constant 'SCALE' is imported across a cycle",
+					],
+				])
+
+				// NOTE: The name is bound as an Error, so the body that reads it
+				// is not a second Diagnostic about a name the Program does
+				// declare.
+				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
+				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
+					[],
+				)
+			},
+		)
+	})
+
+	// NOTE: The same Constant, imported from OUTSIDE a cycle, is ordinary — the
+	// rule is about the cycle rather than about Constants.
+	it("allows a Constant imported down a chain", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	SCALE from "./Settings.es"
+}
+
+implementation {
+	__print(SCALE::toString())
+}
+`,
+				"Settings.es": `implementation {
+	constant SCALE = 3
+}
+
+export {
+	SCALE
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	it("warns about a Statement that runs inside a cycle", () => {
+		withProject(
+			{
+				"A.es": `import {
+	fromB from "./B.es"
+}
+
+implementation {
+	function fromA() -> Integer {
+		<- 1
+	}
+
+	__print(fromB()::toString())
+}
+
+export {
+	fromA
+}
+`,
+				"B.es": `import {
+	fromA from "./A.es"
+}
+
+implementation {
+	function fromB() -> Integer {
+		<- fromA()
+	}
+}
+
+export {
+	fromB
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+				let a = linkedAt(directory, linked, "A.es")
+
+				expect(codesOf(a.diagnostics)).toEqual(["cyclic-side-effects"])
+				expect(a.diagnostics[0]?.severity).toBe("warning")
+				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
+
+				// NOTE: `B.es` declares and nothing more, so nothing there runs
+				// in an order anyone could notice.
+				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
+					[],
+				)
+			},
+		)
+	})
+
+	it("warns about an import nothing reads", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	kept from "./Library.es"
+	unread from "./Library.es"
+}
+
+implementation {
+	__print(kept()::toString())
+}
+`,
+				"Library.es": `implementation {
+	function kept() -> Integer {
+		<- 1
+	}
+
+	function unread() -> Integer {
+		<- 2
+	}
+}
+
+export {
+	kept
+	unread
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(reportsOf(main.diagnostics)).toEqual([
+					["unused-import", "'unread' is imported and never used"],
+				])
+				expect(main.diagnostics[0]?.severity).toBe("warning")
+				expect(main.diagnostics[0]?.tags).toEqual(["unnecessary"])
+			},
+		)
+	})
+
+	// NOTE: The case the check exists for. An imported Namespace used only through
+	// `shape::area()` has no Identifier occurrence anywhere in the file — the only
+	// trace of it is the Namespace name on the resolved Invocation, and reading
+	// Identifiers alone would warn about the import that makes the call resolve.
+	it("counts implicit dispatch as a use of an imported Namespace", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Measurable from "./Geometry.es"
+	Rectangle from "./Geometry.es"
+}
+
+implementation {
+	function areaOf(_ shape: Rectangle) -> Integer {
+		<- shape::area()
+	}
+
+	__print(areaOf({ width = 2, height = 3 })::toString())
+}
+`,
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	namespace Measurable for Rectangle {
+		area() -> Integer {
+			<- @.width::multiply(with @.height)
+		}
+	}
+}
+
+export {
+	Measurable
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: A Type used only in an annotation leaves no Identifier in the TYPED
+	// tree — the annotation resolved to a Type object — so the written tree has to
+	// be read as well.
+	it("counts an annotation as a use of an imported Type", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Rectangle from "./Geometry.es"
+}
+
+implementation {
+	function widthOf(_ shape: Rectangle) -> Integer {
+		<- shape.width
+	}
+
+	__print(widthOf({ width = 2 })::toString())
+}
+`,
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer }
+}
+
+export {
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	it("refuses an export of a Variable and of a name the Module does not declare", () => {
+		withProject(
+			{
+				"Main.es": `implementation {
+	variable counter = 0
+
+	__print(counter::toString())
+}
+
+export {
+	counter
+	nowhere
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					[
+						"export-of-variable",
+						"Variable 'counter' can not be exported",
+					],
+					[
+						"export-of-unknown-name",
+						"'nowhere' is not declared in this Module",
+					],
+				])
+			},
+		)
+	})
+
+	// NOTE: The canonical order — by specifier, then by name — rather than the
+	// written one, which is exactly the order `esfmt` writes the block in. The
+	// "searched Namespaces" listing is where that order is observable, and it is
+	// the same order Completion dedupes members in.
+	it("seeds imported Namespaces in canonical order, not written order", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Zulu from "./Zulu.es"
+	Alpha from "./Alpha.es"
+}
+
+implementation {
+	__print(2::missing()::toString())
+}
+`,
+				"Alpha.es": `implementation {
+	namespace Alpha for Integer {
+		alpha() -> Integer {
+			<- @
+		}
+	}
+}
+
+export {
+	Alpha
+}
+`,
+				"Zulu.es": `implementation {
+	namespace Zulu for Integer {
+		zulu() -> Integer {
+			<- @
+		}
+	}
+}
+
+export {
+	Zulu
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+				let unknownMethod = main.diagnostics.find(
+					(diagnostic) => diagnostic.code === "unknown-method",
+				)
+
+				// NOTE: The builtins come first — they are the parent of every
+				// import — and `Alpha` precedes `Zulu` although `Zulu` was
+				// written first.
+				expect(unknownMethod?.notes[0]).toContain(
+					"'Integer', 'Number', 'Optional', 'Alpha', 'Zulu'",
+				)
+			},
+		)
+	})
+
+	// NOTE: The Diagnostic a forgotten Namespace import produces on its own says
+	// only that no Method of that name exists, which is indistinguishable from a
+	// typo. The graph knows better, and the help is what the auto-import Quick Fix
+	// keys off.
+	it("names the unimported Namespace and its Module in the no-such-Method help", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Rectangle from "./Geometry.es"
+}
+
+implementation {
+	function areaOf(_ shape: Rectangle) -> Integer {
+		<- shape::area()
+	}
+
+	__print(areaOf({ width = 2, height = 3 })::toString())
+}
+`,
+				"Geometry.es": `implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	namespace Measurable for Rectangle {
+		area() -> Integer {
+			<- @.width::multiply(with @.height)
+		}
+	}
+}
+
+export {
+	Measurable
+	Rectangle
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(codesOf(main.diagnostics)).toEqual(["unknown-method"])
+				expect(main.diagnostics[0]?.helps).toContain(
+					"'Measurable' in ./Geometry.es declares 'area' for { width: Integer, height: Integer } — import it.",
+				)
+			},
+		)
+	})
+
+	// NOTE: A single file compile has no graph at all, and its Diagnostics must be
+	// the ones it always had — no help about a Namespace nobody could import.
+	it("says nothing about unimported Namespaces where there is no graph", () => {
+		withProject(
+			{
+				"Main.es": `implementation {
+	type Rectangle = { width: Integer, height: Integer }
+
+	function areaOf(_ shape: Rectangle) -> Integer {
+		<- shape::area()
+	}
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics[0]?.helps,
+				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: Per Module, because the dedup key is severity, code, message and
+	// Position with NO file in it — the two files below make the same mistake on
+	// the same line, and one shared collection would report the first and swallow
+	// the second.
+	it("attributes each Module's Diagnostics to that Module", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	broken from "./Other.es"
+}
+
+implementation {
+	constant wrong = missing
+
+	__print(broken()::toString())
+}
+`,
+				"Other.es": `implementation {
+
+
+
+
+	constant wrong = missing
+}
+
+export {
+	broken
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+				let other = linkedAt(directory, linked, "Other.es")
+				let main = linkedAt(directory, linked, "Main.es")
+
+				// NOTE: The same code, the same message and the same Position in
+				// both files — which is exactly what one shared collection would
+				// deduplicate down to a single report.
+				for (let module of [other, main]) {
+					let unknownName = module.diagnostics.find(
+						(diagnostic) => diagnostic.code === "unknown-name",
+					)
+
+					expect(unknownName?.message).toBe(
+						"'missing' is not declared",
+					)
+					expect(unknownName?.position?.start.line).toBe(6)
+				}
+
+				expect(codesOf(other.diagnostics)).toEqual([
+					"unknown-name",
+					"export-of-unknown-name",
+				])
+				expect(codesOf(main.diagnostics)).toEqual([
+					"unknown-export",
+					"unknown-name",
+				])
+			},
+		)
+	})
+
+	// NOTE: An entry naming something that IS exported and could not be typed
+	// binds an Error rather than nothing. The Module that declares it has said
+	// what is wrong with it; leaving the name unbound would bury that under one
+	// `unknown-name` per use, in a file whose author can see the import written
+	// at the top.
+	it("stays quiet about an import whose declaration the other Module could not type", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	broken from "./Other.es"
+}
+
+implementation {
+	__print(broken()::toString())
+	__print(broken()::toString())
+}
+`,
+				"Other.es": `implementation {
+	function broken() -> Missing {
+		<- 1
+	}
+}
+
+export {
+	broken
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+
+				expect(
+					codesOf(
+						linkedAt(directory, linked, "Other.es").diagnostics,
+					),
+				).toEqual(["unknown-type"])
+				expect(
+					linkedAt(directory, linked, "Main.es").diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// NOTE: What the Module's canonical path is FOR: a Choice takes its nominal
+	// identity from the Module that declares it, so two files each declaring
+	// `choice Result` declare two Types — and linking is where that path is
+	// supplied. Without it the two would be interchangeable at compile time and
+	// carry the same runtime tag, and `is` would confuse them with no Diagnostic
+	// anywhere.
+	it("identifies a Choice by the Module that declares it", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	Result as Theirs from "./Other.es"
+}
+
+implementation {
+	choice Result {
+		Ok
+	}
+
+	function take(_ value: Theirs) -> Boolean {
+		<- true
+	}
+
+	constant mine: Result = #Ok
+
+	__print(take(mine)::toString())
+}
+`,
+				"Other.es": `implementation {
+	choice Result {
+		Ok
+	}
+}
+
+export {
+	Result
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+				let main = linkedAt(directory, linked, "Main.es")
+
+				expect(
+					linkedAt(directory, linked, "Other.es").diagnostics,
+				).toEqual([])
+				expect(main.diagnostics).toEqual([])
+
+				// NOTE: Same spelling, same Case, two Types — because the two
+				// declarations are in two Modules. Unqualified they would be
+				// interchangeable here AND carry the same runtime tag. A free
+				// Function's Arguments are the Validator's stage, which is a
+				// stage linking does not run: it links, and the caller decides
+				// what to run over what came back.
+				expect(codesOf(validate(main.program))).toEqual([
+					"argument-type-mismatch",
+				])
+			},
+		)
+	})
+
+	// NOTE: The fixtures the rest of the Modules work is verified against, linked
+	// end to end — five files, a cycle among them, every Diagnostic stage run.
+	// They are the one Module Programs in the repository that are meant to be
+	// clean, so this is where "clean" is pinned.
+	it("links the Module fixtures without a single Diagnostic", () => {
+		let linked = linkModuleGraph(
+			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
+		)
+
+		expect(
+			[...linked.modules.keys()].map((filePath) =>
+				path.relative(fixturePath("modules"), filePath),
+			),
+		).toEqual([
+			"A.es",
+			"B.es",
+			"Geometry.es",
+			path.join("math", "Math.es"),
+			"Main.es",
+		])
+
+		for (let module of linked.modules.values()) {
+			let diagnostics = [...module.diagnostics]
+
+			if (!containsErrors(diagnostics)) {
+				diagnostics.push(...validate(module.program))
+			}
+
+			expect([
+				path.basename(module.module.filePath),
+				reportsOf(diagnostics),
+			]).toEqual([path.basename(module.module.filePath), []])
+		}
+
+		expect(
+			Object.keys(
+				linked.modules.get(fixturePath("modules", "Main.es"))!.surface
+					.kinds,
+			).sort(),
+		).toEqual(["Rectangle", "describe"])
 	})
 })

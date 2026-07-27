@@ -784,6 +784,77 @@ A specifier resolves to the file it is written in. Everything a Module declares
 is in scope inside it already, exported or not, so such an entry can only be a
 path that was meant to point elsewhere.
 
+### `not-exported`
+
+The Module the specifier names does declare that name — and keeps it private. A
+name is private unless the `export { … }` block lists it, so the fix belongs to
+the file being imported from rather than to the entry: add the name to its
+export block, under an `as` if it should be published differently.
+
+### `unknown-export`
+
+The Module the specifier names declares nothing under that name. Names are
+matched against what a Module exports, under the names it exports them *as* — an
+`as` on its export entry renames it for every importer, so an entry may have to
+ask for a name that appears nowhere in that file's implementation.
+
+### `duplicate-import`
+
+An import binds a name in this Module exactly as a declaration does, so two of
+them cannot share one. Reported whether the name is taken by a builtin, by
+something this file declares, or by another entry of the same block. `as` is the
+fix: it renames the entry locally, and leaves the exporting Module untouched.
+
+The entry is refused rather than allowed to shadow, so whatever already held the
+name still means what it did.
+
+### `export-of-unknown-name`
+
+An `export { … }` entry with no `from` clause exports something this Module's
+implementation declares, and nothing here declares that name. Adding a `from`
+clause turns it into a re-export, which forwards a dependency's name without
+binding it locally.
+
+### `export-of-variable`
+
+Functions, Constants, Type Aliases, Choices, Protocols and Namespaces can be
+exported. A Variable cannot: a Variable another Module can read is state two
+files share and neither owns, and which of them wrote it last is not something
+either one states. Declare it as a Constant, or export a Function that answers
+with its value.
+
+### `cyclic-constant-import`
+
+A Constant imported from a Module that (directly or through further Modules)
+imports this one back. Cycles are allowed for everything that hoists — a
+Function, a Type Alias, a Choice, a Protocol, a Namespace — because those are in
+place before any Module body runs. A Constant is not: its value exists only once
+its Module's body has run, and inside a cycle which body runs first is decided
+by the entry point rather than by any of the files in it. The name would be read
+in its temporal dead zone.
+
+Move the Constant into a Module outside the cycle, or expose it as a Function.
+
+### `cyclic-side-effects`
+
+A Warning. A Module inside a cycle whose top level does something beyond
+declaring names — a call, an assignment, any Statement that runs. Module bodies
+run once, on first import, dependency-first; inside a cycle there is no first,
+so the order these Statements happen in is not something the source states. The
+Program is well-formed, and it is well-formed in more than one way.
+
+### `unused-import`
+
+A Warning, tagged `unnecessary` so an Editor renders the entry faded. Nothing in
+this Module reads the name.
+
+A Namespace counts as used when a Method dispatches through it, even where the
+call never spells its name: `rect::area()` is what an imported
+`RectangleMeasurable` is for, and the import is what makes that call resolve at
+all. The check deliberately over-counts elsewhere — a name that only appears as
+a Method name is treated as a use — because a Warning that fires on a name the
+Module does need is worse than one that stays silent.
+
 ## The Compiler as a program
 
 These are not about a Program at all — they are about the run. They carry no

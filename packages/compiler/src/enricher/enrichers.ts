@@ -47,6 +47,7 @@ import {
 	derivedEquatableNamespace,
 	derivedEquatableNamespaceName,
 	invalidateNamespacesInScope,
+	namespacesTargeting,
 	listItemTypeOf,
 	lookupTypeOf,
 	recordValueTypeOf,
@@ -72,7 +73,12 @@ import {
 	suggestionHelps,
 	suggestionInScope,
 } from "./resolvers"
-import { childScope, modulePathOf, scopeMap } from "./scope"
+import {
+	childScope,
+	modulePathOf,
+	scopeMap,
+	unimportedNamespacesOf,
+} from "./scope"
 
 // NOTE: Hoisting resolves each order-independent declaration's Type up front
 // (see `hoistDeclarations`) and hands it back keyed by its Node. The in-order
@@ -4071,6 +4077,44 @@ function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 	}
 }
 
+// NOTE: A Namespace has to be imported before a Method can dispatch through it,
+// which makes a forgotten import indistinguishable from a misspelling by
+// everything the Scope can see. So the Modules this one depends on are asked as
+// well, by exactly the rule dispatch is decided by — `namespacesTargeting` — and
+// what comes back names the Namespace AND the Module it is in, which is what the
+// auto-import Quick Fix reads. Empty for a Program that is no Module, so a single
+// file compile's Diagnostics are the ones it always had.
+function unimportedNamespaceHelps(
+	memberName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+): Array<string> {
+	let candidates = unimportedNamespacesOf(scope).filter(
+		(candidate) => candidate.namespace.methods[memberName] !== undefined,
+	)
+
+	if (candidates.length === 0) {
+		return []
+	}
+
+	let targeting = namespacesTargeting(
+		new Map(
+			candidates.map((candidate) => [
+				candidate.name,
+				candidate.namespace,
+			]),
+		),
+		baseType,
+	)
+
+	return candidates
+		.filter((candidate) => targeting.has(candidate.name))
+		.map(
+			(candidate) =>
+				`'${candidate.name}' in ${candidate.specifier} declares '${memberName}' for ${describeType(baseType)} — import it.`,
+		)
+}
+
 // NOTE: The Namespaces that were searched are the useful half of "no such
 // Method" — without them the reader can not tell whether they misspelled the
 // Method or the value is not the Type they thought it was. The near miss is
@@ -4080,6 +4124,7 @@ function reportUnknownMethod(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	namespaces: Map<string, common.NamespaceType>,
+	scope: enricher.Scope,
 ): void {
 	let methodNames = new Set<string>()
 
@@ -4112,7 +4157,16 @@ function reportUnknownMethod(
 								.map((name) => `'${name}'`)
 								.join(", ")}.`,
 						],
-			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
+			helps: [
+				...(suggestion === null
+					? []
+					: [`Did you mean '${suggestion}'?`]),
+				...unimportedNamespaceHelps(
+					node.member.content,
+					baseType,
+					scope,
+				),
+			],
 			...suggestionData(suggestion),
 		},
 	)
@@ -4401,11 +4455,16 @@ function resolveMethodInvocation(
 						notes: [
 							`No Namespace in scope targets ${describeType(baseType)}.`,
 						],
+						helps: unimportedNamespaceHelps(
+							node.member.content,
+							baseType,
+							scope,
+						),
 					},
 				)
 			}
 		} else {
-			reportUnknownMethod(node, baseType, namespaces)
+			reportUnknownMethod(node, baseType, namespaces, scope)
 		}
 
 		return resolveFailedMethodInvocation()
