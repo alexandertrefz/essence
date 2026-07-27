@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -8,13 +7,7 @@ import * as vscode from "vscode"
 // `exports` map that would map one.
 import { LanguageClient, State } from "vscode-languageclient/node.js"
 
-import {
-	compileArguments,
-	createNodeDebugConfiguration,
-	debugBuildSlug,
-	resolveCli,
-	summariseFailure,
-} from "./debug.js"
+import { resolveCli } from "./debug.js"
 
 let client
 // NOTE: `onDidChangeState` belongs to the client, and a restart builds a new
@@ -302,67 +295,6 @@ function resolveCliForDebugging() {
 	return cli
 }
 
-// NOTE: One compile, one JSON report. The report arrives on stdout — that is
-// what `--json` promises — while stderr only ever carries the CLI's own
-// failures, which go to the output channel where every other failure detail
-// already lives.
-function compileForDebugging(cli, programPath, outputFile, token) {
-	return new Promise((resolve) => {
-		let child = spawn(
-			cli.command,
-			[...cli.args, ...compileArguments(programPath, outputFile)],
-			{
-				cwd: path.dirname(programPath),
-				stdio: ["ignore", "pipe", "pipe"],
-			},
-		)
-		let stdout = ""
-
-		// NOTE: Cancelling the progress notification kills the compile — the
-		// promise settles once, so the `close` that follows the kill is heard
-		// by a promise that has already answered "cancelled".
-		let cancellation = token?.onCancellationRequested(() => {
-			child.kill()
-			resolve({ ok: false, report: null, detail: null, cancelled: true })
-		})
-
-		child.stdout.on("data", (chunk) => {
-			stdout += chunk
-		})
-		child.stderr.on("data", (chunk) => {
-			outputChannel.append(String(chunk))
-		})
-		child.on("error", (error) => {
-			cancellation?.dispose()
-			resolve({
-				ok: false,
-				report: null,
-				detail:
-					`could not run the ${cli.description} — ${error.message}. ` +
-					"Set 'essence.cli.path', open an Essence checkout, or install 'essence' on PATH.",
-			})
-		})
-		child.on("close", (code) => {
-			cancellation?.dispose()
-
-			let report = null
-
-			try {
-				report = JSON.parse(stdout)
-			} catch {
-				// NOTE: A CLI that died before printing leaves stdout empty or
-				// partial; `summariseFailure(null)` words exactly that.
-			}
-
-			resolve({
-				ok: code === 0 && report?.ok === true,
-				report,
-				detail: null,
-			})
-		})
-	})
-}
-
 // NOTE: What the Run-and-Debug view offers before any launch.json exists —
 // the same configuration the empty-config F5 path synthesizes, so the two
 // entry points cannot drift apart.
@@ -387,10 +319,12 @@ function provideDynamicConfigurations() {
 	]
 }
 
-async function resolveEssenceDebugConfiguration(context, folder, config) {
-	// NOTE: The empty object is what F5 sends with no launch.json — the
-	// zero-configuration path. It becomes the same launch the contribution's
-	// `initialConfigurations` writes, built from the active editor.
+// NOTE: The session itself is `essence dap`'s — the Debug Adapter compiles
+// the program and drives it; this resolver only completes the configuration.
+// The empty object is what F5 sends with no launch.json, and it becomes the
+// same launch the contribution's `initialConfigurations` writes, built from
+// the active editor.
+function resolveEssenceDebugConfiguration(folder, config) {
 	if (
 		config.type === undefined &&
 		config.request === undefined &&
@@ -419,90 +353,31 @@ async function resolveEssenceDebugConfiguration(context, folder, config) {
 		}
 	}
 
-	if (typeof config.program !== "string" || !config.program.endsWith(".es")) {
-		reportFailure("'program' must name a '.es' source file to debug.")
+	// NOTE: A precompiled `artifact` is the Adapter's business entirely; only
+	// the ordinary source launch is worth validating here, where the failure
+	// can be reported before a session ever starts.
+	if (typeof config.artifact !== "string") {
+		if (
+			typeof config.program !== "string" ||
+			!config.program.endsWith(".es")
+		) {
+			reportFailure("'program' must name a '.es' source file to debug.")
 
-		return undefined
+			return undefined
+		}
+
+		if (!fs.existsSync(config.program)) {
+			reportFailure(`'${config.program}' does not exist.`)
+
+			return undefined
+		}
 	}
 
-	if (!fs.existsSync(config.program)) {
-		reportFailure(`'${config.program}' does not exist.`)
-
-		return undefined
+	if (config.cwd === undefined && folder !== undefined) {
+		config.cwd = folder.uri.fsPath
 	}
 
-	let cli = resolveCliForDebugging()
-
-	if (cli === null) {
-		return undefined
-	}
-
-	// NOTE: Debug builds live in the extension's per-workspace storage rather
-	// than beside the source — no `.gitignore` churn, no artefact to commit by
-	// accident — with `outDir` as the escape hatch for anyone who wants to
-	// read the emitted JavaScript. One directory per program, overwritten on
-	// every launch. `globalStorageUri` carries the folderless window, where
-	// `storageUri` is undefined.
-	let storageRoot = context.storageUri?.fsPath ?? context.globalStorageUri.fsPath
-	let directory =
-		typeof config.outDir === "string" && config.outDir.trim() !== ""
-			? config.outDir.trim()
-			: path.join(
-					storageRoot,
-					"debug-builds",
-					debugBuildSlug(config.program),
-				)
-
-	fs.mkdirSync(directory, { recursive: true })
-
-	let program = path.join(
-		directory,
-		`${path.basename(config.program, ".es")}.js`,
-	)
-
-	outputChannel.appendLine(
-		`Compiling '${config.program}' for debugging with the ${cli.description}.`,
-	)
-
-	let compiled = await vscode.window.withProgress(
-		{
-			location: vscode.ProgressLocation.Notification,
-			title: `Compiling ${path.basename(config.program)}…`,
-			cancellable: true,
-		},
-		(_progress, token) =>
-			compileForDebugging(cli, config.program, program, token),
-	)
-
-	// NOTE: A cancelled compile is the user's own decision — the launch just
-	// stops, with nothing to report.
-	if (compiled.cancelled === true) {
-		return undefined
-	}
-
-	if (!compiled.ok) {
-		reportFailure(compiled.detail ?? summariseFailure(compiled.report))
-
-		return undefined
-	}
-
-	await vscode.debug.startDebugging(
-		folder,
-		createNodeDebugConfiguration(config, {
-			program,
-			directory,
-			defaultCwd: folder?.uri.fsPath ?? path.dirname(config.program),
-		}),
-	)
-
-	// NOTE: `undefined` aborts THIS session silently — the `pwa-node` session
-	// started above is the one that lives on. Returning the rewritten
-	// configuration directly is not an option: VS Code ignores a resolver that
-	// changes a configuration's `type` (microsoft/vscode#54213), so the
-	// handoff is a fresh `startDebugging`, the same shim the js-debug
-	// redirects themselves use. `null` would open launch.json instead, which
-	// is the wrong answer everywhere a failure was already reported.
-	return undefined
+	return config
 }
 
 export async function activate(context) {
@@ -532,13 +407,34 @@ export async function activate(context) {
 			resolveDebugConfigurationWithSubstitutedVariables: (
 				folder,
 				config,
-			) => resolveEssenceDebugConfiguration(context, folder, config),
+			) => resolveEssenceDebugConfiguration(folder, config),
 		}),
 		vscode.debug.registerDebugConfigurationProvider(
 			"essence",
 			{ provideDebugConfigurations: provideDynamicConfigurations },
 			vscode.DebugConfigurationProviderTriggerKind.Dynamic,
 		),
+		// NOTE: The adapter is the CLI's own `dap` command — the same binary
+		// that compiles is the one that debugs, so the two can never disagree
+		// about a bundle or its map.
+		vscode.debug.registerDebugAdapterDescriptorFactory("essence", {
+			createDebugAdapterDescriptor: () => {
+				let cli = resolveCliForDebugging()
+
+				if (cli === null) {
+					return undefined
+				}
+
+				outputChannel.appendLine(
+					`Starting the Debug Adapter through the ${cli.description}.`,
+				)
+
+				return new vscode.DebugAdapterExecutable(cli.command, [
+					...cli.args,
+					"dap",
+				])
+			},
+		}),
 		// NOTE: Only the spawn path is worth interrupting for, and only by
 		// asking — a restart drops every open document's diagnostics for a
 		// moment. `essence.trace.server` is deliberately absent:

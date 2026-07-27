@@ -161,7 +161,8 @@ export async function runRun(
 			files,
 			{
 				emit: true,
-				sourcemapMode: temporaryDirectory === null ? undefined : "inline",
+				sourcemapMode:
+					temporaryDirectory === null ? undefined : "inline",
 			},
 		)
 

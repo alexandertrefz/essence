@@ -194,9 +194,9 @@ describe("Source Maps", () => {
 		// everything that is not Essence reads as unmapped code to step over.
 		expect(map.sources).toContain(mainPath)
 		expect(map.sources).toContain(geometryPath)
-		expect(
-			map.sources.filter((source) => !source.endsWith(".es")),
-		).toEqual([])
+		expect(map.sources.filter((source) => !source.endsWith(".es"))).toEqual(
+			[],
+		)
 		expect(map.sourcesContent?.[map.sources.indexOf(geometryPath)]).toBe(
 			texts.get(geometryPath)!,
 		)
@@ -245,10 +245,7 @@ describe("Source Maps", () => {
 
 		let areaOriginal = consumer.originalPositionFor({
 			line: areaBodyLine,
-			column: Math.max(
-				bundleLines[areaBodyLine - 1]!.search(/\S/),
-				0,
-			),
+			column: Math.max(bundleLines[areaBodyLine - 1]!.search(/\S/), 0),
 		})
 
 		expect(areaOriginal.source).toBe(geometryPath)

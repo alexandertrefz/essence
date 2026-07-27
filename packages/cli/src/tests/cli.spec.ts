@@ -21,13 +21,13 @@ import { runCheck } from "../actions"
 import { type OptionValues, parseArguments, UsageError } from "../args"
 import { commands, findCommand, globalOptions, PROGRAM } from "../commands"
 import { colorChoiceFor, createContext, version } from "../context"
+import { runtimeArguments } from "../execute"
 import {
 	renderCommandHelp,
 	renderOverview,
 	renderUsageLine,
 	wrap,
 } from "../help"
-import { runtimeArguments } from "../execute"
 import { run } from "../index"
 import {
 	defaultOutputFor,

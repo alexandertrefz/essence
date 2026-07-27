@@ -34,7 +34,9 @@ describe("Simplifier Positions", () => {
 		let typedStatement = typed.implementation.nodes[0]!
 		let simplifiedStatement = simplified.implementation.nodes[0]!
 
-		expect(simplifiedStatement.nodeType).toBe("VariableDeclarationStatement")
+		expect(simplifiedStatement.nodeType).toBe(
+			"VariableDeclarationStatement",
+		)
 		expect(simplifiedStatement.position).toEqual(typedStatement.position)
 	})
 

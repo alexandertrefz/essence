@@ -137,8 +137,7 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			tag === "Record" ||
 			tag === "Algebraic" ||
 			tag === "Transcendental" ||
-			(tag.indexOf("#") !== -1 &&
-				Object.keys(value as object).length > 0)
+			(tag.indexOf("#") !== -1 && Object.keys(value as object).length > 0)
 		) {
 			return { display: render(value, 0), kind: "record" }
 		}
