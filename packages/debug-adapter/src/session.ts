@@ -20,14 +20,10 @@ import type { DebugProtocol } from "@vscode/debugprotocol"
 import { planBreakpoints } from "./breakpoints"
 import { CdpConnection } from "./cdp"
 import type { CompileDiagnostic, CompileFunction } from "./compile"
-import { escapeNameForEvaluation } from "./names"
-import {
-	type CdpCallFrame,
-	type PresentedFrame,
-	presentFrames,
-} from "./frames"
+import { type CdpCallFrame, type PresentedFrame, presentFrames } from "./frames"
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
+import { escapeNameForEvaluation } from "./names"
 import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "./render"
 import { blackboxPositions } from "./stepping"
 import {
@@ -147,8 +143,16 @@ export class EssenceDebugSession extends DebugSession {
 		response: DebugProtocol.LaunchResponse,
 		args: EssenceLaunchArguments,
 	): Promise<void> {
-		this.stopOnEntry = args.stopOnEntry === true
+		// NOTE: "Run Without Debugging" arrives as `noDebug` — the program
+		// still runs under the adapter, but nothing pauses it: the client
+		// sends no breakpoints, and exceptions and `stopOnEntry` stand down
+		// here.
+		this.stopOnEntry = args.stopOnEntry === true && args.noDebug !== true
 		this.glueFramesMode = args.glueFrames === "subtle" ? "subtle" : "hide"
+
+		if (args.noDebug === true) {
+			this.pauseOnExceptionsState = "none"
+		}
 
 		let prepared = await this.prepareBundle(args)
 

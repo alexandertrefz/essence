@@ -45,7 +45,9 @@ export class CdpConnection {
 				resolve(new CdpConnection(socket)),
 			)
 			socket.addEventListener("error", () =>
-				reject(new Error(`could not connect to the inspector at ${url}`)),
+				reject(
+					new Error(`could not connect to the inspector at ${url}`),
+				),
 			)
 		})
 	}

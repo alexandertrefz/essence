@@ -2,23 +2,33 @@
 
 ## [0.3.0]
 
-A debugger.
+A debugger — the Essence Debug Adapter, `essence dap`.
 
 - `F5` on an `.es` file compiles it and starts it under the debugger, no
   launch.json needed — breakpoints, stepping, call stacks and watch all speak
   in source lines, riding the compiler's new source maps.
+- The session is the CLI's own `dap` command speaking the Debug Adapter
+  Protocol: the same binary that compiles the program drives it under Node's
+  inspector, so the compiler and the debugger can never disagree about a
+  bundle or its map.
+- Stacks speak Essence: the author's names demangled, a `match` shown as one
+  construct, standard library frames as `List.sorted`, and compiler glue
+  hidden (`glueFrames: "subtle"` shows it greyed out).
 - The Variables view renders Essence values the way `__print` spells them —
-  `3/4`, `"text"`, `Ordering#Less`, `{ width = 3, height = 4 }` — with
-  `essenceValueRendering: false` as the way back to raw JavaScript.
-- Compiler-generated code the map leaves unmapped — the standard library
-  prelude, the inlined runtime — is stepped through rather than into.
-- "Uncaught Exceptions" pauses a failing Program on the mapped line; logpoints
-  and conditional breakpoints work, with their expressions (and the Debug
-  Console) being JavaScript in the compiled frame.
-- Compilation runs the `essence` CLI: `essence.cli.path` names it, a checkout
-  open in the workspace is found on its own, PATH is the fallback. The
-  setting joins `essence.server.path` in being ignored in untrusted
-  workspaces, for the same reason.
+  `3/4`, `"text"`, `Ordering#Less`, `{ width = 3, height = 4 }` — expanded
+  children included, rendered live inside the debuggee.
+- Stepping is carried over the prelude and the runtime; `stopOnEntry` pauses
+  on the first statement the author wrote, not the bundle's bootstrap.
+- "Uncaught Exceptions" pauses a failing Program on the mapped line with the
+  failure's own message. The Debug Console evaluates JavaScript in the
+  compiled frame — results still render as Essence values, and a lone
+  identifier like `ok?` is retried under its compiled name.
+- `keepArtifacts` keeps the compiled bundle for reading; `artifact` debugs a
+  precompiled one without compiling at all.
+- The CLI is found through `essence.cli.path`, a checkout open in the
+  workspace, or PATH — in that order. The setting joins
+  `essence.server.path` in being ignored in untrusted workspaces, for the
+  same reason.
 
 ## [0.2.0]
 

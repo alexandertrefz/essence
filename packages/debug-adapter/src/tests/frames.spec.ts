@@ -96,10 +96,7 @@ describe("presentFrames", () => {
 			"hide",
 		)
 
-		expect(presented.map((frame) => frame.name)).toEqual([
-			"greet",
-			"main",
-		])
+		expect(presented.map((frame) => frame.name)).toEqual(["greet", "main"])
 		expect(presented[0]!.callFrameIndex).toBe(0)
 		expect(presented[0]!.source?.line).toBe(7)
 	})
@@ -110,7 +107,11 @@ describe("presentFrames", () => {
 	// in place.
 	it("does not absorb an anonymous frame that sits over glue", () => {
 		let presented = presentFrames(
-			[frame("", 21, 0), frame("$es_List_map", 39, 1), frame("main", 23, 2)],
+			[
+				frame("", 21, 0),
+				frame("$es_List_map", 39, 1),
+				frame("main", 23, 2),
+			],
 			testMap(),
 			"hide",
 		)

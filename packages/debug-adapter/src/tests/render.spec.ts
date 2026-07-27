@@ -51,9 +51,9 @@ describe("the in-debuggee renderer", () => {
 
 	it("classifies how a value expands", () => {
 		expect(describeOne(createInteger(1n)).kind).toBe("leaf")
-		expect(
-			describeOne(createRecord({ a: createInteger(1n) })).kind,
-		).toBe("record")
+		expect(describeOne(createRecord({ a: createInteger(1n) })).kind).toBe(
+			"record",
+		)
 		expect(describeOne(createList([])).kind).toBe("list")
 		expect(describeOne(createCase("Ordering#Less")).kind).toBe("leaf")
 		expect(

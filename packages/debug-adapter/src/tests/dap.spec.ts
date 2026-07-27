@@ -299,7 +299,7 @@ describe("a debug session", () => {
 
 		writeFileSync(
 			brokenPath,
-			"implementation {\n\tconstant answer: Integer = \"text\"\n}\n",
+			'implementation {\n\tconstant answer: Integer = "text"\n}\n',
 		)
 
 		try {

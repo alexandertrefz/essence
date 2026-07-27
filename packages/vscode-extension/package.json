@@ -177,46 +177,41 @@
 								"description": "The working directory the program runs in.",
 								"default": "${workspaceFolder}"
 							},
+							"env": {
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								},
+								"description": "Environment variables set for the program.",
+								"default": {}
+							},
 							"stopOnEntry": {
 								"type": "boolean",
-								"description": "Pause on the first statement.",
+								"description": "Pause on the first statement the program's own source wrote.",
 								"default": false
-							},
-							"console": {
-								"type": "string",
-								"enum": [
-									"internalConsole",
-									"integratedTerminal"
-								],
-								"description": "Where the program's output goes.",
-								"default": "internalConsole"
 							},
 							"runtimeExecutable": {
 								"type": "string",
-								"description": "The executable that runs the compiled JavaScript. Debugging requires Node — the debugger speaks its inspector protocol.",
+								"description": "The executable that runs the compiled JavaScript. Debugging requires Node — the adapter speaks its inspector protocol.",
 								"default": "node"
 							},
-							"smartStep": {
-								"type": "boolean",
-								"description": "Step over compiler-generated code with no source mapping instead of into it.",
-								"default": true
-							},
-							"skipFiles": {
-								"type": "array",
-								"items": {
-									"type": "string"
-								},
-								"description": "Glob patterns of files never stepped into.",
-								"default": []
-							},
-							"outDir": {
+							"glueFrames": {
 								"type": "string",
-								"description": "Keep the compiled JavaScript and its map here instead of the extension's storage."
+								"enum": [
+									"hide",
+									"subtle"
+								],
+								"description": "What becomes of compiler-generated stack frames: hidden entirely, or shown greyed out.",
+								"default": "hide"
 							},
-							"essenceValueRendering": {
+							"keepArtifacts": {
 								"type": "boolean",
-								"description": "Render Essence values in the Variables view — Rational as 3/4, Strings quoted, Choice cases by their tag — instead of their JavaScript innards.",
-								"default": true
+								"description": "Keep the compiled JavaScript and its map after the session, and say where they are.",
+								"default": false
+							},
+							"artifact": {
+								"type": "string",
+								"description": "A precompiled bundle to debug instead of compiling 'program' — its source map must sit beside it."
 							}
 						}
 					}

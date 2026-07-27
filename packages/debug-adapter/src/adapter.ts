@@ -1,7 +1,4 @@
-import {
-	type AdapterOptions,
-	EssenceDebugSession,
-} from "./session"
+import { type AdapterOptions, EssenceDebugSession } from "./session"
 
 export {
 	type CompileDiagnostic,
