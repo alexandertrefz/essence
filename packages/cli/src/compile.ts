@@ -43,7 +43,11 @@ export async function planCompilation(
 	patterns: Array<string>,
 	options: { emit: boolean; watch: boolean },
 ): Promise<CompilationPlan> {
-	let inputFileNames = await resolveInputFiles(patterns, command)
+	let inputFileNames = await resolveInputFiles(
+		patterns,
+		command,
+		context.programName,
+	)
 	let outputs = options.emit
 		? await resolveOutputFiles(inputFileNames, context.options.out, command)
 		: null

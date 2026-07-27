@@ -121,7 +121,26 @@ export const serverCapabilities: ServerCapabilities = {
 	callHierarchyProvider: true,
 }
 
+// NOTE: vscode-languageserver reads the transport off process.argv and throws
+// if it finds none. Editors always pass one, but a person starting the Server
+// by hand — or `essence lsp` — passes nothing, and stdio is the transport this
+// Server documents itself as speaking, so name it instead of failing. A
+// transport the client did ask for still wins: createConnection stops at the
+// first one it recognises, and this is appended behind it.
+const transportArguments = ["--node-ipc", "--stdio", "--socket", "--pipe"]
+
+export function ensureTransportArgument() {
+	let isTransport = (argument: string) =>
+		transportArguments.includes(argument.split("=")[0]!)
+
+	if (!process.argv.slice(2).some(isTransport)) {
+		process.argv.push("--stdio")
+	}
+}
+
 export function startServer() {
+	ensureTransportArgument()
+
 	let connection = createConnection(ProposedFeatures.all)
 	let documents = new TextDocuments(TextDocument)
 	let pendingAnalyses = new Map<string, ReturnType<typeof setTimeout>>()
@@ -481,12 +500,14 @@ export function startServer() {
 			params.textDocument.uri,
 		)
 
-		// NOTE: An `unsafe` refusal means esfmt distrusted its own output and
-		// kept the file as it was — a formatter bug, which the CLI reports
-		// loudly and the editor should not swallow.
+		// NOTE: An `unsafe` refusal means the formatter distrusted its own
+		// output and kept the file as it was — a formatter bug, which the CLI
+		// reports loudly and the editor should not swallow. The warning names
+		// the component, not an executable: the user may have arrived here
+		// through `essence format`, `esfmt` or Format Document alike.
 		if (result.warning !== null) {
 			connection.window.showWarningMessage(
-				`esfmt: ${result.warning} The file was left unchanged; this is a bug in esfmt.`,
+				`${result.warning} The file was left unchanged; this is a bug in the Essence formatter.`,
 			)
 		}
 

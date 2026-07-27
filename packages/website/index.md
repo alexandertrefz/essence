@@ -38,9 +38,20 @@ You can find the most recent and working example of syntax in the [HelloWorld.es
 as well as the other files in [packages/fixtures/files](https://github.com/atrefz/essence/tree/master/packages/fixtures/files). It also should be noted that the syntax is meant to
 be viewed with a font with code ligatures, like FiraCode.
 
-You can compile any of them with the `esc` executable in `packages/cli/bin`. This produces a self-contained ES
+You can compile any of them with the `essence` executable in `packages/cli/bin`. This produces a self-contained ES
 module of the same name beside the source — the parts of the runtime the program actually uses are bundled in,
 so it runs under Bun or Node, or in a browser, with nothing else installed.
+
+```sh
+essence HelloWorld.es       # compile to HelloWorld.js
+essence run HelloWorld.es   # compile and execute in one step
+essence check *.es          # type-check only, no output
+essence format *.es         # format in place
+```
+
+That one executable carries the whole toolchain — `build`, `run`, `check`, `watch`, `format` and `lsp` — and
+`essence help` describes every command. The older names still work as aliases: `esc` is `essence`, `esfmt` is
+`essence format`, and `esls` is `essence lsp`.
 
 The current runtime implementation is rudimentary however. There are many features missing from the standard library. Various langauge features are only partially implemented.
 

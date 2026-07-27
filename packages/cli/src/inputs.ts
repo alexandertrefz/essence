@@ -2,7 +2,7 @@ import { glob, stat } from "node:fs/promises"
 import * as path from "node:path"
 
 import { UsageError } from "./args"
-import type { CommandSpec } from "./commands"
+import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 
 // NOTE: Shells expand globs themselves, but not all of them, not on every
 // platform, and not when the pattern is quoted to stop them from trying. The
@@ -22,12 +22,14 @@ export function looksLikeGlob(value: string): boolean {
 export async function resolveInputFiles(
 	patterns: Array<string>,
 	command: CommandSpec,
+	programName: string = DEFAULT_PROGRAM_NAME,
 ): Promise<Array<string>> {
 	if (patterns.length === 0) {
 		throw new UsageError(
-			`esc ${command.name} needs at least one Essence source file.`,
+			`${programName} ${command.name} needs at least one Essence source ` +
+				"file.",
 			command,
-			"For example: esc " +
+			`For example: ${programName} ` +
 				`${command.name === "build" ? "" : `${command.name} `}` +
 				"HelloWorld.es",
 		)

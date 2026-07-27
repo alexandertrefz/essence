@@ -2,4 +2,4 @@
 
 import { run } from "../src/index"
 
-process.exitCode = await run(process.argv.slice(2))
+process.exitCode = await run(process.argv.slice(2), "esc")

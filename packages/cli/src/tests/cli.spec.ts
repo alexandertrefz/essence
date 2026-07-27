@@ -10,9 +10,15 @@ import { fixturePath } from "@essence/fixtures"
 import { STDLIB_DIRECTORY } from "@essence/stdlib"
 
 import { parseArguments, UsageError } from "../args"
-import { commands, findCommand, globalOptions } from "../commands"
+import { commands, findCommand, globalOptions, PROGRAM } from "../commands"
 import { colorChoiceFor, version } from "../context"
-import { renderCommandHelp, renderOverview, wrap } from "../help"
+import {
+	renderCommandHelp,
+	renderOverview,
+	renderUsageLine,
+	wrap,
+} from "../help"
+import { run } from "../index"
 import {
 	defaultOutputFor,
 	looksLikeGlob,
@@ -38,9 +44,41 @@ import {
 	visibleLength,
 } from "../theme"
 
-const buildCommand = findCommand("build") as NonNullable<
-	ReturnType<typeof findCommand>
->
+type Command = NonNullable<ReturnType<typeof findCommand>>
+
+const buildCommand = findCommand("build") as Command
+const runCommand = findCommand("run") as Command
+const formatCommand = findCommand("format") as Command
+
+// NOTE: Everything the CLI writes goes through `process.stdout` and
+// `process.stderr`, including what a delegate writes for itself, so driving
+// `run` from a spec means holding both for the length of the call.
+async function capture(
+	invoke: () => Promise<number>,
+): Promise<{ code: number; out: string; err: string }> {
+	let out = ""
+	let err = ""
+	let writeOut = process.stdout.write
+	let writeErr = process.stderr.write
+
+	process.stdout.write = ((chunk: string): boolean => {
+		out += chunk
+
+		return true
+	}) as typeof process.stdout.write
+	process.stderr.write = ((chunk: string): boolean => {
+		err += chunk
+
+		return true
+	}) as typeof process.stderr.write
+
+	try {
+		return { code: await invoke(), out, err }
+	} finally {
+		process.stdout.write = writeOut
+		process.stderr.write = writeErr
+	}
+}
 
 function outcome(overrides: Partial<CompileOutcome> = {}): CompileOutcome {
 	return {
@@ -191,6 +229,85 @@ describe("CLI", () => {
 			expect(parseArguments(["--help"]).options.help).toBe(true)
 			expect(parseArguments(["build", "--help"]).options.help).toBe(true)
 		})
+
+		it("names the invoked program in what it suggests", () => {
+			try {
+				parseArguments(["buld", "a.es"], "essence")
+				expect.unreachable()
+			} catch (error) {
+				expect((error as UsageError).suggestion).toContain(
+					"essence build",
+				)
+			}
+
+			try {
+				parseArguments(["build", "--nonsense", "a.es"], "essence")
+				expect.unreachable()
+			} catch (error) {
+				expect((error as UsageError).message).toContain("essence build")
+			}
+
+			expect(() =>
+				parseArguments(["build", "a.es", "--", "x"], "essence"),
+			).toThrow("essence build does not pass arguments")
+		})
+
+		// NOTE: The Formatter parses its own flags, so nothing after `format`
+		// may be read here — a flag esc has never heard of is not a mistake
+		// there, and a bare `--` is not a separator to fold away.
+		it("captures a passthrough Command's arguments verbatim", () => {
+			let invocation = parseArguments([
+				"format",
+				"--check",
+				"--stdin-filepath",
+				"src/App.es",
+				"--",
+				"weird.es",
+			])
+
+			expect(invocation.command.name).toBe("format")
+			expect(invocation.commandWasExplicit).toBe(true)
+			expect(invocation.rawArguments).toEqual([
+				"--check",
+				"--stdin-filepath",
+				"src/App.es",
+				"--",
+				"weird.es",
+			])
+			expect(invocation.files).toEqual([])
+			expect(invocation.programArguments).toEqual([])
+		})
+
+		it("does not read a passthrough Command's flags as its own", () => {
+			expect(() => parseArguments(["format", "--check"])).not.toThrow()
+			expect(() => parseArguments(["fmt", "--nonsense"])).not.toThrow()
+			expect(() => parseArguments(["lsp", "--stdio"])).not.toThrow()
+			expect(parseArguments(["fmt", "--check"]).command.name).toBe(
+				"format",
+			)
+			expect(parseArguments(["lsp", "--stdio"]).rawArguments).toEqual([
+				"--stdio",
+			])
+		})
+
+		// NOTE: --help is answered from the Command table rather than forwarded,
+		// so that `essence format --help` and `essence help format` are one
+		// screen — and so that `essence lsp --help` cannot start a Server that
+		// nobody is talking to.
+		it("answers --help itself for a passthrough Command", () => {
+			expect(parseArguments(["format", "--help"]).options.help).toBe(true)
+			expect(parseArguments(["lsp", "-h"]).options.help).toBe(true)
+			expect(parseArguments(["format", "--check"]).options.help).toBe(
+				false,
+			)
+		})
+
+		it("leaves rawArguments empty for every other Command", () => {
+			expect(parseArguments(["check", "a.es"]).rawArguments).toEqual([])
+			expect(
+				parseArguments(["run", "a.es", "--", "-x"]).rawArguments,
+			).toEqual([])
+		})
 	})
 
 	describe("closestMatch", () => {
@@ -248,6 +365,7 @@ describe("CLI", () => {
 			palette: createPalette(createTheme(false, true)),
 			width: 80,
 			version: "1.2.3",
+			programName: "esc",
 		}
 
 		it("lists every Command in the overview", () => {
@@ -290,6 +408,83 @@ describe("CLI", () => {
 			)) {
 				expect(visibleLength(line)).toBeLessThanOrEqual(88)
 			}
+		})
+
+		it("offers the Formatter and the Language Server in the overview", () => {
+			let overview = renderOverview(context)
+
+			expect(overview).toContain("format")
+			expect(overview).toContain("lsp")
+			expect(overview).toContain("Format Essence sources in place")
+			expect(overview).toContain("Start the Essence Language Server")
+		})
+
+		// NOTE: The same table is rendered under whichever name the binary was
+		// invoked as. Every line of it has to name that one — help that says
+		// `esc` to somebody who typed `essence` cannot be pasted back into
+		// their shell.
+		it("renders the name the binary was invoked as", () => {
+			let asEssence = renderOverview({
+				...context,
+				programName: "essence",
+			})
+
+			expect(asEssence).toContain("essence <command> [file...] [options]")
+			expect(asEssence).toContain("essence help <command>")
+			expect(asEssence).toContain("essence run HelloWorld.es")
+			expect(asEssence).not.toMatch(/\besc\b/)
+
+			let asEsc = renderOverview(context)
+
+			expect(asEsc).toContain("esc <command> [file...] [options]")
+			expect(asEsc).toContain("esc help <command>")
+			expect(asEsc).not.toContain("essence <command>")
+		})
+
+		it("renders the invoked name in Command help", () => {
+			let rendered = renderCommandHelp(runCommand, {
+				...context,
+				programName: "essence",
+			})
+
+			expect(rendered).toContain("essence run <file> [options]")
+			expect(rendered).toContain("essence run App.es -- --port 8080")
+			expect(rendered).not.toMatch(/\besc\b/)
+			expect(renderCommandHelp(runCommand, context)).toContain("esc run")
+		})
+
+		it("never leaves the placeholder in rendered text", () => {
+			for (let programName of ["esc", "essence"]) {
+				let rendered = [
+					renderOverview({ ...context, programName }),
+					...commands.map((command) =>
+						renderCommandHelp(command, { ...context, programName }),
+					),
+					...commands.map((command) =>
+						renderUsageLine(command, { ...context, programName }),
+					),
+				].join("\n")
+
+				expect(rendered).not.toContain(PROGRAM)
+			}
+		})
+
+		// NOTE: A passthrough Command's arguments are read by the tool it
+		// delegates to, which has never heard of --json or --quiet, so listing
+		// them under its help would document flags that do nothing.
+		it("leaves the global Options out of a passthrough Command's help", () => {
+			let rendered = renderCommandHelp(formatCommand, {
+				...context,
+				programName: "essence",
+			})
+
+			expect(rendered).toContain("essence format <files...> [options]")
+			expect(rendered).toContain("--stdin-filepath")
+			expect(rendered).not.toContain("GLOBAL OPTIONS")
+			expect(rendered).not.toContain("--json")
+			expect(renderCommandHelp(buildCommand, context)).toContain(
+				"GLOBAL OPTIONS",
+			)
 		})
 	})
 
@@ -713,5 +908,187 @@ describe("CLI on a standard library source", () => {
 		} finally {
 			rmSync(filePath, { force: true })
 		}
+	})
+})
+
+// NOTE: One binary is installed under several names, and every name exposes
+// every Command — `esc` is `essence` under its old name. The name is not a
+// label on the help screen but the name of the program the user is talking to,
+// so it is threaded from the executable through every line either one prints.
+describe("the name the binary was invoked as", () => {
+	it("says essence when it was invoked as essence", async () => {
+		let { code, out } = await capture(() => run(["help"], "essence"))
+
+		expect(code).toBe(0)
+		expect(out).toContain("essence <command> [file...] [options]")
+		expect(out).toContain("essence help <command>")
+		expect(out).not.toMatch(/\besc\b/)
+	})
+
+	it("says esc when it was invoked as esc", async () => {
+		let { code, out } = await capture(() => run(["help"], "esc"))
+
+		expect(code).toBe(0)
+		expect(out).toContain("esc <command> [file...] [options]")
+		expect(out).not.toMatch(/\bessence\b/)
+	})
+
+	// NOTE: `esc` is what a caller who says nothing gets, so that the CLI can be
+	// driven directly — by a spec, or by a script older than the second name —
+	// without the name of the program changing under it.
+	it("defaults to esc when nobody says", async () => {
+		let { code, out } = await capture(() => run(["help"]))
+
+		expect(code).toBe(0)
+		expect(out).toContain("esc <command> [file...] [options]")
+		expect(out).not.toMatch(/\bessence\b/)
+	})
+
+	it("names the invoked program in a usage error", async () => {
+		let { code, err } = await capture(() =>
+			run(["build", "--nonsense", "a.es"], "essence"),
+		)
+
+		expect(code).toBe(2)
+		expect(err).toContain('Unknown option "--nonsense" for essence build.')
+		expect(err).toContain("essence help build")
+		expect(err).toContain("essence build <file...> [options]")
+		expect(err).not.toMatch(/\besc\b/)
+	})
+
+	// NOTE: A usage error that belongs to no Command still has to say who could
+	// not read the arguments, and a caller who asked for JSON gets the failure
+	// in JSON too.
+	it("names the invoked program in a JSON usage error", async () => {
+		let { code, out } = await capture(() =>
+			run(["buld", "--json"], "essence"),
+		)
+
+		expect(code).toBe(2)
+		expect(JSON.parse(out).command).toBe("essence")
+	})
+})
+
+describe("essence format", () => {
+	// NOTE: Both forms are one screen, rendered from esc's own Command table:
+	// the Formatter's flags are documented there, and `essence lsp --help` must
+	// not start a Server that nobody is talking to.
+	it("answers help the same way through help format and format --help", async () => {
+		let viaHelp = await capture(() => run(["help", "format"], "essence"))
+		let viaFlag = await capture(() => run(["format", "--help"], "essence"))
+
+		expect(viaHelp.code).toBe(0)
+		expect(viaFlag.code).toBe(0)
+		expect(viaFlag.out).toBe(viaHelp.out)
+		expect(viaHelp.out).toContain("essence format <files...> [options]")
+		expect(viaHelp.out).toContain("--stdin-filepath <path>")
+		expect(viaHelp.out).not.toContain("GLOBAL OPTIONS")
+	})
+
+	it("accepts a formatted source", async () => {
+		let { code } = await capture(() =>
+			run(["format", "--check", fixturePath("HelloWorld.es")], "essence"),
+		)
+
+		expect(code).toBe(0)
+	})
+
+	// NOTE: --check is the Formatter's flag, not esc's. Reaching the Formatter
+	// verbatim is the whole point of a passthrough Command: read here, it would
+	// have been an unknown option and never have arrived.
+	it("reports an unformatted source without reading --check itself", async () => {
+		let filePath = path.resolve(
+			tmpdir(),
+			`essence-format-${process.pid}.es`,
+		)
+
+		writeFileSync(filePath, 'implementation {\n  __print("hi")\n}\n')
+
+		try {
+			let { code, out } = await capture(() =>
+				run(["format", "--check", filePath], "essence"),
+			)
+
+			expect(code).toBe(1)
+			expect(out).toContain(`essence-format-${process.pid}.es`)
+			expect(readFileSync(filePath, "utf8")).toContain('  __print("hi")')
+		} finally {
+			rmSync(filePath, { force: true })
+		}
+	})
+
+	it("formats a source in place through the fmt alias", async () => {
+		let filePath = path.resolve(tmpdir(), `essence-fmt-${process.pid}.es`)
+
+		writeFileSync(filePath, 'implementation {\n  __print("hi")\n}\n')
+
+		try {
+			let { code } = await capture(() =>
+				run(["fmt", filePath], "essence"),
+			)
+
+			expect(code).toBe(0)
+			expect(readFileSync(filePath, "utf8")).toBe(
+				'implementation {\n\t__print("hi")\n}\n',
+			)
+		} finally {
+			rmSync(filePath, { force: true })
+		}
+	})
+})
+
+// NOTE: There is deliberately no spec that starts the Server: it holds stdio
+// open until the other end closes it, which in a test runner is forever. What
+// can be said here is that asking about it does not start it — which is why
+// `--help` is answered from the Command table rather than forwarded.
+describe("essence lsp", () => {
+	it("documents itself without starting a Server", async () => {
+		let { code, out } = await capture(() => run(["help", "lsp"], "essence"))
+
+		expect(code).toBe(0)
+		expect(out).toContain("essence lsp")
+		expect(out).toContain("Language Server Protocol")
+		expect(out).not.toContain("GLOBAL OPTIONS")
+	})
+})
+
+// NOTE: `essence check` must not pay for tools it never calls. The Formatter
+// and the Language Server are reached through `import(…)` at the point of use,
+// and a static import anywhere in the package would load both — with everything
+// they import — before the first argument had been read.
+describe("delegation stays lazy", () => {
+	let sourceDirectory = path.resolve(
+		path.dirname(fileURLToPath(import.meta.url)),
+		"..",
+	)
+
+	it("imports the delegates nowhere statically", () => {
+		let fileNames = readdirSync(sourceDirectory).filter((fileName) =>
+			fileName.endsWith(".ts"),
+		)
+
+		expect(fileNames.length).toBeGreaterThan(0)
+
+		for (let fileName of fileNames) {
+			let source = readFileSync(
+				path.resolve(sourceDirectory, fileName),
+				"utf8",
+			)
+
+			expect([
+				fileName,
+				/from\s+"@essence\/(?:formatter|language-server)/.test(source),
+			]).toEqual([fileName, false])
+		}
+	})
+
+	it("reaches them through a dynamic import instead", () => {
+		let source = readFileSync(
+			path.resolve(sourceDirectory, "index.ts"),
+			"utf8",
+		)
+
+		expect(source).toContain('await import("@essence/formatter/cli")')
+		expect(source).toContain('await import("@essence/language-server")')
 	})
 })

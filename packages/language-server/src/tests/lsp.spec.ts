@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import {
 	existsSync,
 	mkdirSync,
@@ -39,6 +39,7 @@ import { matchingNamespaces } from "../namespaces"
 import { findRenameableOccurrence } from "../rename"
 import { semanticTokenModifiers, semanticTokenTypes } from "../semanticTokens"
 import {
+	ensureTransportArgument,
 	serverCapabilities,
 	toLspCodeAction,
 	toLspCompletionItem,
@@ -683,6 +684,73 @@ describe("LSP", () => {
 					(diagnostic) => diagnostic.code === "missing-return",
 				),
 			).toBe(true)
+		})
+	})
+
+	// NOTE: The transport is not something this Server chooses — createConnection
+	// reads it off process.argv and throws when it finds none, so the invocation
+	// that breaks is the one nobody automated: a person running the Server by
+	// hand, and `essence lsp`, which forwards whatever the Editor passed and so
+	// forwards nothing when nobody passed anything.
+	describe("transport", () => {
+		let originalArguments = process.argv
+
+		afterEach(() => {
+			process.argv = originalArguments
+		})
+
+		it("should fall back to stdio when no transport was named", () => {
+			process.argv = ["bun", "/bin/esls"]
+
+			ensureTransportArgument()
+
+			expect(process.argv).toEqual(["bun", "/bin/esls", "--stdio"])
+		})
+
+		it("should fall back to stdio behind a delegating command name", () => {
+			process.argv = ["bun", "/bin/essence", "lsp"]
+
+			ensureTransportArgument()
+
+			expect(process.argv).toEqual([
+				"bun",
+				"/bin/essence",
+				"lsp",
+				"--stdio",
+			])
+		})
+
+		it("should leave a transport the Editor named alone", () => {
+			for (let argument of [
+				"--stdio",
+				"--node-ipc",
+				"--socket=6009",
+				"--pipe=/tmp/essence.sock",
+			]) {
+				process.argv = ["bun", "/bin/essence", "lsp", argument]
+
+				ensureTransportArgument()
+
+				expect(process.argv).toEqual([
+					"bun",
+					"/bin/essence",
+					"lsp",
+					argument,
+				])
+			}
+		})
+
+		it("should leave a transport written as two tokens alone", () => {
+			process.argv = ["bun", "/bin/esls", "--socket", "6009"]
+
+			ensureTransportArgument()
+
+			expect(process.argv).toEqual([
+				"bun",
+				"/bin/esls",
+				"--socket",
+				"6009",
+			])
 		})
 	})
 })

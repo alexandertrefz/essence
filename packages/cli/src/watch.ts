@@ -191,7 +191,7 @@ export async function runWatch(
 
 	terminal.out("")
 	terminal.out(
-		`  ${palette.strong("esc watch")} ${palette.faint(theme.symbols.bullet)} ${palette.muted(
+		`  ${palette.strong(`${context.programName} watch`)} ${palette.faint(theme.symbols.bullet)} ${palette.muted(
 			plan.inputFileNames.length === 1
 				? plan.inputFileNames[0]
 				: `${plan.inputFileNames.length} files`,

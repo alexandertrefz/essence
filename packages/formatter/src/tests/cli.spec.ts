@@ -4,6 +4,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 
 import { EXIT_FAILURE, EXIT_SUCCESS, EXIT_USAGE, run } from "../cli"
+import { WIDTH } from "../index"
 
 const MESSY = "implementation {\n    constant a = 1\n}\n"
 const FORMATTED = "implementation {\n\tconstant a = 1\n}\n"
@@ -13,6 +14,7 @@ const BROKEN = "implementation {\n\tconstant = = =\n}\n"
 // wrapped to keep the test output clean and to let a test read what was said.
 async function runCaptured(
 	argv: Array<string>,
+	options?: { programName?: string },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
 	let stdout = ""
 	let stderr = ""
@@ -33,7 +35,7 @@ async function runCaptured(
 	)
 
 	try {
-		return { code: await run(argv), stdout, stderr }
+		return { code: await run(argv, options), stdout, stderr }
 	} finally {
 		stdoutSpy.mockRestore()
 		stderrSpy.mockRestore()
@@ -73,6 +75,21 @@ describe("cli", () => {
 
 			expect(code).toBe(EXIT_USAGE)
 			expect(stderr).toContain("Unknown option '--frobnicate'.")
+			expect(stderr).toContain("esfmt <files…>")
+		})
+
+		it("answers --help rather than rejecting what follows it", async () => {
+			let { code, stdout } = await runCaptured(["--help", "--frobnicate"])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(stdout).toContain("esfmt — the Essence source formatter.")
+		})
+
+		it("rejects an unknown option written before --help", async () => {
+			let { code, stderr } = await runCaptured(["--frobnicate", "--help"])
+
+			expect(code).toBe(EXIT_USAGE)
+			expect(stderr).toContain("Unknown option '--frobnicate'.")
 		})
 
 		it("rejects a run with nothing to do", async () => {
@@ -103,6 +120,107 @@ describe("cli", () => {
 			expect(code).toBe(EXIT_USAGE)
 			expect(stderr).toContain("'--stdin-filepath' needs a path.")
 		})
+
+		it("takes everything past -- as a file", async () => {
+			let messy = await file("Messy.es", MESSY)
+			let { code } = await runCaptured(["--", messy])
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(await readFile(messy, "utf8")).toBe(FORMATTED)
+		})
+
+		it("takes an option's spelling past -- as a file rather than an option", async () => {
+			let { code, stderr } = await runCaptured(["--", "--check"])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(stderr).toContain("could not be read.")
+		})
+
+		it("keeps reading options written before --", async () => {
+			let messy = await file("Messy.es", MESSY)
+			let { code } = await runCaptured(["--check", "--", messy])
+
+			expect(code).toBe(EXIT_FAILURE)
+			expect(await readFile(messy, "utf8")).toBe(MESSY)
+		})
+	})
+
+	describe("program name", () => {
+		it("names the tool esfmt when no name is given", async () => {
+			let { stdout } = await runCaptured(["--help"])
+
+			expect(stdout).toContain("esfmt — the Essence source formatter.")
+			expect(stdout).toContain("print esfmt's version")
+		})
+
+		it("renders the name it was invoked as in the usage screen", async () => {
+			let { code, stdout } = await runCaptured(["--help"], {
+				programName: "essence format",
+			})
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(stdout).toContain(
+				"essence format — the Essence source formatter.",
+			)
+			expect(stdout).toContain("essence format --check <files…>")
+			expect(stdout).toContain("print essence format's version")
+			expect(stdout).not.toContain("esfmt")
+		})
+
+		it("renders the name it was invoked as when an argument is refused", async () => {
+			let { code, stderr } = await runCaptured(["--frobnicate"], {
+				programName: "essence format",
+			})
+
+			expect(code).toBe(EXIT_USAGE)
+			expect(stderr).toContain("Unknown option '--frobnicate'.")
+			expect(stderr).toContain("essence format <files…>")
+			expect(stderr).not.toContain("esfmt")
+		})
+
+		it("renders the name it was invoked as with nothing to do", async () => {
+			let { code, stderr } = await runCaptured([], {
+				programName: "essence format",
+			})
+
+			expect(code).toBe(EXIT_USAGE)
+			expect(stderr).toContain(
+				"essence format — the Essence source formatter.",
+			)
+			expect(stderr).not.toContain("esfmt")
+		})
+
+		it("lays every description out at one column, whatever the name", async () => {
+			let { stdout } = await runCaptured(["--help"], {
+				programName: "essence format",
+			})
+
+			let described = stdout
+				.split("\n")
+				.filter((line) => line.includes("format each file in place"))
+
+			expect(described).toEqual([
+				"  essence format <files…>    format each file in place",
+			])
+		})
+
+		// NOTE: The screen's own last line promises that Essence is laid out to
+		// fit WIDTH columns, so the screen has to fit it too — under every name
+		// it can be invoked as, since the name is what moves the column.
+		for (let programName of [undefined, "essence format"]) {
+			it(`keeps the usage screen inside ${WIDTH} columns as ${programName ?? "esfmt"}`, async () => {
+				let { stdout } = await runCaptured(
+					["--help"],
+					programName === undefined ? undefined : { programName },
+				)
+
+				let tooWide = stdout
+					.split("\n")
+					.filter((line) => [...line].length > WIDTH)
+
+				expect(tooWide).toEqual([])
+			})
+		}
 	})
 
 	describe("--version", () => {
