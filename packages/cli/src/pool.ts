@@ -162,8 +162,16 @@ function assignSlots(
 	return assignment
 }
 
+// NOTE: The worker is booted as whatever this module is running as — the
+// TypeScript source under Bun in the workspace, the compiled JavaScript in the
+// published package, where no `worker.ts` exists to boot. Exported for the
+// spec: which file that is is a pure question, the Worker around it is not.
+export function workerFileName(moduleURL: string): string {
+	return moduleURL.endsWith(".ts") ? "./worker.ts" : "./worker.js"
+}
+
 export function createWorkerPool(size: number): CompileDispatcher {
-	let workerURL = new URL("./worker.ts", import.meta.url)
+	let workerURL = new URL(workerFileName(import.meta.url), import.meta.url)
 	let slots: Array<Slot> = Array.from({ length: size }, () => ({
 		worker: null,
 		busy: false,

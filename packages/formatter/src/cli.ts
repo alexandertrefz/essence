@@ -225,7 +225,15 @@ async function runStdin(
 	stdinFilepath: string | null,
 	programName: string,
 ): Promise<number> {
-	let source = await new Response(Bun.stdin.stream()).text()
+	// NOTE: Read through the Node stream rather than `Bun.stdin`, so the
+	// published formatter reads its input under either runtime.
+	let chunks: Array<Buffer> = []
+
+	for await (let chunk of process.stdin) {
+		chunks.push(chunk as Buffer)
+	}
+
+	let source = Buffer.concat(chunks).toString("utf8")
 	let documentPath =
 		stdinFilepath === null ? undefined : path.resolve(stdinFilepath)
 	let result = format(source, { documentPath })
