@@ -132,6 +132,9 @@ function generateProgram(program: estree.Program): string {
 export type ModuleInput = {
 	filePath: string
 	program: common.typedSimple.Program
+	// NOTE: The Module's Essence source, verbatim — read only when source maps
+	// are emitted, where it becomes the map's `sourcesContent` entry.
+	sourceText?: string
 }
 
 // NOTE: A whole graph of Modules, emitted as one bundle's worth of JavaScript.
@@ -167,7 +170,9 @@ export function rewriteModules(
 		let freeFunctions = stdlibFreeFunctions()
 		let bodies = modules.map((module) => ({
 			module,
-			body: rewriteImplementationSection(module.program.implementation),
+			body: withSourcePath(module.filePath, () =>
+				rewriteImplementationSection(module.program.implementation),
+			),
 		}))
 
 		let essenceMembers = reachableEssenceMethods(
@@ -478,6 +483,48 @@ function withModuleSpellings<Value>(
 	}
 }
 
+// NOTE: The canonical path of the Module currently being emitted — what a
+// node's `loc` names as its source. Null everywhere outside `rewriteModules`'
+// per-Module pass: the prelude and the single-file form then attach no `loc`
+// and emit no mapping.
+let currentSourcePath: string | null = null
+
+function withSourcePath<Value>(sourcePath: string, emit: () => Value): Value {
+	let previousSourcePath = currentSourcePath
+	currentSourcePath = sourcePath
+
+	try {
+		return emit()
+	} finally {
+		currentSourcePath = previousSourcePath
+	}
+}
+
+// NOTE: An Essence Position is 1-based on both axes, while escodegen reads
+// estree's convention — 1-based lines, 0-based columns. Undefined whenever the
+// node carries no position (the Simplifier synthesized it) or no Module is
+// being emitted; escodegen then emits the segment unmapped, which is exactly
+// what a debugger should see of code no source was written for.
+function locOf(
+	position: common.Position | undefined,
+): estree.SourceLocation | undefined {
+	if (position === undefined || currentSourcePath === null) {
+		return undefined
+	}
+
+	return {
+		source: currentSourcePath,
+		start: {
+			line: position.start.line,
+			column: position.start.column - 1,
+		},
+		end: {
+			line: position.end.line,
+			column: position.end.column - 1,
+		},
+	}
+}
+
 // NOTE: One nominal identity as the bundle spells it. A Case tag is
 // `<Choice identity>#<Case>` and a Choice identity is `<Module path>#<Choice>`,
 // so what arrives here carries the canonical path of the Module that declared
@@ -514,6 +561,19 @@ function rewriteImplementationSection(
 // #region Statements
 
 function rewriteStatement(
+	node: common.typedSimple.ImplementationNode,
+): estree.Statement {
+	let statement = rewriteStatementByKind(node)
+	let loc = locOf(node.position)
+
+	if (loc !== undefined) {
+		statement.loc = loc
+	}
+
+	return statement
+}
+
+function rewriteStatementByKind(
 	node: common.typedSimple.ImplementationNode,
 ): estree.Statement {
 	switch (node.nodeType) {
@@ -1393,6 +1453,21 @@ function rewriteExpressionStatement(
 // #region Expressions
 
 function rewriteExpression(
+	node:
+		| common.typedSimple.ExpressionNode
+		| common.typedSimple.VariableAssignmentStatementNode,
+): estree.Expression {
+	let expression = rewriteExpressionByKind(node)
+	let loc = locOf(node.position)
+
+	if (loc !== undefined) {
+		expression.loc = loc
+	}
+
+	return expression
+}
+
+function rewriteExpressionByKind(
 	node:
 		| common.typedSimple.ExpressionNode
 		| common.typedSimple.VariableAssignmentStatementNode,
