@@ -40,6 +40,7 @@ export function isPresentableScope(scopeType: string): boolean {
 export type RemoteObject = {
 	type: string
 	subtype?: string
+	className?: string
 	objectId?: string
 	value?: unknown
 	unserializableValue?: string

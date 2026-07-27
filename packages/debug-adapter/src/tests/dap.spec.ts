@@ -5,6 +5,7 @@ import * as path from "node:path"
 
 import { fixturePath } from "@essence/fixtures"
 import { DebugClient } from "@vscode/debugadapter-testsupport"
+import { SourceMapGenerator } from "source-map"
 
 import { adapterCapabilities } from "../session"
 
@@ -163,6 +164,16 @@ describe("a debug session", () => {
 
 		expect(greetee?.value).toBe('""')
 
+		// NOTE: The console is JavaScript over the compiled frame, but an
+		// Essence value it answers still renders as one.
+		let evaluated = await client.evaluateRequest({
+			expression: "greetee",
+			frameId: top.id,
+			context: "watch",
+		})
+
+		expect(evaluated.body.result).toBe('""')
+
 		// NOTE: One step over `variable message = …` lands on the `if` two
 		// source lines down — the interpolation glue between them is carried
 		// over, and never surfaces as a landing place.
@@ -220,6 +231,64 @@ describe("a debug session", () => {
 			client.continueRequest({ threadId: 1 }),
 			client.waitForEvent("terminated"),
 		])
+	}, 60_000)
+
+	// NOTE: Exercised through the `artifact` door with a hand-built bundle: a
+	// Diagnostic-clean Essence program has no deterministic uncaught throw to
+	// offer — the one failure it can earn, a stack overflow, is the one V8
+	// cannot pause on, there being no stack left to pause with.
+	it("pauses on an uncaught throw at the mapped line", async () => {
+		client = await startedClient()
+
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-dap-spec-"))
+		let artifactPath = path.join(directory, "boom.js")
+		let sourcePath = path.join(directory, "Boom.es")
+
+		writeFileSync(
+			artifactPath,
+			'function detonate() {\n\tthrow new Error("boom");\n}\ndetonate();\n//# sourceMappingURL=boom.js.map\n',
+		)
+
+		let generator = new SourceMapGenerator({ file: "boom.js" })
+
+		for (let line = 1; line <= 4; line++) {
+			generator.addMapping({
+				generated: { line, column: 0 },
+				original: { line, column: 0 },
+				source: sourcePath,
+			})
+		}
+
+		writeFileSync(`${artifactPath}.map`, generator.toString())
+
+		try {
+			let initialized = client.waitForEvent("initialized")
+			let launched = client.launch({ artifact: artifactPath } as never)
+
+			await initialized
+
+			let stopped = client.waitForEvent("stopped")
+
+			await client.configurationDoneRequest()
+			await launched
+
+			expect((await stopped).body.reason).toBe("exception")
+
+			let info = await client.customRequest("exceptionInfo", {
+				threadId: 1,
+			})
+
+			expect(info.body.exceptionId).toBe("Error")
+			expect(info.body.description).toBe("Error: boom")
+
+			let stack = await client.stackTraceRequest({ threadId: 1 })
+
+			expect(stack.body.stackFrames[0]!.name).toBe("detonate")
+			expect(stack.body.stackFrames[0]!.source?.path).toBe(sourcePath)
+			expect(stack.body.stackFrames[0]!.line).toBe(2)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	}, 60_000)
 
 	it("fails the launch of a program that does not compile", async () => {
