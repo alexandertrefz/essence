@@ -14,6 +14,7 @@
 		"./enricher/builtins": "./src/enricher/builtins.ts",
 		"./enricher/resolvers": "./src/enricher/resolvers.ts",
 		"./enricher/stdlib": "./src/enricher/stdlib.ts",
+		"./modules": "./src/modules/index.ts",
 		"./validator": "./src/validator/index.ts",
 		"./simplifier": "./src/simplifier/index.ts",
 		"./optimiser": "./src/optimiser/index.ts",
