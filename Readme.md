@@ -1,3 +1,14 @@
+<p align="center">
+	<picture>
+		<source media="(prefers-color-scheme: dark)" srcset="brand/essence-mark-dark.svg">
+		<img src="brand/essence-mark.svg" width="88" alt="The Essence mark — a red band folded into a gem">
+	</picture>
+</p>
+
+<h1 align="center">Essence</h1>
+
+<p align="center">A language for the web with exact arithmetic, immutable data and a type system that finds every error before you ship.</p>
+
 # Goals
 The main goal for Essence is to allow the authoring of bug-free maintainable code, in a fast and pleasant manner.
 Essence features a strong type system combined with a mixture of functional and object oriented concepts, enabling code that is easy to understand & maintain.
