@@ -150,6 +150,35 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: An interpolated String is reprinted from source verbatim, holes and
+	// escapes and all — so formatting the code around it must leave the String
+	// itself byte-for-byte, and the AST-equality safety gate must accept it.
+	describe("string interpolation", () => {
+		let roundTrips = (line: string) => {
+			let source = `implementation {\n\t${line}\n}\n`
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toContain(line)
+		}
+
+		it("leaves a hole exactly as written", () => {
+			roundTrips('__print("Hello, {name}! {count} left")')
+		})
+
+		it("leaves the hole's own spacing untouched", () => {
+			roundTrips('__print("sum {1::add( 2 )}")')
+		})
+
+		it("leaves escapes and literal braces untouched", () => {
+			roundTrips('__print("a \\"b\\" \\\\ \\{c\\}")')
+		})
+
+		it("leaves a nested interpolation untouched", () => {
+			roundTrips('__print("outer {"inner {name}"}")')
+		})
+	})
+
 	describe("layout", () => {
 		let formatted = (source: string) => format(source).text
 

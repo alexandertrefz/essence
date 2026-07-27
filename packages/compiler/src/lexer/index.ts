@@ -5,21 +5,30 @@ type Token = lexer.Token
 type Cursor = common.Cursor
 
 // NOTE: The Lexer's non-fatal problems — a Token it could read but that can
-// never be valid, like `0xFF`. They are handed to the caller rather than
-// thrown, because the Token stream is intact and every later Token is worth
-// reading; the parser's TokenStream turns each into a positioned Diagnostic.
-// The one fatal case, an unterminated String Literal, still throws, because
-// after it there is nothing left to lex.
+// never be valid, like `0xFF` or an unknown escape. They are handed to the
+// caller rather than thrown, because the Token stream is intact and every later
+// Token is worth reading; the parser's TokenStream turns each into a positioned
+// Diagnostic. `code` picks which Diagnostic. The one fatal case, an
+// unterminated String Literal, still throws, because after it there is nothing
+// left to lex.
 export type LexingError = {
 	message: string
 	position: common.Position
+	code: "invalid-number" | "invalid-escape"
 }
 
+// NOTE: `extraTokens` and `errors` carry the tail of a String that interpolated
+// into several Tokens — the head Token rides in `token`, its `Start`/`Middle`/
+// `End` chunk Tokens and the holes' own Tokens follow in `extraTokens`, and any
+// bad escapes it held in `errors`. Every non-String Token leaves both empty, so
+// the ordinary path is untouched.
 type SubLexingResult = {
 	input: string
 	token: Token
 	cursor: Cursor
 	error?: LexingError
+	extraTokens?: Array<Token>
+	errors?: Array<LexingError>
 }
 
 type LexingResult = {
@@ -27,6 +36,8 @@ type LexingResult = {
 	token: Token | undefined
 	cursor: Cursor
 	error?: LexingError
+	extraTokens?: Array<Token>
+	errors?: Array<LexingError>
 }
 
 const createIsHelper = (tester: string | Array<string>) => {
@@ -300,55 +311,234 @@ const lexSymbol = (input: string, cursor: Cursor): SubLexingResult => {
 	}
 }
 
-const lexString = (input: string, cursor: Cursor): SubLexingResult => {
-	let token: Token = {
-		value: "",
-		type: TokenType.LiteralString,
-		position: {
-			start: cursor,
-			end: cursor,
-		},
-	}
+// NOTE: The escape set every String Literal understands. A backslash before
+// anything else is an `invalid-escape` — reported, then read as the character
+// alone so the rest of the String still lexes. `\{` and `\}` are how a literal
+// brace is written now that a bare `{` opens an interpolation hole.
+const stringEscapes: { [char: string]: string } = {
+	'"': '"',
+	"\\": "\\",
+	n: "\n",
+	t: "\t",
+	"{": "{",
+	"}": "}",
+}
 
-	let inputSliced = false
-	let balance = 0
-	let balanceWasChanged = false
+const interpolationStart = "{"
+
+type ChunkTerminator = "quote" | "hole" | "eof"
+
+type ChunkResult = {
+	value: string
+	input: string
+	cursor: Cursor
+	terminator: ChunkTerminator
+	errors: Array<LexingError>
+}
+
+// NOTE: Reads one run of literal String text, decoding escapes into `value`,
+// and stops at the character that ends the run: the closing `"` (`quote`), an
+// unescaped `{` opening a hole (`hole`), or the end of the input (`eof`, which
+// the caller turns into the fatal unterminated-String throw). The terminating
+// character is consumed — the returned `input`/`cursor` sit just past it.
+const scanStringChunk = (input: string, cursor: Cursor): ChunkResult => {
+	let value = ""
+	let errors: Array<LexingError> = []
 
 	for (let i = 0; i < input.length; i++) {
-		token.value += input[i]
+		let char = input[i]
 
-		cursor = moveCursor(input[i], cursor)
+		if (char === stringLiteral) {
+			return {
+				value,
+				input: input.slice(i + 1),
+				cursor: moveCursor(char, cursor),
+				terminator: "quote",
+				errors,
+			}
+		}
 
-		if (token.value.startsWith(stringLiteral) && token.value.length === 1) {
-			balanceWasChanged = true
-			balance++
+		if (char === interpolationStart) {
+			return {
+				value,
+				input: input.slice(i + 1),
+				cursor: moveCursor(char, cursor),
+				terminator: "hole",
+				errors,
+			}
+		}
+
+		if (char === "\\") {
+			let escaped = input[i + 1]
+
+			// NOTE: A backslash with nothing after it is the input running out
+			// mid-String — let the loop fall through to the `eof` return, which
+			// the caller reports as an unterminated String.
+			if (escaped === undefined) {
+				break
+			}
+
+			let escapeStart = cursor
+			cursor = moveCursor(char, cursor)
+			cursor = moveCursor(escaped, cursor)
+
+			let decoded = stringEscapes[escaped]
+
+			if (decoded === undefined) {
+				errors.push({
+					message: `'\\${escaped}' is not a valid escape`,
+					position: { start: escapeStart, end: cursor },
+					code: "invalid-escape",
+				})
+				value += escaped
+			} else {
+				value += decoded
+			}
+
+			i++
 			continue
 		}
 
-		if (token.value.endsWith(stringLiteral)) {
-			balance--
+		value += char
+		cursor = moveCursor(char, cursor)
+	}
+
+	return { value, input: "", cursor, terminator: "eof", errors }
+}
+
+const throwUnterminatedString = (cursor: Cursor): never => {
+	throw new Error(
+		`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`,
+	)
+}
+
+// NOTE: A String Literal reads as one `LiteralString` Token when it holds no
+// `{…}` hole, exactly as before. A hole makes it interpolated: the text before
+// the first hole becomes a `LiteralStringStart` Token, each hole's own Tokens
+// are lexed in place (by driving `lexToken`, so a nested String, Record or even
+// a nested interpolation inside a hole needs no special case), the text between
+// holes becomes `LiteralStringMiddle` and the text after the last hole becomes
+// `LiteralStringEnd`. The head Token rides in `token`; the rest follow in
+// `extraTokens`, which the Lexer drains before it lexes anything more.
+const lexString = (
+	input: string,
+	cursor: Cursor,
+	ignoreList: Array<string>,
+): SubLexingResult => {
+	let stringStart = cursor
+
+	// Consume the opening quote.
+	cursor = moveCursor(input[0], cursor)
+	input = input.slice(1)
+
+	let firstChunk = scanStringChunk(input, cursor)
+	input = firstChunk.input
+	cursor = firstChunk.cursor
+
+	if (firstChunk.terminator === "eof") {
+		throwUnterminatedString(cursor)
+	}
+
+	if (firstChunk.terminator === "quote") {
+		return {
+			input,
+			token: {
+				value: firstChunk.value,
+				type: TokenType.LiteralString,
+				position: { start: stringStart, end: cursor },
+			},
+			cursor,
+			errors:
+				firstChunk.errors.length > 0 ? firstChunk.errors : undefined,
+		}
+	}
+
+	let tokens: Array<Token> = [
+		{
+			value: firstChunk.value,
+			type: TokenType.LiteralStringStart,
+			position: { start: stringStart, end: cursor },
+		},
+	]
+	let errors: Array<LexingError> = [...firstChunk.errors]
+
+	while (true) {
+		// Lex the hole's own Tokens until the `}` that closes it — the one
+		// `SymbolRightBrace` seen at brace depth zero. Braces of Records written
+		// inside the hole balance out before that, and a nested String's braces
+		// live inside its own Tokens, so neither reaches the count.
+		let depth = 0
+
+		while (true) {
+			let holeResult = lexToken(input, cursor, ignoreList)
+
+			if (holeResult.token === undefined) {
+				throwUnterminatedString(cursor)
+				return { input, token: tokens[0], cursor }
+			}
+
+			input = holeResult.input
+			cursor = holeResult.cursor
+
+			if (holeResult.error !== undefined) {
+				errors.push(holeResult.error)
+			}
+			if (holeResult.errors !== undefined) {
+				errors.push(...holeResult.errors)
+			}
+
+			if (
+				holeResult.token.type === TokenType.SymbolRightBrace &&
+				depth === 0
+			) {
+				break
+			}
+
+			if (holeResult.token.type === TokenType.SymbolLeftBrace) {
+				depth++
+			} else if (holeResult.token.type === TokenType.SymbolRightBrace) {
+				depth--
+			}
+
+			tokens.push(holeResult.token)
+
+			if (holeResult.extraTokens !== undefined) {
+				tokens.push(...holeResult.extraTokens)
+			}
 		}
 
-		if (balanceWasChanged && balance === 0) {
-			token.value = token.value.slice(1, token.value.length - 1)
-			input = input.slice(i + 1)
-			inputSliced = true
+		let chunkStart = cursor
+		let chunk = scanStringChunk(input, cursor)
+		input = chunk.input
+		cursor = chunk.cursor
+		errors.push(...chunk.errors)
+
+		if (chunk.terminator === "eof") {
+			throwUnterminatedString(cursor)
+		}
+
+		if (chunk.terminator === "quote") {
+			tokens.push({
+				value: chunk.value,
+				type: TokenType.LiteralStringEnd,
+				position: { start: chunkStart, end: cursor },
+			})
 			break
 		}
-	}
 
-	if (!inputSliced) {
-		throw new Error(
-			`String Token not closed at line: ${cursor.line}, column: ${cursor.column}`,
-		)
+		tokens.push({
+			value: chunk.value,
+			type: TokenType.LiteralStringMiddle,
+			position: { start: chunkStart, end: cursor },
+		})
 	}
-
-	token.position.end = cursor
 
 	return {
 		input,
-		token,
+		token: tokens[0],
 		cursor,
+		extraTokens: tokens.slice(1),
+		errors: errors.length > 0 ? errors : undefined,
 	}
 }
 
@@ -473,6 +663,7 @@ const lexNumber = (input: string, cursor: Cursor): SubLexingResult => {
 		error: {
 			message: `'${lexeme}' is not a valid Number`,
 			position: token.position,
+			code: "invalid-number",
 		},
 	}
 }
@@ -536,6 +727,8 @@ const lexToken = (
 ): LexingResult => {
 	let token: Token | undefined
 	let error: LexingError | undefined
+	let extraTokens: Array<Token> | undefined
+	let errors: Array<LexingError> | undefined
 
 	if (input.length === 0) {
 		return {
@@ -562,7 +755,11 @@ const lexToken = (
 	} else if (isCommentLiteral(firstChar)) {
 		;({ input, token, cursor } = lexComment(input, cursor))
 	} else if (isStringLiteral(firstChar)) {
-		;({ input, token, cursor } = lexString(input, cursor))
+		;({ input, token, cursor, extraTokens, errors } = lexString(
+			input,
+			cursor,
+			ignoreList,
+		))
 	} else if (isNumberLiteral(firstChar)) {
 		;({ input, token, cursor, error } = lexNumber(input, cursor))
 	} else {
@@ -577,6 +774,9 @@ const lexToken = (
 		}
 	}
 
+	// NOTE: A String's head Token can be an ignored type only never — the
+	// `Start`/`LiteralString` types are never on an ignore list — so its
+	// `extraTokens` never need the ignore filter here either.
 	if (ignoreList.includes(token.type)) {
 		return lexToken(input, cursor, ignoreList)
 	}
@@ -586,6 +786,8 @@ const lexToken = (
 		token,
 		cursor,
 		error,
+		extraTokens,
+		errors,
 	}
 }
 
@@ -594,6 +796,12 @@ export class Lexer {
 	protected index: number
 	protected state: Cursor
 	protected ignoreList: Array<string>
+	// NOTE: An interpolated String lexes into several Tokens at once — its head
+	// is returned, and its chunk and hole Tokens wait here to be handed out one
+	// per `next()` before any more input is read. Every other Token leaves this
+	// empty. `index`/`state` already sit past the whole String while these
+	// drain, so a queued Token advances neither.
+	protected pending: Array<Token>
 	// NOTE: Collected rather than thrown — see `LexingError`. The caller reads
 	// them once lexing is done; `reset` starts a new input with none.
 	public errors: Array<LexingError>
@@ -603,6 +811,7 @@ export class Lexer {
 		this.index = 0
 		this.state = { line: 1, column: 1 }
 		this.ignoreList = []
+		this.pending = []
 		this.errors = []
 	}
 
@@ -610,13 +819,20 @@ export class Lexer {
 		this.data = data
 		this.index = 0
 		this.state = state
+		this.pending = []
 		this.errors = []
 	}
 
 	next(): lexer.Token | undefined {
+		let queued = this.pending.shift()
+
+		if (queued !== undefined) {
+			return queued
+		}
+
 		const data = this.data.slice(this.index)
 
-		const { input, token, cursor, error } = lexToken(
+		const { input, token, cursor, error, extraTokens, errors } = lexToken(
 			data,
 			this.state,
 			this.ignoreList,
@@ -624,6 +840,14 @@ export class Lexer {
 
 		if (error !== undefined) {
 			this.errors.push(error)
+		}
+
+		if (errors !== undefined) {
+			this.errors.push(...errors)
+		}
+
+		if (extraTokens !== undefined) {
+			this.pending.push(...extraTokens)
 		}
 
 		this.state = cursor

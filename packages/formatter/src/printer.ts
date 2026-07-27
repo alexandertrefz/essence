@@ -1391,11 +1391,15 @@ export class Printer {
 		switch (node.nodeType) {
 			// NOTE: Reprinted from the source rather than the node. The AST
 			// normalises `1_000` to `1000`, a Rational's parts must stay flush
-			// to keep parsing as one literal, and the Lexer strips a String's
-			// quotes without processing escapes.
+			// to keep parsing as one literal, and the Lexer decodes a String's
+			// escapes and splits an interpolation into pieces — so only the
+			// source still holds a String exactly as it was written, holes and
+			// all. Reprinting it verbatim also leaves the hole Expressions as
+			// the author spaced them, which is what keeps the round-trip exact.
 			case "IntegerValue":
 			case "RationalValue":
 			case "StringValue":
+			case "InterpolatedStringValue":
 				return text(this.source.slice(node.position))
 
 			case "BooleanValue":

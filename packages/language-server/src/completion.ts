@@ -479,6 +479,21 @@ function findProbeLookupInNode(
 
 			return null
 		}
+		case "InterpolatedStringValue": {
+			for (let segment of node.segments) {
+				if (segment.kind !== "expression") {
+					continue
+				}
+
+				let found = findProbeLookupInNode(segment.expression)
+
+				if (found !== null) {
+					return found
+				}
+			}
+
+			return null
+		}
 		case "FunctionValue":
 			return findProbeLookup(node.value.body)
 		case "CaseValue":
@@ -1098,6 +1113,14 @@ function analyseCaseProbe(program: common.typed.Program): {
 
 				return
 			}
+			case "InterpolatedStringValue":
+				for (let segment of node.segments) {
+					if (segment.kind === "expression") {
+						visitNode(segment.expression, null)
+					}
+				}
+
+				return
 			case "TypeAliasStatement":
 			case "ProtocolDeclarationStatement":
 			case "Identifier":
@@ -1467,6 +1490,14 @@ function describeDeclarations(
 			case "ListValue":
 				for (let value of node.values) {
 					visitNode(value)
+				}
+
+				return
+			case "InterpolatedStringValue":
+				for (let segment of node.segments) {
+					if (segment.kind === "expression") {
+						visitNode(segment.expression)
+					}
 				}
 
 				return

@@ -323,6 +323,14 @@ function collectCasesFromNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					collectCasesFromNode(segment.expression, tokens)
+				}
+			}
+
+			return
 		case "Combination":
 			collectCasesFromNode(node.lhs, tokens)
 			collectCasesFromNode(node.rhs, tokens)

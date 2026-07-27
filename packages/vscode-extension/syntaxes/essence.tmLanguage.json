@@ -167,7 +167,7 @@
 			]
 		},
 		"string": {
-			"comment": "A String legitimately spans lines, so running on past the end of the line is the correct reading of an unterminated quote rather than a bug.",
+			"comment": "A String legitimately spans lines, so running on past the end of the line is the correct reading of an unterminated quote rather than a bug. A '{ … }' hole re-enters the language so its Expression is highlighted as code.",
 			"begin": "\"",
 			"end": "\"",
 			"name": "string.quoted.double.essence",
@@ -180,7 +180,37 @@
 				"0": {
 					"name": "punctuation.definition.string.end.essence"
 				}
-			}
+			},
+			"patterns": [
+				{
+					"match": "\\\\[\"\\\\nt{}]",
+					"name": "constant.character.escape.essence"
+				},
+				{
+					"match": "\\\\.",
+					"name": "invalid.illegal.unknown-escape.essence"
+				},
+				{
+					"begin": "\\{",
+					"end": "\\}",
+					"name": "meta.embedded.interpolation.essence",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.section.interpolation.begin.essence"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.section.interpolation.end.essence"
+						}
+					},
+					"patterns": [
+						{
+							"include": "$self"
+						}
+					]
+				}
+			]
 		},
 		"valueDeclaration": {
 			"match": "\\b(constant|variable)[ \\t]+([^\\s\"§(){}\\[\\]<>|/@,.:=~_#-]+)",

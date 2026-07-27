@@ -1088,10 +1088,10 @@ third"::lines())
 	§ by. Keep every printed Record here short until that bug is fixed.
 	constant point = { x = 1, y = 2 }
 
-	show("Record.is(_ {})", point::is({ x = 1, y = 2 }))
-	show("Record.is(_ {}) [differing]", point::is({ x = 1, y = 3 }))
-	show("Record.isNot(_ {})", point::isNot({ x = 1, y = 3 }))
-	show("Record.isNot(_ {}) [equal]", point::isNot({ x = 1, y = 2 }))
+	show("Record.is(_ \{\})", point::is({ x = 1, y = 2 }))
+	show("Record.is(_ \{\}) [differing]", point::is({ x = 1, y = 3 }))
+	show("Record.isNot(_ \{\})", point::isNot({ x = 1, y = 3 }))
+	show("Record.isNot(_ \{\}) [equal]", point::isNot({ x = 1, y = 2 }))
 
 	§ A Function is the one value with no Type tag on it, and reading that
 	§ missing tag used to THROW here rather than answer — a Record holding a
@@ -1104,11 +1104,11 @@ third"::lines())
 	constant holdingDouble = { fn = double }
 
 	show(
-		"Record.is(_ {}) [holding a Function]",
+		"Record.is(_ \{\}) [holding a Function]",
 		holdingDouble::is(holdingDouble),
 	)
 	show(
-		"Record.is(_ {}) [differing Functions]",
+		"Record.is(_ \{\}) [differing Functions]",
 		holdingDouble::is({ fn = (_ value: Integer) -> Integer { <- value } }),
 	)
 	show("Record.keys()", point::keys())

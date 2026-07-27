@@ -502,6 +502,48 @@ describe("Enricher", () => {
 		})
 	})
 
+	describe("String Interpolation", () => {
+		it("should accept a Printable hole and type the whole as String", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant count = 3
+				constant message = "count: {count}"
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let declaration = program.implementation.nodes[1]
+			expect(declaration.nodeType).toBe("ConstantDeclarationStatement")
+
+			if (declaration.nodeType === "ConstantDeclarationStatement") {
+				expect(declaration.value.nodeType).toBe(
+					"InterpolatedStringValue",
+				)
+				expect(declaration.value.type).toEqual({ type: "String" })
+			}
+		})
+
+		it("should refuse a hole that is not Printable", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant maybe = 3::squareRoot()
+				constant message = "root: {maybe}"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("interpolation-not-printable")
+		})
+
+		it("should still enrich the Statements around a bad hole", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant maybe = 3::squareRoot()
+				constant message = "root: {maybe}"
+				constant after = 5
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(program.implementation.nodes).toHaveLength(3)
+		})
+	})
+
 	describe("Constant Reassignment", () => {
 		it("should allow reassigning Variables", () => {
 			expect(

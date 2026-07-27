@@ -149,6 +149,7 @@ function validateImplementationNode(
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
+		case "InterpolatedStringValue":
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
@@ -204,6 +205,8 @@ function validateExpression(
 			return validateRecordValue(node)
 		case "ListValue":
 			return validateListValue(node)
+		case "InterpolatedStringValue":
+			return validateInterpolatedStringValue(node)
 		case "Combination":
 			return validateCombination(node)
 		case "StringValue":
@@ -1639,6 +1642,22 @@ function validateListValue(
 	for (let value of node.values) {
 		validateExpression(value)
 		validateNoBoundFunctionValue(value)
+	}
+
+	return node
+}
+
+// NOTE: Each hole is an Expression of its own — `"total: {price::add(tax)}"`
+// holds an Invocation — so each is walked. A hole can not itself be a bound
+// Function value (the Enricher already refused it as not Printable), so unlike
+// a List there is no `validateNoBoundFunctionValue` guard to add.
+function validateInterpolatedStringValue(
+	node: common.typed.InterpolatedStringValueNode,
+): common.typed.InterpolatedStringValueNode {
+	for (let segment of node.segments) {
+		if (segment.kind === "expression") {
+			validateExpression(segment.expression)
+		}
 	}
 
 	return node

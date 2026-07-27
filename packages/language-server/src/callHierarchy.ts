@@ -392,6 +392,14 @@ function collectItemsFromNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					collectItemsFromNode(segment.expression, container, items)
+				}
+			}
+
+			return
 		case "CaseValue":
 			if (node.value !== null) {
 				collectItemsFromNode(node.value, container, items)
@@ -724,6 +732,14 @@ function visitNode(
 		case "ListValue":
 			for (let value of node.values) {
 				visitNode(value, caller, context, sites)
+			}
+
+			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					visitNode(segment.expression, caller, context, sites)
+				}
 			}
 
 			return

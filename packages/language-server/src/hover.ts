@@ -580,6 +580,16 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
+		case "InterpolatedStringValue":
+			consider(state, node.position, node.type, null)
+
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					visitNode(segment.expression, state)
+				}
+			}
+
+			return
 		case "FunctionValue":
 			consider(state, node.value.headPosition, node.type, null)
 			visitFunctionDefinition(node.value, state)

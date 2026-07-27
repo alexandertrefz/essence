@@ -169,6 +169,17 @@ export function stringValueNode(
 	}
 }
 
+export function interpolatedStringValueNode(
+	segments: Array<parser.InterpolationSegmentNode>,
+	position: common.Position,
+): parser.InterpolatedStringValueNode {
+	return {
+		nodeType: "InterpolatedStringValue",
+		segments,
+		position,
+	}
+}
+
 export function integerValueNode(
 	value: string,
 	position: common.Position,

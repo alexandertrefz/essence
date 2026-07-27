@@ -238,3 +238,14 @@ Nothing
 `;
 
 exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `""`;
+
+exports[`Fixture Sweep Interpolation.es should print what it printed before 1`] = `
+""Hello, World! You have 3 left."
+"one plus two is 3"
+"the answer is true"
+"reversed: dlroW, upper: WORLD"
+"she said "hi" \\ wrote {braces}"
+"greeting is Hello, World"
+"emptybetween"
+"World has 3 apples today""
+`;

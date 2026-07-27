@@ -935,6 +935,14 @@ function walkNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					walkNode(segment.expression, visit)
+				}
+			}
+
+			return
 		case "MethodInvocation":
 			walkNode(node.base, visit)
 			walkArguments(node.arguments, visit)

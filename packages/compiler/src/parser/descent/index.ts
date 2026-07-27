@@ -58,10 +58,15 @@ function isIdentifierToken(token: Token | undefined): boolean {
 
 // NOTE: The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
 // `case "a"`. Everything else in Matcher position is read as a Type.
+// `LiteralStringStart` is here only so an interpolated String reaches
+// `parseLiteralMatcherValue`, which refuses it with a message about why a
+// String with holes can not be matched — rather than the generic "expected a
+// Type" a Type parse would give.
 const literalMatcherTokenTypes = [
 	TokenType.LiteralNumber,
 	TokenType.SymbolDash,
 	TokenType.LiteralString,
+	TokenType.LiteralStringStart,
 	TokenType.LiteralTrue,
 	TokenType.LiteralFalse,
 	TokenType.LiteralNothing,
@@ -1715,6 +1720,8 @@ class DescentParser {
 			case TokenType.LiteralString:
 				this.tokens.next()
 				return generators.stringValueNode(token.value, token.position)
+			case TokenType.LiteralStringStart:
+				return this.parseInterpolatedString()
 			case TokenType.SymbolDash:
 			case TokenType.LiteralNumber:
 				return this.parseNumberLiteral()
@@ -2024,6 +2031,17 @@ class DescentParser {
 			case TokenType.LiteralNothing:
 				this.tokens.next()
 				return generators.nothingValueNode(token.position)
+			// NOTE: An interpolated String is not a compile-time literal — its
+			// holes are evaluated — so it can never be the fixed value a `case`
+			// compares against. Refused with its own message rather than the
+			// generic one, since "found an interpolated String" alone does not
+			// say why a String would be turned away here.
+			case TokenType.LiteralStringStart:
+				fail(
+					"An interpolated String can not be matched against — a Matcher compares one written literal, and a hole is evaluated.",
+					token.position,
+					"write a plain String Literal here",
+				)
 			default:
 				fail(
 					`Expected a literal value but found ${describeToken(token)}.`,
@@ -2196,6 +2214,56 @@ class DescentParser {
 		return generators.keyValuePair(name, value, {
 			start: name.position.start,
 			end: value.position.end,
+		})
+	}
+
+	// NOTE: The Lexer has already split the interpolated String into its chunk
+	// Tokens (`Start`/`Middle`/`End`) with each hole's own Tokens lexed in
+	// place between them, so this reads as an ordinary alternation: a chunk, a
+	// hole parsed by the full Expression grammar, a chunk, and so on, ending on
+	// the `End` chunk. Positions come out absolute because the holes were never
+	// a separate parse.
+	protected parseInterpolatedString(): parser.InterpolatedStringValueNode {
+		let start = this.tokens.expect(TokenType.LiteralStringStart)
+
+		let segments: Array<parser.InterpolationSegmentNode> = [
+			{ kind: "text", value: start.value },
+		]
+		let endToken = start
+
+		while (true) {
+			segments.push({
+				kind: "expression",
+				expression: this.parseExpression(),
+			})
+
+			let chunk = this.peekOrFail("the rest of the interpolated String")
+
+			if (chunk.type === TokenType.LiteralStringEnd) {
+				this.tokens.next()
+				segments.push({ kind: "text", value: chunk.value })
+				endToken = chunk
+				break
+			}
+
+			if (chunk.type === TokenType.LiteralStringMiddle) {
+				this.tokens.next()
+				segments.push({ kind: "text", value: chunk.value })
+				continue
+			}
+
+			// NOTE: Unreachable for a String the Lexer produced — every hole it
+			// opens it closes with a `Middle` or `End` chunk — but the grammar
+			// says so rather than trusting it to.
+			fail(
+				`Expected the rest of the interpolated String but found ${describeToken(chunk)}.`,
+				chunk.position,
+			)
+		}
+
+		return generators.interpolatedStringValueNode(segments, {
+			start: start.position.start,
+			end: endToken.position.end,
 		})
 	}
 

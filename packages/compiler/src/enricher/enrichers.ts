@@ -69,6 +69,7 @@ import {
 	resolveTypeAliasStatementType,
 	scopeWithGenerics,
 	silentCheckedConformances,
+	solveConformance,
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
@@ -150,6 +151,7 @@ export function enrichNode(
 		case "Combination":
 		case "RecordValue":
 		case "StringValue":
+		case "InterpolatedStringValue":
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
@@ -203,6 +205,8 @@ export function enrichExpression(
 			return enrichRecordValue(node, scope, expectedType)
 		case "StringValue":
 			return enrichStringValue(node, scope)
+		case "InterpolatedStringValue":
+			return enrichInterpolatedStringValue(node, scope)
 		case "IntegerValue":
 			return enrichIntegerValue(node, scope)
 		case "RationalValue":
@@ -1246,6 +1250,84 @@ export function enrichStringValue(
 	}
 }
 
+// NOTE: A hole is interpolated by its value's `toString`, so it must be
+// `Printable` — resolved through the very machinery a bounded Method's items go
+// through (`solveConformance`), which threads the same witness `List::join`
+// does. A hole whose Type has no such conformance — an `Optional`, a bare
+// structural Union — is refused with `interpolation-not-printable`, and a
+// placeholder `parameter` witness keeps the rest of the enrichment going.
+export function enrichInterpolatedStringValue(
+	node: parser.InterpolatedStringValueNode,
+	scope: enricher.Scope,
+): common.typed.InterpolatedStringValueNode {
+	let segments: Array<common.typed.InterpolationSegmentNode> =
+		node.segments.map((segment) => {
+			if (segment.kind === "text") {
+				return segment
+			}
+
+			let expression = enrichExpression(segment.expression, scope)
+			let solved = solveConformance(
+				expression.type,
+				"Printable",
+				scope,
+				expression.position,
+			)
+
+			if (!solved.ok) {
+				// NOTE: An empty chain means the failure was already reported
+				// (an Error-typed hole, an unknown Protocol) — stay silent to
+				// avoid a cascade, exactly as `resolveConformances` does.
+				if (solved.chain.length > 0) {
+					reportError(
+						`${describeType(expression.type)} can not be interpolated into a String`,
+						expression.position,
+						{
+							code: "interpolation-not-printable",
+							labels: [
+								primary(
+									expression.position,
+									`this is ${describeType(expression.type)}, which is not Printable`,
+								),
+							],
+							notes: solved.chain,
+							helps: [
+								"Interpolate only Printable values; match an Optional or a Union apart first and interpolate each Case.",
+							],
+						},
+					)
+				}
+
+				return {
+					kind: "expression",
+					expression,
+					conformance: {
+						genericName: "$interpolation",
+						protocolName: "Printable",
+						source: { kind: "parameter", name: "$interpolation" },
+					},
+				}
+			}
+
+			return {
+				kind: "expression",
+				expression,
+				conformance: {
+					genericName: "$interpolation",
+					protocolName: "Printable",
+					source: solved.source,
+				},
+			}
+		})
+
+	return {
+		nodeType: "InterpolatedStringValue",
+		segments,
+		position: node.position,
+		type: { type: "String" },
+	}
+}
+
 export function enrichIntegerValue(
 	node: parser.IntegerValueNode,
 	_scope: enricher.Scope,
@@ -1720,6 +1802,7 @@ export function enrichStatement(
 const parameterlessValues = new Set([
 	"RecordValue",
 	"StringValue",
+	"InterpolatedStringValue",
 	"IntegerValue",
 	"RationalValue",
 	"BooleanValue",

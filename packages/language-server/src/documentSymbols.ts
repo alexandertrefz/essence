@@ -176,6 +176,12 @@ function symbolsOfNode(
 			)
 		case "ListValue":
 			return node.values.flatMap(symbolsOfNode)
+		case "InterpolatedStringValue":
+			return node.segments.flatMap((segment) =>
+				segment.kind === "expression"
+					? symbolsOfNode(segment.expression)
+					: [],
+			)
 		case "CaseValue":
 			return node.value === null ? [] : symbolsOfNode(node.value)
 		default:
@@ -575,6 +581,14 @@ function collectDetail(
 		case "ListValue":
 			for (let value of node.values) {
 				collectDetail(value, details)
+			}
+
+			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					collectDetail(segment.expression, details)
+				}
 			}
 
 			return

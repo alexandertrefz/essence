@@ -992,6 +992,14 @@ function walkNode(
 			}
 
 			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					walkNode(segment.expression, scope, context)
+				}
+			}
+
+			return
 		case "FunctionValue":
 			walkFunctionDefinition(node.value, scope, context, node.position)
 			return
@@ -1735,6 +1743,14 @@ function walkTypedNode(
 		case "ListValue":
 			for (let value of node.values) {
 				walkTypedNode(value, context)
+			}
+
+			return
+		case "InterpolatedStringValue":
+			for (let segment of node.segments) {
+				if (segment.kind === "expression") {
+					walkTypedNode(segment.expression, context)
+				}
 			}
 
 			return
