@@ -13,6 +13,18 @@ export type ExecutionResult = {
 	duration: number
 }
 
+// NOTE: Node translates a stack trace through the bundle's map only when
+// asked, while Bun reads the `sourceMappingURL` comment on its own — so the
+// flag is added exactly when a map was emitted and the runtime is Node.
+// Exported for the spec: whether the flag belongs is a pure question, the
+// spawn around it is not.
+export function runtimeArguments(
+	sourceMaps: boolean,
+	runningOnBun = process.versions.bun !== undefined,
+): Array<string> {
+	return sourceMaps && !runningOnBun ? ["--enable-source-maps"] : []
+}
+
 function rule(context: CLIContext, label: string | null): string {
 	let { palette, theme, terminal } = context
 	let width = Math.min(terminal.width, 88) - 2
@@ -32,10 +44,15 @@ function rule(context: CLIContext, label: string | null): string {
 export function startProgram(
 	fileName: string,
 	programArguments: Array<string> = [],
+	sourceMaps = false,
 ): ChildProcess {
-	return spawn(process.execPath, [fileName, ...programArguments], {
-		stdio: "inherit",
-	})
+	return spawn(
+		process.execPath,
+		[...runtimeArguments(sourceMaps), fileName, ...programArguments],
+		{
+			stdio: "inherit",
+		},
+	)
 }
 
 // NOTE: The program's output is inherited rather than captured, so it streams
@@ -56,9 +73,17 @@ export function execute(
 			context.terminal.out(rule(context, "program output"))
 		}
 
-		let child = spawn(process.execPath, [fileName, ...programArguments], {
-			stdio: "inherit",
-		})
+		let child = spawn(
+			process.execPath,
+			[
+				...runtimeArguments(context.options.sourcemap),
+				fileName,
+				...programArguments,
+			],
+			{
+				stdio: "inherit",
+			},
+		)
 
 		// NOTE: A program that fails to start emits "error", and one that runs
 		// emits "exit" — but a program can manage both, so the result is

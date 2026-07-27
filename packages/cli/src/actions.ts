@@ -42,7 +42,7 @@ async function compileAll(
 	context: CLIContext,
 	command: CommandSpec,
 	files: Array<string>,
-	options: { emit: boolean },
+	options: { emit: boolean; sourcemapMode?: "linked" | "inline" },
 ): Promise<CompilationResult> {
 	let plan = await planCompilation(context, command, files, {
 		emit: options.emit,
@@ -50,7 +50,9 @@ async function compileAll(
 	})
 
 	try {
-		return await runCompilation(context, plan)
+		return await runCompilation(context, plan, {
+			sourcemapMode: options.sourcemapMode,
+		})
 	} finally {
 		await plan.dispatcher.dispose()
 	}
@@ -146,6 +148,10 @@ export async function runRun(
 	}
 
 	try {
+		// NOTE: The scratch directory is removed the moment the program exits,
+		// so a map written beside the bundle would be gone before anyone read a
+		// stack trace through it — asked for a map, `run` rides it inside the
+		// bundle instead. `--out` keeps the linked default.
 		let result = await compileAll(
 			{
 				...context,
@@ -153,7 +159,10 @@ export async function runRun(
 			},
 			command,
 			files,
-			{ emit: true },
+			{
+				emit: true,
+				sourcemapMode: temporaryDirectory === null ? undefined : "inline",
+			},
 		)
 
 		printCompilationResult(context, result)

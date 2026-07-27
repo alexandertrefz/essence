@@ -122,7 +122,7 @@ export async function runWatch(
 
 		stopProgram()
 		terminal.out("")
-		running = startProgram(outputFileName)
+		running = startProgram(outputFileName, [], context.options.sourcemap)
 	}
 
 	let footer = () => {
