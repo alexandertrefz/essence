@@ -13,7 +13,20 @@ import * as path from "node:path"
 // package that holds the files, rather than by the Rewriter and the Bundler
 // each counting `../`s towards them — they used to, and the two counts had to
 // stay agreeing with each other and with the directory layout.
-export const RUNTIME_DIRECTORY = import.meta.dirname
+//
+// NOTE: Two layouts. In the workspace this module IS a runtime module, and
+// the directory is its own. The published package is compiled, and this
+// module runs as `dist/index.js` — but what the Bundler inlines must stay the
+// TypeScript sources, which ship as `src/` beside `dist/` exactly so that a
+// published compiler emits the same bundle bytes the workspace one does.
+// Exported for the spec: where the runtime is is a pure question.
+export function runtimeDirectoryFor(moduleDirname: string): string {
+	return path.basename(moduleDirname) === "dist"
+		? path.resolve(moduleDirname, "../src")
+		: moduleDirname
+}
+
+export const RUNTIME_DIRECTORY = runtimeDirectoryFor(import.meta.dirname)
 
 // NOTE: The tsconfig esbuild transpiles the runtime modules with while
 // inlining them. It is deliberately not this repository's — the runtime is
