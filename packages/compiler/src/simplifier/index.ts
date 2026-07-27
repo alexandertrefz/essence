@@ -168,6 +168,7 @@ function simplifyCaseValue(
 				: "",
 		value: node.value === null ? null : simplifyExpression(node.value),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -179,6 +180,7 @@ function simplifyNativeFunctionInvocation(
 		name: simplifyIdentifier(node.name),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -204,6 +206,7 @@ function simplifyMethodInvocation(
 			nodeType: "Identifier",
 			name: node.namespace.name,
 			type: node.namespace.type,
+			position: node.position,
 		},
 		member: { name: node.member.name },
 		arguments: [
@@ -217,6 +220,7 @@ function simplifyMethodInvocation(
 		],
 		derivedDescriptor: node.derivedDescriptor,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -255,6 +259,7 @@ function simplifyUnionMethodInvocation(
 		})),
 		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -288,6 +293,7 @@ function simplifyFunctionInvocation(
 			...simplifyConformanceArguments(node.conformances),
 		],
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -338,6 +344,7 @@ function simplifyCombination(
 		lhs: simplifyExpression(node.lhs),
 		rhs: simplifyExpression(node.rhs),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -348,6 +355,7 @@ function simplifyRecordValue(
 		nodeType: "RecordValue",
 		type: node.declaredType !== null ? node.declaredType : node.type,
 		members: simplifyMembers(node.members),
+		position: node.position,
 	}
 }
 
@@ -358,6 +366,7 @@ function simplifyStringValue(
 		nodeType: "StringValue",
 		value: node.value,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -383,6 +392,7 @@ function simplifyInterpolatedStringValue(
 			}
 		}),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -393,6 +403,7 @@ function simplifyIntegerValue(
 		nodeType: "IntegerValue",
 		value: node.value,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -404,6 +415,7 @@ function simplifyRationalValue(
 		numerator: node.numerator,
 		denominator: node.denominator,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -414,6 +426,7 @@ function simplifyBooleanValue(
 		nodeType: "BooleanValue",
 		value: node.value,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -423,6 +436,7 @@ function simplifyNothingValue(
 	return {
 		nodeType: "NothingValue",
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -433,6 +447,7 @@ function simplifyFunctionValue(
 		nodeType: "FunctionValue",
 		value: simplifyFunctionDefinition(node.value),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -443,6 +458,7 @@ function simplifyListValue(
 		nodeType: "ListValue",
 		values: node.values.map((expr) => simplifyExpression(expr)),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -454,6 +470,7 @@ function simplifyLookup(
 		base: simplifyExpression(node.base),
 		member: simplifyIdentifier(node.member),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -464,6 +481,7 @@ function simplifyIdentifier(
 		nodeType: "Identifier",
 		name: node.content,
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -487,6 +505,7 @@ function simplifySelf(
 		nodeType: "Identifier",
 		name: "_self",
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -562,6 +581,7 @@ function simplifyMatch(
 			}),
 		),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -607,6 +627,7 @@ function simplifyConstantDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: true,
+		position: node.position,
 	}
 }
 
@@ -619,6 +640,7 @@ function simplifyVariableDeclarationStatement(
 		value: simplifyExpression(node.value),
 		type: node.type,
 		isConstant: false,
+		position: node.position,
 	}
 }
 
@@ -629,6 +651,7 @@ function simplifyVariableAssignmentStatement(
 		nodeType: "VariableAssignmentStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyExpression(node.value),
+		position: node.position,
 	}
 }
 
@@ -645,6 +668,7 @@ function simplifyNamespaceDefinitionStatement(
 		),
 		methods: simplifyMethods(node.methods, node.type),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -657,6 +681,7 @@ function simplifyProtocolDeclarationStatement(
 	return {
 		nodeType: "ProtocolDeclarationStatement",
 		name: simplifyIdentifier(node.name),
+		position: node.position,
 	}
 }
 
@@ -667,6 +692,7 @@ function simplifyTypeAliasStatement(
 		nodeType: "TypeAliasStatement",
 		name: simplifyIdentifier(node.name),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -680,6 +706,7 @@ function simplifyChoiceDeclarationStatement(
 		nodeType: "TypeAliasStatement",
 		name: simplifyIdentifier(node.name),
 		type: node.type,
+		position: node.position,
 	}
 }
 
@@ -708,6 +735,7 @@ function simplifyConditional(
 		falseBody: convertedNode.falseBody.map((node) =>
 			simplifyImplementationNode(node),
 		),
+		position: node.position,
 	}
 }
 
@@ -717,6 +745,7 @@ function simplifyReturnStatement(
 	return {
 		nodeType: "ReturnStatement",
 		expression: simplifyExpression(node.expression),
+		position: node.position,
 	}
 }
 
@@ -727,6 +756,7 @@ function simplifyFunctionStatement(
 		nodeType: "FunctionStatement",
 		name: simplifyIdentifier(node.name),
 		value: simplifyFunctionDefinition(node.value),
+		position: node.position,
 	}
 }
 
