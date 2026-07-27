@@ -44,23 +44,26 @@ type JSONReport = {
 	}>
 }
 
-// NOTE: Which `essence` compiles when none was injected: a checkout's own
-// launcher first — this package sits beside the CLI's in the monorepo, which
-// is where `bin/esdap` runs from — and PATH otherwise. A `.js` path would
-// need Node, but both candidates here are the extensionless Bun launcher or
-// whatever PATH resolves, so the command IS the path.
+// NOTE: Which `essence` compiles when none was injected: the CLI sitting
+// beside this package first — `packages/cli/bin/essence` in a checkout, where
+// `bin/esdap` runs from, and `@essence/cli/bin/essence.js` in a published
+// install, where the relative depth is the same — and PATH otherwise. Every
+// candidate carries its own shebang, Bun's or Node's, so the command IS the
+// path.
 function resolveCliCommand(): Array<string> {
-	let checkoutBinary = path.resolve(
-		import.meta.dirname,
-		"..",
-		"..",
-		"cli",
-		"bin",
-		"essence",
-	)
+	for (let binaryName of ["essence", "essence.js"]) {
+		let siblingBinary = path.resolve(
+			import.meta.dirname,
+			"..",
+			"..",
+			"cli",
+			"bin",
+			binaryName,
+		)
 
-	if (existsSync(checkoutBinary)) {
-		return [checkoutBinary]
+		if (existsSync(siblingBinary)) {
+			return [siblingBinary]
+		}
 	}
 
 	return ["essence"]

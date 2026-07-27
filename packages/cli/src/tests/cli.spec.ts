@@ -37,7 +37,7 @@ import {
 } from "../inputs"
 import { type JSONReport, toJSONReport } from "../json"
 import { type CompileOutcome, compileFile } from "../pipeline"
-import { defaultWorkerCount, shouldUseWorkers } from "../pool"
+import { defaultWorkerCount, shouldUseWorkers, workerFileName } from "../pool"
 import {
 	countDiagnostics,
 	formatBytes,
@@ -674,6 +674,18 @@ describe("CLI", () => {
 			expect(defaultWorkerCount(1)).toBe(1)
 			expect(defaultWorkerCount(2)).toBeLessThanOrEqual(2)
 			expect(defaultWorkerCount(1000)).toBeLessThanOrEqual(8)
+		})
+
+		// NOTE: The worker is booted as whatever `pool.ts` itself is running
+		// as — in the published package the sources are compiled, and there is
+		// no `worker.ts` to boot.
+		it("boots the worker its own module could be", () => {
+			expect(workerFileName("file:///checkout/cli/src/pool.ts")).toBe(
+				"./worker.ts",
+			)
+			expect(workerFileName("file:///install/cli/dist/pool.js")).toBe(
+				"./worker.js",
+			)
 		})
 	})
 
