@@ -4,7 +4,7 @@ implementation {
 	§ hole — the `toString` is implied, exactly as `List::join(with:)` calls it
 	§ for its items. A String with no hole is an ordinary String Literal.
 
-	constant name = "World"
+	constant name  = "World"
 	constant count = 3
 
 	§ Values of different Types, each rendered by its own `toString`.

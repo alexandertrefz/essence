@@ -402,7 +402,7 @@ declarations {
 				§ match it finds: "aaa" split on "aa" consumes the match at 0 and
 				§ leaves "a", giving 0, while the last occurrence of "aa" really
 				§ begins at 1.
-				constant length = @::length()
+				constant length     = @::length()
 				constant partLength = part::length()
 
 				§ `@` is the SCRUTINEE inside a match, not the receiver, so both

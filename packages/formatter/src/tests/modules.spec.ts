@@ -71,7 +71,7 @@ describe("module sections", () => {
 			).toBe(
 				source(
 					"implementation {",
-					"\tconstant zeta = 1",
+					"\tconstant zeta  = 1",
 					"\tconstant alpha = 2",
 					"}",
 					"",
