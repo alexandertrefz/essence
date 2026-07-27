@@ -183,17 +183,11 @@ function sourceMapComment(map: object): string {
 	return `//# sourceMappingURL=data:application/json;base64,${encoded}`
 }
 
-// NOTE: The prelude gets an EMPTY map rather than none: unmapped, esbuild
-// would map its every line back onto the generated JavaScript under the
-// synthetic specifier, and a debugger would step "into" prelude internals as
-// if they were source. An empty map declares the whole Module unmappable,
-// which reads as library code to skip.
-const emptySourceMapComment = sourceMapComment({
-	version: 3,
-	sources: [],
-	names: [],
-	mappings: "",
-})
+// NOTE: The prelude gets no map — not even an empty one, which esbuild
+// ignores outright and self-maps anyway. Its lines arrive in the bundle's map
+// labelled with the synthetic specifier, and the Bundler's final pass strips
+// every source that is not an on-disk `.es` file, prelude and inlined runtime
+// alike, so a debugger sees the glue as unmapped code to step over.
 
 // NOTE: One Module of a bundle: the canonical path it is keyed by — which is
 // also what the Choices it declares take their identity from — and the Program
@@ -266,12 +260,7 @@ export function rewriteModules(
 		let preludeProgram = preludeModule(essenceMembers)
 
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
-		sources.set(
-			PRELUDE_SPECIFIER,
-			sourceTexts === null
-				? generateProgram(preludeProgram)
-				: `${generateProgram(preludeProgram)}\n${emptySourceMapComment}`,
-		)
+		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
 		for (let { module, body } of bodies) {
 			let names = referencedNames(body)

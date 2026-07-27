@@ -4,6 +4,7 @@ import * as path from "node:path"
 import type { common } from "@essence/interfaces"
 import { RUNTIME_DIRECTORY, RUNTIME_TSCONFIG } from "@essence/runtime"
 import type { Plugin } from "esbuild"
+import type { RawSourceMap } from "source-map"
 
 import { placelessDiagnostic } from "../diagnostics/index"
 
@@ -50,6 +51,11 @@ export type BundleOptions = {
 	outputFileName: string
 	minify?: boolean
 	sourcemap?: boolean
+	// NOTE: `linked` writes the map beside the output; `inline` rides it inside
+	// the bundle itself, which is what `esc run`'s transient output needs — the
+	// directory the map would sit beside is deleted the moment the Program
+	// exits.
+	sourcemapMode?: "linked" | "inline"
 }
 
 export type BundleOutput = {
@@ -161,7 +167,10 @@ export async function bundle(
 			// `Number.ts`, and the output depends on the Program alone.
 			absWorkingDir: RUNTIME_DIRECTORY,
 			minify: options.minify ?? false,
-			sourcemap: options.sourcemap === true ? "linked" : false,
+			sourcemap:
+				options.sourcemap === true
+					? (options.sourcemapMode ?? "linked")
+					: false,
 			treeShaking: true,
 			bundle: true,
 			format: "esm",
@@ -174,11 +183,17 @@ export async function bundle(
 			write: false,
 		})
 
+		let outputs: Array<BundleOutput> = result.outputFiles.map((file) => ({
+			path: file.path,
+			contents: file.contents,
+		}))
+
+		if (options.sourcemap === true) {
+			outputs = await confineOutputMaps(outputs)
+		}
+
 		return {
-			outputs: result.outputFiles.map((file) => ({
-				path: file.path,
-				contents: file.contents,
-			})),
+			outputs,
 			diagnostics: result.warnings.map((warning) =>
 				placelessDiagnostic("warning", warning.text, "bundler-warning"),
 			),
@@ -192,6 +207,106 @@ export async function bundle(
 			diagnostics: bundleErrorsToDiagnostics(error),
 		}
 	}
+}
+
+// NOTE: esbuild maps every line it cannot attribute through an input map back
+// onto the module itself — the synthetic prelude and the inlined runtime
+// arrive in the bundle's map as `essence:$prelude` and `Number.ts`, sources no
+// debugger can resolve to a file. The final map is confined to the on-disk
+// `.es` sources instead: everything else becomes unmapped, which is what lets
+// a debugger's "step through code with no map" setting carry a session over
+// the glue rather than into it.
+async function confineMapToEssenceSources(raw: RawSourceMap): Promise<string> {
+	// NOTE: Loaded lazily for the same reason esbuild is — only a compile that
+	// asked for a map pays for it.
+	let { SourceMapConsumer, SourceMapGenerator } = await import("source-map")
+	let consumer = new SourceMapConsumer(raw)
+	let generator = new SourceMapGenerator({ file: raw.file })
+	let keptSources = new Set<string>()
+
+	consumer.eachMapping((mapping) => {
+		if (
+			mapping.source === null ||
+			!mapping.source.endsWith(".es") ||
+			mapping.source.startsWith(MODULE_SCHEME) ||
+			mapping.originalLine === null
+		) {
+			return
+		}
+
+		keptSources.add(mapping.source)
+		generator.addMapping({
+			generated: {
+				line: mapping.generatedLine,
+				column: mapping.generatedColumn,
+			},
+			original: {
+				line: mapping.originalLine,
+				column: mapping.originalColumn,
+			},
+			source: mapping.source,
+			name: mapping.name ?? undefined,
+		})
+	})
+
+	for (let source of keptSources) {
+		let content = consumer.sourceContentFor(source, true)
+
+		if (content !== null) {
+			generator.setSourceContent(source, content)
+		}
+	}
+
+	return generator.toString()
+}
+
+const inlineMapPrefix = "//# sourceMappingURL=data:application/json;base64,"
+
+// NOTE: Where the map to confine LIVES depends on the mode — `linked` wrote a
+// `.map` output beside the bundle, `inline` rode it into the bundle's own last
+// line — so both places are covered by shape rather than by re-deriving the
+// mode here.
+async function confineOutputMaps(
+	outputs: Array<BundleOutput>,
+): Promise<Array<BundleOutput>> {
+	return Promise.all(
+		outputs.map(async (output) => {
+			if (output.path.endsWith(".map")) {
+				let raw = JSON.parse(
+					new TextDecoder().decode(output.contents),
+				) as RawSourceMap
+
+				return {
+					path: output.path,
+					contents: new TextEncoder().encode(
+						await confineMapToEssenceSources(raw),
+					),
+				}
+			}
+
+			let text = new TextDecoder().decode(output.contents)
+			let commentStart = text.lastIndexOf(inlineMapPrefix)
+
+			if (commentStart === -1) {
+				return output
+			}
+
+			let encoded = text.slice(commentStart + inlineMapPrefix.length)
+			let raw = JSON.parse(
+				Buffer.from(encoded.trimEnd(), "base64").toString("utf-8"),
+			) as RawSourceMap
+			let confined = Buffer.from(
+				await confineMapToEssenceSources(raw),
+			).toString("base64")
+
+			return {
+				path: output.path,
+				contents: new TextEncoder().encode(
+					`${text.slice(0, commentStart)}${inlineMapPrefix}${confined}\n`,
+				),
+			}
+		}),
+	)
 }
 
 function bundleErrorsToDiagnostics(error: unknown): Array<common.Diagnostic> {
