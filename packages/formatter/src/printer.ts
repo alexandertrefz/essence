@@ -11,6 +11,7 @@ import {
 	line,
 	renderFlat,
 	softline,
+	stringWidth,
 	text,
 	type TextDoc,
 } from "./doc"
@@ -29,6 +30,14 @@ type Entry = {
 }
 
 const EMPTY = text("")
+
+// NOTE: The most padding an aligned assignment is worth carrying to reach its
+// block's `=` column. A run of assignments is split into blocks whose heads
+// span no more than this, so a head that would need more padding than this to
+// line up starts a new block rather than dragging every sibling's `=` right to
+// meet it — a group of short Declarations above the wide typed ones is the usual
+// case, and each lines up on its own.
+const MAX_ALIGNMENT_PADDING = 12
 
 function positionLines(position: common.Position): {
 	startLine: number
@@ -117,6 +126,135 @@ export class Printer {
 		return entries
 	}
 
+	// NOTE: The Statements of one block, with the `=` of a run of adjacent
+	// assignments written in one column — the same alignment a `match` gives its
+	// Handlers' braces, and built the same way: each Statement is laid out in
+	// source order, because that is the order the trivia cursor is walked in,
+	// and the padding is written into a Doc node kept aside for it once the
+	// widths of a whole run are known.
+	//
+	// A run ends wherever the column would stop meaning anything: at a Statement
+	// that is not an assignment; at a blank line, which is how the author says
+	// that two groups of Declarations are not one; between a Declaration and a
+	// bare reassignment; and at a value that lays itself out over several lines,
+	// for the same reason a guarded `case` is left out of its run. A Comment
+	// does not end a run — it is written between two Statements the author kept
+	// together, and the run is what they wrote.
+	private implementationEntries(
+		nodes: Array<parser.ImplementationNode>,
+	): Array<Entry> {
+		let run: Array<AlignedAssignment> = []
+		let kind: AssignmentKind | null = null
+		let previousEnd: number | null = null
+
+		// NOTE: The run is broken into blocks that each line up on their own `=`
+		// rather than forced to one column, so a long typed Declaration among
+		// short ones does not drag every sibling's `=` across the line to meet it.
+		// A block is a maximal stretch of adjacent assignments whose heads span no
+		// more than `MAX_ALIGNMENT_PADDING` — the widest minus the narrowest — so
+		// no member is ever padded further than that to reach its block's column.
+		// A block ends where the next head would widen that span past the budget,
+		// which is what splits a group of short Declarations from the wide typed
+		// ones written below them into their own lined-up blocks. A block of one
+		// is left unpadded.
+		//
+		// The span is measured widest-minus-narrowest rather than against the
+		// neighbour above, which would let a slow ramp of widths pad the first
+		// member of a block far past the budget. The walk is in source order and
+		// greedy rather than optimal — the corpus writes similar widths together,
+		// and a greedy left-to-right pass is stable under a second run, which an
+		// optimal partition need not be.
+		let closeRun = () => {
+			let start = 0
+			let narrowest = 0
+			let widest = 0
+
+			let flushBlock = (end: number) => {
+				if (end - start > 1) {
+					for (let index = start; index < end; index++) {
+						let assignment = run[index] as AlignedAssignment
+
+						assignment.padding.value = " ".repeat(
+							widest - assignment.headWidth,
+						)
+					}
+				}
+
+				start = end
+			}
+
+			for (let index = 0; index < run.length; index++) {
+				let width = (run[index] as AlignedAssignment).headWidth
+
+				if (
+					index > start &&
+					Math.max(widest, width) - Math.min(narrowest, width) >
+						MAX_ALIGNMENT_PADDING
+				) {
+					flushBlock(index)
+				}
+
+				if (index === start) {
+					narrowest = width
+					widest = width
+				} else {
+					narrowest = Math.min(narrowest, width)
+					widest = Math.max(widest, width)
+				}
+			}
+
+			flushBlock(run.length)
+
+			run = []
+			kind = null
+		}
+
+		let entries = this.entriesFor(
+			nodes,
+			(node) => positionLines(node.position),
+			(node) => {
+				let separated =
+					previousEnd !== null &&
+					this.source.hasBlankLineBetween(
+						previousEnd,
+						node.position.start.line,
+					)
+
+				previousEnd = node.position.end.line
+
+				let assignment = assignmentOf(node)
+
+				if (assignment === null) {
+					closeRun()
+
+					return this.printImplementationNode(node)
+				}
+
+				if (separated || assignmentKind(assignment) !== kind) {
+					closeRun()
+				}
+
+				let padding = text("")
+				let printed = this.printAssignment(assignment, padding)
+
+				if (printed.headWidth === null || !printed.flat) {
+					closeRun()
+
+					return printed.doc
+				}
+
+				kind = assignmentKind(assignment)
+				run.push({ headWidth: printed.headWidth, padding })
+
+				return printed.doc
+			},
+		)
+
+		closeRun()
+
+		return entries
+	}
+
 	private flushBefore(line: number, entries: Array<Entry>) {
 		for (let comment of this.trivia.takeBefore(line)) {
 			entries.push(this.commentEntry(comment))
@@ -186,11 +324,7 @@ export class Printer {
 	): Doc {
 		let opening = this.trivia.claimTrailingOn(openLine)
 
-		let entries = this.entriesFor(
-			body,
-			(node) => positionLines(node.position),
-			(node) => this.printImplementationNode(node),
-		)
+		let entries = this.implementationEntries(body)
 
 		this.flushBefore(closeLine, entries)
 
@@ -250,11 +384,7 @@ export class Printer {
 		let heading = this.headingComments(program.position)
 		let opening = this.trivia.claimTrailingOn(program.position.start.line)
 
-		let entries = this.entriesFor(
-			program.implementation.nodes,
-			(node) => positionLines(node.position),
-			(node) => this.printImplementationNode(node),
-		)
+		let entries = this.implementationEntries(program.implementation.nodes)
 
 		this.flushBefore(program.position.end.line, entries)
 
@@ -440,16 +570,9 @@ export class Printer {
 	printImplementationNode(node: parser.ImplementationNode): Doc {
 		switch (node.nodeType) {
 			case "ConstantDeclarationStatement":
-				return this.printDeclaration("constant", node)
-
 			case "VariableDeclarationStatement":
-				return this.printDeclaration("variable", node)
-
 			case "VariableAssignmentStatement":
-				return concat([
-					text(node.name.content + " = "),
-					this.printExpression(node.value),
-				])
+				return this.printAssignment(node, EMPTY).doc
 
 			case "ReturnStatement":
 				return concat([
@@ -512,21 +635,41 @@ export class Printer {
 		}
 	}
 
-	private printDeclaration(
-		keyword: string,
-		node:
-			| parser.ConstantDeclarationStatementNode
-			| parser.VariableDeclarationStatementNode,
-	): Doc {
-		let head: Array<Doc> = [text(keyword + " " + node.name.content)]
+	// NOTE: `padding` is written between the head and the `=`, and is the slot an
+	// alignment run fills in once it knows its block's widest member — so the
+	// head's width is reported back alongside the Doc. It is null when the head
+	// cannot be written on one line at all, which leaves nothing to measure a
+	// column against; `flat` says the same of the value, which is what keeps a
+	// `match` or a Function literal from dragging its neighbours out of true.
+	private printAssignment(
+		node: AssignmentNode,
+		padding: Doc,
+	): { doc: Doc; headWidth: number | null; flat: boolean } {
+		let head: Array<Doc> = []
 
-		if (node.type !== null) {
-			head.push(text(": "), this.printType(node.type))
+		if (node.nodeType === "VariableAssignmentStatement") {
+			head.push(text(node.name.content))
+		} else {
+			let keyword =
+				node.nodeType === "ConstantDeclarationStatement"
+					? "constant"
+					: "variable"
+
+			head.push(text(keyword + " " + node.name.content))
+
+			if (node.type !== null) {
+				head.push(text(": "), this.printType(node.type))
+			}
 		}
 
-		head.push(text(" = "), this.printExpression(node.value))
+		let written = renderFlat(concat(head))
+		let value = this.printExpression(node.value)
 
-		return concat(head)
+		return {
+			doc: concat([...head, padding, text(" = "), value]),
+			headWidth: written === null ? null : stringWidth(written),
+			flat: renderFlat(value) !== null,
+		}
 	}
 
 	// NOTE: `else if` is one written form, not a block holding an `if`. The
@@ -1326,7 +1469,7 @@ export class Printer {
 			// right rather than line them up. One that breaks ends the run for
 			// the same reason it is not in it.
 			if (handler.guard === null && renderFlat(body) !== null) {
-				run.push({ matcherWidth: matcherText.length, padding })
+				run.push({ matcherWidth: stringWidth(matcherText), padding })
 			} else {
 				closeRun()
 			}
@@ -1684,6 +1827,47 @@ export class Printer {
 type AlignedHandler = {
 	matcherWidth: number
 	padding: TextDoc
+}
+
+// NOTE: The same, for one assignment of a run of them: how wide it reads left
+// of its `=`, and the slot the padding that carries it to its block's column is
+// written into.
+type AlignedAssignment = {
+	headWidth: number
+	padding: TextDoc
+}
+
+type AssignmentNode =
+	| parser.ConstantDeclarationStatementNode
+	| parser.VariableDeclarationStatementNode
+	| parser.VariableAssignmentStatementNode
+
+// NOTE: The Statements written as `… = …`, which are the ones an alignment run
+// is made of. A `type` alias carries an `=` too, but it is a Declaration of a
+// different kind written among Declarations of this one, and lining the two up
+// would put a Type's name in the same column as a value's.
+function assignmentOf(node: parser.ImplementationNode): AssignmentNode | null {
+	switch (node.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+			return node
+
+		default:
+			return null
+	}
+}
+
+type AssignmentKind = "declaration" | "assignment"
+
+// NOTE: A Declaration and a bare reassignment never share a run. `constant` and
+// `variable` are the same width, so Declarations line up on their names by
+// themselves — but a reassignment writes no keyword at all, and padding it out
+// to one would leave a keyword's worth of empty column in the middle of the run.
+function assignmentKind(node: AssignmentNode): AssignmentKind {
+	return node.nodeType === "VariableAssignmentStatement"
+		? "assignment"
+		: "declaration"
 }
 
 // NOTE: One entry of a Module section with everything that rides along when the

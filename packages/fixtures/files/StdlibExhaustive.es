@@ -66,14 +66,14 @@ implementation {
 		})
 	}
 
-	constant greeting = "Hello, World"
-	constant emptyText = ""
-	constant numbers = [3, 1, 2, 1, 4]
+	constant greeting     = "Hello, World"
+	constant emptyText    = ""
+	constant numbers      = [3, 1, 2, 1, 4]
 	constant singleNumber = [7]
-	constant noNumbers: List<Integer> = []
+	constant noNumbers: List<Integer>    = []
 	constant noRationals: List<Rational> = []
 	constant noMixedNumbers: List<Integer | Rational> = []
-	constant noNestedNumbers: List<List<Integer>> = []
+	constant noNestedNumbers: List<List<Integer>>     = []
 
 	§ ——— String ———————————————————————————————————————————————————————————
 	show("String.isEmpty()", greeting::isEmpty())
@@ -257,8 +257,8 @@ third"::lines())
 	§ Grapheme & normalization. The decomposed forms are derived with
 	§ `normalized(as:)` rather than typed as literal combining marks, so the
 	§ test does not depend on how the source file was saved.
-	constant accented = "café"
-	constant flag = "🇩🇪"
+	constant accented   = "café"
+	constant flag       = "🇩🇪"
 	constant decomposed = accented::normalized(
 		as NormalizationForm#DecomposedCanonical,
 	)
@@ -985,8 +985,8 @@ third"::lines())
 	)
 
 	§ ——— Ordering —————————————————————————————————————————————————————————
-	constant less: Ordering = #Less
-	constant equal: Ordering = #Equal
+	constant less: Ordering    = #Less
+	constant equal: Ordering   = #Equal
 	constant greater: Ordering = #Greater
 
 	show("Choice_Equatable.is(_ Ordering) [Less]", less::is(#Less))
@@ -1001,8 +1001,8 @@ third"::lines())
 	show("Ordering.toString() [Greater]", greater::toString())
 
 	§ ——— Side —————————————————————————————————————————————————————————————
-	constant atStart: Side = #Start
-	constant atEnd: Side = #End
+	constant atStart: Side    = #Start
+	constant atEnd: Side      = #End
 	constant atBothEnds: Side = #BothEnds
 
 	show("Choice_Equatable.is(_ Side) [Start]", atStart::is(#Start))
@@ -1016,7 +1016,7 @@ third"::lines())
 	show("Side.toString() [BothEnds]", atBothEnds::toString())
 
 	§ ——— Case —————————————————————————————————————————————————————————————
-	constant sensitive: Case = #Sensitive
+	constant sensitive: Case   = #Sensitive
 	constant insensitive: Case = #Insensitive
 
 	show("Choice_Equatable.is(_ Case) [Sensitive]", sensitive::is(#Sensitive))
@@ -1034,7 +1034,7 @@ third"::lines())
 	show("Case.toString() [Insensitive]", insensitive::toString())
 
 	§ ——— NormalizationForm ————————————————————————————————————————————————
-	constant composedCanonical: NormalizationForm = #ComposedCanonical
+	constant composedCanonical: NormalizationForm   = #ComposedCanonical
 	constant decomposedCanonical: NormalizationForm = #DecomposedCanonical
 
 	show(
@@ -1064,7 +1064,7 @@ third"::lines())
 
 	§ ——— NumberFormat ———————————————————————————————————————————————————————
 	constant asFraction: NumberFormat = #Fraction
-	constant asDecimal: NumberFormat = #Decimal
+	constant asDecimal: NumberFormat  = #Decimal
 
 	show("Choice_Equatable.is(_ NumberFormat)", asFraction::is(#Fraction))
 	show(
@@ -1098,7 +1098,7 @@ third"::lines())
 	§ Function could not be compared with itself at all. Equality of Functions
 	§ is identity: the same Function is equal to itself, two separately written
 	§ ones are not, which is the most that is decidable.
-	constant double = (_ value: Integer) -> Integer {
+	constant double        = (_ value: Integer) -> Integer {
 		<- value::multiply(with 2)
 	}
 	constant holdingDouble = { fn = double }

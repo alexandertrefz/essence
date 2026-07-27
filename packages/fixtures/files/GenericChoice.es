@@ -71,7 +71,7 @@ implementation {
 		Empty,
 	}
 
-	constant full: Box<String> = #Full("packed")
+	constant full: Box<String>  = #Full("packed")
 	constant empty: Box<String> = Box#Empty
 
 	__print(match full -> String {

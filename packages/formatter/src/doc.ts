@@ -74,8 +74,9 @@ export function join(separator: Doc, parts: Array<Doc>): Doc {
 
 // NOTE: Measured in code points rather than UTF-16 units so that the box
 // drawing and em dashes the corpus uses in divider Comments count as the one
-// column they occupy.
-function stringWidth(value: string): number {
+// column they occupy. Exported because the printer's alignment runs measure
+// their columns against the same ruler the renderer lays them out with.
+export function stringWidth(value: string): number {
 	let width = 0
 
 	for (let character of value) {

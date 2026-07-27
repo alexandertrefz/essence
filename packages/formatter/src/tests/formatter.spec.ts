@@ -314,6 +314,144 @@ describe("formatter", () => {
 			})
 		})
 
+		// NOTE: The same alignment the corpus was given for `match` Handlers,
+		// carried to the `=` of a run of adjacent Declarations — the one place a
+		// column lines something up outside a `match`.
+		describe("assignment alignment", () => {
+			let equalsOf = (source: string) =>
+				formatted(source)
+					.split("\n")
+					.filter((sourceLine) => sourceLine.includes(" = "))
+					.map((sourceLine) => sourceLine.indexOf("="))
+
+			let block = (...lines: Array<string>) =>
+				"implementation {\n" +
+				lines.map((entry) => "\t" + entry + "\n").join("") +
+				"}\n"
+
+			it("lines up the equals signs of a run of declarations", () => {
+				expect(
+					equalsOf(block("constant a = 1", "constant bbbb = 2")),
+				).toEqual([15, 15])
+			})
+
+			it("measures the type annotation into the column", () => {
+				expect(
+					formatted(
+						block("constant a: Integer = 1", "constant b = 2"),
+					),
+				).toBe(
+					"implementation {\n\tconstant a: Integer = 1\n\tconstant b          = 2\n}\n",
+				)
+			})
+
+			it("does not align a run of one", () => {
+				expect(
+					formatted(block("constant a = 1", "__print(a)")),
+				).toContain("constant a = 1")
+			})
+
+			// NOTE: A blank line is how the author says two groups of Declarations
+			// are not one, so the column stops at it.
+			it("starts a new column after a blank line", () => {
+				expect(
+					equalsOf(
+						block(
+							"constant a = 1",
+							"constant bbbb = 2",
+							"",
+							"constant cc = 3",
+							"constant d = 4",
+						),
+					),
+				).toEqual([15, 15, 13, 13])
+			})
+
+			// NOTE: A value that lays itself out over several lines is left out of
+			// the run, the same as a guarded `case` — it would drag the column
+			// past everything around it.
+			it("leaves a multi-line value out of the run", () => {
+				let equals = equalsOf(
+					block(
+						"constant a = 1",
+						"constant bbbb = 2",
+						'constant m = match a -> String {\n\t\tcase _ { <- "x" }\n\t}',
+					),
+				)
+
+				expect(equals[0]).toBe(15)
+				expect(equals[1]).toBe(15)
+			})
+
+			// NOTE: A reassignment writes no keyword, so padding it out to a
+			// Declaration would leave a keyword's worth of empty column mid-run.
+			it("keeps a declaration and a bare reassignment in separate runs", () => {
+				expect(
+					equalsOf(
+						block("variable aaaaaa = 1", "aaaaaa = 2", "bb = 3"),
+					),
+				).toEqual([17, 8, 8])
+			})
+
+			// NOTE: A run whose heads span more than the padding budget is split
+			// into blocks that each line up on their own `=`, rather than forced
+			// to one column that a single long typed Declaration would drag right.
+			// Here a group of short Declarations, a pair of medium ones and a pair
+			// of wide ones each line up among themselves.
+			it("splits a run into blocks that each line up", () => {
+				expect(
+					equalsOf(
+						block(
+							"constant greeting = 1",
+							"constant emptyText = 2",
+							"constant numbers = 3",
+							"constant singleNumber = 4",
+							"constant noNumbers: List<Integer> = 5",
+							"constant noRationals: List<Rational> = 6",
+							"constant noMixedNumbers: List<Integer | Rational> = 7",
+							"constant noNestedNumbers: List<List<Integer>> = 8",
+						),
+					),
+				).toEqual([23, 23, 23, 23, 38, 38, 51, 51])
+			})
+
+			// NOTE: A head far wider than its neighbours starts its own block, so
+			// it lines up with nothing and drags no sibling's `=` out to meet it. A
+			// short Declaration on either side of it lands in a block of its own
+			// too, and a block of one is left unpadded.
+			it("gives a wide declaration between short ones its own block", () => {
+				expect(
+					equalsOf(
+						block(
+							"constant a = 1",
+							"constant longFieldName: List<Integer | Rational> = 2",
+							"constant bb = 3",
+						),
+					),
+				).toEqual([12, 50, 13])
+			})
+
+			// NOTE: Heads of a similar width belong to one block — a run of
+			// uniformly long Declarations lines up like any other.
+			it("aligns a run of uniformly long heads", () => {
+				expect(
+					equalsOf(
+						block(
+							"constant firstThing: Ordering = 1",
+							"constant secondThing: Ordering = 2",
+							"constant thirdThing: Ordering = 3",
+						),
+					),
+				).toEqual([32, 32, 32])
+			})
+
+			it("is stable under a second pass", () => {
+				let once = format(block("constant a = 1", "constant bbbb = 2"))
+
+				expect(format(once.text).changed).toBe(false)
+			})
+		})
+
 		it("removes a blank line before a closing brace", () => {
 			expect(formatted("implementation {\n\tconstant a = 1\n\n}\n")).toBe(
 				"implementation {\n\tconstant a = 1\n}\n",
