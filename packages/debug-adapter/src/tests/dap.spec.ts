@@ -137,6 +137,15 @@ describe("a debug session", () => {
 
 		expect((await stopped).body.reason).toBe("breakpoint")
 
+		// NOTE: The paused stack must speak Essence: the author's function on
+		// the author's line, in the author's file — not a bundle position.
+		let stack = await client.stackTraceRequest({ threadId: 1 })
+		let top = stack.body.stackFrames[0]!
+
+		expect(top.name).toBe("greet")
+		expect(top.source?.path).toBe(programPath)
+		expect(top.line).toBe(4)
+
 		// NOTE: `greet` runs three times; clearing the breakpoint before
 		// resuming is what lets one continue reach the end of the program.
 		await client.setBreakpointsRequest({

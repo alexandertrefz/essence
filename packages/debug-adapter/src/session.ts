@@ -18,6 +18,11 @@ import type { DebugProtocol } from "@vscode/debugprotocol"
 import { planBreakpoints } from "./breakpoints"
 import { CdpConnection } from "./cdp"
 import type { CompileDiagnostic, CompileFunction } from "./compile"
+import {
+	type CdpCallFrame,
+	type PresentedFrame,
+	presentFrames,
+} from "./frames"
 import { launchProgram } from "./launcher"
 import { BundleMap } from "./maps"
 
@@ -83,7 +88,7 @@ type Debuggee = {
 
 type PausedParameters = {
 	reason: string
-	callFrames: Array<unknown>
+	callFrames: Array<CdpCallFrame>
 	hitBreakpoints?: Array<string>
 	data?: unknown
 }
@@ -92,6 +97,8 @@ export class EssenceDebugSession extends DebugSession {
 	protected compile: CompileFunction | null
 	protected debuggee: Debuggee | null = null
 	protected lastPause: PausedParameters | null = null
+	protected presentedFrames: Array<PresentedFrame> = []
+	protected glueFramesMode: "hide" | "subtle" = "hide"
 	protected stopOnEntry = false
 	protected terminatedSent = false
 	protected pauseOnExceptionsState: "none" | "uncaught" | "all" = "uncaught"
@@ -121,6 +128,7 @@ export class EssenceDebugSession extends DebugSession {
 		args: EssenceLaunchArguments,
 	): Promise<void> {
 		this.stopOnEntry = args.stopOnEntry === true
+		this.glueFramesMode = args.glueFrames === "subtle" ? "subtle" : "hide"
 
 		let prepared = await this.prepareBundle(args)
 
@@ -402,6 +410,67 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
+	protected override stackTraceRequest(
+		response: DebugProtocol.StackTraceResponse,
+		args: DebugProtocol.StackTraceArguments,
+	): void {
+		let debuggee = this.debuggee
+		let pause = this.lastPause
+
+		if (debuggee === null || pause === null) {
+			response.body = { stackFrames: [], totalFrames: 0 }
+			this.sendResponse(response)
+
+			return
+		}
+
+		// NOTE: Presented once per stop and kept — a frame's DAP id is its
+		// index in here, which is what `scopes` resolves back to the raw CDP
+		// frame whose chain it reads.
+		this.presentedFrames = presentFrames(
+			pause.callFrames,
+			debuggee.map,
+			this.glueFramesMode,
+		)
+
+		let start = args.startFrame ?? 0
+		let count =
+			args.levels === undefined || args.levels === 0
+				? this.presentedFrames.length
+				: args.levels
+
+		response.body = {
+			stackFrames: this.presentedFrames
+				.slice(start, start + count)
+				.map((frame, offset) => {
+					let stackFrame: DebugProtocol.StackFrame = {
+						id: start + offset,
+						name: frame.name,
+						line: frame.source?.line ?? 0,
+						// NOTE: The map speaks 0-based columns, the client
+						// 1-based ones.
+						column:
+							frame.source === null ? 0 : frame.source.column + 1,
+					}
+
+					if (frame.source !== null) {
+						stackFrame.source = {
+							name: path.basename(frame.source.source),
+							path: frame.source.source,
+						}
+					}
+
+					if (frame.kind !== "user") {
+						stackFrame.presentationHint = "subtle"
+					}
+
+					return stackFrame
+				}),
+			totalFrames: this.presentedFrames.length,
+		}
+		this.sendResponse(response)
+	}
+
 	protected override terminateRequest(
 		response: DebugProtocol.TerminateResponse,
 	): void {
@@ -418,6 +487,7 @@ export class EssenceDebugSession extends DebugSession {
 
 	private async resumeDebuggee(): Promise<void> {
 		this.lastPause = null
+		this.presentedFrames = []
 		await this.debuggee?.cdp.send("Debugger.resume").catch(() => {
 			// NOTE: A resume can race the program's own exit; the exit path
 			// already reports what happened.
