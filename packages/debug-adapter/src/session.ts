@@ -20,6 +20,7 @@ import type { DebugProtocol } from "@vscode/debugprotocol"
 import { planBreakpoints } from "./breakpoints"
 import { CdpConnection } from "./cdp"
 import type { CompileDiagnostic, CompileFunction } from "./compile"
+import { escapeNameForEvaluation } from "./names"
 import {
 	type CdpCallFrame,
 	type PresentedFrame,
@@ -832,6 +833,153 @@ export class EssenceDebugSession extends DebugSession {
 		}
 
 		return entries.map(() => ({ display: null, kind: "leaf" }))
+	}
+
+	protected override exceptionInfoRequest(
+		response: DebugProtocol.ExceptionInfoResponse,
+	): void {
+		let pause = this.lastPause
+		let data =
+			pause?.reason === "exception"
+				? (pause.data as RemoteObject | undefined)
+				: undefined
+		let description = data?.description ?? "An exception was thrown."
+
+		// NOTE: A thrown Error's `description` is its message with V8's OWN
+		// stack behind it — bundle positions, glue and all. The first line is
+		// the message (`noCaseMatched`'s is already Essence-phrased and comes
+		// through untouched); the stack shown in details is the SESSION's,
+		// mapped and filtered like any other.
+		response.body = {
+			exceptionId: data?.className ?? "Error",
+			description: description.split("\n")[0]!,
+			breakMode:
+				this.pauseOnExceptionsState === "all" ? "always" : "unhandled",
+			details: {
+				message: description.split("\n")[0]!,
+				stackTrace:
+					pause === undefined || pause === null
+						? undefined
+						: presentFrames(
+								pause.callFrames,
+								this.debuggee?.map ?? null,
+								this.glueFramesMode,
+							)
+								.map((frame) =>
+									frame.source === null
+										? `at ${frame.name}`
+										: `at ${frame.name} (${frame.source.source}:${frame.source.line})`,
+								)
+								.join("\n"),
+			},
+		}
+		this.sendResponse(response)
+	}
+
+	protected override async evaluateRequest(
+		response: DebugProtocol.EvaluateResponse,
+		args: DebugProtocol.EvaluateArguments,
+	): Promise<void> {
+		let debuggee = this.debuggee
+		let frame =
+			args.frameId !== undefined
+				? this.presentedFrames[args.frameId]
+				: this.presentedFrames[0]
+		let callFrameId =
+			frame === undefined
+				? this.lastPause?.callFrames[0]?.callFrameId
+				: this.lastPause?.callFrames[frame.callFrameIndex]?.callFrameId
+
+		if (debuggee === null || callFrameId === undefined) {
+			this.sendErrorResponse(
+				response,
+				1003,
+				"evaluation needs a paused program.",
+			)
+
+			return
+		}
+
+		let evaluate = (expression: string) =>
+			debuggee.cdp.send<{
+				result: RemoteObject
+				exceptionDetails?: {
+					text?: string
+					exception?: RemoteObject
+				}
+			}>("Debugger.evaluateOnCallFrame", {
+				callFrameId,
+				expression,
+			})
+
+		let result = await evaluate(args.expression)
+
+		// NOTE: The console speaks JavaScript over the compiled frame — that
+		// is documented — but a single identifier deserves one mercy: a name
+		// the emitted Program binds differently (`ok?`, `new`) is retried
+		// under its emitted spelling before the failure is reported.
+		if (
+			result.exceptionDetails !== undefined &&
+			/^\S+$/.test(args.expression)
+		) {
+			let escaped = escapeNameForEvaluation(args.expression)
+
+			if (escaped !== args.expression) {
+				let retried = await evaluate(escaped)
+
+				if (retried.exceptionDetails === undefined) {
+					result = retried
+				}
+			}
+		}
+
+		if (result.exceptionDetails !== undefined) {
+			this.sendErrorResponse(
+				response,
+				1004,
+				result.exceptionDetails.exception?.description?.split(
+					"\n",
+				)[0] ??
+					result.exceptionDetails.text ??
+					"the expression failed.",
+			)
+
+			return
+		}
+
+		let value = result.result
+		let described =
+			value.objectId === undefined
+				? undefined
+				: (
+						await this.describeValues(value.objectId, [
+							{ name: "result", value },
+						])
+					)[0]
+		let reference = 0
+
+		if (value.objectId !== undefined && described !== undefined) {
+			if (described.kind === "list") {
+				reference = this.variableHandles.create({
+					kind: "list",
+					objectId: value.objectId,
+				})
+			} else if (
+				described.kind === "record" ||
+				described.kind === "plain"
+			) {
+				reference = this.variableHandles.create({
+					kind: "members",
+					objectId: value.objectId,
+				})
+			}
+		}
+
+		response.body = {
+			result: described?.display ?? fallbackDisplay(value),
+			variablesReference: reference,
+		}
+		this.sendResponse(response)
 	}
 
 	protected override terminateRequest(

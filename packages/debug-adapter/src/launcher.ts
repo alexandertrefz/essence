@@ -29,6 +29,10 @@ export function launchProgram(options: {
 			options.runtime,
 			[
 				"--inspect-brk=127.0.0.1:0",
+				// NOTE: A crash the debugger does not catch still prints its
+				// trace to stderr — read through the bundle's map, it names
+				// `.es` lines there too.
+				"--enable-source-maps",
 				options.bundlePath,
 				...options.programArguments,
 			],
