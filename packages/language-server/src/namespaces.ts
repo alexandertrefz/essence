@@ -61,11 +61,19 @@ export function targetTypeMatches(
 	return matchesTypeWithBindings(namespace.targetType, baseType, context)
 }
 
+// NOTE: `workspaceNamespaces` are Namespaces other Modules publish that this
+// document has NOT imported. They take part in matching on exactly the same
+// terms as the ones in scope — a Method only resolves through a Namespace whose
+// target Type matches the receiver, and an offer that would not resolve is worse
+// than no offer. Which of the results came from there is told apart by name,
+// which is unique across the whole set: a candidate whose name this document
+// already binds is never handed in.
 export function matchingNamespaces(
 	documentText: string,
 	baseType: common.Type,
 	specifierName: string | null,
 	documentPath?: string,
+	workspaceNamespaces: Array<common.NamespaceType> = [],
 ): Array<common.NamespaceType> {
 	// NOTE: A receiver whose Type is a Protocol-bounded Type Parameter
 	// resolves only through its Protocol — mirroring the Enricher's Method
@@ -120,6 +128,7 @@ export function matchingNamespaces(
 			(namespace) => !shadowed.has(namespace.name),
 		),
 		...documentNamespaces,
+		...workspaceNamespaces,
 	]
 
 	let namespaces =

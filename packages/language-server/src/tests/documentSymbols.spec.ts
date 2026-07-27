@@ -425,3 +425,40 @@ describe("Document Symbols", () => {
 		})
 	})
 })
+
+describe("The export block", () => {
+	it("should list what a Module publishes, under one entry", () => {
+		let symbols = symbolsOf(
+			[
+				"implementation {",
+				"\tfunction squared(_ value: Integer) -> Integer {",
+				"\t\t<- value::multiply(with value)",
+				"\t}",
+				"}",
+				"export {",
+				"\tsquared as square",
+				'\tRectangle from "./Geometry.es"',
+				"}",
+			].join("\n"),
+		)
+
+		let section = symbols[symbols.length - 1]
+
+		expect(section?.name).toBe("export")
+		expect(section?.kind).toBe("export")
+		expect(
+			section?.children.map((child) => [child.name, child.detail]),
+		).toEqual([
+			["square", "squared"],
+			["Rectangle", 'from "./Geometry.es"'],
+		])
+	})
+
+	it("should add nothing to a Program that exports nothing", () => {
+		expect(
+			symbolsOf(
+				["implementation {", "\tconstant one = 1", "}"].join("\n"),
+			).map((symbol) => symbol.kind),
+		).toEqual(["constant"])
+	})
+})

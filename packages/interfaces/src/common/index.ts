@@ -244,6 +244,7 @@ export type DiagnosticCode =
 	| "cyclic-constant-import"
 	| "cyclic-side-effects"
 	| "unused-import"
+	| "dependency-has-errors"
 	// The Compiler as a program — reading files, bundling the output.
 	| "file-not-found"
 	| "not-a-file"

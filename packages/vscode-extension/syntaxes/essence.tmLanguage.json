@@ -4,6 +4,9 @@
 	"scopeName": "source.essence",
 	"patterns": [
 		{
+			"include": "#moduleSection"
+		},
+		{
 			"include": "#docComment"
 		},
 		{
@@ -126,6 +129,42 @@
 					"name": "punctuation.definition.comment.essence"
 				}
 			}
+		},
+		"moduleSection": {
+			"comment": "All four of `import`, `export`, `from` and `as` stay valid Identifiers everywhere else — `from` is an Argument label in the standard library — so none of them can be lit on the word alone. The block is what scopes them: it opens at the start of a line with a brace and holds nothing but entries, so `from` and `as` inside it are always the Keywords. Semantic Tokens correct whatever is left.",
+			"begin": "^[ \\t]*\\b(import|export)\\b[ \\t]*(\\{)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.import.essence"
+				},
+				"2": {
+					"name": "punctuation.section.block.begin.essence"
+				}
+			},
+			"end": "^[ \\t]*(\\})",
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.section.block.end.essence"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#docComment"
+				},
+				{
+					"include": "#comment"
+				},
+				{
+					"include": "#string"
+				},
+				{
+					"match": "\\b(from|as)\\b",
+					"name": "keyword.control.import.essence"
+				},
+				{
+					"include": "#type"
+				}
+			]
 		},
 		"string": {
 			"comment": "A String legitimately spans lines, so running on past the end of the line is the correct reading of an unterminated quote rather than a bug.",

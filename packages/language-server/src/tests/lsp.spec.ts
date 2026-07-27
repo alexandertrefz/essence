@@ -335,6 +335,14 @@ describe("LSP", () => {
 				},
 				completionProvider: {
 					triggerCharacters: [".", ":", "<", "#"],
+					resolveProvider: true,
+				},
+				workspaceSymbolProvider: true,
+				workspace: {
+					workspaceFolders: {
+						supported: true,
+						changeNotifications: true,
+					},
 				},
 				signatureHelpProvider: {
 					triggerCharacters: ["(", ","],

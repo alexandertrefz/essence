@@ -41,6 +41,12 @@ export type DeclarationKind =
 	| "property"
 	| "member"
 	| "label"
+	// NOTE: What an `import { … }` entry binds. One entry carries its name
+	// across every table it is bound in, so the kind the OTHER Module declared
+	// it as is not something one file can answer — the workspace index joins the
+	// entry to that Module's own Declaration, and everything reading a single
+	// file's index sees the entry for what it is here: a name from elsewhere.
+	| "import"
 
 export type Declaration = {
 	builtin: boolean
@@ -112,6 +118,13 @@ type WalkContext = {
 	// NOTE: Property and Method Declarations per Namespace name — the typed
 	// AST identifies resolved Namespaces by name.
 	namespaceMembers: Map<string, Map<string, Declaration>>
+	// NOTE: Every Method and Property reference whose Namespace this file does
+	// not declare, by the name the reference resolved through. A Namespace an
+	// `import { … }` entry brought in has its Methods declared in another file
+	// entirely, so nothing here can bind them — the workspace index joins them
+	// through that entry, and a single file's index simply carries the
+	// references it could not answer for.
+	externalMembers: Array<ExternalMemberReference>
 	// NOTE: Record member declaration sites (literals and Record Type
 	// declarations) and member Lookups, grouped structurally after the walk.
 	recordSites: Array<RecordMemberSite>
@@ -119,6 +132,15 @@ type WalkContext = {
 	// NOTE: Every Scope with the Position it spans — lets completion find
 	// the names visible at a cursor.
 	scopes: Array<ScopeRange>
+}
+
+export type ExternalMemberReference = {
+	// NOTE: The name the Namespace is reachable under HERE — an aliased import
+	// binds a copy of the Namespace Type carrying its local name, which is what
+	// the resolved Invocation names.
+	namespaceName: string
+	memberName: string
+	position: common.Position
 }
 
 // NOTE: These ARE the top level Scope the Enricher starts from — derived
@@ -276,6 +298,13 @@ export function buildRenameIndex(
 export type ProgramIndex = {
 	index: RenameIndex
 	scopes: Array<ScopeRange>
+	// NOTE: Handed out so the workspace index can reach the Method and Property
+	// Declarations of a Namespace an importer only ever names through an entry.
+	// Keyed by the Namespace's own name, which is unique within one file — two
+	// Namespaces sharing a name is a duplicate the Enricher rejects, and an
+	// import may not shadow a declaration either.
+	namespaceMembers: Map<string, Map<string, Declaration>>
+	externalMembers: Array<ExternalMemberReference>
 }
 
 export function indexProgram(
@@ -288,6 +317,7 @@ export function indexProgram(
 		labels: new Map(),
 		pendingLabelReferences: [],
 		namespaceMembers: new Map(),
+		externalMembers: [],
 		recordSites: [],
 		recordLookups: [],
 		scopes: [],
@@ -330,9 +360,16 @@ export function indexProgram(
 		})
 	}
 
+	// NOTE: The two Module sections frame the body here as they do in the source:
+	// an entry is in Scope before the first Statement, and an export entry reads
+	// a Scope the whole implementation has been walked into.
+	declareImports(program, topLevelScope, context)
+
 	walkBody(program.implementation.nodes, topLevelScope, context, {
 		hoist: true,
 	})
+
+	referenceExports(program, topLevelScope, context)
 
 	for (let { identifier, callee } of context.pendingLabelReferences) {
 		for (let definition of context.functionDefinitions.get(callee) ?? []) {
@@ -358,7 +395,101 @@ export function indexProgram(
 
 	resolveRecordMembers(context)
 
-	return { index: context.index, scopes: context.scopes }
+	return {
+		index: context.index,
+		scopes: context.scopes,
+		namespaceMembers: context.namespaceMembers,
+		externalMembers: context.externalMembers,
+	}
+}
+
+// NOTE: An entry binds its local name across BOTH symbol spaces through one
+// Declaration — a `type Foo` and a Namespace `Foo` travel together under one
+// entry, so a use of either has to reach the same Declaration and rename with
+// it. Hoisted, because an entry is in scope everywhere in the file it is
+// written in, whatever the kind at the other end turns out to be.
+function declareImports(
+	program: parser.Program,
+	scope: Scope,
+	context: WalkContext,
+) {
+	let declared = topLevelNames(program)
+
+	for (let entry of program.imports?.entries ?? []) {
+		let local = entry.alias ?? entry.name
+		let declaration: Declaration = {
+			builtin: false,
+			kind: "import",
+			definition: local.position,
+			visibleFrom: null,
+			occurrences: [],
+		}
+
+		// NOTE: An entry whose name this Module also declares is REFUSED by the
+		// Compiler, and the declaration keeps the name — so it must not reach
+		// the Scope, or a use of the name would rename with the entry instead of
+		// with what it actually resolves to. The Identifier is still indexed:
+		// the entry is a mistake, and a mistake is a thing a reader edits.
+		if (!declared.has(local.content)) {
+			scope.values.set(local.content, declaration)
+			scope.types.set(local.content, declaration)
+		}
+
+		record(
+			declaration,
+			local.content,
+			local.position,
+			context.index,
+			"write",
+		)
+	}
+}
+
+// NOTE: What the implementation declares at its top level, off the Parser AST —
+// asked before anything is walked, which is the only moment an import entry can
+// be told from a declaration of the same name.
+function topLevelNames(program: parser.Program): Set<string> {
+	let names = new Set<string>()
+
+	for (let node of program.implementation.nodes) {
+		switch (node.nodeType) {
+			case "ConstantDeclarationStatement":
+			case "VariableDeclarationStatement":
+			case "FunctionStatement":
+			case "NativeFunctionStatement":
+			case "OverloadedFunctionStatement":
+			case "NamespaceDefinitionStatement":
+			case "TypeAliasStatement":
+			case "ChoiceDeclarationStatement":
+			case "ProtocolDeclarationStatement":
+				names.add(node.name.content)
+				break
+		}
+	}
+
+	return names
+}
+
+// NOTE: Only the side of an entry that names something THIS file holds. The
+// public name an entry publishes under — the `alias` of `area as measure`, and
+// a re-export's name, which is the dependency's — is a workspace-wide symbol
+// rather than a local one, so it is joined by the workspace index and left
+// unbound here. An unaliased entry's single Identifier is both at once, and it
+// is recorded here as the local occurrence it also is.
+function referenceExports(
+	program: parser.Program,
+	scope: Scope,
+	context: WalkContext,
+) {
+	for (let entry of program.exports?.entries ?? []) {
+		if (entry.source !== null) {
+			continue
+		}
+
+		if (reference(scope, "values", entry.name, context) === null) {
+			reference(scope, "types", entry.name, context)
+		}
+	}
 }
 
 export function occurrenceAt(
@@ -1468,7 +1599,15 @@ function bindNamespaceMember(
 
 	if (declaration !== undefined) {
 		record(declaration, memberName, position, context.index)
+
+		return
 	}
+
+	// NOTE: An imported Namespace lands here too, and unlike a builtin it DOES
+	// have a source declaration — in the Module that wrote it. Kept so the
+	// workspace index can bind it there; a single file's index has no way to
+	// tell the two apart and does not have to.
+	context.externalMembers.push({ namespaceName, memberName, position })
 }
 
 function walkTypedBody(

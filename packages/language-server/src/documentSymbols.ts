@@ -39,6 +39,7 @@ export type DocumentSymbolKind =
 	| "method"
 	| "staticMethod"
 	| "property"
+	| "export"
 
 export type DocumentSymbolEntry = {
 	name: string
@@ -59,11 +60,55 @@ export function findDocumentSymbols(
 ): Array<DocumentSymbolEntry> {
 	let symbols = symbolsOfBody(program.implementation.nodes)
 
-	if (enrichedProgram === null) {
-		return symbols
+	if (enrichedProgram !== null) {
+		symbols = withDetails(symbols, detailsOf(enrichedProgram))
 	}
 
-	return withDetails(symbols, detailsOf(enrichedProgram))
+	// NOTE: What this Module publishes, last and under one entry — an outline is
+	// read for the declarations, and the export block is the summary of them
+	// rather than one more of them. The `import { … }` block is deliberately
+	// absent: it names what OTHER Modules declare, and none of it is in this
+	// file to navigate to.
+	let exportSection = exportSymbols(program)
+
+	return exportSection === null ? symbols : [...symbols, exportSection]
+}
+
+// NOTE: No enriched Program is consulted for a detail here. An entry with a
+// `from` clause names something no Type in this file describes, and the two
+// facts worth showing — where a re-export forwards from, and what an aliased
+// entry publishes locally — are both written in the entry itself.
+function exportSymbols(program: parser.Program): DocumentSymbolEntry | null {
+	let section = program.exports
+
+	if (section === null) {
+		return null
+	}
+
+	return {
+		name: "export",
+		kind: "export",
+		detail: null,
+		range: section.position,
+		selectionRange: section.position,
+		children: section.entries.map((entry) => {
+			let published = entry.alias ?? entry.name
+
+			return {
+				name: published.content,
+				kind: "export" as const,
+				detail:
+					entry.source !== null
+						? `from "${entry.source.path}"`
+						: entry.alias === null
+							? null
+							: entry.name.content,
+				range: entry.position,
+				selectionRange: published.position,
+				children: [],
+			}
+		}),
+	}
 }
 
 function symbolsOfBody(
