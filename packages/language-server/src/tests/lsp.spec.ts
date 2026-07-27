@@ -481,6 +481,30 @@ describe("LSP", () => {
 			expect(item.sortText).toBe("1subject")
 		})
 
+		// NOTE: The inserted call never types `(` or `,`, so the Editor is
+		// asked to open the parameter hints itself — for the resolved snippet
+		// and the bare-parentheses fallback alike, and for nothing that is
+		// referred to rather than called.
+		it("should ask the Editor for parameter hints after inserting a call", () => {
+			let hints = {
+				title: "Trigger parameter hints",
+				command: "editor.action.triggerParameterHints",
+			}
+
+			expect(
+				toLspCompletionItem(entry({ snippet: "greet(subject ${1})" }))
+					.command,
+			).toEqual(hints)
+			expect(
+				toLspCompletionItem(entry({ snippet: null })).command,
+			).toEqual(hints)
+			expect(
+				toLspCompletionItem(
+					entry({ label: "subject", kind: "parameter", tier: 1 }),
+				).command,
+			).toBeUndefined()
+		})
+
 		it("should tell Overloads sharing a label apart by their signature tails", () => {
 			let item = toLspCompletionItem(
 				entry({
