@@ -198,36 +198,6 @@ export type NumberNatives = {
 	TAU: TranscendentalType
 	// compare(to: Number) -> Ordering
 	compare: (self: NumberType, to: NumberType) => OrderingType
-	// static sum(_: List<Integer>) -> Integer
-	sum__overload$1: (argument0: ListType<IntegerType>) => IntegerType
-	// static sum(_: List<Rational>) -> Rational
-	sum__overload$2: (argument0: ListType<RationalType>) => RationalType
-	// static sum(_: List<Integer | Rational>) -> Integer | Rational
-	sum__overload$3: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType
-	// static product(_: List<Integer>) -> Integer
-	product__overload$1: (argument0: ListType<IntegerType>) => IntegerType
-	// static product(_: List<Rational>) -> Rational
-	product__overload$2: (argument0: ListType<RationalType>) => RationalType
-	// static product(_: List<Integer | Rational>) -> Integer | Rational
-	product__overload$3: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType
-	// static average(_: List<Integer>) -> Optional<Rational>
-	average__overload$1: (argument0: ListType<IntegerType>) => RationalType | NothingType
-	// static average(_: List<Rational>) -> Optional<Rational>
-	average__overload$2: (argument0: ListType<RationalType>) => RationalType | NothingType
-	// static average(_: List<Integer | Rational>) -> Optional<Rational>
-	average__overload$3: (argument0: ListType<IntegerType | RationalType>) => RationalType | NothingType
-	// static lowestNumber(_: List<Integer>) -> Optional<Integer>
-	lowestNumber__overload$5: (argument0: ListType<IntegerType>) => IntegerType | NothingType
-	// static lowestNumber(_: List<Rational>) -> Optional<Rational>
-	lowestNumber__overload$6: (argument0: ListType<RationalType>) => RationalType | NothingType
-	// static lowestNumber(_: List<Integer | Rational>) -> Optional<Integer | Rational>
-	lowestNumber__overload$7: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType | NothingType
-	// static greatestNumber(_: List<Integer>) -> Optional<Integer>
-	greatestNumber__overload$5: (argument0: ListType<IntegerType>) => IntegerType | NothingType
-	// static greatestNumber(_: List<Rational>) -> Optional<Rational>
-	greatestNumber__overload$6: (argument0: ListType<RationalType>) => RationalType | NothingType
-	// static greatestNumber(_: List<Integer | Rational>) -> Optional<Integer | Rational>
-	greatestNumber__overload$7: (argument0: ListType<IntegerType | RationalType>) => IntegerType | RationalType | NothingType
 }
 
 export type NothingNatives = {
@@ -414,24 +384,9 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 
 declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
-export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4"> = true
+export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "sum__overload$1" | "sum__overload$2" | "sum__overload$3" | "product__overload$1" | "product__overload$2" | "product__overload$3" | "average__overload$1" | "average__overload$2" | "average__overload$3" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "lowestNumber__overload$5" | "lowestNumber__overload$6" | "lowestNumber__overload$7" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4" | "greatestNumber__overload$5" | "greatestNumber__overload$6" | "greatestNumber__overload$7"> = true
 export const $NumberArity: AssertArities<typeof import("./Number"), {
 	compare: 2
-	sum__overload$1: 1
-	sum__overload$2: 1
-	sum__overload$3: 1
-	product__overload$1: 1
-	product__overload$2: 1
-	product__overload$3: 1
-	average__overload$1: 1
-	average__overload$2: 1
-	average__overload$3: 1
-	lowestNumber__overload$5: 1
-	lowestNumber__overload$6: 1
-	lowestNumber__overload$7: 1
-	greatestNumber__overload$5: 1
-	greatestNumber__overload$6: 1
-	greatestNumber__overload$7: 1
 }> = true
 
 declare const NothingModule: typeof import("./Nothing")
