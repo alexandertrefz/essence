@@ -45,9 +45,9 @@ declarations {
 		toString() -> String {
 			if @ {
 				<- "true"
+			} else {
+				<- "false"
 			}
-
-			<- "false"
 		}
 	}
 }
