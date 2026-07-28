@@ -49,7 +49,7 @@ type AssertArities<Module, Arities extends Record<string, number>> =
 		: ["a native must take exactly the Parameters its declaration does, with no default or rest Parameter", MismatchedArities<Module, Arities>]
 
 type ComparableConformance<Self extends AnyType> = {
-	compareTo: (self: Self, argument1: Self) => OrderingType
+	compare: (self: Self, to: Self) => OrderingType
 }
 
 type EquatableConformance<Self extends AnyType> = {
@@ -82,8 +82,8 @@ export type StringNatives = {
 	trim__overload$2: (self: StringType, at: SideType) => StringType
 	// ends(with: String) -> Boolean
 	ends: (self: StringType, argument1: StringType) => BooleanType
-	// compareTo(_: String) -> Ordering
-	compareTo__overload$1: (self: StringType, argument1: StringType) => OrderingType
+	// compare(to: String) -> Ordering
+	compare__overload$1: (self: StringType, to: StringType) => OrderingType
 }
 
 export type BooleanNatives = {
@@ -138,8 +138,8 @@ export type IntegerNatives = {
 	parse: (argument0: StringType) => IntegerType | NothingType
 	// toString() -> String
 	toString: (self: IntegerType) => StringType
-	// compareTo(_: Integer) -> Ordering
-	compareTo: (self: IntegerType, argument1: IntegerType) => OrderingType
+	// compare(to: Integer) -> Ordering
+	compare: (self: IntegerType, to: IntegerType) => OrderingType
 }
 
 export type RationalNatives = {
@@ -193,13 +193,13 @@ export type RationalNatives = {
 	toString__overload$1: (self: RationalType) => StringType
 	// toString(formatAs: NumberFormat) -> String
 	toString__overload$2: (self: RationalType, formatAs: NumberFormatType) => StringType
-	// compareTo(_: Rational) -> Ordering
-	compareTo: (self: RationalType, argument1: RationalType) => OrderingType
+	// compare(to: Rational) -> Ordering
+	compare: (self: RationalType, to: RationalType) => OrderingType
 }
 
 export type AlgebraicNatives = {
-	// compareTo(_: Algebraic) -> Ordering
-	compareTo: (self: AlgebraicType, argument1: AlgebraicType) => OrderingType
+	// compare(to: Algebraic) -> Ordering
+	compare: (self: AlgebraicType, to: AlgebraicType) => OrderingType
 	// add(_: Integer) -> Algebraic
 	add__overload$1: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType
 	// add(_: Rational) -> Algebraic
@@ -252,8 +252,8 @@ export type NumberNatives = {
 	PI: TranscendentalType
 	// TAU: Transcendental
 	TAU: TranscendentalType
-	// compareTo(_: Number) -> Ordering
-	compareTo: (self: NumberType, argument1: NumberType) => OrderingType
+	// compare(to: Number) -> Ordering
+	compare: (self: NumberType, to: NumberType) => OrderingType
 	// static sum(_: List<Integer>) -> Integer
 	sum__overload$1: (argument0: ListType<IntegerType>) => IntegerType
 	// static sum(_: List<Rational>) -> Rational
@@ -350,8 +350,8 @@ export type ListNatives = {
 	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
 	// sort<ItemType>(by: (_: ItemType, _: ItemType) -> Ordering) -> List<ItemType>
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
-	// compareTo<ItemType is Comparable>(_: List<ItemType>) -> Ordering
-	compareTo: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
+	// compare<ItemType is Comparable>(to: List<ItemType>) -> Ordering
+	compare: <ItemType extends AnyType>(self: ListType<ItemType>, to: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
 	// join<ItemType is Printable>(with: String) -> String
 	join: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// pair<ItemType, Other>(with: List<Other>) -> List<{ first: ItemType, second: Other }>
@@ -378,7 +378,7 @@ export type FunctionsNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compareTo__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compare__overload$2" | "toString"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	append: 2
 	split: 2
@@ -390,7 +390,7 @@ export const $StringArity: AssertArities<typeof import("./String"), {
 	normalized__overload$2: 2
 	trim__overload$2: 2
 	ends: 2
-	compareTo__overload$1: 2
+	compare__overload$1: 2
 }> = true
 
 declare const BooleanModule: typeof import("./Boolean")
@@ -427,7 +427,7 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	raise: 2
 	parse: 1
 	toString: 1
-	compareTo: 2
+	compare: 2
 }> = true
 
 declare const RationalModule: typeof import("./Rational")
@@ -459,14 +459,14 @@ export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	parse: 1
 	toString__overload$1: 1
 	toString__overload$2: 2
-	compareTo: 2
+	compare: 2
 }> = true
 
 declare const AlgebraicModule: typeof import("./Algebraic")
 export const $Algebraic: AlgebraicNatives = AlgebraicModule
 export const $AlgebraicAbsent: AssertNoEssenceExports<typeof import("./Algebraic"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
 export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
-	compareTo: 2
+	compare: 2
 	add__overload$1: 2
 	add__overload$2: 2
 	add__overload$3: 2
@@ -500,7 +500,7 @@ declare const NumberModule: typeof import("./Number")
 export const $Number: NumberNatives = NumberModule
 export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "is" | "isNot" | "toString" | "isLessThan" | "isLessThanOrEqualTo" | "isGreaterThan" | "isGreaterThanOrEqualTo" | "isBetween" | "lowestNumber__overload$1" | "lowestNumber__overload$2" | "lowestNumber__overload$3" | "lowestNumber__overload$4" | "greatestNumber__overload$1" | "greatestNumber__overload$2" | "greatestNumber__overload$3" | "greatestNumber__overload$4"> = true
 export const $NumberArity: AssertArities<typeof import("./Number"), {
-	compareTo: 2
+	compare: 2
 	sum__overload$1: 1
 	sum__overload$2: 1
 	sum__overload$3: 1
@@ -572,7 +572,7 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	reverse: 1
 	sort__overload$1: 2
 	sort__overload$2: 2
-	compareTo: 3
+	compare: 3
 	join: 3
 	pair: 2
 	split: 2

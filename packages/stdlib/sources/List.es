@@ -19,7 +19,7 @@ declarations {
 	§
 	§ The Equatable and Comparable conformances are BOTH conditional — a List is
 	§ equatable exactly when its items are, and orderable exactly when its items
-	§ are. `is` and `compareTo` carry the same bound as their own Method
+	§ are. `is` and `compare` carry the same bound as their own Method
 	§ Generic, so a use site solving `List<ItemType> is Equatable` recursively
 	§ solves `ItemType is Equatable` and hands the item equality in as the
 	§ hidden conformance Argument. That recursion is what makes a
@@ -48,7 +48,7 @@ declarations {
 		§ a::pair(with b)::everyItem(…) }` overflows the same way, and did
 		§ before any of this. So `is` stays native and takes the witness — it
 		§ compares each pair with the items' own `is` rather than structurally,
-		§ exactly as `compareTo` below does with their `compareTo`.
+		§ exactly as `compare` below does with their `compare`.
 
 		§§ Checks whether the Lists are structurally equal — the same items in the same order, each pair compared with the items' own `is`. Available whenever the items conform to `Equatable`.
 		§§
@@ -400,7 +400,7 @@ declarations {
 		§ The `Comparable` bound works exactly as the `Equatable` one above
 		§ does. It resolves the conforming Namespace at the call site —
 		§ `Integer` for a `List<Integer>`, the covering `Number` for a mixed
-		§ numeric List — and its `compareTo` arrives as a hidden trailing
+		§ numeric List — and its `compare` arrives as a hidden trailing
 		§ Argument. Its own bounded `ItemType` shadows the Namespace's.
 		§
 		§ BOTH entries are native, and the no-Argument one is native for a
@@ -441,8 +441,8 @@ declarations {
 		§§
 		§§ @param other — the List to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo<infer ItemType is Comparable>(
-			_ other: List<ItemType>,
+		compare<infer ItemType is Comparable>(
+			to other: List<ItemType>,
 		) -> Ordering
 
 		§ `anyItem`/`everyItem` read as sentences — "any item matches …", "every
@@ -564,7 +564,7 @@ declarations {
 		§ restating a conformance of List's own: joining needs nothing of the
 		§ items but that each can say what it is, so the bound is `Printable`
 		§ and the conforming Namespace's `toString` arrives as the hidden
-		§ Argument, exactly as `sort`'s `compareTo` does. Bounding the METHOD
+		§ Argument, exactly as `sort`'s `compare` does. Bounding the METHOD
 		§ is what keeps it here — a Namespace targeting `List<String>` would
 		§ have answered for Strings only, and every builtin worth joining is
 		§ Printable, Lists included. `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`.

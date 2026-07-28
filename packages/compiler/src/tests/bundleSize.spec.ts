@@ -55,7 +55,7 @@ describe("Bundle Size", () => {
 	// The measured size rose from 48,261 when the `Number` comparison cluster
 	// (`is`, `isNot`, `toString` and the `isLessThan` family) moved into
 	// Essence: each is now emitted as its own const reading the covering
-	// `compareTo`, so an Everyday Program that compares Numbers carries those
+	// `compare`, so an Everyday Program that compares Numbers carries those
 	// bodies. It rose ~900 bytes again when String's derivable Methods
 	// followed — a String Method now pulls in the small chain it is written on
 	// (`length` -> `characters` -> `split`) instead of one native, and

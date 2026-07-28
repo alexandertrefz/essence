@@ -528,8 +528,8 @@ function checkWitnessScope(
 }
 
 // NOTE: A `namespace` source is spelled into the Argument list of the CALL, not
-// of the Declaration it comes from — `things::sort()` emits `{ compareTo:
-// Thing.compareTo }` — so a call that RUNS above the conforming Namespace reads
+// of the Declaration it comes from — `things::sort()` emits `{ compare:
+// Thing.compare }` — so a call that RUNS above the conforming Namespace reads
 // a `class` binding that holds nothing yet. The Namespace's name appears
 // nowhere in the source, which is why the rails that check the names a call
 // does spell walk straight past it; it is the same fault they report, one

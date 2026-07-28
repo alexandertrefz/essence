@@ -402,18 +402,18 @@ describe("Resolvers", () => {
 			let namespace = `namespace Boxes<infer Item> for { value: Item }
 				is Rankable,
 				is Comparable where Item is Comparable {
-				compareTo(_ other: { value: Item }) -> Ordering {
-					<- @.value::compareTo(other.value)
+				compare(to other: { value: Item }) -> Ordering {
+					<- @.value::compare(to other.value)
 				}
 			}`
 
 			return `implementation {
 				protocol Rankable {
-					compareTo(_ other: Self) -> Ordering
+					compare(to other: Self) -> Ordering
 				}
 
 				function rank<infer Item is Rankable>(_ a: Item, _ b: Item) -> String {
-					<- a::compareTo(b)::toString()
+					<- a::compare(to b)::toString()
 				}
 
 				${order === "above" ? `${use}\n\n${namespace}` : `${namespace}\n\n${use}`}
@@ -422,7 +422,7 @@ describe("Resolvers", () => {
 			}`
 		}
 
-		// NOTE: `compareTo` can not fulfil `Rankable` unconditionally AND carry
+		// NOTE: `compare` can not fulfil `Rankable` unconditionally AND carry
 		// the `Comparable` clause's bound — the Method the Protocol promises
 		// takes no witness. Both orders have to say so; the "above" one used to
 		// compile clean and die with `Item__conformance` undefined.
@@ -448,7 +448,7 @@ describe("Resolvers", () => {
 			let namespace = `namespace Boxes<infer Item> for { value: Item }
 				is Rankable where Item is Comparable {
 				rank(_ other: { value: Item }) -> String {
-					<- @.value::compareTo(other.value)::toString()
+					<- @.value::compare(to other.value)::toString()
 				}
 			}`
 
@@ -478,7 +478,7 @@ describe("Resolvers", () => {
 
 		it("should curry the Item witness onto the call above the Namespace", () => {
 			expect(emitted(sortable(false))).toContain(
-				"Boxes.rank(a, b, { compareTo: Integer.compareTo })",
+				"Boxes.rank(a, b, { compare: Integer.compare })",
 			)
 		})
 	})
@@ -513,7 +513,7 @@ describe("Resolvers", () => {
 			).toEqual(["unsatisfied-conformance-condition"])
 		})
 
-		// NOTE: This one used to compile clean and die reading `compareTo` off
+		// NOTE: This one used to compile clean and die reading `compare` off
 		// `undefined` — the items the Program actually sorted were Lists of
 		// Integers whose witness was never curried. The assignment now DECIDES
 		// the Variable's item Type, so the receiver is a List of Lists of

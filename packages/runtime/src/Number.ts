@@ -1,5 +1,5 @@
 import type { AlgebraicType } from "./Algebraic"
-import { compareTo as compareAlgebraicTo } from "./Algebraic"
+import { compare as compareAlgebraicTo } from "./Algebraic"
 import type { BigRational } from "./bigRational"
 import { reduced } from "./bigRational"
 import type { IntegerType } from "./Integer"
@@ -401,9 +401,9 @@ function denominatorOf(number: RationalKind): bigint {
 }
 
 // NOTE: `is`, `isNot` and `toString` are written in Essence now —
-// `packages/stdlib/sources/Number.es`. `is` reads the covering `compareTo` against
+// `packages/stdlib/sources/Number.es`. `is` reads the covering `compare` against
 // `Ordering#Equal`, `isNot` negates it, and `toString` matches the member Type
-// and defers to that member's own `toString`. `compareTo` below is the one
+// and defers to that member's own `toString`. `compare` below is the one
 // ordering primitive they all fall out of, and it stays native.
 
 // NOTE: Wiring B — the covering Namespace hand-writes all sixteen cells.
@@ -411,7 +411,7 @@ function denominatorOf(number: RationalKind): bigint {
 // impossible by definition; only comparing two Transcendentals could ever
 // need refinement, and within the current linear-in-π grammar even that cell
 // is exact.
-export function compareTo(number: NumberType, other: NumberType): OrderingType {
+export function compare(number: NumberType, other: NumberType): OrderingType {
 	const numberKind = number[typeKeySymbol]
 	const otherKind = other[typeKeySymbol]
 
@@ -484,9 +484,9 @@ export function compareTo(number: NumberType, other: NumberType): OrderingType {
 
 // NOTE: The Union-level ordering family — `isLessThan`, `isLessThanOrEqualTo`,
 // `isGreaterThan` and `isGreaterThanOrEqualTo` — is written in Essence now,
-// `packages/stdlib/sources/Number.es`. Each reads the covering `compareTo` above against the
+// `packages/stdlib/sources/Number.es`. Each reads the covering `compare` above against the
 // matching `Ordering` variant (`isLessThan` against `Ordering#Less`, and so
-// on), and the `…OrEqualTo` pair negates the strict opposite. `compareTo` is
+// on), and the `…OrEqualTo` pair negates the strict opposite. `compare` is
 // the one ordering primitive they all fall out of, and it stays native.
 
 // NOTE: `isBetween` is written in Essence now — `packages/stdlib/sources/Number.es` — as

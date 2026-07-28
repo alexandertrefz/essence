@@ -25,7 +25,7 @@ const ints = (...values: Array<bigint>) => list.createList(values.map(int))
 // there is no runtime function left to compare two Rationals with. The
 // assertions below that reach for it are about OTHER natives — `parse`,
 // `raise`, the Number aggregates — and only need value equality, so
-// they cross-multiply here the way the Essence `is` does through `compareTo`.
+// they cross-multiply here the way the Essence `is` does through `compare`.
 const ratIs = (
 	first: rational.RationalType,
 	second: rational.RationalType,
@@ -41,7 +41,7 @@ const stringToString = (value: string.StringType) => value
 
 // NOTE: The same story for `Integer.is` (packages/stdlib/sources/Integer.es), which the
 // List Methods bounded by `Equatable` now take as their hidden witness. The
-// Essence body reads `compareTo(other)::is(Ordering#Equal)`; two Integers
+// Essence body reads `compare(other)::is(Ordering#Equal)`; two Integers
 // answer that exactly when their values match, so this is what the Simplifier
 // passes at a `List<Integer>` call site.
 const integerIs = (first: integer.IntegerType, second: integer.IntegerType) =>
@@ -372,30 +372,30 @@ describe("Stdlib", () => {
 
 		// NOTE: `List.sorted` is implemented in Essence now
 		// (`packages/stdlib/sources/List.es`) — it hands its hidden conformance Argument's
-		// `compareTo` straight to `sort__overload$2`, and the golden harness covers the
+		// `compare` straight to `sort__overload$2`, and the golden harness covers the
 		// flat case. What is NOT covered there, and what the two tests below
 		// keep, is the WITNESS a nested List is sorted through: the Essence
-		// body only ever sees `conformance.compareTo`, so the currying
+		// body only ever sees `conformance.compare`, so the currying
 		// `boundConformance` does is what makes the nesting work. They call
 		// `sort__overload$2` with exactly the Function the Essence body passes on.
 
 		it("compares Lists lexicographically", () => {
-			let integerConformance = { compareTo: number.compareTo }
+			let integerConformance = { compare: number.compare }
 
 			expect(
-				list.compareTo(ints(1n, 2n), ints(1n, 3n), integerConformance)[
+				list.compare(ints(1n, 2n), ints(1n, 3n), integerConformance)[
 					typeKeySymbol
 				],
 			).toBe("Ordering#Less")
 
 			expect(
-				list.compareTo(ints(2n), ints(1n, 9n), integerConformance)[
+				list.compare(ints(2n), ints(1n, 9n), integerConformance)[
 					typeKeySymbol
 				],
 			).toBe("Ordering#Greater")
 
 			expect(
-				list.compareTo(ints(1n, 2n), ints(1n, 2n), integerConformance)[
+				list.compare(ints(1n, 2n), ints(1n, 2n), integerConformance)[
 					typeKeySymbol
 				],
 			).toBe("Ordering#Equal")
@@ -403,8 +403,8 @@ describe("Stdlib", () => {
 
 		it("orders a shorter List before a longer one that shares its prefix", () => {
 			expect(
-				list.compareTo(ints(1n), ints(1n, 2n), {
-					compareTo: number.compareTo,
+				list.compare(ints(1n), ints(1n, 2n), {
+					compare: number.compare,
 				})[typeKeySymbol],
 			).toBe("Ordering#Less")
 		})
@@ -412,15 +412,15 @@ describe("Stdlib", () => {
 		it("sorts nested Lists through a bound conformance", () => {
 			// NOTE: The witness the codegen builds for `List<List<Integer>>` —
 			// `boundConformance` curries the inner Integer ordering onto
-			// `List.compareTo`, exactly what `$type.boundConformance(...)` emits.
-			let nested = boundConformance({ compareTo: list.compareTo }, [
-				{ compareTo: number.compareTo },
+			// `List.compare`, exactly what `$type.boundConformance(...)` emits.
+			let nested = boundConformance({ compare: list.compare }, [
+				{ compare: number.compare },
 			])
 
 			expect(
 				list.sort__overload$2(
 					list.createList([ints(3n), ints(1n, 2n)]),
-					nested.compareTo as unknown as Parameters<
+					nested.compare as unknown as Parameters<
 						typeof list.sort__overload$2
 					>[1],
 				),
@@ -428,17 +428,16 @@ describe("Stdlib", () => {
 		})
 
 		it("sorts three-level nested Lists", () => {
-			let integerConformance = { compareTo: number.compareTo }
-			let listOfIntegers = boundConformance(
-				{ compareTo: list.compareTo },
-				[integerConformance],
-			)
+			let integerConformance = { compare: number.compare }
+			let listOfIntegers = boundConformance({ compare: list.compare }, [
+				integerConformance,
+			])
 			let listOfListOfIntegers = boundConformance(
-				{ compareTo: list.compareTo },
+				{ compare: list.compare },
 				[listOfIntegers],
 			)
 			let listOfListOfListOfIntegers = boundConformance(
-				{ compareTo: list.compareTo },
+				{ compare: list.compare },
 				[listOfListOfIntegers],
 			)
 
@@ -451,7 +450,7 @@ describe("Stdlib", () => {
 			expect(
 				list.sort__overload$2(
 					list.createList([a, b]),
-					listOfListOfListOfIntegers.compareTo as unknown as Parameters<
+					listOfListOfListOfIntegers.compare as unknown as Parameters<
 						typeof list.sort__overload$2
 					>[1],
 				),

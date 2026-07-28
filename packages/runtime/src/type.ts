@@ -66,12 +66,12 @@ export function dispatchMethod(
 
 // NOTE: The runtime half of a conditional conformance — each fulfilling Method
 // is curried with the `where` conditions' own witnesses, which the bounded
-// helper (`List.compareTo`) receives as its hidden trailing conformance
+// helper (`List.compare`) receives as its hidden trailing conformance
 // Arguments. The unconditional case never reaches here: the Rewriter emits its
 // method map as a plain object literal instead.
 export function boundConformance(
 	// NOTE: The fulfilling Methods carry concrete runtime signatures
-	// (`List.compareTo` takes its own conformance Argument), so the map is
+	// (`List.compare` takes its own conformance Argument), so the map is
 	// typed loosely here — the curried witnesses restore the exact shape the
 	// bounded helper expects.
 	methods: Record<string, (...args: Array<any>) => unknown>,

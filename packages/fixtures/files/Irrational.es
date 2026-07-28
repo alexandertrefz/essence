@@ -21,7 +21,7 @@ implementation {
 			__print(1::divide(by @))
 
 			§ Ordering is exact, too: √2 is below 3/2.
-			__print(@::compareTo(3/2)::toString())
+			__print(@::compare(to 3/2)::toString())
 
 			<- @::toString()
 		}
@@ -41,7 +41,7 @@ implementation {
 	__print(Number.PI::multiply(with 2)::is(Number.TAU))
 
 	§ Comparing π against 22/7 is exact and total — the classic bound.
-	__print(Number.PI::compareTo(22/7)::toString())
+	__print(Number.PI::compare(to 22/7)::toString())
 
 	§ The whole tower is comparable through Number, across any two kinds.
 	§ An Integer against π, a Rational against π, two Transcendentals.

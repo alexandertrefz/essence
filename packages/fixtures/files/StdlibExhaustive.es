@@ -233,23 +233,23 @@ third"::lines())
 		"String.pad(to: Integer, with: String, at: Side) [both ends, multi-character]",
 		"ab"::pad(to 8, with "xy", at Side#BothEnds),
 	)
-	show("String.compareTo(_ String)", "app"::compareTo("apple"))
+	show("String.compare(to: String)", "app"::compare(to "apple"))
 	show(
-		"String.compareTo(_ String) [equal]",
-		greeting::compareTo("Hello, World"),
+		"String.compare(to: String) [equal]",
+		greeting::compare(to "Hello, World"),
 	)
-	show("String.compareTo(_ String) [greater]", "b"::compareTo("a"))
+	show("String.compare(to: String) [greater]", "b"::compare(to "a"))
 	show(
-		"String.compareTo(_ String, comparing: Case) [sensitive]",
-		"abc"::compareTo("ABC", comparing Case#Sensitive),
-	)
-	show(
-		"String.compareTo(_ String, comparing: Case) [insensitive, equal]",
-		"abc"::compareTo("ABC", comparing Case#Insensitive),
+		"String.compare(to: String, comparing: Case) [sensitive]",
+		"abc"::compare(to "ABC", comparing Case#Sensitive),
 	)
 	show(
-		"String.compareTo(_ String, comparing: Case) [insensitive, less]",
-		"abc"::compareTo("ABD", comparing Case#Insensitive),
+		"String.compare(to: String, comparing: Case) [insensitive, equal]",
+		"abc"::compare(to "ABC", comparing Case#Insensitive),
+	)
+	show(
+		"String.compare(to: String, comparing: Case) [insensitive, less]",
+		"abc"::compare(to "ABD", comparing Case#Insensitive),
 	)
 	show("String.toString()", greeting::toString())
 	show("String.toString() [empty]", emptyText::toString())
@@ -429,9 +429,9 @@ third"::lines())
 	showMaybe("Integer.parse(_ String) [empty]", Integer.parse(emptyText))
 	show("Integer.toString()", 42::toString())
 	show("Integer.toString() [negative]", -42::toString())
-	show("Integer.compareTo(_ Integer)", 1::compareTo(2))
-	show("Integer.compareTo(_ Integer) [equal]", 2::compareTo(2))
-	show("Integer.compareTo(_ Integer) [greater]", 3::compareTo(2))
+	show("Integer.compare(to: Integer)", 1::compare(to 2))
+	show("Integer.compare(to: Integer) [equal]", 2::compare(to 2))
+	show("Integer.compare(to: Integer) [greater]", 3::compare(to 2))
 
 	withRootTwo((_ rootTwo: Algebraic) -> Nothing {
 		show("Integer.add(_ Algebraic)", 1::add(rootTwo))
@@ -558,9 +558,9 @@ third"::lines())
 		"Rational.toString(formatAs: NumberFormat) [fraction]",
 		1/2::toString(formatAs NumberFormat#Fraction),
 	)
-	show("Rational.compareTo(_ Rational)", 1/2::compareTo(2/3))
-	show("Rational.compareTo(_ Rational) [equal]", 1/2::compareTo(2/4))
-	show("Rational.compareTo(_ Rational) [greater]", 2/3::compareTo(1/2))
+	show("Rational.compare(to: Rational)", 1/2::compare(to 2/3))
+	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
+	show("Rational.compare(to: Rational) [greater]", 2/3::compare(to 1/2))
 
 	withRootTwo((_ rootTwo: Algebraic) -> Nothing {
 		show("Rational.add(_ Algebraic)", 1/2::add(rootTwo))
@@ -583,14 +583,14 @@ third"::lines())
 		)
 		show("Algebraic.isNot(_ Algebraic)", rootTwo::isNot(rootThree))
 		show("Algebraic.isNot(_ Algebraic) [equal]", rootTwo::isNot(rootTwo))
-		show("Algebraic.compareTo(_ Algebraic)", rootTwo::compareTo(rootThree))
+		show("Algebraic.compare(to: Algebraic)", rootTwo::compare(to rootThree))
 		show(
-			"Algebraic.compareTo(_ Algebraic) [equal]",
-			rootTwo::compareTo(rootTwo),
+			"Algebraic.compare(to: Algebraic) [equal]",
+			rootTwo::compare(to rootTwo),
 		)
 		show(
-			"Algebraic.compareTo(_ Algebraic) [greater]",
-			rootThree::compareTo(rootTwo),
+			"Algebraic.compare(to: Algebraic) [greater]",
+			rootThree::compare(to rootTwo),
 		)
 		show("Algebraic.add(_ Integer)", rootTwo::add(1))
 		show("Algebraic.add(_ Rational)", rootTwo::add(1/2))
@@ -733,20 +733,20 @@ third"::lines())
 		show("Number.toString() [Algebraic]", Number.toString(rootTwo))
 		show("Number.toString() [Transcendental]", Number.toString(Number.PI))
 		show(
-			"Number.compareTo(_ Number) [Integer]",
-			Number.compareTo(3, Number.PI),
+			"Number.compare(to: Number) [Integer]",
+			Number.compare(3, to Number.PI),
 		)
 		show(
-			"Number.compareTo(_ Number) [Rational]",
-			Number.compareTo(22/7, Number.PI),
+			"Number.compare(to: Number) [Rational]",
+			Number.compare(22/7, to Number.PI),
 		)
 		show(
-			"Number.compareTo(_ Number) [Algebraic]",
-			Number.compareTo(rootTwo, 3/2),
+			"Number.compare(to: Number) [Algebraic]",
+			Number.compare(rootTwo, to 3/2),
 		)
 		show(
-			"Number.compareTo(_ Number) [Transcendental]",
-			Number.compareTo(Number.PI, Number.TAU),
+			"Number.compare(to: Number) [Transcendental]",
+			Number.compare(Number.PI, to Number.TAU),
 		)
 		show(
 			"Number.isLessThan(_ Number) [Integer]",
@@ -1337,27 +1337,27 @@ third"::lines())
 	show("List.sort<ItemType is Comparable>() [empty]", noNumbers::sort())
 	show(
 		"List.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering)",
-		numbers::sort(by (first, second) { <- first::compareTo(second) }),
+		numbers::sort(by (first, second) { <- first::compare(to second) }),
 	)
 	show(
 		"List.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering) [empty]",
-		noNumbers::sort(by (first, second) { <- first::compareTo(second) }),
+		noNumbers::sort(by (first, second) { <- first::compare(to second) }),
 	)
 	show(
-		"List.compareTo<ItemType is Comparable>(_ List<ItemType>)",
-		[1, 2]::compareTo([1, 3]),
+		"List.compare<ItemType is Comparable>(to: List<ItemType>)",
+		[1, 2]::compare(to [1, 3]),
 	)
 	show(
-		"List.compareTo<ItemType is Comparable>(_ List<ItemType>) [equal]",
-		[1, 2]::compareTo([1, 2]),
+		"List.compare<ItemType is Comparable>(to: List<ItemType>) [equal]",
+		[1, 2]::compare(to [1, 2]),
 	)
 	show(
-		"List.compareTo<ItemType is Comparable>(_ List<ItemType>) [shorter]",
-		[1]::compareTo([1, 2]),
+		"List.compare<ItemType is Comparable>(to: List<ItemType>) [shorter]",
+		[1]::compare(to [1, 2]),
 	)
 	show(
-		"List.compareTo<ItemType is Comparable>(_ List<ItemType>) [both empty]",
-		noNumbers::compareTo([]),
+		"List.compare<ItemType is Comparable>(to: List<ItemType>) [both empty]",
+		noNumbers::compare(to []),
 	)
 	show(
 		"List.anyItem<ItemType>(matches: (_ ItemType) -> Boolean)",

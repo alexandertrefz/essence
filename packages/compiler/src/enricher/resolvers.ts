@@ -2314,7 +2314,7 @@ function solveNamespaceConformance(
 
 	// NOTE: The candidate conforms only under its own `where` conditions — feed
 	// them in as assumptions so a fulfilling Method carrying that same bound
-	// (List's `compareTo`) is accepted here, then verify the assumptions hold
+	// (List's `compare`) is accepted here, then verify the assumptions hold
 	// by solving the conditions recursively below.
 	let assumptions = new Map(
 		candidate.conditions.map((condition) => [
@@ -2383,7 +2383,7 @@ function solveNamespaceConformance(
 		// accepts a `List<Unknown>` receiver outright, binding nothing. There is
 		// no witness to hand over — skipping the condition used to emit a plain
 		// method map where the fulfilling Method expects a curried one, and the
-		// Program died reading `compareTo` off `undefined`. Binding the Generic
+		// Program died reading `compare` off `undefined`. Binding the Generic
 		// to Unknown instead would only move the lie one level down.
 		if (conditionBinding === undefined) {
 			return {

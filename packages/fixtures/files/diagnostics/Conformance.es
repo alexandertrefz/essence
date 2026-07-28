@@ -14,7 +14,7 @@ implementation {
 	namespace Unknown<infer Item> for { value: Item }
 		is Comparable where Other is Comparable
 	{
-		compareTo(_ other: { value: Item }) -> Ordering {
+		compare(to other: { value: Item }) -> Ordering {
 			<- Ordering#Equal
 		}
 	}
@@ -23,8 +23,8 @@ implementation {
 	namespace Conflicting<infer Item> for { value: Item }
 		is Comparable where Item is Comparable, Item is Equatable
 	{
-		compareTo(_ other: { value: Item }) -> Ordering {
-			<- @.value::compareTo(other.value)
+		compare(to other: { value: Item }) -> Ordering {
+			<- @.value::compare(to other.value)
 		}
 	}
 

@@ -37,10 +37,10 @@ implementation {
 	__print(emoji::reverse()) § "b😀a"
 
 	§ String is Comparable now, so a List of Strings sorts with a real
-	§ comparator, and `compareTo` orders by code point.
+	§ comparator, and `compare` orders by code point.
 	__print(
-		["banana", "apple", "cherry"]::sort(by (a, b) { <- a::compareTo(b) }),
+		["banana", "apple", "cherry"]::sort(by (a, b) { <- a::compare(to b) }),
 	) § ["apple", "banana", "cherry"]
 
-	__print("app"::compareTo("apple")::toString()) § "Less"
+	__print("app"::compare(to "apple")::toString()) § "Less"
 }

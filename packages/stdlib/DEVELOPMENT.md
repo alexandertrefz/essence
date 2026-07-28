@@ -111,8 +111,8 @@ value is written here.
 
 Composition is not free, and two costs are easy to miss because no test fails:
 
-- **A body pulls in everything it transitively reaches.** `Integer.compareTo`
-  once delegated to the covering `Number.compareTo`; that made comparing two
+- **A body pulls in everything it transitively reaches.** `Integer.compare`
+  once delegated to the covering `Number.compare`; that made comparing two
   Integers drag the Algebraic, Transcendental and Rational machinery into any
   Program that compared two Integers, nearly doubling `HelloWorld.es`.
   Same-kind ordering is native again for that reason.

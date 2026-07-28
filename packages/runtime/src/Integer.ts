@@ -283,12 +283,12 @@ export function squareRoot(
 // #endregion
 
 // NOTE: Same-kind ordering stays native deliberately. Routing it through the
-// covering `Number.compareTo` reads better, but that Method decides every
+// covering `Number.compare` reads better, but that Method decides every
 // cross-kind cell, so comparing two Integers would drag the Algebraic,
 // Transcendental and Rational machinery into any Program that compares two
 // Integers, which is nearly all of them. `is` and the inequalities are still
 // written in Essence on top of this.
-export function compareTo(
+export function compare(
 	originalInteger: IntegerType,
 	otherInteger: IntegerType,
 ): OrderingType {

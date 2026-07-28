@@ -32,6 +32,6 @@ declarations {
 		§§
 		§§ @param other — the value to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Self) -> Ordering
+		compare(to other: Self) -> Ordering
 	}
 }

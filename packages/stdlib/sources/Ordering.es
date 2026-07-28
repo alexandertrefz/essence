@@ -12,7 +12,7 @@ declarations {
 
 	§ No properties — the Cases are reached as `Ordering#Less` etc., like
 	§ those of any other Choice. The `Equatable` conformance is DECLARED and
-	§ not written: a Choice derives equality from its tags, and `compareTo`
+	§ not written: a Choice derives equality from its tags, and `compare`
 	§ across the whole language leans on `Ordering::is`, so the one written
 	§ here would have been the most-called nested match in the standard library.
 	namespace Ordering for Ordering is Equatable, is Printable {

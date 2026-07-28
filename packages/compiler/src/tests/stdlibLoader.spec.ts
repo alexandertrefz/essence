@@ -575,7 +575,7 @@ describe("Standard Library Loader", () => {
 					is Comparable where Item is Comparable
 				{
 					§§ Orders two Boxes by their values.
-					compareTo(_ other: { value: Item }) -> Ordering
+					compare(to other: { value: Item }) -> Ordering
 				}
 			}`,
 			],
@@ -589,19 +589,19 @@ describe("Standard Library Loader", () => {
 				choice Ordering { Less, Equal, Greater }
 
 				protocol Comparable {
-					compareTo(_ other: Self) -> Ordering
+					compare(to other: Self) -> Ordering
 				}
 			}`,
 			],
 		)
 
 		let namespace = namespaceNamed(stdlib, "Boxes")
-		let compareTo = namespace.methods["compareTo"]!
+		let compare = namespace.methods["compare"]!
 
-		expect(compareTo.type).toBe("SimpleMethod")
+		expect(compare.type).toBe("SimpleMethod")
 
-		if (compareTo.type === "SimpleMethod") {
-			expect(compareTo.generics).toEqual([
+		if (compare.type === "SimpleMethod") {
+			expect(compare.generics).toEqual([
 				{
 					name: "Item",
 					defaultType: null,
@@ -917,14 +917,14 @@ describe("Standard Library Loader", () => {
 	// in a file that comes after them.
 	it("resolves names across standard library files", () => {
 		let stdlib = loadStdlib()
-		let compareTo = stdlib.protocols["Comparable"]!.methods["compareTo"]!
+		let compare = stdlib.protocols["Comparable"]!.methods["compare"]!
 
-		expect(compareTo.type).toBe("SimpleMethod")
+		expect(compare.type).toBe("SimpleMethod")
 
-		if (compareTo.type === "SimpleMethod") {
+		if (compare.type === "SimpleMethod") {
 			// NOTE: The SAME object the `choice Ordering` in `Ordering.es`
 			// declared, not a structural twin left behind by a table.
-			expect(compareTo.returnType).toBe(stdlib.types["Ordering"]!)
+			expect(compare.returnType).toBe(stdlib.types["Ordering"]!)
 		}
 
 		// NOTE: `Boolean.es` declares no Protocol and is hoisted before the

@@ -58,7 +58,7 @@ async function run(source: string): Promise<Array<string>> {
 // `Equatable` (the first is the builtin `List<Nothing>`). The narrowed Integer
 // can not answer with its own `is` here: with the other side still a Union that
 // call resolves back to this very Method and never returns, so the comparison
-// goes through `compareTo`, the way `String.is` does.
+// goes through `compare`, the way `String.is` does.
 const maybeIntegers = `namespace MaybeInts for Integer | Nothing is Equatable {
 	is(_ other: Integer | Nothing) -> Boolean {
 		<- match @ -> Boolean {
@@ -74,7 +74,7 @@ const maybeIntegers = `namespace MaybeInts for Integer | Nothing is Equatable {
 
 				<- match other -> Boolean {
 					case Nothing { <- false }
-					case _ { <- mine::compareTo(@)::is(#Equal) }
+					case _ { <- mine::compare(to @)::is(#Equal) }
 				}
 			}
 		}

@@ -18,7 +18,7 @@ declarations {
 	§ specificity routes single-member receivers to those, so these Methods
 	§ only answer for Union-typed receivers and mixed-member Arguments.
 	§
-	§ `compareTo` hand-writes all sixteen member cells and keeps the
+	§ `compare` hand-writes all sixteen member cells and keeps the
 	§ Comparable conformance even though Transcendental alone does not
 	§ conform: every cross-kind cell is total because equality across kinds
 	§ is impossible by definition, and the only cell that could ever need a
@@ -38,7 +38,7 @@ declarations {
 		§§ @param other — the Number to compare against
 		§§ @returns — `true` when both Numbers have the same numeric value.
 		is(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(#Equal)
+			<- @::compare(to other)::is(#Equal)
 		}
 
 		§§ Checks whether the Number has a different numeric value than another Number.
@@ -63,13 +63,13 @@ declarations {
 		§§
 		§§ @param other — the Number to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Number) -> Ordering
+		compare(to other: Number) -> Ordering
 
 		§§ Whether this Number is strictly below the given one.
 		§§
 		§§ @param other — the Number to compare against
 		isLessThan(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(#Less)
+			<- @::compare(to other)::is(#Less)
 		}
 
 		§§ Whether this Number is below the given one, or equal to it.
@@ -83,7 +83,7 @@ declarations {
 		§§
 		§§ @param other — the Number to compare against
 		isGreaterThan(_ other: Number) -> Boolean {
-			<- @::compareTo(other)::is(#Greater)
+			<- @::compare(to other)::is(#Greater)
 		}
 
 		§§ Whether this Number is above the given one, or equal to it.

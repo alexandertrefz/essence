@@ -465,10 +465,10 @@ export function squareRoot(
 
 // #endregion
 
-// NOTE: Same-kind ordering stays native — see the NOTE on `Integer.compareTo`.
+// NOTE: Same-kind ordering stays native — see the NOTE on `Integer.compare`.
 // Cross-multiplication is exact, and denominators are kept positive by
 // `createRational`, so the sign of the comparison is the sign of the products.
-export function compareTo(
+export function compare(
 	originalRational: RationalType,
 	otherRational: RationalType,
 ): OrderingType {
