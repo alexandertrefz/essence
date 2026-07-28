@@ -172,7 +172,9 @@ declarations {
 		lastItem() -> Optional<ItemType> {
 			§ The empty List's last position is -1, which is outside it, so
 			§ `item(at:)` answers `Nothing` without a guard here.
-			<- @::item(at @::length()::subtract(1))
+			§ -1 is the last position, and the empty List has no such item —
+			§ the position resolves to -1 there and lands outside the List.
+			<- @::item(at -1)
 		}
 
 		§§ A new List without the first item, or without the given number of leading items.
@@ -186,28 +188,45 @@ declarations {
 			}
 
 			(_ count: Integer) -> List<ItemType> {
-				§ `slice` clamps both ends to the List, which is exactly the
-				§ clamping this needs: a count below one clamps the start to
-				§ zero and keeps every item, and a count at or past the length
-				§ clamps it to the length, leaving nothing.
-				<- @::slice(from count, to @::length())
+				§ A COUNT, not a position — so a negative one removes nothing
+				§ rather than counting back from the end, which is what `slice`
+				§ would read it as. A count past the length clamps there and
+				§ leaves nothing, which is `slice`'s own clamping.
+				if count::isLessThan(0) {
+					<- @
+				} else {
+					<- @::slice(from count, to @::length())
+				}
 			}
 		}
 
-		§§ A new List without the item at the given position, counting from zero.
+		§§ A new List without the item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item.
 		§§
 		§§ @param index — the position of the item to remove
 		§§ @returns — the List without that item, or unchanged when the position is outside it.
 		remove(at index: Integer) -> List<ItemType> {
-			§ Everything before the position, then everything after it. A
-			§ position outside the List leaves it unchanged without a guard: a
-			§ negative one empties the first slice and clamps the second's start
-			§ to zero, and one at or past the end fills the first slice with the
-			§ whole List and empties the second.
-			<- @::slice(from 0, to index)
-				::append(
-					contentsOf @::slice(from index::add(1), to @::length()),
-				)
+			constant length = @::length()
+
+			§ A position counting back from the end is resolved to its
+			§ counting-from-zero form BEFORE the slices below run, because the
+			§ two have to agree on one position and the second starts at
+			§ `index + 1` — which for -1 is 0, naming the FIRST position rather
+			§ than the end. Resolving it here is one step: the guard above
+			§ leaves nothing negative for the call to resolve again.
+			if index::isLessThan(0::subtract(length)) {
+				§ Reaching back past the first item names no position at all,
+				§ so there is nothing to remove.
+				<- @
+			} else if index::isLessThan(0) {
+				<- @::remove(at index::add(length))
+			} else {
+				§ Everything before the position, then everything after it. A
+				§ position at or past the end leaves the List unchanged without
+				§ a guard: the first slice fills with the whole List and the
+				§ second empties.
+				<- @::slice(from 0, to index)
+					::append(contentsOf @::slice(from index::add(1), to length))
+			}
 		}
 
 		§§ A new List without every item equal — by the items' own `is` — to the given one, or without every item the given check accepts. The by-value entry is available whenever the items conform to `Equatable`.
@@ -228,17 +247,25 @@ declarations {
 		§§ @returns — the shortened List — empty when more items were removed than it had.
 		overload removeLast {
 			() -> List<ItemType> {
-				§ On the empty List the end is -1, which `slice` clamps to zero
-				§ — an empty range, so the empty List comes back unchanged.
-				<- @::slice(from 0, to @::length()::subtract(1))
+				§ -1 is the last position, so the half-open range stops just
+				§ before it. The empty List has no last item and the range
+				§ collapses to nothing, leaving it unchanged.
+				<- @::slice(from 0, to -1)
 			}
 
 			(_ count: Integer) -> List<ItemType> {
-				§ Again `slice`'s clamping is the clamping this needs: a count
-				§ below one puts the end past the length and keeps every item,
-				§ and a count at or past the length drives it below zero,
-				§ leaving nothing.
-				<- @::slice(from 0, to @::length()::subtract(count))
+				§ A COUNT, not a position. A count below one keeps every item;
+				§ one at or past the length leaves nothing — and the
+				§ subtraction that says so goes negative, which `slice` would
+				§ read as a position counting back from the end, so both ends
+				§ are answered here rather than left to its clamping.
+				if count::isLessThan(1) {
+					<- @
+				} else if count::isGreaterThanOrEqualTo(@::length()) {
+					<- []
+				} else {
+					<- @::slice(from 0, to @::length()::subtract(count))
+				}
 			}
 		}
 
@@ -344,7 +371,7 @@ declarations {
 		§§ @returns — the List of accepted items.
 		keepEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>
 
-		§§ The item at the given position, counting from zero.
+		§§ The item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item and -length the first.
 		§§
 		§§ @returns — the item, or `Nothing` when the position is outside the List.
 		item(at index: Integer) -> Optional<ItemType>
@@ -396,11 +423,11 @@ declarations {
 			}
 		}
 
-		§§ A new List of the items from one position up to, but not including, another.
+		§§ A new List of the items from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item.
 		§§
-		§§ @param from — the first position to include, counting from zero.
-		§§ @param to — the position to stop before.
-		§§ @returns — the List of items in that range.
+		§§ @param from — the first position to include, counting from zero, or back from the end when negative.
+		§§ @param to — the position to stop before, counting the same way.
+		§§ @returns — the List of items in that range — empty when the range is empty, inverted, or entirely outside the List.
 		slice(from: Integer, to: Integer) -> List<ItemType>
 
 		§§ A new List with the items in the opposite order.
@@ -512,7 +539,7 @@ declarations {
 			}
 		}
 
-		§§ A new List with the given item inserted before the given position.
+		§§ A new List with the given item inserted before the given position. A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one; a position outside the List clamps to the nearer end, so insertion never drops the item.
 		§§
 		§§ @returns — the List with the item inserted.
 		insert(_ item: ItemType, at index: Integer) -> List<ItemType> {
@@ -526,16 +553,25 @@ declarations {
 				::append(contentsOf @::slice(from index, to @::length()))
 		}
 
-		§§ A new List with the item at the given position replaced.
+		§§ A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item.
 		§§
 		§§ @returns — the List with the item replaced, or unchanged when the position is outside it.
 		replace(_ item: ItemType, at index: Integer) -> List<ItemType> {
+			constant length = @::length()
+
 			§ A position outside the List leaves it unchanged. The guard is
 			§ needed: `remove(at:)` would ignore such a position but `insert(_:at:)`
 			§ clamps it, so without this the item would be added at an end.
-			if index::isLessThan(0) {
+			§
+			§ A position counting back from the end is resolved first, because
+			§ `remove(at:)` shortens the List before `insert(_:at:)` reads the
+			§ position again — and the same negative position names a different
+			§ place in the shorter List.
+			if index::isLessThan(0::subtract(length)) {
 				<- @
-			} else if index::isGreaterThanOrEqualTo(@::length()) {
+			} else if index::isLessThan(0) {
+				<- @::replace(item, at index::add(length))
+			} else if index::isGreaterThanOrEqualTo(length) {
 				<- @
 			} else {
 				<- @::remove(at index)::insert(item, at index)
