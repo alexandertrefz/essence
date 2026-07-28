@@ -88,14 +88,12 @@ describe("Stdlib", () => {
 			expect(integer.negate(int(5n))).toEqual(int(-5n))
 		})
 
-		it("parses exactly the shape toString produces", () => {
-			expect(integer.parse(str("42"))).toEqual(int(42n))
-			expect(integer.parse(str("-42"))).toEqual(int(-42n))
-			expect(integer.parse(str("+42"))[typeKeySymbol]).toBe("Nothing")
-			expect(integer.parse(str("4.2"))[typeKeySymbol]).toBe("Nothing")
-			expect(integer.parse(str(""))[typeKeySymbol]).toBe("Nothing")
-			expect(integer.parse(str("nope"))[typeKeySymbol]).toBe("Nothing")
-		})
+		// NOTE: `parse` is written in Essence now
+		// (`packages/stdlib/sources/Integer.es`) — a fold over the characters
+		// with the digit's value read off its position in "0123456789". The
+		// golden harness covers the same shapes the runtime-direct test here
+		// asserted: plain, negative, leading zeroes, and the refusals — plus
+		// sign, double sign, inner sign, decimal point, empty and non-digits.
 	})
 
 	describe("Rational everyday Methods", () => {
@@ -137,25 +135,13 @@ describe("Stdlib", () => {
 			)
 		})
 
-		it("parses fractions, decimals and whole numbers", () => {
-			expect(
-				ratIs(rational.parse(str("3/4")) as never, rat(3n, 4n)),
-			).toBe(true)
-			expect(
-				ratIs(rational.parse(str("-3/4")) as never, rat(-3n, 4n)),
-			).toBe(true)
-			expect(
-				ratIs(rational.parse(str("0.75")) as never, rat(3n, 4n)),
-			).toBe(true)
-			expect(
-				ratIs(rational.parse(str("-1.5")) as never, rat(-3n, 2n)),
-			).toBe(true)
-			expect(ratIs(rational.parse(str("5")) as never, rat(5n, 1n))).toBe(
-				true,
-			)
-			expect(rational.parse(str("1/0"))[typeKeySymbol]).toBe("Nothing")
-			expect(rational.parse(str("nope"))[typeKeySymbol]).toBe("Nothing")
-		})
+		// NOTE: `parse` is written in Essence now
+		// (`packages/stdlib/sources/Rational.es`) — one leading sign, then a
+		// split on `/` or `.` with each piece read by `Integer.parse`. The
+		// golden harness covers the same shapes the runtime-direct test here
+		// asserted — fractions, decimals and wholes, each signed and not —
+		// and the refusals: a zero or signed denominator, a double sign, two
+		// slashes or dots, a dangling dot, and plain non-digits.
 	})
 
 	// NOTE: `absolute` and `is` are written in Essence now for both Algebraic
@@ -190,7 +176,6 @@ describe("Stdlib", () => {
 	// Integer. The golden harness covers every entry, the empty Lists and the
 	// mixed collapse included, so the runtime-direct tests that lived here are
 	// retired.
-
 
 	// NOTE: `Number.isBetween` used to be tested here, against the runtime
 	// function directly. It is written in Essence now — `packages/stdlib/sources/Number.es`

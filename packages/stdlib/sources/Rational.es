@@ -322,7 +322,114 @@ declarations {
 		§§
 		§§ @param text — the text to read
 		§§ @returns — the Rational, or `Nothing` when the text has any other shape or divides by zero.
-		static parse(_ text: String) -> Optional<Rational>
+		static parse(_ text: String) -> Optional<Rational> {
+			§ The sign is carried as the position of the first `-` — `0` for a
+			§ leading sign, anything else for none — exactly as
+			§ `Integer.parse` carries it, and for the same reason: a `match`
+			§ needs a Union, and a Boolean is not one.
+			constant signPosition = text::firstIndex(of "-")
+
+			constant unsignedText = match signPosition -> String {
+				case 0 { <- text::slice(from 1, to text::length()) }
+
+				case _ { <- text }
+			}
+
+			§ The leading sign was the ONE place a `-` may stand — the pieces
+			§ below are plain digit runs, so `1/-2` and `--1/2` are refused
+			§ here rather than read as signed pieces.
+			if unsignedText::contains("-") {
+				<- nothing
+			}
+
+			§ The sign folds back in as a factor on the numerator — the pieces
+			§ below are unsigned, so multiplying the parsed numerator by this
+			§ is the whole of what the leading `-` means.
+			constant signFactor = match signPosition -> Integer {
+				case 0 { <- -1 }
+
+				case _ { <- 1 }
+			}
+
+			constant fractionPieces = unsignedText::split(on "/")
+
+			if fractionPieces::length()::is(2) {
+				§ One slash — a numerator over a denominator. `Rational.of`
+				§ answers the zero-denominator `Nothing` itself.
+				<- match Integer.parse(
+					fractionPieces::firstItem()::otherwise(""),
+				) -> Optional<Rational> {
+					case Nothing { <- nothing }
+
+					case _ {
+						constant parsedNumerator = @
+
+						<- match Integer.parse(
+							fractionPieces::lastItem()::otherwise(""),
+						) -> Optional<Rational> {
+							case Nothing { <- nothing }
+
+							case _       {
+								<- Rational.of(
+									parsedNumerator::multiply(with signFactor),
+									over @,
+								)
+							}
+						}
+					}
+				}
+			} else if fractionPieces::length()::isNot(1) {
+				<- nothing
+			} else {
+				constant decimalPieces = unsignedText::split(on ".")
+
+				if decimalPieces::length()::is(2) {
+					§ One dot — the digits on both sides of it over a power
+					§ of ten, one factor per fractional digit.
+					constant wholeText      = decimalPieces
+						::firstItem()
+						::otherwise("")
+					constant fractionalText = decimalPieces
+						::lastItem()
+						::otherwise("")
+
+					if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
+						<- nothing
+					}
+
+					<- match Integer.parse(
+						wholeText::append(fractionalText),
+					) -> Optional<Rational> {
+						case Nothing { <- nothing }
+
+						case _ {
+							constant digitsValue = @
+							constant scale       = fractionalText
+								::characters()
+								::reduce(startingWith 1, (scaled, _) {
+									<- scaled::multiply(with 10)
+								})
+
+							<- Rational.of(
+								digitsValue::multiply(with signFactor),
+								over scale,
+							)
+						}
+					}
+				} else if decimalPieces::length()::isNot(1) {
+					<- nothing
+				} else {
+					§ No slash and no dot — a whole number.
+					<- match Integer.parse(unsignedText) -> Optional<Rational> {
+						case Nothing { <- nothing }
+
+						case _       {
+							<- Rational.of(@::multiply(with signFactor), over 1)
+						}
+					}
+				}
+			}
+		}
 
 		§ The format was a String — `toString(formatAs "decimal")` — which meant
 		§ every other spelling silently fell back to the fraction form, and
