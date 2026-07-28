@@ -184,7 +184,11 @@ describe("Runtime Internals", () => {
 			).toBe("[ Function ]")
 		})
 
-		it("answers from Record.toString and List.toString for a Function", () => {
+		it("answers from Record.toString for a Function, bare or in a List", () => {
+			// NOTE: `List.toString` is Essence now and bounded by `Printable`,
+			// so a List of Functions has no `toString` of its own — but the
+			// universal printer still reaches one through a Record, and the
+			// gap fill is what keeps that from throwing.
 			expect(
 				record.toString(
 					record.createRecord({ callback: functionValue() }),
@@ -192,8 +196,12 @@ describe("Runtime Internals", () => {
 			).toBe("{ callback = Function }")
 
 			expect(
-				list.toString(list.createList([functionValue()])).value,
-			).toBe("[ Function ]")
+				record.toString(
+					record.createRecord({
+						callbacks: list.createList([functionValue()]),
+					}),
+				).value,
+			).toBe("{ callbacks = [ Function ] }")
 		})
 	})
 

@@ -236,8 +236,6 @@ export type RecordNatives = {
 export type ListNatives = {
 	// is<ItemType is Equatable>(_: List<ItemType>) -> Boolean
 	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
-	// toString<ItemType>() -> String
-	toString: <ItemType extends AnyType>(self: ListType<ItemType>) => StringType
 	// length<ItemType>() -> Integer
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// append<ItemType>(contentsOf: List<ItemType>) -> List<ItemType>
@@ -422,10 +420,9 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "toString" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
-	toString: 1
 	length: 1
 	append__overload$2: 2
 	map: 2

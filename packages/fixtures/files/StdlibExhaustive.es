@@ -1173,9 +1173,15 @@ third"::lines())
 		"List.isNot<ItemType is Equatable>(_ List<ItemType>) [equal]",
 		numbers::isNot([3, 1, 2, 1, 4]),
 	)
-	show("List.toString<ItemType>()", numbers::toString())
-	show("List.toString<ItemType>() [empty]", noNumbers::toString())
-	show("List.toString<ItemType>() [single]", singleNumber::toString())
+	show("List.toString<ItemType is Printable>()", numbers::toString())
+	show(
+		"List.toString<ItemType is Printable>() [empty]",
+		noNumbers::toString(),
+	)
+	show(
+		"List.toString<ItemType is Printable>() [single]",
+		singleNumber::toString(),
+	)
 	show("List.length<ItemType>()", numbers::length())
 	show("List.length<ItemType>() [empty]", noNumbers::length())
 	show("List.hasItems<ItemType>()", numbers::hasItems())
