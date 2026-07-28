@@ -78,7 +78,13 @@ declarations {
 
 		§§ The Algebraic without its sign — its distance from zero. The sign of `a + b·√d` is exactly decidable, so no approximation is consulted.
 		absolute() -> Algebraic {
-			if @::<Number>isLessThan(0) {
+			§ An Algebraic is never zero — a value whose radical cancels comes
+			§ back a Rational instead — so it is below its own negation exactly
+			§ when it is negative, which this Namespace's own `compare`
+			§ decides. The covering `Number`'s `isLessThan(0)` says the same
+			§ thing and reads better; what it costs is the whole numeric tower,
+			§ in every Program that takes an absolute value.
+			if @::compare(to @::negate())::is(#Less) {
 				<- @::negate()
 			} else {
 				<- @

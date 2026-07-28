@@ -165,6 +165,8 @@ export type AlgebraicNatives = {
 }
 
 export type TranscendentalNatives = {
+	// is(_: Transcendental) -> Boolean
+	is: (self: TranscendentalType, argument1: TranscendentalType) => BooleanType
 	// add(_: Integer) -> Transcendental
 	add__overload$1: (self: TranscendentalType, argument1: IntegerType) => TranscendentalType
 	// add(_: Rational) -> Transcendental
@@ -181,6 +183,8 @@ export type TranscendentalNatives = {
 	divide__overload$2: (self: TranscendentalType, by: RationalType) => OptionalType<TranscendentalType>
 	// divide(by: Transcendental) -> Optional<Rational>
 	divide__overload$3: (self: TranscendentalType, by: TranscendentalType) => OptionalType<RationalType>
+	// absolute() -> Transcendental
+	absolute: (self: TranscendentalType) => TranscendentalType
 	// negate() -> Transcendental
 	negate: (self: TranscendentalType) => TranscendentalType
 	// toString() -> String
@@ -240,6 +244,8 @@ export type RecordNatives = {
 export type ListNatives = {
 	// is<ItemType is Equatable>(_: List<ItemType>) -> Boolean
 	is: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => BooleanType
+	// toString<ItemType is Printable>() -> String
+	toString: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// length<ItemType>() -> Integer
 	length: <ItemType extends AnyType>(self: ListType<ItemType>) => IntegerType
 	// append<ItemType>(contentsOf: List<ItemType>) -> List<ItemType>
@@ -364,8 +370,9 @@ export const $AlgebraicArity: AssertArities<typeof import("./Algebraic"), {
 
 declare const TranscendentalModule: typeof import("./Transcendental")
 export const $Transcendental: TranscendentalNatives = TranscendentalModule
-export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "is" | "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "absolute"> = true
+export const $TranscendentalAbsent: AssertNoEssenceExports<typeof import("./Transcendental"), "isNot" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3"> = true
 export const $TranscendentalArity: AssertArities<typeof import("./Transcendental"), {
+	is: 2
 	add__overload$1: 2
 	add__overload$2: 2
 	add__overload$3: 2
@@ -374,6 +381,7 @@ export const $TranscendentalArity: AssertArities<typeof import("./Transcendental
 	divide__overload$1: 2
 	divide__overload$2: 2
 	divide__overload$3: 2
+	absolute: 1
 	negate: 1
 	toString: 1
 }> = true
@@ -428,9 +436,10 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "toString" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$1" | "prepend__overload$2" | "append__overload$1" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
+	toString: 2
 	length: 1
 	append__overload$2: 2
 	map: 2

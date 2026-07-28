@@ -529,7 +529,6 @@ describe("Stdlib Call Graph", () => {
 			"List.removeLast__overload$2",
 			"List.repeat",
 			"List.replace",
-			"List.toString",
 			// NOTE: `flatten` is the one Optional Method that is not on every
 			// Optional, so it lives in a Namespace of its own — receiver
 			// `Optional<Optional<ItemType>>` — exactly as `NestedList::flatten`
@@ -638,8 +637,11 @@ describe("Stdlib Call Graph", () => {
 			"String.starts",
 			"String.toString",
 			"String.trim__overload$1",
-			"Transcendental.absolute",
-			"Transcendental.is",
+			// NOTE: `Transcendental.is` and `absolute` are natives, and
+			// `List.toString` is one too — each was written on a Namespace
+			// heavier than its own (`Number`, `String`) and none could be
+			// rewritten onto a primitive of its own, so all three left Essence
+			// rather than go on carrying that Namespace's whole reach.
 			"Transcendental.isNot",
 			"Transcendental.subtract__overload$1",
 			"Transcendental.subtract__overload$2",

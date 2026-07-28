@@ -9,6 +9,8 @@ import {
 	reduced,
 	subtractRationals,
 } from "./bigRational"
+import type { BooleanType } from "./Boolean"
+import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { OptionalType } from "./Optional"
 import { createEmpty, createValue } from "./Optional"
@@ -183,6 +185,46 @@ export function signRelativeTo(
 // #endregion
 
 // #region Methods
+
+// NOTE: Canonical-form equality, decided structurally: `createTranscendental`
+// reduces both components and `reduced` puts the sign in the numerator, so two
+// values are the same number exactly when all four bigints agree. Native
+// because this Namespace has no ordering to write equality on — the Essence
+// body it replaces asked the covering `Number`, which put the whole numeric
+// tower behind an equality check.
+export function is(
+	transcendental: TranscendentalType,
+	other: TranscendentalType,
+): BooleanType {
+	return createBoolean(
+		transcendental.rationalPartNumerator === other.rationalPartNumerator &&
+			transcendental.rationalPartDenominator ===
+				other.rationalPartDenominator &&
+			transcendental.piCoefficientNumerator ===
+				other.piCoefficientNumerator &&
+			transcendental.piCoefficientDenominator ===
+				other.piCoefficientDenominator,
+	)
+}
+
+// NOTE: A Transcendental is never zero — `a + b·π = 0` with b ≠ 0 would make π
+// rational, and a zero b makes the value a Rational at construction — so it is
+// below its own negation exactly when it is negative, and the exact comparison
+// below decides that with no zero value to build. Native because the sign
+// reaches no primitive this Namespace declares: Transcendental deliberately
+// does not conform to Comparable, and the Essence body this replaces borrowed
+// the covering `Number`'s ordering, dragging the whole numeric tower behind an
+// absolute value.
+export function absolute(
+	transcendental: TranscendentalType,
+): TranscendentalType {
+	const negated = negate(transcendental)
+
+	return compareTranscendentals(transcendental, negated)[typeKeySymbol] ===
+		"Ordering#Less"
+		? negated
+		: transcendental
+}
 
 // NOTE: Exact within the linear grammar: the difference is again
 // `A + B·π`; its sign is B's sign when B ≠ 0 (π-dominance), else A's.

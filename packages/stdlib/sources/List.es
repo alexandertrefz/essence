@@ -65,21 +65,22 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
+		§ NOTE: The items' own representations, joined and wrapped in brackets
+		§ — and native, because the wrapping is String concatenation and no
+		§ Method here can do it. `"[ "::append(…)` was the ONE call this file
+		§ made into `String`'s Namespace, and `String` is written on `List`
+		§ throughout — `lines`, `repeat` and `replaceFirst` all route through
+		§ it — so dropping it leaves one edge pointing one way instead of two
+		§ pointing at each other. Interpolating the joined String is that same
+		§ edge under another name: a hole renders through its value's
+		§ `Printable` conformance, and for a String that is `String::toString`.
+		§ The empty List still prints as `[]` rather than `[  ]`, having no
+		§ items to space.
+
 		§§ Represents the List and its items as a String — `[ 1, 2, 3 ]`, each item as its own `toString`. Available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
-		toString<infer ItemType is Printable>() -> String {
-			§ The items' own representations, joined — `join(with:)` carries
-			§ the same `Printable` bound, so the witness this Method receives
-			§ flows straight through to it. Only the empty List needs a word
-			§ of its own: it has no items to space, so it prints as `[]`
-			§ rather than `[  ]`.
-			if @::isEmpty() {
-				<- "[]"
-			} else {
-				<- "[ "::append(@::join(with ", "))::append(" ]")
-			}
-		}
+		toString<infer ItemType is Printable>() -> String
 
 		§§ How many items the List has.
 		§§
