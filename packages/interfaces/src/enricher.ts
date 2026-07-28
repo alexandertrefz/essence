@@ -54,4 +54,18 @@ export type Scope = {
 	// while a Match Handler nested inside still binds its own `@` and wins,
 	// because that binding sits closer to the use.
 	isStaticMethodBody?: boolean
+	// NOTE: Names that stand for a member of `@` rather than for a binding of
+	// their own — what a Case Matcher's payload binding lends its Guard. A use
+	// resolves into the Lookup the author could have written instead, because a
+	// Guard is emitted into the Handler's TEST and runs before any Statement of
+	// the body: the Constant the body reads the same name through does not
+	// exist yet. Reading `@` there is safe regardless, since the Matcher's own
+	// check is ANDed in front of the Guard and short-circuits it.
+	//
+	// Only ever consulted on the Scope that DECLARES the name, so an inner
+	// binding of the same name shadows the alias like any other.
+	selfMemberAliases?: Record<
+		string,
+		{ member: string; selfType: common.Type }
+	>
 }

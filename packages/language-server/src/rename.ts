@@ -955,26 +955,23 @@ function walkNode(
 					walkTypeDeclaration(handler.matcher, scope, context)
 				}
 
-				// NOTE: Walked in the enclosing Scope rather than the
-				// Handler's — a Guard sits outside the body's range, and it
-				// declares nothing of its own.
-				if (handler.guard !== null) {
-					walkNode(handler.guard, scope, context)
-				}
-
+				// NOTE: The Handler's Scope spans its Matcher onwards rather
+				// than only its body, because a payload binding is written in
+				// the Matcher and read in the Guard as well as in the body. ONE
+				// Scope holds it for all three: two Declarations of the same
+				// name at the same Position would be two Declarations, and a
+				// rename would only reach the half it was started from.
 				let handlerScope = childScope(
 					scope,
-					rangeOfBody(handler.body, node.position),
+					{
+						start: handler.matcher.position.start,
+						end: rangeOfBody(handler.body, node.position).end,
+					},
 					context,
 				)
 
-				// NOTE: A payload binding (`case #Value(item)`) declares a
-				// name for the Handler's body, so it belongs to the Handler's
-				// Scope rather than the enclosing one — and it is declared
-				// BEFORE the body is walked, so a use inside binds to it. It is
-				// deliberately not visible to the Guard, which the Enricher
-				// enriches before the binding exists; the Guard is walked above,
-				// in the enclosing Scope, which already reflects that.
+				// NOTE: Declared BEFORE the Guard and the body are walked, so
+				// a use in either binds to it.
 				if (
 					handler.matcher.nodeType === "CaseMatcher" &&
 					handler.matcher.binding !== null
@@ -986,6 +983,10 @@ function walkNode(
 						"constant",
 						context,
 					)
+				}
+
+				if (handler.guard !== null) {
+					walkNode(handler.guard, handlerScope, context)
 				}
 
 				walkBody(handler.body, handlerScope, context, {

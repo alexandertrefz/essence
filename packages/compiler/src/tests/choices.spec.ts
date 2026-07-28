@@ -3703,6 +3703,72 @@ describe("Choices", () => {
 			)
 		})
 
+		it("lets a Guard name the binding", async () => {
+			// NOTE: The Guard is emitted into the Handler's test, which runs
+			// before the body's constant exists — so the name resolves there
+			// into the `@.radius` it stands for instead. Safe because the
+			// Matcher's own check is ANDed in front of it.
+			expect(
+				await run(`implementation {
+					${shape}
+
+					function describe(_ shape: Shape) -> String {
+						<- match shape -> String {
+							case #Circle(radius) where radius::isLessThan(2) {
+								<- "small {radius}"
+							}
+							case #Circle(radius) { <- "big {radius}" }
+							case #Rect           { <- "rect" }
+							case #Dot            { <- "dot" }
+						}
+					}
+
+					__print(describe(#Circle(1)))
+					__print(describe(#Circle(9)))
+				}`),
+			).toEqual(['"small 1"', '"big 9"'])
+		})
+
+		it("lets a Handler's own binding shadow the one a Guard was lent", async () => {
+			// NOTE: The alias is read off the Scope that declares the name, so
+			// the callback's Parameter wins inside the callback — the List is
+			// what is searched, not the payload.
+			expect(
+				await run(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Circle(3)
+
+					__print(match drawn -> String {
+						case #Circle(radius) where [10, 20]::anyItem(where (radius) {
+							<- radius::isGreaterThan(15)
+						}) {
+							<- "guarded {radius}"
+						}
+						case #Circle(radius) { <- "plain {radius}" }
+						case #Rect           { <- "rect" }
+						case #Dot            { <- "dot" }
+					})
+				}`),
+			).toEqual(['"guarded 3"'])
+		})
+
+		it("does not leak the binding into a sibling Handler's Guard", () => {
+			expect(
+				diagnosticsOf(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Dot
+
+					__print(match drawn -> Integer {
+						case #Circle(radius)                    { <- radius }
+						case #Rect where radius::isLessThan(2)  { <- 0 }
+						case #Dot                               { <- 0 }
+					})
+				}`).map(({ code }) => code),
+			).toContain("unknown-name")
+		})
+
 		it("does not leak the binding into a sibling Handler", () => {
 			expect(
 				diagnosticsOf(`implementation {
