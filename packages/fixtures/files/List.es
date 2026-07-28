@@ -42,8 +42,8 @@ implementation {
 	__print(numbers::firstItem(where (n) { <- n::isGreaterThan(2) })) § 3
 
 	§ Existential and universal checks read as sentences.
-	__print(numbers::anyItem(matches (n) { <- n::isGreaterThan(3) })) § true
-	__print(numbers::everyItem(matches (n) { <- n::isGreaterThan(0) })) § true
+	__print(numbers::anyItem(where (n) { <- n::isGreaterThan(3) })) § true
+	__print(numbers::everyItem(where (n) { <- n::isGreaterThan(0) })) § true
 
 	§ Indexing, slicing and counting — all zero-based, `slice` half-open.
 	__print(numbers::item(at 2)) § 2

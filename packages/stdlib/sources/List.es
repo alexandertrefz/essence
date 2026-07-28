@@ -40,7 +40,7 @@ declarations {
 		is Equatable where ItemType is Equatable,
 		is Comparable where ItemType is Comparable {
 		§ NOTE: This would read better in Essence — length equality AND
-		§ `pair(with other)::everyItem(matches (pair) { … })` — and it can not
+		§ `pair(with other)::everyItem(where (pair) { … })` — and it can not
 		§ be written that way yet. Binding a List Method's own `ItemType` to a
 		§ Type that MENTIONS `ItemType` (the pair Record) makes inference
 		§ substitute the name into itself and recurse until the stack runs out.
@@ -111,7 +111,7 @@ declarations {
 			§ The bound is the whole of the difference from `anyItem`: the
 			§ conforming Namespace's `is` arrives as the hidden conformance
 			§ Argument, and this hands it straight on as the check.
-			<- @::anyItem(matches (candidate) { <- candidate::is(item) })
+			<- @::anyItem(where (candidate) { <- candidate::is(item) })
 		}
 
 		§§ Whether no item equal to the given one is in the List. Available whenever the items conform to `Equatable`.
@@ -483,9 +483,11 @@ declarations {
 			to other: List<ItemType>,
 		) -> Ordering
 
-		§ `anyItem`/`everyItem` read as sentences — "any item matches …", "every
-		§ item matches …" — the existential and universal checks over a
-		§ predicate. The no-argument existential is `hasItems`.
+		§ `anyItem`/`everyItem` are the existential and universal checks over a
+		§ predicate. The no-argument existential is `hasItems`. Their predicate
+		§ is labelled `where`, like every other predicate Parameter here —
+		§ `matches` read as a sentence ("any item matches …") and was the one
+		§ pair a reader could not guess from the other five.
 		§
 		§ Both stop at the first item that decides the answer — `anyItem` at the
 		§ first match, `everyItem` at the first failure — and both stop on
@@ -501,7 +503,7 @@ declarations {
 		§§ Whether the given check accepts at least one item.
 		§§
 		§§ @returns — `true` when some item is accepted.
-		anyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
+		anyItem(where check: (_: ItemType) -> Boolean) -> Boolean {
 			§ The accumulator is the answer so far, which stays `false` until an
 			§ item is accepted and `#Done` finishes the fold with `true`. The
 			§ empty List has no item to accept and keeps the seed.
@@ -517,10 +519,10 @@ declarations {
 		§§ Whether the given check accepts every item.
 		§§
 		§§ @returns — `true` when all items are accepted, including the empty List.
-		everyItem(matches check: (_: ItemType) -> Boolean) -> Boolean {
+		everyItem(where check: (_: ItemType) -> Boolean) -> Boolean {
 			§ No item fails the check. The empty List has none to fail, so it
 			§ answers `true`, as it should.
-			<- @::anyItem(matches (item) { <- check(item)::negate() })::negate()
+			<- @::anyItem(where (item) { <- check(item)::negate() })::negate()
 		}
 
 		§§ How many items equal the given one — by the items' own `is` — or are accepted by the given check. The by-value entry is available whenever the items conform to `Equatable`.

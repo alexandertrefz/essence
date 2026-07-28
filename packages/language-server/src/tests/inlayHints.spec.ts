@@ -247,7 +247,7 @@ describe("Inlay Hints", () => {
 				"implementation {",
 				"\tconstant numbers: List<Integer> | String = [1, 2, 3]",
 				"\tconstant label = match numbers -> String {",
-				'\t\tcase List<Integer> where @::anyItem(matches (item) { <- item::isGreaterThan(2) }) { <- "long" }',
+				'\t\tcase List<Integer> where @::anyItem(where (item) { <- item::isGreaterThan(2) }) { <- "long" }',
 				'\t\tcase List<Integer> { <- "short" }',
 				"\t\tcase String { <- @ }",
 				"\t}",
@@ -261,12 +261,12 @@ describe("Inlay Hints", () => {
 					kind: "type",
 				},
 				{
-					position: { line: 4, column: 52 },
+					position: { line: 4, column: 50 },
 					label: ": Integer",
 					kind: "type",
 				},
 				{
-					position: { line: 4, column: 53 },
+					position: { line: 4, column: 51 },
 					label: " -> Boolean",
 					kind: "type",
 				},
