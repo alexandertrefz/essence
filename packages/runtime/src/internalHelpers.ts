@@ -49,15 +49,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		return a === b
 	}
 
-	if (
-		a[typeKeySymbol] === "Nothing" && //
-		b[typeKeySymbol] === "Nothing"
-	) {
-		return true
-	} else if (
-		a[typeKeySymbol] === "Boolean" &&
-		b[typeKeySymbol] === "Boolean"
-	) {
+	if (a[typeKeySymbol] === "Boolean" && b[typeKeySymbol] === "Boolean") {
 		return boolIs(a, b).value
 	} else if (
 		a[typeKeySymbol] === "String" && //
@@ -335,9 +327,9 @@ function memberEqual(
 			// NOTE: An arm claims a value by its `typeKeySymbol` tag, and — when
 			// the tag alone can not tell it from another arm — by the shape the
 			// Enricher gave it. Both sides must land on the same arm, so a
-			// Nothing and a `T` value are unequal. Anything no arm claims falls
-			// to the one generic arm (`tag: null`) and compares through its
-			// witness.
+			// `String` and a `T` value are unequal. Anything no arm claims
+			// falls to the one generic arm (`tag: null`) and compares through
+			// its witness.
 			let aArm = node.arms.find((arm) => armClaims(arm, a))
 			let bArm = node.arms.find((arm) => armClaims(arm, b))
 

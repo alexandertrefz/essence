@@ -347,7 +347,6 @@ function collectCasesFromNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return
 	}
 }

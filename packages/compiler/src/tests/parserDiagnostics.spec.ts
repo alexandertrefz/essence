@@ -206,7 +206,7 @@ _ 2
 				"Expected a literal value but found 'expected'.",
 			)
 			expect(diagnostics[0].labels[0]?.message).toBe(
-				"expected a Number, a String, a Boolean or 'nothing'",
+				"expected a Number, a String or a Boolean",
 			)
 		})
 
@@ -227,12 +227,36 @@ _ 2
 			)
 		})
 
+		// NOTE: `nothing` is no longer a Literal — it is not even a Keyword —
+		// so it reaches this the same way any other bare name does, and is
+		// turned away for the same reason `expected` is above. Pinned on its
+		// own because it used to be accepted here, and a Matcher that silently
+		// started reading `nothing` as a Constant lookup would invert what the
+		// `case` was written to say.
+		it("should report 'nothing' as a member value, now that it is an ordinary Identifier", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant result = match value -> String {
+						case { missing = nothing } { <- "missing" }
+						case _ { <- "other" }
+					}
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("syntax-error")
+			expect(diagnostics[0].message).toBe(
+				"Expected a literal value but found 'nothing'.",
+			)
+		})
+
 		it("should parse the literal member values", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
 					constant result = match value -> String {
 						case { size = 5, name = "a", flag = true } { <- "one" }
-						case { size = -3/2, missing = nothing } { <- "two" }
+						case { size = -3/2, flag = false } { <- "two" }
 						case { size: Integer } { <- "three" }
 						case _ { <- "other" }
 					}

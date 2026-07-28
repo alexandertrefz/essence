@@ -84,7 +84,6 @@ function simplifyImplementationNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -134,8 +133,6 @@ function simplifyExpression(
 			return simplifyRationalValue(node)
 		case "BooleanValue":
 			return simplifyBooleanValue(node)
-		case "NothingValue":
-			return simplifyNothingValue(node)
 		case "FunctionValue":
 			return simplifyFunctionValue(node)
 		case "ListValue":
@@ -425,16 +422,6 @@ function simplifyBooleanValue(
 	return {
 		nodeType: "BooleanValue",
 		value: node.value,
-		type: node.type,
-		position: node.position,
-	}
-}
-
-function simplifyNothingValue(
-	node: common.typed.NothingValueNode,
-): common.typedSimple.NothingValueNode {
-	return {
-		nodeType: "NothingValue",
 		type: node.type,
 		position: node.position,
 	}
@@ -890,11 +877,11 @@ function simplifyParameter(
 	}
 }
 
-// NOTE: A body that can fall off its end is only legal when it promises
-// Nothing — for every other Return Type the Validator has already reported
+// NOTE: A body that can fall off its end is only legal when it promises unit —
+// for every other Return Type the Validator has already reported
 // `missing-return` — but falling off the end of an emitted JavaScript Function
 // answers `undefined`, which carries no hidden Type key and so is not an
-// Essence value at all. The Nothing that was promised is spelled out here
+// Essence value at all. The empty Record that was promised is spelled out here
 // instead, at the one place a Function body and a Match Handler body both pass
 // through; without it the failure surfaced somewhere else entirely, as a
 // `TypeError` out of whatever read the missing Type key next.
@@ -912,8 +899,9 @@ function simplifyBody(
 		{
 			nodeType: "ReturnStatement",
 			expression: {
-				nodeType: "NothingValue",
-				type: { type: "Nothing" },
+				nodeType: "RecordValue",
+				type: { type: "Record", members: {} },
+				members: {},
 			},
 		},
 	]

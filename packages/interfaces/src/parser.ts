@@ -145,7 +145,6 @@ export type ValueNode =
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
-	| NothingValueNode
 	| FunctionValueNode
 	| ListValueNode
 
@@ -201,11 +200,6 @@ export type RationalValueNode = {
 export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
-	position: Position
-}
-
-export type NothingValueNode = {
-	nodeType: "NothingValue"
 	position: Position
 }
 
@@ -322,7 +316,6 @@ export type LiteralMatcherValueNode =
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
-	| NothingValueNode
 
 // #endregion
 

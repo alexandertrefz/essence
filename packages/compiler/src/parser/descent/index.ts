@@ -69,7 +69,6 @@ const literalMatcherTokenTypes = [
 	TokenType.LiteralStringStart,
 	TokenType.LiteralTrue,
 	TokenType.LiteralFalse,
-	TokenType.LiteralNothing,
 ]
 
 // NOTE: The Token types that can begin a Statement — these are the
@@ -1731,9 +1730,6 @@ class DescentParser {
 			case TokenType.LiteralFalse:
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
-			case TokenType.LiteralNothing:
-				this.tokens.next()
-				return generators.nothingValueNode(token.position)
 			case TokenType.SymbolLeftBracket:
 				return this.parseListLiteral()
 			case TokenType.SymbolLeftParen:
@@ -2036,8 +2032,7 @@ class DescentParser {
 	// NOTE: A Matcher compares against a written literal and nothing else —
 	// `size = expected` does not read the Constant `expected`, because a
 	// Matcher is a pattern rather than an Expression. Anything else after `=`
-	// is a parse error here: taking the Token and calling it `nothing`, as
-	// this once did, inverted what the Matcher was written to say.
+	// is a parse error here rather than something quietly stood in for.
 	protected parseLiteralMatcherValue(): parser.LiteralMatcherValueNode {
 		let token = this.peekOrFail()
 
@@ -2054,9 +2049,6 @@ class DescentParser {
 			case TokenType.LiteralFalse:
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
-			case TokenType.LiteralNothing:
-				this.tokens.next()
-				return generators.nothingValueNode(token.position)
 			// NOTE: An interpolated String is not a compile-time literal — its
 			// holes are evaluated — so it can never be the fixed value a `case`
 			// compares against. Refused with its own message rather than the
@@ -2072,7 +2064,7 @@ class DescentParser {
 				fail(
 					`Expected a literal value but found ${describeToken(token)}.`,
 					token.position,
-					"expected a Number, a String, a Boolean or 'nothing'",
+					"expected a Number, a String or a Boolean",
 				)
 		}
 	}

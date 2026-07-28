@@ -508,7 +508,6 @@ function findProbeLookupInNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return null
 	}
 }
@@ -1129,7 +1128,6 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "IntegerValue":
 			case "RationalValue":
 			case "BooleanValue":
-			case "NothingValue":
 				return
 		}
 	}
@@ -1513,7 +1511,6 @@ function describeDeclarations(
 			case "IntegerValue":
 			case "RationalValue":
 			case "BooleanValue":
-			case "NothingValue":
 				return
 		}
 	}

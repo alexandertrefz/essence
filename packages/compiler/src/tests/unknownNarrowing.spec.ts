@@ -113,22 +113,29 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
+		// NOTE: The Union matched on is `Integer | String` only because a Match
+		// needs something to narrow at all — nothing here turns on WHICH Types
+		// those are. What is pinned is that the decision the first Handler made
+		// still binds the second one: the Handlers are separate bodies, and the
+		// slot they share is the Variable's, not either body's. The Handlers
+		// answer unit, the empty Record `{}`, because their value is not what
+		// is under test.
 		it("refuses the second of two Handlers that disagree", () => {
 			expect(
 				codesFor(`implementation {
 					variable items = []
-					constant value: Integer | Nothing = 1
+					constant value: Integer | String = 1
 
-					constant ignored = match value -> Nothing {
+					constant ignored = match value -> {} {
 						case Integer {
 							items = [1, 2]
 
-							<- nothing
+							<- {}
 						}
-						case Nothing {
+						case String {
 							items = ["a"]
 
-							<- nothing
+							<- {}
 						}
 					}
 				}`),

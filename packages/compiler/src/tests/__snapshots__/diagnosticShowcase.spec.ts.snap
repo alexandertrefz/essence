@@ -300,22 +300,22 @@ Error: This Match Expression does not handle every Case
 
 [unreachable-case]
 Warning: This Case can never match
-    ╭─┤ Match.es:31:8 │
+    ╭─┤ Match.es:35:8 │
     │
- 28 │     constant described = match other -> String {
+ 32 │     constant described = match other -> String {
     │                                ──┬──  
-    │                                  ╰──── this is an Integer | Nothing
+    │                                  ╰──── this is an Integer | Boolean
     │ 
- 31 │        case String { <- "never" }
+ 35 │        case String  { <- "never" }
     │             ───┬──  
     │                ╰──── String is not a member of the matched Union
 ────╯
 
 [match-on-non-union]
 Error: Match Expressions require a Union Type
-    ╭─┤ Match.es:35:24 │
+    ╭─┤ Match.es:39:24 │
     │
- 35 │     constant only = match "essence" -> String {
+ 39 │     constant only = match "essence" -> String {
     │                           ────┬────  
     │                               ╰────── this is a String
     │ 

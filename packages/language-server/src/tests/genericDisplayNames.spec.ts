@@ -32,16 +32,18 @@ describe("Display names of freshened Generics", () => {
 	// fresh Generic itself.
 	const source = [
 		"implementation {",
-		"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> Nothing {",
-		"\t\t<- nothing",
+		"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> {} {",
+		"\t\t<- {}",
 		"\t}",
 		"\tconstant r = apply((x) { <- x }, times 5)",
 		"}",
 	].join("\n")
 
 	it("should hint a contextually typed lambda under the Generic the source wrote", () => {
+		// NOTE: The first hint is `r`'s own Type: `apply` answers nothing
+		// useful, which is the unit Type, the empty Record.
 		expect(hintsOf(source).map((hint) => hint.label)).toEqual([
-			": Nothing",
+			": {}",
 			": T",
 			" -> T",
 		])

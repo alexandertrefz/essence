@@ -265,9 +265,9 @@ describe("Choices", () => {
 
 		it("parses bare and prefixed Case Matchers", () => {
 			let program = parse(`implementation {
-				match operation -> Nothing {
-					case #Add { <- nothing }
-					case CalculatorOperation#ClearAll { <- nothing }
+				match operation -> {} {
+					case #Add { <- {} }
+					case CalculatorOperation#ClearAll { <- {} }
 				}
 			}`)
 			let match = program.implementation.nodes[0] as parser.MatchNode
@@ -289,10 +289,10 @@ describe("Choices", () => {
 
 		it("parses a payload binding on bare and prefixed Case Matchers", () => {
 			let program = parse(`implementation {
-				match operation -> Nothing {
-					case #Add(pair) { <- nothing }
-					case CalculatorOperation#ClearAll { <- nothing }
-					case Wrapper#Held(item) { <- nothing }
+				match operation -> {} {
+					case #Add(pair) { <- {} }
+					case CalculatorOperation#ClearAll { <- {} }
+					case Wrapper#Held(item) { <- {} }
 				}
 			}`)
 			let match = program.implementation.nodes[0] as parser.MatchNode
@@ -382,9 +382,9 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation: CalculatorOperation = CalculatorOperation#ClearAll
 
-					match operation -> Nothing {
-						case #Modulo { <- nothing }
-						case _ { <- nothing }
+					match operation -> {} {
+						case #Modulo { <- {} }
+						case _ { <- {} }
 					}
 				}`),
 			).toContain("The matched value has no Case '#Modulo'")
@@ -398,9 +398,9 @@ describe("Choices", () => {
 
 					constant command: A | B = A#Stop
 
-					match command -> Nothing {
-						case #Go { <- nothing }
-						case _ { <- nothing }
+					match command -> {} {
+						case #Go { <- {} }
+						case _ { <- {} }
 					}
 				}`),
 			).toContain("Case '#Go' is declared by more than one Choice")
@@ -411,9 +411,9 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 
-					match operation -> Nothing {
-						case #Add { __print(@.missing) <- nothing }
-						case _ { <- nothing }
+					match operation -> {} {
+						case #Add { __print(@.missing) <- {} }
+						case _ { <- {} }
 					}
 				}`),
 			).toContain(
@@ -954,24 +954,28 @@ describe("Choices", () => {
 				messagesOf(`implementation { ${calculatorChoice}
 					constant operation: CalculatorOperation = CalculatorOperation#ClearAll
 
-					match operation -> Nothing {
-						case #Add { <- nothing }
-						case #ClearAll { <- nothing }
+					match operation -> {} {
+						case #Add { <- {} }
+						case #ClearAll { <- {} }
 					}
 				}`),
 			).toContain("This Match Expression does not handle every Case")
 		})
 
+		// NOTE: The Union's OTHER member is an ordinary Type — the claim is that a
+		// Choice standing in a Union contributes its Cases rather than itself, so
+		// exhaustiveness is every Case plus every non-Choice member, and the
+		// second member is only here to make a Union at all.
 		it("treats a Union containing a Choice as the Union of its Cases", () => {
 			expect(
 				messagesOf(`implementation { ${calculatorChoice}
-					constant operation: CalculatorOperation | Nothing = nothing
+					constant operation: CalculatorOperation | String = "cleared"
 
-					match operation -> Nothing {
-						case #Add { <- nothing }
-						case #Negate { <- nothing }
-						case #ClearAll { <- nothing }
-						case Nothing { <- nothing }
+					match operation -> {} {
+						case #Add { <- {} }
+						case #Negate { <- {} }
+						case #ClearAll { <- {} }
+						case String { <- {} }
 					}
 				}`),
 			).toEqual([])
@@ -1343,9 +1347,9 @@ describe("Choices", () => {
 
 					constant command: A = A#Go
 
-					match command -> Nothing {
-						case #Go { <- nothing }
-						case B#Wait { <- nothing }
+					match command -> {} {
+						case #Go { <- {} }
+						case B#Wait { <- {} }
 					}
 				}`).map((diagnostic) => [diagnostic.code, diagnostic.message]),
 			).toEqual([
@@ -1375,8 +1379,8 @@ describe("Choices", () => {
 					choice A { Go }
 					choice B { Wait }
 
-					match undeclared -> Nothing {
-						case B#Wait { <- nothing }
+					match undeclared -> {} {
+						case B#Wait { <- {} }
 					}
 				}`),
 			).toEqual(["unknown-name"])
@@ -2773,7 +2777,7 @@ describe("Choices", () => {
 	describe("Generic Derived Equality", () => {
 		const maybe = `choice Maybe<T> { Some { value: T }, None }`
 		const bag = `choice Bag<T> { Full { items: List<T> } }`
-		const opt = `choice Opt<T> { Holding { value: T | Nothing } }`
+		const opt = `choice Opt<T> { Holding { value: T | String } }`
 		const wrap = `choice Wrap<T> { It { value: T } }`
 		const tagged = `choice Tagged<T, Phantom> { Val { value: T }, Empty }`
 
@@ -2809,17 +2813,22 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		it("discriminates a Union payload's Nothing from its generic arm", async () => {
+		// NOTE: A payload Union of one generic arm and one concrete one — the
+		// concrete arm claims its own tag and the generic arm is the fallback
+		// everything else falls through to, so a value of the concrete arm is
+		// never compared through the Type Argument's witness and the other way
+		// round. `Opt<Integer>` is what makes the two tell apart at all.
+		it("discriminates a Union payload's concrete arm from its generic arm", async () => {
 			expect(
 				await run(`implementation { ${opt}
 					constant a: Opt<Integer> = #Holding({ value = 1 })
 					constant b: Opt<Integer> = #Holding({ value = 2 })
-					constant n: Opt<Integer> = #Holding({ value = nothing })
+					constant text: Opt<Integer> = #Holding({ value = "x" })
 
 					__print(a::is(a)::toString())
 					__print(a::is(b)::toString())
-					__print(a::is(n)::toString())
-					__print(n::is(n)::toString())
+					__print(a::is(text)::toString())
+					__print(text::is(text)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"false"', '"true"'])
 		})
@@ -3239,7 +3248,7 @@ describe("Choices", () => {
 			// descriptor it emits is the one it always emitted.
 			it("leaves a single generic arm carrying no shape", () => {
 				let generated = generate(`implementation {
-					choice Opt<T is Equatable> { Holding { value: T | Nothing } }
+					choice Opt<T is Equatable> { Holding { value: T | String } }
 
 					constant a: Opt<Integer> = #Holding({ value = 1 })
 

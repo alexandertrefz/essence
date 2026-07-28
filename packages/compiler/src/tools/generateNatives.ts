@@ -30,7 +30,6 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	BooleanType: "./Boolean",
 	IntegerType: "./Integer",
 	ListType: "./List",
-	NothingType: "./Nothing",
 	NumberType: "./Number",
 	OrderingType: "./Ordering",
 	LessType: "./Ordering",
@@ -202,9 +201,6 @@ function mapType(
 	where: string,
 ): string {
 	switch (type.type) {
-		case "Nothing":
-			ctx.used.add("NothingType")
-			return "NothingType"
 		case "Boolean":
 			ctx.used.add("BooleanType")
 			return "BooleanType"
@@ -394,8 +390,6 @@ function renderArrow(
 // `Record`. Cosmetic, so it never throws.
 function describeEssenceType(type: common.Type | common.GenericUse): string {
 	switch (type.type) {
-		case "Nothing":
-			return "Nothing"
 		case "Boolean":
 			return "Boolean"
 		case "String":

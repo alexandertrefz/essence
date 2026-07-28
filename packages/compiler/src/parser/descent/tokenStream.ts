@@ -71,7 +71,6 @@ const tokenTypeLexemes: { [tokenType in lexer.TokenType]?: string } = {
 	[TokenType.SymbolHash]: "#",
 	[TokenType.LiteralTrue]: "true",
 	[TokenType.LiteralFalse]: "false",
-	[TokenType.LiteralNothing]: "nothing",
 	[TokenType.KeywordType]: "type",
 	[TokenType.KeywordIf]: "if",
 	[TokenType.KeywordElse]: "else",

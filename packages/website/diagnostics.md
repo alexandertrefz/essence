@@ -361,7 +361,7 @@ is strictly narrower wins outright — a concrete `for List<Integer>` beats
 `List<ItemType>`, and `for List<List<ItemType>>` beats `for List<ItemType>` — so
 what is left is a tie, two targets of which neither is the narrower one. The
 same target twice is one such tie; so is a pair that does not compare at all.
-`for List<Integer> | Nothing` and `for List<ItemType>` are both matched by a
+`for List<Integer> | String` and `for List<ItemType>` are both matched by a
 List of Integers, yet the Union is no case of the generic List and the generic
 List is no case of the Union, which leaves that receiver with nothing to pick
 by. The matching Namespaces are listed; qualify the call to pick one.
@@ -590,8 +590,8 @@ is an Error where plain dead code is a Warning.
 A Generic Case (`case Value`, inside `<infer Value>`) swallows the rest the same
 way `case _` does, even though it names a Type of its own: Types erase before a
 Match runs, so it narrows nothing and accepts every value that reaches it. It
-can therefore only ever be written last — written above `case Nothing`, it
-answered the Nothing where the Signature promised a `Value`.
+can therefore only ever be written last — written above `case String`, it
+answered the String where the Signature promised a `Value`.
 
 **Quick Fix — "Remove unreachable Case":** deletes the whole Handler, taking
 the line break and the indentation before it along.
@@ -647,9 +647,10 @@ to — either it carries no such bound, or no conforming Namespace is in scope.
 
 A `{ … }` hole in a String Literal holds a value that does not conform to
 `Printable`, so it has no `toString` to turn it into text. Every builtin is
-Printable, but an `Optional` or a bare structural Union belongs to no Namespace
-and is not — match it apart first and interpolate each Case, exactly as a
-`case Nothing { … } case Value { … }` would.
+Printable, but a bare structural Union belongs to no Namespace and is not, and
+an `Optional` is Printable only when its payload is — match it apart first and
+interpolate each Case, exactly as a `case #Empty { … } case #Value(item) { … }`
+would.
 
 ### `redundant-interpolation-to-string`
 
@@ -659,8 +660,9 @@ hole renders its value through that same conformance, so `"{ count }"` and
 
 Only the bare, String-answering call is redundant. A `toString` given an
 Argument picks a form the hole would not — `"{ ratio::toString(formatAs
-#Decimal) }"` — and a receiver that is not Printable on its own, an `Optional`
-or a bare structural Union, has no conformance for the hole to reach at all.
+#Decimal) }"` — and a receiver that is not Printable on its own, a bare
+structural Union or an `Optional` whose payload is not Printable, has no
+conformance for the hole to reach at all.
 
 **Quick Fix — "Remove the redundant 'toString' call":** deletes the
 `::toString()` and leaves the receiver.

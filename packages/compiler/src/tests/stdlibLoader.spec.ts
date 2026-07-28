@@ -151,14 +151,18 @@ describe("Standard Library Loader", () => {
 				}
 			}`,
 			],
-			// NOTE: `Optional` is declared in Essence now, so a synthetic
-			// library that uses it has to bring its own — which is the point:
+			// NOTE: `Optional` is declared in Essence now — a nominal Choice
+			// with a `Value` payload and an `Empty` Case — so a synthetic
+			// library that uses it has to bring its own, which is the point:
 			// the file that USES a name is hoisted alongside the file that
 			// DECLARES it, in either order.
 			[
 				"Fallible.es",
 				`declarations {
-				type Optional<ItemType> = ItemType | Nothing
+				choice Optional<ItemType> {
+					Value { item: ItemType },
+					Empty,
+				}
 			}`,
 			],
 		)
@@ -861,7 +865,6 @@ describe("Standard Library Loader", () => {
 			"Algebraic",
 			"Transcendental",
 			"Number",
-			"Nothing",
 			"Optional",
 			// NOTE: The one Namespace an Optional value can reach besides
 			// `Optional`, listed after it for the same reason `NestedList` is
@@ -1326,22 +1329,30 @@ describe("Standard Library Loader", () => {
 	})
 
 	// NOTE: A standard library file is the WHOLE of what the Namespace it
-	// declares contains. Nothing is merged in from anywhere else — a name the
+	// declares contains. No member is merged in from anywhere else — a name the
 	// sources do not write is a name a Program can not reach, which is what
 	// makes `packages/stdlib/sources/*.es` readable as the definition of the language.
+	//
+	// NOTE: The file name and the Namespace name are both taken from a REAL
+	// standard library file, which is what makes the claim worth pinning: the
+	// loader is given one synthetic `Boolean.es` and answers with exactly the
+	// one Method that file writes. `negate`, `is`, `isNot`, `and`, `or`,
+	// `exclusiveOr` and `toString` — everything the shipped `Boolean.es`
+	// declares — are absent, so nothing is keyed off the name and filled in
+	// behind the source's back.
 	it("gives a Namespace exactly what its source declares", () => {
 		let stdlib = load([
-			"Nothing.es",
+			"Boolean.es",
 			`declarations {
-				namespace Nothing for Nothing {
-					§§ Whether the value is Nothing.
-					isNothing() -> Boolean
+				namespace Boolean for Boolean {
+					§§ Whether the value is true.
+					isTrue() -> Boolean
 				}
 			}`,
 		])
 
-		expect(Object.keys(namespaceNamed(stdlib, "Nothing").methods)).toEqual([
-			"isNothing",
+		expect(Object.keys(namespaceNamed(stdlib, "Boolean").methods)).toEqual([
+			"isTrue",
 		])
 	})
 })

@@ -106,8 +106,8 @@ describe("Type matching", () => {
 		it("should try each Union member from a clean set of bindings", () => {
 			expect(
 				errorsFor(`implementation {
-					function pick <infer T>(_ value: { left: T, right: String } | { left: String, right: T }) -> Nothing {
-						<- nothing
+					function pick <infer T>(_ value: { left: T, right: String } | { left: String, right: T }) -> {} {
+						<- {}
 					}
 
 					constant used = pick({ left = "hi", right = 5 })
@@ -118,8 +118,8 @@ describe("Type matching", () => {
 		it("should accept the same call with the members written the other way round", () => {
 			expect(
 				errorsFor(`implementation {
-					function pick <infer T>(_ value: { left: String, right: T } | { left: T, right: String }) -> Nothing {
-						<- nothing
+					function pick <infer T>(_ value: { left: String, right: T } | { left: T, right: String }) -> {} {
+						<- {}
 					}
 
 					constant used = pick({ left = "hi", right = 5 })
@@ -129,8 +129,8 @@ describe("Type matching", () => {
 
 		it("should still reject an Argument no member accepts", () => {
 			let errors = errorsFor(`implementation {
-				function pick <infer T>(_ value: { left: T, right: String } | { left: String, right: T }) -> Nothing {
-					<- nothing
+				function pick <infer T>(_ value: { left: T, right: String } | { left: String, right: T }) -> {} {
+					<- {}
 				}
 
 				constant used = pick({ left = 1, right = 5 })

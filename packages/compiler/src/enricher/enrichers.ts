@@ -156,7 +156,6 @@ export function enrichNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -214,8 +213,6 @@ export function enrichExpression(
 			return enrichRationalValue(node, scope)
 		case "BooleanValue":
 			return enrichBooleanValue(node, scope)
-		case "NothingValue":
-			return enrichNothingValue(node, scope)
 		case "FunctionValue":
 			return enrichFunctionValue(node, scope)
 		case "ListValue":
@@ -1445,17 +1442,6 @@ export function enrichBooleanValue(
 	}
 }
 
-export function enrichNothingValue(
-	node: parser.NothingValueNode,
-	_scope: enricher.Scope,
-): common.typed.NothingValueNode {
-	return {
-		nodeType: "NothingValue",
-		position: node.position,
-		type: { type: "Nothing" },
-	}
-}
-
 export function enrichFunctionValue(
 	node: parser.FunctionValueNode,
 	scope: enricher.Scope,
@@ -1668,8 +1654,8 @@ export function enrichSelf(
 // NOTE: A wildcard Handler stands for whatever the Handlers before it have not
 // already caught, so it resolves to the Union of the still-unhandled members.
 // That is what lets `@` inside `case _` keep the matched Union's own member
-// Type instead of degrading to Unknown — `case Nothing` followed by `case _`
-// types `@` as the non-Nothing member. A wildcard with nothing left to catch
+// Type instead of degrading to Unknown — `case #Empty` followed by `case _`
+// types `@` as the Optional's other Case. A wildcard with nothing left to catch
 // falls back to Unknown, which matches anything, so a redundant `case _` stays
 // harmless rather than becoming un-typeable.
 function resolveWildcardMatcherType(
@@ -1939,7 +1925,6 @@ const parameterlessValues = new Set([
 	"IntegerValue",
 	"RationalValue",
 	"BooleanValue",
-	"NothingValue",
 	"ListValue",
 	"CaseValue",
 ])
@@ -3086,7 +3071,7 @@ function enrichMembers(
 
 // NOTE: What the item position of an expected Type wants, for the Expressions
 // that react to one. A Union spells its members out — `List<Box<Integer>> |
-// Nothing` still wants a Box in its items — and several Lists in one Union offer
+// String` still wants a Box in its items — and several Lists in one Union offer
 // the Union of their item Types, which is what a single item may be any of. `null`
 // where nothing there is a List at all, which is what "no expected Type" means to
 // everything downstream.
@@ -5994,7 +5979,7 @@ function payloadFitsCase(
 }
 
 // NOTE: What a Type offers as its arms, with a nested Union spelled out, so
-// `Walk<Integer> | Nothing` offers Walk's Cases as readily as `Walk<Integer>`
+// `Walk<Integer> | String` offers Walk's Cases as readily as `Walk<Integer>`
 // does. A Type that is no Union is its own only arm — every caller here is
 // asking "what could a value of this be", and one shape is an answer to that.
 function unionArmsOf(type: common.Type): Array<common.Type> {

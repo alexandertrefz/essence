@@ -54,35 +54,40 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: An `Integer | Nothing` conformance spelled by hand — an item Type that
-// still CONTAINS `Nothing` now that `Optional` does not, and the hand-written
-// counterpart to the equality a Choice derives for `Optional<Integer>` above
-// it. The narrowed Integer can not answer with its own `is` here: with the
-// other side still a Union that call resolves back to this very Method and
-// never returns, so the comparison goes through `compare`, the way `String.is`
-// does.
-const maybeIntegers = `namespace MaybeInts for Integer | Nothing is Equatable {
-	is(_ other: Integer | Nothing) -> Boolean {
+// NOTE: An `Integer | String` conformance spelled by hand — the hand-written
+// counterpart to the equality a Choice DERIVES for `Optional<Integer>`, on the
+// other kind of item Type a List can hold. A Union derives nothing, so without
+// this Namespace `List<Integer | String>` does not conform to `Equatable` at
+// all and the searching Methods below can not be called on it.
+//
+// Each arm narrows BOTH sides before it compares, and only a narrowed side can
+// be asked for its own `is`: at the Union Type that call resolves back to this
+// very Method — which is exactly what `isNot` is written on, and would never
+// return if `is` asked it of itself.
+const integersOrStrings = `namespace IntegersOrStrings for Integer | String is Equatable {
+	is(_ other: Integer | String) -> Boolean {
 		<- match @ -> Boolean {
-			case Nothing {
-				<- match other -> Boolean {
-					case Nothing { <- true }
-					case _ { <- false }
-				}
-			}
-
-			case _ {
+			case String {
 				constant mine = @
 
 				<- match other -> Boolean {
-					case Nothing { <- false }
-					case _ { <- mine::compare(to @)::is(#Equal) }
+					case String { <- mine::is(@) }
+					case Integer { <- false }
+				}
+			}
+
+			case Integer {
+				constant mine = @
+
+				<- match other -> Boolean {
+					case Integer { <- mine::is(@) }
+					case String { <- false }
 				}
 			}
 		}
 	}
 
-	isNot(_ other: Integer | Nothing) -> Boolean {
+	isNot(_ other: Integer | String) -> Boolean {
 		<- @::is(other)::negate()
 	}
 }`
@@ -195,27 +200,35 @@ describe("Stdlib searching Methods", () => {
 				'"Empty"',
 			])
 		})
+	})
 
-		it("finds the nothing among the items of a hand-written Union item Type", async () => {
+	// NOTE: The same searching Methods over the other kind of item Type that
+	// carries more than one shape: a Union, whose equality nothing derives.
+	// `Optional<Integer>` above hands the search the equality its Choice built
+	// from tags and payloads; here the search has to find and run a conformance
+	// a Program WROTE, and hand it on through the same bound — `count` through
+	// the `firstIndex` fold, `lastIndex` through the reversal.
+	describe("a hand-written conformance over a Union item Type", () => {
+		it("finds every item of one member of the Union", async () => {
 			expect(
 				await run(`implementation {
-					${maybeIntegers}
+					${integersOrStrings}
 
-					constant mixed: List<Integer | Nothing> = [nothing, 1, nothing]
+					constant mixed: List<Integer | String> = ["a", 1, "a"]
 
-					__print(mixed::firstIndex(of nothing)::toString())
-					__print(mixed::lastIndex(of nothing)::toString())
-					__print(mixed::count(of nothing)::toString())
+					__print(mixed::firstIndex(of "a")::toString())
+					__print(mixed::lastIndex(of "a")::toString())
+					__print(mixed::count(of "a")::toString())
 				}`),
 			).toEqual(['"Value(0)"', '"Value(2)"', '"2"'])
 		})
 
-		it("still finds the ordinary items beside them", async () => {
+		it("still finds the items of the other member beside them", async () => {
 			expect(
 				await run(`implementation {
-					${maybeIntegers}
+					${integersOrStrings}
 
-					constant mixed: List<Integer | Nothing> = [nothing, 1, nothing]
+					constant mixed: List<Integer | String> = ["a", 1, "a"]
 
 					__print(mixed::firstIndex(of 1)::toString())
 					__print(mixed::lastIndex(of 1)::toString())

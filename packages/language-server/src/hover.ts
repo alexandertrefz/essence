@@ -685,7 +685,6 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			consider(state, node.position, node.type, null)
 			return
 	}

@@ -5093,6 +5093,55 @@ exports[`Parser Expressions Literals GenericFunctionLiterals should parse Functi
 }
 `;
 
+exports[`Parser Expressions Literals AnonymousRecordLiteral should parse an empty AnonymousRecordLiteral 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "members": {},
+        "nodeType": "RecordValue",
+        "position": {
+          "end": {
+            "column": 20,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "type": null,
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 22,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 22,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
 exports[`Parser Expressions Literals AnonymousRecordLiteral should parse AnonymousRecordLiterals with a KeyValuePair 1`] = `
 {
   "exports": null,
@@ -6336,53 +6385,6 @@ exports[`Parser Expressions Literals TypedRecordLiterals should parse TypedRecor
     "end": {
       "column": 7,
       "line": 7,
-    },
-    "start": {
-      "column": 1,
-      "line": 1,
-    },
-  },
-}
-`;
-
-exports[`Parser Expressions Literals NothingLiteral should parse NothingLiteral 1`] = `
-{
-  "exports": null,
-  "implementation": {
-    "nodeType": "ImplementationSection",
-    "nodes": [
-      {
-        "nodeType": "NothingValue",
-        "position": {
-          "end": {
-            "column": 25,
-            "line": 1,
-          },
-          "start": {
-            "column": 18,
-            "line": 1,
-          },
-        },
-      },
-    ],
-    "position": {
-      "end": {
-        "column": 27,
-        "line": 1,
-      },
-      "start": {
-        "column": 1,
-        "line": 1,
-      },
-    },
-  },
-  "imports": null,
-  "kind": "implementation",
-  "nodeType": "Program",
-  "position": {
-    "end": {
-      "column": 27,
-      "line": 1,
     },
     "start": {
       "column": 1,
@@ -18514,10 +18516,25 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
           "body": [
             {
               "expression": {
-                "nodeType": "NothingValue",
+                "caseName": {
+                  "content": "Empty",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 18,
+                      "line": 3,
+                    },
+                    "start": {
+                      "column": 13,
+                      "line": 3,
+                    },
+                  },
+                },
+                "choice": null,
+                "nodeType": "CaseValue",
                 "position": {
                   "end": {
-                    "column": 19,
+                    "column": 18,
                     "line": 3,
                   },
                   "start": {
@@ -18525,11 +18542,13 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
                     "line": 3,
                   },
                 },
+                "typeArguments": null,
+                "value": null,
               },
               "nodeType": "ReturnStatement",
               "position": {
                 "end": {
-                  "column": 19,
+                  "column": 18,
                   "line": 3,
                 },
                 "start": {
@@ -18697,7 +18716,63 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
             },
           ],
           "returnType": {
-            "nodeType": "UnionTypeDeclaration",
+            "baseType": {
+              "nodeType": "IdentifierTypeDeclaration",
+              "position": {
+                "end": {
+                  "column": 84,
+                  "line": 2,
+                },
+                "start": {
+                  "column": 76,
+                  "line": 2,
+                },
+              },
+              "type": {
+                "content": "Optional",
+                "nodeType": "Identifier",
+                "position": {
+                  "end": {
+                    "column": 84,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 76,
+                    "line": 2,
+                  },
+                },
+              },
+            },
+            "generics": [
+              {
+                "nodeType": "IdentifierTypeDeclaration",
+                "position": {
+                  "end": {
+                    "column": 89,
+                    "line": 2,
+                  },
+                  "start": {
+                    "column": 85,
+                    "line": 2,
+                  },
+                },
+                "type": {
+                  "content": "Item",
+                  "nodeType": "Identifier",
+                  "position": {
+                    "end": {
+                      "column": 89,
+                      "line": 2,
+                    },
+                    "start": {
+                      "column": 85,
+                      "line": 2,
+                    },
+                  },
+                },
+              },
+            ],
+            "nodeType": "GenericTypeDeclaration",
             "position": {
               "end": {
                 "column": 90,
@@ -18708,62 +18783,6 @@ exports[`Parser Statements ProtocolDeclarationStatements Generic Bounds should p
                 "line": 2,
               },
             },
-            "types": [
-              {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 80,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 76,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "Item",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 80,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 76,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-              {
-                "nodeType": "IdentifierTypeDeclaration",
-                "position": {
-                  "end": {
-                    "column": 90,
-                    "line": 2,
-                  },
-                  "start": {
-                    "column": 83,
-                    "line": 2,
-                  },
-                },
-                "type": {
-                  "content": "Nothing",
-                  "nodeType": "Identifier",
-                  "position": {
-                    "end": {
-                      "column": 90,
-                      "line": 2,
-                    },
-                    "start": {
-                      "column": 83,
-                      "line": 2,
-                    },
-                  },
-                },
-              },
-            ],
           },
         },
       },

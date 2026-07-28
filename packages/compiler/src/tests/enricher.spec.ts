@@ -367,9 +367,9 @@ describe("Enricher", () => {
 				choice Operation { Add, Subtract }
 				constant chosen: Operation = Operation#Add
 
-				match chosen -> Nothing {
-					case #Ad { <- nothing }
-					case _ { <- nothing }
+				match chosen -> {} {
+					case #Ad { <- {} }
+					case _ { <- {} }
 				}
 			}`
 			let diagnostics = diagnosticsFor(source)
@@ -388,9 +388,9 @@ describe("Enricher", () => {
 				choice Operation { Add, Subtract }
 				constant chosen: Operation = Operation#Add
 
-				match chosen -> Nothing {
-					case #Zzzzzzzz { <- nothing }
-					case _ { <- nothing }
+				match chosen -> {} {
+					case #Zzzzzzzz { <- {} }
+					case _ { <- {} }
 				}
 			}`)
 
@@ -912,20 +912,23 @@ describe("Enricher", () => {
 		})
 
 		it("should infer Namespace Generics from the receiver", () => {
+			// NOTE: `firstAgain` hands `firstItem`'s answer straight back, so
+			// its return Type is written as the `Optional<Item>` that answer IS
+			// — the Choice does not widen into an `Item | Nothing` the way the
+			// Alias used to expand into one. What is asserted is unchanged: the
+			// `Item` the Namespace abstracts over was bound to String by the
+			// receiver alone.
 			expect(
 				typeOfFirstConstant(`implementation {
 					namespace Wrapper<infer Item> for List<Item> {
-						firstAgain() -> Item | Nothing {
+						firstAgain() -> Optional<Item> {
 							<- @::firstItem()
 						}
 					}
 
 					constant first = ["x"]::firstAgain()
 				}`),
-			).toEqual({
-				type: "UnionType",
-				types: [{ type: "String" }, { type: "Nothing" }],
-			})
+			).toEqual(optionalOf({ type: "String" }))
 		})
 
 		it("terminates inference for a generic reduce-step folding into an Optional", () => {
@@ -1031,8 +1034,8 @@ describe("Enricher", () => {
 							fallback fallbackValue: Target,
 						) -> Target {
 							<- match @::firstItem() -> Target {
-								case Nothing { <- fallbackValue }
-								case Item { <- transform(@) }
+								case #Empty { <- fallbackValue }
+								case #Value(item) { <- transform(item) }
 							}
 						}
 					}
@@ -1176,6 +1179,10 @@ describe("Enricher", () => {
 			})
 
 			it("unions the Types of several returns", () => {
+				// NOTE: Two returns of unrelated Types — an Integer and a
+				// String — is all this needs; what it is about is that the
+				// literal's return Type is read as the Union of every return
+				// its body makes, not off the first one the walk reaches.
 				expect(
 					typeOfFirstConstant(`implementation {
 						namespace Mapper<infer Item> for List<Item> {
@@ -1186,17 +1193,17 @@ describe("Enricher", () => {
 							}
 						}
 
-						constant maybeDouble = [1]::transformFirst((value) {
+						constant doubledOrLabel = [1]::transformFirst((value) {
 							if value::isGreaterThan(0) {
 								<- value::multiply(with 2)
 							}
 
-							<- nothing
+							<- "none"
 						})
 					}`),
 				).toEqual({
 					type: "UnionType",
-					types: [{ type: "Integer" }, { type: "Nothing" }],
+					types: [{ type: "Integer" }, { type: "String" }],
 				})
 			})
 
@@ -1422,8 +1429,8 @@ describe("Enricher", () => {
 								<infer State, infer Result>(
 									startingWith state: State,
 									step advance: (_ current: State) -> Progress<State, Result>,
-								) -> Result | Nothing {
-									<- nothing
+								) -> Optional<Result> {
+									<- #Empty
 								}
 							}
 						}
@@ -1663,9 +1670,9 @@ describe("Enricher", () => {
 
 		it("should expand applied Generic Type Aliases", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				type Maybe<Value> = Value | Nothing
+				type Tagged<Value> = Value | String
 
-				constant a: Maybe<Rational> = 1/2
+				constant a: Tagged<Rational> = 1/2
 			}`)
 
 			expect(diagnostics).toEqual([])
@@ -1680,10 +1687,10 @@ describe("Enricher", () => {
 				expect(constant.declaredType).toEqual({
 					type: "UnionType",
 					alias: {
-						name: "Maybe",
+						name: "Tagged",
 						typeArguments: [{ type: "Rational" }],
 					},
-					types: [{ type: "Rational" }, { type: "Nothing" }],
+					types: [{ type: "Rational" }, { type: "String" }],
 				})
 			}
 		})
@@ -1691,7 +1698,7 @@ describe("Enricher", () => {
 		it("should apply Generic Type Alias defaults", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					type Fallback<Value = String> = Value | Nothing
+					type Fallback<Value = String> = Value | Boolean
 
 					constant a: Fallback = "value"
 				}`),
@@ -1700,57 +1707,59 @@ describe("Enricher", () => {
 
 		it("should report Generic Type Aliases applied with too many Type Arguments", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				type Maybe<Value> = Value | Nothing
+				type Tagged<Value> = Value | String
 
-				constant a: Maybe<Rational, Integer> = 1/2
+				constant a: Tagged<Rational, Integer> = 1/2
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Maybe' was given the wrong number of Type Arguments",
+				"Type 'Tagged' was given the wrong number of Type Arguments",
 			)
 			expect(diagnostics[0].position?.start.line).toBe(4)
 		})
 
 		it("should report Generic Type Aliases used without Type Arguments", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				type Maybe<Value> = Value | Nothing
+				type Tagged<Value> = Value | String
 
-				constant a: Maybe = 1/2
+				constant a: Tagged = 1/2
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].message).toBe(
-				"Type 'Maybe' was given the wrong number of Type Arguments",
+				"Type 'Tagged' was given the wrong number of Type Arguments",
 			)
 		})
 
-		// NOTE: The receiver is a Function's declared `Maybe<Integer>` rather
-		// than a `firstItem()` — the stdlib no longer produces a Union of this
-		// shape at all. `Optional` is a Choice now, so `[1, 2]::firstItem()` is
-		// a Union of `Optional#Value` and `Optional#Empty`, and matching THAT
-		// against `Maybe<Value>` binds `Value := Optional#Value` and asks
-		// `withDefault` to take one. What this is about is a Namespace whose
-		// target is an APPLIED Alias, which a hand-written `Maybe` still is.
+		// NOTE: The receiver is a Function's declared `Tagged<Integer>` rather
+		// than a `firstItem()` — the stdlib no longer produces a bare Union of
+		// this shape at all. `Optional` is a Choice now, so `[1, 2]::firstItem()`
+		// is a Union of `Optional#Value` and `Optional#Empty`, and matching THAT
+		// against `Tagged<Value>` binds `Value := Optional#Value` and asks
+		// `unwrapped` to take one. What this is about is a Namespace whose
+		// target is an APPLIED Alias, which a hand-written `Tagged` still is —
+		// the second member is a plain String, because the Alias is here to be
+		// applied, not to mean "missing".
 		it("should match Generic Namespaces through applied Alias targets", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
-					type Maybe<Value> = Value | Nothing
+					type Tagged<Value> = Value | String
 
-					namespace Maybe<infer Value> for Maybe<Value> {
-						withDefault(_ fallbackValue: Value) -> Value {
+					namespace Tagged<infer Value> for Tagged<Value> {
+						unwrapped(_ fallbackValue: Value) -> Value {
 							<- match @ -> Value {
-								case Nothing { <- fallbackValue }
+								case String { <- fallbackValue }
 								case Value { <- @ }
 							}
 						}
 					}
 
-					function maybeOne() -> Maybe<Integer> {
+					function taggedOne() -> Tagged<Integer> {
 						<- 1
 					}
 
-					constant first = maybeOne()::withDefault(0)
+					constant first = taggedOne()::unwrapped(0)
 				}`),
 			).toEqual({ type: "Integer" })
 		})
@@ -1822,7 +1831,7 @@ describe("Enricher", () => {
 					toString() -> String
 				}
 
-				constant value: Showable | Nothing = nothing
+				constant value: Showable | Boolean = true
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -1837,12 +1846,12 @@ describe("Enricher", () => {
 					toString() -> String
 				}
 
-				variable value: Integer | Nothing = 1
+				variable value: Integer | Boolean = 1
 
 				constant result = match value -> Integer {
 					case Showable { <- 0 }
 					case Integer { <- @ }
-					case Nothing { <- 0 }
+					case Boolean { <- 0 }
 				}
 			}`)
 
@@ -2116,15 +2125,15 @@ describe("Enricher", () => {
 		it("should report a concrete covering Union against the generic blanket", () => {
 			// NOTE: The one shape the specificity order leaves ambiguous where
 			// concreteness alone used to decide it: a Namespace for
-			// `List<Integer> | Nothing` covers the binding without spelling it
+			// `List<Integer> | String` covers the binding without spelling it
 			// out, and `List<ItemType>` covers it without being concrete, so
 			// neither target is narrower than the other. Naming the Union in
 			// full is what makes it a real choice, and a hand written
 			// `for List<Integer>` still wins outright.
 			let diagnostics = diagnosticsFor(`implementation {
-				namespace MaybeListEquatable for List<Integer> | Nothing is Equatable {
-					is(_ other: List<Integer> | Nothing) -> Boolean { <- true }
-					isNot(_ other: List<Integer> | Nothing) -> Boolean { <- false }
+				namespace WideListEquatable for List<Integer> | String is Equatable {
+					is(_ other: List<Integer> | String) -> Boolean { <- true }
+					isNot(_ other: List<Integer> | String) -> Boolean { <- false }
 				}
 
 				function areEqual <infer Value is Equatable>(_ a: Value, _ b: Value) -> Boolean {
@@ -2543,13 +2552,13 @@ describe("Enricher", () => {
 			// missed shape would silently prune a Generic that IS used, leaving
 			// it unbindable at the call site.
 			const cases: Array<[string, string]> = [
-				["the return Type alone", "produce() -> Item | Nothing"],
+				["the return Type alone", "produce() -> Item | String"],
 				["a List item Type", "collect(_ items: List<Item>) -> Boolean"],
 				[
 					"a Record member",
 					"unwrap(_ box: { value: Item }) -> Boolean",
 				],
-				["a Union member", "store(_ maybe: Item | Nothing) -> Boolean"],
+				["a Union member", "store(_ tagged: Item | String) -> Boolean"],
 				[
 					"a Function Parameter Type",
 					"apply(_ transform: (_: Item) -> Boolean) -> Boolean",
@@ -2560,21 +2569,21 @@ describe("Enricher", () => {
 				],
 				[
 					"a Generic Alias application",
-					"hold(_ maybe: Maybe<Item>) -> Boolean",
+					"hold(_ tagged: Tagged<Item>) -> Boolean",
 				],
 			]
 
 			for (let [name, signature] of cases) {
 				it(`should keep a Namespace Generic used in ${name}`, () => {
-					let returnsUnion = signature.includes("-> Item | Nothing")
+					let returnsUnion = signature.includes("-> Item | String")
 
 					let method = methodTypeFor(
 						`implementation {
-							type Maybe<Value> = Value | Nothing
+							type Tagged<Value> = Value | String
 
 							namespace Tags<infer Item> for Integer {
 								${signature} {
-									<- ${returnsUnion ? "nothing" : "true"}
+									<- ${returnsUnion ? '"tag"' : "true"}
 								}
 							}
 						}`,
@@ -2961,9 +2970,9 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					${printableSetup}
 
-					namespace MaybeVectorShowable for Vector | Nothing is Showable {
+					namespace WideVectorShowable for Vector | Boolean is Showable {
 						toString() -> String {
-							<- "maybe a vector"
+							<- "a vector, or else a Boolean"
 						}
 					}
 
@@ -3076,11 +3085,16 @@ describe("Enricher", () => {
 				}`
 			}
 
+			// NOTE: `for {}` throughout this block — a Namespace that declares
+			// nothing but STATIC Methods is never reached through a receiver,
+			// so its target is beside the point and the unit Record is the
+			// shortest Type to write that no other Namespace in these sources
+			// also targets.
 			function staticCall(overloads: string): string {
 				return `implementation {
 					${printableSetup}
 
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							${overloads}
 						}
@@ -3126,7 +3140,7 @@ describe("Enricher", () => {
 					lastConstantFunctionInvocation(`implementation {
 					${printableSetup}
 
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							(_ value: Boolean) -> String {
 								<- "boolean"
@@ -3165,7 +3179,7 @@ describe("Enricher", () => {
 						is(_ other: Self) -> Boolean
 					}
 
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							<infer Value is Showable>(_ value: Value) -> String {
 								<- value::toString()
@@ -3210,7 +3224,7 @@ describe("Enricher", () => {
 						}
 					}
 
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							<infer Value is Showable>(_ value: Value) -> String {
 								<- value::toString()
@@ -3240,7 +3254,7 @@ describe("Enricher", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					${printableSetup}
 
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							<infer Value is Showable>(_ value: Value) -> String {
 								<- value::toString()
@@ -3277,7 +3291,7 @@ describe("Enricher", () => {
 			// spelling that entry out.
 			it("should list the one signature a single entry Overload block declares", () => {
 				let diagnostics = diagnosticsFor(`implementation {
-					namespace Renderer for Nothing {
+					namespace Renderer for {} {
 						overload static render {
 							(_ value: Boolean) -> String {
 								<- "boolean"
@@ -3388,7 +3402,7 @@ describe("Enricher", () => {
 						Full { value: Item },
 					}
 
-					namespace Takers for Nothing {
+					namespace Takers for {} {
 						overload static take {
 							${overloads}
 						}
@@ -3547,7 +3561,7 @@ describe("Enricher", () => {
 					__print(describeValue(1/2))
 					__print(describeValue("text"))
 					__print(describeValue(true))
-					__print(describeValue(nothing))
+					__print(describeValue({}))
 					__print(describeValue({ x = 1 }))
 					__print(describeValue(Ordering#Less))
 				}`),
@@ -3599,10 +3613,14 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		it("should compare Nothing and Orderings with Equatable methods", () => {
+		// NOTE: The unit Record stands where `nothing` used to — a Function
+		// that answers nothing useful answers `{}` now, so `{}` is the value an
+		// `is` has to keep working on. It reaches Equatable through the builtin
+		// Record Namespace like any other Record.
+		it("should compare unit Records and Orderings with Equatable methods", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant nothingSame: Boolean = nothing::is(nothing)
+					constant unitSame: Boolean = {}::is({})
 					constant orderingSame: Boolean = Ordering#Less::is(Ordering#Less)
 					constant orderingText: String = Ordering#Greater::toString()
 				}`),
@@ -3666,15 +3684,25 @@ describe("Enricher", () => {
 		// NOTE: The ordering family lives only on the covering Number
 		// Namespace, so a mixed-kind comparison resolves through it — the
 		// member Namespaces declare no cross-kind `isLessThan` of their own.
+		//
+		// NOTE: `squareRoot` answers an `Optional<Integer | Algebraic>`, which
+		// takes two matches to take apart rather than one: the outer one names
+		// the Cases of the Optional and binds the payload, the inner one
+		// narrows that payload's Union. The kinds are what this is about, and
+		// they are still both reached.
 		it("should compare across Number kinds through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant belowPi: Boolean = 3::isLessThan(Number.PI)
 					constant orderedPis: Boolean = Number.PI::isGreaterThan(Number.TAU)
 					constant rootVsHalf = match 2::squareRoot() -> Boolean {
-						case Algebraic { <- @::isLessThanOrEqualTo(3/2) }
-						case Integer   { <- false }
-						case Nothing   { <- false }
+						case #Value(root) {
+							<- match root -> Boolean {
+								case Algebraic { <- @::isLessThanOrEqualTo(3/2) }
+								case Integer   { <- false }
+							}
+						}
+						case #Empty { <- false }
 					}
 				}`),
 			).toEqual([])
@@ -3682,17 +3710,22 @@ describe("Enricher", () => {
 
 		it("should span the numeric tower for Integer::add", () => {
 			// NOTE: The Transcendental annotation only type-checks if
-			// `1::add(π)` resolves to the new overload. The match narrows √2
-			// to an Algebraic and adds an Integer to it — the other new
-			// overload — with `toString` keeping the handler's return a String
-			// so the test turns on resolution, not on the result Type.
+			// `1::add(π)` resolves to the new overload. The match unwraps the
+			// `Optional` √2 comes back in and then narrows the payload to an
+			// Algebraic, and adds an Integer to it — the other new overload —
+			// with `toString` keeping the handler's return a String so the test
+			// turns on resolution, not on the result Type.
 			expect(
 				diagnosticsFor(`implementation {
 					constant withPi: Transcendental = 1::add(Number.PI)
 					constant withRoot: String = match 2::squareRoot() -> String {
-						case Algebraic { <- 1::add(@)::toString() }
-						case Integer   { <- @::toString() }
-						case Nothing   { <- "none" }
+						case #Value(root) {
+							<- match root -> String {
+								case Algebraic { <- 1::add(@)::toString() }
+								case Integer   { <- @::toString() }
+							}
+						}
+						case #Empty { <- "none" }
 					}
 				}`),
 			).toEqual([])
@@ -3795,10 +3828,11 @@ describe("Enricher", () => {
 		// the whole of it — so it resolves the way `Ordering` does above, with
 		// no dispatch at all, which is the case this one is NOT about. Two
 		// Namespaces that know nothing of each other, each declaring `toString`
-		// for one member, is what a dispatch has to be built out of.
+		// for one member, is what a dispatch has to be built out of, and
+		// `Rational | String` is the shortest pair of those left to write.
 		it("should dispatch across unrelated member Namespaces", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
-				constant quotient: Rational | Nothing = 1/2
+				constant quotient: Rational | String = 1/2
 				constant text = quotient::toString()
 			}`)
 
@@ -3807,7 +3841,7 @@ describe("Enricher", () => {
 				invocation.dispatch?.map(
 					(dispatchCase) => dispatchCase.namespaceName,
 				),
-			).toEqual(["Rational", "Nothing"])
+			).toEqual(["Rational", "String"])
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
@@ -3915,7 +3949,32 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
+		// NOTE: The Union is written out rather than read off a `firstItem()`,
+		// which used to answer an `Item | Nothing`. That call answers an
+		// `Optional<Item>` today — one Type with a Namespace covering it, which
+		// resolves without a dispatch at all and so says nothing about the
+		// member-by-member lookup this is about. The test below covers that
+		// half. What matters here is the `Item` member: it is a Type Parameter,
+		// so the only thing that can answer `toString` for it is the bound.
 		it("should dispatch a bounded Type Parameter member through its conformance", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function textOrLabel <infer Item is Printable>(_ value: Item | String) -> String {
+						<- value::toString()
+					}
+
+					constant text: String = textOrLabel(1)
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: The other half — an `Optional` conforms to `Printable` only
+		// when its payload does, and the payload here is a Type Parameter
+		// nothing has decided. The bound is the whole of what makes the call
+		// legal: the same body with `is Printable` dropped reports that 'Item'
+		// does not conform to it, which is the conformance the Optional's own
+		// is conditional on.
+		it("should satisfy a conditional conformance from a Type Parameter's bound", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
@@ -4250,8 +4309,8 @@ describe("Enricher", () => {
 				// The Union is built by a callback rather than read off
 				// `[[]]::firstItem()`, which used to answer one. That call
 				// answers an `Optional<List<Unknown>>` today, and the undecided
-				// List is the PAYLOAD of a `Optional#Value` member rather than a
-				// member itself, so no member of it is undecided at all.
+				// List is the PAYLOAD of an `Optional#Value` member rather than
+				// a member itself, so no member of it is undecided at all.
 				let diagnostics = diagnosticsFor(`implementation {
 				${overlappingNamespaces}
 

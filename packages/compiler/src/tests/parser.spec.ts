@@ -482,6 +482,19 @@ describe("Parser", () => {
 			})
 
 			describe("AnonymousRecordLiteral", () => {
+				// NOTE: The empty Record is the unit value — the thing a
+				// Function that answers nothing useful returns — so `{}` in
+				// Expression position has to reach the Parser as an ordinary
+				// AnonymousRecordLiteral with no members, not as a Literal of
+				// its own. There is no dedicated Node for it and no Keyword
+				// behind it: `{}` is only the general Record syntax with
+				// nothing between the braces.
+				it("should parse an empty AnonymousRecordLiteral", () => {
+					let input: parser.Program = parse("implementation { {} }")
+
+					expect(input).toMatchSnapshot()
+				})
+
 				it("should parse AnonymousRecordLiterals with a KeyValuePair", () => {
 					let input: parser.Program = parse(
 						"implementation { { key = value } }",
@@ -579,16 +592,6 @@ describe("Parser", () => {
 							}
 						}
 					}`,
-					)
-
-					expect(input).toMatchSnapshot()
-				})
-			})
-
-			describe("NothingLiteral", () => {
-				it("should parse NothingLiteral", () => {
-					let input: parser.Program = parse(
-						"implementation { nothing }",
 					)
 
 					expect(input).toMatchSnapshot()
@@ -1469,8 +1472,8 @@ describe("Parser", () => {
 				it("should parse a bounded Generic on a Function", () => {
 					let input: parser.Program = parse(
 						`implementation {
-							function smallest <infer Item is Comparable>(_ list: List<Item>) -> Item | Nothing {
-								<- nothing
+							function smallest <infer Item is Comparable>(_ list: List<Item>) -> Optional<Item> {
+								<- #Empty
 							}
 						}`,
 					)
@@ -1730,7 +1733,7 @@ describe("Parser", () => {
 				let node = firstNode(
 					`implementation {
 						namespace Wrapper<infer Item> for List<Item> {
-							first() -> Item | Nothing {
+							first() -> Optional<Item> {
 								<- @::firstItem()
 							}
 						}
@@ -1780,7 +1783,7 @@ describe("Parser", () => {
 			it("should parse Generic TypeAliasStatements", () => {
 				let node = firstNode(
 					`implementation {
-						type Maybe<Value> = Value | Nothing
+						type Labelled<Value> = Value | String
 					}`,
 				)
 

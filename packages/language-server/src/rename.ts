@@ -175,7 +175,6 @@ const reservedWords = new Set([
 	"choice",
 	"true",
 	"false",
-	"nothing",
 ])
 
 // NOTE: Anything the Lexer would not produce as a single Identifier Token —
@@ -1029,7 +1028,6 @@ function walkNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return
 	}
 }
@@ -1785,7 +1783,6 @@ function walkTypedNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return
 	}
 }

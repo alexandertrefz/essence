@@ -119,8 +119,6 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Algebraics"
 		case "Transcendental":
 			return "Transcendentals"
-		case "Nothing":
-			return "Nothings"
 		case "String":
 			return "Strings"
 		case "Unknown":
@@ -1329,8 +1327,6 @@ function constrainedGenericOrder(
 // discriminate a Union payload's concrete arms at runtime.
 function runtimeTagOf(type: common.Type): string | null {
 	switch (type.type) {
-		case "Nothing":
-			return "Nothing"
 		case "Boolean":
 			return "Boolean"
 		case "String":
@@ -3106,7 +3102,7 @@ function applyGenericAlias(
 
 	// NOTE: An applied alias whose body is an anonymous Union carries the
 	// applied spelling as its display alias, so `Optional<Integer>` prints as
-	// written rather than as `Integer | Nothing`. The Type Arguments are kept
+	// written rather than as its target's members. The Type Arguments are kept
 	// as Types — a later substitution rewrites them alongside the members, so
 	// the spelling never goes stale. Display-only, like every Union name. A
 	// body that is already named or aliased keeps its own spelling, the way
@@ -3172,9 +3168,8 @@ export function resolveIdentifierTypeDeclarationType(
 	return result
 }
 
-// NOTE: Built canonical — `Integer | Rational | Nothing` becomes
-// `(Integer | Rational) | Nothing`, still printing exactly as written. See
-// `buildUnion`.
+// NOTE: Members that subsume one another collapse and anonymous nested Unions
+// flatten in; a named one keeps its name. See `buildUnion`.
 export function resolveUnionTypeDeclarationType(
 	node: parser.UnionTypeDeclarationNode,
 	scope: enricher.Scope,
@@ -3958,9 +3953,14 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	}
 
 	// NOTE: An unbounded Type Parameter has no Methods — it resolves only
-	// through a Protocol bound, handled above. Without this cut, a Namespace
-	// whose target Union carries a bindable Generic member (`Optional`) would
-	// bind the bare Parameter and offer its Methods on every `T`.
+	// through a Protocol bound, handled above. The cut says that outright
+	// rather than relying on no Namespace happening to match: a Namespace whose
+	// target Union carries a bindable Generic member binds the bare Parameter
+	// and would offer its Methods on every `T`. `Optional` was that Namespace,
+	// back when its target was `ItemType | Nothing`, which is why
+	// `"essence"::hasValue()` used to name it among the Namespaces it searched.
+	// A user's own generic Choice can be written in the same shape, so this
+	// stays.
 	if (baseType.type === "GenericUse") {
 		return matchingNamespaces
 	}

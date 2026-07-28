@@ -250,7 +250,7 @@ describe("Parser Recovery", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
 				namespace Broken<infer for List<Item> {
-					first() -> Item | Nothing {
+					first() -> Optional<Item> {
 						<- @::firstItem()
 					}
 				}

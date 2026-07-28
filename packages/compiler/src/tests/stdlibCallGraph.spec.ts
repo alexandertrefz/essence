@@ -537,9 +537,6 @@ describe("Stdlib Call Graph", () => {
 			// under `Optional`.
 			"NestedOptional.flatten",
 			"NormalizationForm.toString",
-			"Nothing.is",
-			"Nothing.isNot",
-			"Nothing.toString",
 			"Number.average__overload$1",
 			"Number.average__overload$2",
 			"Number.average__overload$3",

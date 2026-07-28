@@ -268,10 +268,6 @@ export type ErrorType = {
 	type: "Error"
 }
 
-export type NothingType = {
-	type: "Nothing"
-}
-
 export type BooleanType = {
 	type: "Boolean"
 }
@@ -393,7 +389,6 @@ export type MethodType =
 	| OverloadedMethodType
 
 export type PrimitiveType =
-	| NothingType
 	| BooleanType
 	| StringType
 	| IntegerType
@@ -444,7 +439,7 @@ export type ProtocolType = {
 // assignability ignores it entirely, it only gives Diagnostics and Hovers a
 // readable name for the Union.
 // `alias` is its parameterized sibling, set on the Union an applied Generic
-// Alias produces (`Optional<Integer>`). Its Type Arguments are real Types, so
+// Alias produces (`Labelled<Integer>` for a `type Labelled<T> = T | String`). Its Type Arguments are real Types, so
 // generic substitution rewrites them alongside the members and the applied
 // spelling stays accurate — a plain string name would go stale instead.
 // Equally ignored by assignability.

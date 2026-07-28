@@ -3,7 +3,7 @@
 Essence's standard library, written in Essence.
 
 Everything a Program can reach before its first line is declared here: the core
-Protocols (`Equatable`, `Printable`, `Comparable`), `Boolean`, `Nothing`,
+Protocols (`Equatable`, `Printable`, `Comparable`), `Boolean`,
 `Optional`, `Ordering`, `Record`, `String`, the whole numeric tower (`Integer`,
 `Rational`, `Algebraic`, `Transcendental` and the covering `Number`, which
 brings the `Number` and `Irrational` Union Types with it), and `List` together
@@ -11,7 +11,7 @@ with `NestedList`.
 
 The only things NOT declared here are the ones no declaration could produce:
 the bare Type tags — `Boolean`, `String`, `Integer`, `Rational`, `Algebraic`,
-`Transcendental`, `Nothing`, the open Record and the unapplied `List` — which
+`Transcendental`, the open Record and the unapplied `List` — which
 live in `packages/compiler/src/enricher/primitives.ts`. `__print` — the one
 native Function with no Namespace to live in — is declared here after all, in
 `Print.es`, as an ordinary body-less free Function.

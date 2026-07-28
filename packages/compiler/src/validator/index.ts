@@ -9,6 +9,7 @@ import {
 } from "../diagnostics/index"
 import {
 	bodyDefinitelyReturns,
+	isUnitType,
 	conformanceParameterName,
 	countOf,
 	createFreshenedInference,
@@ -153,7 +154,6 @@ function validateImplementationNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 		case "FunctionValue":
 		case "ListValue":
 		case "Lookup":
@@ -212,7 +212,6 @@ function validateExpression(
 		case "StringValue":
 		case "IntegerValue":
 		case "BooleanValue":
-		case "NothingValue":
 		case "Self":
 			// these nodes dont need any validation
 			return node
@@ -959,8 +958,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 
 	if (node.value.type.type === "UnionType") {
 		// NOTE: Flattened, so that a Union member that is itself a Union — a
-		// Choice composed as `CalculatorOperation | Nothing`, or `Number |
-		// Nothing` — is discharged by Handlers for its *members* rather than
+		// Choice composed as `CalculatorOperation | String`, or `Number |
+		// String` — is discharged by Handlers for its *members* rather than
 		// demanding one Handler for the nested Union as a whole.
 		let memberTypes = flattenUnionMembers(node.value.type)
 		let unhandledTypes: Array<common.Type> = []
@@ -2156,7 +2155,7 @@ function validateDefiniteReturn(
 	let returnType = definition.returnType
 
 	if (
-		returnType.type === "Nothing" ||
+		isUnitType(returnType) ||
 		returnType.type === "Unknown" ||
 		returnType.type === "Error"
 	) {

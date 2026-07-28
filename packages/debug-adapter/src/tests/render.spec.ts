@@ -4,7 +4,6 @@ import { createBoolean } from "@essence-lang/runtime/Boolean"
 import { getStringRepresentation } from "@essence-lang/runtime/functions"
 import { createInteger } from "@essence-lang/runtime/Integer"
 import { createList } from "@essence-lang/runtime/List"
-import { createNothing } from "@essence-lang/runtime/Nothing"
 import { createRecord } from "@essence-lang/runtime/Record"
 import { createString } from "@essence-lang/runtime/String"
 import { createCase } from "@essence-lang/runtime/type"
@@ -32,7 +31,7 @@ describe("the in-debuggee renderer", () => {
 			createInteger(42n),
 			createString("hello"),
 			createBoolean(true),
-			createNothing(),
+			createRecord({}),
 			createRecord({
 				width: createInteger(3n),
 				height: createInteger(4n),

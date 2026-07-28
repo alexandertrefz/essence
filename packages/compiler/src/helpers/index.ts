@@ -273,12 +273,26 @@ export function conformanceParameterName(genericName: string): string {
 	return `${genericName}__conformance`
 }
 
+// NOTE: The unit Type — the empty Record, `{}`. A Function that answers
+// nothing useful says so by promising a Record with no members: there is
+// nothing to read off it, and a caller that tries names a member it does not
+// have. Essence had a `Nothing` Type for this and it earned its keep nowhere
+// else — a functional language has no statements to sequence, so "returns
+// nothing useful" is the whole of what it ever meant, and `{}` says that
+// without a Type of its own.
+//
+// Two stages ask: the Validator lets a body promising it fall off its end, and
+// the Simplifier spells the fall-off out. They must agree, so they ask here.
+export function isUnitType(type: common.Type): boolean {
+	return type.type === "Record" && Object.keys(type.members).length === 0
+}
+
 // NOTE: Whether every path through a body reaches a `<-`. Two stages need the
 // same answer and must never disagree: the Validator refuses a body that
 // promises a value and can fall off its end, and the Simplifier gives the
-// bodies that may fall off — the ones returning Nothing — the `return` that
-// says so, because JavaScript would otherwise answer `undefined`, which is not
-// an Essence value at all. Conservative on purpose: only a `<-` and an
+// bodies that may fall off — the ones returning unit — the `return` that says
+// so, because JavaScript would otherwise answer `undefined`, which is not an
+// Essence value at all. Conservative on purpose: only a `<-` and an
 // `if`/`else` whose both halves return count, so anything it can not see
 // through is treated as falling through.
 export function bodyDefinitelyReturns(
@@ -954,65 +968,6 @@ function restoreBindings(
 	}
 }
 
-// NOTE: The failure fallback of Union-against-Union matching with an
-// inference context — it only ever turns a rejection into an acceptance, so
-// every match that succeeded before still succeeds unchanged. When the
-// whole-member pass fails and the expected Union carries exactly one
-// still-unbound `infer` Generic, the actual Union is flattened, the concrete
-// expected members claim the members they accept, and the Generic binds the
-// Union of the leftovers. This is what resolves `otherwise` on a receiver
-// like `MaybeInt | Rational` (with `type MaybeInt = Integer | Nothing`):
-// `Nothing` claims MaybeInt's buried `Nothing`, and `ItemType` binds
-// `Integer | Rational`. The whole-member pass keeps first claim, so an
-// Optional-shaped receiver still binds its payload in one piece and this
-// path never runs for it.
-function matchUnionRemainder(
-	lhs: common.UnionType,
-	rhs: common.UnionType,
-	context: GenericInferenceContext | null,
-	mark: number,
-): boolean {
-	if (context === null) {
-		return false
-	}
-
-	// NOTE: The failed whole-member pass may have bound Generics on its way
-	// down — those bindings are rolled back before the remainder is collected.
-	restoreBindings(context, mark)
-
-	let unboundGenericMembers = lhs.types.filter(
-		(member): member is common.GenericUse =>
-			member.type === "GenericUse" &&
-			context.bindableNames.has(member.name) &&
-			!context.bindings.has(member.name),
-	)
-
-	if (unboundGenericMembers.length !== 1) {
-		return false
-	}
-
-	let genericMember = unboundGenericMembers[0]
-	let concreteMembers = lhs.types.filter((member) => member !== genericMember)
-
-	let leftovers: Array<common.Type> = []
-
-	for (let actualMember of flattenUnionMembers(rhs)) {
-		let claimed = concreteMembers.some((concreteMember) =>
-			matchTypes(concreteMember, actualMember, context),
-		)
-
-		if (!claimed) {
-			leftovers.push(actualMember)
-		}
-	}
-
-	if (leftovers.length > 0) {
-		context.bindings.set(genericMember.name, buildUnion(leftovers))
-	}
-
-	return true
-}
-
 // NOTE: Members that would bind a still-unbound Generic are tried last, so
 // that a Union member with a concrete counterpart does not get eaten by a
 // greedy first-occurrence binding (`Nothing` must match the `Nothing` member
@@ -1512,28 +1467,38 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 	return false
 }
 
-// NOTE: Builds a Union in its canonical, Optional-shaped form: `Nothing` is
-// hoisted to a single top-level member and every other member becomes the
-// payload — one member, or one anonymous nested Union of them. So
-// `Integer | Rational | Nothing` is built as `(Integer | Rational) | Nothing`,
-// which is what lets `otherwise` (and any Generic bound over `T | Nothing`)
-// bind the payload in one piece — while an anonymous nested payload still
-// prints member by member, exactly as written.
+// NOTE: Builds a Union from a list of members. Members that subsume one another
+// collapse (`Integer` alongside `Number` becomes just `Number`), anonymous
+// nested Unions are flattened in, and NAMED ones (`Number`, a Choice, an
+// applied `Optional<X>`, a named Alias) stay whole — their name is their
+// spelling.
 //
-// Members that subsume one another collapse (`Integer` alongside `Number`
-// becomes just `Number`); named Unions (`Number`, a Choice, a named Alias)
-// stay whole; an applied `Optional<X>` member surrenders its payload and its
-// `Nothing` only when it has to merge with other members — on its own it is
-// returned as written.
+// This used to build a canonical, Optional-SHAPED form: `Nothing` was hoisted
+// to a single top-level member and everything else became one payload member,
+// so that `Integer | Rational | Nothing` came out as
+// `(Integer | Rational) | Nothing` and a Generic bound over `T | Nothing`
+// could bind the payload in one piece. An applied `Optional<X>` even
+// surrendered its own spelling to merge. All of that existed so that a Union's
+// SHAPE could mean "fallible"; a nominal `Optional` says it by name, so the
+// canonical form and the invariant it imposed on every caller are gone.
 export function buildUnion(members: Array<common.Type>): common.Type {
-	// NOTE: Subsumption runs before decomposition, so `Optional<Rational>`
-	// next to a plain `nothing` collapses to just `Optional<Rational>` and
-	// keeps its spelling instead of being taken apart.
 	let distinct: Array<common.Type> = []
 
-	for (let member of members) {
+	let collect = (member: common.Type) => {
+		if (
+			member.type === "UnionType" &&
+			member.name === undefined &&
+			member.alias === undefined
+		) {
+			for (let nestedMember of member.types) {
+				collect(nestedMember)
+			}
+
+			return
+		}
+
 		if (distinct.some((existing) => subsumesForUnion(existing, member))) {
-			continue
+			return
 		}
 
 		distinct = distinct.filter(
@@ -1542,85 +1507,15 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 		distinct.push(member)
 	}
 
+	for (let member of members) {
+		collect(member)
+	}
+
 	if (distinct.length === 1) {
 		return distinct[0]
 	}
 
-	let hasNothing = false
-	let payloadMembers: Array<common.Type> = []
-
-	let collect = (member: common.Type) => {
-		if (member.type === "Nothing") {
-			hasNothing = true
-			return
-		}
-
-		if (member.type === "UnionType") {
-			if (member.name === undefined && member.alias === undefined) {
-				for (let nestedMember of member.types) {
-					collect(nestedMember)
-				}
-
-				return
-			}
-
-			// NOTE: An aliased Union that carries a `Nothing` (`Optional<X>`)
-			// gives it up to the top level here — buried inside a payload
-			// member it would be invisible to `otherwise`. Named Unions keep
-			// their members regardless: their name is their spelling.
-			if (
-				member.alias !== undefined &&
-				flattenUnionMembers(member).some(
-					(nestedMember) => nestedMember.type === "Nothing",
-				)
-			) {
-				for (let nestedMember of member.types) {
-					collect(nestedMember)
-				}
-
-				return
-			}
-		}
-
-		payloadMembers.push(member)
-	}
-
-	for (let member of distinct) {
-		collect(member)
-	}
-
-	// NOTE: Decomposition can surface duplicates — `Optional<Integer>` next
-	// to a plain `Integer` — so the payload subsumes once more.
-	let payload: Array<common.Type> = []
-
-	for (let member of payloadMembers) {
-		if (payload.some((existing) => subsumesForUnion(existing, member))) {
-			continue
-		}
-
-		payload = payload.filter(
-			(existing) => !subsumesForUnion(member, existing),
-		)
-		payload.push(member)
-	}
-
-	if (payload.length === 0) {
-		return { type: "Nothing" }
-	}
-
-	let payloadType: common.Type =
-		payload.length === 1
-			? payload[0]
-			: { type: "UnionType", types: payload }
-
-	if (!hasNothing) {
-		return payloadType
-	}
-
-	return {
-		type: "UnionType",
-		types: [payloadType, { type: "Nothing" }],
-	}
+	return { type: "UnionType", types: distinct }
 }
 
 // NOTE: The deduped member list for a Union built from several candidate
@@ -1689,7 +1584,7 @@ const activeCasePairs = new Map<common.CaseType, Set<common.CaseType>>()
 // caller's opaque symbol, so from then on it must behave EXACTLY like an opaque
 // Generic — matching only another occurrence of itself, and falling THROUGH the
 // bindable dispatch so an expected Union can still accept it as a member (the
-// `ItemType` arm of a bound `Result` of `ItemType | Nothing`). Left as "open" it
+// `ItemType` arm of a bound `Result` of `ItemType | String`). Left as "open" it
 // would instead be chased through its own binding forever.
 function isOpenBindable(
 	name: string,
@@ -1791,10 +1686,6 @@ function matchTypes(
 		return matchTypes(lhs.itemType, rhs.itemType, context)
 	}
 
-	if (lhs.type === "Nothing" && rhs.type === "Nothing") {
-		return true
-	}
-
 	if (lhs.type === "String" && rhs.type === "String") {
 		return true
 	}
@@ -1827,12 +1718,11 @@ function matchTypes(
 			// members is accepted by some member of the expected Union — the
 			// actual Type must not be able to hold any value the expected
 			// Type can not hold. A whole member is tried first, so a binding
-			// Generic binds a nested Union (`Optional<Integer | Rational>`'s
+			// Generic binds a nested Union (a `Labelled<Integer | Rational>`'s
 			// payload) in one piece; only when no single expected member takes
 			// it is a nested actual member decomposed against the whole
 			// expected Union, which makes the nested and the flattened
 			// spelling of the same Union interchangeable.
-			let mark = markBindings(context)
 			let matchedWholeMembers = true
 
 			for (let rhsType of rhs.types) {
@@ -1862,11 +1752,7 @@ function matchTypes(
 				}
 			}
 
-			if (matchedWholeMembers) {
-				return true
-			}
-
-			return matchUnionRemainder(lhs, rhs, context, mark)
+			return matchedWholeMembers
 		} else {
 			// NOTE: Each member is tried on its own. A composite member — a
 			// Record, Case or Function mentioning a bindable Generic — can bind

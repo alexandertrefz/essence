@@ -333,17 +333,17 @@ describe("Rationals", () => {
 				await run(`implementation {
 					constant negativeThree = 0::subtract(3)
 
-					match 1/2::divide(by negativeThree) -> Nothing {
+					match 1/2::divide(by negativeThree) -> {} {
 						case #Value(quotient) {
 							__print(quotient::toString())
 							__print(quotient::isLessThan(0/1)::toString())
 							__print(quotient::absolute()::toString())
 							__print(quotient::round(toward #Down)::toString())
-							<- nothing
+							<- {}
 						}
 						case #Empty {
 							__print("Empty")
-							<- nothing
+							<- {}
 						}
 					}
 				}`),
@@ -355,17 +355,17 @@ describe("Rationals", () => {
 				await run(`implementation {
 					constant negativeThree = 0::subtract(3)
 
-					match 1/2::divide(by negativeThree) -> Nothing {
+					match 1/2::divide(by negativeThree) -> {} {
 						case #Value(quotient) {
 							__print(quotient::round()::toString())
 							__print(quotient::round(toward #TowardZero)::toString())
 							__print(quotient::isLessThan(0)::toString())
 							__print(quotient::isGreaterThan(0)::toString())
-							<- nothing
+							<- {}
 						}
 						case #Empty {
 							__print("Empty")
-							<- nothing
+							<- {}
 						}
 					}
 				}`),
@@ -391,7 +391,7 @@ describe("Rationals", () => {
 				await run(`implementation {
 					constant negativeThree = 0::subtract(3)
 
-					match 1/2::divide(by negativeThree) -> Nothing {
+					match 1/2::divide(by negativeThree) -> {} {
 						case #Value(quotient) {
 							constant text = quotient::toString()
 
@@ -400,11 +400,11 @@ describe("Rationals", () => {
 								case #Value(parsed) { <- parsed::toString() }
 								case #Empty         { <- "Empty" }
 							})
-							<- nothing
+							<- {}
 						}
 						case #Empty {
 							__print("Empty")
-							<- nothing
+							<- {}
 						}
 					}
 				}`),
