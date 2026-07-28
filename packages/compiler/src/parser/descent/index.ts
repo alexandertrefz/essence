@@ -37,7 +37,7 @@ type NamespaceBodyNode = Parameters<
 // `from` and `as` are valid Identifiers. The Module keywords are on this list
 // for the same reason the rest are: `from` and `as` are Argument labels the
 // standard library already writes (`slice(from 1, to 3)`,
-// `normalized(as #ComposedCanonical)`), so they can only ever be Keywords where
+// `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
 // a Module section is being read.
 const identifierTokenTypes = [
 	TokenType.Identifier,

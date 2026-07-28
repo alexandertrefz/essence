@@ -21,7 +21,7 @@ Essence; the rest bind to `@essence-lang/runtime`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compare`), the JavaScript intrinsics Essence has no expression for
-(`String.uppercased`, `String.trim(at:)`, `String.normalized(as:)`,
+(`String.uppercase`, `String.trim(at:)`, `String.normalize(as:)`,
 `String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
 there is no way to name a character's code point), and the iteration primitives
 the rest rest on (`List.reduce`, `item(at:)`, `slice`, `keepEvery`,

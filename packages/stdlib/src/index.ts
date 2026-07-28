@@ -18,7 +18,7 @@ import * as path from "node:path"
 // This is what the extension shipped broken. `../sources` resolved to a
 // directory that was not there, the loader answered with no sources at all,
 // and the editor then reported every standard library Method as missing —
-// `"hi"::uppercased()` came back as "No Namespace provides Methods for this
+// `"hi"::uppercase()` came back as "No Namespace provides Methods for this
 // value". So `build:server` copies the sources beside the bundle, and this
 // finds them there.
 const WORKSPACE_SOURCES = path.resolve(import.meta.dirname, "../sources")
@@ -52,7 +52,7 @@ export function readStdlibFiles(): Array<StdlibFile> {
 	// standard library — every Type and every Method a Program can reach is
 	// declared in these files. What the user then sees is not "the standard
 	// library is missing" but "No Namespace provides Methods for this value"
-	// against `"hi"::uppercased()`, which reads like a bug in their code. There
+	// against `"hi"::uppercase()`, which reads like a bug in their code. There
 	// is no situation where continuing is better than saying which directory
 	// was looked in and stopping.
 	if (fileNames.length === 0) {

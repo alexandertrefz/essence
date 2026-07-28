@@ -673,12 +673,12 @@ describe("Rewriter", () => {
 
 			describe("casing and trimming", () => {
 				it("upper- and lower-cases", () => {
-					expect(
-						string.uppercased(string.createString("aB")),
-					).toEqual(string.createString("AB"))
-					expect(
-						string.lowercased(string.createString("aB")),
-					).toEqual(string.createString("ab"))
+					expect(string.uppercase(string.createString("aB"))).toEqual(
+						string.createString("AB"),
+					)
+					expect(string.lowercase(string.createString("aB"))).toEqual(
+						string.createString("ab"),
+					)
 				})
 
 				it("trims from either end", () => {

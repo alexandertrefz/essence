@@ -13,7 +13,7 @@ implementation {
 	__print("the answer is {count::isBetween(1, and 5)}") § a Boolean
 
 	§ A hole holds a whole Expression, not just a name.
-	__print("reversed: {name::reverse()}, upper: {name::uppercased()}")
+	__print("reversed: {name::reverse()}, upper: {name::uppercase()}")
 
 	§ Escapes: a quote, a backslash, and a literal brace inside a String.
 	__print("she said \"hi\" \\ wrote \{braces\}")

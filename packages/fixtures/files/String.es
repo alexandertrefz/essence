@@ -4,8 +4,8 @@ implementation {
 
 	§ Length and case.
 	__print(greeting::length()) § 12
-	__print(greeting::uppercased()) § "HELLO, WORLD"
-	__print(greeting::lowercased()) § "hello, world"
+	__print(greeting::uppercase()) § "HELLO, WORLD"
+	__print(greeting::lowercase()) § "hello, world"
 
 	§ Searching and testing.
 	__print(greeting::starts(with "Hello")) § true

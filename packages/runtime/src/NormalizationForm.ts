@@ -3,10 +3,11 @@ import { typeKeySymbol } from "./type"
 // NOTE: `NormalizationForm` is a builtin Choice, like `Side` — its values carry
 // Case tags (`"NormalizationForm#ComposedCanonical"`) exactly as user-declared
 // Cases do. `is`, `isNot` and `toString` are implemented in Essence
-// (`packages/stdlib/sources/String.es`, beside `normalized`, the Method that reads a form).
-// The native `normalized(as:)` reads the tag to pick the `String.normalize`
-// argument; a user's `NormalizationForm#…` value is built by `$type.createCase`,
-// so these singletons exist for symmetry with the other builtin Choices.
+// (`packages/stdlib/sources/String.es`, beside `normalize`, the Method that
+// reads a form). The native `normalize(as:)` reads the tag to pick the
+// JavaScript `String.prototype.normalize` argument; a user's
+// `NormalizationForm#…` value is built by `$type.createCase`, so these
+// singletons exist for symmetry with the other builtin Choices.
 export type ComposedCanonicalType = {
 	[typeKeySymbol]: "NormalizationForm#ComposedCanonical"
 }
