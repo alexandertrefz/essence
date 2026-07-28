@@ -238,7 +238,7 @@ export class TokenStream {
 						primary(error.position, "this escape is not known"),
 					],
 					notes: [
-						"A String understands '\\\"', '\\\\', '\\n', '\\t', '\\{' and '\\}'; every other backslash is an error.",
+						"A String understands '\\\"', '\\\\', '\\n', '\\r', '\\t', '\\{' and '\\}'; every other backslash is an error.",
 					],
 					helps: [
 						"Write '\\\\' for a literal backslash, or drop the backslash to keep the character as itself.",

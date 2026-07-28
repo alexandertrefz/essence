@@ -319,6 +319,7 @@ const stringEscapes: { [char: string]: string } = {
 	'"': '"',
 	"\\": "\\",
 	n: "\n",
+	r: "\r",
 	t: "\t",
 	"{": "{",
 	"}": "}",
