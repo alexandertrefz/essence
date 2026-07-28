@@ -6,6 +6,7 @@ import {
 	primary,
 	report,
 	reportError,
+	reportWarning,
 	secondary,
 } from "../diagnostics/index"
 import {
@@ -1267,6 +1268,9 @@ export function enrichInterpolatedStringValue(
 			}
 
 			let expression = enrichExpression(segment.expression, scope)
+
+			reportRedundantInterpolatedToString(expression, scope)
+
 			let solved = solveConformance(
 				expression.type,
 				"Printable",
@@ -1326,6 +1330,82 @@ export function enrichInterpolatedStringValue(
 		position: node.position,
 		type: { type: "String" },
 	}
+}
+
+// NOTE: A hole renders its value through the very `toString` a `Printable`
+// receiver's own conformance provides, so writing that call out spells the
+// hole's own step a second time — `"{ count::toString() }"` and `"{ count }"`
+// are the same String by construction, not by coincidence. Three things keep
+// this from flagging a call that means something:
+//
+// - An Argument makes it a different Method. `Rational`'s
+//   `toString(formatAs #Decimal)` picks a form the hole would not have.
+// - A non-String answer is a `toString` that merely shares the name; dropping
+//   it would change what is interpolated.
+// - A receiver that is not itself Printable — an `Optional`, a bare structural
+//   Union — has no conformance for the hole to reach, so the explicit call is
+//   the ONLY spelling and `interpolation-not-printable` is what the alternative
+//   would earn.
+function reportRedundantInterpolatedToString(
+	expression: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): void {
+	if (
+		expression.nodeType !== "MethodInvocation" ||
+		expression.member.name !== "toString" ||
+		expression.arguments.length > 0 ||
+		expression.type.type !== "String"
+	) {
+		return
+	}
+
+	// NOTE: Solved speculatively. An ambiguous conformance on the receiver is a
+	// Diagnostic about the receiver, and this query is one the Program never
+	// asked for — reporting from inside it would blame the hole for a Namespace
+	// clash the reader would meet again the moment they took the call out.
+	let { result: receiver } = collectDiagnostics(() =>
+		solveConformance(
+			expression.base.type,
+			"Printable",
+			scope,
+			expression.base.position,
+		),
+	)
+
+	if (!receiver.ok) {
+		return
+	}
+
+	// NOTE: The span is the call alone — from the end of the receiver to the
+	// end of the Invocation — so the greyed-out range is exactly what deleting
+	// it would remove, chained receivers (`x::length()::toString()`) and a
+	// written Namespace specifier (`::<Integer>toString()`) included.
+	let callPosition = {
+		start: expression.base.position.end,
+		end: expression.position.end,
+	}
+
+	reportWarning(
+		"A String Interpolation calls 'toString' on its own",
+		callPosition,
+		{
+			code: "redundant-interpolation-to-string",
+			labels: [
+				primary(callPosition, "this call is redundant"),
+				secondary(
+					expression.base.position,
+					`this is ${describeType(expression.base.type)}, which is Printable`,
+				),
+			],
+			notes: [
+				"A hole renders its value through its 'Printable' conformance — the same Method this call names.",
+			],
+			helps: [
+				"Drop the '::toString()' and interpolate the value itself.",
+			],
+			tags: ["unnecessary"],
+		},
+	)
 }
 
 export function enrichIntegerValue(

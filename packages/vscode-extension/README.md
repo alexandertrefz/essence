@@ -30,6 +30,8 @@ offer it under the lightbulb (`Ctrl+.`):
   Method or Case — take the suggested spelling.
 - `constant-reassignment` turns the Constant into a Variable.
 - `redundant-parameter-label` drops the label.
+- `redundant-interpolation-to-string` drops a `::toString()` a String
+  Interpolation would have called anyway.
 - `missing-return` adds the `else` a Function needs to return on every path.
 
 Writing out an inferred Type is offered as a refactoring wherever an inlay hint

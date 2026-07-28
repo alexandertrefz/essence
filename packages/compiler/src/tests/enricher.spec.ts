@@ -542,6 +542,69 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(program.implementation.nodes).toHaveLength(3)
 		})
+
+		it("should warn about a 'toString' the hole would call itself", () => {
+			let source = `implementation {
+				constant count = 3
+				constant message = "count: {count::toString()}"
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe(
+				"redundant-interpolation-to-string",
+			)
+			expect(diagnostics[0].severity).toBe("warning")
+			// NOTE: The span is the call alone — the receiver stays, and the
+			// greyed-out range is exactly what the Quick Fix deletes.
+			expect(underlinedText(source, diagnostics[0])).toBe("::toString()")
+			expect(diagnostics[0].tags).toEqual(["unnecessary"])
+		})
+
+		it("should warn about a 'toString' on a String, which is its own representation", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant name = "Ada"
+				constant message = "hello, {name::toString()}"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe(
+				"redundant-interpolation-to-string",
+			)
+		})
+
+		it("should underline only the last call of a chained receiver", () => {
+			let source = `implementation {
+				constant words = ["a", "b"]
+				constant message = "words: {words::length()::toString()}"
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(underlinedText(source, diagnostics[0])).toBe("::toString()")
+		})
+
+		it("should accept a 'toString' that takes an Argument", () => {
+			// NOTE: `Rational.toString(formatAs:)` picks a form the hole would
+			// not have — dropping the call would change the String.
+			expect(
+				diagnosticsFor(`implementation {
+					constant message = "half: {1/2::toString(formatAs NumberFormat#Decimal)}"
+				}`),
+			).toEqual([])
+		})
+
+		it("should accept a 'toString' on a receiver that is not Printable itself", () => {
+			// NOTE: A bare structural Union belongs to no Namespace, so nothing
+			// makes it conform — the Method resolves per member and the explicit
+			// call is the only spelling that works.
+			expect(
+				diagnosticsFor(`implementation {
+					constant value: Integer | String = 1
+					constant message = "value: {value::toString()}"
+				}`),
+			).toEqual([])
+		})
 	})
 
 	describe("Constant Reassignment", () => {

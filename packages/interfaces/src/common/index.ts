@@ -215,6 +215,7 @@ export type DiagnosticCode =
 	| "protocol-as-type"
 	| "unsatisfied-bound"
 	| "interpolation-not-printable"
+	| "redundant-interpolation-to-string"
 	| "ambiguous-conformance"
 	| "nonconforming-namespace"
 	| "conformance-needs-target-type"

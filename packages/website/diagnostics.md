@@ -640,6 +640,20 @@ Printable, but an `Optional` or a bare structural Union belongs to no Namespace
 and is not — match it apart first and interpolate each Case, exactly as a
 `case Nothing { … } case Value { … }` would.
 
+### `redundant-interpolation-to-string`
+
+A `{ … }` hole calls `toString` on a value that is already `Printable`. The
+hole renders its value through that same conformance, so `"{ count }"` and
+`"{ count::toString() }"` are the same String — write the shorter one.
+
+Only the bare, String-answering call is redundant. A `toString` given an
+Argument picks a form the hole would not — `"{ ratio::toString(formatAs
+#Decimal) }"` — and a receiver that is not Printable on its own, an `Optional`
+or a bare structural Union, has no conformance for the hole to reach at all.
+
+**Quick Fix — "Remove the redundant 'toString' call":** deletes the
+`::toString()` and leaves the receiver.
+
 ### `ambiguous-conformance`
 
 More than one Namespace in scope makes the Type conform to the Protocol, and
