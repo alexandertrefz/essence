@@ -269,7 +269,7 @@ describe("Resolvers", () => {
 				codesFor(`implementation {
 					constant Other = 5
 
-					constant text = "x"::<Other>uppercased()
+					constant text = "x"::<Other>uppercase()
 				}`),
 			).toContain("not-a-namespace")
 		})
@@ -752,7 +752,7 @@ describe("Resolvers", () => {
 
 			namespace NamedEquality for Named is Equatable {
 				is (_ other: Named) -> Boolean {
-					<- @.name::lowercased()::is(other.name::lowercased())
+					<- @.name::lowercase()::is(other.name::lowercase())
 				}
 
 				isNot (_ other: Named) -> Boolean {
@@ -794,7 +794,7 @@ describe("Resolvers", () => {
 
 					namespace NamedEquality for Named is Equatable {
 						is (_ other: Named) -> Boolean {
-							<- @.name::lowercased()::is(other.name::lowercased())
+							<- @.name::lowercase()::is(other.name::lowercase())
 						}
 
 						isNot (_ other: Named) -> Boolean {
@@ -845,7 +845,7 @@ describe("Resolvers", () => {
 		// NOTE: The other half of the collision, and the one a dropped arm gets
 		// wrong: a `{ code = 3 }` is a value of the arm as DECLARED, and sending
 		// it to the Parameter's witness — written for a Named — read a `name` off
-		// a Record that has none and died in `lowercased`. Both arms have to
+		// a Record that has none and died in `lowercase`. Both arms have to
 		// keep claiming, each the values whose SHAPE fits it.
 		it("should compare the colliding arm's own values structurally", async () => {
 			expect(
@@ -878,7 +878,7 @@ describe("Resolvers", () => {
 
 					namespace NamedEquality for Named is Equatable {
 						is (_ other: Named) -> Boolean {
-							<- @.name::lowercased()::is(other.name::lowercased())
+							<- @.name::lowercase()::is(other.name::lowercase())
 						}
 
 						isNot (_ other: Named) -> Boolean {
@@ -912,7 +912,7 @@ describe("Resolvers", () => {
 
 					namespace NamedEquality for Named is Equatable {
 						is (_ other: Named) -> Boolean {
-							<- @.name::lowercased()::is(other.name::lowercased())
+							<- @.name::lowercase()::is(other.name::lowercase())
 						}
 
 						isNot (_ other: Named) -> Boolean {
@@ -947,7 +947,7 @@ describe("Resolvers", () => {
 
 					namespace CodedEquality for Coded is Equatable {
 						is (_ other: Coded) -> Boolean {
-							<- @.code::lowercased()::is(other.code::lowercased())
+							<- @.code::lowercase()::is(other.code::lowercase())
 						}
 
 						isNot (_ other: Coded) -> Boolean {
@@ -1012,7 +1012,7 @@ describe("Resolvers", () => {
 
 					namespace TaggedEquality for Tagged is Equatable {
 						is (_ other: Tagged) -> Boolean {
-							<- @.name::lowercased()::is(other.name::lowercased())
+							<- @.name::lowercase()::is(other.name::lowercase())
 						}
 
 						isNot (_ other: Tagged) -> Boolean {

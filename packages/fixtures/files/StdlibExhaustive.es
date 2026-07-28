@@ -141,9 +141,9 @@ third"::lines())
 		"String.character(at: Integer) [before the start]",
 		greeting::character(at -99),
 	)
-	show("String.uppercased()", greeting::uppercased())
-	show("String.uppercased() [empty]", emptyText::uppercased())
-	show("String.lowercased()", greeting::lowercased())
+	show("String.uppercase()", greeting::uppercase())
+	show("String.uppercase() [empty]", emptyText::uppercase())
+	show("String.lowercase()", greeting::lowercase())
 	show("String.trim()", "  spaced  "::trim())
 	show("String.trim() [nothing to trim]", greeting::trim())
 	show("String.trim(at: Side) [start]", "  spaced  "::trim(at Side#Start))
@@ -279,11 +279,11 @@ third"::lines())
 	show("String.toString() [empty]", emptyText::toString())
 
 	§ Grapheme & normalization. The decomposed forms are derived with
-	§ `normalized(as:)` rather than typed as literal combining marks, so the
+	§ `normalize(as:)` rather than typed as literal combining marks, so the
 	§ test does not depend on how the source file was saved.
 	constant accented   = "café"
 	constant flag       = "🇩🇪"
-	constant decomposed = accented::normalized(
+	constant decomposed = accented::normalize(
 		as NormalizationForm#DecomposedCanonical,
 	)
 
@@ -295,10 +295,10 @@ third"::lines())
 	)
 	show("String.reverse() [flag not torn]", flag::append("!")::reverse())
 	show("String.is(_ String) [NFC equals NFD]", accented::is(decomposed))
-	show("String.normalized()", accented::normalized())
+	show("String.normalize()", accented::normalize())
 	show(
-		"String.normalized(as: NormalizationForm) [compatibility folds ligature]",
-		"ﬁle"::normalized(as NormalizationForm#ComposedCompatibility),
+		"String.normalize(as: NormalizationForm) [compatibility folds ligature]",
+		"ﬁle"::normalize(as NormalizationForm#ComposedCompatibility),
 	)
 
 	§ ——— Boolean ——————————————————————————————————————————————————————————

@@ -52,7 +52,7 @@ declarations {
 		}
 	}
 
-	§ Which Unicode normalization form `normalized(as:)` produces. A Choice
+	§ Which Unicode normalization form `normalize(as:)` produces. A Choice
 	§ rather than a `String` for the reason every mode here is one: the four
 	§ forms are a fixed, checkable set. Canonical (NFC/NFD) preserves the text;
 	§ Compatibility (NFKC/NFKD) also folds compatibility characters — ligatures,
@@ -91,7 +91,7 @@ declarations {
 	§ written on top of `characters`/`split`, so the grapheme view is the only
 	§ one a Program can observe. Both sides of a comparison are first normalized
 	§ to NFC, so canonically equivalent Strings — an accent composed or
-	§ decomposed — count, order and compare the same; `normalized(as:)` reaches
+	§ decomposed — count, order and compare the same; `normalize(as:)` reaches
 	§ the other forms.
 	namespace String for String is Equatable, is Printable, is Comparable {
 		§§ Whether this String has no characters at all.
@@ -220,12 +220,12 @@ declarations {
 		}
 
 		§§ The String with every character in upper case.
-		uppercased() -> String
+		uppercase() -> String
 
 		§§ The String with every character in lower case.
-		lowercased() -> String
+		lowercase() -> String
 
-		§ `normalized()` with no Argument is Composed Canonical (NFC), the form
+		§ `normalize()` with no Argument is Composed Canonical (NFC), the form
 		§ the rest of the Namespace already works in — `is`, `compare` and the
 		§ grapheme view all normalize to it — so it is what a Program wants far
 		§ more often than not. The `as:` entry is the native, naming the form.
@@ -233,9 +233,9 @@ declarations {
 		§§ The String in the given Unicode normalization form, or Composed Canonical (NFC) when none is named — so two Strings that look identical can be made to compare and read the same.
 		§§
 		§§ @returns — the normalized String.
-		overload normalized {
+		overload normalize {
 			() -> String {
-				<- @::normalized(as #ComposedCanonical)
+				<- @::normalize(as #ComposedCanonical)
 			}
 
 			§§ @param as — the normalization form to produce
@@ -533,7 +533,7 @@ declarations {
 					case #Sensitive   { <- text::compare(to other) }
 
 					case #Insensitive {
-						<- text::lowercased()::compare(to other::lowercased())
+						<- text::lowercase()::compare(to other::lowercase())
 					}
 				}
 			}

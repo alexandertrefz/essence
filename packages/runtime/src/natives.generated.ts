@@ -70,12 +70,12 @@ export type StringNatives = {
 	words: (self: StringType) => ListType<StringType>
 	// length() -> Integer
 	length: (self: StringType) => IntegerType
-	// uppercased() -> String
-	uppercased: (self: StringType) => StringType
-	// lowercased() -> String
-	lowercased: (self: StringType) => StringType
-	// normalized(as: NormalizationForm) -> String
-	normalized__overload$2: (self: StringType, as: NormalizationFormType) => StringType
+	// uppercase() -> String
+	uppercase: (self: StringType) => StringType
+	// lowercase() -> String
+	lowercase: (self: StringType) => StringType
+	// normalize(as: NormalizationForm) -> String
+	normalize__overload$2: (self: StringType, as: NormalizationFormType) => StringType
 	// trim(at: Side) -> String
 	trim__overload$2: (self: StringType, at: SideType) => StringType
 	// ends(with: String) -> Boolean
@@ -286,15 +286,15 @@ export type FunctionsNatives = {
 
 declare const StringModule: typeof import("./String")
 export const $String: StringNatives = StringModule
-export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "character" | "normalized__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compare__overload$2" | "toString"> = true
+export const $StringAbsent: AssertNoEssenceExports<typeof import("./String"), "isEmpty" | "hasAnyContent" | "is__overload$1" | "is__overload$2" | "isNot" | "prepend" | "lines" | "contains" | "doesNotContain" | "characters" | "character" | "normalize__overload$1" | "trim__overload$1" | "starts" | "doesNotStart" | "doesNotEnd" | "replaceEvery" | "replaceFirst" | "repeat" | "reverse" | "slice" | "firstIndex" | "lastIndex" | "pad__overload$1" | "pad__overload$2" | "compare__overload$2" | "toString"> = true
 export const $StringArity: AssertArities<typeof import("./String"), {
 	append: 2
 	split: 2
 	words: 1
 	length: 1
-	uppercased: 1
-	lowercased: 1
-	normalized__overload$2: 2
+	uppercase: 1
+	lowercase: 1
+	normalize__overload$2: 2
 	trim__overload$2: 2
 	ends: 2
 	compare__overload$1: 2

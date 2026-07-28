@@ -119,19 +119,19 @@ export function ends(
 	)
 }
 
-export function uppercased(originalString: StringType): StringType {
+export function uppercase(originalString: StringType): StringType {
 	return createString(originalString.value.toUpperCase())
 }
 
-export function lowercased(originalString: StringType): StringType {
+export function lowercase(originalString: StringType): StringType {
 	return createString(originalString.value.toLowerCase())
 }
 
-// NOTE: `normalized()` with no Argument is the Composed Canonical (NFC) entry,
+// NOTE: `normalize()` with no Argument is the Composed Canonical (NFC) entry,
 // written in Essence on top of this one; this native names the form. The four
-// Cases are the four Unicode normalization forms, so the map to `normalize`'s
-// argument is direct.
-export function normalized__overload$2(
+// Cases are the four Unicode normalization forms, so the map to the JavaScript
+// `String.prototype.normalize` argument is direct.
+export function normalize__overload$2(
 	originalString: StringType,
 	form: NormalizationFormType,
 ): StringType {

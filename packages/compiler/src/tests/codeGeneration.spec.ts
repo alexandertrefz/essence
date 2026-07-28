@@ -245,8 +245,8 @@ describe("Code Generation", () => {
 		it("compares Strings inside a Record by canonical equivalence", async () => {
 			expect(
 				await run(`implementation {
-					constant composed = "café"::normalized()
-					constant decomposed = "café"::normalized(as #DecomposedCanonical)
+					constant composed = "café"::normalize()
+					constant decomposed = "café"::normalize(as #DecomposedCanonical)
 
 					__print(composed::is(decomposed))
 					__print({ v = composed }::is({ v = decomposed }))
