@@ -147,9 +147,9 @@ declarations {
 				<- @::reduce(startingWith start, step (found, item) {
 					if check(item) {
 						<- #Done(item)
+					} else {
+						<- #Continue(found)
 					}
-
-					<- #Continue(found)
 				})
 			}
 		}
