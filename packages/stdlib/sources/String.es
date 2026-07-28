@@ -408,8 +408,7 @@ declarations {
 				§ `@` is the SCRUTINEE inside a match, not the receiver, so both
 				§ lengths are bound before the match to stay reachable in the Case
 				§ bodies.
-				<- match @
-					::reverse()
+				<- match @::reverse()
 					::firstIndex(of part::reverse()) -> Optional<Integer> {
 					case Nothing { <- nothing }
 

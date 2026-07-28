@@ -1321,6 +1321,13 @@ export class Printer {
 			return concat([head, linkDocs[0] as Doc])
 		}
 
+		// NOTE: A bare `@` is too small to hold a line of its own, so the
+		// first link stays fused to it and only the links after it break.
+		if (current.nodeType === "Self") {
+			head = concat([head, linkDocs[0] as Doc])
+			linkDocs = linkDocs.slice(1)
+		}
+
 		return group(
 			concat([
 				head,
