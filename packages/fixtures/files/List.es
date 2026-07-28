@@ -39,16 +39,20 @@ implementation {
 	__print(
 		numbers::keepEvery(where (n) { <- n::isGreaterThan(1) }),
 	) § [3, 2, 4]
-	__print(numbers::firstItem(where (n) { <- n::isGreaterThan(2) })) § 3
+	__print(
+		numbers::firstItem(where (n) { <- n::isGreaterThan(2) }),
+	) § Optional#Value(3)
 
 	§ Existential and universal checks read as sentences.
 	__print(numbers::anyItem(where (n) { <- n::isGreaterThan(3) })) § true
 	__print(numbers::everyItem(where (n) { <- n::isGreaterThan(0) })) § true
 
 	§ Indexing, slicing and counting — all zero-based, `slice` half-open.
-	__print(numbers::item(at 2)) § 2
-	__print(numbers::item(at 99)) § Nothing
-	__print(numbers::firstIndex(of 1)) § 1
+	§ A position outside the List is not an error and not a sentinel — the
+	§ answer is simply an Optional carrying nothing.
+	__print(numbers::item(at 2)) § Optional#Value(2)
+	__print(numbers::item(at 99)) § Optional#Empty
+	__print(numbers::firstIndex(of 1)) § Optional#Value(1)
 	__print(numbers::slice(from 1, to 3)) § [1, 2]
 	__print(numbers::count(of 1)) § 2
 

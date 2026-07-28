@@ -63,7 +63,7 @@ declarations {
 		§§
 		§§ @param numerator — the numerator
 		§§ @param over — the denominator
-		§§ @returns — the Rational, or `Nothing` when the denominator is zero.
+		§§ @returns — the Rational, or nothing when the denominator is zero.
 		static of(
 			_ numerator: Integer,
 			over denominator: Integer,
@@ -87,7 +87,7 @@ declarations {
 
 		§ The arithmetic here is written on the lowest-terms accessors and
 		§ `Rational.of`, so every result passes through the one gateway a
-		§ Rational may be built by. `of` can only answer `Nothing` for a zero
+		§ Rational may be built by. `of` can only come back empty for a zero
 		§ denominator, and a product of two denominators — each positive in
 		§ lowest terms — never is one, so each `otherwise` below is
 		§ unreachable. The irrational entries lean on commutativity: the other
@@ -143,19 +143,19 @@ declarations {
 			}
 		}
 
-		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
+		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by an Algebraic can never fail — an irrational is never zero.
 		overload divide {
 			(by other: Rational) -> Optional<Rational> {
 				§ Division is multiplication by the reciprocal, and `reciprocal`
-				§ already answers `Nothing` for zero — the same shape
+				§ already comes back empty for zero — the same shape
 				§ `Integer::divide(by:)` has.
 				constant dividend = @
 
-				<- match other::reciprocal() -> Optional<Rational> {
-					case Rational { <- dividend::multiply(with @) }
-
-					case Nothing  { <- nothing }
-				}
+				<- other
+					::reciprocal()
+					::map((reciprocal) {
+						<- dividend::multiply(with reciprocal)
+					})
 			}
 
 			(by other: Integer) -> Optional<Rational> {
@@ -248,7 +248,7 @@ declarations {
 			}
 		}
 
-		§§ The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.
+		§§ The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative is empty.
 		squareRoot() -> Optional<Rational | Algebraic>
 
 		§§ The numerator of the Rational in lowest terms. The sign of the Rational lives here — the denominator is always positive.
@@ -276,7 +276,7 @@ declarations {
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.
 		§§
-		§§ @returns — the reciprocal, or `Nothing` for zero.
+		§§ @returns — the reciprocal, or nothing for zero.
 		reciprocal() -> Optional<Rational> {
 			<- Rational.of(@::denominator(), over @::numerator())
 		}
@@ -312,7 +312,7 @@ declarations {
 				§ The denominator is positive in lowest terms, so the Euclidean
 				§ quotient is the FLOOR — `Down` outright, and the one Integer
 				§ the other three are placed against. `quotient` can only answer
-				§ `Nothing` for a zero divisor, and a denominator never is one.
+				§ empty for a zero divisor, and a denominator never is one.
 				constant floored = @::numerator()
 					::quotient(dividingBy @::denominator())
 					::otherwise(0)
@@ -372,71 +372,72 @@ declarations {
 		§§ Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.
 		§§
 		§§ @param exponent — the exponent
-		§§ @returns — the power, or `Nothing` when raising zero to a negative power.
+		§§ @returns — the power, or nothing when raising zero to a negative power.
 		raise(to exponent: Integer) -> Optional<Rational>
 
 		§§ Reads a Rational from its text form — a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`, each with an optional minus sign.
 		§§
 		§§ @param text — the text to read
-		§§ @returns — the Rational, or `Nothing` when the text has any other shape or divides by zero.
+		§§ @returns — the Rational, or nothing when the text has any other shape or divides by zero.
 		static parse(_ text: String) -> Optional<Rational> {
-			§ The sign is carried as the position of the first `-` — `0` for a
-			§ leading sign, anything else for none — exactly as
-			§ `Integer.parse` carries it, and for the same reason: a `match`
-			§ needs a Union, and a Boolean is not one.
-			constant signPosition = text::firstIndex(of "-")
+			§ The sign is carried as the position of a LEADING `-`, exactly as
+			§ `Integer.parse` carries it — `keep` discards a `-` standing
+			§ anywhere else, so what is left has a value exactly when the text
+			§ is negative.
+			constant sign = text
+				::firstIndex(of "-")
+				::keep(where (position) { <- position::is(0) })
 
-			constant unsignedText = match signPosition -> String {
-				case 0 { <- text::slice(from 1, to text::length()) }
+			constant unsignedText = match sign -> String {
+				case #Value { <- text::slice(from 1, to text::length()) }
 
-				case _ { <- text }
+				case #Empty { <- text }
 			}
 
 			§ The leading sign was the ONE place a `-` may stand — the pieces
 			§ below are plain digit runs, so `1/-2` and `--1/2` are refused
 			§ here rather than read as signed pieces.
 			if unsignedText::contains("-") {
-				<- nothing
+				<- #Empty
 			}
 
 			§ The sign folds back in as a factor on the numerator — the pieces
 			§ below are unsigned, so multiplying the parsed numerator by this
 			§ is the whole of what the leading `-` means.
-			constant signFactor = match signPosition -> Integer {
-				case 0 { <- -1 }
+			constant signFactor = match sign -> Integer {
+				case #Value { <- -1 }
 
-				case _ { <- 1 }
+				case #Empty { <- 1 }
 			}
 
 			constant fractionPieces = unsignedText::split(on "/")
 
 			if fractionPieces::length()::is(2) {
 				§ One slash — a numerator over a denominator. `Rational.of`
-				§ answers the zero-denominator `Nothing` itself.
+				§ answers the zero-denominator empty itself, so both arms
+				§ below hand back what it decided rather than wrapping it.
 				<- match Integer.parse(
 					fractionPieces::firstItem()::otherwise(""),
 				) -> Optional<Rational> {
-					case Nothing { <- nothing }
+					case #Empty { <- #Empty }
 
-					case _ {
-						constant parsedNumerator = @
-
+					case #Value(parsedNumerator) {
 						<- match Integer.parse(
 							fractionPieces::lastItem()::otherwise(""),
 						) -> Optional<Rational> {
-							case Nothing { <- nothing }
+							case #Empty                    { <- #Empty }
 
-							case _       {
+							case #Value(parsedDenominator) {
 								<- Rational.of(
 									parsedNumerator::multiply(with signFactor),
-									over @,
+									over parsedDenominator,
 								)
 							}
 						}
 					}
 				}
 			} else if fractionPieces::length()::isNot(1) {
-				<- nothing
+				<- #Empty
 			} else {
 				constant decimalPieces = unsignedText::split(on ".")
 
@@ -451,17 +452,16 @@ declarations {
 						::otherwise("")
 
 					if wholeText::isEmpty()::or(fractionalText::isEmpty()) {
-						<- nothing
+						<- #Empty
 					}
 
 					<- match Integer.parse(
 						wholeText::append(fractionalText),
 					) -> Optional<Rational> {
-						case Nothing { <- nothing }
+						case #Empty { <- #Empty }
 
-						case _ {
-							constant digitsValue = @
-							constant scale       = fractionalText
+						case #Value(digitsValue) {
+							constant scale = fractionalText
 								::characters()
 								::reduce(startingWith 1, (scaled, _) {
 									<- scaled::multiply(with 10)
@@ -474,14 +474,17 @@ declarations {
 						}
 					}
 				} else if decimalPieces::length()::isNot(1) {
-					<- nothing
+					<- #Empty
 				} else {
 					§ No slash and no dot — a whole number.
 					<- match Integer.parse(unsignedText) -> Optional<Rational> {
-						case Nothing { <- nothing }
+						case #Empty              { <- #Empty }
 
-						case _       {
-							<- Rational.of(@::multiply(with signFactor), over 1)
+						case #Value(parsedWhole) {
+							<- Rational.of(
+								parsedWhole::multiply(with signFactor),
+								over 1,
+							)
 						}
 					}
 				}

@@ -42,6 +42,11 @@ export const builtinMemberOrder: Array<string> = [
 	"Number",
 	"Nothing",
 	"Optional",
+	// NOTE: Directly after `Optional`, for the reason `NestedList` sits
+	// directly after `List` — the two Namespaces one Optional value can reach
+	// belong together, and the general one has to be met FIRST so that
+	// `NestedOptional::flatten` reads as the extra a nested Optional has.
+	"NestedOptional",
 	"Ordering",
 	"Side",
 	"Case",

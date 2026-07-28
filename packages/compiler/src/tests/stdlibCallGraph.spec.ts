@@ -530,6 +530,12 @@ describe("Stdlib Call Graph", () => {
 			"List.repeat",
 			"List.replace",
 			"List.toString",
+			// NOTE: `flatten` is the one Optional Method that is not on every
+			// Optional, so it lives in a Namespace of its own — receiver
+			// `Optional<Optional<ItemType>>` — exactly as `NestedList::flatten`
+			// does, and it is a Node under that Namespace's name rather than
+			// under `Optional`.
+			"NestedOptional.flatten",
 			"NormalizationForm.toString",
 			"Nothing.is",
 			"Nothing.isNot",
@@ -567,8 +573,11 @@ describe("Stdlib Call Graph", () => {
 			"Number.toString",
 			"NumberFormat.toString",
 			"Optional.hasValue",
-			"Optional.isNothing",
+			"Optional.isEmpty",
+			"Optional.keep",
+			"Optional.map",
 			"Optional.otherwise",
+			"Optional.toString",
 			"Ordering.toString",
 			"Rational.absolute",
 			"Rational.add__overload$1",

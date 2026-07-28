@@ -100,6 +100,20 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			return obj[typeKeySymbol]
 		}
 
+		// NOTE: A ONE-member Case prints its payload bare, in parentheses,
+		// because that is how the language already writes one: `#Value(5)`
+		// stands for `#Value({ item = 5 })`, and the member's name is decided
+		// by the Case rather than chosen at the construction. Spelling it as a
+		// Record here would print a name the writer never wrote — and every
+		// `Optional` in a Program is one of these, so the noise would be
+		// everywhere.
+		if (payloadEntries.length === 1) {
+			return `${obj[typeKeySymbol]}(${getStringRepresentation(
+				payloadEntries[0]![1] as never,
+				indentLevel,
+			)})`
+		}
+
 		let payload = {
 			...Object.fromEntries(payloadEntries),
 			[typeKeySymbol]: "Record",

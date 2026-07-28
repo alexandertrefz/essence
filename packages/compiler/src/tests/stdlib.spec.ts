@@ -5,10 +5,15 @@ import * as boolean from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as list from "@essence-lang/runtime/List"
 import * as number from "@essence-lang/runtime/Number"
+import * as optional from "@essence-lang/runtime/Optional"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as string from "@essence-lang/runtime/String"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
-import { boundConformance, typeKeySymbol } from "@essence-lang/runtime/type"
+import {
+	type AnyType,
+	boundConformance,
+	typeKeySymbol,
+} from "@essence-lang/runtime/type"
 
 import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
@@ -20,6 +25,28 @@ const rat = (numerator: bigint, denominator: bigint) =>
 const str = (value: string) => string.createString(value)
 const bool = (value: boolean) => boolean.createBoolean(value)
 const ints = (...values: Array<bigint>) => list.createList(values.map(int))
+
+// NOTE: `Optional` is a nominal Choice now (packages/stdlib/sources/Optional.es), not a
+// Type Alias for `ItemType | Nothing`, so a fallible native no longer answers
+// its result bare — it answers `Optional#Value { item }` or `Optional#Empty`.
+// These two build exactly what the natives build, so an assertion about a
+// fallible native names the whole answer rather than reaching past the wrapper.
+const value = <ItemType extends AnyType>(item: ItemType) =>
+	optional.createValue(item)
+const empty = () => optional.createEmpty()
+
+// NOTE: For the assertions that have to POKE at the value inside — the ones
+// that check a Type tag or cross-multiply two Rationals — rather than compare
+// the whole answer. The `#Value` Case is asserted on the way through, so a
+// native that came back empty fails here instead of further down with an
+// undefined member.
+const unwrap = <ItemType extends AnyType>(
+	answer: optional.OptionalType<ItemType>,
+): ItemType => {
+	expect(answer[typeKeySymbol]).toBe("Optional#Value")
+
+	return (answer as optional.ValueType<ItemType>).item
+}
 
 // NOTE: `Rational.is` is written in Essence now (packages/stdlib/sources/Rational.es), so
 // there is no runtime function left to compare two Rationals with. The
@@ -57,27 +84,28 @@ function diagnosticsFor(source: string) {
 
 describe("Stdlib", () => {
 	describe("Integer everyday Methods", () => {
-		it("takes the Euclidean remainder — never negative", () => {
-			expect(integer.remainder(int(7n), int(3n))).toEqual(int(1n))
-			expect(integer.remainder(int(-7n), int(3n))).toEqual(int(2n))
-			expect(integer.remainder(int(-7n), int(-3n))).toEqual(int(2n))
-			expect(integer.remainder(int(7n), int(-3n))).toEqual(int(1n))
-			expect(integer.remainder(int(7n), int(0n))[typeKeySymbol]).toBe(
-				"Nothing",
+		it("takes the Euclidean remainder — never negative, and is empty on a zero divisor", () => {
+			expect(integer.remainder(int(7n), int(3n))).toEqual(value(int(1n)))
+			expect(integer.remainder(int(-7n), int(3n))).toEqual(value(int(2n)))
+			expect(integer.remainder(int(-7n), int(-3n))).toEqual(
+				value(int(2n)),
 			)
+			expect(integer.remainder(int(7n), int(-3n))).toEqual(value(int(1n)))
+			expect(integer.remainder(int(7n), int(0n))).toEqual(empty())
 		})
 
 		it("raises to a power, exactly in both directions", () => {
-			expect(integer.raise(int(2n), int(10n))).toEqual(int(1024n))
-			expect(integer.raise(int(0n), int(0n))).toEqual(int(1n))
+			expect(integer.raise(int(2n), int(10n))).toEqual(value(int(1024n)))
+			expect(integer.raise(int(0n), int(0n))).toEqual(value(int(1n)))
 
-			const reciprocalPower = integer.raise(int(2n), int(-2n))
+			// NOTE: A negative exponent widens the answer to a Rational, so the
+			// `#Value` payload here is not an Integer — the Type tag is read off
+			// the payload rather than off the Optional.
+			const reciprocalPower = unwrap(integer.raise(int(2n), int(-2n)))
 			expect(reciprocalPower[typeKeySymbol]).toBe("Rational")
 			expect(ratIs(reciprocalPower as never, rat(1n, 4n))).toBe(true)
 
-			expect(integer.raise(int(0n), int(-1n))[typeKeySymbol]).toBe(
-				"Nothing",
-			)
+			expect(integer.raise(int(0n), int(-1n))).toEqual(empty())
 		})
 
 		it("negates a value", () => {
@@ -120,19 +148,17 @@ describe("Stdlib", () => {
 		it("raises to a power, exactly in both directions", () => {
 			expect(
 				ratIs(
-					rational.raise(rat(2n, 3n), int(2n)) as never,
+					unwrap(rational.raise(rat(2n, 3n), int(2n))),
 					rat(4n, 9n),
 				),
 			).toBe(true)
 			expect(
 				ratIs(
-					rational.raise(rat(2n, 3n), int(-2n)) as never,
+					unwrap(rational.raise(rat(2n, 3n), int(-2n))),
 					rat(9n, 4n),
 				),
 			).toBe(true)
-			expect(rational.raise(rat(0n, 1n), int(-1n))[typeKeySymbol]).toBe(
-				"Nothing",
-			)
+			expect(rational.raise(rat(0n, 1n), int(-1n))).toEqual(empty())
 		})
 
 		// NOTE: `parse` is written in Essence now
@@ -301,13 +327,13 @@ describe("Stdlib", () => {
 			expect(pairs.value[1].second).toEqual(int(2n))
 		})
 
-		it("splits into groups, the last one shorter", () => {
+		it("splits into groups, the last one shorter, and is empty on a group size below one", () => {
 			const groups = list.split(ints(1n, 2n, 3n, 4n, 5n), int(2n))
 
 			expect(groups).toEqual(
-				list.createList([ints(1n, 2n), ints(3n, 4n), ints(5n)]),
+				value(list.createList([ints(1n, 2n), ints(3n, 4n), ints(5n)])),
 			)
-			expect(list.split(ints(1n), int(0n))[typeKeySymbol]).toBe("Nothing")
+			expect(list.split(ints(1n), int(0n))).toEqual(empty())
 		})
 
 		// NOTE: `List.sorted` is implemented in Essence now
@@ -399,7 +425,11 @@ describe("Stdlib", () => {
 	})
 
 	describe("Enricher typings", () => {
-		it("types otherwise by the non-Nothing member", () => {
+		// NOTE: `otherwise` used to be typed by picking the non-`Nothing` member
+		// out of the Union the Alias stood for. `Optional` is a nominal Choice
+		// now, so what it is typed by is the Choice's own Type Argument — the
+		// `item` the `#Value` Case carries — and the fallback has to match that.
+		it("types otherwise by the Optional's item Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant fallback: Integer = [1]::firstItem()::otherwise(0)

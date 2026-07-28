@@ -4336,12 +4336,12 @@ function unimportedNamespaceHelps(
 // Method or the value is not the Type they thought it was. The near miss is
 // offered from the same set, so a suggestion is always a Method that would
 // actually resolve.
-function reportUnknownMethod(
-	node: parser.MethodInvocationNode,
-	baseType: common.Type,
+// NOTE: Every Method name a set of Namespaces declares, for the near miss two
+// unknown-method reports each want — the one for a plain receiver, and the one
+// per-member dispatch raises for a Union.
+function methodNamesOf(
 	namespaces: Map<string, common.NamespaceType>,
-	scope: enricher.Scope,
-): void {
+): Array<string> {
 	let methodNames = new Set<string>()
 
 	for (let namespace of namespaces.values()) {
@@ -4350,7 +4350,19 @@ function reportUnknownMethod(
 		}
 	}
 
-	let suggestion = closestMatch(node.member.content, [...methodNames])
+	return [...methodNames]
+}
+
+function reportUnknownMethod(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	namespaces: Map<string, common.NamespaceType>,
+	scope: enricher.Scope,
+): void {
+	let suggestion = closestMatch(
+		node.member.content,
+		methodNamesOf(namespaces),
+	)
 	let namespaceNames = [...namespaces.keys()]
 
 	reportError(
@@ -4881,6 +4893,24 @@ function resolveUnionMethodDispatch(
 				return resolveFailedMethodInvocation()
 			}
 
+			// NOTE: The near miss is looked for on the Namespaces that target
+			// the WHOLE Union, not on this member's — a covering Namespace is
+			// the likeliest thing a mistyped call meant, and it is exactly
+			// where per-member dispatch does not look. `Optional` is the
+			// everyday case: `firstItem()::hasValu()` reaches here because no
+			// Case declares the name, and the Method it meant is one letter
+			// away on the Namespace over both Cases.
+			let suggestion = closestMatch(
+				node.member.content,
+				methodNamesOf(
+					resolveMethodLookupNamespacesForReceiverType(
+						unionType,
+						node.namespaceSpecifier,
+						scope,
+					),
+				),
+			)
+
 			reportError(
 				`No Method named '${node.member.content}' for ${describeType(memberType)}`,
 				node.member.position,
@@ -4899,6 +4929,11 @@ function resolveUnionMethodDispatch(
 					notes: [
 						`Every member of the Union must provide '${node.member.content}' — the receiver's Type is only known at runtime.`,
 					],
+					helps:
+						suggestion === null
+							? []
+							: [`Did you mean '${suggestion}'?`],
+					...suggestionData(suggestion),
 				},
 			)
 
@@ -6960,9 +6995,16 @@ function reportAmbiguousCase(
 				(choiceName) =>
 					`'${choiceName}' declares '#${caseName.content}'.`,
 			),
-			helps: [
-				`Write '${choiceNames[0]}#${caseName.content}' to pick one.`,
-			],
+			// NOTE: One Help per candidate, not just the first. WHICH Choice was
+			// meant is exactly what this Diagnostic can not decide, so naming
+			// only one quietly recommends it — and since `Optional` became a
+			// builtin Choice, `#Empty` and `#Value` collide with names a
+			// Program is likely to declare, where the builtin is the one it
+			// almost certainly did NOT mean.
+			helps: choiceNames.map(
+				(choiceName) =>
+					`Write '${choiceName}#${caseName.content}' to pick '${choiceName}'.`,
+			),
 		},
 	)
 }

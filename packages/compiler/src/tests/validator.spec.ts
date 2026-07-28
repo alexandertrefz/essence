@@ -57,18 +57,77 @@ describe("Validator", () => {
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
 
-		it("should treat a nested Optional and its flattened spelling as interchangeable", () => {
-			// NOTE: `Optional<Integer | Rational>` nests its payload as one
-			// member; the flat spelling lists all three. Assignability must
-			// accept both directions — the two describe the same values.
+		it("should treat an Optional and its flattened spelling as different Types", () => {
+			// NOTE: `Optional<ItemType>` was a Type Alias for
+			// `ItemType | Nothing`, so `Optional<Integer | Rational>` and
+			// `Integer | Rational | Nothing` were two spellings of one Type
+			// and assignability accepted both directions. Optional is a
+			// nominal Choice now — a value is `#Value(payload)` or `#Empty`,
+			// which is not the payload sitting in a Union beside `Nothing`.
+			// Neither direction is assignable any more, and that is the
+			// point: no hand-written Union can be Optional-shaped by
+			// accident, and the wrapper is what carries the Namespace an
+			// `Integer | Nothing` never had.
 			expect(
 				diagnosticsFor(`implementation {
-					constant nested: Optional<Integer | Rational> = 1
-					constant flat: Integer | Rational | Nothing = nested
-					constant back: Optional<Integer | Rational> = flat
-					__print(back)
+					constant nested: Optional<Integer | Rational> = #Value(1)
+					__print(nested)
 				}`),
 			).toEqual([])
+
+			let widened = diagnosticsFor(`implementation {
+				constant nested: Optional<Integer | Rational> = #Value(1)
+				constant flat: Integer | Rational | Nothing = nested
+				__print(flat)
+			}`)
+
+			expect(widened).toHaveLength(1)
+			expect(widened[0].code).toBe("assignment-type-mismatch")
+			expect(widened[0].labels[0]?.message).toBe(
+				"this is an Optional<Integer | Rational>",
+			)
+
+			let narrowed = diagnosticsFor(`implementation {
+				constant flat: Integer | Rational | Nothing = 1
+				constant back: Optional<Integer | Rational> = flat
+				__print(back)
+			}`)
+
+			expect(narrowed).toHaveLength(1)
+			expect(narrowed[0].code).toBe("assignment-type-mismatch")
+			expect(narrowed[0].labels[0]?.message).toBe(
+				"this is an Integer | Rational | Nothing",
+			)
+		})
+
+		it("should keep a nested Optional distinct from the Optional it wraps", () => {
+			// NOTE: The other half of the same change, and the reason it was
+			// worth making. As a Type Alias `Optional<Optional<Integer>>`
+			// flattened to `Integer | Nothing`, so a `List<Optional<Integer>>`
+			// could not say whether `firstItem()` had found an empty Optional
+			// or had found nothing at all. The Choice keeps the two levels
+			// apart: `#Value(#Empty)` is not `#Empty`, and only
+			// `NestedOptional::flatten` collapses one into the other.
+			expect(
+				diagnosticsFor(`implementation {
+					constant inner: Optional<Integer> = #Empty
+					constant nested: Optional<Optional<Integer>> = #Value(inner)
+					__print(nested::flatten())
+				}`),
+			).toEqual([])
+
+			let diagnostics = diagnosticsFor(`implementation {
+				constant inner: Optional<Integer> = #Value(1)
+				constant nested: Optional<Optional<Integer>> = #Value(inner)
+				constant flat: Optional<Integer> = nested
+				__print(flat)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this is an Optional<Optional<Integer>>",
+			)
 		})
 
 		it("should report Variable Declarations with mismatched Types", () => {
@@ -1148,7 +1207,7 @@ describe("Validator", () => {
 		it("should accept declared Types matching inferred return Types", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant a: String | Nothing = ["x"]::firstItem()
+					constant a: Optional<String> = ["x"]::firstItem()
 				}`),
 			).toEqual([])
 		})
@@ -1165,12 +1224,12 @@ describe("Validator", () => {
 			)
 		})
 
-		it("should type Divisions as Rational | Nothing", () => {
+		it("should type Divisions as Optional<Rational>", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant a: Rational | Nothing = 1::divide(by 2)
-					constant b: Rational | Nothing = 1/2::divide(by 2)
-					constant c: Rational | Nothing = Rational.of(1, over 2)
+					constant a: Optional<Rational> = 1::divide(by 2)
+					constant b: Optional<Rational> = 1/2::divide(by 2)
+					constant c: Optional<Rational> = Rational.of(1, over 2)
 				}`),
 			).toEqual([])
 
@@ -1205,14 +1264,20 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		it("should validate Match Expressions over Generic Unions", () => {
+		it("should validate Match Expressions over Generic Choices", () => {
+			// NOTE: `firstItem()` answers `Optional<Item>` for a Generic
+			// `Item`, so the Cases are the Choice's own — and the payload
+			// binding is what carries `Item` out of the Match: `item` is
+			// typed as the Namespace's `Item`, which is what the `<-` has to
+			// fit. The Match is exhaustive by the Choice's two Cases, so no
+			// `case _` is needed to prove it.
 			expect(
 				diagnosticsFor(`implementation {
 					namespace Wrapper<infer Item> for List<Item> {
 						firstOr(fallback fallbackValue: Item) -> Item {
 							<- match @::firstItem() -> Item {
-								case Nothing { <- fallbackValue }
-								case Item { <- @ }
+								case #Value(item) { <- item }
+								case #Empty      { <- fallbackValue }
 							}
 						}
 					}

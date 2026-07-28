@@ -1234,18 +1234,49 @@ describe("Choices", () => {
 		describe("A unit Case of a generic Choice", () => {
 			const box = `choice Box<Value> { Full { value: Value }, Empty }`
 
+			// NOTE: `Optional` is a generic Choice in every Program's scope now, and
+			// its empty Case is spelled `#Empty` — so a Choice of one's own that
+			// names a unit Case the same way makes the BARE spelling ambiguous
+			// before anything gets as far as asking what decides it. Which is what
+			// this second Choice is for: the undecided rail is only reachable
+			// through a unit Case name nothing ELSE in scope declares, and the
+			// collision the shared `box` now has is pinned on its own below.
+			const blankBox = `choice Box<Value> { Full { value: Value }, Blank }`
+
 			it("reports one nothing decides", () => {
-				let source = `implementation { ${box}
-					constant empty = #Empty
+				let source = `implementation { ${blankBox}
+					constant blank = #Blank
 				}`
 
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
 				expect(messagesOf(source)).toEqual([
-					"Nothing decides the Type Arguments of '#Empty'",
+					"Nothing decides the Type Arguments of '#Blank'",
 				])
 				expect(helpsOf(source)).toEqual([
-					"Annotate the declaration: 'constant left: Box<Value> = #Empty'.",
-					"Or apply the Type Arguments: 'Box<Value>#Empty'.",
+					"Annotate the declaration: 'constant left: Box<Value> = #Blank'.",
+					"Or apply the Type Arguments: 'Box<Value>#Blank'.",
+				])
+			})
+
+			// NOTE: And a bare `#Empty` is answered by the ambiguity rail rather
+			// than the undecided one, because which Choice is meant has to be
+			// settled before its Type Arguments can be: `Optional` declares one too,
+			// and a Program that declares a second is told to prefix the spelling.
+			// The rails downstream are unchanged — every test below hands the bare
+			// form a position that names `Box`, and a position that decides which
+			// Choice is meant decides this one as well.
+			it("reports a bare one the builtin Optional also declares", () => {
+				let source = `implementation { ${box}
+					constant empty = #Empty
+				}`
+
+				expect(codesOf(source)).toEqual(["ambiguous-case"])
+				expect(messagesOf(source)).toEqual([
+					"Case '#Empty' is declared by more than one Choice",
+				])
+				expect(notesOf(source)).toEqual([
+					"'Optional' declares '#Empty'.",
+					"'Box' declares '#Empty'.",
 				])
 			})
 
@@ -1495,6 +1526,17 @@ describe("Choices", () => {
 			Empty,
 		}`
 
+		// NOTE: The same Choice with its unit Case spelled so nothing else in
+		// scope declares it. The builtin `Optional` declares an `#Empty` of its
+		// own, so a BARE `#Empty` no position decides is answered by the ambiguity
+		// rail before the undecided one is reached — and it is the undecided one
+		// under test here. Every other test in this block hands the bare form a
+		// position that names `Box`, which settles the ambiguity as it goes.
+		const blankBox = `choice Box<T is Equatable> {
+			Full { value: T },
+			Blank,
+		}`
+
 		it("rejects an annotation whose Type Argument does not conform", () => {
 			let source = `implementation { ${boundedBox}
 				constant b: Box<(_ x: Integer) -> Integer> = #Empty
@@ -1550,13 +1592,13 @@ describe("Choices", () => {
 		// of the Program, where the bound had nothing to ask about and the Type
 		// Arguments named something no declaration in sight applies.
 		it("refuses a bare unit construction nothing decides", () => {
-			let source = `implementation { ${boundedBox}
-				constant b = #Empty
+			let source = `implementation { ${blankBox}
+				constant b = #Blank
 			}`
 
 			expect(codesOf(source)).toEqual(["undecided-type-arguments"])
 			expect(messagesOf(source)).toEqual([
-				"Nothing decides the Type Arguments of '#Empty'",
+				"Nothing decides the Type Arguments of '#Blank'",
 			])
 		})
 

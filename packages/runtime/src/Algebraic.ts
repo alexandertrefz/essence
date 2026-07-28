@@ -8,8 +8,8 @@ import {
 	subtractRationals,
 } from "./bigRational"
 import type { IntegerType } from "./Integer"
-import type { NothingType } from "./Nothing"
-import { createNothing } from "./Nothing"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
@@ -134,22 +134,24 @@ function radicalCoefficientOf(algebraic: AlgebraicType): BigRational {
 // the root is exact and an Algebraic otherwise.
 export function squareRootOfRational(
 	value: BigRational,
-): AlgebraicType | RationalType | NothingType {
+): OptionalType<AlgebraicType | RationalType> {
 	if (value.numerator < 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
 	// NOTE: √0 is exactly 0 — the one non-negative root that leaves no radical
 	// at all. Said here rather than left to `createAlgebraic` so the answer is
 	// the canonical zero and not `0/q`.
 	if (value.numerator === 0n) {
-		return createRational(0n, 1n)
+		return createValue(createRational(0n, 1n))
 	}
 
-	return createAlgebraic(
-		{ numerator: 0n, denominator: 1n },
-		{ numerator: 1n, denominator: value.denominator },
-		value.numerator * value.denominator,
+	return createValue(
+		createAlgebraic(
+			{ numerator: 0n, denominator: 1n },
+			{ numerator: 1n, denominator: value.denominator },
+			value.numerator * value.denominator,
+		),
 	)
 }
 
@@ -393,45 +395,49 @@ export function multiply(
 export function divide(
 	algebraic: AlgebraicType,
 	other: IntegerType | RationalType,
-): AlgebraicType | NothingType {
+): OptionalType<AlgebraicType> {
 	const divisor = bigRationalOf(other)
 
 	if (divisor.numerator === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createAlgebraic(
-		divideRationals(rationalPartOf(algebraic), divisor),
-		divideRationals(radicalCoefficientOf(algebraic), divisor),
-		algebraic.radicand,
-	) as AlgebraicType
+	return createValue(
+		createAlgebraic(
+			divideRationals(rationalPartOf(algebraic), divisor),
+			divideRationals(radicalCoefficientOf(algebraic), divisor),
+			algebraic.radicand,
+		) as AlgebraicType,
+	)
 }
 
 // NOTE: Same-radicand arithmetic stays inside the slice (and may collapse to
-// a Rational — √2·√2 = 2); different radicands generally do not — those
-// return Nothing until the general algebraic representation exists.
+// a Rational — √2·√2 = 2); different radicands generally do not — those come
+// back empty until the general algebraic representation exists.
 export function addAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
-): AlgebraicType | RationalType | NothingType {
+): OptionalType<AlgebraicType | RationalType> {
 	if (algebraic.radicand !== other.radicand) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createAlgebraic(
-		addRationals(rationalPartOf(algebraic), rationalPartOf(other)),
-		addRationals(
-			radicalCoefficientOf(algebraic),
-			radicalCoefficientOf(other),
+	return createValue(
+		createAlgebraic(
+			addRationals(rationalPartOf(algebraic), rationalPartOf(other)),
+			addRationals(
+				radicalCoefficientOf(algebraic),
+				radicalCoefficientOf(other),
+			),
+			algebraic.radicand,
 		),
-		algebraic.radicand,
 	)
 }
 
 export function multiplyWithAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
-): AlgebraicType | RationalType | NothingType {
+): OptionalType<AlgebraicType | RationalType> {
 	const firstRational = rationalPartOf(algebraic)
 	const firstRadical = radicalCoefficientOf(algebraic)
 	const secondRational = rationalPartOf(other)
@@ -439,42 +445,46 @@ export function multiplyWithAlgebraic(
 
 	if (algebraic.radicand === other.radicand) {
 		// NOTE: (a + b·√d)(a' + b'·√d) = aa' + bb'·d + (ab' + a'b)·√d.
-		return createAlgebraic(
-			addRationals(
-				multiplyRationals(firstRational, secondRational),
-				multiplyRationals(
-					multiplyRationals(firstRadical, secondRadical),
-					{
-						numerator: algebraic.radicand,
-						denominator: 1n,
-					},
+		return createValue(
+			createAlgebraic(
+				addRationals(
+					multiplyRationals(firstRational, secondRational),
+					multiplyRationals(
+						multiplyRationals(firstRadical, secondRadical),
+						{
+							numerator: algebraic.radicand,
+							denominator: 1n,
+						},
+					),
 				),
+				addRationals(
+					multiplyRationals(firstRational, secondRadical),
+					multiplyRationals(secondRational, firstRadical),
+				),
+				algebraic.radicand,
 			),
-			addRationals(
-				multiplyRationals(firstRational, secondRadical),
-				multiplyRationals(secondRational, firstRadical),
-			),
-			algebraic.radicand,
 		)
 	}
 
 	// NOTE: Across radicands only pure radicals stay quadratic:
 	// b·√d · b'·√e = bb'·√(d·e).
 	if (firstRational.numerator === 0n && secondRational.numerator === 0n) {
-		return createAlgebraic(
-			{ numerator: 0n, denominator: 1n },
-			multiplyRationals(firstRadical, secondRadical),
-			algebraic.radicand * other.radicand,
+		return createValue(
+			createAlgebraic(
+				{ numerator: 0n, denominator: 1n },
+				multiplyRationals(firstRadical, secondRadical),
+				algebraic.radicand * other.radicand,
+			),
 		)
 	}
 
-	return createNothing()
+	return createEmpty()
 }
 
 export function divideByAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
-): AlgebraicType | RationalType | NothingType {
+): OptionalType<AlgebraicType | RationalType> {
 	const reciprocal = reciprocalOf(other)
 
 	if (reciprocal[typeKeySymbol] === "Algebraic") {
@@ -484,7 +494,7 @@ export function divideByAlgebraic(
 	// NOTE: A reciprocal can not itself collapse — the inverse of an
 	// irrational is irrational — so this branch is unreachable; it exists for
 	// the type system.
-	return createNothing()
+	return createEmpty()
 }
 
 // NOTE: `value − algebraic`, for the commuted overloads on Integer and

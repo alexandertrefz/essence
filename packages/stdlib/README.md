@@ -120,7 +120,7 @@ to break:
   `count(where:)`, `anyItem(where:)`.
 - **Count-like nonsense is lenient; value-like failure returns an `Optional`** —
   `List.repeat(_, times 0)` is the empty List, while `clamp` with inverted
-  bounds is `Nothing`.
+  bounds is `#Empty`.
 - **Keep return Types tight.** Add Overloads rather than widening one signature:
   `Integer::add(Integer) -> Integer` beside `add(Rational) -> Rational`, never a
   single `add(Number) -> Number`.

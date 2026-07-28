@@ -8,6 +8,7 @@ import * as functions from "@essence-lang/runtime/functions"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
+import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
 import * as normalizationForm from "@essence-lang/runtime/NormalizationForm"
 import * as nothing from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
@@ -41,6 +42,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Number: number,
 	Nothing: nothing,
 	Optional: optional,
+	NestedOptional: nestedOptional,
 	Ordering: ordering,
 	Side: side,
 	Case: caseModule,

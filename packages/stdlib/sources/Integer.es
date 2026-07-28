@@ -74,7 +74,7 @@ declarations {
 			}
 		}
 
-		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
+		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by an Algebraic can never fail — an irrational is never zero.
 		overload divide {
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
@@ -82,10 +82,12 @@ declarations {
 
 			(by other: Rational) -> Optional<Rational> {
 				constant dividend = @
-				<- match other::reciprocal() -> Optional<Rational> {
-					case Rational { <- dividend::multiply(with @) }
-					case Nothing  { <- nothing }
-				}
+
+				<- other
+					::reciprocal()
+					::map((reciprocal) {
+						<- dividend::multiply(with reciprocal)
+					})
 			}
 
 			(by other: Algebraic) -> Algebraic | Rational
@@ -172,7 +174,7 @@ declarations {
 			}
 		}
 
-		§§ The exact square root. A perfect square gives a Integer; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.
+		§§ The exact square root. A perfect square gives a Integer; any other non-negative value gives an exact Algebraic — and a negative is empty.
 		squareRoot() -> Optional<Integer | Algebraic>
 
 		§§ The Integer without its sign — its distance from zero.
@@ -189,9 +191,17 @@ declarations {
 
 		§§ Whether the Integer is divisible by two. Zero is even.
 		isEven() -> Boolean {
+			§ Matched apart rather than written `::is(#Value(0))`, which reads
+			§ better and costs a Program 2.4 kB: a Choice's derived equality on
+			§ a GENERIC Choice goes through `boundChoiceIs` and the descriptor
+			§ machinery behind it, and `isEven` is reached by almost everything.
+			§ `src/tests/bundleSize.spec.ts` is the guard.
+			§
+			§ A divisor of two can not be zero, so the empty arm never runs.
 			<- match @::remainder(dividingBy 2) -> Boolean {
-				case 0 { <- true }
-				case _ { <- false }
+				case #Value(rest) { <- rest::is(0) }
+
+				case #Empty       { <- false }
 			}
 		}
 
@@ -218,64 +228,66 @@ declarations {
 		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainder(dividingBy 3)` is `2`.
 		§§
 		§§ @param dividingBy — the divisor
-		§§ @returns — the remainder, or `Nothing` when dividing by zero.
+		§§ @returns — the remainder, or nothing when dividing by zero.
 		remainder(dividingBy divisor: Integer) -> Optional<Integer>
 
 		§§ The whole part of Euclidean division — the count of whole divisors, paired with `remainder` so that `quotient · divisor + remainder` is the original Integer. `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, since the remainder is never negative.
 		§§
 		§§ @param dividingBy — the divisor
-		§§ @returns — the quotient, or `Nothing` when dividing by zero.
+		§§ @returns — the quotient, or nothing when dividing by zero.
 		quotient(dividingBy divisor: Integer) -> Optional<Integer>
 
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
 		§§
 		§§ @param exponent — the exponent
-		§§ @returns — the power, or `Nothing` when raising zero to a negative power.
+		§§ @returns — the power, or nothing when raising zero to a negative power.
 		raise(to exponent: Integer) -> Optional<Integer | Rational>
 
 		§§ The Integer, pulled into the given bounds — the lower bound when below it, the upper when above it, itself otherwise.
 		§§
 		§§ @param lowest — the lowest allowed value
 		§§ @param and — the highest allowed value
-		§§ @returns — the clamped Integer, or `Nothing` when the bounds are in the wrong order.
+		§§ @returns — the clamped Integer, or nothing when the bounds are in the wrong order.
 		clamp(
 			between lowest: Integer,
 			and highest: Integer,
 		) -> Optional<Integer> {
 			if lowest::isGreaterThan(highest) {
-				<- nothing
+				<- #Empty
 			} else if @::isLessThan(lowest) {
-				<- lowest
+				<- #Value(lowest)
 			} else if @::isGreaterThan(highest) {
-				<- highest
+				<- #Value(highest)
 			} else {
-				<- @
+				<- #Value(@)
 			}
 		}
 
 		§§ Reads an Integer from its text form — an optional minus sign followed by digits, the same shape `toString` produces.
 		§§
 		§§ @param text — the text to read
-		§§ @returns — the Integer, or `Nothing` when the text has any other shape.
+		§§ @returns — the Integer, or nothing when the text has any other shape.
 		static parse(_ text: String) -> Optional<Integer> {
-			§ A `match` needs a Union, and a Boolean is not one — so the sign
-			§ is carried as the position of the first `-`, which is `0` for a
-			§ leading sign and anything else for none. One leading sign at
-			§ most: everything after it has to be a digit, so a second sign
-			§ falls to the digit check below like any other stray character,
-			§ and a sign alone leaves no digits at all.
-			constant signPosition = text::firstIndex(of "-")
+			§ The sign is carried as the position of a LEADING `-` — `keep`
+			§ discards a `-` found anywhere else, so what is left has a value
+			§ exactly when the text is negative. One leading sign at most:
+			§ everything after it has to be a digit, so a second sign falls to
+			§ the digit check below like any other stray character, and a sign
+			§ alone leaves no digits at all.
+			constant sign = text
+				::firstIndex(of "-")
+				::keep(where (position) { <- position::is(0) })
 
-			constant digitsText = match signPosition -> String {
-				case 0 { <- text::slice(from 1, to text::length()) }
+			constant digitsText = match sign -> String {
+				case #Value { <- text::slice(from 1, to text::length()) }
 
-				case _ { <- text }
+				case #Empty { <- text }
 			}
 
 			if digitsText::isEmpty() {
-				<- nothing
+				<- #Empty
 			} else {
-				constant start: Optional<Integer> = 0
+				constant start: Optional<Integer> = #Value(0)
 
 				constant magnitude = digitsText
 					::characters()
@@ -286,30 +298,24 @@ declarations {
 						<- match "0123456789"::firstIndex(
 							of character,
 						) -> Step<Optional<Integer>, Optional<Integer>> {
-							case Nothing { <- #Done(nothing) }
+							case #Empty        { <- #Done(#Empty) }
 
-							case _       {
-								<- #Continue(value
+							case #Value(digit) {
+								<- #Continue(#Value(value
 									::otherwise(0)
 									::multiply(with 10)
-									::add(@))
+									::add(digit)))
 							}
 						}
 					})
 
-				<- match magnitude -> Optional<Integer> {
-					case Nothing { <- nothing }
+				<- magnitude::map((parsedMagnitude) {
+					<- match sign -> Integer {
+						case #Value { <- parsedMagnitude::negate() }
 
-					case _ {
-						constant parsedMagnitude = @
-
-						<- match signPosition -> Optional<Integer> {
-							case 0 { <- parsedMagnitude::negate() }
-
-							case _ { <- parsedMagnitude }
-						}
+						case #Empty { <- parsedMagnitude }
 					}
-				}
+				})
 			}
 		}
 

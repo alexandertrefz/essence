@@ -7,9 +7,10 @@ import * as algebraic from "@essence-lang/runtime/Algebraic"
 import * as integer from "@essence-lang/runtime/Integer"
 import * as number from "@essence-lang/runtime/Number"
 import { decimal, fraction } from "@essence-lang/runtime/NumberFormat"
+import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
-import { typeKeySymbol } from "@essence-lang/runtime/type"
+import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
@@ -74,6 +75,21 @@ const partsOf = (value: rational.RationalType) => ({
 	denominator: value.denominator,
 })
 
+// NOTE: Every fallible native answers an `Optional<…>` — `Rational.of` has no
+// answer for a zero denominator, `squareRoot` none for a negative radicand —
+// so the direct tests below have to step through the `#Value` Case before they
+// reach the value the invariants live on. The tag is asserted on the way past
+// rather than cast away: an accidental `#Empty` would otherwise hand the checks
+// an `undefined` payload, and `undefined` compares equal to nothing they ask
+// about, which reads as a failure somewhere else entirely.
+function valueOf<Item extends AnyType>(
+	built: optional.OptionalType<Item>,
+): Item {
+	expect(built[typeKeySymbol]).toBe("Optional#Value")
+
+	return (built as optional.ValueType<Item>).item
+}
+
 describe("Rationals", () => {
 	describe("The positive-denominator invariant", () => {
 		it("keeps the sign on the numerator at the createRational gateway", () => {
@@ -84,9 +100,11 @@ describe("Rationals", () => {
 		})
 
 		it("keeps the sign on the numerator through Rational.of", () => {
-			const built = rational.of(
-				integer.createInteger(1n),
-				integer.createInteger(-6n),
+			const built = valueOf(
+				rational.of(
+					integer.createInteger(1n),
+					integer.createInteger(-6n),
+				),
 			)
 
 			expect(built[typeKeySymbol]).toBe("Rational")
@@ -242,8 +260,10 @@ describe("Rationals", () => {
 							::toString(formatAs NumberFormat#Decimal)
 
 						<- __print(match Rational.parse(text) -> String {
-							case Rational { <- @::is(value)::toString() }
-							case Nothing  { <- "Nothing" }
+							case #Value(parsed) {
+								<- parsed::is(value)::toString()
+							}
+							case #Empty { <- "Empty" }
 						})
 					})
 				}`),
@@ -254,12 +274,14 @@ describe("Rationals", () => {
 	describe("The square root of zero", () => {
 		it("gives the exact Integer zero", () => {
 			expect(integer.squareRoot(integer.createInteger(0n))).toEqual(
-				integer.createInteger(0n),
+				optional.createValue(integer.createInteger(0n)),
 			)
 		})
 
 		it("gives the exact Rational zero", () => {
-			const root = rational.squareRoot(rational.createRational(0n, 5n))
+			const root = valueOf(
+				rational.squareRoot(rational.createRational(0n, 5n)),
+			)
 
 			expect(root[typeKeySymbol]).toBe("Rational")
 			expect(partsOf(root as rational.RationalType)).toEqual({
@@ -288,10 +310,12 @@ describe("Rationals", () => {
 		})
 
 		it("never hands back an Algebraic that is not irrational", () => {
-			const root = algebraic.squareRootOfRational({
-				numerator: 0n,
-				denominator: 1n,
-			})
+			const root = valueOf(
+				algebraic.squareRootOfRational({
+					numerator: 0n,
+					denominator: 1n,
+				}),
+			)
 
 			expect(root[typeKeySymbol]).toBe("Rational")
 			expect(
@@ -310,15 +334,15 @@ describe("Rationals", () => {
 					constant negativeThree = 0::subtract(3)
 
 					match 1/2::divide(by negativeThree) -> Nothing {
-						case Rational {
-							__print(@::toString())
-							__print(@::isLessThan(0/1)::toString())
-							__print(@::absolute()::toString())
-							__print(@::round(toward #Down)::toString())
+						case #Value(quotient) {
+							__print(quotient::toString())
+							__print(quotient::isLessThan(0/1)::toString())
+							__print(quotient::absolute()::toString())
+							__print(quotient::round(toward #Down)::toString())
 							<- nothing
 						}
-						case Nothing {
-							__print("Nothing")
+						case #Empty {
+							__print("Empty")
 							<- nothing
 						}
 					}
@@ -332,15 +356,15 @@ describe("Rationals", () => {
 					constant negativeThree = 0::subtract(3)
 
 					match 1/2::divide(by negativeThree) -> Nothing {
-						case Rational {
-							__print(@::round()::toString())
-							__print(@::round(toward #TowardZero)::toString())
-							__print(@::isLessThan(0)::toString())
-							__print(@::isGreaterThan(0)::toString())
+						case #Value(quotient) {
+							__print(quotient::round()::toString())
+							__print(quotient::round(toward #TowardZero)::toString())
+							__print(quotient::isLessThan(0)::toString())
+							__print(quotient::isGreaterThan(0)::toString())
 							<- nothing
 						}
-						case Nothing {
-							__print("Nothing")
+						case #Empty {
+							__print("Empty")
 							<- nothing
 						}
 					}
@@ -368,18 +392,18 @@ describe("Rationals", () => {
 					constant negativeThree = 0::subtract(3)
 
 					match 1/2::divide(by negativeThree) -> Nothing {
-						case Rational {
-							constant text = @::toString()
+						case #Value(quotient) {
+							constant text = quotient::toString()
 
 							__print(text)
 							__print(match Rational.parse(text) -> String {
-								case Rational { <- @::toString() }
-								case Nothing  { <- "Nothing" }
+								case #Value(parsed) { <- parsed::toString() }
+								case #Empty         { <- "Empty" }
 							})
 							<- nothing
 						}
-						case Nothing {
-							__print("Nothing")
+						case #Empty {
+							__print("Empty")
 							<- nothing
 						}
 					}
@@ -399,9 +423,13 @@ describe("Rationals", () => {
 					__print(match Number.lowestNumber(
 						[quotient, negativeOne],
 					) -> String {
-						case Integer  { <- @::toString() }
-						case Rational { <- @::toString() }
-						case Nothing  { <- "Nothing" }
+						case #Value(lowest) {
+							<- match lowest -> String {
+								case Integer  { <- @::toString() }
+								case Rational { <- @::toString() }
+							}
+						}
+						case #Empty { <- "Empty" }
 					})
 				}`),
 			).toEqual(['"-1"'])
@@ -425,8 +453,8 @@ describe("Rationals", () => {
 					__print(4/2::toString(formatAs NumberFormat#Decimal))
 					__print(1/2::subtract(1/2)::toString(formatAs NumberFormat#Decimal))
 					__print(match Rational.parse(4/2::toString(formatAs NumberFormat#Decimal)) -> String {
-						case Rational { <- @::toString() }
-						case Nothing { <- "Nothing" }
+						case #Value(parsed) { <- parsed::toString() }
+						case #Empty         { <- "Empty" }
 					})
 				}`),
 			).toEqual(['"2"', '"0"', '"2/1"'])
@@ -436,15 +464,23 @@ describe("Rationals", () => {
 			expect(
 				await run(`implementation {
 					__print(match 0::squareRoot() -> String {
-						case Integer { <- @::toString() }
-						case Algebraic { <- @::toString() }
-						case Nothing { <- "Nothing" }
+						case #Value(root) {
+							<- match root -> String {
+								case Integer   { <- @::toString() }
+								case Algebraic { <- @::toString() }
+							}
+						}
+						case #Empty { <- "Empty" }
 					})
 
 					__print(match 0/5::squareRoot() -> String {
-						case Rational { <- @::toString() }
-						case Algebraic { <- @::toString() }
-						case Nothing { <- "Nothing" }
+						case #Value(root) {
+							<- match root -> String {
+								case Rational  { <- @::toString() }
+								case Algebraic { <- @::toString() }
+							}
+						}
+						case #Empty { <- "Empty" }
 					})
 				}`),
 			).toEqual(['"0"', '"0/1"'])

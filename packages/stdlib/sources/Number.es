@@ -240,11 +240,11 @@ declarations {
 
 		§ The empty List needs no guard of its own in `average`: it sums to
 		§ zero and counts zero items, and dividing by the zero count is the
-		§ `Nothing` the signature already answers with.
+		§ empty Optional the signature already answers with.
 
 		§§ The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational.
 		§§
-		§§ @returns — the mean, or `Nothing` for the empty List — no Numbers have no mean.
+		§§ @returns — the mean, or nothing for the empty List — no Numbers have no mean.
 		overload static average {
 			(_ integers: List<Integer>) -> Optional<Rational> {
 				<- Number.sum(integers)::divide(by integers::length())
@@ -267,7 +267,7 @@ declarations {
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
 		§§
-		§§ @returns — the lowest Number — `Nothing` for the empty List, which has none.
+		§§ @returns — the lowest Number — nothing for the empty List, which has none.
 		overload static lowestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
@@ -308,33 +308,37 @@ declarations {
 			}
 
 			§ The List entries fold the pairwise ones over the items, seeded
-			§ with `Nothing` so the first item becomes the running answer and
-			§ the empty List keeps the seed. On a tie the pairwise entries
+			§ empty so the first item becomes the running answer and the empty
+			§ List keeps the seed. On a tie the pairwise entries
 			§ answer the FIRST operand, so the earliest of equal items wins,
 			§ exactly as walking the List reads. The mixed entry matches both
 			§ operands apart to reach a pairwise entry, as the aggregates
 			§ above do.
 
 			(_ integers: List<Integer>) -> Optional<Integer> {
-				constant start: Optional<Integer> = nothing
+				constant start: Optional<Integer> = #Empty
 
 				<- integers::reduce(startingWith start, (lowest, integer) {
 					<- match lowest -> Optional<Integer> {
-						case Nothing { <- integer }
+						case #Empty          { <- #Value(integer) }
 
-						case _       { <- Number.lowestNumber(@, integer) }
+						case #Value(running) {
+							<- #Value(Number.lowestNumber(running, integer))
+						}
 					}
 				})
 			}
 
 			(_ rationals: List<Rational>) -> Optional<Rational> {
-				constant start: Optional<Rational> = nothing
+				constant start: Optional<Rational> = #Empty
 
 				<- rationals::reduce(startingWith start, (lowest, rational) {
 					<- match lowest -> Optional<Rational> {
-						case Nothing { <- rational }
+						case #Empty          { <- #Value(rational) }
 
-						case _       { <- Number.lowestNumber(@, rational) }
+						case #Value(running) {
+							<- #Value(Number.lowestNumber(running, rational))
+						}
 					}
 				})
 			}
@@ -342,38 +346,54 @@ declarations {
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
-				constant start: Optional<Integer | Rational> = nothing
+				constant start: Optional<Integer | Rational> = #Empty
 
 				<- numbers::reduce(startingWith start, (lowest, number) {
 					<- match lowest -> Optional<Integer | Rational> {
-						case Nothing { <- number }
+						case #Empty { <- #Value(number) }
 
-						case Integer {
-							constant lowestInteger = @
+						case #Value(running) {
+							<- #Value(match running -> Integer | Rational {
+								case Integer {
+									constant lowestInteger = @
 
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- Number.lowestNumber(lowestInteger, @)
+									<- match number -> Integer | Rational {
+										case Integer  {
+											<- Number.lowestNumber(
+												lowestInteger,
+												@,
+											)
+										}
+
+										case Rational {
+											<- Number.lowestNumber(
+												lowestInteger,
+												@,
+											)
+										}
+									}
 								}
 
 								case Rational {
-									<- Number.lowestNumber(lowestInteger, @)
-								}
-							}
-						}
+									constant lowestRational = @
 
-						case Rational {
-							constant lowestRational = @
+									<- match number -> Integer | Rational {
+										case Integer  {
+											<- Number.lowestNumber(
+												lowestRational,
+												@,
+											)
+										}
 
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- Number.lowestNumber(lowestRational, @)
+										case Rational {
+											<- Number.lowestNumber(
+												lowestRational,
+												@,
+											)
+										}
+									}
 								}
-
-								case Rational {
-									<- Number.lowestNumber(lowestRational, @)
-								}
-							}
+							})
 						}
 					}
 				})
@@ -382,7 +402,7 @@ declarations {
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
 		§§
-		§§ @returns — the greatest Number — `Nothing` for the empty List, which has none.
+		§§ @returns — the greatest Number — nothing for the empty List, which has none.
 		overload static greatestNumber {
 			(_ firstNumber: Integer, _ secondNumber: Integer) -> Integer {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
@@ -426,25 +446,29 @@ declarations {
 			§ pairwise answer.
 
 			(_ integers: List<Integer>) -> Optional<Integer> {
-				constant start: Optional<Integer> = nothing
+				constant start: Optional<Integer> = #Empty
 
 				<- integers::reduce(startingWith start, (greatest, integer) {
 					<- match greatest -> Optional<Integer> {
-						case Nothing { <- integer }
+						case #Empty          { <- #Value(integer) }
 
-						case _       { <- Number.greatestNumber(@, integer) }
+						case #Value(running) {
+							<- #Value(Number.greatestNumber(running, integer))
+						}
 					}
 				})
 			}
 
 			(_ rationals: List<Rational>) -> Optional<Rational> {
-				constant start: Optional<Rational> = nothing
+				constant start: Optional<Rational> = #Empty
 
 				<- rationals::reduce(startingWith start, (greatest, rational) {
 					<- match greatest -> Optional<Rational> {
-						case Nothing { <- rational }
+						case #Empty          { <- #Value(rational) }
 
-						case _       { <- Number.greatestNumber(@, rational) }
+						case #Value(running) {
+							<- #Value(Number.greatestNumber(running, rational))
+						}
 					}
 				})
 			}
@@ -452,44 +476,54 @@ declarations {
 			(
 				_ numbers: List<Integer | Rational>,
 			) -> Optional<Integer | Rational> {
-				constant start: Optional<Integer | Rational> = nothing
+				constant start: Optional<Integer | Rational> = #Empty
 
 				<- numbers::reduce(startingWith start, (greatest, number) {
 					<- match greatest -> Optional<Integer | Rational> {
-						case Nothing { <- number }
+						case #Empty { <- #Value(number) }
 
-						case Integer {
-							constant greatestInteger = @
+						case #Value(running) {
+							<- #Value(match running -> Integer | Rational {
+								case Integer {
+									constant greatestInteger = @
 
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- Number.greatestNumber(greatestInteger, @)
+									<- match number -> Integer | Rational {
+										case Integer  {
+											<- Number.greatestNumber(
+												greatestInteger,
+												@,
+											)
+										}
+
+										case Rational {
+											<- Number.greatestNumber(
+												greatestInteger,
+												@,
+											)
+										}
+									}
 								}
 
 								case Rational {
-									<- Number.greatestNumber(greatestInteger, @)
-								}
-							}
-						}
+									constant greatestRational = @
 
-						case Rational {
-							constant greatestRational = @
+									<- match number -> Integer | Rational {
+										case Integer  {
+											<- Number.greatestNumber(
+												greatestRational,
+												@,
+											)
+										}
 
-							<- match number -> Integer | Rational {
-								case Integer  {
-									<- Number.greatestNumber(
-										greatestRational,
-										@,
-									)
+										case Rational {
+											<- Number.greatestNumber(
+												greatestRational,
+												@,
+											)
+										}
+									}
 								}
-
-								case Rational {
-									<- Number.greatestNumber(
-										greatestRational,
-										@,
-									)
-								}
-							}
+							})
 						}
 					}
 				})

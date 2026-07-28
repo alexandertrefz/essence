@@ -1,15 +1,20 @@
 implementation {
 
-	§ The everyday Integer Methods.
+	§ The everyday Integer Methods. A Method that can fail answers an
+	§ `Optional`, and `__print` shows it whole — `Optional#Value(1024)` rather
+	§ than `1024`. `otherwise` below is how a Program collapses one back to a
+	§ bare value.
 	__print(
 		0::subtract(7)::remainder(dividingBy 3),
-	) § 2 — Euclidean, never negative
-	__print(2::raise(to 10)) § 1024
-	__print(2::raise(to 0::subtract(2))) § 1/4 — negative powers stay exact
+	) § Optional#Value(2) — Euclidean, never negative
+	__print(2::raise(to 10)) § Optional#Value(1024)
+	__print(
+		2::raise(to 0::subtract(2)),
+	) § Optional#Value(1/4) — negative powers stay exact
 	__print(0::subtract(5)::absolute()) § 5
 	__print(4::isEven()) § true
 	__print(0::isPositive()) § false — zero is neither sign
-	__print(15::clamp(between 1, and 10)) § 10
+	__print(15::clamp(between 1, and 10)) § Optional#Value(10)
 
 	§ The everyday Rational Methods — and the way back to Integer.
 	constant sevenHalves = 7/2
@@ -19,8 +24,8 @@ implementation {
 		sevenHalves::negate()::round(toward #TowardZero),
 	) § -3 — towards zero
 	__print(3/4::numerator()) § 3
-	__print(3/4::reciprocal()) § 4/3
-	__print(2/3::raise(to 2)) § 4/9
+	__print(3/4::reciprocal()) § Optional#Value(4/3)
+	__print(2/3::raise(to 2)) § Optional#Value(4/9)
 
 	§ Reading Numbers from text — the return trip of toString.
 	__print(Integer.parse("42")::otherwise(0)) § 42
@@ -55,12 +60,12 @@ implementation {
 
 	§ The new List shapes.
 	__print([[1, 2], [3]]::flatten()) § [ 1, 2, 3 ]
-	__print([1, 2, 3, 2]::lastIndex(of 2)) § 3
+	__print([1, 2, 3, 2]::lastIndex(of 2)) § Optional#Value(3)
 	__print([1, 2, 3, 4]::partition(where (n) { <- n::isEven() }))
 	__print(["a", "b"]::pair(with [1, 2, 3])) § pairs stop with the shorter List
 	__print(
 		[1, 2, 3, 4, 5]::split(intoGroupsOf 2),
-	) § [ [ 1, 2 ], [ 3, 4 ], [ 5 ] ]
+	) § Optional#Value([ [ 1, 2 ], [ 3, 4 ], [ 5 ] ])
 
 	§ Loop fuel — Essence has no Range Type by design.
 	__print(List.of(integersFrom 1, through 5)) § [ 1, 2, 3, 4, 5 ]

@@ -10,8 +10,8 @@ import {
 	subtractRationals,
 } from "./bigRational"
 import type { IntegerType } from "./Integer"
-import type { NothingType } from "./Nothing"
-import { createNothing } from "./Nothing"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
@@ -265,17 +265,19 @@ export function multiply(
 export function divide(
 	transcendental: TranscendentalType,
 	other: IntegerType | RationalType,
-): TranscendentalType | NothingType {
+): OptionalType<TranscendentalType> {
 	const divisor = bigRationalOf(other)
 
 	if (divisor.numerator === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createTranscendental(
-		divideRationals(rationalPartOf(transcendental), divisor),
-		divideRationals(piCoefficientOf(transcendental), divisor),
-	) as TranscendentalType
+	return createValue(
+		createTranscendental(
+			divideRationals(rationalPartOf(transcendental), divisor),
+			divideRationals(piCoefficientOf(transcendental), divisor),
+		) as TranscendentalType,
+	)
 }
 
 // NOTE: `value − transcendental`, for the commuted overloads on Integer and
@@ -307,11 +309,11 @@ export function addTranscendental(
 
 // NOTE: A quotient of two linear-in-π values is representable exactly when
 // they are proportional — π/π = 1, TAU/PI = 2, (1 + π)/(2 + 2·π) = 1/2.
-// Anything else leaves the grammar and returns Nothing.
+// Anything else leaves the grammar and comes back empty.
 export function divideByTranscendental(
 	transcendental: TranscendentalType,
 	other: TranscendentalType,
-): RationalType | NothingType {
+): OptionalType<RationalType> {
 	const ratio = divideRationals(
 		piCoefficientOf(transcendental),
 		piCoefficientOf(other),
@@ -322,10 +324,10 @@ export function divideByTranscendental(
 			.numerator === 0n
 
 	if (!isProportional) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createRational(ratio.numerator, ratio.denominator)
+	return createValue(createRational(ratio.numerator, ratio.denominator))
 }
 
 // NOTE: Negation flips both components and keeps the π coefficient non-zero,

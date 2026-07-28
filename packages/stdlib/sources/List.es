@@ -126,11 +126,11 @@ declarations {
 
 		§§ The first item, or the first item the given check accepts.
 		§§
-		§§ @returns — the matching item, or `Nothing` when there is none.
+		§§ @returns — the matching item, or nothing when there is none.
 		overload firstItem {
 			() -> Optional<ItemType> {
-				§ `item(at:)` answers `Nothing` for a position outside the List, so
-				§ the empty case needs no guard of its own.
+				§ `item(at:)` comes back empty for a position outside the List,
+				§ so the empty case needs no guard of its own.
 				<- @::item(at 0)
 			}
 
@@ -141,24 +141,25 @@ declarations {
 			§ what the `Step` Choice made an Essence expression able to do — this
 			§ Method was native until it existed.
 			§
-			§ What this Method can NOT say is which of two things happened when it
-			§ answers `Nothing`: no item matched, or the item that matched IS
-			§ `nothing`. Both are the same value, and no return Type here can tell
-			§ them apart. So the Methods that only want the DECISION —
-			§ `anyItem`/`everyItem`, and `firstIndex`/`lastIndex` for the position —
-			§ step the same fold themselves, carrying a Boolean or an Integer, and
-			§ are not written on top of this one.
+			§ On a `List<Optional<Item>>` the answer is an
+			§ `Optional<Optional<Item>>`, and the two levels say different
+			§ things: `#Empty` is "no item matched", `#Value(#Empty)` is "the
+			§ item that matched is itself empty". An Optional that was a Union
+			§ could not tell them apart, and every Method below that wants only
+			§ the DECISION was written to route around the ambiguity. They stay
+			§ written that way for a smaller reason — see `anyItem`.
 			(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-				§ `reduce` binds its `Result` from the `startingWith` value, and a
-				§ bare `nothing` would fix it to `Nothing` alone — so the seed is
-				§ annotated to the `Optional` the accumulator and the answer share.
-				§ The accumulator is only ever `nothing`: it is carried untouched
-				§ until a match `#Done`s the whole fold with the item itself.
-				constant start: Optional<ItemType> = nothing
+				§ `reduce` binds its `Result` from the `startingWith` value, and
+				§ a bare `#Empty` would fix it to the empty Case alone — so the
+				§ seed is annotated to the `Optional` the accumulator and the
+				§ answer share. The accumulator is only ever empty: it is
+				§ carried untouched until a match `#Done`s the whole fold with
+				§ the item itself.
+				constant start: Optional<ItemType> = #Empty
 
 				<- @::reduce(startingWith start, step (found, item) {
 					if check(item) {
-						<- #Done(item)
+						<- #Done(#Value(item))
 					} else {
 						<- #Continue(found)
 					}
@@ -168,12 +169,11 @@ declarations {
 
 		§§ The last item of the List.
 		§§
-		§§ @returns — the item, or `Nothing` for the empty List.
+		§§ @returns — the item, or nothing for the empty List.
 		lastItem() -> Optional<ItemType> {
-			§ The empty List's last position is -1, which is outside it, so
-			§ `item(at:)` answers `Nothing` without a guard here.
 			§ -1 is the last position, and the empty List has no such item —
-			§ the position resolves to -1 there and lands outside the List.
+			§ the position resolves to -1 there and lands outside the List, so
+			§ `item(at:)` comes back empty without a guard here.
 			<- @::item(at -1)
 		}
 
@@ -373,7 +373,7 @@ declarations {
 
 		§§ The item at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last item and -length the first.
 		§§
-		§§ @returns — the item, or `Nothing` when the position is outside the List.
+		§§ @returns — the item, or nothing when the position is outside the List.
 		item(at index: Integer) -> Optional<ItemType>
 
 		§ `firstIndex` and `lastIndex` COUNT their way through the items, stopping
@@ -385,13 +385,10 @@ declarations {
 		§ its accumulator and never builds a List.
 		§
 		§ The counting is what makes them right for EVERY item Type. Walking the
-		§ positions with `item(at:)` reads better and is wrong: `item(at:)` answers
-		§ `Optional<ItemType>`, so a `nothing` STORED in the List and a position
-		§ past the end come back as the same value, and an item Type that already
-		§ contains `Nothing` — a `List<Nothing>`, or any `… | Nothing` Union a
-		§ Program conforms to `Equatable` — would have its `nothing` items skipped
-		§ without ever being compared. `reduce` hands the item ITSELF, so every
-		§ item reaches the comparison.
+		§ positions with `item(at:)` reads better and costs a wrapper per item:
+		§ `item(at:)` answers `Optional<ItemType>`, which every comparison would
+		§ then have to take apart. `reduce` hands the item ITSELF, so every item
+		§ reaches the comparison as it stands.
 		§
 		§ The bound is the whole of the search: the item Type's own `is` decides
 		§ which position is found, arriving as the hidden conformance Argument
@@ -399,7 +396,7 @@ declarations {
 
 		§§ The position of the first item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns — the zero-based position, or `Nothing` when the item is absent.
+		§§ @returns — the zero-based position, or nothing when the item is absent.
 		firstIndex<infer ItemType is Equatable>(
 			of item: ItemType,
 		) -> Optional<Integer> {
@@ -407,7 +404,8 @@ declarations {
 			§ at the first match, carrying that position, and a fold that reaches
 			§ the end settles on the position AFTER the last item — the length,
 			§ which is the one Integer no match can answer. So "absent" needs no
-			§ sentinel of its own, and every item, `nothing` included, is compared.
+			§ sentinel of its own, and the fold carries a bare Integer rather
+			§ than an Optional it would have to unwrap each turn.
 			constant found = @::reduce(startingWith 0, step (index, candidate) {
 				if candidate::is(item) {
 					<- #Done(index)
@@ -417,9 +415,9 @@ declarations {
 			})
 
 			if found::isLessThan(@::length()) {
-				<- found
+				<- #Value(found)
 			} else {
-				<- nothing
+				<- #Empty
 			}
 		}
 
@@ -492,13 +490,12 @@ declarations {
 		§ Both stop at the first item that decides the answer — `anyItem` at the
 		§ first match, `everyItem` at the first failure — and both stop on
 		§ `reduce`'s early-stopping entry, carrying the ANSWER rather than the
-		§ item. `firstItem(where:)::hasValue()` would read the same way and is
-		§ wrong: it answers `Nothing` both when no item matched and when the
-		§ matching item IS `nothing`, so on a `List<Optional<Integer>>` a check
-		§ that accepts the empty Optionals would find one and report `false`.
-		§ A Boolean has no such second reading. `count(where:)` below stays on
-		§ `keepEvery` — counting has to see every item, so there is no walk to
-		§ leave early.
+		§ item. `firstItem(where:)::hasValue()` answers the same question
+		§ correctly — a nested Optional keeps "no match" and "an empty match"
+		§ apart, which is what once made it wrong — and it builds an Optional
+		§ per call to throw it away. A Boolean accumulator builds nothing.
+		§ `count(where:)` below stays on `keepEvery` — counting has to see every
+		§ item, so there is no walk to leave early.
 
 		§§ Whether the given check accepts at least one item.
 		§§
@@ -582,30 +579,25 @@ declarations {
 
 		§§ The position of the last item equal — by the items' own `is` — to the given one. Available whenever the items conform to `Equatable`.
 		§§
-		§§ @returns — the zero-based position, or `Nothing` when the item is absent.
+		§§ @returns — the zero-based position, or nothing when the item is absent.
 		lastIndex<infer ItemType is Equatable>(
 			of item: ItemType,
 		) -> Optional<Integer> {
 			§ The LAST occurrence is the FIRST occurrence of the reversed List, so
 			§ `firstIndex` answers this one too and only the position has to be
 			§ counted back from the end. Counting down from the last position
-			§ instead would have to read each one with `item(at:)`, which can not
-			§ say whether a `Nothing` is the item stored there or the end of the
-			§ List — see the note above `firstIndex`.
+			§ instead would read each one with `item(at:)` and take an Optional
+			§ apart per item — see the note above `firstIndex`.
 			§
 			§ The empty List reverses to itself and holds no item to find, so it
-			§ answers `Nothing` without a guard of its own — the -1 that
-			§ `lastPosition` holds for it never reaches the subtraction.
+			§ comes back empty without a guard of its own — the -1 that
+			§ `lastPosition` holds for it never reaches the subtraction, because
+			§ `map` does not run on an empty Optional.
 			constant lastPosition = @::length()::subtract(1)
 
-			§ `@` is the SCRUTINEE inside a match, not the receiver, so the last
-			§ position is bound before the match to stay reachable in the Case
-			§ bodies.
-			<- match @::reverse()::firstIndex(of item) -> Optional<Integer> {
-				case Nothing { <- nothing }
-
-				case _       { <- lastPosition::subtract(@) }
-			}
+			<- @::reverse()
+				::firstIndex(of item)
+				::map((position) { <- lastPosition::subtract(position) })
 		}
 
 		§ The one bounded Method whose bound does real work rather than
@@ -656,7 +648,7 @@ declarations {
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§
 		§§ @param intoGroupsOf — how many items each group holds
-		§§ @returns — the List of groups, or `Nothing` when the group size is below one.
+		§§ @returns — the List of groups, or nothing when the group size is below one.
 		split(intoGroupsOf size: Integer) -> Optional<List<List<ItemType>>>
 
 		§§ A List holding the given item the given number of times. Zero or fewer times gives the empty List.

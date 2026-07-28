@@ -2,8 +2,8 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
-import type { NothingType } from "./Nothing"
-import { createNothing } from "./Nothing"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import { equal, greater, less, type OrderingType } from "./Ordering"
 import type { RecordType } from "./Record"
 import type { StepType } from "./Step"
@@ -142,14 +142,14 @@ export function positionFromEnd(index: bigint, length: bigint): bigint {
 export function item<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
-): ItemType | NothingType {
+): OptionalType<ItemType> {
 	let length = BigInt(originalList.value.length)
 	let position = positionFromEnd(index.value, length)
 
 	if (position > -1n && position < length) {
-		return originalList.value[Number(position)]
+		return createValue(originalList.value[Number(position)])
 	} else {
-		return createNothing()
+		return createEmpty()
 	}
 }
 
@@ -318,9 +318,9 @@ export function pair<ItemType extends AnyType, Other extends AnyType>(
 export function split<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	groupSize: IntegerType,
-): ListType<ListType<ItemType>> | NothingType {
+): OptionalType<ListType<ListType<ItemType>>> {
 	if (groupSize.value < 1n) {
-		return createNothing()
+		return createEmpty()
 	}
 
 	let size = Number(groupSize.value)
@@ -330,7 +330,7 @@ export function split<ItemType extends AnyType>(
 		groups.push(createList(originalList.value.slice(start, start + size)))
 	}
 
-	return createList(groups)
+	return createValue(createList(groups))
 }
 
 export function of(

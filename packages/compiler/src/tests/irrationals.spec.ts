@@ -6,10 +6,11 @@ import * as integer from "@essence-lang/runtime/Integer"
 import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
 import * as number from "@essence-lang/runtime/Number"
+import type { OptionalType, ValueType } from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
-import { typeKeySymbol } from "@essence-lang/runtime/type"
+import { type AnyType, typeKeySymbol } from "@essence-lang/runtime/type"
 
 import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
@@ -32,6 +33,18 @@ const radical = (radicand: bigint): algebraic.AlgebraicType => {
 	expect(value[typeKeySymbol]).toBe("Algebraic")
 
 	return value as algebraic.AlgebraicType
+}
+
+// NOTE: Every fallible native answers an `Optional` now — `Optional#Value`
+// around the answer, or `Optional#Empty`. The tests below still care about the
+// tag of the ANSWER (Rational versus Algebraic), so this asserts the value Case
+// once and hands the payload on, rather than repeating the wrapper check at
+// every call site. The cast is what the assertion above has already proven:
+// `expect` throws on a mismatch, so nothing reaches the return but a `#Value`.
+const unwrap = <Item extends AnyType>(optional: OptionalType<Item>): Item => {
+	expect(optional[typeKeySymbol]).toBe("Optional#Value")
+
+	return (optional as ValueType<Item>).item
 }
 
 function diagnosticsFor(source: string) {
@@ -73,39 +86,48 @@ describe("Irrationals", () => {
 		})
 
 		it("computes exact square roots of Integers", () => {
-			expect(integer.squareRoot(integer.createInteger(9n))).toEqual(
-				integer.createInteger(3n),
-			)
 			expect(
-				integer.squareRoot(integer.createInteger(2n))[typeKeySymbol],
+				unwrap(integer.squareRoot(integer.createInteger(9n))),
+			).toEqual(integer.createInteger(3n))
+			expect(
+				unwrap(integer.squareRoot(integer.createInteger(2n)))[
+					typeKeySymbol
+				],
 			).toBe("Algebraic")
+			// NOTE: A negative has no real root, so the root is missing rather
+			// than being some other kind of number.
 			expect(
 				integer.squareRoot(integer.createInteger(-1n))[typeKeySymbol],
-			).toBe("Nothing")
+			).toBe("Optional#Empty")
 		})
 
 		it("computes exact square roots of Rationals", () => {
-			const exact = rational.squareRoot(rational.createRational(9n, 4n))
+			const exact = unwrap(
+				rational.squareRoot(rational.createRational(9n, 4n)),
+			)
 
 			expect(exact[typeKeySymbol]).toBe("Rational")
 
-			const inexact = rational.squareRoot(rational.createRational(1n, 2n))
+			const inexact = unwrap(
+				rational.squareRoot(rational.createRational(1n, 2n)),
+			)
 
 			expect(inexact[typeKeySymbol]).toBe("Algebraic")
 		})
 
 		it("multiplies back to an exact Rational — √2·√2 is 2", () => {
 			const rootTwo = radical(2n)
-			const product = algebraic.multiplyWithAlgebraic(rootTwo, rootTwo)
+			const product = unwrap(
+				algebraic.multiplyWithAlgebraic(rootTwo, rootTwo),
+			)
 
 			expect(product[typeKeySymbol]).toBe("Rational")
 			// NOTE: `Number.is` (√2·√2 is 2) is Essence now, covered by the golden harness.
 		})
 
 		it("combines pure radicals across radicands — √2·√3 is √6", () => {
-			const product = algebraic.multiplyWithAlgebraic(
-				radical(2n),
-				radical(3n),
+			const product = unwrap(
+				algebraic.multiplyWithAlgebraic(radical(2n), radical(3n)),
 			)
 
 			expect(product[typeKeySymbol]).toBe("Algebraic")
@@ -114,10 +136,10 @@ describe("Irrationals", () => {
 			).toBe("√6")
 		})
 
-		it("returns Nothing for sums across different radicands", () => {
+		it("answers nothing for sums across different radicands", () => {
 			expect(
 				algebraic.addAlgebraic(radical(2n), radical(3n))[typeKeySymbol],
-			).toBe("Nothing")
+			).toBe("Optional#Empty")
 		})
 
 		it("never fails when dividing a Rational by an Algebraic", () => {
@@ -186,16 +208,15 @@ describe("Irrationals", () => {
 		})
 
 		it("divides proportional values exactly — TAU/π is 2", () => {
-			const quotient = transcendental.divideByTranscendental(
-				number.TAU,
-				number.PI,
+			const quotient = unwrap(
+				transcendental.divideByTranscendental(number.TAU, number.PI),
 			)
 
 			expect(quotient[typeKeySymbol]).toBe("Rational")
 			// NOTE: `Number.is` (TAU/π is 2) is Essence now, covered by the golden harness.
 		})
 
-		it("returns Nothing for non-proportional quotients", () => {
+		it("answers nothing for non-proportional quotients", () => {
 			const shifted = transcendental.add(
 				number.PI,
 				integer.createInteger(1n),
@@ -206,7 +227,7 @@ describe("Irrationals", () => {
 					shifted as transcendental.TranscendentalType,
 					number.PI,
 				)[typeKeySymbol],
-			).toBe("Nothing")
+			).toBe("Optional#Empty")
 		})
 
 		it("orders π exactly against tight rational bounds", () => {
@@ -237,9 +258,9 @@ describe("Irrationals", () => {
 	describe("Number cross-kind semantics", () => {
 		// NOTE: cross-kind `Number.is` is Essence now (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
 		// NOTE: the List entries of `lowestNumber`/`greatestNumber` — and the
-		// empty-List `Nothing` they answer — are Essence now
+		// empty Optional they answer for an empty List — are Essence now
 		// (`packages/stdlib/sources/Number.es`), folds over the pairwise
-		// entries seeded with `Nothing`; the golden harness covers every entry
+		// entries seeded with `#Empty`; the golden harness covers every entry
 		// including the empty Lists.
 		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
 		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`); its symmetry with itself is covered by the golden harness.
@@ -303,10 +324,10 @@ describe("Irrationals", () => {
 	})
 
 	describe("Enricher", () => {
-		it("types squareRoot as Integer | Algebraic | Nothing", () => {
+		it("types squareRoot as Optional<Integer | Algebraic>", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant root: Integer | Algebraic | Nothing = 2::squareRoot()
+					constant root: Optional<Integer | Algebraic> = 2::squareRoot()
 				}`),
 			).toEqual([])
 		})
@@ -374,15 +395,27 @@ describe("Irrationals", () => {
 			).toEqual([])
 		})
 
-		it("keeps division by an Algebraic total — no Nothing in the Type", () => {
+		// NOTE: The gate is the `Algebraic` arm: `1::divide(by @)` there answers
+		// an `Algebraic | Rational` and NOT an `Optional` of one, because an
+		// irrational is never zero. If division by an Algebraic ever became
+		// fallible the arm would answer an `Optional<…>`, `toString` would not
+		// resolve on it, and this would stop being Diagnostic-free. The outer
+		// match takes the Optional that `squareRoot` answers apart; the inner
+		// one narrows the payload Union, which is the only way in now that
+		// `case Algebraic` can not reach through the wrapper.
+		it("keeps division by an Algebraic total — the quotient is not an Optional", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant root = 2::squareRoot()
 
 					__print(match root -> String {
-						case Algebraic { <- 1::divide(by @)::toString() }
-						case Integer { <- @::toString() }
-						case Nothing { <- "impossible" }
+						case #Value(value) {
+							<- match value -> String {
+								case Algebraic { <- 1::divide(by @)::toString() }
+								case Integer { <- @::toString() }
+							}
+						}
+						case #Empty { <- "impossible" }
 					})
 				}`),
 			).toEqual([])

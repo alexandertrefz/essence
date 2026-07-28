@@ -178,9 +178,11 @@ guards two files, but it is a floor, not a substitute for measuring.
   one a call reaches then depends on the receiver's Type rather than on what it
   says.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
-  and `Ordering` each declare their Type and the Namespace over it together;
+  and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea
-  where nobody looking at either finds the other.
+  where nobody looking at either finds the other. A Namespace narrower than the
+  general one goes in the same file too — `NestedOptional` sits under
+  `Optional`, as `NestedList` does under `List`.
 
 ## Adding a Namespace
 

@@ -214,7 +214,7 @@ declarations {
 
 		§§ The character at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last character and -length the first.
 		§§
-		§§ @returns — the character, or `Nothing` when the position is outside the String.
+		§§ @returns — the character, or nothing when the position is outside the String.
 		character(at index: Integer) -> Optional<String> {
 			<- @::characters()::item(at index)
 		}
@@ -362,38 +362,38 @@ declarations {
 
 		§§ The position of the first occurrence of the given String.
 		§§
-		§§ @returns — the zero-based position, or `Nothing` when it does not occur.
+		§§ @returns — the zero-based position, or nothing when it does not occur.
 		firstIndex(of part: String) -> Optional<Integer> {
 			§ The empty part occurs at the very start of every String, the
 			§ empty String included — and splitting on it would answer the
 			§ length of the first CHARACTER instead, so it is answered here.
 			if part::isEmpty() {
-				<- 0
+				<- #Value(0)
 			} else {
 				constant pieces = @::split(on part)
 
 				§ One piece means the separator was never found.
 				if pieces::length()::is(1) {
-					<- nothing
+					<- #Empty
 				} else {
 					§ Splitting always yields at least one piece, so the
 					§ fallback is unreachable; the first piece is everything
 					§ before the first occurrence, and its length is that
 					§ occurrence's position.
-					<- pieces::firstItem()::otherwise("")::length()
+					<- #Value(pieces::firstItem()::otherwise("")::length())
 				}
 			}
 		}
 
 		§§ The position of the last occurrence of the given String.
 		§§
-		§§ @returns — the zero-based position, or `Nothing` when it does not occur.
+		§§ @returns — the zero-based position, or nothing when it does not occur.
 		lastIndex(of part: String) -> Optional<Integer> {
 			§ The empty part occurs after the very last character too, so its
 			§ last position is the length — the mirror of `firstIndex`, whose
 			§ empty part is at position zero.
 			if part::isEmpty() {
-				<- @::length()
+				<- #Value(@::length())
 			} else {
 				§ The LAST occurrence of the part is the FIRST occurrence of the
 				§ reversed part in the reversed String, so `firstIndex` answers
@@ -411,17 +411,14 @@ declarations {
 				constant length     = @::length()
 				constant partLength = part::length()
 
-				§ `@` is the SCRUTINEE inside a match, not the receiver, so both
-				§ lengths are bound before the match to stay reachable in the Case
-				§ bodies.
-				<- match @::reverse()
-					::firstIndex(of part::reverse()) -> Optional<Integer> {
-					case Nothing { <- nothing }
-
-					case _       {
-						<- length::subtract(@)::subtract(partLength)
-					}
-				}
+				§ `@` is the RECEIVER of the `map` callback's enclosing Method,
+				§ and the callback names its own Parameter — so both lengths are
+				§ bound before the call to stay reachable inside it.
+				<- @::reverse()
+					::firstIndex(of part::reverse())
+					::map((position) {
+						<- length::subtract(position)::subtract(partLength)
+					})
 			}
 		}
 
@@ -487,7 +484,7 @@ declarations {
 						§ character goes to the END — the text sits one to the
 						§ left, which is what centring in a fixed width
 						§ conventionally does. `quotient` can only answer
-						§ `Nothing` for a zero divisor, and this one is two.
+						§ empty for a zero divisor, and this one is two.
 						constant atStart = needed
 							::quotient(dividingBy 2)
 							::otherwise(0)

@@ -569,7 +569,8 @@ describe("Type matching", () => {
 				"'Right' declares '#Shared'.",
 			])
 			expect(diagnostics[0].helps).toEqual([
-				"Write 'Left#Shared' to pick one.",
+				"Write 'Left#Shared' to pick 'Left'.",
+				"Write 'Right#Shared' to pick 'Right'.",
 			])
 		})
 

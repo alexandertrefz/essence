@@ -37,10 +37,7 @@ implementation {
 			_ transform: (_ item: Item) -> Target,
 			fallback fallbackValue: Target,
 		) -> Target {
-			<- match @::firstItem() -> Target {
-				case Nothing { <- fallbackValue }
-				case Item    { <- transform(@) }
-			}
+			<- @::firstItem()::map(transform)::otherwise(fallbackValue)
 		}
 	}
 
@@ -79,7 +76,7 @@ implementation {
 	§ A literal that is not an Argument has no expected signature anywhere, so
 	§ it writes its annotations in full — inferring a whole signature from a
 	§ body is what makes a Program hard to follow.
-	constant halve = (_ value: Integer) -> Rational | Nothing {
+	constant halve = (_ value: Integer) -> Optional<Rational> {
 		<- value::divide(by 2)
 	}
 
