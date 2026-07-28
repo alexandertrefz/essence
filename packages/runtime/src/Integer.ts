@@ -109,14 +109,6 @@ export function raise(
 
 // #endregion
 
-export function parse(text: StringType): IntegerType | NothingType {
-	if (!/^-?[0-9]+$/.test(text.value)) {
-		return createNothing()
-	}
-
-	return createInteger(BigInt(text.value))
-}
-
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())

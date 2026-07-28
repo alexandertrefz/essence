@@ -106,38 +106,6 @@ export function raise(
 
 // #endregion
 
-export function parse(text: StringType): RationalType | NothingType {
-	let fractionForm = /^(-?[0-9]+)\/([0-9]+)$/.exec(text.value)
-
-	if (fractionForm !== null) {
-		let parsedDenominator = BigInt(fractionForm[2])
-
-		if (parsedDenominator === 0n) {
-			return createNothing()
-		}
-
-		return createRational(BigInt(fractionForm[1]), parsedDenominator)
-	}
-
-	let decimalForm = /^(-?)([0-9]+)\.([0-9]+)$/.exec(text.value)
-
-	if (decimalForm !== null) {
-		let scale = 10n ** BigInt(decimalForm[3].length)
-		let magnitude = BigInt(decimalForm[2]) * scale + BigInt(decimalForm[3])
-
-		return createRational(
-			decimalForm[1] === "-" ? -magnitude : magnitude,
-			scale,
-		)
-	}
-
-	if (/^-?[0-9]+$/.test(text.value)) {
-		return createRational(BigInt(text.value), 1n)
-	}
-
-	return createNothing()
-}
-
 // NOTE: Exported for `getStringRepresentation` in `functions.ts` — the
 // no-Argument `toString` is written in Essence now, so the universal printer
 // renders a Rational off this helper rather than calling a native that no

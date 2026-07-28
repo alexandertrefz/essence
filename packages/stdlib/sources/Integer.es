@@ -257,7 +257,61 @@ declarations {
 		§§
 		§§ @param text — the text to read
 		§§ @returns — the Integer, or `Nothing` when the text has any other shape.
-		static parse(_ text: String) -> Optional<Integer>
+		static parse(_ text: String) -> Optional<Integer> {
+			§ A `match` needs a Union, and a Boolean is not one — so the sign
+			§ is carried as the position of the first `-`, which is `0` for a
+			§ leading sign and anything else for none. One leading sign at
+			§ most: everything after it has to be a digit, so a second sign
+			§ falls to the digit check below like any other stray character,
+			§ and a sign alone leaves no digits at all.
+			constant signPosition = text::firstIndex(of "-")
+
+			constant digitsText = match signPosition -> String {
+				case 0 { <- text::slice(from 1, to text::length()) }
+
+				case _ { <- text }
+			}
+
+			if digitsText::isEmpty() {
+				<- nothing
+			} else {
+				constant start: Optional<Integer> = 0
+
+				constant magnitude = digitsText
+					::characters()
+					::reduce(startingWith start, step (value, character) {
+						§ A digit's value IS its position in the digit
+						§ line-up; a character that is not there refuses the
+						§ whole text at once.
+						<- match "0123456789"::firstIndex(
+							of character,
+						) -> Step<Optional<Integer>, Optional<Integer>> {
+							case Nothing { <- #Done(nothing) }
+
+							case _       {
+								<- #Continue(value
+									::otherwise(0)
+									::multiply(with 10)
+									::add(@))
+							}
+						}
+					})
+
+				<- match magnitude -> Optional<Integer> {
+					case Nothing { <- nothing }
+
+					case _ {
+						constant parsedMagnitude = @
+
+						<- match signPosition -> Optional<Integer> {
+							case 0 { <- parsedMagnitude::negate() }
+
+							case _ { <- parsedMagnitude }
+						}
+					}
+				}
+			}
+		}
 
 		§§ Represents the Integer as a String, in decimal digits.
 		toString() -> String
