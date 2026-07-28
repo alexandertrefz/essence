@@ -196,10 +196,6 @@ export type NumberNatives = {
 	compare: (self: NumberType, to: NumberType) => OrderingType
 }
 
-export type NothingNatives = {
-
-}
-
 export type OptionalNatives = {
 
 }
@@ -388,10 +384,6 @@ export const $NumberAbsent: AssertNoEssenceExports<typeof import("./Number"), "i
 export const $NumberArity: AssertArities<typeof import("./Number"), {
 	compare: 2
 }> = true
-
-declare const NothingModule: typeof import("./Nothing")
-export const $Nothing: NothingNatives = NothingModule
-export const $NothingAbsent: AssertNoEssenceExports<typeof import("./Nothing"), "is" | "isNot" | "toString"> = true
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule

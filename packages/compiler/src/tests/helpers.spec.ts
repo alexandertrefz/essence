@@ -1412,15 +1412,20 @@ describe("Helpers", () => {
 				expect(matchesType(integerPrimitive, genericT)).toBe(false)
 			})
 
+			// NOTE: An opaque Generic accepts nothing but itself, yet a Union
+			// that HAS it as a member still accepts it — the member is the same
+			// symbol, so the value really does fit. The Union's other member is
+			// beside the point here; it is only there to make this a Union at
+			// all, and it is accepted on its own terms.
 			it("should accept a Generic member of an expected Union", () => {
-				const maybeT: UnionType = {
+				const genericOrString: UnionType = {
 					type: "UnionType",
-					types: [genericT, { type: "Nothing" }],
+					types: [genericT, stringPrimitive],
 				}
 
-				expect(matchesType(maybeT, genericT)).toBe(true)
-				expect(matchesType(maybeT, { type: "Nothing" })).toBe(true)
-				expect(matchesType(maybeT, genericU)).toBe(false)
+				expect(matchesType(genericOrString, genericT)).toBe(true)
+				expect(matchesType(genericOrString, stringPrimitive)).toBe(true)
+				expect(matchesType(genericOrString, genericU)).toBe(false)
 			})
 		})
 	})
@@ -1430,7 +1435,6 @@ describe("Helpers", () => {
 		const integer: Type = { type: "Integer" }
 		const rational: Type = { type: "Rational" }
 		const string: Type = { type: "String" }
-		const nothing: Type = { type: "Nothing" }
 
 		function inferContextFor(names: Array<string>) {
 			return createInferenceContext(
@@ -1664,24 +1668,29 @@ describe("Helpers", () => {
 				).toBe(false)
 			})
 
+			// NOTE: A bindable Generic beside a concrete member would swallow
+			// whatever the concrete member was written to take — bound to
+			// `String` here, every later occurrence of `Value` would then be
+			// held to it. The concrete members are tried FIRST, so the Generic
+			// only ever binds what none of them claimed.
 			it("should prefer concrete Union members over binding a Generic", () => {
 				let context = inferContextFor(["Value"])
 				let genericValue: GenericUse = {
 					type: "GenericUse",
 					name: "Value",
 				}
-				let maybeValue: UnionType = {
+				let valueOrString: UnionType = {
 					type: "UnionType",
-					types: [genericValue, nothing],
+					types: [genericValue, string],
 				}
 
 				expect(
-					matchesTypeWithBindings(maybeValue, nothing, context),
+					matchesTypeWithBindings(valueOrString, string, context),
 				).toBe(true)
 				expect(context.bindings.has("Value")).toBe(false)
 
 				expect(
-					matchesTypeWithBindings(maybeValue, integer, context),
+					matchesTypeWithBindings(valueOrString, integer, context),
 				).toBe(true)
 				expect(context.bindings.get("Value")).toEqual(integer)
 			})
@@ -1692,19 +1701,19 @@ describe("Helpers", () => {
 					type: "GenericUse",
 					name: "Value",
 				}
-				let maybeValue: UnionType = {
+				let valueOrString: UnionType = {
 					type: "UnionType",
-					types: [genericValue, nothing],
+					types: [genericValue, string],
 				}
-				let integerOrNothing: UnionType = {
+				let integerOrString: UnionType = {
 					type: "UnionType",
-					types: [integer, nothing],
+					types: [integer, string],
 				}
 
 				expect(
 					matchesTypeWithBindings(
-						maybeValue,
-						integerOrNothing,
+						valueOrString,
+						integerOrString,
 						context,
 					),
 				).toBe(true)
@@ -2207,71 +2216,113 @@ describe("Helpers", () => {
 		})
 	})
 
+	// NOTE: `buildUnion` used to answer with a canonical, Optional-SHAPED form:
+	// `Nothing` was hoisted to a single top-level member and everything else
+	// folded into one payload member beside it, so `Integer | Rational |
+	// Nothing` came out as `(Integer | Rational) | Nothing` and even an applied
+	// `Optional<Rational>` gave up its own spelling to merge that way. All of
+	// it existed so that a Union's SHAPE could mean "fallible" — a Generic
+	// bound over `T | Nothing` could then take the payload in one piece. A
+	// nominal `Optional` says fallible by NAME, so the canonical form went with
+	// `Nothing`, and these pin what is promised in its place: dedupe by
+	// subsumption, flatten ANONYMOUS nested Unions, keep NAMED and applied
+	// Alias ones whole, and hand a lone survivor back unwrapped.
 	describe("buildUnion", () => {
 		const integer: Type = { type: "Integer" }
 		const rational: Type = { type: "Rational" }
-		const nothing: Type = { type: "Nothing" }
+		const string: Type = { type: "String" }
+		const boolean: Type = { type: "Boolean" }
 
-		it("should hoist Nothing and nest the payload", () => {
-			expect(buildUnion([integer, rational, nothing])).toEqual({
+		const number: UnionType = {
+			type: "UnionType",
+			name: "Number",
+			types: [integer, rational],
+		}
+
+		it("should keep distinct members side by side in the order given", () => {
+			expect(buildUnion([integer, rational, string])).toEqual({
 				type: "UnionType",
-				types: [
-					{ type: "UnionType", types: [integer, rational] },
-					nothing,
-				],
+				types: [integer, rational, string],
 			})
 		})
 
-		it("should leave a single payload beside Nothing flat", () => {
-			expect(buildUnion([integer, nothing])).toEqual({
+		it("should drop a member the Union already holds", () => {
+			expect(buildUnion([integer, string, integer])).toEqual({
 				type: "UnionType",
-				types: [integer, nothing],
+				types: [integer, string],
 			})
+		})
+
+		it("should hand a lone survivor back unwrapped", () => {
+			expect(buildUnion([integer])).toEqual(integer)
+			expect(buildUnion([integer, integer])).toEqual(integer)
 		})
 
 		it("should collapse a subsumed member into its named superset", () => {
-			const number: UnionType = {
+			expect(buildUnion([integer, number, string])).toEqual({
 				type: "UnionType",
-				name: "Number",
-				types: [integer, rational],
-			}
-
-			expect(buildUnion([integer, number, nothing])).toEqual({
-				type: "UnionType",
-				types: [number, nothing],
+				types: [number, string],
 			})
 		})
 
-		// NOTE: The shape the Enricher produces for an `Optional<Rational>`
-		// annotation — the Union `Rational | Nothing` carrying the applied
-		// spelling, which is what makes Hovers and Diagnostics print the alias
-		// and what lets `otherwise` bind a compound payload in one piece.
-		const optionalOf = (itemType: Type): UnionType => ({
-			type: "UnionType",
-			types: [itemType, nothing],
-			alias: { name: "Optional", typeArguments: [itemType] },
+		it("should flatten an anonymous nested Union", () => {
+			expect(
+				buildUnion([
+					{
+						type: "UnionType",
+						types: [
+							{ type: "UnionType", types: [integer, rational] },
+							boolean,
+						],
+					},
+					string,
+				]),
+			).toEqual({
+				type: "UnionType",
+				types: [integer, rational, boolean, string],
+			})
 		})
 
-		it("should keep a lone applied Optional as written", () => {
-			const optionalRational = optionalOf(rational)
+		// NOTE: A named Union's name IS its spelling — flattening `Number` into
+		// `Integer | Rational` here would cost every Hover and Diagnostic
+		// downstream the word `Number`. Assignability is unaffected either way,
+		// which is exactly why the display side gets to decide.
+		it("should keep a named nested Union whole", () => {
+			expect(buildUnion([number, string])).toEqual({
+				type: "UnionType",
+				types: [number, string],
+			})
+		})
 
-			expect(buildUnion([optionalRational, nothing])).toBe(
-				optionalRational,
+		// NOTE: The shape the Enricher produces for an applied generic Type
+		// Alias over a Union — `type Labelled<ItemType> = ItemType | String`
+		// written `Labelled<Rational>` — the members with the applied spelling
+		// carried alongside, which is what makes Hovers and Diagnostics print
+		// `Labelled<Rational>` rather than `Rational | String`.
+		const labelledOf = (itemType: Type): UnionType => ({
+			type: "UnionType",
+			types: [itemType, string],
+			alias: { name: "Labelled", typeArguments: [itemType] },
+		})
+
+		it("should keep a lone applied Alias as written", () => {
+			const labelledRational = labelledOf(rational)
+
+			// NOTE: `String` says nothing the Alias does not already hold, so
+			// it collapses into it — and what comes back is that very Union,
+			// applied spelling and all, not an equal one rebuilt without it.
+			expect(buildUnion([labelledRational, string])).toBe(
+				labelledRational,
 			)
 		})
 
-		it("should decompose an applied Optional that merges with other members", () => {
-			expect(buildUnion([optionalOf(rational), integer])).toEqual({
-				type: "UnionType",
-				types: [
-					{ type: "UnionType", types: [rational, integer] },
-					nothing,
-				],
-			})
-		})
+		it("should keep an applied Alias whole beside other members", () => {
+			const labelledRational = labelledOf(rational)
 
-		it("should collapse to Nothing when nothing else remains", () => {
-			expect(buildUnion([nothing, nothing])).toEqual(nothing)
+			expect(buildUnion([labelledRational, integer])).toEqual({
+				type: "UnionType",
+				types: [labelledRational, integer],
+			})
 		})
 
 		// NOTE: The Unknown item Type an empty List Literal carries is a
@@ -2317,69 +2368,95 @@ describe("Helpers", () => {
 		})
 	})
 
-	describe("matchesTypeWithBindings remainder fallback", () => {
+	// NOTE: A Generic member of an expected Union used to have one inference
+	// rule beyond the ordinary ones. `matchUnionRemainder` let it bind
+	// EVERYTHING the concrete expected members had not claimed, so an actual
+	// `MaybeInt | Rational` — `MaybeInt` a named Alias for `Integer | Nothing`
+	// — matched an expected `ItemType | Nothing` by handing the buried
+	// `Nothing` to the concrete member and binding
+	// `ItemType := Integer | Rational` from what was left over. It was written
+	// for exactly one call, `otherwise` on such a receiver, and it went with
+	// `Nothing` itself. What remains is the plain rule these pin: every actual
+	// member has to be taken by ONE expected member, and a Generic takes the
+	// whole member it binds to — which still binds a compound payload in one
+	// piece, as long as that payload is written as one member.
+	describe("matchesTypeWithBindings against a Union actual", () => {
 		const integer: Type = { type: "Integer" }
 		const rational: Type = { type: "Rational" }
-		const nothing: Type = { type: "Nothing" }
+		const string: Type = { type: "String" }
 
-		it("should bind the Generic to the leftovers once concrete members claimed theirs", () => {
-			const maybeInt: UnionType = {
-				type: "UnionType",
-				name: "MaybeInt",
-				types: [integer, nothing],
-			}
-			const expected: UnionType = {
-				type: "UnionType",
-				types: [{ type: "GenericUse", name: "ItemType" }, nothing],
-			}
-			const context = createInferenceContext([
+		function itemTypeContext() {
+			return createInferenceContext([
 				{ name: "ItemType", infer: true, defaultType: null },
 			])
+		}
+
+		const itemTypeOrString: UnionType = {
+			type: "UnionType",
+			types: [{ type: "GenericUse", name: "ItemType" }, string],
+		}
+
+		it("should bind a Generic to a nested Union member in one piece", () => {
+			const context = itemTypeContext()
 
 			expect(
 				matchesTypeWithBindings(
-					expected,
-					{ type: "UnionType", types: [maybeInt, rational] },
+					itemTypeOrString,
+					{
+						type: "UnionType",
+						types: [
+							{ type: "UnionType", types: [integer, rational] },
+							string,
+						],
+					},
 					context,
 				),
 			).toBe(true)
 
-			// NOTE: MaybeInt's buried Nothing goes to the concrete member;
-			// the Generic binds the payload that is left.
 			expect(context.bindings.get("ItemType")).toEqual({
 				type: "UnionType",
 				types: [integer, rational],
 			})
 		})
 
+		// NOTE: The direct counterpart of the deleted remainder rule. `Integer`
+		// binds `ItemType`, `Rational` then finds no expected member left that
+		// will take it, and the match fails — where the remainder rule would
+		// have collected both into `ItemType := Integer | Rational`. Written as
+		// ONE nested member, the very same pair still binds; see above.
+		it("should not spread a Generic over every member no concrete member took", () => {
+			expect(
+				matchesTypeWithBindings(
+					itemTypeOrString,
+					{ type: "UnionType", types: [integer, rational] },
+					itemTypeContext(),
+				),
+			).toBe(false)
+		})
+
 		it("should not rebind a Generic that is already bound", () => {
-			const expected: UnionType = {
-				type: "UnionType",
-				types: [{ type: "GenericUse", name: "ItemType" }, nothing],
-			}
-			const context = createInferenceContext([
-				{ name: "ItemType", infer: true, defaultType: null },
-			])
+			const context = itemTypeContext()
 			context.bindings.set("ItemType", integer)
 
 			expect(
 				matchesTypeWithBindings(
-					expected,
-					{
-						type: "UnionType",
-						types: [
-							{
-								type: "UnionType",
-								name: "MaybeRational",
-								types: [rational, nothing],
-							},
-							integer,
-						],
-					},
+					itemTypeOrString,
+					{ type: "UnionType", types: [rational, string] },
 					context,
 				),
 			).toBe(false)
+			expect(context.bindings.get("ItemType")).toEqual(integer)
 
+			// NOTE: The binding is CHECKED against later occurrences, never
+			// replaced by them — an actual the bound `Integer` does cover still
+			// matches, and still through that same `Integer`.
+			expect(
+				matchesTypeWithBindings(
+					itemTypeOrString,
+					{ type: "UnionType", types: [integer, string] },
+					context,
+				),
+			).toBe(true)
 			expect(context.bindings.get("ItemType")).toEqual(integer)
 		})
 	})

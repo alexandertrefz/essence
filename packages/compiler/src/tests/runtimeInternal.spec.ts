@@ -11,7 +11,6 @@ import {
 	choiceIs,
 } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
-import { createNothing } from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as record from "@essence-lang/runtime/Record"
@@ -330,9 +329,13 @@ describe("Runtime Internals", () => {
 			})
 
 			// NOTE: A Number is still only equal to a Number — the numeric cell
-			// must not swallow a value of some other Type.
+			// must not swallow a value of some other Type. The empty Record is
+			// named among them on purpose: it is the unit value, it carries no
+			// members at all, and a numeric cell reading `numerator` off it
+			// would find `undefined` on both sides rather than a mismatch.
 			it("answers unequal for a Number beside another Type", () => {
-				expect(anyIs(whole(1n), createNothing())).toBeFalse()
+				expect(anyIs(whole(1n), createBoolean(true))).toBeFalse()
+				expect(anyIs(whole(1n), record.createRecord({}))).toBeFalse()
 				expect(anyIs(whole(1n), text("1"))).toBeFalse()
 			})
 		})

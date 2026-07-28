@@ -28,41 +28,41 @@ implementation {
 	function show<infer Value is Printable>(
 		_ label: String,
 		_ value: Value,
-	) -> Nothing {
+	) -> {} {
 		__print("{label} => {value}")
-		<- nothing
+		<- {}
 	}
 
 	§ An Algebraic can not be written as a literal — it is only ever reached
 	§ through `squareRoot`, whose result is an Optional the caller has to
 	§ match apart. These two hand one to a body so that the Methods needing
 	§ an Algebraic receiver or Argument read as ordinary calls.
-	function withRootTwo(_ body: (_ rootTwo: Algebraic) -> Nothing) -> Nothing {
-		<- match 2::squareRoot() -> Nothing {
+	function withRootTwo(_ body: (_ rootTwo: Algebraic) -> {}) -> {} {
+		<- match 2::squareRoot() -> {} {
 			case #Value(root) {
-				<- match root -> Nothing {
+				<- match root -> {} {
 					case Algebraic { <- body(@) }
-					case Integer   { <- nothing }
+					case Integer   { <- {} }
 				}
 			}
 
-			case #Empty { <- nothing }
+			case #Empty { <- {} }
 		}
 	}
 
 	function withTwoRoots(
-		_ body: (_ rootTwo: Algebraic, _ rootThree: Algebraic) -> Nothing,
-	) -> Nothing {
-		<- withRootTwo((_ rootTwo: Algebraic) -> Nothing {
-			<- match 3::squareRoot() -> Nothing {
+		_ body: (_ rootTwo: Algebraic, _ rootThree: Algebraic) -> {},
+	) -> {} {
+		<- withRootTwo((_ rootTwo: Algebraic) -> {} {
+			<- match 3::squareRoot() -> {} {
 				case #Value(root) {
-					<- match root -> Nothing {
+					<- match root -> {} {
 						case Algebraic { <- body(rootTwo, @) }
-						case Integer   { <- nothing }
+						case Integer   { <- {} }
 					}
 				}
 
-				case #Empty { <- nothing }
+				case #Empty { <- {} }
 			}
 		})
 	}
@@ -452,7 +452,7 @@ third"::lines())
 	show("Integer.compare(to: Integer) [equal]", 2::compare(to 2))
 	show("Integer.compare(to: Integer) [greater]", 3::compare(to 2))
 
-	withRootTwo((_ rootTwo: Algebraic) -> Nothing {
+	withRootTwo((_ rootTwo: Algebraic) -> {} {
 		show("Integer.add(_ Algebraic)", 1::add(rootTwo))
 		show("Integer.subtract(_ Algebraic)", 1::subtract(rootTwo))
 		show("Integer.divide(by: Algebraic)", 1::divide(by rootTwo))
@@ -461,7 +461,7 @@ third"::lines())
 			"Integer.multiply(with: Algebraic) [collapses to Rational]",
 			0::multiply(with rootTwo),
 		)
-		<- nothing
+		<- {}
 	})
 
 	§ ——— Rational —————————————————————————————————————————————————————————
@@ -623,7 +623,7 @@ third"::lines())
 	show("Rational.compare(to: Rational) [equal]", 1/2::compare(to 2/4))
 	show("Rational.compare(to: Rational) [greater]", 2/3::compare(to 1/2))
 
-	withRootTwo((_ rootTwo: Algebraic) -> Nothing {
+	withRootTwo((_ rootTwo: Algebraic) -> {} {
 		show("Rational.add(_ Algebraic)", 1/2::add(rootTwo))
 		show("Rational.subtract(_ Algebraic)", 1/2::subtract(rootTwo))
 		show("Rational.divide(by: Algebraic)", 1/2::divide(by rootTwo))
@@ -632,11 +632,11 @@ third"::lines())
 			"Rational.multiply(with: Algebraic) [collapses to Rational]",
 			0/1::multiply(with rootTwo),
 		)
-		<- nothing
+		<- {}
 	})
 
 	§ ——— Algebraic ————————————————————————————————————————————————————————
-	withTwoRoots((_ rootTwo: Algebraic, _ rootThree: Algebraic) -> Nothing {
+	withTwoRoots((_ rootTwo: Algebraic, _ rootThree: Algebraic) -> {} {
 		show("Algebraic.is(_ Algebraic)", rootTwo::is(rootTwo))
 		show(
 			"Algebraic.is(_ Algebraic) [differing radicals]",
@@ -703,7 +703,7 @@ third"::lines())
 		show("Algebraic.absolute() [negative]", rootTwo::negate()::absolute())
 		show("Algebraic.negate()", rootTwo::negate())
 		show("Algebraic.toString()", rootTwo::toString())
-		<- nothing
+		<- {}
 	})
 
 	§ ——— Transcendental ———————————————————————————————————————————————————
@@ -768,7 +768,7 @@ third"::lines())
 	show("Number.PI", Number.PI)
 	show("Number.TAU", Number.TAU)
 
-	withRootTwo((_ rootTwo: Algebraic) -> Nothing {
+	withRootTwo((_ rootTwo: Algebraic) -> {} {
 		show("Number.is(_ Number) [Integer]", Number.is(2, 2/1))
 		show("Number.is(_ Number) [Rational]", Number.is(1/2, 1))
 		show("Number.is(_ Number) [Algebraic]", Number.is(rootTwo, 2))
@@ -891,7 +891,7 @@ third"::lines())
 			"Number.isBetween(_ Number, and: Number) [on the bound]",
 			Number.isBetween(5, 5, and 5),
 		)
-		<- nothing
+		<- {}
 	})
 
 	show("Number.sum(_ List<Integer>)", Number.sum([1, 2, 3]))
@@ -1004,11 +1004,6 @@ third"::lines())
 		"Number.greatestNumber(_ List<Integer | Rational>) [empty]",
 		Number.greatestNumber(noMixedNumbers),
 	)
-
-	§ ——— Nothing ——————————————————————————————————————————————————————————
-	show("Nothing.is(_ Nothing)", nothing::is(nothing))
-	show("Nothing.isNot(_ Nothing)", nothing::isNot(nothing))
-	show("Nothing.toString()", nothing::toString())
 
 	§ ——— Optional —————————————————————————————————————————————————————————
 	show(

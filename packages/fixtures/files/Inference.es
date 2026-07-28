@@ -61,16 +61,13 @@ implementation {
 
 	§ Several `<-` Statements give the Union of what they return.
 	__print(
-		numbers::transformFirst(
-			(item) {
-				if item::isGreaterThan(0) {
-					<- item::multiply(with 2)
-				}
+		numbers::transformFirst((item) {
+			if item::isGreaterThan(0) {
+				<- item::multiply(with 2)
+			}
 
-				<- nothing
-			},
-			fallback nothing,
-		),
+			<- {}
+		}, fallback {}),
 	)
 
 	§ A literal that is not an Argument has no expected signature anywhere, so

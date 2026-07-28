@@ -124,7 +124,11 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			indentLevel,
 		)}`
 	} else {
-		return "Nothing"
+		// NOTE: Unreachable for any value the Compiler emits — every Essence
+		// value carries one of the tags above. It answers rather than throws
+		// because a printer that crashes takes the Program with it, and what a
+		// reader needs then is the tag it did not recognise.
+		return `<unknown value: ${String(obj[typeKeySymbol])}>`
 	}
 }
 

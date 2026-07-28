@@ -57,17 +57,19 @@ describe("Validator", () => {
 			expect(diagnostics[0].position?.start.line).toBe(2)
 		})
 
-		it("should treat an Optional and its flattened spelling as different Types", () => {
+		it("should treat an Optional and its payload Union as different Types", () => {
 			// NOTE: `Optional<ItemType>` was a Type Alias for
-			// `ItemType | Nothing`, so `Optional<Integer | Rational>` and
-			// `Integer | Rational | Nothing` were two spellings of one Type
-			// and assignability accepted both directions. Optional is a
-			// nominal Choice now — a value is `#Value(payload)` or `#Empty`,
-			// which is not the payload sitting in a Union beside `Nothing`.
-			// Neither direction is assignable any more, and that is the
-			// point: no hand-written Union can be Optional-shaped by
-			// accident, and the wrapper is what carries the Namespace an
-			// `Integer | Nothing` never had.
+			// `ItemType | Nothing`, so `Optional<Integer | Rational>` and the
+			// hand-written `Integer | Rational | Nothing` were two spellings
+			// of one Type and assignability accepted both directions.
+			// Optional is a nominal Choice now — a value is `#Value(payload)`
+			// or `#Empty`, which is not the payload sitting in a Union — and
+			// `Nothing` is gone, so the flattened spelling cannot even be
+			// written. What is left to check is that the wrapper and its
+			// payload Union stay apart: neither direction is assignable, and
+			// that is the point, because no hand-written Union can be
+			// Optional-shaped by accident and the wrapper is what carries the
+			// Namespace a bare `Integer | Rational` never had.
 			expect(
 				diagnosticsFor(`implementation {
 					constant nested: Optional<Integer | Rational> = #Value(1)
@@ -75,28 +77,28 @@ describe("Validator", () => {
 				}`),
 			).toEqual([])
 
-			let widened = diagnosticsFor(`implementation {
+			let unwrapped = diagnosticsFor(`implementation {
 				constant nested: Optional<Integer | Rational> = #Value(1)
-				constant flat: Integer | Rational | Nothing = nested
+				constant flat: Integer | Rational = nested
 				__print(flat)
 			}`)
 
-			expect(widened).toHaveLength(1)
-			expect(widened[0].code).toBe("assignment-type-mismatch")
-			expect(widened[0].labels[0]?.message).toBe(
+			expect(unwrapped).toHaveLength(1)
+			expect(unwrapped[0].code).toBe("assignment-type-mismatch")
+			expect(unwrapped[0].labels[0]?.message).toBe(
 				"this is an Optional<Integer | Rational>",
 			)
 
-			let narrowed = diagnosticsFor(`implementation {
-				constant flat: Integer | Rational | Nothing = 1
+			let rewrapped = diagnosticsFor(`implementation {
+				constant flat: Integer | Rational = 1
 				constant back: Optional<Integer | Rational> = flat
 				__print(back)
 			}`)
 
-			expect(narrowed).toHaveLength(1)
-			expect(narrowed[0].code).toBe("assignment-type-mismatch")
-			expect(narrowed[0].labels[0]?.message).toBe(
-				"this is an Integer | Rational | Nothing",
+			expect(rewrapped).toHaveLength(1)
+			expect(rewrapped[0].code).toBe("assignment-type-mismatch")
+			expect(rewrapped[0].labels[0]?.message).toBe(
+				"this is an Integer | Rational",
 			)
 		})
 
@@ -339,10 +341,14 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
-		it("should accept Functions returning Nothing without a return", () => {
+		// NOTE: The unit Type is the empty Record, `{}`. A Function that
+		// answers nothing useful promises `{}`, and a body that promises `{}`
+		// is the one body allowed to fall off its end — the Validator exempts
+		// it here and the Simplifier appends the `return` for it.
+		it("should accept Functions returning the unit Record without a return", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					function log (_ value: String) -> Nothing {
+					function log (_ value: String) -> {} {
 						__print(value)
 					}
 				}`),
@@ -523,8 +529,8 @@ describe("Validator", () => {
 	describe("Nested Expressions", () => {
 		it("should report a non-exhaustive Match inside a List Literal", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Integer | Nothing = nothing
-				constant values = [match maybe -> Integer {
+				constant either: Integer | String = 5
+				constant values = [match either -> Integer {
 					case Integer { <- @ }
 				}]
 
@@ -598,9 +604,9 @@ describe("Validator", () => {
 
 		it("should report a non-exhaustive Match on the right side of a Combination", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Integer | Nothing = nothing
+				constant either: Integer | String = 5
 				constant base = { x = 1, y = 2 }
-				constant combined = { base with x = match maybe -> Integer {
+				constant combined = { base with x = match either -> Integer {
 					case Integer { <- @ }
 				} }
 
@@ -649,10 +655,10 @@ describe("Validator", () => {
 	describe("Match Handlers", () => {
 		it("should report a non-Boolean Guard", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Integer | Nothing = 5
-				constant a = match maybe -> Integer {
+				constant either: Integer | String = 5
+				constant a = match either -> Integer {
 					case Integer where "" { <- 111 }
-					case Nothing { <- 0 }
+					case String { <- 0 }
 					case Integer { <- 222 }
 				}
 
@@ -676,8 +682,8 @@ describe("Validator", () => {
 					<- value
 				}
 
-				constant maybe: Integer | Nothing = 5
-				constant a = match maybe -> Integer {
+				constant either: Integer | String = 5
+				constant a = match either -> Integer {
 					case Integer where takesInteger("bad")::isEven() { <- 1 }
 					case _ { <- 0 }
 				}
@@ -692,11 +698,11 @@ describe("Validator", () => {
 		it("should accept a Boolean Guard", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant maybe: Integer | Nothing = 5
-					constant a = match maybe -> Integer {
+					constant either: Integer | String = 5
+					constant a = match either -> Integer {
 						case Integer where @::isGreaterThan(100) { <- 111 }
 						case Integer { <- 222 }
-						case Nothing { <- 0 }
+						case String { <- 0 }
 					}
 
 					__print(a)
@@ -706,11 +712,11 @@ describe("Validator", () => {
 
 		it("should report a zero denominator in a literal Matcher", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Rational | Nothing = 1/2
-				constant a = match maybe -> String {
+				constant either: Rational | String = 1/2
+				constant a = match either -> String {
 					case 1/0 { <- "half" }
 					case Rational { <- "other" }
-					case Nothing { <- "none" }
+					case String { <- "a word" }
 				}
 
 				__print(a)
@@ -724,11 +730,11 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Point = { x: Rational, y: Rational }
 
-				constant point: Point | Nothing = { x = 1/2, y = 1/2 }
+				constant point: Point | String = { x = 1/2, y = 1/2 }
 				constant a = match point -> String {
 					case { x = 2/0, y: Rational } { <- "x" }
 					case Point { <- "point" }
-					case Nothing { <- "none" }
+					case String { <- "a word" }
 				}
 
 				__print(a)
@@ -742,11 +748,11 @@ describe("Validator", () => {
 	describe("Unreachable Cases", () => {
 		it("should warn about a duplicated Case", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Integer | Nothing = 5
-				constant a = match maybe -> Integer {
+				constant either: Integer | String = 5
+				constant a = match either -> Integer {
 					case Integer { <- 1 }
 					case Integer { <- 2 }
-					case Nothing { <- 0 }
+					case String { <- 0 }
 				}
 
 				__print(a)
@@ -770,8 +776,8 @@ describe("Validator", () => {
 
 		it("should warn about a Case shadowed by an earlier wildcard", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe: Integer | Nothing = 5
-				constant a = match maybe -> Integer {
+				constant either: Integer | String = 5
+				constant a = match either -> Integer {
 					case _ { <- 0 }
 					case Integer { <- 1 }
 				}
@@ -787,11 +793,11 @@ describe("Validator", () => {
 		it("should not warn about a Case below a Guarded Case of the same Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant maybe: Integer | Nothing = 5
-					constant a = match maybe -> Integer {
+					constant either: Integer | String = 5
+					constant a = match either -> Integer {
 						case Integer where @::isGreaterThan(100) { <- 111 }
 						case Integer { <- 222 }
-						case Nothing { <- 0 }
+						case String { <- 0 }
 					}
 
 					__print(a)
@@ -802,11 +808,11 @@ describe("Validator", () => {
 		it("should not warn about a Case below a literal Case of the same Type", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant maybe: Integer | Nothing = 5
-					constant a = match maybe -> String {
+					constant either: Integer | String = 5
+					constant a = match either -> String {
 						case 0 { <- "none" }
 						case Integer { <- "many" }
-						case Nothing { <- "no count at all" }
+						case String { <- "not a count at all" }
 					}
 
 					__print(a)
@@ -817,9 +823,9 @@ describe("Validator", () => {
 		it("should not warn about a wildcard that catches what is left", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant maybe: Integer | Nothing = 5
-					constant a = match maybe -> Integer {
-						case Nothing { <- 0 }
+					constant either: Integer | String = 5
+					constant a = match either -> Integer {
+						case String { <- 0 }
 						case _ { <- @ }
 					}
 
@@ -832,23 +838,24 @@ describe("Validator", () => {
 		// emitted check for a Generic Matcher is unconditionally true and every
 		// Case below it is dead. Assignability says `Value` matches nothing but
 		// `Value`, so this Match used to pass every check without a Diagnostic:
-		// `unwrap(nothing, fallback 7)` answered the Nothing where the
-		// Signature promised a `Value`, and the wrong value flowed on. It is an
-		// Error rather than the Warning dead code gets: nothing is greyed out
-		// here, a Program is answering with the wrong value.
+		// `unwrap("missing", fallback 7)` answered the String where the
+		// Signature promised a `Value` — an Integer here — and the wrong value
+		// flowed on. It is an Error rather than the Warning dead code gets:
+		// nothing is greyed out here, a Program is answering with the wrong
+		// value.
 		it("should reject a Case shadowed by an earlier Generic Case", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				function unwrap <infer Value>(
-					_ maybe: Value | Nothing,
+					_ candidate: Value | String,
 					fallback fallbackValue: Value,
 				) -> Value {
-					<- match maybe -> Value {
+					<- match candidate -> Value {
 						case Value { <- @ }
-						case Nothing { <- fallbackValue }
+						case String { <- fallbackValue }
 					}
 				}
 
-				__print(unwrap(nothing, fallback 7))
+				__print(unwrap("missing", fallback 7))
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
@@ -857,7 +864,7 @@ describe("Validator", () => {
 			// NOTE: Untagged — `unnecessary` greys a Case out, and this one is
 			// not something to remove but something to reorder.
 			expect(diagnostics[0].tags).toBeUndefined()
-			// NOTE: On `case Nothing`, the Case that never runs — pointing back
+			// NOTE: On `case String`, the Case that never runs — pointing back
 			// at the Generic Case above it.
 			expect(diagnostics[0].position?.start.line).toBe(8)
 			expect(diagnostics[0].labels[1]?.position.start.line).toBe(7)
@@ -873,16 +880,16 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function unwrap <infer Value>(
-						_ maybe: Value | Nothing,
+						_ candidate: Value | String,
 						fallback fallbackValue: Value,
 					) -> Value {
-						<- match maybe -> Value {
-							case Nothing { <- fallbackValue }
+						<- match candidate -> Value {
+							case String { <- fallbackValue }
 							case Value { <- @ }
 						}
 					}
 
-					__print(unwrap(nothing, fallback 7))
+					__print(unwrap("missing", fallback 7))
 				}`),
 			).toEqual([])
 		})
@@ -949,17 +956,17 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function unwrap <infer Value>(
-						_ maybe: Value | Nothing,
+						_ candidate: Value | String,
 						fallback fallbackValue: Value,
 					) -> Value {
-						<- match maybe -> Value {
+						<- match candidate -> Value {
 							case Value where true { <- @ }
-							case Nothing { <- fallbackValue }
+							case String { <- fallbackValue }
 							case Value { <- @ }
 						}
 					}
 
-					__print(unwrap(nothing, fallback 7))
+					__print(unwrap("missing", fallback 7))
 				}`),
 			).toEqual([])
 		})
@@ -1010,10 +1017,10 @@ describe("Validator", () => {
 		it("should stay silent where no empty List can cross over", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant scrutinee: List<Integer> | Nothing = [1]
+					constant scrutinee: List<Integer> | String = [1]
 
 					__print(match scrutinee -> String {
-						case Nothing       { <- "nothing" }
+						case String        { <- "a word" }
 						case List<Integer> { <- "integers" }
 					})
 				}`),
@@ -1123,10 +1130,10 @@ describe("Validator", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Thing = { id: Integer }
 
-				constant maybe: Integer | Nothing = nothing
+				constant either: Integer | String = 5
 
 				namespace Things for Thing {
-					static fallback: Integer = match maybe -> Integer {
+					static fallback: Integer = match either -> Integer {
 						case Integer { <- @ }
 					}
 				}

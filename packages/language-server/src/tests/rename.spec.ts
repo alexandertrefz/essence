@@ -803,7 +803,7 @@ describe("isValidIdentifierName", () => {
 	it("should reject reserved words", () => {
 		expect(isValidIdentifierName("constant")).toBe(false)
 		expect(isValidIdentifierName("match")).toBe(false)
-		expect(isValidIdentifierName("nothing")).toBe(false)
+		expect(isValidIdentifierName("choice")).toBe(false)
 		expect(isValidIdentifierName("true")).toBe(false)
 	})
 })

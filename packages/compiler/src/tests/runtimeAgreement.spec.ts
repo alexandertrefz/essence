@@ -5,7 +5,7 @@ import { createAlgebraic } from "@essence-lang/runtime/Algebraic"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
 import { createInteger } from "@essence-lang/runtime/Integer"
 import { createList } from "@essence-lang/runtime/List"
-import { createNothing } from "@essence-lang/runtime/Nothing"
+import { createEmpty, createValue } from "@essence-lang/runtime/Optional"
 import { equal, greater, less } from "@essence-lang/runtime/Ordering"
 import { createRational } from "@essence-lang/runtime/Rational"
 import { createRecord } from "@essence-lang/runtime/Record"
@@ -18,12 +18,13 @@ import {
 } from "@essence-lang/runtime/type"
 
 import { loadStdlib } from "../enricher/stdlib"
+import { applyGenericBindings } from "../helpers/index"
 import { acceptsAllAtRuntime, overlapsAtRuntime } from "../validator/index"
 
 // NOTE: The Validator decides which Handlers of a Match can run by asking what
-// a Type NAMES; the runtime decides it by asking what a value IS. Nothing says
-// so when those two answers drift apart — a Handler the Validator called
-// impossible runs anyway (an empty `List<Integer>` walking into `case
+// a Type NAMES; the runtime decides it by asking what a value IS. No one
+// announces it when those two answers drift apart — a Handler the Validator
+// called impossible runs anyway (an empty `List<Integer>` walking into `case
 // List<String>`), or one it counted on never does and the Match falls off its
 // chain. `acceptsAllAtRuntime` and `overlapsAtRuntime` are the two edges the
 // Validator reasons between, and this file sandwiches `isValueOfType` inside
@@ -66,8 +67,25 @@ const caseValue = (tag: string, payload?: Record<string, AnyType>) =>
 // table from describing a language the Compiler no longer has.
 const stdlibTypes = loadStdlib().types
 
+// NOTE: `Optional` is read out of the standard library for the same reason, and
+// with more riding on it: it is the Choice every fallible Signature in the
+// language answers with, so the applied `Optional<Integer>` below is the real
+// declaration with its Type Argument substituted in rather than a second
+// hand-written copy of a shape only `Optional.es` gets to decide.
+function optionalOf(itemType: common.Type): common.Type {
+	let optional = stdlibTypes.Optional
+
+	if (optional.type !== "GenericAlias") {
+		throw new Error("`Optional` is no longer a generic Type Alias")
+	}
+
+	return applyGenericBindings(
+		optional.aliasedType,
+		new Map([["ItemType", itemType]]),
+	)
+}
+
 let samples: Array<Sample> = [
-	{ name: "Nothing", type: { type: "Nothing" }, values: [createNothing()] },
 	{
 		name: "Boolean",
 		type: { type: "Boolean" },
@@ -235,17 +253,33 @@ let samples: Array<Sample> = [
 		type: { type: "UnionType", types: [integerType, stringType] },
 		values: [createInteger(1n), createString("here")],
 	},
+	// NOTE: Fallibility, spelled the only way the language spells it. This used
+	// to be `Integer | Nothing`, a Union whose SHAPE meant "might be missing";
+	// `Optional` is a nominal Choice now, so what the two edges have to agree
+	// about is a Union of two Cases whose tags the runtime reads off the value.
 	{
-		name: "Integer | Nothing",
-		type: { type: "UnionType", types: [integerType, { type: "Nothing" }] },
-		values: [createInteger(1n), createNothing()],
+		name: "Optional<Integer>",
+		type: optionalOf(integerType),
+		values: [
+			createValue(createInteger(1n)) as unknown as AnyType,
+			createEmpty() as unknown as AnyType,
+		],
+	},
+	{
+		name: "Optional<String>",
+		type: optionalOf(stringType),
+		values: [
+			createValue(createString("here")) as unknown as AnyType,
+			createEmpty() as unknown as AnyType,
+		],
 	},
 	// NOTE: A GenericUse and an Unknown carry no values of their own. As a
 	// Matcher each takes everything, which the accepting half below asserts
 	// against every value in the table. As a member Type neither NAMES any
 	// value — a Type Parameter's Argument could be anything, and
 	// `overlapsAtRuntime` deliberately declines to guess, because otherwise
-	// every Match over a `Value | Nothing` would report an overlap — so
+	// every Match written inside a generic Namespace would report an overlap
+	// on the very Type Parameter its Handlers are there to sort out — so
 	// sampling them would ask the refusing half a question it does not answer.
 	{
 		name: "ItemType",

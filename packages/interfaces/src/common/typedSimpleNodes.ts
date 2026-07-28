@@ -8,7 +8,6 @@ import type {
 	IntegerType,
 	ListType,
 	NamespaceType,
-	NothingType,
 	Position,
 	RecordType,
 	StringType,
@@ -186,7 +185,6 @@ export type ValueNode =
 	| IntegerValueNode
 	| RationalValueNode
 	| BooleanValueNode
-	| NothingValueNode
 	| FunctionValueNode
 	| ListValueNode
 
@@ -243,12 +241,6 @@ export type BooleanValueNode = {
 	nodeType: "BooleanValue"
 	value: boolean
 	type: BooleanType
-	position?: Position
-}
-
-export type NothingValueNode = {
-	nodeType: "NothingValue"
-	type: NothingType
 	position?: Position
 }
 

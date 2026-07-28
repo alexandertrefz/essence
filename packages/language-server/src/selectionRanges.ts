@@ -200,7 +200,6 @@ function collectFromNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return
 	}
 }

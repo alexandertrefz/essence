@@ -281,13 +281,13 @@ describe("Code Generation", () => {
 		it("emits every Handler of a Match", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Rational | String | Nothing = nothing
+					variable value: Integer | Rational | String | Boolean = true
 
 					__print(match value -> String {
 						case Integer  { <- "handled integer" }
 						case Rational { <- "handled rational" }
 						case String   { <- "handled string" }
-						case Nothing  { <- "handled nothing" }
+						case Boolean  { <- "handled boolean" }
 					})
 				}
 			`)
@@ -295,18 +295,18 @@ describe("Code Generation", () => {
 			expect(generated).toContain("handled integer")
 			expect(generated).toContain("handled rational")
 			expect(generated).toContain("handled string")
-			expect(generated).toContain("handled nothing")
+			expect(generated).toContain("handled boolean")
 		})
 
 		it("nests the Handlers so that each one is the alternate of the last", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Rational | Nothing = nothing
+					variable value: Integer | Rational | Boolean = true
 
 					__print(match value -> String {
 						case Integer  { <- "a" }
 						case Rational { <- "b" }
-						case Nothing  { <- "c" }
+						case Boolean  { <- "c" }
 					})
 				}
 			`)
@@ -325,11 +325,11 @@ describe("Code Generation", () => {
 		it("serialises the member list of a Union Matcher as an Array", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Rational | Nothing = nothing
+					variable value: Integer | Rational | Boolean = true
 
 					__print(match value -> String {
 						case Integer | Rational { <- "number" }
-						case Nothing            { <- "nothing" }
+						case Boolean            { <- "boolean" }
 					})
 				}
 			`)
@@ -341,16 +341,16 @@ describe("Code Generation", () => {
 		it("emits a wildcard Handler alongside the Handlers before it", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Rational | Nothing = nothing
+					variable value: Integer | Rational | Boolean = true
 
 					__print(match value -> String {
-						case Nothing { <- "handled nothing" }
+						case Boolean { <- "handled boolean" }
 						case _       { <- "handled the rest" }
 					})
 				}
 			`)
 
-			expect(generated).toContain("handled nothing")
+			expect(generated).toContain("handled boolean")
 			expect(generated).toContain("handled the rest")
 		})
 	})
@@ -364,10 +364,10 @@ describe("Code Generation", () => {
 			expect(() =>
 				generate(`
 					implementation {
-						variable value: Integer | Nothing = 5
+						variable value: Integer | Boolean = 5
 
 						__print(match value -> Integer {
-							case Nothing { <- 0 }
+							case Boolean { <- 0 }
 							case _       { <- @::multiply(with 2) }
 						})
 					}
@@ -379,7 +379,7 @@ describe("Code Generation", () => {
 			expect(() =>
 				generate(`
 					implementation {
-						variable value: Integer | Nothing = 5
+						variable value: Integer | Boolean = 5
 
 						__print(match value -> String {
 							case _ { <- "anything" }
@@ -394,12 +394,12 @@ describe("Code Generation", () => {
 		it("compares by value for a literal Matcher", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Nothing = 0
+					variable value: Integer | Boolean = 0
 
 					__print(match value -> String {
 						case 0       { <- "zero" }
 						case Integer { <- "other" }
-						case Nothing { <- "nothing" }
+						case Boolean { <- "boolean" }
 					})
 				}
 			`)
@@ -413,12 +413,12 @@ describe("Code Generation", () => {
 		it("ands a Guard onto the check its Matcher produced", () => {
 			let generated = generate(`
 				implementation {
-					variable value: Integer | Nothing = 1
+					variable value: Integer | Boolean = 1
 
 					__print(match value -> String {
 						case Integer where @::isGreaterThan(0) { <- "positive" }
 						case Integer                           { <- "other" }
-						case Nothing                           { <- "nothing" }
+						case Boolean                           { <- "boolean" }
 					})
 				}
 			`)
@@ -431,11 +431,11 @@ describe("Code Generation", () => {
 		it("does not let a literal Matcher discharge its Type", () => {
 			let diagnostics = diagnosticsOf(`
 				implementation {
-					variable value: Integer | Nothing = 0
+					variable value: Integer | Boolean = 0
 
 					__print(match value -> String {
 						case 0       { <- "zero" }
-						case Nothing { <- "nothing" }
+						case Boolean { <- "boolean" }
 					})
 				}
 			`)
@@ -446,11 +446,11 @@ describe("Code Generation", () => {
 		it("does not let a Guard discharge its Type", () => {
 			let diagnostics = diagnosticsOf(`
 				implementation {
-					variable value: Integer | Nothing = 1
+					variable value: Integer | Boolean = 1
 
 					__print(match value -> String {
 						case Integer where @::isGreaterThan(0) { <- "positive" }
-						case Nothing                           { <- "nothing" }
+						case Boolean                           { <- "boolean" }
 					})
 				}
 			`)
@@ -460,11 +460,11 @@ describe("Code Generation", () => {
 
 		it("leaves a literal's Type in the residual of a later wildcard", () => {
 			// NOTE: `case 0` catches one Integer, so `@` inside the wildcard is
-			// still Integer|Nothing — calling an Integer Method on it has to
+			// still Integer|Boolean — calling an Integer Method on it has to
 			// stay an error.
 			let diagnostics = diagnosticsOf(`
 				implementation {
-					variable value: Integer | Nothing = 1
+					variable value: Integer | Boolean = 1
 
 					__print(match value -> Integer {
 						case 0 { <- 0 }
@@ -480,10 +480,10 @@ describe("Code Generation", () => {
 			expect(() =>
 				generate(`
 					implementation {
-						variable value: Integer | Nothing = 1
+						variable value: Integer | Boolean = 1
 
 						__print(match value -> Integer {
-							case Nothing { <- 0 }
+							case Boolean { <- 0 }
 							case 0       { <- 0 }
 							case _       { <- @::multiply(with 2) }
 						})
@@ -500,28 +500,28 @@ describe("Code Generation", () => {
 		it("matches a Record structurally", () => {
 			let generated = generate(`
 				implementation {
-					variable value: { a: Integer } | Nothing = { a = 1 }
+					variable value: { a: Integer } | String = { a = 1 }
 
 					__print(match value -> String {
-						case { a: Integer } { <- "record" }
-						case Nothing        { <- "nothing" }
+						case { a: Integer } { <- "handled record" }
+						case String         { <- "handled string" }
 					})
 				}
 			`)
 
-			expect(generated).toContain("record")
-			expect(generated).toContain("nothing")
+			expect(generated).toContain("handled record")
+			expect(generated).toContain("handled string")
 		})
 
 		it("compares a value-constrained member by value", () => {
 			let generated = generate(`
 				implementation {
-					variable value: { a: Integer, b: Integer } | Nothing = { a = 6, b = 2 }
+					variable value: { a: Integer, b: Integer } | String = { a = 6, b = 2 }
 
 					__print(match value -> String {
 						case { a = 6, b: Integer } { <- "six" }
 						case { a: Integer }        { <- "record" }
-						case Nothing               { <- "nothing" }
+						case String                { <- "string" }
 					})
 				}
 			`)
@@ -533,12 +533,12 @@ describe("Code Generation", () => {
 			expect(() =>
 				generate(`
 					implementation {
-						variable value: { a: Integer, b: Integer } | Nothing = { a = 6, b = 7 }
+						variable value: { a: Integer, b: Integer } | String = { a = 6, b = 7 }
 
 						__print(match value -> Integer {
 							case { a = 6, b: Integer } { <- @.b }
 							case { a: Integer }        { <- @.a }
-							case Nothing               { <- 0 }
+							case String                { <- 0 }
 						})
 					}
 				`),
@@ -548,11 +548,11 @@ describe("Code Generation", () => {
 		it("does not let a value-constrained Record discharge its Type", () => {
 			let diagnostics = diagnosticsOf(`
 				implementation {
-					variable value: { a: Integer } | Nothing = { a = 6 }
+					variable value: { a: Integer } | String = { a = 6 }
 
 					__print(match value -> String {
 						case { a = 6 }  { <- "six" }
-						case Nothing    { <- "nothing" }
+						case String     { <- "string" }
 					})
 				}
 			`)
@@ -564,11 +564,11 @@ describe("Code Generation", () => {
 			expect(() =>
 				generate(`
 					implementation {
-						variable value: { a: Integer } | Nothing = { a = 6 }
+						variable value: { a: Integer } | String = { a = 6 }
 
 						__print(match value -> String {
 							case { a: Integer } { <- "record" }
-							case Nothing        { <- "nothing" }
+							case String         { <- "string" }
 						})
 					}
 				`),

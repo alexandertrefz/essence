@@ -246,7 +246,6 @@ function visitNode(
 		case "IntegerValue":
 		case "RationalValue":
 		case "BooleanValue":
-		case "NothingValue":
 			return
 	}
 }

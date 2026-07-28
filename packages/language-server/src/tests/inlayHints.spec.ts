@@ -228,15 +228,15 @@ describe("Inlay Hints", () => {
 				"\tconstant picked = value::pick((item) {",
 				"\t\tif item::isGreaterThan(0) { <- item }",
 				"",
-				"\t\t<- nothing",
+				'\t\t<- "none"',
 				"\t})",
 				"}",
 			].join("\n")
 
 			let labels = hintsOf(source).map((hint) => hint.label)
 
-			expect(labels).toContain(" -> Number | Nothing")
-			expect(labels).toContain(": Number | Nothing")
+			expect(labels).toContain(" -> Number | String")
+			expect(labels).toContain(": Number | String")
 		})
 
 		// NOTE: A Guard is where a contextually typed literal is hardest to
@@ -348,20 +348,22 @@ describe("Inlay Hints", () => {
 			])
 		})
 
-		it("should not resolve `otherwise` when `Nothing` hides inside a named member", () => {
-			// NOTE: `MaybeInt` keeps its name — and its buried `Nothing` — as
-			// a member of the wider Union, and that used to be enough: a
-			// remainder fallback let the `Nothing` an `otherwise` expected
-			// claim the buried one, and typed the payload as
-			// `Integer | Rational`. There is no such fallback left to fall
-			// into, because there is no Union SHAPE that means "fallible" any
-			// more — only the Choice does, and naming a Union does not make it
-			// one. The surviving Hint says the rest of the file is unharmed:
-			// `mixed` still enriches, and still reads back under its own alias.
-			// It simply has no `otherwise` to offer.
+		it("should not resolve `otherwise` on a named member of a wider Union", () => {
+			// NOTE: This test used to be about a `Nothing` BURIED inside a
+			// named Alias: `type MaybeInt = Integer | Nothing` as a member of
+			// `MaybeInt | Rational`, where a remainder fallback let the
+			// `Nothing` an `otherwise` expected claim the buried one and typed
+			// the payload as `Integer | Rational`. Neither the Type nor the
+			// fallback exists — there is no Union SHAPE that means "fallible"
+			// any more, only the Choice, and naming a Union does not make it
+			// one. What is left worth pinning is the half that outlived them:
+			// a named Alias keeps its name as a member of a wider Union, and
+			// `otherwise` finds nothing to resolve against there. The one Hint
+			// says both — `mixed` enriches and reads back under its own alias,
+			// while `sure` gets none because the call did not resolve.
 			let source = [
 				"implementation {",
-				"\ttype MaybeInt = Integer | Nothing",
+				"\ttype MaybeInt = Integer | String",
 				"\tconstant mixed: MaybeInt | Rational = 1",
 				"\tconstant echoed = mixed",
 				"\tconstant sure = mixed::otherwise(0)",
@@ -380,13 +382,15 @@ describe("Inlay Hints", () => {
 		it("should keep an `Optional` branch whole in a Union inferred from mixed branches", () => {
 			// NOTE: One branch returns `Optional<Rational>`, the other a bare
 			// Integer, and the inferred Union keeps the two side by side — the
-			// Optional stays ONE nested member rather than dissolving into a
-			// top-level `Nothing` that the Integer then sits next to. That is
-			// what a nominal Optional buys: a Union cannot become
-			// fallible-shaped by accident, so `merged` reads back as
-			// `Optional<Rational> | Integer` and has no `otherwise` to call —
-			// `sure` gets no Type and no Hint. A value that is fallible has to
-			// say so by being an `Optional` the whole way out.
+			// Optional stays ONE nested member. Back when `Optional<X>` was an
+			// Alias for a Union, the two branches dissolved into each other
+			// and the Integer ended up sitting beside the missing case at the
+			// top level; a nominal Choice has no shape to dissolve INTO. That
+			// is what it buys: a Union cannot become fallible by accident, so
+			// `merged` reads back as `Optional<Rational> | Integer` and has no
+			// `otherwise` to call — `sure` gets no Type and no Hint. A value
+			// that is fallible has to say so by being an `Optional` the whole
+			// way out.
 			let source = [
 				"implementation {",
 				"\tnamespace Picker for Integer {",

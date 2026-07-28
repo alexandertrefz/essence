@@ -40,7 +40,6 @@ export const builtinMemberOrder: Array<string> = [
 	"Algebraic",
 	"Transcendental",
 	"Number",
-	"Nothing",
 	"Optional",
 	// NOTE: Directly after `Optional`, for the reason `NestedList` sits
 	// directly after `List` — the two Namespaces one Optional value can reach
@@ -85,7 +84,6 @@ export const builtinTypeOrder: Array<string> = [
 	"Rational",
 	"Algebraic",
 	"Transcendental",
-	"Nothing",
 	"Record",
 	"List",
 	"Irrational",

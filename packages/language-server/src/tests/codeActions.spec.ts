@@ -170,7 +170,7 @@ describe("Code Actions", () => {
 			let lines = [
 				"implementation {",
 				"\tconstant outer: Integer | String = 1",
-				"\tconstant inner: Boolean | Nothing = true",
+				"\tconstant inner: Boolean | Integer = true",
 				"\tconstant described = match outer -> String {",
 				'\t\tcase Integer { <- "number" }',
 				"\t\tcase String {",
@@ -189,7 +189,7 @@ describe("Code Actions", () => {
 					entry.diagnosticPosition?.start.line === 7,
 			) as CodeActionEntry
 
-			expect(applied(lines, inner)[8]).toBe("\t\t\t\tcase Nothing {}")
+			expect(applied(lines, inner)[8]).toBe("\t\t\t\tcase Integer {}")
 		})
 
 		// NOTE: A Match written on one line has no line to insert whole arms

@@ -22,13 +22,17 @@ implementation {
 		case #Red { <- "stop" }
 	}
 
-	§ unreachable-case — a Warning, greyed out at the Matcher itself.
-	constant other: Integer | Nothing = 1
+	§ unreachable-case — a Warning, greyed out at the Matcher itself. The
+	§ receiver is a structural Union rather than a Choice, so that this and the
+	§ `missing-case` above cover both kinds of Type a `match` takes apart. The
+	§ members are ordinary Types: what makes the last Case unreachable is that
+	§ `String` is not one of them, not anything about the Union's shape.
+	constant other: Integer | Boolean = 1
 
 	constant described = match other -> String {
 		case Integer { <- "number" }
-		case Nothing { <- "nothing" }
-		case String { <- "never" }
+		case Boolean { <- "flag" }
+		case String  { <- "never" }
 	}
 
 	§ match-on-non-union.

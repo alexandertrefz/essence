@@ -263,7 +263,7 @@
 			"name": "storage.modifier.essence"
 		},
 		"languageConstant": {
-			"match": "\\b(true|false|nothing)\\b",
+			"match": "\\b(true|false)\\b",
 			"name": "constant.language.essence"
 		},
 		"fraction": {

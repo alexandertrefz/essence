@@ -182,6 +182,8 @@ exports[`Fixture Sweep Match.es should print what it printed before 1`] = `
 "exactly one"
 "less than none?"
 "many"
+"not a count at all: lots"
+"many"
 "no count at all"
 "clicked the y axis at 7""
 `;

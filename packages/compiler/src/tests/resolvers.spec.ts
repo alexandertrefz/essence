@@ -644,22 +644,22 @@ describe("Resolvers", () => {
 
 					constant first: Pace<Integer, String> = #First({ a = 1 })
 
-					match first -> Nothing {
+					match first -> {} {
 						case #First {
 							__print(@::is(@))
 							__print(@::isNot(@))
 
-							<- nothing
+							<- {}
 						}
 						case #Second {
-							<- nothing
+							<- {}
 						}
 					}
 				}`),
 			).toEqual(["true", "false"])
 		})
 
-		it("should report nothing for a narrowed receiver of the Case that mentions no Parameter", () => {
+		it("should report no diagnostic for a narrowed receiver of the Case that mentions no Parameter", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					choice Signal<Payload> {
@@ -669,14 +669,14 @@ describe("Resolvers", () => {
 
 					constant signal: Signal<Integer> = #Ping
 
-					match signal -> Nothing {
+					match signal -> {} {
 						case #Ping {
 							__print(@::is(@))
 
-							<- nothing
+							<- {}
 						}
 						case #Pong {
-							<- nothing
+							<- {}
 						}
 					}
 				}`),
@@ -691,14 +691,14 @@ describe("Resolvers", () => {
 					constant first: Pace<Integer, String> = #First({ a = 1 })
 					constant second: Pace<Integer, String> = #Second({ b = "s" })
 
-					match first -> Nothing {
+					match first -> {} {
 						case #First {
 							__print(@::is(second))
 
-							<- nothing
+							<- {}
 						}
 						case #Second {
-							<- nothing
+							<- {}
 						}
 					}
 				}`),

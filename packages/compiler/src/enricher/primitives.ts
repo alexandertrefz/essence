@@ -22,10 +22,10 @@ export const algebraicType: common.AlgebraicType = { type: "Algebraic" }
 export const transcendentalType: common.TranscendentalType = {
 	type: "Transcendental",
 }
-export const nothingType: common.NothingType = { type: "Nothing" }
-
 // NOTE: The open Record Type — `{}` members, which every Record is assignable
-// to. It is the receiver Type the Record Namespace targets.
+// to. It is the receiver Type the Record Namespace targets, and it is also the
+// UNIT Type: a Function that answers nothing useful promises a Record with no
+// members, and there is nothing to read off one. See `isUnitType`.
 export const recordType: common.RecordType = { type: "Record", members: {} }
 
 // NOTE: `List` names the unapplied List Type — `List<Item>` applies it. The
@@ -44,7 +44,6 @@ export const primitiveTypes: Record<string, common.Type> = {
 	Rational: rationalType,
 	Algebraic: algebraicType,
 	Transcendental: transcendentalType,
-	Nothing: nothingType,
 	Record: recordType,
 	List: genericListType,
 }

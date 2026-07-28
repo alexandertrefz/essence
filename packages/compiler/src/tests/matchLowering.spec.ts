@@ -237,60 +237,60 @@ describe("Match Lowering", () => {
 	describe("Exhaustiveness fallback", () => {
 		it("ends the emitted chain in an else no Handler owns", () => {
 			let generated = generate(`implementation {
-				constant maybe: Integer | Nothing = 5
+				constant scrutinee: Integer | String = 5
 
-				__print(match maybe -> String {
+				__print(match scrutinee -> String {
 					case Integer { <- "an Integer" }
-					case Nothing { <- "nothing" }
+					case String { <- "a String" }
 				})
 			}`)
 
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 		})
 
-		// NOTE: A Match written for its effects has Handlers that return
-		// nothing, so the fallback has to be the innermost `else` rather than a
-		// Statement after the chain — a Handler that RAN and fell through must
-		// not reach it.
+		// NOTE: A Match written for its effects promises the unit Type, `{}`,
+		// and its Handlers answer nothing useful, so the fallback has to be the
+		// innermost `else` rather than a Statement after the chain — a Handler
+		// that RAN and fell off its own end must not reach it.
 		it("leaves a Match in Statement position alone", async () => {
 			expect(
 				await run(`implementation {
-					constant maybe: Integer | Nothing = nothing
+					constant scrutinee: Integer | String = "text"
 
-					match maybe -> Nothing {
+					match scrutinee -> {} {
 						case Integer { __print("an Integer") }
-						case Nothing { __print("nothing") }
+						case String { __print("a String") }
 					}
 				}`),
-			).toEqual(['"nothing"'])
+			).toEqual(['"a String"'])
 		})
 	})
 
 	// NOTE: Regression tests — Types erase before a Match runs, so the check
 	// emitted for a Generic Matcher is unconditionally true. A Generic Case
 	// written above a concrete one therefore swallowed every value, and neither
-	// the Enricher nor the Validator said so: `unwrap(nothing, fallback 7)`
-	// compiled with no Diagnostic at all and answered the Nothing, where its
-	// own Signature promised a `Value`.
+	// the Enricher nor the Validator said so: `pick("missing", fallback 7)`
+	// compiled with no Diagnostic at all and answered the String, where its own
+	// Signature promised a `Value`.
 	describe("Generic Cases", () => {
-		let unwrap = (cases: string) => `implementation {
-			function unwrap <infer Value>(
-				_ maybe: Value | Nothing,
+		let pick = (cases: string) => `implementation {
+			function pick <infer Value>(
+				_ candidate: Value | String,
 				fallback fallbackValue: Value,
 			) -> Value {
-				<- match maybe -> Value {
+				<- match candidate -> Value {
 					${cases}
 				}
 			}
 
-			__print(unwrap(nothing, fallback 7))
-			__print(unwrap(3, fallback 7))
+			__print(pick("missing", fallback 7))
+			__print(pick(3, fallback 7))
 		}`
 
 		it("refuses the Case a Generic Case above it swallows", () => {
 			let diagnostics = diagnosticsOf(
-				unwrap(`case Value { <- @ }
-					case Nothing { <- fallbackValue }`),
+				pick(`case Value { <- @ }
+					case String { <- fallbackValue }`),
 			)
 
 			expect(diagnostics).toHaveLength(1)
@@ -301,7 +301,7 @@ describe("Match Lowering", () => {
 		it("answers with the fallback once the Generic Case is written last", async () => {
 			expect(
 				await run(
-					unwrap(`case Nothing { <- fallbackValue }
+					pick(`case String { <- fallbackValue }
 						case Value { <- @ }`),
 				),
 			).toEqual(["7", "3"])

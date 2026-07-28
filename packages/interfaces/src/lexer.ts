@@ -33,7 +33,6 @@ export enum TokenType {
 	LiteralStringMiddle = "LiteralStringMiddle",
 	LiteralStringEnd = "LiteralStringEnd",
 	LiteralNumber = "LiteralNumber",
-	LiteralNothing = "LiteralNothing",
 	//
 	KeywordType = "KeywordType",
 	KeywordIf = "KeywordIf",

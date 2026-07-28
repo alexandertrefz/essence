@@ -4,7 +4,6 @@ import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
-import type { NothingType } from "./Nothing"
 import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
@@ -115,13 +114,10 @@ export type AnyType =
 	| AlgebraicType
 	| TranscendentalType
 	| BooleanType
-	| NothingType
 	| OrderingType
 
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
-	if (type.type === "Nothing") {
-		return value[typeKeySymbol] === "Nothing"
-	} else if (type.type === "Boolean") {
+	if (type.type === "Boolean") {
 		return value[typeKeySymbol] === "Boolean"
 	} else if (type.type === "String") {
 		return value[typeKeySymbol] === "String"

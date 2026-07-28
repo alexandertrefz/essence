@@ -99,53 +99,63 @@ describe("Hover", () => {
 		)
 	})
 
-	it("should print a flat fallible Union exactly as written", () => {
-		// NOTE: `Integer | Rational | Nothing` is built canonical — payload
-		// nested beside `Nothing` — but the nesting is anonymous, so the
-		// Hover still spells the members out just as the source does.
+	it("should print a wide anonymous Union exactly as written", () => {
+		// NOTE: `buildUnion` dedupes and flattens, it does not regroup: an
+		// anonymous Union is stored as the members the source spelled, in the
+		// order it spelled them, however many there are. So a three-member
+		// Union reads back flat rather than as some canonical nesting of a
+		// pair beside a third.
 		let source = [
 			"implementation {",
-			"\tconstant something: Integer | Rational | Nothing = 42",
+			"\tconstant something: Integer | Rational | String = 42",
 			"\t__print(something)",
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 10 })).toBe(
-			"something: Integer | Rational | Nothing",
+			"something: Integer | Rational | String",
 		)
 	})
 
 	it("should keep a named Alias by name inside a wider Union", () => {
+		// NOTE: The counterpart to the test above — flattening a nested Union
+		// into its parent is only ever done to ANONYMOUS ones. A member that
+		// carries a name of its own stays whole, so the reader is shown the
+		// name they wrote instead of having the Alias smeared out into the
+		// Types it happens to stand for.
 		let source = [
 			"implementation {",
-			"\ttype MaybeInt = Integer | Nothing",
-			"\tconstant mixed: MaybeInt | Rational = 1",
+			"\ttype IntOrText = Integer | String",
+			"\tconstant mixed: IntOrText | Rational = 1",
 			"\t__print(mixed)",
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 4, column: 10 })).toBe(
-			"mixed: MaybeInt | Rational",
+			"mixed: IntOrText | Rational",
 		)
 	})
 
 	it("should keep `Number` by name inside a Union Type", () => {
+		// NOTE: `Number` is itself a named Union from the standard library, so
+		// this is the same claim as the test above made about a userland
+		// Alias, made about a builtin one.
 		let source = [
 			"implementation {",
-			"\tconstant something: Number | Nothing = 42",
+			"\tconstant something: Number | String = 42",
 			"\t__print(something)",
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 10 })).toBe(
-			"something: Number | Nothing",
+			"something: Number | String",
 		)
 	})
 
 	it("should describe the builtin `Optional` as applied", () => {
 		let source = [
 			"implementation {",
-			"\tconstant something: Optional<Integer> = nothing",
+			"\tconstant something: Optional<Integer> = #Empty",
 			"\t__print(something)",
 			"}",
 		].join("\n")
@@ -170,11 +180,15 @@ describe("Hover", () => {
 	})
 
 	it("should keep an untouched `Number` by name when a wildcard narrows", () => {
+		// NOTE: The wildcard's `@` is the scrutinee minus everything the
+		// Handlers above it already claimed. `String` is claimed and `Number`
+		// is not, and what is left is shown under the name the source wrote —
+		// not spelled out as the members `Number` is a Union of.
 		let source = [
 			"implementation {",
-			"\tconstant value: Number | Nothing = 42",
+			"\tconstant value: Number | String = 42",
 			"\t__print(match value -> Number {",
-			"\t\tcase Nothing { <- 0 }",
+			"\t\tcase String { <- 0 }",
 			"\t\tcase _ { <- @ }",
 			"\t})",
 			"}",
@@ -367,8 +381,8 @@ describe("Hover", () => {
 	it("should describe a Generic under the name the source wrote", () => {
 		let source = [
 			"implementation {",
-			"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> Nothing {",
-			"\t\t<- nothing",
+			"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> {} {",
+			"\t\t<- {}",
 			"\t}",
 			"\tconstant r = apply((x) { <- x }, times 5)",
 			"}",
@@ -575,7 +589,7 @@ describe("Hover inside a declaration's body", () => {
 			"\tfunction f (n: Integer) -> Integer {",
 			"",
 			"\t\tif n::isGreaterThan(1) {",
-			"\t\t\t__print(nothing)",
+			"\t\t\t__print(n)",
 			"\t\t}",
 			"",
 			"\t\t<- n",

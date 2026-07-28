@@ -351,9 +351,12 @@ describe("Completion", () => {
 		})
 
 		it("should offer only dispatchable Methods on a Union-typed receiver", () => {
+			// NOTE: Both members are Printable and Equatable, so `toString` and
+			// `is` dispatch across the Union; `add` belongs to Integer alone and
+			// a String receiver would find nothing to run.
 			let source = [
 				"implementation {",
-				"\tconstant value: Integer | Nothing = 5",
+				"\tconstant value: Integer | String = 5",
 				"\tvalue::",
 				"}",
 			].join("\n")

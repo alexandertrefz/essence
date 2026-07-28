@@ -40,7 +40,6 @@ export const runtimeNamespaceNames = [
 	"Transcendental",
 	"Number",
 	"Boolean",
-	"Nothing",
 	"Optional",
 	"NestedOptional",
 	"Ordering",
@@ -1576,8 +1575,6 @@ function rewriteExpressionByKind(
 			return rewriteRationalValue(node)
 		case "BooleanValue":
 			return rewriteBooleanValue(node)
-		case "NothingValue":
-			return rewriteNothingValue(node)
 		case "FunctionValue":
 			return rewriteFunctionValue(node)
 		case "ListValue":
@@ -2192,29 +2189,6 @@ function rewriteBooleanValue(
 				value: node.value,
 			},
 		],
-	}
-}
-
-function rewriteNothingValue(
-	_node: common.typedSimple.NothingValueNode,
-): estree.CallExpression {
-	return {
-		type: "CallExpression",
-		optional: false,
-		callee: {
-			type: "MemberExpression",
-			optional: false,
-			object: {
-				type: "Identifier",
-				name: "Nothing",
-			},
-			property: {
-				type: "Identifier",
-				name: "createNothing",
-			},
-			computed: false,
-		},
-		arguments: [],
 	}
 }
 

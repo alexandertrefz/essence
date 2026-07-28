@@ -70,7 +70,6 @@ const stringLiteral = '"'
 const commentLiteral = "§"
 const documentationLiteral = "§§"
 const booleans = ["true", "false"]
-const nothing = "nothing"
 const keywords = [
 	"if",
 	"else",
@@ -122,7 +121,6 @@ const isWhitespace = createIsHelper(whitespaces)
 const isLinebreak = createIsHelper(linebreak)
 const isSymbol = createIsHelper(symbols)
 const isKeyword = createIsHelper(keywords)
-const isNothingLiteral = createIsHelper(nothing)
 const isBooleanLiteral = createIsHelper(booleans)
 const isStringLiteral = createIsHelper(stringLiteral)
 const isNumberLiteral = createIsHelper(numbers)
@@ -766,9 +764,7 @@ const lexToken = (
 	} else {
 		;({ input, token, cursor } = lexIdentifier(input, cursor))
 
-		if (isNothingLiteral(token.value)) {
-			token.type = TokenType.LiteralNothing
-		} else if (isKeyword(token.value)) {
+		if (isKeyword(token.value)) {
 			token.type = getKeywordType(token.value)
 		} else if (isBooleanLiteral(token.value)) {
 			token.type = getBooleanType(token.value)

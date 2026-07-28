@@ -5,7 +5,6 @@ import * as boolean from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
 import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
-import { createNothing } from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
 import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
@@ -14,6 +13,7 @@ import * as record from "@essence-lang/runtime/Record"
 import * as side from "@essence-lang/runtime/Side"
 import * as string from "@essence-lang/runtime/String"
 import {
+	type AnyType,
 	dispatchMethod,
 	isValueOfType,
 	noCaseMatched,
@@ -45,7 +45,17 @@ const listEmpty = () => list.createList([])
 
 const recordEmpty = () => record.createRecord({})
 
-const nothing = () => createNothing()
+// NOTE: Absence, as the language spells it — `Optional` is a nominal Choice, so
+// "no value" is the payload-less Case `Optional#Empty`, a tagged value carrying
+// no members at all. It stands in these tables where the deleted `nothing`
+// literal used to, and it asks more of them than that literal did: a Case is
+// decided by its tag first and its payload second, so it must compare equal to
+// itself and to nothing else, and it must NOT be confused with the structurally
+// identical empty Record.
+//
+// NOTE: Cast because `CaseInstanceType` is deliberately kept out of `AnyType`
+// — the same cast the emitted code's own call sites need.
+const optionalEmpty = () => optional.createEmpty() as unknown as AnyType
 
 // NOTE: `Integer.is` and `String.is` are written in Essence now — so are the
 // `Equatable` witnesses the bounded List Methods take. These spell out the
@@ -67,7 +77,14 @@ describe("Rewriter", () => {
 
 			describe("anyIs", () => {
 				it("returns true if the elements are identical", () => {
-					expect(anyIs(nothing(), nothing())).toBeTrue()
+					expect(anyIs(optionalEmpty(), optionalEmpty())).toBeTrue()
+
+					expect(
+						anyIs(
+							optional.createValue(integerOne()) as never,
+							optional.createValue(integerOne()) as never,
+						),
+					).toBeTrue()
 
 					expect(anyIs(booleanTrue(), booleanTrue())).toBeTrue()
 
@@ -134,40 +151,68 @@ describe("Rewriter", () => {
 					).toBeTrue()
 				})
 
+				// NOTE: `Optional#Empty` beside the empty Record is the pair
+				// worth naming: the two are structurally identical — no
+				// members on either side — and only the tag tells them apart,
+				// which is exactly what a nominal Case promises. `#Empty`
+				// beside `#Value` is the other: same Choice, different Case.
 				it("returns false if the elements are different", () => {
-					expect(anyIs(nothing(), booleanTrue())).toBeFalse()
+					expect(anyIs(optionalEmpty(), booleanTrue())).toBeFalse()
 
-					expect(anyIs(nothing(), booleanFalse())).toBeFalse()
+					expect(anyIs(optionalEmpty(), booleanFalse())).toBeFalse()
 
-					expect(anyIs(nothing(), integerOne())).toBeFalse()
+					expect(anyIs(optionalEmpty(), integerOne())).toBeFalse()
 
-					expect(anyIs(nothing(), rationalOne())).toBeFalse()
+					expect(anyIs(optionalEmpty(), rationalOne())).toBeFalse()
 
-					expect(anyIs(nothing(), stringEmpty())).toBeFalse()
+					expect(anyIs(optionalEmpty(), stringEmpty())).toBeFalse()
 
-					expect(anyIs(nothing(), listEmpty())).toBeFalse()
+					expect(anyIs(optionalEmpty(), listEmpty())).toBeFalse()
 
-					expect(anyIs(nothing(), recordEmpty())).toBeFalse()
+					expect(anyIs(optionalEmpty(), recordEmpty())).toBeFalse()
 
-					expect(anyIs(booleanTrue(), nothing())).toBeFalse()
+					expect(
+						anyIs(
+							optionalEmpty(),
+							optional.createValue(integerOne()) as never,
+						),
+					).toBeFalse()
 
-					expect(anyIs(booleanFalse(), nothing())).toBeFalse()
+					expect(
+						anyIs(
+							optional.createValue(integerOne()) as never,
+							optional.createValue(integerTwo()) as never,
+						),
+					).toBeFalse()
 
-					expect(anyIs(integerOne(), nothing())).toBeFalse()
+					expect(anyIs(booleanTrue(), optionalEmpty())).toBeFalse()
 
-					expect(anyIs(rationalOne(), nothing())).toBeFalse()
+					expect(anyIs(booleanFalse(), optionalEmpty())).toBeFalse()
 
-					expect(anyIs(stringEmpty(), nothing())).toBeFalse()
+					expect(anyIs(integerOne(), optionalEmpty())).toBeFalse()
 
-					expect(anyIs(listEmpty(), nothing())).toBeFalse()
+					expect(anyIs(rationalOne(), optionalEmpty())).toBeFalse()
 
-					expect(anyIs(recordEmpty(), nothing())).toBeFalse()
+					expect(anyIs(stringEmpty(), optionalEmpty())).toBeFalse()
+
+					expect(anyIs(listEmpty(), optionalEmpty())).toBeFalse()
+
+					expect(anyIs(recordEmpty(), optionalEmpty())).toBeFalse()
 				})
 			})
 
 			describe("anyIsNot", () => {
 				it("returns false if the elements are identical", () => {
-					expect(anyIsNot(nothing(), nothing())).toBeFalse()
+					expect(
+						anyIsNot(optionalEmpty(), optionalEmpty()),
+					).toBeFalse()
+
+					expect(
+						anyIsNot(
+							optional.createValue(integerOne()) as never,
+							optional.createValue(integerOne()) as never,
+						),
+					).toBeFalse()
 
 					expect(anyIsNot(booleanTrue(), booleanTrue())).toBeFalse()
 
@@ -237,33 +282,47 @@ describe("Rewriter", () => {
 				})
 
 				it("returns true if the elements are different", () => {
-					expect(anyIsNot(nothing(), booleanTrue())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), booleanTrue())).toBeTrue()
 
-					expect(anyIsNot(nothing(), booleanFalse())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), booleanFalse())).toBeTrue()
 
-					expect(anyIsNot(nothing(), integerOne())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), integerOne())).toBeTrue()
 
-					expect(anyIsNot(nothing(), rationalOne())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), rationalOne())).toBeTrue()
 
-					expect(anyIsNot(nothing(), stringEmpty())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), stringEmpty())).toBeTrue()
 
-					expect(anyIsNot(nothing(), listEmpty())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), listEmpty())).toBeTrue()
 
-					expect(anyIsNot(nothing(), recordEmpty())).toBeTrue()
+					expect(anyIsNot(optionalEmpty(), recordEmpty())).toBeTrue()
 
-					expect(anyIsNot(booleanTrue(), nothing())).toBeTrue()
+					expect(
+						anyIsNot(
+							optionalEmpty(),
+							optional.createValue(integerOne()) as never,
+						),
+					).toBeTrue()
 
-					expect(anyIsNot(booleanFalse(), nothing())).toBeTrue()
+					expect(
+						anyIsNot(
+							optional.createValue(integerOne()) as never,
+							optional.createValue(integerTwo()) as never,
+						),
+					).toBeTrue()
 
-					expect(anyIsNot(integerOne(), nothing())).toBeTrue()
+					expect(anyIsNot(booleanTrue(), optionalEmpty())).toBeTrue()
 
-					expect(anyIsNot(rationalOne(), nothing())).toBeTrue()
+					expect(anyIsNot(booleanFalse(), optionalEmpty())).toBeTrue()
 
-					expect(anyIsNot(stringEmpty(), nothing())).toBeTrue()
+					expect(anyIsNot(integerOne(), optionalEmpty())).toBeTrue()
 
-					expect(anyIsNot(listEmpty(), nothing())).toBeTrue()
+					expect(anyIsNot(rationalOne(), optionalEmpty())).toBeTrue()
 
-					expect(anyIsNot(recordEmpty(), nothing())).toBeTrue()
+					expect(anyIsNot(stringEmpty(), optionalEmpty())).toBeTrue()
+
+					expect(anyIsNot(listEmpty(), optionalEmpty())).toBeTrue()
+
+					expect(anyIsNot(recordEmpty(), optionalEmpty())).toBeTrue()
 				})
 			})
 		})
@@ -272,8 +331,11 @@ describe("Rewriter", () => {
 			describe("isValueOfType", () => {
 				it("returns true when the type is the same", () => {
 					expect(
-						isValueOfType(nothing(), {
-							type: "Nothing",
+						isValueOfType(optionalEmpty(), {
+							type: "Case",
+							choice: "Optional",
+							name: "Empty",
+							members: {},
 						}),
 					).toBeTrue()
 
@@ -308,40 +370,58 @@ describe("Rewriter", () => {
 					).toBeTrue()
 				})
 
+				// NOTE: The last two pairs are the ones a nominal Case earns:
+				// `Optional#Empty` and the empty Record carry the very same
+				// members — none — so a structural check would call each a
+				// value of the other's Type. Only the tag says otherwise, and
+				// it has to say it in both directions.
 				it("returns false when the type is different", () => {
 					expect(
-						isValueOfType(nothing(), {
+						isValueOfType(optionalEmpty(), {
 							type: "String",
 						}),
 					).toBeFalse()
 
 					expect(
-						isValueOfType(nothing(), {
+						isValueOfType(optionalEmpty(), {
 							type: "Boolean",
 						}),
 					).toBeFalse()
 
 					expect(
-						isValueOfType(nothing(), {
-							type: "Boolean",
-						}),
-					).toBeFalse()
-
-					expect(
-						isValueOfType(nothing(), {
-							type: "String",
-						}),
-					).toBeFalse()
-
-					expect(
-						isValueOfType(nothing(), {
+						isValueOfType(optionalEmpty(), {
 							type: "Integer",
 						}),
 					).toBeFalse()
 
 					expect(
-						isValueOfType(nothing(), {
+						isValueOfType(optionalEmpty(), {
 							type: "Rational",
+						}),
+					).toBeFalse()
+
+					expect(
+						isValueOfType(optionalEmpty(), {
+							type: "Case",
+							choice: "Optional",
+							name: "Value",
+							members: { item: { type: "Integer" } },
+						}),
+					).toBeFalse()
+
+					expect(
+						isValueOfType(optionalEmpty(), {
+							type: "Record",
+							members: {},
+						}),
+					).toBeFalse()
+
+					expect(
+						isValueOfType(recordEmpty(), {
+							type: "Case",
+							choice: "Optional",
+							name: "Empty",
+							members: {},
 						}),
 					).toBeFalse()
 				})
@@ -354,7 +434,7 @@ describe("Rewriter", () => {
 						isValueOfType(listEmpty(), {
 							type: "List",
 							itemType: {
-								type: "Nothing",
+								type: "String",
 							},
 						}),
 					).toBeTrue()
@@ -458,8 +538,11 @@ describe("Rewriter", () => {
 						"No Case of this Match matched the Integer it was given.",
 					)
 
-					expect(() => noCaseMatched(nothing())).toThrow(
-						"No Case of this Match matched the Nothing it was given.",
+					// NOTE: A Case value is named by its whole tag, Choice and
+					// Case both — `Optional#Empty`, not `Optional` — which is
+					// what makes the message say WHICH Case fell through.
+					expect(() => noCaseMatched(optionalEmpty())).toThrow(
+						"No Case of this Match matched the Optional#Empty it was given.",
 					)
 
 					expect(() =>
@@ -825,11 +908,12 @@ describe("Rewriter", () => {
 		})
 
 		describe("Rational", () => {
-			// NOTE: `of` is fallible, and `Optional` is a nominal generic Choice
-			// now rather than a Type Alias for `Rational | Nothing` — so the
-			// answer is a tagged Case either way: `#Value` carrying the Rational
-			// under `item`, or the payload-less `#Empty`. The Rational itself is
-			// still asserted on in full, one wrapper deeper.
+			// NOTE: `of` is fallible, and fallibility is `Optional`, a nominal
+			// generic Choice — so the answer is a tagged Case either way:
+			// `#Value` carrying the Rational under `item`, or the payload-less
+			// `#Empty`. No Union's SHAPE means "missing" any more; the tag says
+			// it. The Rational itself is still asserted on in full, one wrapper
+			// deeper.
 			describe("of", () => {
 				it("creates a rational", () => {
 					expect(rational.of(integerOne(), integerTwo())).toEqual(
@@ -977,9 +1061,9 @@ describe("Rewriter", () => {
 						list.length(list.createList([stringEmpty()])),
 					).toEqual(integerOne())
 
-					expect(list.length(list.createList([nothing()]))).toEqual(
-						integerOne(),
-					)
+					expect(
+						list.length(list.createList([booleanTrue()])),
+					).toEqual(integerOne())
 
 					expect(
 						list.length(
@@ -1107,12 +1191,13 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: `item` is fallible, and `Optional` is a nominal generic
-			// Choice now rather than a Type Alias for `ItemType | Nothing` — so
-			// a hit answers `#Value` carrying the item under `item`, and a miss
-			// answers the payload-less `#Empty`. Which item was found is still
-			// asserted on in full, one wrapper deeper; the wrapper is also what
-			// keeps a List whose items are themselves Optionals unambiguous.
+			// NOTE: `item` is fallible, and fallibility is `Optional`, a
+			// nominal generic Choice — so a hit answers `#Value` carrying the
+			// item under `item`, and a miss answers the payload-less `#Empty`.
+			// Which item was found is still asserted on in full, one wrapper
+			// deeper; the wrapper is also what keeps a List whose items are
+			// themselves Optionals unambiguous, which no flattening Union
+			// could.
 			describe("item", () => {
 				it("returns the item at a position inside the list", () => {
 					expect(
@@ -1515,9 +1600,11 @@ describe("Rewriter", () => {
 			// (`packages/stdlib/sources/List.es`) — the Printable conformance
 			// is conditional on the items, and the golden harness covers the
 			// filled, empty and single-item renderings.
-			// NOTE: `Nothing.is`, `isNot` and `toString` are implemented in
-			// Essence now (`packages/stdlib/sources/Nothing.es`) and covered by the golden
-			// harness; only the value constructor stays native.
+			// NOTE: There was a third entry here, for `Nothing.is`, `isNot` and
+			// `toString`. `Nothing` is gone as a Type — a Function that answers
+			// nothing useful answers `{}` now, and absence is `Optional`'s
+			// `#Empty` — so there is no Namespace left to gap-fill for. The
+			// empty Record reaches `Record`'s own conformances like any other.
 		})
 
 		describe("Number", () => {
@@ -1544,14 +1631,14 @@ describe("Rewriter", () => {
 
 		describe("Union Method dispatch", () => {
 			it("runs the first case whose member Type accepts the receiver", () => {
-				// NOTE: `Nothing.toString` is implemented in Essence now, so the
-				// Nothing case supplies a stand-in of the same shape — this tests
+				// NOTE: `Boolean.toString` is implemented in Essence now, so the
+				// Boolean case supplies a stand-in of the same shape — this tests
 				// that `dispatchMethod` picks the case whose member Type accepts
 				// the receiver, not any particular runtime Method.
 				let cases: Parameters<typeof dispatchMethod>[2] = [
 					[
-						{ type: "Nothing" },
-						(() => string.createString("Nothing")) as (
+						{ type: "Boolean" },
+						(() => string.createString("Boolean")) as (
 							...args: Array<unknown>
 						) => unknown,
 						[],
@@ -1568,8 +1655,8 @@ describe("Rewriter", () => {
 				expect(dispatchMethod(integerTwo(), [], cases)).toEqual(
 					string.createString("2"),
 				)
-				expect(dispatchMethod(nothing(), [], cases)).toEqual(
-					string.createString("Nothing"),
+				expect(dispatchMethod(booleanTrue(), [], cases)).toEqual(
+					string.createString("Boolean"),
 				)
 			})
 
@@ -1627,8 +1714,8 @@ describe("Rewriter", () => {
 						[],
 					],
 					[
-						{ type: "Nothing" },
-						(() => string.createString("Nothing")) as (
+						{ type: "Boolean" },
+						(() => string.createString("Boolean")) as (
 							...args: Array<unknown>
 						) => unknown,
 						[],
@@ -1644,11 +1731,15 @@ describe("Rewriter", () => {
 				)
 			})
 
+			// NOTE: The three spies below are only ever asked what they were
+			// HANDED, so each answers the unit value — the empty Record, which
+			// is what a `-> {}` Method returns. It has to be an Essence value
+			// all the same: `dispatchMethod` hands its answer straight on.
 			it("appends the matched case's conformance Arguments", () => {
 				let receivedArguments: Array<unknown> = []
 				let method = (...args: Array<unknown>) => {
 					receivedArguments = args
-					return nothing()
+					return recordEmpty()
 				}
 
 				dispatchMethod(
@@ -1674,7 +1765,7 @@ describe("Rewriter", () => {
 				let receivedArguments: Array<unknown> = []
 				let method = (...args: Array<unknown>) => {
 					receivedArguments = args
-					return nothing()
+					return recordEmpty()
 				}
 
 				dispatchMethod(
@@ -1709,7 +1800,7 @@ describe("Rewriter", () => {
 				let receivedArguments: Array<unknown> = []
 				let method = (...args: Array<unknown>) => {
 					receivedArguments = args
-					return nothing()
+					return recordEmpty()
 				}
 
 				dispatchMethod(integerTwo(), sharedArguments, [
