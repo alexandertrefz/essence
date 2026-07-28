@@ -23,10 +23,14 @@ import { validate } from "../validator/index"
 // numerator, and zero is `0/1` — plus the two places they historically leaked:
 // an Integer-operand `divide` that handed the sign to the DENOMINATOR, which
 // every ordering primitive then read backwards, and a `reduce` that bailed on
-// a zero operand, so a cancelled `0/4` could never reduce itself. Both are
-// checked here on the runtime directly and again through a compiled Program,
-// because the damage they did was visible from Essence: `absolute()`,
-// `roundDown()` and `isWholeNumber()` are all written on top of them.
+// a zero operand, so a cancelled `0/4` could never reduce itself. The
+// arithmetic is written in Essence now (`packages/stdlib/sources/Rational.es`)
+// and funnels every result through `Rational.of` into `createRational`, so the
+// direct half of these tests checks THAT gateway — the one place the invariants
+// are enforced — and the compiled Programs below check the same behaviour
+// through the Essence bodies, because the damage the leaks did was visible from
+// Essence: `absolute()`, `roundDown()` and `isWholeNumber()` are all written on
+// top of them.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -72,108 +76,48 @@ const partsOf = (value: rational.RationalType) => ({
 
 describe("Rationals", () => {
 	describe("The positive-denominator invariant", () => {
-		it("keeps the sign on the numerator when dividing by a negative Integer", () => {
-			const quotient = rational.divide__overload$2(
-				rational.createRational(1n, 2n),
-				integer.createInteger(-3n),
-			)
-
-			expect(quotient[typeKeySymbol]).toBe("Rational")
-			expect(partsOf(quotient as rational.RationalType)).toEqual({
+		it("keeps the sign on the numerator at the createRational gateway", () => {
+			expect(partsOf(rational.createRational(1n, -6n))).toEqual({
 				numerator: -1n,
 				denominator: 6n,
 			})
 		})
 
-		it("orders a Rational divided by a negative Integer below zero", () => {
-			const quotient = rational.divide__overload$2(
-				rational.createRational(1n, 2n),
-				integer.createInteger(-3n),
-			) as rational.RationalType
+		it("keeps the sign on the numerator through Rational.of", () => {
+			const built = rational.of(
+				integer.createInteger(1n),
+				integer.createInteger(-6n),
+			)
+
+			expect(built[typeKeySymbol]).toBe("Rational")
+			expect(partsOf(built as rational.RationalType)).toEqual({
+				numerator: -1n,
+				denominator: 6n,
+			})
+		})
+
+		it("orders a gateway-normalised Rational below zero", () => {
+			const quotient = rational.createRational(1n, -6n)
 			const zero = rational.createRational(0n, 1n)
 
 			expect(rational.compare(quotient, zero)).toEqual(ordering.less)
-			expect(
-				rational.isLessThan__overload$2(
-					quotient,
-					integer.createInteger(0n),
-				).value,
-			).toBeTrue()
-			expect(
-				rational.isGreaterThan__overload$2(
-					quotient,
-					integer.createInteger(0n),
-				).value,
-			).toBeFalse()
 			expect(number.compare(quotient, zero)).toEqual(ordering.less)
-			expect(
-				number.lowestNumber__overload$7({
-					[typeKeySymbol]: "List",
-					value: [quotient, integer.createInteger(-1n)],
-				}),
-			).toEqual(integer.createInteger(-1n))
 		})
 
-		it("reads the accessors and the rounding family off the numerator's sign", () => {
-			const quotient = rational.divide__overload$2(
-				rational.createRational(1n, 2n),
-				integer.createInteger(-3n),
-			) as rational.RationalType
+		it("reads the accessors off the numerator's sign", () => {
+			const quotient = rational.createRational(1n, -6n)
 
 			expect(rational.numerator(quotient).value).toBe(-1n)
 			expect(rational.denominator(quotient).value).toBe(6n)
-			expect(rational.round(quotient).value).toBe(0n)
-			expect(rational.truncate(quotient).value).toBe(0n)
-		})
-
-		it("prints a negative quotient in a form parse reads back", () => {
-			const quotient = rational.divide__overload$2(
-				rational.createRational(1n, 2n),
-				integer.createInteger(-3n),
-			) as rational.RationalType
-			const text = rational.toString__overload$1(quotient)
-
-			expect(text.value).toBe("-1/6")
-			expect(rational.parse(text)).toEqual(quotient)
-		})
-
-		it("keeps the invariant through the other Integer-operand arithmetic", () => {
-			const half = rational.createRational(1n, 2n)
-
-			expect(
-				partsOf(
-					rational.multiply__overload$2(
-						half,
-						integer.createInteger(-3n),
-					),
-				),
-			).toEqual({ numerator: -3n, denominator: 2n })
-			expect(
-				partsOf(
-					rational.add__overload$2(half, integer.createInteger(-1n)),
-				),
-			).toEqual({ numerator: -1n, denominator: 2n })
-		})
-
-		it("leaves the receiver untouched — the parts are never shared", () => {
-			const half = rational.createRational(1n, 2n)
-
-			rational.divide__overload$2(half, integer.createInteger(-3n))
-			rational.multiply__overload$2(half, integer.createInteger(4n))
-			rational.add__overload$2(half, integer.createInteger(7n))
-
-			expect(partsOf(half)).toEqual({ numerator: 1n, denominator: 2n })
 		})
 	})
 
 	describe("Canonical zero", () => {
-		// NOTE: `1/2 − 1/2` builds `(1·2 + −1·2)/4` — a zero that reaches the
-		// gateway with a denominator of 4 and must leave it as `0/1`.
-		const cancelled = () =>
-			rational.add__overload$1(
-				rational.createRational(1n, 2n),
-				rational.createRational(-1n, 2n),
-			)
+		// NOTE: `1/2 − 1/2` builds `(1·2 + −1·2)/4` in the Essence `add` — a
+		// zero that reaches the gateway with a denominator of 4 and must leave
+		// it as `0/1`. The gateway is checked with that same shape here, and
+		// the Essence route to it in the compiled Programs below.
+		const cancelled = () => rational.createRational(0n, 4n)
 
 		it("reduces a cancelled zero to 0/1", () => {
 			expect(partsOf(cancelled())).toEqual({
@@ -187,39 +131,16 @@ describe("Rationals", () => {
 			expect(
 				rational.denominator(rational.createRational(0n, 6n)).value,
 			).toBe(1n)
-			expect(
-				rational.denominator(
-					rational.multiply__overload$2(
-						rational.createRational(1n, 2n),
-						integer.createInteger(0n),
-					),
-				).value,
-			).toBe(1n)
 		})
 
 		it("prints every zero as 0/1", () => {
-			expect(rational.toString__overload$1(cancelled()).value).toBe("0/1")
+			expect(rational.formatAsRational(cancelled())).toBe("0/1")
 			expect(
 				rational.toString__overload$2(cancelled(), fraction).value,
 			).toBe("0/1")
 			expect(
-				rational.toString__overload$1(rational.createRational(0n, 6n))
-					.value,
+				rational.formatAsRational(rational.createRational(0n, 6n)),
 			).toBe("0/1")
-		})
-
-		// NOTE: A zero built by Integer-operand arithmetic rather than written
-		// as a literal — the accessors must answer canonically for it all the
-		// same.
-		it("answers for a zero the Integer Namespace built", () => {
-			const zero = integer.add__overload$2(
-				integer.createInteger(-1n),
-				rational.createRational(2n, 2n),
-			)
-
-			expect(rational.denominator(zero).value).toBe(1n)
-			expect(rational.numerator(zero).value).toBe(0n)
-			expect(rational.toString__overload$1(zero).value).toBe("0/1")
 		})
 
 		it("still compares a zero equal whatever it was built from", () => {
@@ -311,21 +232,22 @@ describe("Rationals", () => {
 			).toBe("-1")
 		})
 
-		it("round-trips the decimal form back through parse", () => {
-			for (const value of [
-				rational.createRational(4n, 2n),
-				rational.createRational(-4n, 2n),
-				rational.createRational(0n, 1n),
-				rational.createRational(1n, 2n),
-			]) {
-				const text = rational.toString__overload$2(value, decimal)
-				const parsed = rational.parse(text)
+		it("round-trips the decimal form back through parse", async () => {
+			expect(
+				await run(`implementation {
+					constant values = [4/2, 0/1::subtract(4/2), 0/1, 1/2]
 
-				expect(parsed[typeKeySymbol]).toBe("Rational")
-				expect(
-					rational.compare(parsed as rational.RationalType, value),
-				).toEqual(ordering.equal)
-			}
+					values::map((value) {
+						constant text = value
+							::toString(formatAs NumberFormat#Decimal)
+
+						<- __print(match Rational.parse(text) -> String {
+							case Rational { <- @::is(value)::toString() }
+							case Nothing  { <- "Nothing" }
+						})
+					})
+				}`),
+			).toEqual(['"true"', '"true"', '"true"', '"true"'])
 		})
 	})
 
@@ -402,6 +324,87 @@ describe("Rationals", () => {
 					}
 				}`),
 			).toEqual(['"-1/6"', '"true"', '"1/6"', '"-1"'])
+		})
+
+		it("rounds and truncates a negative quotient towards the right ends", async () => {
+			expect(
+				await run(`implementation {
+					constant negativeThree = 0::subtract(3)
+
+					match 1/2::divide(by negativeThree) -> Nothing {
+						case Rational {
+							__print(@::round()::toString())
+							__print(@::truncate()::toString())
+							__print(@::isLessThan(0)::toString())
+							__print(@::isGreaterThan(0)::toString())
+							<- nothing
+						}
+						case Nothing {
+							__print("Nothing")
+							<- nothing
+						}
+					}
+				}`),
+			).toEqual(['"0"', '"0"', '"true"', '"false"'])
+		})
+
+		it("keeps the invariant through the Integer-operand arithmetic", async () => {
+			expect(
+				await run(`implementation {
+					constant half = 1/2
+					constant negativeThree = 0::subtract(3)
+					constant negativeOne = 0::subtract(1)
+
+					__print(half::multiply(with negativeThree)::toString())
+					__print(half::add(negativeOne)::toString())
+					__print(half::toString())
+				}`),
+			).toEqual(['"-3/2"', '"-1/2"', '"1/2"'])
+		})
+
+		it("prints a negative quotient in a form parse reads back", async () => {
+			expect(
+				await run(`implementation {
+					constant negativeThree = 0::subtract(3)
+
+					match 1/2::divide(by negativeThree) -> Nothing {
+						case Rational {
+							constant text = @::toString()
+
+							__print(text)
+							__print(match Rational.parse(text) -> String {
+								case Rational { <- @::toString() }
+								case Nothing  { <- "Nothing" }
+							})
+							<- nothing
+						}
+						case Nothing {
+							__print("Nothing")
+							<- nothing
+						}
+					}
+				}`),
+			).toEqual(['"-1/6"', '"-1/6"'])
+		})
+
+		it("finds the lowest of a mixed List through the Essence fold", async () => {
+			expect(
+				await run(`implementation {
+					constant negativeThree = 0::subtract(3)
+					constant negativeOne = 0::subtract(1)
+					constant quotient = 1/2
+						::divide(by negativeThree)
+						::otherwise(0/1)
+
+					__print(match Number.lowestNumber(
+						[quotient, negativeOne],
+					) -> String {
+						case Integer  { <- @::toString() }
+						case Rational { <- @::toString() }
+						case Nothing  { <- "Nothing" }
+					})
+				}`),
+			).toEqual(['"-1"'])
 		})
 
 		it("says a cancelled zero is a whole number", async () => {

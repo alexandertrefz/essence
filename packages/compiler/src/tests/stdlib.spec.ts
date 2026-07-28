@@ -114,15 +114,10 @@ describe("Stdlib", () => {
 		// the reciprocal of zero. The same move was made for the Integer
 		// everyday Methods above.
 
-		it("rounds to the nearest and towards zero", () => {
-			// NOTE: `roundDown` and `roundUp` are written in Essence now;
-			// only `round` and `truncate` are still natives to call here.
-			expect(rational.round(rat(7n, 2n))).toEqual(int(4n))
-			expect(rational.round(rat(-7n, 2n))).toEqual(int(-4n))
-			expect(rational.round(rat(1n, 3n))).toEqual(int(0n))
-			expect(rational.truncate(rat(7n, 2n))).toEqual(int(3n))
-			expect(rational.truncate(rat(-7n, 2n))).toEqual(int(-3n))
-		})
+		// NOTE: `round` and `truncate` joined them — `truncate` is the
+		// Euclidean quotient corrected towards zero, `round` steps away from
+		// zero on a fractional part of at least one half — and the golden
+		// harness covers both directions of both, negatives included.
 
 		it("raises to a power, exactly in both directions", () => {
 			expect(

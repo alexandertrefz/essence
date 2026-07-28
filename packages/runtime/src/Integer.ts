@@ -1,12 +1,8 @@
 import type { AlgebraicType } from "./Algebraic"
 import {
-	add as algebraicAdd,
 	dividedInto as algebraicDividedInto,
-	multiply as algebraicMultiplyWith,
 	squareRootOfRational,
 } from "./Algebraic"
-import type { BooleanType } from "./Boolean"
-import { createBoolean } from "./Boolean"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import type { OrderingType } from "./Ordering"
@@ -15,11 +11,6 @@ import type { RationalType } from "./Rational"
 import { createRational } from "./Rational"
 import type { StringType } from "./String"
 import { createString } from "./String"
-import type { TranscendentalType } from "./Transcendental"
-import {
-	add as transcendentalAdd,
-	multiply as transcendentalMultiplyWith,
-} from "./Transcendental"
 import { typeKeySymbol } from "./type"
 
 export type IntegerType = { [typeKeySymbol]: "Integer"; value: bigint }
@@ -37,16 +28,6 @@ export function add__overload$1(
 	return createInteger(originalNumber.value + other.value)
 }
 
-export function add__overload$2(
-	originalNumber: IntegerType,
-	other: RationalType,
-): RationalType {
-	return createRational(
-		other.numerator + originalNumber.value * other.denominator,
-		other.denominator,
-	)
-}
-
 // #endregion
 
 // #region Multiply
@@ -56,92 +37,6 @@ export function multiply__overload$1(
 	other: IntegerType,
 ): IntegerType {
 	return createInteger(originalNumber.value * other.value)
-}
-
-export function multiply__overload$2(
-	originalNumber: IntegerType,
-	other: RationalType,
-): RationalType {
-	return createRational(
-		other.numerator * originalNumber.value,
-		other.denominator,
-	)
-}
-
-// #endregion
-
-// #region isLessThan
-
-export function isLessThan__overload$2(
-	integer: IntegerType,
-	rational: RationalType,
-): BooleanType {
-	const numerator1 = integer.value
-	const denominator1 = 1n
-	const numerator2 = rational.numerator
-	const denominator2 = rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 < rational2)
-}
-
-// #endregion
-
-// #region isLessThanOrEqualTo
-
-export function isLessThanOrEqualTo__overload$2(
-	integer: IntegerType,
-	rational: RationalType,
-): BooleanType {
-	const numerator1 = integer.value
-	const denominator1 = 1n
-	const numerator2 = rational.numerator
-	const denominator2 = rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 <= rational2)
-}
-
-// #endregion
-
-// #region isGreaterThan
-
-export function isGreaterThan__overload$2(
-	integer: IntegerType,
-	rational: RationalType,
-): BooleanType {
-	const numerator1 = integer.value
-	const denominator1 = 1n
-	const numerator2 = rational.numerator
-	const denominator2 = rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 > rational2)
-}
-
-// #endregion
-
-// #region isGreaterThanOrEqualTo
-
-export function isGreaterThanOrEqualTo__overload$2(
-	integer: IntegerType,
-	rational: RationalType,
-): BooleanType {
-	const numerator1 = integer.value
-	const denominator1 = 1n
-	const numerator2 = rational.numerator
-	const denominator2 = rational.denominator
-
-	const rational1 = numerator1 * denominator2
-	const rational2 = numerator2 * denominator1
-
-	return createBoolean(rational1 >= rational2)
 }
 
 // #endregion
@@ -212,6 +107,8 @@ export function raise(
 	return createRational(1n, base.value ** -exponent.value)
 }
 
+// #endregion
+
 export function parse(text: StringType): IntegerType | NothingType {
 	if (!/^-?[0-9]+$/.test(text.value)) {
 		return createNothing()
@@ -220,42 +117,12 @@ export function parse(text: StringType): IntegerType | NothingType {
 	return createInteger(BigInt(text.value))
 }
 
-// #endregion
-
 // biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
 export function toString(integer: IntegerType): StringType {
 	return createString(integer.value.toString())
 }
 
 // #region Irrational operands
-
-export function add__overload$3(
-	integer: IntegerType,
-	algebraic: AlgebraicType,
-): AlgebraicType {
-	return algebraicAdd(algebraic, integer)
-}
-
-export function add__overload$4(
-	integer: IntegerType,
-	transcendental: TranscendentalType,
-): TranscendentalType {
-	return transcendentalAdd(transcendental, integer)
-}
-
-export function multiply__overload$3(
-	integer: IntegerType,
-	algebraic: AlgebraicType,
-): AlgebraicType | RationalType {
-	return algebraicMultiplyWith(algebraic, integer)
-}
-
-export function multiply__overload$4(
-	integer: IntegerType,
-	transcendental: TranscendentalType,
-): TranscendentalType | RationalType {
-	return transcendentalMultiplyWith(transcendental, integer)
-}
 
 export function divide__overload$3(
 	integer: IntegerType,
