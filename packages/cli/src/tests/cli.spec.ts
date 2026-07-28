@@ -1279,7 +1279,7 @@ const sharedDependency = {
 		"implementation {",
 		"",
 		"\tfunction halve(_ amount: Integer) -> Integer {",
-		"\t\t<- amount::divide(by 2)::otherwise(0/1)::truncate()",
+		"\t\t<- amount::divide(by 2)::otherwise(0/1)::round(toward #TowardZero)",
 		"\t}",
 		"}",
 		"",

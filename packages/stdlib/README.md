@@ -73,8 +73,20 @@ at `index`" — the item is the direct object, the index is reached through *at*
 
 **4. A variant of one idea is an Overload, not a new name.** One `trim` with an
 `at:` Overload, not `trimmed`/`trimmedAtStart`/`trimmedAtEnd`; one `sort`, not
-`sorted`/`sortedBy`. And a fixed set of modes is a `choice`, never a `String` —
-`trim(at Side#Start)`, not `trim("start")`.
+`sorted`/`sortedBy`; one `round` with a `toward:` Overload, not
+`round`/`roundDown`/`roundUp`/`truncate`. And a fixed set of modes is a
+`choice`, never a `String` — `trim(at Side#Start)`, not `trim("start")`, and
+`round(toward Rounding#Down)`, not a Method name per direction. The default is
+a Case of that `choice` too, not a value hidden in a body: `trim()` IS
+`trim(at #BothEnds)` and `round()` IS `round(toward #Nearest)`.
+
+**What counts as a variant.** A MODE — one of a fixed set of ways to carry the
+same operation out, where the caller picks and the return Type does not change.
+A quantifier or a position spelled into the name is NOT one: `removeFirst`
+/`removeLast`, `firstItem`/`lastItem`, `firstIndex`/`lastIndex` and
+`replaceEvery`/`replaceFirst` say WHICH items the Method is about, which reads
+as a different question rather than as the same question answered differently.
+Those keep their own names.
 
 **The one thing rule 4 does NOT license.** The numeric tower declares the four
 inequalities on `Integer` and `Rational` AND on the covering `Number`, and that
@@ -93,7 +105,7 @@ Three name SHAPES, so rule 1 is not misapplied:
 |---|---|---|
 | **Transformation** — does something, returns the result | imperative command | `sort`, `reverse`, `trim`, `negate`, `pad`, `clamp`, `raise(to:)`, `join(with:)` |
 | **Predicate** — returns a `Boolean` | `is…`/`has…`/`doesNot…` prefix, or a direct verb | `isEmpty`, `isEven`, `hasItems`, `contains`, `starts(with:)` |
-| **Accessor** — returns an intrinsic part | noun or adjective; no verb to force | `length`, `numerator`, `reciprocal`, `absolute`, `keys`, `firstItem`, `item(at:)`, `firstIndex(of:)`, `indexed` |
+| **Accessor** — returns an intrinsic part | noun or adjective; no verb to force | `length`, `numerator`, `reciprocal`, `absolute`, `keys`, `firstItem`, `item(at:)`, `firstIndex(of:)` |
 
 Rules 2 and 3 do NOT apply to the `is…`/`has…`/`doesNot…` prefixes — those are
 predicate naming, not prepositional Arguments, so `isGreaterThan`, `isBetween`

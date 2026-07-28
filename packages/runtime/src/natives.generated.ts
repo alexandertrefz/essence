@@ -224,6 +224,10 @@ export type NumberFormatNatives = {
 
 }
 
+export type RoundingNatives = {
+
+}
+
 export type RecordNatives = {
 	// is(_: Record) -> Boolean
 	is: (self: RecordType, argument1: RecordType) => BooleanType
@@ -328,7 +332,7 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 
 declare const RationalModule: typeof import("./Rational")
 export const $Rational: RationalNatives = RationalModule
-export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$1" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$1" | "divide__overload$2" | "multiply__overload$1" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round" | "roundDown" | "roundUp" | "truncate" | "parse" | "toString__overload$1"> = true
+export const $RationalAbsent: AssertNoEssenceExports<typeof import("./Rational"), "is" | "isNot" | "add__overload$1" | "add__overload$2" | "add__overload$3" | "add__overload$4" | "subtract__overload$1" | "subtract__overload$2" | "subtract__overload$3" | "subtract__overload$4" | "divide__overload$1" | "divide__overload$2" | "multiply__overload$1" | "multiply__overload$2" | "multiply__overload$3" | "multiply__overload$4" | "isLessThan__overload$1" | "isLessThan__overload$2" | "isLessThanOrEqualTo__overload$1" | "isLessThanOrEqualTo__overload$2" | "isGreaterThan__overload$1" | "isGreaterThan__overload$2" | "isGreaterThanOrEqualTo__overload$1" | "isGreaterThanOrEqualTo__overload$2" | "absolute" | "negate" | "reciprocal" | "isWholeNumber" | "round__overload$1" | "round__overload$2" | "parse" | "toString__overload$1"> = true
 export const $RationalArity: AssertArities<typeof import("./Rational"), {
 	of: 2
 	divide__overload$3: 2
@@ -408,6 +412,10 @@ export const $NormalizationFormAbsent: AssertNoEssenceExports<typeof import("./N
 declare const NumberFormatModule: typeof import("./NumberFormat")
 export const $NumberFormat: NumberFormatNatives = NumberFormatModule
 export const $NumberFormatAbsent: AssertNoEssenceExports<typeof import("./NumberFormat"), "toString"> = true
+
+declare const RoundingModule: typeof import("./Rounding")
+export const $Rounding: RoundingNatives = RoundingModule
+export const $RoundingAbsent: AssertNoEssenceExports<typeof import("./Rounding"), "toString"> = true
 
 declare const RecordModule: typeof import("./Record")
 export const $Record: RecordNatives = RecordModule

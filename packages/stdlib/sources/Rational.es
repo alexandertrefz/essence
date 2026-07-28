@@ -23,6 +23,37 @@ declarations {
 		}
 	}
 
+	§ Which Integer `round` reaches for a Rational that is not already whole.
+	§ It lives here because `Rational::round` is its only user, and it is what
+	§ keeps rounding ONE Method: `round`, `roundDown`, `roundUp` and `truncate`
+	§ were four names for one idea, which is exactly the shape
+	§ `trimmed`/`trimmedAtStart`/`trimmedAtEnd` had before `Side` collapsed it.
+	§ `Nearest` is the direction the no-Argument entry means, so it is a Case
+	§ like any other rather than a default hidden in a body.
+	choice Rounding {
+		Nearest,
+		Down,
+		Up,
+		TowardZero,
+	}
+
+	§ The same unit-Case shape as `NumberFormat` above — compared and printed
+	§ by tag, with the `Equatable` conformance declared and derived rather than
+	§ written.
+	namespace Rounding for Rounding is Equatable, is Printable {
+		§§ Represents the Rounding as `Nearest`, `Down`, `Up` or `TowardZero`.
+		§§
+		§§ @returns — the name of the Rounding variant.
+		toString() -> String {
+			<- match @ -> String {
+				case #Nearest    { <- "Nearest" }
+				case #Down       { <- "Down" }
+				case #Up         { <- "Up" }
+				case #TowardZero { <- "TowardZero" }
+			}
+		}
+	}
+
 	§ Exact ratios of Integers, kept in lowest terms with the sign on the
 	§ numerator. The literal form is `3/4`; `Rational.of` builds one from two
 	§ computed Integers. Arithmetic never rounds — an operation that leaves
@@ -255,60 +286,86 @@ declarations {
 			<- @::denominator()::is(1)
 		}
 
-		§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
-		round() -> Integer {
-			§ The distance from the truncated Integer is the fractional part,
-			§ and a fractional part of at least one half rounds the value one
-			§ further from zero — which is a step DOWN for a negative value.
-			constant truncated      = @::truncate()
-			constant fractionalPart = @::subtract(truncated)::absolute()
+		§ ONE Method, not four. `round`, `roundDown`, `roundUp` and `truncate`
+		§ named the same idea four times, differing only in which Integer they
+		§ reach for — which is what a Choice says in one place. Every entry is
+		§ written on the FLOOR rather than on a sibling, so no branch depends
+		§ on another entry of this same Overload, which an Essence body can not
+		§ reach anyway.
 
-			if fractionalPart::isGreaterThanOrEqualTo(1/2) {
-				if @::isLessThan(0/1) {
-					<- truncated::subtract(1)
-				} else {
-					<- truncated::add(1)
+		§§ The Rational as an Integer — the nearest one when no direction is named, or the one the given direction reaches.
+		§§
+		§§ @returns — the rounded Integer.
+		overload round {
+			§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
+			§§
+			§§ @returns — the nearest Integer.
+			() -> Integer {
+				<- @::round(toward #Nearest)
+			}
+
+			§§ The Integer the given direction reaches — `Nearest` with halves rounding away from zero, `Down` the floor, `Up` the ceiling, `TowardZero` the Integer part with the fractional part cut off.
+			§§
+			§§ @param toward — which Integer to reach for
+			§§ @returns — the rounded Integer.
+			(toward direction: Rounding) -> Integer {
+				§ The denominator is positive in lowest terms, so the Euclidean
+				§ quotient is the FLOOR — `Down` outright, and the one Integer
+				§ the other three are placed against. `quotient` can only answer
+				§ `Nothing` for a zero divisor, and a denominator never is one.
+				constant floored = @::numerator()
+					::quotient(dividingBy @::denominator())
+					::otherwise(0)
+
+				constant isWhole = @::isWholeNumber()
+
+				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
+				§ Rational is bound before the match to stay reachable in the
+				§ Case bodies.
+				constant value = @
+
+				<- match direction -> Integer {
+					case #Down { <- floored }
+
+					case #Up {
+						§ A whole Rational is already its own ceiling; anything
+						§ else sits strictly above the floor.
+						if isWhole {
+							<- floored
+						} else {
+							<- floored::add(1)
+						}
+					}
+
+					case #TowardZero {
+						§ Cutting the fractional part off is the floor for a
+						§ non-negative value, and one step back up towards zero
+						§ for a negative one that is not already whole.
+						if value::isLessThan(0/1)::and(isWhole::negate()) {
+							<- floored::add(1)
+						} else {
+							<- floored
+						}
+					}
+
+					case #Nearest {
+						§ How far the value sits above its floor. Past a half
+						§ the Integer above is nearer, below a half the floor
+						§ is — and exactly at a half the tie is broken AWAY
+						§ from zero, which for a negative value is the floor.
+						constant fractionalPart = value::subtract(floored)
+
+						if fractionalPart::isGreaterThan(1/2) {
+							<- floored::add(1)
+						} else if fractionalPart::isLessThan(1/2) {
+							<- floored
+						} else if value::isLessThan(0/1) {
+							<- floored
+						} else {
+							<- floored::add(1)
+						}
+					}
 				}
-			} else {
-				<- truncated
-			}
-		}
-
-		§§ The greatest Integer at or below the Rational — the floor.
-		roundDown() -> Integer {
-			constant truncatedValue = @::truncate()
-			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
-				<- truncatedValue::subtract(1)
-			} else {
-				<- truncatedValue
-			}
-		}
-
-		§§ The lowest Integer at or above the Rational — the ceiling.
-		roundUp() -> Integer {
-			constant truncatedValue = @::truncate()
-			if @::isGreaterThan(0/1)::and(@::isWholeNumber()::negate()) {
-				<- truncatedValue::add(1)
-			} else {
-				<- truncatedValue
-			}
-		}
-
-		§§ The Integer part of the Rational — the fractional part cut off, rounding towards zero.
-		truncate() -> Integer {
-			§ The denominator is positive in lowest terms, so the Euclidean
-			§ quotient is the FLOOR — for a negative value that is one below
-			§ the truncation, unless the value is whole and the two agree.
-			§ `quotient` can only answer `Nothing` for a zero divisor, and a
-			§ denominator never is one.
-			constant floored = @::numerator()
-				::quotient(dividingBy @::denominator())
-				::otherwise(0)
-
-			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
-				<- floored::add(1)
-			} else {
-				<- floored
 			}
 		}
 

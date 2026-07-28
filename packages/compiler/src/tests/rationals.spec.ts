@@ -29,7 +29,7 @@ import { validate } from "../validator/index"
 // direct half of these tests checks THAT gateway — the one place the invariants
 // are enforced — and the compiled Programs below check the same behaviour
 // through the Essence bodies, because the damage the leaks did was visible from
-// Essence: `absolute()`, `roundDown()` and `isWholeNumber()` are all written on
+// Essence: `absolute()`, `round(toward:)` and `isWholeNumber()` are all written on
 // top of them.
 
 function generate(source: string): string {
@@ -314,7 +314,7 @@ describe("Rationals", () => {
 							__print(@::toString())
 							__print(@::isLessThan(0/1)::toString())
 							__print(@::absolute()::toString())
-							__print(@::roundDown()::toString())
+							__print(@::round(toward #Down)::toString())
 							<- nothing
 						}
 						case Nothing {
@@ -334,7 +334,7 @@ describe("Rationals", () => {
 					match 1/2::divide(by negativeThree) -> Nothing {
 						case Rational {
 							__print(@::round()::toString())
-							__print(@::truncate()::toString())
+							__print(@::round(toward #TowardZero)::toString())
 							__print(@::isLessThan(0)::toString())
 							__print(@::isGreaterThan(0)::toString())
 							<- nothing

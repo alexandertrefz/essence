@@ -16,6 +16,7 @@ import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as record from "@essence-lang/runtime/Record"
+import * as rounding from "@essence-lang/runtime/Rounding"
 import * as side from "@essence-lang/runtime/Side"
 import * as string from "@essence-lang/runtime/String"
 import * as transcendental from "@essence-lang/runtime/Transcendental"
@@ -45,6 +46,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Case: caseModule,
 	NormalizationForm: normalizationForm,
 	NumberFormat: numberFormat,
+	Rounding: rounding,
 	Record: record,
 	List: list,
 	NestedList: nestedList,
