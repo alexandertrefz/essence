@@ -170,6 +170,50 @@ describe("formatter", () => {
 		})
 	})
 
+	describe("Comments above the Program", () => {
+		// NOTE: The blank line that separates a file's header from its
+		// `implementation {` used to be found under EVERY line of that header,
+		// because each Comment was measured against the keyword rather than
+		// against the Comment below it — so a four-line header came back
+		// double-spaced, and running the formatter again spaced it again. Every
+		// deliberately-broken file under `fixtures/files/diagnostics/` opens
+		// with one of these headers.
+		it("keeps a run of heading Comments together", () => {
+			let source = [
+				"§ A header above the Program.",
+				"§",
+				"§ A second paragraph, and",
+				"§ a third line under it.",
+				"",
+				"implementation {",
+				'\t__print("hi")',
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("keeps a heading Comment sitting straight on the keyword", () => {
+			let source = [
+				"§ One.",
+				"§ Two.",
+				"implementation {",
+				'\t__print("hi")',
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+	})
+
 	describe("refuses what it cannot format", () => {
 		it("leaves a file with syntax errors byte for byte alone", () => {
 			let source = "implementation {\n\tconstant = = =\n}\n"

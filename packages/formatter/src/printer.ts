@@ -263,7 +263,7 @@ export class Printer {
 
 	// NOTE: A braced block breaks, with one exception: a `match` Handler
 	// holding a single short Statement is written on one line throughout the
-	// corpus — `case Nothing { <- fallback }` — and expanding all of those to
+	// corpus — `case #Empty { <- fallback }` — and expanding all of those to
 	// three lines each would triple the size of every `match`. `allowFlat`
 	// offers that shape to the group, which takes it only if it fits.
 	// NOTE: `opening` is the Comment written after the `{` itself — `reduce(…,
@@ -463,11 +463,20 @@ export class Printer {
 	private headingComments(position: common.Position): Array<Doc> {
 		let line = position.start.line
 		let parts: Array<Doc> = []
+		let comments = this.trivia.takeBefore(line)
 
-		for (let comment of this.trivia.takeBefore(line)) {
+		for (let [index, comment] of comments.entries()) {
 			parts.push(text(comment.text), hardline)
 
-			if (this.source.hasBlankLineBetween(comment.endLine, line)) {
+			// NOTE: A blank line is judged against WHAT FOLLOWS this Comment —
+			// the next Comment of the run, or the keyword when this is the last
+			// of them. Judging every one against the keyword meant that the
+			// blank line separating the run from the keyword was found under
+			// each line of the run, and a file opening with a paragraph of `§`
+			// above its `implementation {` came back double-spaced.
+			let next = comments[index + 1]?.startLine ?? line
+
+			if (this.source.hasBlankLineBetween(comment.endLine, next)) {
 				parts.push(hardline)
 			}
 		}
@@ -1577,9 +1586,6 @@ export class Printer {
 
 			case "BooleanValue":
 				return text(node.value ? "true" : "false")
-
-			case "NothingValue":
-				return text("nothing")
 
 			case "RecordValue":
 				return this.printRecord(node)
