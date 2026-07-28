@@ -3,11 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 import * as boolean from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
-import {
-	anyIs,
-	anyIsNot,
-	isFirstRationalBigger,
-} from "@essence-lang/runtime/internalHelpers"
+import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
 import { createNothing } from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
@@ -63,39 +59,10 @@ const stringIs = (first: string.StringType, second: string.StringType) =>
 describe("Rewriter", () => {
 	describe("Runtime", () => {
 		describe("Internal Helpers", () => {
-			describe("isFirstRationalBigger", () => {
-				it("returns true of the first rational is bigger", () => {
-					expect(
-						isFirstRationalBigger(
-							{ numerator: 1n, denominator: 2n },
-							{ numerator: 1n, denominator: 3n },
-						),
-					).toBeTrue()
-
-					expect(
-						isFirstRationalBigger(
-							{ numerator: 2n, denominator: 8n },
-							{ numerator: 3n, denominator: 24n },
-						),
-					).toBeTrue()
-				})
-
-				it("returns false of the second rational is bigger", () => {
-					expect(
-						isFirstRationalBigger(
-							{ numerator: 1n, denominator: 2n },
-							{ numerator: 2n, denominator: 3n },
-						),
-					).toBeFalse()
-
-					expect(
-						isFirstRationalBigger(
-							{ numerator: 2n, denominator: 8n },
-							{ numerator: 7n, denominator: 24n },
-						),
-					).toBeFalse()
-				})
-			})
+			// NOTE: `isFirstRationalBigger` is gone — the `lowestNumber` and
+			// `greatestNumber` List entries it served are written in Essence
+			// now (`packages/stdlib/sources/Number.es`), folding the pairwise
+			// entries, which read the members' own `compare`.
 
 			describe("anyIs", () => {
 				it("returns true if the elements are identical", () => {
@@ -883,245 +850,11 @@ describe("Rewriter", () => {
 		})
 
 		describe("Number", () => {
-			describe("lowestNumber", () => {
-				// NOTE: the pairwise `lowestNumber` overloads ($1-$4) are
-				// implemented in Essence now (`packages/stdlib/sources/Number.es`) and
-				// covered by the golden harness; only the List-form overloads
-				// ($5-$7) stay native.
-				it("returns the smallest number of a list", () => {
-					expect(
-						number.lowestNumber__overload$5(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$5(
-							list.createList([
-								integerTwo(),
-								integerOne(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$5(
-							list.createList([
-								integerHundred(),
-								integerTwo(),
-								integerOne(),
-							]),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$6(
-							list.createList([
-								rationalOne(),
-								rationalTwo(),
-								rationalHundred(),
-							]),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$6(
-							list.createList([
-								rationalTwo(),
-								rationalOne(),
-								rationalHundred(),
-							]),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$6(
-							list.createList([
-								rationalHundred(),
-								rationalTwo(),
-								rationalOne(),
-							]),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$6(
-							list.createList([
-								rationalHundred(),
-								rationalTwo(),
-								rationalOneHalf(),
-								rationalOne(),
-							]),
-						),
-					).toEqual(rationalOneHalf())
-
-					expect(
-						number.lowestNumber__overload$7(
-							list.createList([
-								integerOne(),
-								rationalTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$7(
-							list.createList([
-								integerTwo(),
-								rationalOne(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(rationalOne())
-
-					expect(
-						number.lowestNumber__overload$7(
-							list.createList([
-								rationalHundred(),
-								integerTwo(),
-								integerOne(),
-							]),
-						),
-					).toEqual(integerOne())
-
-					expect(
-						number.lowestNumber__overload$7(
-							list.createList([
-								integerHundred(),
-								rationalOne(),
-								rationalOneHalf(),
-								integerOne(),
-							]),
-						),
-					).toEqual(rationalOneHalf())
-				})
-			})
-
-			describe("greatestNumber", () => {
-				// NOTE: the pairwise `greatestNumber` overloads ($1-$4) are
-				// implemented in Essence now (`packages/stdlib/sources/Number.es`) and
-				// covered by the golden harness; only the List-form overloads
-				// ($5-$7) stay native.
-				it("returns the largest number of a list", () => {
-					expect(
-						number.greatestNumber__overload$5(
-							list.createList([
-								integerOne(),
-								integerTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$5(
-							list.createList([
-								integerTwo(),
-								integerOne(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$5(
-							list.createList([
-								integerHundred(),
-								integerTwo(),
-								integerOne(),
-							]),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$6(
-							list.createList([
-								rationalOne(),
-								rationalTwo(),
-								rationalHundred(),
-							]),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$6(
-							list.createList([
-								rationalTwo(),
-								rationalOne(),
-								rationalHundred(),
-							]),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$6(
-							list.createList([
-								rationalHundred(),
-								rationalTwo(),
-								rationalOne(),
-							]),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$6(
-							list.createList([
-								rationalHundred(),
-								rationalTwo(),
-								rationalOneHalf(),
-								rationalOne(),
-							]),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$7(
-							list.createList([
-								integerOne(),
-								rationalTwo(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$7(
-							list.createList([
-								integerTwo(),
-								rationalOne(),
-								integerHundred(),
-							]),
-						),
-					).toEqual(integerHundred())
-
-					expect(
-						number.greatestNumber__overload$7(
-							list.createList([
-								rationalHundred(),
-								integerTwo(),
-								integerOne(),
-							]),
-						),
-					).toEqual(rationalHundred())
-
-					expect(
-						number.greatestNumber__overload$7(
-							list.createList([
-								rationalOneHalf(),
-								rationalOne(),
-								integerHundred(),
-								integerOne(),
-							]),
-						),
-					).toEqual(integerHundred())
-				})
-			})
+			// NOTE: every `lowestNumber`/`greatestNumber` overload is
+			// implemented in Essence now (`packages/stdlib/sources/Number.es`)
+			// — the List forms fold the pairwise ones — as are `sum`,
+			// `product` and `average`. The golden harness covers them all;
+			// only the constants and the covering `compare` stay native.
 		})
 
 		describe("List", () => {

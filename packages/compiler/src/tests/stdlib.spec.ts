@@ -184,53 +184,13 @@ describe("Stdlib", () => {
 		})
 	})
 
-	describe("Number aggregates", () => {
-		it("sums exactly, the empty List to zero", () => {
-			expect(number.sum__overload$1(ints(1n, 2n, 3n))).toEqual(int(6n))
-			expect(number.sum__overload$1(list.createList([]))).toEqual(int(0n))
-			expect(
-				ratIs(
-					number.sum__overload$2(
-						list.createList([rat(1n, 2n), rat(1n, 3n)]),
-					),
-					rat(5n, 6n),
-				),
-			).toBe(true)
-		})
+	// NOTE: `sum`, `product` and `average` are written in Essence now
+	// (`packages/stdlib/sources/Number.es`) — folds over the members' own
+	// arithmetic, with the mixed entries collapsing a whole total back to an
+	// Integer. The golden harness covers every entry, the empty Lists and the
+	// mixed collapse included, so the runtime-direct tests that lived here are
+	// retired.
 
-		it("collapses a whole mixed sum to an Integer", () => {
-			const total = number.sum__overload$3(
-				list.createList([int(1n), rat(1n, 2n), rat(1n, 2n)]),
-			)
-
-			expect(total).toEqual(int(2n))
-		})
-
-		it("multiplies exactly, the empty List to one", () => {
-			expect(number.product__overload$1(ints(2n, 3n, 4n))).toEqual(
-				int(24n),
-			)
-			expect(number.product__overload$1(list.createList([]))).toEqual(
-				int(1n),
-			)
-
-			const mixed = number.product__overload$3(
-				list.createList([int(3n), rat(1n, 3n)]),
-			)
-			expect(mixed).toEqual(int(1n))
-		})
-
-		it("averages to an exact Rational, the empty List to Nothing", () => {
-			const mean = number.average__overload$1(ints(1n, 2n))
-
-			expect(mean[typeKeySymbol]).toBe("Rational")
-			expect(ratIs(mean as never, rat(3n, 2n))).toBe(true)
-
-			expect(
-				number.average__overload$1(list.createList([]))[typeKeySymbol],
-			).toBe("Nothing")
-		})
-	})
 
 	// NOTE: `Number.isBetween` used to be tested here, against the runtime
 	// function directly. It is written in Essence now — `packages/stdlib/sources/Number.es`

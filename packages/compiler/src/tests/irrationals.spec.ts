@@ -5,7 +5,6 @@ import { createBoolean } from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
 import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
-import { createNothing } from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
@@ -237,21 +236,11 @@ describe("Irrationals", () => {
 
 	describe("Number cross-kind semantics", () => {
 		// NOTE: cross-kind `Number.is` is Essence now (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
-
-		it("crashes no longer on empty lists — lowestNumber gives Nothing", () => {
-			expect(
-				number.lowestNumber__overload$5({
-					[typeKeySymbol]: "List",
-					value: [],
-				}),
-			).toEqual(createNothing())
-			expect(
-				number.greatestNumber__overload$7({
-					[typeKeySymbol]: "List",
-					value: [],
-				}),
-			).toEqual(createNothing())
-		})
+		// NOTE: the List entries of `lowestNumber`/`greatestNumber` — and the
+		// empty-List `Nothing` they answer — are Essence now
+		// (`packages/stdlib/sources/Number.es`), folds over the pairwise
+		// entries seeded with `Nothing`; the golden harness covers every entry
+		// including the empty Lists.
 		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
 		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`); its symmetry with itself is covered by the golden harness.
 	})

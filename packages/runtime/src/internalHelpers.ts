@@ -1,6 +1,5 @@
 import type { common } from "@essence-lang/interfaces"
 
-import type { BigRational } from "./bigRational"
 import type { BooleanType } from "./Boolean"
 import { is as boolIs, createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
@@ -13,20 +12,6 @@ import { isValueOfType, typeKeySymbol } from "./type"
 
 export function getInt32(number: IntegerType): number {
 	return Number(BigInt.asIntN(32, number.value))
-}
-
-export function isFirstRationalBigger(
-	firstRational: BigRational,
-	secondRational: BigRational,
-): boolean {
-	if (firstRational.denominator === secondRational.denominator) {
-		return firstRational.numerator > secondRational.numerator
-	} else {
-		return (
-			firstRational.numerator * secondRational.denominator >
-			secondRational.numerator * firstRational.denominator
-		)
-	}
 }
 
 // NOTE: Integer and Rational — the two members of the numeric tower that spell

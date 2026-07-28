@@ -103,37 +103,166 @@ declarations {
 				::and(@::isLessThanOrEqualTo(upper))
 		}
 
+		§ The aggregates are folds over the members' own arithmetic. The
+		§ mixed-kind entries dispatch each step by matching BOTH operands
+		§ apart — a Union-typed receiver reaches no member Namespace's `add`,
+		§ and the covering Namespace deliberately declares none — and collapse
+		§ a whole-number total back to an Integer at the end, so a mixed List
+		§ that happens to sum to a whole answers with the simpler member.
+
 		§§ Adds up every Number in the List. The empty List sums to zero.
 		§§
 		§§ @returns — the exact total.
 		overload static sum {
-			(_ integers: List<Integer>) -> Integer
+			(_ integers: List<Integer>) -> Integer {
+				<- integers::reduce(startingWith 0, (total, integer) {
+					<- total::add(integer)
+				})
+			}
 
-			(_ rationals: List<Rational>) -> Rational
+			(_ rationals: List<Rational>) -> Rational {
+				<- rationals::reduce(startingWith 0/1, (total, rational) {
+					<- total::add(rational)
+				})
+			}
 
-			(_ numbers: List<Integer | Rational>) -> Integer | Rational
+			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
+				constant start: Integer | Rational = 0
+
+				constant total = numbers::reduce(startingWith start, (
+					accumulated,
+					number,
+				) {
+					<- match accumulated -> Integer | Rational {
+						case Integer {
+							constant accumulatedInteger = @
+
+							<- match number -> Integer | Rational {
+								case Integer  { <- accumulatedInteger::add(@) }
+
+								case Rational { <- accumulatedInteger::add(@) }
+							}
+						}
+
+						case Rational {
+							constant accumulatedRational = @
+
+							<- match number -> Integer | Rational {
+								case Integer  { <- accumulatedRational::add(@) }
+
+								case Rational { <- accumulatedRational::add(@) }
+							}
+						}
+					}
+				})
+
+				<- match total -> Integer | Rational {
+					case Integer { <- @ }
+
+					case Rational {
+						if @::isWholeNumber() {
+							<- @::numerator()
+						} else {
+							<- @
+						}
+					}
+				}
+			}
 		}
 
 		§§ Multiplies every Number in the List together. The empty List multiplies to one.
 		§§
 		§§ @returns — the exact product.
 		overload static product {
-			(_ integers: List<Integer>) -> Integer
+			(_ integers: List<Integer>) -> Integer {
+				<- integers::reduce(startingWith 1, (total, integer) {
+					<- total::multiply(with integer)
+				})
+			}
 
-			(_ rationals: List<Rational>) -> Rational
+			(_ rationals: List<Rational>) -> Rational {
+				<- rationals::reduce(startingWith 1/1, (total, rational) {
+					<- total::multiply(with rational)
+				})
+			}
 
-			(_ numbers: List<Integer | Rational>) -> Integer | Rational
+			(_ numbers: List<Integer | Rational>) -> Integer | Rational {
+				constant start: Integer | Rational = 1
+
+				constant total = numbers::reduce(startingWith start, (
+					accumulated,
+					number,
+				) {
+					<- match accumulated -> Integer | Rational {
+						case Integer {
+							constant accumulatedInteger = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- accumulatedInteger::multiply(with @)
+								}
+
+								case Rational {
+									<- accumulatedInteger::multiply(with @)
+								}
+							}
+						}
+
+						case Rational {
+							constant accumulatedRational = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- accumulatedRational::multiply(with @)
+								}
+
+								case Rational {
+									<- accumulatedRational::multiply(with @)
+								}
+							}
+						}
+					}
+				})
+
+				<- match total -> Integer | Rational {
+					case Integer { <- @ }
+
+					case Rational {
+						if @::isWholeNumber() {
+							<- @::numerator()
+						} else {
+							<- @
+						}
+					}
+				}
+			}
 		}
+
+		§ The empty List needs no guard of its own in `average`: it sums to
+		§ zero and counts zero items, and dividing by the zero count is the
+		§ `Nothing` the signature already answers with.
 
 		§§ The arithmetic mean of the Numbers in the List — their sum divided by their count, as an exact Rational.
 		§§
 		§§ @returns — the mean, or `Nothing` for the empty List — no Numbers have no mean.
 		overload static average {
-			(_ integers: List<Integer>) -> Optional<Rational>
+			(_ integers: List<Integer>) -> Optional<Rational> {
+				<- Number.sum(integers)::divide(by integers::length())
+			}
 
-			(_ rationals: List<Rational>) -> Optional<Rational>
+			(_ rationals: List<Rational>) -> Optional<Rational> {
+				<- Number.sum(rationals)::divide(by rationals::length())
+			}
 
-			(_ numbers: List<Integer | Rational>) -> Optional<Rational>
+			(_ numbers: List<Integer | Rational>) -> Optional<Rational> {
+				constant count = numbers::length()
+
+				<- match Number.sum(numbers) -> Optional<Rational> {
+					case Integer  { <- @::divide(by count) }
+
+					case Rational { <- @::divide(by count) }
+				}
+			}
 		}
 
 		§§ The lower of two Numbers, or the lowest in a List of them.
@@ -178,13 +307,77 @@ declarations {
 				}
 			}
 
-			(_ integers: List<Integer>) -> Optional<Integer>
+			§ The List entries fold the pairwise ones over the items, seeded
+			§ with `Nothing` so the first item becomes the running answer and
+			§ the empty List keeps the seed. On a tie the pairwise entries
+			§ answer the FIRST operand, so the earliest of equal items wins,
+			§ exactly as walking the List reads. The mixed entry matches both
+			§ operands apart to reach a pairwise entry, as the aggregates
+			§ above do.
 
-			(_ rationals: List<Rational>) -> Optional<Rational>
+			(_ integers: List<Integer>) -> Optional<Integer> {
+				constant start: Optional<Integer> = nothing
+
+				<- integers::reduce(startingWith start, (lowest, integer) {
+					<- match lowest -> Optional<Integer> {
+						case Nothing { <- integer }
+
+						case _       { <- Number.lowestNumber(@, integer) }
+					}
+				})
+			}
+
+			(_ rationals: List<Rational>) -> Optional<Rational> {
+				constant start: Optional<Rational> = nothing
+
+				<- rationals::reduce(startingWith start, (lowest, rational) {
+					<- match lowest -> Optional<Rational> {
+						case Nothing { <- rational }
+
+						case _       { <- Number.lowestNumber(@, rational) }
+					}
+				})
+			}
 
 			(
 				_ numbers: List<Integer | Rational>,
-			) -> Optional<Integer | Rational>
+			) -> Optional<Integer | Rational> {
+				constant start: Optional<Integer | Rational> = nothing
+
+				<- numbers::reduce(startingWith start, (lowest, number) {
+					<- match lowest -> Optional<Integer | Rational> {
+						case Nothing { <- number }
+
+						case Integer {
+							constant lowestInteger = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- Number.lowestNumber(lowestInteger, @)
+								}
+
+								case Rational {
+									<- Number.lowestNumber(lowestInteger, @)
+								}
+							}
+						}
+
+						case Rational {
+							constant lowestRational = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- Number.lowestNumber(lowestRational, @)
+								}
+
+								case Rational {
+									<- Number.lowestNumber(lowestRational, @)
+								}
+							}
+						}
+					}
+				})
+			}
 		}
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
@@ -229,13 +422,78 @@ declarations {
 				}
 			}
 
-			(_ integers: List<Integer>) -> Optional<Integer>
+			§ The same fold as `lowestNumber`'s List entries, over the greater
+			§ pairwise answer.
 
-			(_ rationals: List<Rational>) -> Optional<Rational>
+			(_ integers: List<Integer>) -> Optional<Integer> {
+				constant start: Optional<Integer> = nothing
+
+				<- integers::reduce(startingWith start, (greatest, integer) {
+					<- match greatest -> Optional<Integer> {
+						case Nothing { <- integer }
+
+						case _       { <- Number.greatestNumber(@, integer) }
+					}
+				})
+			}
+
+			(_ rationals: List<Rational>) -> Optional<Rational> {
+				constant start: Optional<Rational> = nothing
+
+				<- rationals::reduce(startingWith start, (greatest, rational) {
+					<- match greatest -> Optional<Rational> {
+						case Nothing { <- rational }
+
+						case _       { <- Number.greatestNumber(@, rational) }
+					}
+				})
+			}
 
 			(
 				_ numbers: List<Integer | Rational>,
-			) -> Optional<Integer | Rational>
+			) -> Optional<Integer | Rational> {
+				constant start: Optional<Integer | Rational> = nothing
+
+				<- numbers::reduce(startingWith start, (greatest, number) {
+					<- match greatest -> Optional<Integer | Rational> {
+						case Nothing { <- number }
+
+						case Integer {
+							constant greatestInteger = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- Number.greatestNumber(greatestInteger, @)
+								}
+
+								case Rational {
+									<- Number.greatestNumber(greatestInteger, @)
+								}
+							}
+						}
+
+						case Rational {
+							constant greatestRational = @
+
+							<- match number -> Integer | Rational {
+								case Integer  {
+									<- Number.greatestNumber(
+										greatestRational,
+										@,
+									)
+								}
+
+								case Rational {
+									<- Number.greatestNumber(
+										greatestRational,
+										@,
+									)
+								}
+							}
+						}
+					}
+				})
+			}
 		}
 	}
 }
