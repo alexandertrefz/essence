@@ -173,7 +173,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					__print(parsed::anyItem(matches (value) {
+					__print(parsed::anyItem(where (value) {
 						<- value::isNothing()
 					})::toString())
 				}`),
@@ -188,7 +188,7 @@ describe("Stdlib searching Methods", () => {
 						Integer.parse("5"),
 					]
 
-					__print(parsed::everyItem(matches (value) {
+					__print(parsed::everyItem(where (value) {
 						<- value::hasValue()
 					})::toString())
 				}`),
@@ -201,22 +201,22 @@ describe("Stdlib searching Methods", () => {
 					constant numbers = [1, 2, 3]
 					constant none: List<Integer> = []
 
-					__print(numbers::anyItem(matches (item) {
+					__print(numbers::anyItem(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					__print(numbers::anyItem(matches (item) {
+					__print(numbers::anyItem(where (item) {
 						<- item::isGreaterThan(9)
 					})::toString())
-					__print(none::anyItem(matches (item) {
+					__print(none::anyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					__print(numbers::everyItem(matches (item) {
+					__print(numbers::everyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
-					__print(numbers::everyItem(matches (item) {
+					__print(numbers::everyItem(where (item) {
 						<- item::isGreaterThan(2)
 					})::toString())
-					__print(none::everyItem(matches (item) {
+					__print(none::everyItem(where (item) {
 						<- item::isGreaterThan(0)
 					})::toString())
 				}`),
@@ -237,10 +237,10 @@ describe("Stdlib searching Methods", () => {
 		it("still stops at the item that decides the answer", async () => {
 			expect(
 				await run(`implementation {
-					constant any = [1, 2, 3, 4]::anyItem(matches (item) {
+					constant any = [1, 2, 3, 4]::anyItem(where (item) {
 						<- __print(item)::isGreaterThan(1)
 					})
-					constant every = [1, 2, 3, 4]::everyItem(matches (item) {
+					constant every = [1, 2, 3, 4]::everyItem(where (item) {
 						<- __print(item)::isLessThan(2)
 					})
 
