@@ -145,10 +145,10 @@ describe("Lexer", () => {
 		it("should decode escapes into the value", () => {
 			let lexer = new Lexer()
 
-			lexer.reset('"a\\nb\\t\\"c\\\\d"')
+			lexer.reset('"a\\nb\\t\\"c\\\\d\\re"')
 
 			expect(stripPosition(lexer.next())).toEqual({
-				value: 'a\nb\t"c\\d',
+				value: 'a\nb\t"c\\d\re',
 				type: TokenType.LiteralString,
 			})
 			expect(lexer.errors).toEqual([])
