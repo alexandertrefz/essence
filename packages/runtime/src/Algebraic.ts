@@ -357,7 +357,7 @@ export function scaledIntervalOf(
 
 // #region Methods
 
-export function compareTo(
+export function compare(
 	algebraic: AlgebraicType,
 	other: AlgebraicType | IntegerType | RationalType,
 ): OrderingType {

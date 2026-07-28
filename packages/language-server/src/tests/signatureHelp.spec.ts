@@ -262,7 +262,7 @@ describe("Signature Help", () => {
 
 describe("Signature Help for bounded Methods", () => {
 	it("should render the Protocol bound and keep parameter ranges aligned", () => {
-		let source = ["implementation {", "\t[3, 1]::compareTo(", "}"].join(
+		let source = ["implementation {", "\t[3, 1]::compare(to ", "}"].join(
 			"\n",
 		)
 
@@ -270,7 +270,7 @@ describe("Signature Help for bounded Methods", () => {
 		let signature = help?.signatures[0]
 
 		expect(signature?.label).toBe(
-			"compareTo<ItemType is Comparable>(_ List<ItemType>) -> Ordering",
+			"compare<ItemType is Comparable>(to: List<ItemType>) -> Ordering",
 		)
 
 		// NOTE: The bound widens the generics prefix — the range has to keep
@@ -280,7 +280,7 @@ describe("Signature Help for bounded Methods", () => {
 		expect(parameter).toBeDefined()
 		expect(
 			signature?.label.slice(parameter!.range[0], parameter!.range[1]),
-		).toBe("_ List<ItemType>")
+		).toBe("to: List<ItemType>")
 		expect(help?.activeParameter).toBe(0)
 	})
 })

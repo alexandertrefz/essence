@@ -22,7 +22,7 @@ export function createString(value: string): StringType {
 // marks, a ZWJ emoji sequence and a flag's two regional indicators each into
 // ONE element, so `length`, `character(at:)`, `slice` and `reverse` never split
 // one. NFC first means canonically equivalent Strings (an accent composed or
-// decomposed) have the SAME view, which is what makes `is`/`compareTo` agree.
+// decomposed) have the SAME view, which is what makes `is`/`compare` agree.
 // The Segmenter is built once — constructing one per call is the expensive part.
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
 	granularity: "grapheme",
@@ -187,7 +187,7 @@ export function trim__overload$2(
 	}
 }
 
-export function compareTo__overload$1(
+export function compare__overload$1(
 	originalString: StringType,
 	otherString: StringType,
 ): OrderingType {
@@ -195,7 +195,7 @@ export function compareTo__overload$1(
 	// canonically equivalent pair (an accent composed or decomposed) compares
 	// `Equal`, and the order agrees with the grapheme view the character
 	// Methods take rather than JS's UTF-16 `<`. This is also the whole of
-	// String equality: `String.is` is `compareTo(other)::is(Ordering#Equal)` in
+	// String equality: `String.is` is `compare(other)::is(Ordering#Equal)` in
 	// Essence, so equality is canonical equivalence too.
 	let first = Array.from(originalString.value.normalize("NFC"))
 	let second = Array.from(otherString.value.normalize("NFC"))

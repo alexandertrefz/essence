@@ -2,11 +2,11 @@ implementation {
 
 	§ A conditional conformance — Boxes are only Comparable when their Item
 	§ is. The `where` clause supplies the bound, and the Method body leans on
-	§ it: `compareTo` on the Items is exactly what the condition proves.
+	§ it: `compare` on the Items is exactly what the condition proves.
 	namespace Boxes<infer Item> for { value: Item }
 		is Comparable where Item is Comparable {
-		compareTo(_ other: { value: Item }) -> Ordering {
-			<- @.value::compareTo(other.value)
+		compare(to other: { value: Item }) -> Ordering {
+			<- @.value::compare(to other.value)
 		}
 	}
 
@@ -21,7 +21,7 @@ implementation {
 	__print([[[2]], [[1]]]::sort()) § [ [ [ 1 ] ], [ [ 2 ] ] ]
 
 	§ Two Lists compare lexicographically; on an equal prefix, shorter first.
-	__print([1, 2]::compareTo([1, 2, 3])::toString()) § "Less"
+	__print([1, 2]::compare(to [1, 2, 3])::toString()) § "Less"
 
 	§ Where a condition can not be proven, the compiler explains the chain:
 	§ sorting a List of Booleans reports that List<Boolean> is Comparable

@@ -108,23 +108,23 @@ declarations {
 			<- @::isEmpty()::negate()
 		}
 
-		§ Both entries are written on `compareTo`, so `Case#Insensitive` means
-		§ exactly what the case-insensitive `compareTo` below means, and both
-		§ inherit whatever `compareTo` decides about normalization.
+		§ Both entries are written on `compare`, so `Case#Insensitive` means
+		§ exactly what the case-insensitive `compare` below means, and both
+		§ inherit whatever `compare` decides about normalization.
 
 		§§ Checks whether the String has the same characters as another — case-sensitively, or as the given `Case` asks.
 		overload is {
 			§§ @param other — the String to compare against
 			§§ @returns — `true` when the Strings are equal.
 			(_ other: String) -> Boolean {
-				<- @::compareTo(other)::is(#Equal)
+				<- @::compare(to other)::is(#Equal)
 			}
 
 			§§ @param other — the String to compare against
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when the Strings are equal under the given `Case`.
 			(_ other: String, comparing sensitivity: Case) -> Boolean {
-				<- @::compareTo(other, comparing sensitivity)::is(#Equal)
+				<- @::compare(to other, comparing sensitivity)::is(#Equal)
 			}
 		}
 
@@ -221,7 +221,7 @@ declarations {
 		lowercased() -> String
 
 		§ `normalized()` with no Argument is Composed Canonical (NFC), the form
-		§ the rest of the Namespace already works in — `is`, `compareTo` and the
+		§ the rest of the Namespace already works in — `is`, `compare` and the
 		§ grapheme view all normalize to it — so it is what a Program wants far
 		§ more often than not. The `as:` entry is the native, naming the form.
 
@@ -501,14 +501,14 @@ declarations {
 		}
 
 		§§ Orders the String against another — by character code point, or as the given `Case` asks.
-		overload compareTo {
+		overload compare {
 			§ NATIVE. Ordering by code point is what the Comparable conformance
 			§ names, and there is no Essence expression for a character's code
 			§ point.
 
 			§§ @param other — the String to order against
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-			(_ other: String) -> Ordering
+			(to other: String) -> Ordering
 
 			§ Case is folded by lower-casing both sides — a documented
 			§ approximation of full Unicode case-folding, close enough for the
@@ -518,17 +518,17 @@ declarations {
 			§§ @param other — the String to order against
 			§§ @param comparing — whether case is significant
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-			(_ other: String, comparing sensitivity: Case) -> Ordering {
+			(to other: String, comparing sensitivity: Case) -> Ordering {
 				§ `@` is the SCRUTINEE inside a match, not the receiver, so the
 				§ String is bound before the match to stay reachable in the Case
 				§ bodies.
 				constant text = @
 
 				<- match sensitivity -> Ordering {
-					case #Sensitive   { <- text::compareTo(other) }
+					case #Sensitive   { <- text::compare(to other) }
 
 					case #Insensitive {
-						<- text::lowercased()::compareTo(other::lowercased())
+						<- text::lowercased()::compare(to other::lowercased())
 					}
 				}
 			}

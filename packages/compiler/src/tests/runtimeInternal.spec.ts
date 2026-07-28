@@ -198,7 +198,7 @@ describe("Runtime Internals", () => {
 	})
 
 	describe("anyIs", () => {
-		// NOTE: The regression — `String::is` is `compareTo(other)::is(#Equal)`
+		// NOTE: The regression — `String::is` is `compare(other)::is(#Equal)`
 		// over the NFC-normalised String, so canonically equivalent Strings are
 		// equal. Comparing the raw representation here made the SAME pair
 		// unequal the moment either side was wrapped in a Record, a List or a
@@ -305,7 +305,7 @@ describe("Runtime Internals", () => {
 
 			// NOTE: An Algebraic and a Transcendental are provably irrational,
 			// so no cross-kind pairing with them can ever be equal — which is
-			// what makes the covering `compareTo` total and keeps these cheap.
+			// what makes the covering `compare` total and keeps these cheap.
 			it("answers unequal for an irrational beside a rational value", () => {
 				expect(anyIs(radical(2n), whole(2n))).toBeFalse()
 				expect(anyIs(whole(2n), radical(2n))).toBeFalse()

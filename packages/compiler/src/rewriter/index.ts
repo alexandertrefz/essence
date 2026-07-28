@@ -1624,7 +1624,7 @@ function rewriteCaseValue(
 
 // NOTE: A conformance value is an object literal that maps each Protocol
 // Method's emitted name onto the conforming Namespace's fulfilling Method —
-// `{ compareTo: Integer.compareTo, … }`. This works uniformly for user
+// `{ compare: Integer.compare, … }`. This works uniformly for user
 // Namespaces (classes with static Methods) and builtin runtime modules, and
 // decouples the Protocol's method names from the Namespace's layout.
 function rewriteConformanceValue(

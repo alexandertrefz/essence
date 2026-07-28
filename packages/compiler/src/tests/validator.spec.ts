@@ -1320,12 +1320,12 @@ describe("Validator", () => {
 				namespace Wrapper<infer Item> for { value: Item }
 					is Comparable where Item is Comparable
 				{
-					compareTo(_ other: { value: Item }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Item }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 
-				constant reference = Wrapper.compareTo
+				constant reference = Wrapper.compare
 			}`)
 
 			expect(
@@ -1523,8 +1523,8 @@ describe("Validator", () => {
 		})
 
 		// NOTE: A conformance witness names a Namespace that the source does not
-		// spell anywhere — `things::sort()` emits `{ compareTo: Thing.compareTo }`
-		// — so these compiled green and threw a `TypeError` reading `compareTo` of
+		// spell anywhere — `things::sort()` emits `{ compare: Thing.compare }`
+		// — so these compiled green and threw a `TypeError` reading `compare` of
 		// `undefined` before the witness rail existed.
 		it("reports a call whose conformance witness comes from a Namespace declared below it", () => {
 			let source = `implementation {
@@ -1533,8 +1533,8 @@ describe("Validator", () => {
 				__print(things::sort()::length()::toString())
 
 				namespace Thing for { value: Integer } is Comparable {
-					compareTo(_ other: { value: Integer }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Integer }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 			}`
@@ -1572,8 +1572,8 @@ describe("Validator", () => {
 				__print(ordered([{ value = 3 }, { value = 1 }])::length()::toString())
 
 				namespace Thing for { value: Integer } is Comparable {
-					compareTo(_ other: { value: Integer }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Integer }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 			}`
@@ -1604,14 +1604,14 @@ describe("Validator", () => {
 				namespace Boxes<infer Item> for { item: Item }
 					is Comparable where Item is Comparable
 				{
-					compareTo(_ other: { item: Item }) -> Ordering {
-						<- @.item::compareTo(other.item)
+					compare(to other: { item: Item }) -> Ordering {
+						<- @.item::compare(to other.item)
 					}
 				}
 
 				namespace Thing for { value: Integer } is Comparable {
-					compareTo(_ other: { value: Integer }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Integer }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 			}`
@@ -1643,7 +1643,7 @@ describe("Validator", () => {
 			let source = `implementation {
 				namespace Lefts for { left: Integer } {
 					ranked <infer Item is Comparable>(_ item: Item) -> String {
-						<- item::compareTo(item)::toString()
+						<- item::compare(to item)::toString()
 					}
 				}
 
@@ -1658,8 +1658,8 @@ describe("Validator", () => {
 				__print(receiver::ranked({ value = 3 }))
 
 				namespace Ordered for { value: Integer } is Comparable {
-					compareTo(_ other: { value: Integer }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Integer }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 
@@ -1704,8 +1704,8 @@ describe("Validator", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					namespace Thing for { value: Integer } is Comparable {
-						compareTo(_ other: { value: Integer }) -> Ordering {
-							<- @.value::compareTo(other.value)
+						compare(to other: { value: Integer }) -> Ordering {
+							<- @.value::compare(to other.value)
 						}
 					}
 
@@ -1724,8 +1724,8 @@ describe("Validator", () => {
 					}
 
 					namespace Thing for { value: Integer } is Comparable {
-						compareTo(_ other: { value: Integer }) -> Ordering {
-							<- @.value::compareTo(other.value)
+						compare(to other: { value: Integer }) -> Ordering {
+							<- @.value::compare(to other.value)
 						}
 					}
 

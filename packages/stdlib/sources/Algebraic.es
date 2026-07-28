@@ -15,7 +15,7 @@ declarations {
 		§§ @param other — the Algebraic to compare with
 		§§ @returns — `true` when the numbers are equal.
 		is(_ other: Algebraic) -> Boolean {
-			<- @::compareTo(other)::is(#Equal)
+			<- @::compare(to other)::is(#Equal)
 		}
 
 		§§ Whether the Algebraics are different numbers — exactly, no approximation is consulted.
@@ -30,7 +30,7 @@ declarations {
 		§§
 		§§ @param other — the Algebraic to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Algebraic) -> Ordering
+		compare(to other: Algebraic) -> Ordering
 
 		§§ Adds a number to this Algebraic, exactly. Two Algebraics over the same radical stay in the slice; the radical parts may also cancel, leaving a Rational.
 		overload add {

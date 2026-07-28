@@ -563,7 +563,7 @@ describe("Stdlib Call Graph", () => {
 			"Side.toString",
 			"String.character",
 			"String.characters",
-			"String.compareTo__overload$2",
+			"String.compare__overload$2",
 			"String.contains",
 			"String.doesNotContain",
 			"String.doesNotEnd",

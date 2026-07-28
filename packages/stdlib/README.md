@@ -20,9 +20,9 @@ About half of the declared Method entries are also IMPLEMENTED here, in
 Essence; the rest bind to `@essence-lang/runtime`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
-`compareTo`), the JavaScript intrinsics Essence has no expression for
+`compare`), the JavaScript intrinsics Essence has no expression for
 (`String.uppercased`, `String.trim(at:)`, `String.normalized(as:)`,
-`String.lines`/`words`, `Record`'s reflective Methods, `String.compareTo` —
+`String.lines`/`words`, `Record`'s reflective Methods, `String.compare` —
 there is no way to name a character's code point), and the iteration primitives
 the rest rest on (`List.reduce`, `item(at:)`, `slice`, `keepEvery`,
 `append(contentsOf:)`, `static of`, `firstItem(where:)` — the short-circuiting
@@ -79,7 +79,7 @@ at `index`" — the item is the direct object, the index is reached through *at*
 **The one thing rule 4 does NOT license.** The numeric tower declares the four
 inequalities on `Integer` and `Rational` AND on the covering `Number`, and that
 is not duplication to collapse — it is a performance stratification. The
-same-kind entry is written on the member's own `compareTo`; `Number`'s is the
+same-kind entry is written on the member's own `compare`; `Number`'s is the
 sixteen-cell cross-kind table that reaches the whole numeric tower. Deleting
 the member entries would route two Integers through it and
 nearly double a Program that only prints a greeting. The reasoning is written

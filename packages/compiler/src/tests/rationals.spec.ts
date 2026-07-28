@@ -92,7 +92,7 @@ describe("Rationals", () => {
 			) as rational.RationalType
 			const zero = rational.createRational(0n, 1n)
 
-			expect(rational.compareTo(quotient, zero)).toEqual(ordering.less)
+			expect(rational.compare(quotient, zero)).toEqual(ordering.less)
 			expect(
 				rational.isLessThan__overload$2(
 					quotient,
@@ -105,7 +105,7 @@ describe("Rationals", () => {
 					integer.createInteger(0n),
 				).value,
 			).toBeFalse()
-			expect(number.compareTo(quotient, zero)).toEqual(ordering.less)
+			expect(number.compare(quotient, zero)).toEqual(ordering.less)
 			expect(
 				number.lowestNumber__overload$7({
 					[typeKeySymbol]: "List",
@@ -224,10 +224,7 @@ describe("Rationals", () => {
 
 		it("still compares a zero equal whatever it was built from", () => {
 			expect(
-				rational.compareTo(
-					cancelled(),
-					rational.createRational(0n, 1n),
-				),
+				rational.compare(cancelled(), rational.createRational(0n, 1n)),
 			).toEqual(ordering.equal)
 		})
 	})
@@ -326,7 +323,7 @@ describe("Rationals", () => {
 
 				expect(parsed[typeKeySymbol]).toBe("Rational")
 				expect(
-					rational.compareTo(parsed as rational.RationalType, value),
+					rational.compare(parsed as rational.RationalType, value),
 				).toEqual(ordering.equal)
 			}
 		})
@@ -376,7 +373,7 @@ describe("Rationals", () => {
 
 			expect(root[typeKeySymbol]).toBe("Rational")
 			expect(
-				number.compareTo(
+				number.compare(
 					root as rational.RationalType,
 					integer.createInteger(0n),
 				),

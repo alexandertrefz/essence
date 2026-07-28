@@ -189,15 +189,15 @@ export function reverse<ItemType extends AnyType>(
 // NOTE: `sort` is one Method with two Overloads, so both bind by position.
 // `$1` is the no-Argument entry, whose `Comparable` bound hands its
 // conformance in as the trailing Argument; it orders by the items' own
-// `compareTo`. `$2` takes the comparison outright. Both land on the same walk.
+// `compare`. `$2` takes the comparison outright. Both land on the same walk.
 export function sort__overload$1<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	conformance: {
-		compareTo: (self: ItemType, other: ItemType) => OrderingType
+		compare: (self: ItemType, other: ItemType) => OrderingType
 	},
 ): ListType<ItemType> {
 	return sort__overload$2(originalList, (first, second) =>
-		conformance.compareTo(first, second),
+		conformance.compare(first, second),
 	)
 }
 
@@ -226,21 +226,21 @@ export function sort__overload$2<ItemType extends AnyType>(
 	return createList(sorted)
 }
 
-// NOTE: Lexicographic comparison — the item `compareTo` arrives as the hidden
+// NOTE: Lexicographic comparison — the item `compare` arrives as the hidden
 // conformance Argument (curried by `boundConformance` for a nested List). The
 // first pair that is not `Equal` decides; on an equal prefix the shorter List
 // is `Less`, and two equal-length Lists compare `Equal`.
-export function compareTo<ItemType extends AnyType>(
+export function compare<ItemType extends AnyType>(
 	first: ListType<ItemType>,
 	second: ListType<ItemType>,
 	conformance: {
-		compareTo: (first: ItemType, second: ItemType) => OrderingType
+		compare: (first: ItemType, second: ItemType) => OrderingType
 	},
 ): OrderingType {
 	let shared = Math.min(first.value.length, second.value.length)
 
 	for (let index = 0; index < shared; index++) {
-		let ordering = conformance.compareTo(
+		let ordering = conformance.compare(
 			first.value[index],
 			second.value[index],
 		)

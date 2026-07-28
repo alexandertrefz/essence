@@ -40,7 +40,7 @@ implementation {
 	§ through Number, so they carry no Comparable conformance of their own.)
 
 	function smallerOf<infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
-		<- match a::compareTo(b) -> Item {
+		<- match a::compare(to b) -> Item {
 			case #Less    { <- a }
 			case #Equal   { <- a }
 			case #Greater { <- b }
@@ -49,6 +49,6 @@ implementation {
 
 	__print(smallerOf(5, 3))
 	__print(smallerOf(1/2, 1/3))
-	__print(1::compareTo(2)::toString())
-	__print(Ordering#Less::is(1::compareTo(2)))
+	__print(1::compare(to 2)::toString())
+	__print(Ordering#Less::is(1::compare(to 2)))
 }

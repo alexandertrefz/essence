@@ -993,7 +993,7 @@ export function enrichMethodFunctionDefinition(
 // already has an unbounded `ItemType`. The Method's Parameter and return Types
 // are resolved in a Scope where the name is the Method's, so `@` has to agree:
 // the receiver of `sort` is a List of the BOUNDED ItemType, which is what
-// lets `first::compareTo(second)` in the body resolve through the bound and
+// lets `first::compare(to second)` in the body resolve through the bound and
 // reach the hidden conformance Argument. Left unshadowed, `@` would carry the
 // Namespace's opaque Generic, an item read off it would have no bound, and the
 // body could call nothing on it.

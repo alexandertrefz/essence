@@ -2012,11 +2012,11 @@ describe("Enricher", () => {
 		it("should report a Method that needs a condition", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Orderable {
-					compareTo(_ other: Self) -> Ordering
+					compare(to other: Self) -> Ordering
 				}
 
 				namespace ListOrderable<infer Item> for List<Item> is Orderable {
-					compareTo <infer Item is Comparable>(_ other: List<Item>) -> Ordering {
+					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
 				}
@@ -2025,7 +2025,7 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("nonconforming-namespace")
 			expect(diagnostics[0].labels[0]?.message).toBe(
-				"Method 'compareTo' needs 'Item is Comparable'",
+				"Method 'compare' needs 'Item is Comparable'",
 			)
 		})
 
@@ -2076,8 +2076,8 @@ describe("Enricher", () => {
 					namespace Wrapper<infer Item> for { value: Item }
 						is Comparable where Item is Comparable
 					{
-						compareTo(_ other: { value: Item }) -> Ordering {
-							<- @.value::compareTo(other.value)
+						compare(to other: { value: Item }) -> Ordering {
+							<- @.value::compare(to other.value)
 						}
 					}
 				}`),
@@ -2087,11 +2087,11 @@ describe("Enricher", () => {
 		it("should help toward a where clause on a needs-condition Method", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Orderable {
-					compareTo(_ other: Self) -> Ordering
+					compare(to other: Self) -> Ordering
 				}
 
 				namespace ListOrderable<infer Item> for List<Item> is Orderable {
-					compareTo <infer Item is Comparable>(_ other: List<Item>) -> Ordering {
+					compare <infer Item is Comparable>(to other: List<Item>) -> Ordering {
 						<- Ordering#Equal
 					}
 				}
@@ -2109,7 +2109,7 @@ describe("Enricher", () => {
 				namespace Wrapper<infer Item> for { value: Item }
 					is Comparable where Other is Comparable
 				{
-					compareTo(_ other: { value: Item }) -> Ordering {
+					compare(to other: { value: Item }) -> Ordering {
 						<- Ordering#Equal
 					}
 				}
@@ -2130,8 +2130,8 @@ describe("Enricher", () => {
 				namespace Weird<infer Ghost, infer Item> for { value: Item }
 					is Comparable where Ghost is Comparable, Item is Comparable
 				{
-					compareTo(_ other: { value: Item }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Item }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 			}`)
@@ -2148,8 +2148,8 @@ describe("Enricher", () => {
 				namespace Wrapper<infer Item> for { value: Item }
 					is Comparable where Item is Comparable, Item is Equatable
 				{
-					compareTo(_ other: { value: Item }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Item }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 				}
 			}`)
@@ -2231,9 +2231,9 @@ describe("Enricher", () => {
 			).toBe(true)
 		})
 
-		it("should demand a witness for a direct compareTo call", () => {
+		it("should demand a witness for a direct compare call", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				constant order = [1, 2]::compareTo([1, 3])
+				constant order = [1, 2]::compare(to [1, 3])
 			}`)
 
 			expect(diagnostics).toEqual([])
@@ -2461,15 +2461,15 @@ describe("Enricher", () => {
 
 		it("should still bound a conditional conformance's fulfilling Method", () => {
 			// NOTE: Guards the interaction with the conditional-conformance
-			// Generic weaving: `compareTo` uses `Item`, so it survives pruning
+			// Generic weaving: `compare` uses `Item`, so it survives pruning
 			// and keeps its retrofitted bound — which is what makes the hidden
 			// conformance Parameter emitted for it.
 			let source = `implementation {
 				namespace Boxes<infer Item> for { value: Item }
 					is Comparable where Item is Comparable
 				{
-					compareTo(_ other: { value: Item }) -> Ordering {
-						<- @.value::compareTo(other.value)
+					compare(to other: { value: Item }) -> Ordering {
+						<- @.value::compare(to other.value)
 					}
 
 					static describe() -> String {
@@ -2479,7 +2479,7 @@ describe("Enricher", () => {
 			}`
 
 			expect(
-				genericsOf(methodTypeFor(source, "Boxes", "compareTo")),
+				genericsOf(methodTypeFor(source, "Boxes", "compare")),
 			).toEqual([
 				{
 					name: "Item",
@@ -2498,11 +2498,11 @@ describe("Enricher", () => {
 				(node) => node.nodeType === "NamespaceDefinitionStatement",
 			) as common.typed.NamespaceDefinitionStatementNode
 
-			let compareTo = namespaceNode.methods.compareTo
+			let compare = namespaceNode.methods.compare
 
-			expect(compareTo?.nodeType).toBe("SimpleMethod")
+			expect(compare?.nodeType).toBe("SimpleMethod")
 			expect(
-				(compareTo as common.typed.SimpleMethod).method.value.generics,
+				(compare as common.typed.SimpleMethod).method.value.generics,
 			).toMatchObject([{ name: "Item", constraint: "Comparable" }])
 
 			// NOTE: A Method that does not fulfil the conformance carries
@@ -2581,7 +2581,7 @@ describe("Enricher", () => {
 						}
 
 						<infer Other is Comparable>(_ a: Other, _ b: Other) -> String {
-							<- a::compareTo(b)::toString()
+							<- a::compare(to b)::toString()
 						}
 					}
 				}
@@ -2646,7 +2646,7 @@ describe("Enricher", () => {
 						}
 
 						<infer Other is Comparable>(_ a: Other, _ b: Other) -> String {
-							<- a::compareTo(b)::toString()
+							<- a::compare(to b)::toString()
 						}
 					}
 				}
@@ -3392,10 +3392,10 @@ describe("Enricher", () => {
 			}
 		})
 
-		it("should order Integers with compareTo and match the Ordering exhaustively", () => {
+		it("should order Integers with compare and match the Ordering exhaustively", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordering = 5::compareTo(7)
+					constant ordering = 5::compare(to 7)
 
 					constant description = match ordering -> String {
 						case #Less    { <- "smaller" }
@@ -3428,7 +3428,7 @@ describe("Enricher", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
-						<- match a::compareTo(b) -> Item {
+						<- match a::compare(to b) -> Item {
 							case #Less    { <- a }
 							case #Equal   { <- a }
 							case #Greater { <- b }
@@ -3444,12 +3444,12 @@ describe("Enricher", () => {
 
 		it("should sort a List of Strings, now that String is Comparable", () => {
 			// NOTE: `sort__overload$2` needs no Protocol bound — the comparator does —
-			// but the annotation only holds if `compareTo` resolves on a
+			// but the annotation only holds if `compare` resolves on a
 			// String, which it does now that String conforms to Comparable.
 			expect(
 				diagnosticsFor(`implementation {
 					constant ordered: List<String> = ["b", "a"]::sort(by 
-						(first, second) { <- first::compareTo(second) },
+						(first, second) { <- first::compare(to second) },
 					)
 				}`),
 			).toEqual([])
@@ -3487,7 +3487,7 @@ describe("Enricher", () => {
 					}
 
 					function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
-						<- match a::compareTo(b) -> Item {
+						<- match a::compare(to b) -> Item {
 							case #Less    { <- a }
 							case #Equal   { <- a }
 							case #Greater { <- b }
@@ -3527,8 +3527,8 @@ describe("Enricher", () => {
 		it("should resolve Methods on a Union-typed Ordering receiver", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant text: String = 5::compareTo(7)::toString()
-					constant same: Boolean = 5::compareTo(7)::is(Ordering#Less)
+					constant text: String = 5::compare(to 7)::toString()
+					constant same: Boolean = 5::compare(to 7)::is(Ordering#Less)
 				}`),
 			).toEqual([])
 		})
@@ -3650,7 +3650,7 @@ describe("Enricher", () => {
 		// actually declares, which is what this is about.
 		it("should keep a Namespace covering the whole Union ahead of dispatch", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
-				constant ordering = 5::compareTo(7)
+				constant ordering = 5::compare(to 7)
 				constant text = ordering::toString()
 			}`)
 
@@ -3936,7 +3936,7 @@ describe("Enricher", () => {
 		it("should order mixed members through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant ordered = match 5::compareTo(1/2) -> String {
+					constant ordered = match 5::compare(to 1/2) -> String {
 						case #Less    { <- "smaller" }
 						case #Equal   { <- "same" }
 						case #Greater { <- "bigger" }

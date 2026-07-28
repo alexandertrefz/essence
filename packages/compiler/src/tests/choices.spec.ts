@@ -1010,7 +1010,7 @@ describe("Choices", () => {
 				messagesOf(`implementation {
 					constant smaller: Ordering = #Less
 
-					__print(smaller::is(1::compareTo(2)))
+					__print(smaller::is(1::compare(to 2)))
 				}`),
 			).toEqual([])
 		})
@@ -2585,13 +2585,13 @@ describe("Choices", () => {
 		it("constructs and matches Ordering Cases like any other Choice", () => {
 			expect(
 				messagesOf(`implementation {
-					__print(match 1::compareTo(2) -> String {
+					__print(match 1::compare(to 2) -> String {
 						case #Less { <- "smaller" }
 						case #Equal { <- "same" }
 						case #Greater { <- "bigger" }
 					})
 
-					__print(Ordering#Less::is(1::compareTo(2)))
+					__print(Ordering#Less::is(1::compare(to 2)))
 				}`),
 			).toEqual([])
 		})

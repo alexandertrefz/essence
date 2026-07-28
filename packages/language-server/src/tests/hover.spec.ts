@@ -440,8 +440,8 @@ describe("Hover of Type annotations", () => {
 			"\tnamespace Box<infer Item> for { value: Item }",
 			"\t\tis Comparable where Item is Comparable",
 			"\t{",
-			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
-			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\tcompare(to other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compare(to other.value)",
 			"\t\t}",
 			"\t}",
 			"}",
@@ -521,15 +521,15 @@ describe("Hover of declaration parts", () => {
 			"\tnamespace Box<infer Item> for { value: Item }",
 			"\t\tis Comparable where Item is Comparable",
 			"\t{",
-			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
-			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\tcompare(to other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compare(to other.value)",
 			"\t\t}",
 			"\t}",
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 3, column: 10 })).toBe(
-			"protocol Comparable\ncompareTo(_ Self) -> Ordering",
+			"protocol Comparable\ncompare(to: Self) -> Ordering",
 		)
 	})
 
@@ -551,8 +551,8 @@ describe("Hover of declaration parts", () => {
 			"\tnamespace Box<infer Item> for { value: Item }",
 			"\t\tis Comparable where Item is Comparable",
 			"\t{",
-			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
-			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\tcompare(to other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compare(to other.value)",
 			"\t\t}",
 			"\t}",
 			"}",
@@ -560,7 +560,7 @@ describe("Hover of declaration parts", () => {
 
 		expect(hover(source, { line: 3, column: 24 })).toBe("infer Item")
 		expect(hover(source, { line: 3, column: 33 })).toBe(
-			"protocol Comparable\ncompareTo(_ Self) -> Ordering",
+			"protocol Comparable\ncompare(to: Self) -> Ordering",
 		)
 	})
 })
@@ -721,8 +721,8 @@ describe("Hover of conformance clauses", () => {
 			"\tnamespace Box<infer Item> for { value: Item }",
 			"\t\tis Comparable where Item is Comparable",
 			"\t{",
-			"\t\tcompareTo(_ other: { value: Item }) -> Ordering {",
-			"\t\t\t<- @.value::compareTo(other.value)",
+			"\t\tcompare(to other: { value: Item }) -> Ordering {",
+			"\t\t\t<- @.value::compare(to other.value)",
 			"\t\t}",
 			"\t}",
 			"}",

@@ -43,7 +43,7 @@ declarations {
 		§§ @param other — the Rational to compare against
 		§§ @returns — `true` when both are equal.
 		is(_ other: Rational) -> Boolean {
-			<- @::compareTo(other)::is(#Equal)
+			<- @::compare(to other)::is(#Equal)
 		}
 
 		§§ Checks whether the Rational has a different value than another.
@@ -106,14 +106,14 @@ declarations {
 
 		§ These four are not a copy of `Number`'s — see the note above
 		§ `Integer::isLessThan`. The same-kind entry is written on Rational's
-		§ OWN `compareTo`, a cross-multiplication, so that comparing two
+		§ OWN `compare`, a cross-multiplication, so that comparing two
 		§ Rationals does not reach the sixteen-cell cross-kind table and drag
 		§ the Algebraic and Transcendental machinery in behind it.
 
 		§§ Whether this Rational is strictly below the given number.
 		overload isLessThan {
 			(_ other: Rational) -> Boolean {
-				<- @::compareTo(other)::is(#Less)
+				<- @::compare(to other)::is(#Less)
 			}
 
 			(_ other: Integer) -> Boolean
@@ -131,7 +131,7 @@ declarations {
 		§§ Whether this Rational is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Rational) -> Boolean {
-				<- @::compareTo(other)::is(#Greater)
+				<- @::compare(to other)::is(#Greater)
 			}
 
 			(_ other: Integer) -> Boolean
@@ -242,6 +242,6 @@ declarations {
 		§§
 		§§ @param other — the Rational to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Rational) -> Ordering
+		compare(to other: Rational) -> Ordering
 	}
 }

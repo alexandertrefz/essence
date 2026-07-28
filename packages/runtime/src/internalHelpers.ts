@@ -78,7 +78,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "String" && //
 		b[typeKeySymbol] === "String"
 	) {
-		// NOTE: String.is is written in Essence now — it reads `compareTo`,
+		// NOTE: String.is is written in Essence now — it reads `compare`,
 		// which is lexicographic by code point over the NFC-normalised String,
 		// so it answers `Equal` for any two canonically equivalent Strings (an
 		// accent composed or decomposed). Normalising both sides here is the
@@ -96,7 +96,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		)
 	} else if (isRationalKind(a) && isRationalKind(b)) {
 		// NOTE: ONE cell for the two rational kinds, because that is what the
-		// language promises: `Number.is` is `compareTo(other)::is(#Equal)` over
+		// language promises: `Number.is` is `compare(other)::is(#Equal)` over
 		// the covering order, and it answers by VALUE — `1 is 1/1` holds. A cell
 		// per kind could not see across the two, so an Integer beside a
 		// numerically equal Rational matched nothing and fell to `false`: a
@@ -105,9 +105,9 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// pair, too — `createRational` never reduces, so `(1/2)::add(1/2)` is
 		// the Rational `4/4` beside anyone else's Integer `1`.
 		//
-		// NOTE: Cross-multiplication, which is what `Number.compareTo` does for
+		// NOTE: Cross-multiplication, which is what `Number.compare` does for
 		// this pairing — it answers for unreduced parts and for either sign,
-		// and it is not the covering `compareTo` itself because EVERY emitted
+		// and it is not the covering `compare` itself because EVERY emitted
 		// Program imports this module: reading the covering order here dragged
 		// π's interval arithmetic and the algebraic sign routines into Programs
 		// holding no Numbers at all (measured at ~11 kB on one that only
@@ -121,7 +121,7 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		a[typeKeySymbol] === "Algebraic" &&
 		b[typeKeySymbol] === "Algebraic"
 	) {
-		// NOTE: Algebraic.is is written in Essence now — it reads `compareTo`,
+		// NOTE: Algebraic.is is written in Essence now — it reads `compare`,
 		// which decides the sign of the difference symbolically. Normal forms
 		// make that the same answer as comparing the representation directly,
 		// which is what the deleted native did. An Algebraic is irrational, so

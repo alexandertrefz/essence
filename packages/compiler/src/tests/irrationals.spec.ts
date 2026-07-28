@@ -141,13 +141,13 @@ describe("Irrationals", () => {
 				integer.createInteger(1n),
 			)
 
-			expect(algebraic.compareTo(onePlusRootTwo, radical(6n))).toEqual(
+			expect(algebraic.compare(onePlusRootTwo, radical(6n))).toEqual(
 				ordering.less,
 			)
-			expect(algebraic.compareTo(radical(6n), onePlusRootTwo)).toEqual(
+			expect(algebraic.compare(radical(6n), onePlusRootTwo)).toEqual(
 				ordering.greater,
 			)
-			expect(algebraic.compareTo(radical(2n), radical(2n))).toEqual(
+			expect(algebraic.compare(radical(2n), radical(2n))).toEqual(
 				ordering.equal,
 			)
 		})
@@ -214,28 +214,22 @@ describe("Irrationals", () => {
 			// NOTE: 22/7 and 355/113 are the classic over-approximations;
 			// 333/106 under-approximates. All three are decided exactly.
 			expect(
-				number.compareTo(number.PI, rational.createRational(22n, 7n)),
+				number.compare(number.PI, rational.createRational(22n, 7n)),
 			).toEqual(ordering.less)
 			expect(
-				number.compareTo(
-					number.PI,
-					rational.createRational(355n, 113n),
-				),
+				number.compare(number.PI, rational.createRational(355n, 113n)),
 			).toEqual(ordering.less)
 			expect(
-				number.compareTo(
-					number.PI,
-					rational.createRational(333n, 106n),
-				),
+				number.compare(number.PI, rational.createRational(333n, 106n)),
 			).toEqual(ordering.greater)
 		})
 
 		it("orders π against Algebraics", () => {
 			// NOTE: √10 ≈ 3.162 > π > √9 — and √9 collapses, so use √8.
-			expect(number.compareTo(number.PI, radical(10n))).toEqual(
+			expect(number.compare(number.PI, radical(10n))).toEqual(
 				ordering.less,
 			)
-			expect(number.compareTo(number.PI, radical(8n))).toEqual(
+			expect(number.compare(number.PI, radical(8n))).toEqual(
 				ordering.greater,
 			)
 		})
@@ -258,7 +252,7 @@ describe("Irrationals", () => {
 				}),
 			).toEqual(createNothing())
 		})
-		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compareTo` is covered by the golden harness.
+		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`) — its agreement with `compare` is covered by the golden harness.
 		// NOTE: the `isLessThan` family is Essence now (`packages/stdlib/sources/Number.es`); its symmetry with itself is covered by the golden harness.
 	})
 
@@ -271,7 +265,7 @@ describe("Irrationals", () => {
 		// for a Record's members and for a literal Matcher, so it keeps these
 		// tests, and `List.is` is exercised through that witness beside them.
 		// `Algebraic.is` and `Transcendental.is` are Essence
-		// (both read `compareTo`), so the witnesses are spelled out here the
+		// (both read `compare`), so the witnesses are spelled out here the
 		// way the Simplifier passes them.
 		const irrationalIs = (
 			first: algebraic.AlgebraicType | transcendental.TranscendentalType,
@@ -366,10 +360,10 @@ describe("Irrationals", () => {
 			).toEqual([])
 		})
 
-		it("routes mixed compareTo through the Number Namespace", () => {
+		it("routes mixed compare through the Number Namespace", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					constant order: Ordering = Number.PI::compareTo(22/7)
+					constant order: Ordering = Number.PI::compare(to 22/7)
 				}`),
 			).toEqual([])
 		})

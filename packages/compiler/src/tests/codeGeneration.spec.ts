@@ -238,7 +238,7 @@ describe("Code Generation", () => {
 			).toEqual(["Function", "{ callback = Function }", "[ Function ]"])
 		})
 
-		// NOTE: `String::is` is canonical equivalence — `compareTo` normalises
+		// NOTE: `String::is` is canonical equivalence — `compare` normalises
 		// to NFC — so a composed and a decomposed `café` are the same String.
 		// Deep equality compared the raw code units, so the same pair came out
 		// unequal the moment it was wrapped.
@@ -616,19 +616,19 @@ describe("Code Generation", () => {
 
 	describe("String Methods", () => {
 		// NOTE: String gained Comparable, so a List of Strings sorts with a
-		// real comparator — this pins that `compareTo` resolves on the String
+		// real comparator — this pins that `compare` resolves on the String
 		// receiver and the whole pipeline emits.
-		it("sorts a List of Strings through String.compareTo", () => {
+		it("sorts a List of Strings through String.compare", () => {
 			let generated = generate(`
 				implementation {
 					__print(["b", "a"]::sort(by 
-						(first, second) { <- first::compareTo(second) },
+						(first, second) { <- first::compare(to second) },
 					))
 				}
 			`)
 
 			expect(generated).toContain("List.sort__overload$2(")
-			expect(generated).toContain("String.compareTo__overload$1(")
+			expect(generated).toContain("String.compare__overload$1(")
 		})
 	})
 
@@ -749,7 +749,7 @@ describe("Code Generation", () => {
 		it("should package builtin Namespace Methods into conformance values", () => {
 			const code = generate(`implementation {
 				function smaller <infer Item is Comparable>(_ a: Item, _ b: Item) -> Item {
-					<- match a::compareTo(b) -> Item {
+					<- match a::compare(to b) -> Item {
 						case #Less    { <- a }
 						case #Equal   { <- a }
 						case #Greater { <- b }
@@ -759,8 +759,8 @@ describe("Code Generation", () => {
 				__print(smaller(5, 3))
 			}`)
 
-			expect(code).toContain("compareTo: Integer.compareTo")
-			expect(code).toContain("Item__conformance.compareTo(")
+			expect(code).toContain("compare: Integer.compare")
+			expect(code).toContain("Item__conformance.compare(")
 		})
 
 		it("should forward a conformance parameter between bounded Functions", () => {
@@ -797,9 +797,9 @@ describe("Code Generation", () => {
 			}`)
 
 			// NOTE: An unconditional witness stays exactly the method-map object
-			// literal — no `boundConformance` wrapper. `Integer.compareTo` is
+			// literal — no `boundConformance` wrapper. `Integer.compare` is
 			// native, so the witness is a plain member read.
-			expect(code).toContain("compareTo: Integer.compareTo")
+			expect(code).toContain("compare: Integer.compare")
 			expect(code).not.toContain("boundConformance")
 		})
 
@@ -808,11 +808,11 @@ describe("Code Generation", () => {
 				constant ordered = [[1, 2], [3]]::sort()
 			}`)
 
-			// NOTE: `List<List<Integer>>` sorts through List's own `compareTo`,
+			// NOTE: `List<List<Integer>>` sorts through List's own `compare`,
 			// curried with the inner Integer ordering — the conditional witness.
 			expect(code).toContain("$type.boundConformance(")
-			expect(code).toContain("compareTo: List.compareTo")
-			expect(code).toContain("compareTo: Integer.compareTo")
+			expect(code).toContain("compare: List.compare")
+			expect(code).toContain("compare: Integer.compare")
 		})
 
 		it("should order multiple retrofitted bounds by Namespace Generic declaration", () => {
@@ -820,9 +820,9 @@ describe("Code Generation", () => {
 				namespace Pair<infer Key, infer Value> for { key: Key, value: Value }
 					is Comparable where Key is Comparable, Value is Comparable
 				{
-					compareTo(_ other: { key: Key, value: Value }) -> Ordering {
-						constant keyOrder = @.key::compareTo(other.key)
-						constant valueOrder = @.value::compareTo(other.value)
+					compare(to other: { key: Key, value: Value }) -> Ordering {
+						constant keyOrder = @.key::compare(to other.key)
+						constant valueOrder = @.value::compare(to other.value)
 						<- match keyOrder -> Ordering {
 							case #Equal { <- valueOrder }
 							case _ { <- keyOrder }
@@ -832,20 +832,20 @@ describe("Code Generation", () => {
 
 				constant a = { key = 1, value = "x" }
 				constant b = { key = 1, value = "y" }
-				__print(a::compareTo(b))
+				__print(a::compare(to b))
 			}`)
 
 			// NOTE: R7 — the hidden conformance Parameters follow the Namespace's
 			// Generic declaration order (Key, then Value), and the call site's
 			// witnesses appear in that same order so they line up.
 			expect(code).toContain(
-				"compareTo(_self, other, Key__conformance, Value__conformance)",
+				"compare(_self, other, Key__conformance, Value__conformance)",
 			)
 			expect(code).toContain(
-				"Key__conformance.compareTo(_self.key, other.key)",
+				"Key__conformance.compare(_self.key, other.key)",
 			)
 			expect(code).toContain(
-				"Value__conformance.compareTo(_self.value, other.value)",
+				"Value__conformance.compare(_self.value, other.value)",
 			)
 		})
 	})

@@ -10,7 +10,7 @@ declarations {
 		§§ @param other — the Integer to compare against
 		§§ @returns — `true` when both are equal.
 		is(_ other: Integer) -> Boolean {
-			<- @::compareTo(other)::is(#Equal)
+			<- @::compare(to other)::is(#Equal)
 		}
 
 		§§ Checks whether the Integer has a different value than another.
@@ -95,7 +95,7 @@ declarations {
 		§ `Number` declares the same four over the whole tower, and deleting
 		§ these four would leave every Integer comparison resolving to those —
 		§ which is exactly the regression `eb27756` fixed. The chain runs
-		§ `Integer.isLessThan` → `compareTo`, and WHICH `compareTo` is the
+		§ `Integer.isLessThan` → `compare`, and WHICH `compare` is the
 		§ whole point: the one below is Integer's own, a bigint comparison,
 		§ while `Number`'s is the sixteen-cell cross-kind table that reaches
 		§ Rational, Algebraic and Transcendental. Routing
@@ -112,7 +112,7 @@ declarations {
 		§§ Whether this Integer is strictly below the given number.
 		overload isLessThan {
 			(_ other: Integer) -> Boolean {
-				<- @::compareTo(other)::is(#Less)
+				<- @::compare(to other)::is(#Less)
 			}
 
 			(_ other: Rational) -> Boolean
@@ -130,7 +130,7 @@ declarations {
 		§§ Whether this Integer is strictly above the given number.
 		overload isGreaterThan {
 			(_ other: Integer) -> Boolean {
-				<- @::compareTo(other)::is(#Greater)
+				<- @::compare(to other)::is(#Greater)
 			}
 
 			(_ other: Rational) -> Boolean
@@ -239,6 +239,6 @@ declarations {
 		§§
 		§§ @param other — the Integer to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compareTo(_ other: Integer) -> Ordering
+		compare(to other: Integer) -> Ordering
 	}
 }

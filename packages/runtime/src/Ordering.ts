@@ -9,7 +9,7 @@ export type OrderingType = LessType | EqualType | GreaterType
 
 // NOTE: Shared unit instances for the compare Methods — Case equality goes
 // by tag, so these being singletons is an optimisation, not a semantic. The
-// numeric tower and every other `compareTo` return these, so they stay native
+// numeric tower and every other `compare` return these, so they stay native
 // even though `is`, `isNot` and `toString` are implemented in Essence — see
 // `packages/stdlib/sources/Ordering.es`.
 export const less: LessType = { [typeKeySymbol]: "Ordering#Less" }

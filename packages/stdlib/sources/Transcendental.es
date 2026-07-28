@@ -7,7 +7,7 @@ declarations {
 	§ deliberately does NOT conform to Comparable — deciding
 	§ `Ordering#Equal` is undecidable for transcendentals in general — but
 	§ every cross-kind comparison is total through the `Number` Namespace,
-	§ whose covering `compareTo` hand-writes those cells.
+	§ whose covering `compare` hand-writes those cells.
 	namespace Transcendental for Transcendental is Equatable, is Printable {
 		§§ Whether both Transcendentals have the same canonical form.
 		§§

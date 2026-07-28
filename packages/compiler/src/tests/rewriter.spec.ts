@@ -745,32 +745,32 @@ describe("Rewriter", () => {
 			// behaviour, the empty part included, is covered by the stdlib
 			// golden harness.
 
-			describe("compareTo", () => {
+			describe("compare", () => {
 				it("orders lexicographically by code point", () => {
 					// NOTE: This is also the whole of String equality —
-					// `String.is` is `compareTo(other)::is(Ordering#Equal)` in
+					// `String.is` is `compare(other)::is(Ordering#Equal)` in
 					// Essence.
 					expect(
-						string.compareTo__overload$1(
+						string.compare__overload$1(
 							string.createString("apple"),
 							string.createString("banana"),
 						),
 					).toBe(ordering.less)
 					expect(
-						string.compareTo__overload$1(
+						string.compare__overload$1(
 							string.createString("banana"),
 							string.createString("apple"),
 						),
 					).toBe(ordering.greater)
 					expect(
-						string.compareTo__overload$1(
+						string.compare__overload$1(
 							string.createString("apple"),
 							string.createString("apple"),
 						),
 					).toBe(ordering.equal)
 					// NOTE: A prefix orders before the longer String.
 					expect(
-						string.compareTo__overload$1(
+						string.compare__overload$1(
 							string.createString("app"),
 							string.createString("apple"),
 						),
@@ -1408,7 +1408,7 @@ describe("Rewriter", () => {
 				})
 			})
 
-			// NOTE: is, isNot, compareTo, subtract and the Rational-operand
+			// NOTE: is, isNot, compare, subtract and the Rational-operand
 			// entries of the four comparison overloads are implemented in
 			// Essence now (packages/stdlib/sources/Rational.es); the golden harness covers
 			// them. The Integer-operand entries of the comparisons are still
@@ -2679,7 +2679,7 @@ describe("Rewriter", () => {
 					const ascending = (
 						first: integer.IntegerType,
 						second: integer.IntegerType,
-					) => number.compareTo(first, second)
+					) => number.compare(first, second)
 
 					expect(
 						list.sort__overload$2(
@@ -2901,9 +2901,9 @@ describe("Rewriter", () => {
 		describe("Ordering", () => {
 			// NOTE: `Ordering.is`, `isNot` and `toString` are implemented in
 			// Essence now (`packages/stdlib/sources/Ordering.es`) — the golden harness
-			// exercises them end to end. `Integer.compareTo` and
-			// `Rational.compareTo` are Essence too now (both route through the
-			// native `Number.compareTo`); only the runtime `anyIs` remains
+			// exercises them end to end. `Integer.compare` and
+			// `Rational.compare` are Essence too now (both route through the
+			// native `Number.compare`); only the runtime `anyIs` remains
 			// native and keeps its unit test.
 			it("compares Ordering values with anyIs", () => {
 				expect(anyIs(ordering.less, ordering.less)).toBeTrue()
@@ -2935,19 +2935,19 @@ describe("Rewriter", () => {
 			// NOTE: `Number.is`, `isNot`, `toString` and the `isLessThan`
 			// family are implemented in Essence now
 			// (`packages/stdlib/sources/Number.es`) and covered by the golden harness.
-			// Only `compareTo`, the one ordering primitive they all fall
+			// Only `compare`, the one ordering primitive they all fall
 			// out of, stays native.
 			it("orders numerically across members", () => {
-				expect(number.compareTo(integerOne(), rationalOneHalf())).toBe(
+				expect(number.compare(integerOne(), rationalOneHalf())).toBe(
 					ordering.greater,
 				)
-				expect(number.compareTo(rationalOneHalf(), integerOne())).toBe(
+				expect(number.compare(rationalOneHalf(), integerOne())).toBe(
 					ordering.less,
 				)
-				expect(number.compareTo(integerOne(), rationalOne())).toBe(
+				expect(number.compare(integerOne(), rationalOne())).toBe(
 					ordering.equal,
 				)
-				expect(number.compareTo(integerTwo(), integerHundred())).toBe(
+				expect(number.compare(integerTwo(), integerHundred())).toBe(
 					ordering.less,
 				)
 			})
