@@ -109,13 +109,26 @@ value is written here.
 
 ### What to weigh before writing the next one
 
-Composition is not free, and two costs are easy to miss because no test fails:
+Composition is not free, and three costs are easy to miss because no test fails:
 
 - **A body pulls in everything it transitively reaches.** `Integer.compare`
   once delegated to the covering `Number.compare`; that made comparing two
   Integers drag the Algebraic, Transcendental and Rational machinery into any
   Program that compared two Integers, nearly doubling `HelloWorld.es`.
-  Same-kind ordering is native again for that reason.
+  Same-kind ordering is native again for that reason. `Algebraic::absolute`,
+  `Transcendental::absolute` and `Transcendental::is` read the covering
+  Namespace the same way — three lines that were the only mentions of `Number`
+  in either file — and cost a Program that takes two absolute values 3.9 kB of
+  a tower it never named. Algebraic's is written on its own `compare` now (a
+  value is below its own negation exactly when it is negative, and an Algebraic
+  is never zero); Transcendental declares no ordering to write either of its
+  two on, so both went native. `Number.es` is out of the cycle entirely.
+- **Two Namespaces can end up written on each other.** `String` is written on
+  `List` throughout — `lines`, `repeat` and `replaceFirst` all route through it
+  — and `List::toString` was written on `String::append`, the one call back.
+  It is native now, so the edge points one way. Interpolating would not have
+  helped: a hole renders through its value's `Printable` conformance, and for a
+  String that is `String::toString`, the same edge under another name.
 - **A body can change complexity class.** `String.length` written as
   `@::characters()::length()` is correct, but builds a List of every character
   to count them, and pulls `List`'s whole import graph in behind it. It is

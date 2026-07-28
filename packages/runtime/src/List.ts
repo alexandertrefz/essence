@@ -289,6 +289,26 @@ export function join<ItemType extends AnyType>(
 	)
 }
 
+// NOTE: `join` with brackets around it, carrying the same `Printable` witness
+// through. Here rather than in Essence because the brackets are String
+// concatenation: written there it would call `String::append`, the only edge
+// this Namespace drew into a Namespace that is written on THIS one. The empty
+// List has no items to space, so it prints as `[]` rather than `[  ]`.
+export function toString<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	conformance: {
+		toString: (value: ItemType) => StringType
+	},
+): StringType {
+	if (originalList.value.length === 0) {
+		return createString("[]")
+	}
+
+	return createString(
+		`[ ${join(originalList, createString(", "), conformance).value} ]`,
+	)
+}
+
 export function flatten<ItemType extends AnyType>(
 	originalList: ListType<ListType<ItemType>>,
 ): ListType<ItemType> {

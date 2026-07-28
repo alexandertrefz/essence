@@ -9,15 +9,21 @@ declarations {
 	§ every cross-kind comparison is total through the `Number` Namespace,
 	§ whose covering `compare` hand-writes those cells.
 	namespace Transcendental for Transcendental is Equatable, is Printable {
+		§ `is` and `absolute` are native for one reason: neither can be
+		§ written on a primitive this Namespace has. Equality is the canonical
+		§ form's own — every component is held reduced, so agreement is
+		§ structural — and the sign of `a + b·π` needs an ordering the
+		§ deliberately-not-Comparable Transcendental declares nowhere. Both
+		§ once asked the covering `Number` instead, which put the entire
+		§ numeric tower behind an equality check and behind an absolute value.
+
 		§§ Whether both Transcendentals have the same canonical form.
 		§§
 		§§ Within the current grammar this is exactly numeric equality.
 		§§
 		§§ @param other — the Transcendental to compare with
 		§§ @returns — `true` when the canonical forms agree.
-		is(_ other: Transcendental) -> Boolean {
-			<- @::<Number>is(other)
-		}
+		is(_ other: Transcendental) -> Boolean
 
 		§§ Whether the Transcendentals have different canonical forms — within the current grammar, different numbers.
 		§§
@@ -70,13 +76,7 @@ declarations {
 		}
 
 		§§ The Transcendental without its sign — its distance from zero. The sign of `a + b·π` against zero is decidable, since the value can never equal a rational.
-		absolute() -> Transcendental {
-			if @::<Number>isLessThan(0) {
-				<- @::negate()
-			} else {
-				<- @
-			}
-		}
+		absolute() -> Transcendental
 
 		§§ The Transcendental with its sign flipped. The π term keeps its non-zero coefficient, so the result is again a Transcendental.
 		negate() -> Transcendental
