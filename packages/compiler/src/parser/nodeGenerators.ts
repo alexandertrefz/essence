@@ -344,12 +344,14 @@ export function literalMatcher(
 export function caseMatcher(
 	choice: parser.IdentifierNode | null,
 	caseName: parser.IdentifierNode,
+	binding: parser.IdentifierNode | null,
 	position: common.Position,
 ): parser.CaseMatcherNode {
 	return {
 		nodeType: "CaseMatcher",
 		choice,
 		caseName,
+		binding,
 		position,
 	}
 }

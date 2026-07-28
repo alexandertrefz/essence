@@ -287,6 +287,32 @@ describe("Choices", () => {
 			)
 		})
 
+		it("parses a payload binding on bare and prefixed Case Matchers", () => {
+			let program = parse(`implementation {
+				match operation -> Nothing {
+					case #Add(pair) { <- nothing }
+					case CalculatorOperation#ClearAll { <- nothing }
+					case Wrapper#Held(item) { <- nothing }
+				}
+			}`)
+			let match = program.implementation.nodes[0] as parser.MatchNode
+			let [bare, unit, prefixed] = match.handlers.map(
+				(handler) => handler.matcher as parser.CaseMatcherNode,
+			)
+
+			expect(bare!.binding?.content).toBe("pair")
+			// NOTE: The Matcher's Position has to reach the closing paren, or
+			// an editor greys out a dead Handler short of its own binding.
+			expect(bare!.position.end.column).toBeGreaterThan(
+				bare!.caseName.position.end.column,
+			)
+
+			expect(unit!.binding).toBeNull()
+
+			expect(prefixed!.choice?.content).toBe("Wrapper")
+			expect(prefixed!.binding?.content).toBe("item")
+		})
+
 		it("keeps 'choice' usable as an Identifier", () => {
 			let { diagnostics } = parseWithDiagnostics(`implementation {
 				variable choice = 1
@@ -3560,6 +3586,137 @@ describe("Choices", () => {
 				'"packed"',
 				'"nothing"',
 			])
+		})
+	})
+
+	// NOTE: `case #Value(item)` — the binder names what the CONSTRUCTOR takes,
+	// which is the whole rule. `@` is deliberately untouched by it, so these
+	// pin BOTH: the bound name reads the payload, and `@` still reads the Case.
+	describe("Case Matcher payload bindings", () => {
+		const shape = `choice Shape {
+				Circle { radius: Integer },
+				Rect { width: Integer, height: Integer },
+				Dot,
+			}`
+
+		it("binds the payload of a one-member Case", async () => {
+			expect(
+				await run(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Circle(3)
+
+					__print(match drawn -> Integer {
+						case #Circle(radius) { <- radius }
+						case #Rect           { <- 0 }
+						case #Dot            { <- 0 }
+					})
+				}`),
+			).toEqual(["3"])
+		})
+
+		it("leaves '@' meaning the whole Case alongside a binding", async () => {
+			expect(
+				await run(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Circle(4)
+
+					__print(match drawn -> String {
+						case #Circle(radius) {
+							<- "{radius} / {@.radius}"
+						}
+						case #Rect { <- "" }
+						case #Dot  { <- "" }
+					})
+				}`),
+			).toEqual(['"4 / 4"'])
+		})
+
+		it("hands the whole Case onwards from a bound arm", async () => {
+			// NOTE: The reason `@` is not redefined as the payload — rebuilding
+			// the Case to pass it on would be the cost of that choice.
+			expect(
+				await run(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Circle(5)
+
+					constant same = match drawn -> Shape {
+						case #Circle(radius) { <- @ }
+						case #Rect           { <- @ }
+						case #Dot            { <- @ }
+					}
+
+					__print(match same -> Integer {
+						case #Circle(radius) { <- radius }
+						case #Rect           { <- 0 }
+						case #Dot            { <- 0 }
+					})
+				}`),
+			).toEqual(["5"])
+		})
+
+		it("refuses a binding on a Case that carries nothing", () => {
+			let source = `implementation {
+				${shape}
+
+				constant drawn: Shape = #Dot
+
+				__print(match drawn -> Integer {
+					case #Circle { <- 0 }
+					case #Rect   { <- 0 }
+					case #Dot(what) { <- 0 }
+				})
+			}`
+
+			expect(diagnosticsOf(source).map(({ code }) => code)).toContain(
+				"unbindable-case-payload",
+			)
+			expect(labelsOf(source)).toContain("this Case carries no value")
+			expect(helpsOf(source)).toContain(
+				"Drop the binding — the Matcher alone is the test.",
+			)
+		})
+
+		it("refuses a binding on a Case that carries several, naming them", () => {
+			let source = `implementation {
+				${shape}
+
+				constant drawn: Shape = #Dot
+
+				__print(match drawn -> Integer {
+					case #Circle    { <- 0 }
+					case #Rect(box) { <- 0 }
+					case #Dot       { <- 0 }
+				})
+			}`
+
+			expect(diagnosticsOf(source).map(({ code }) => code)).toContain(
+				"unbindable-case-payload",
+			)
+			expect(notesOf(source)).toContain(
+				"Its values are 'width', 'height'.",
+			)
+			expect(helpsOf(source)).toContain(
+				"Read them off the Matcher instead: '@.width'.",
+			)
+		})
+
+		it("does not leak the binding into a sibling Handler", () => {
+			expect(
+				diagnosticsOf(`implementation {
+					${shape}
+
+					constant drawn: Shape = #Dot
+
+					__print(match drawn -> Integer {
+						case #Circle(radius) { <- radius }
+						case #Rect           { <- radius }
+						case #Dot            { <- 0 }
+					})
+				}`).map(({ code }) => code),
+			).toContain("unknown-name")
 		})
 	})
 })

@@ -118,6 +118,58 @@ describe("formatter", () => {
 		}
 	})
 
+	// NOTE: A Case Matcher's payload binding is part of the Matcher, so it has
+	// to survive the round trip AND be measured as part of the Matcher's width
+	// by the case-brace alignment. The safety gate compares ASTs, so a dropped
+	// binding would be a refusal rather than silent data loss — but a refusal on
+	// ordinary source is itself the bug.
+	describe("Case Matcher payload bindings", () => {
+		it("round-trips a binding and aligns the braces past it", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Shape {",
+				"\t\tCircle { radius: Integer },",
+				"\t\tDot,",
+				"\t}",
+				"",
+				"\tconstant drawn: Shape = #Circle(3)",
+				"",
+				"\t__print(match drawn -> Integer {",
+				"\t\tcase #Circle(radius) { <- radius }",
+				"\t\tcase #Dot            { <- 0 }",
+				"\t})",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("is idempotent over a binding", () => {
+			let source = [
+				"implementation {",
+				"\tchoice Held { Item { value: Integer } }",
+				"",
+				"\tconstant held: Held = #Item(1)",
+				"",
+				"\t__print(match held -> Integer {",
+				"\t\tcase #Item(value) { <- value }",
+				"\t})",
+				"}",
+				"",
+			].join("\n")
+
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(twice.text).toBe(once.text)
+		})
+	})
+
 	describe("refuses what it cannot format", () => {
 		it("leaves a file with syntax errors byte for byte alone", () => {
 			let source = "implementation {\n\tconstant = = =\n}\n"
