@@ -160,13 +160,18 @@ declarations {
 		§§ @returns — the List of pieces, without the separator.
 		split(on separator: String) -> List<String>
 
-		§ NATIVE. A line break is any of `\n`, `\r` or `\r\n`, which no single
-		§ `split(on:)` separator can express.
-
 		§§ The String's lines, split at every line break. A trailing break leaves a final empty line, and the empty String is one empty line.
 		§§
 		§§ @returns — the List of lines, without the line breaks.
-		lines() -> List<String>
+		lines() -> List<String> {
+			§ A line break is any of `\n`, `\r` or `\r\n`, which no single
+			§ `split(on:)` separator can express — so the other two forms are
+			§ first folded onto `\n`, the two-character one before the bare `\r`
+			§ it contains, and one split does the rest.
+			<- @::replaceEvery("\r\n", with "\n")
+				::replaceEvery("\r", with "\n")
+				::split(on "\n")
+		}
 
 		§ NATIVE. Words are runs of non-whitespace, so every run of whitespace
 		§ is a separator and the empty pieces between adjacent separators are
