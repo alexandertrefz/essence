@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "@essence/compiler/enricher"
-import { parseWithDiagnostics } from "@essence/compiler/parser"
-import type { common } from "@essence/interfaces"
+import { enrich } from "@essence-lang/compiler/enricher"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import type { common } from "@essence-lang/interfaces"
 
 import {
 	findOccurrence as findAnyOccurrence,

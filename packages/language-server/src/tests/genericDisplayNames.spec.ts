@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "@essence/compiler/enricher"
-import { describeType, displayGenericName } from "@essence/compiler/helpers"
-import { parseWithDiagnostics } from "@essence/compiler/parser"
-import { printType } from "@essence/compiler/printType"
+import { enrich } from "@essence-lang/compiler/enricher"
+import {
+	describeType,
+	displayGenericName,
+} from "@essence-lang/compiler/helpers"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import { printType } from "@essence-lang/compiler/printType"
 
 import { findInlayHints } from "../inlayHints"
 

@@ -1,8 +1,8 @@
 import { realpathSync } from "node:fs"
 import path from "node:path"
 
-import type { common, parser } from "@essence/interfaces"
-import { STDLIB_DIRECTORY } from "@essence/stdlib"
+import type { common, parser } from "@essence-lang/interfaces"
+import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { enrich } from "./enricher/index"
 import { declaredNames } from "./enricher/stdlib"

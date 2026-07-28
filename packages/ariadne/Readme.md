@@ -21,7 +21,7 @@ Error: can't compare apples with oranges
 ## Usage
 
 ```ts
-import { Config, Label, Report } from "@essence/ariadne"
+import { Config, Label, Report } from "@essence-lang/ariadne"
 
 let report = new Report({
 	kind: "error",

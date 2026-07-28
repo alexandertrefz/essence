@@ -1,5 +1,5 @@
-import { printSignature, signaturesOf } from "@essence/compiler/printType"
-import type { common } from "@essence/interfaces"
+import { printSignature, signaturesOf } from "@essence-lang/compiler/printType"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: Accepting a callable writes the call the way Essence spells it: a
 // labelled Argument is `label value`, with NO colon, so the label belongs to

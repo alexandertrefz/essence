@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 
-import { isStdlibDocument } from "@essence/compiler/documents"
+import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import {
 	canonicalPath,
 	type LinkedModule,
@@ -9,10 +9,10 @@ import {
 	type Module,
 	type ModuleHost,
 	resolveSpecifier,
-} from "@essence/compiler/modules"
-import { optimise } from "@essence/compiler/optimiser"
-import { simplify } from "@essence/compiler/simplifier"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/modules"
+import { optimise } from "@essence-lang/compiler/optimiser"
+import { simplify } from "@essence-lang/compiler/simplifier"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: One invocation's Modules, read once, parsed once and linked once.
 // `esc check src/*.es` hands every file it was given as an entry, and with

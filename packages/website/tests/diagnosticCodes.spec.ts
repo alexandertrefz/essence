@@ -20,7 +20,7 @@ function declaredCodes(): Array<string> {
 	// The union lives in another package now, and the number of directories
 	// between here and there is not something this spec should know.
 	let source = readFileSync(
-		fileURLToPath(import.meta.resolve("@essence/interfaces/common")),
+		fileURLToPath(import.meta.resolve("@essence-lang/interfaces/common")),
 		"utf8",
 	)
 	let union = source.match(

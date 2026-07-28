@@ -1,5 +1,5 @@
-import type { common, enricher, parser } from "@essence/interfaces"
-import { readStdlibFiles } from "@essence/stdlib"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
+import { readStdlibFiles } from "@essence-lang/stdlib"
 
 import { renderDiagnostics } from "../diagnostics/render"
 import { parseWithDiagnostics } from "../parser/index"
@@ -451,7 +451,7 @@ export function parseStdlibSource(
 	return { fileName, sourceText, program, diagnostics }
 }
 
-// NOTE: `@essence/stdlib` finds and reads the files — it owns them, so it is
+// NOTE: `@essence-lang/stdlib` finds and reads the files — it owns them, so it is
 // the one that knows where they are, and it hands them over already sorted.
 // Parsing is what stays here, because parsing is the Compiler's half.
 function readStdlibSources(): {

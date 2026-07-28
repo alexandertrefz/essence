@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import * as path from "node:path"
 
-import { STDLIB_DIRECTORY } from "@essence/stdlib"
+import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { findFormattingEdits } from "../formatting"
 

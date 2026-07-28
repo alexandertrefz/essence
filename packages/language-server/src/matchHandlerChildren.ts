@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: A typed Match Handler holds Expressions outside its body — the value a
 // literal Matcher compares against, one per by-value member of a Record

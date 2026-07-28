@@ -2,20 +2,20 @@ import {
 	enrichDocument,
 	isStdlibDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
+} from "@essence-lang/compiler/documents"
 import {
 	builtinNamespaces,
 	builtinProtocols as builtinProtocolTable,
-} from "@essence/compiler/enricher/builtins"
-import { derivedEquatableNamespaceForChoice } from "@essence/compiler/enricher/resolvers"
+} from "@essence-lang/compiler/enricher/builtins"
+import { derivedEquatableNamespaceForChoice } from "@essence-lang/compiler/enricher/resolvers"
 import {
 	applyGenericBindings,
 	createInferenceContext,
 	flattenUnionMembers,
 	type GenericBindings,
 	matchesTypeWithBindings,
-} from "@essence/compiler/helpers"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/helpers"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: Shared between Completion's `::` Method listing and Signature
 // Help's Method resolution — both need "every Namespace whose target Type

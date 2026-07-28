@@ -1,4 +1,4 @@
-import { builtinProtocols } from "@essence/compiler/enricher/builtins"
+import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
 	printCaseWithPayload,
 	printConformanceClauses,
@@ -6,8 +6,8 @@ import {
 	printType,
 	signaturesOf,
 	withoutSelf,
-} from "@essence/compiler/printType"
-import type { common, parser } from "@essence/interfaces"
+} from "@essence-lang/compiler/printType"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"

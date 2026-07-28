@@ -5,7 +5,7 @@ import { resolveCli } from "../debug.js"
 
 // NOTE: The extension's whole debugging job is finding the CLI whose `dap`
 // command speaks the session — everything else lives in
-// `@essence/debug-adapter`, tested there.
+// `@essence-lang/debug-adapter`, tested there.
 describe("resolveCli", () => {
 	it("runs a configured bundle with node and anything else with bun", () => {
 		expect(resolveCli("/tools/essence.js", undefined, () => true)).toEqual({

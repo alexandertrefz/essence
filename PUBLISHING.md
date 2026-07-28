@@ -1,6 +1,6 @@
 # Publishing
 
-Ten packages publish to npm under the `@essence` scope, always together and
+Ten packages publish to npm under the `@essence-lang` scope, always together and
 always at one version: `interfaces`, `escodegen` (the vendored fork),
 `ariadne`, `stdlib`, `runtime`, `compiler`, `formatter`, `debug-adapter`,
 `language-server` and `cli`. `fixtures` and the website stay private, and the
@@ -9,7 +9,7 @@ its own directory.
 
 ## One-time setup
 
-- The `essence` organisation must exist on npm — <https://www.npmjs.com/org/create> —
+- The `essence-lang` organisation must exist on npm — <https://www.npmjs.com/org/create> —
   and the publishing account must be a member allowed to publish in it.
 - `npm login` on the publishing machine.
 

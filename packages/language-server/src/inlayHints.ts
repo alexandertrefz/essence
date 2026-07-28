@@ -1,5 +1,5 @@
-import { printType } from "@essence/compiler/printType"
-import type { common } from "@essence/interfaces"
+import { printType } from "@essence-lang/compiler/printType"
+import type { common } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 

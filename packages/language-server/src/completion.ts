@@ -1,15 +1,15 @@
-import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import {
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
-} from "@essence/compiler/helpers"
+} from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
 	printType,
 	signaturesOf,
-} from "@essence/compiler/printType"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/printType"
+import type { common } from "@essence-lang/interfaces"
 
 import { type ArgumentContext, findArgumentContext } from "./argumentContext"
 import { type ImportEdit, insertImportEdit } from "./autoImport"

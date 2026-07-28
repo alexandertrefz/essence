@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseDocument } from "@essence/compiler/documents"
+import { parseDocument } from "@essence-lang/compiler/documents"
 
 import { format } from "../index"
 import { sectionSpans } from "../sections"

@@ -1,5 +1,5 @@
 {
-	"name": "@essence/compiler",
+	"name": "@essence-lang/compiler",
 	"version": "0.1.0",
 	"description": "The Essence compiler: source text in, JavaScript out.",
 	"private": true,
@@ -43,16 +43,16 @@
 		"compiler"
 	],
 	"dependencies": {
-		"@essence/ariadne": "workspace:*",
-		"@essence/escodegen": "workspace:*",
-		"@essence/interfaces": "workspace:*",
-		"@essence/runtime": "workspace:*",
-		"@essence/stdlib": "workspace:*",
+		"@essence-lang/ariadne": "workspace:*",
+		"@essence-lang/escodegen": "workspace:*",
+		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/runtime": "workspace:*",
+		"@essence-lang/stdlib": "workspace:*",
 		"esbuild": "0.28.1",
 		"source-map": "0.6.1"
 	},
 	"devDependencies": {
-		"@essence/fixtures": "workspace:*",
+		"@essence-lang/fixtures": "workspace:*",
 		"@types/estree": "1.0.9"
 	}
 }

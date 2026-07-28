@@ -1,4 +1,4 @@
-import type { common, parser } from "@essence/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: Folding is derived from the Parser AST, so it keeps working while the
 // Program has Type errors. Only constructs that span more than one line are

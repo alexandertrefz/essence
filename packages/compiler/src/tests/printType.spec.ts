@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 import {
 	caseHeader,

@@ -6,7 +6,7 @@
 			// every edit to extension.js would need a manual rebuild first.
 			//
 			// Only the extension is rebuilt. The Server bundle is built from
-			// `@essence/language-server` in this workspace and is slow, and
+			// `@essence-lang/language-server` in this workspace and is slow, and
 			// developing against it directly is what `essence.server.path` is
 			// for; run `bun run build:server` when the bundled one needs
 			// refreshing.

@@ -1,17 +1,21 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence/interfaces"
-import { createAlgebraic } from "@essence/runtime/Algebraic"
-import { createBoolean } from "@essence/runtime/Boolean"
-import { createInteger } from "@essence/runtime/Integer"
-import { createList } from "@essence/runtime/List"
-import { createNothing } from "@essence/runtime/Nothing"
-import { equal, greater, less } from "@essence/runtime/Ordering"
-import { createRational } from "@essence/runtime/Rational"
-import { createRecord } from "@essence/runtime/Record"
-import { createString } from "@essence/runtime/String"
-import { createTranscendental } from "@essence/runtime/Transcendental"
-import { type AnyType, createCase, isValueOfType } from "@essence/runtime/type"
+import type { common } from "@essence-lang/interfaces"
+import { createAlgebraic } from "@essence-lang/runtime/Algebraic"
+import { createBoolean } from "@essence-lang/runtime/Boolean"
+import { createInteger } from "@essence-lang/runtime/Integer"
+import { createList } from "@essence-lang/runtime/List"
+import { createNothing } from "@essence-lang/runtime/Nothing"
+import { equal, greater, less } from "@essence-lang/runtime/Ordering"
+import { createRational } from "@essence-lang/runtime/Rational"
+import { createRecord } from "@essence-lang/runtime/Record"
+import { createString } from "@essence-lang/runtime/String"
+import { createTranscendental } from "@essence-lang/runtime/Transcendental"
+import {
+	type AnyType,
+	createCase,
+	isValueOfType,
+} from "@essence-lang/runtime/type"
 
 import { loadStdlib } from "../enricher/stdlib"
 import { acceptsAllAtRuntime, overlapsAtRuntime } from "../validator/index"

@@ -3,7 +3,7 @@ node_modules
 .DS_Store
 
 # Build products of `bun run build`. Both ship inside the .vsix but neither is
-# committed: the Language Server bundle is built from `@essence/language-server`
+# committed: the Language Server bundle is built from `@essence-lang/language-server`
 # in this workspace, the extension bundle from extension.js and its
 # dependencies.
 server/

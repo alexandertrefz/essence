@@ -2,9 +2,9 @@ import {
 	enrichDocument,
 	isStdlibDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
-import { loadStdlib } from "@essence/compiler/enricher/stdlib"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/documents"
+import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
+import type { common } from "@essence-lang/interfaces"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import {
 	type CallHierarchyItem as LspCallHierarchyItem,

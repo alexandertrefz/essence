@@ -3,8 +3,8 @@ import {
 	printSignatureSummary,
 	printType,
 	signaturesOf,
-} from "@essence/compiler/printType"
-import type { common, parser } from "@essence/interfaces"
+} from "@essence-lang/compiler/printType"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"

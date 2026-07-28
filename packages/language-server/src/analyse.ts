@@ -4,20 +4,20 @@ import {
 	placelessDiagnostic,
 	primary,
 	reportError,
-} from "@essence/compiler/diagnostics"
+} from "@essence-lang/compiler/diagnostics"
 import {
 	canonicalPath,
 	enrichDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
+} from "@essence-lang/compiler/documents"
 import {
 	diskModuleHost,
 	linkModuleGraph,
 	loadModuleGraph,
 	type ModuleHost,
-} from "@essence/compiler/modules"
-import { validate } from "@essence/compiler/validator"
-import type { common, parser } from "@essence/interfaces"
+} from "@essence-lang/compiler/modules"
+import { validate } from "@essence-lang/compiler/validator"
+import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: Either Program is null when the stage that builds it threw — the
 // Diagnostics then hold the Internal Compiler Error and nothing else.

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test"
 
-import { createBoolean } from "@essence/runtime/Boolean"
-import { getStringRepresentation } from "@essence/runtime/functions"
-import { createInteger } from "@essence/runtime/Integer"
-import { createList } from "@essence/runtime/List"
-import { createNothing } from "@essence/runtime/Nothing"
-import { createRecord } from "@essence/runtime/Record"
-import { createString } from "@essence/runtime/String"
-import { createCase } from "@essence/runtime/type"
+import { createBoolean } from "@essence-lang/runtime/Boolean"
+import { getStringRepresentation } from "@essence-lang/runtime/functions"
+import { createInteger } from "@essence-lang/runtime/Integer"
+import { createList } from "@essence-lang/runtime/List"
+import { createNothing } from "@essence-lang/runtime/Nothing"
+import { createRecord } from "@essence-lang/runtime/Record"
+import { createString } from "@essence-lang/runtime/String"
+import { createCase } from "@essence-lang/runtime/type"
 
 import { type DescribedValue, DESCRIBE_BATCH_SOURCE } from "../render"
 

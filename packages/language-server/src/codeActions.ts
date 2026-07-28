@@ -1,4 +1,4 @@
-import type { common, parser } from "@essence/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { analyseDocument, documentFilePath } from "./analyse"
 import { insertImportEdit, relativeSpecifier } from "./autoImport"

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
 
-import { fixturePath } from "@essence/fixtures"
+import { fixturePath } from "@essence-lang/fixtures"
 
 import { bundle } from "../bundler/index"
 import { enrich } from "../enricher/index"

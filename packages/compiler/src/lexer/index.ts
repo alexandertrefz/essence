@@ -1,4 +1,4 @@
-import { type common, lexer } from "@essence/interfaces"
+import { type common, lexer } from "@essence-lang/interfaces"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token

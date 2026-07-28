@@ -1,8 +1,8 @@
 import * as path from "node:path"
 
-import { generate } from "@essence/escodegen"
-import type { common } from "@essence/interfaces"
-import { RUNTIME_DIRECTORY } from "@essence/runtime"
+import { generate } from "@essence-lang/escodegen"
+import type { common } from "@essence-lang/interfaces"
+import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import type * as estree from "estree"
 
 import {
@@ -23,7 +23,7 @@ import {
 	stdlibPrelude,
 } from "./stdlibPrelude"
 
-// NOTE: The builtin Namespaces that have a runtime module in `@essence/runtime`, in
+// NOTE: The builtin Namespaces that have a runtime module in `@essence-lang/runtime`, in
 // the order their imports are emitted. Every one is imported unconditionally,
 // under its own name, and a Namespace no Program references costs nothing —
 // esbuild shakes an unused `import * as <Name>` away entirely. A Method the
@@ -2756,7 +2756,7 @@ function internalImport(
 	>,
 	fileName: string,
 ): estree.ImportDeclaration {
-	// NOTE: An absolute path rather than `@essence/runtime/<Name>`, because the
+	// NOTE: An absolute path rather than `@essence-lang/runtime/<Name>`, because the
 	// emitted module is written to the user's directory and handed to esbuild
 	// from there — a package specifier would have to resolve against wherever
 	// that is. The Bundler inlines these and they never reach the output.

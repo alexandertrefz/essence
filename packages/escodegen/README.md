@@ -1,4 +1,4 @@
-# @essence/escodegen
+# @essence-lang/escodegen
 
 The [Essence](https://github.com/alexandertrefz/essence) compiler's vendored
 fork of [escodegen 2.1.0](https://github.com/estools/escodegen): upstream,

@@ -12,49 +12,49 @@
       },
     },
     "packages/ariadne": {
-      "name": "@essence/ariadne",
-      "version": "0.0.1",
+      "name": "@essence-lang/ariadne",
+      "version": "0.1.0",
     },
     "packages/cli": {
-      "name": "@essence/cli",
-      "version": "0.0.1",
+      "name": "@essence-lang/cli",
+      "version": "0.1.0",
       "bin": {
         "essence": "bin/essence",
         "esc": "bin/esc",
       },
       "dependencies": {
-        "@essence/ariadne": "workspace:*",
-        "@essence/compiler": "workspace:*",
-        "@essence/debug-adapter": "workspace:*",
-        "@essence/formatter": "workspace:*",
-        "@essence/interfaces": "workspace:*",
-        "@essence/language-server": "workspace:*",
+        "@essence-lang/ariadne": "workspace:*",
+        "@essence-lang/compiler": "workspace:*",
+        "@essence-lang/debug-adapter": "workspace:*",
+        "@essence-lang/formatter": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
+        "@essence-lang/language-server": "workspace:*",
       },
       "devDependencies": {
-        "@essence/fixtures": "workspace:*",
-        "@essence/stdlib": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/stdlib": "workspace:*",
       },
     },
     "packages/compiler": {
-      "name": "@essence/compiler",
-      "version": "0.0.1",
+      "name": "@essence-lang/compiler",
+      "version": "0.1.0",
       "dependencies": {
-        "@essence/ariadne": "workspace:*",
-        "@essence/escodegen": "workspace:*",
-        "@essence/interfaces": "workspace:*",
-        "@essence/runtime": "workspace:*",
-        "@essence/stdlib": "workspace:*",
+        "@essence-lang/ariadne": "workspace:*",
+        "@essence-lang/escodegen": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
+        "@essence-lang/stdlib": "workspace:*",
         "esbuild": "0.28.1",
         "source-map": "0.6.1",
       },
       "devDependencies": {
-        "@essence/fixtures": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
         "@types/estree": "1.0.9",
       },
     },
     "packages/debug-adapter": {
-      "name": "@essence/debug-adapter",
-      "version": "0.0.1",
+      "name": "@essence-lang/debug-adapter",
+      "version": "0.1.0",
       "bin": {
         "esdap": "bin/esdap",
       },
@@ -64,14 +64,14 @@
         "source-map": "0.6.1",
       },
       "devDependencies": {
-        "@essence/fixtures": "workspace:*",
-        "@essence/runtime": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
         "@vscode/debugadapter-testsupport": "1.68.0",
       },
     },
     "packages/escodegen": {
-      "name": "@essence/escodegen",
-      "version": "2.1.0-essence.1",
+      "name": "@essence-lang/escodegen",
+      "version": "0.1.0",
       "dependencies": {
         "estraverse": "5.3.0",
         "esutils": "2.0.3",
@@ -79,71 +79,71 @@
       },
     },
     "packages/fixtures": {
-      "name": "@essence/fixtures",
+      "name": "@essence-lang/fixtures",
       "version": "0.0.1",
     },
     "packages/formatter": {
-      "name": "@essence/formatter",
-      "version": "0.0.1",
+      "name": "@essence-lang/formatter",
+      "version": "0.1.0",
       "bin": {
         "esfmt": "bin/esfmt",
       },
       "dependencies": {
-        "@essence/compiler": "workspace:*",
-        "@essence/interfaces": "workspace:*",
+        "@essence-lang/compiler": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
       },
       "devDependencies": {
-        "@essence/fixtures": "workspace:*",
-        "@essence/stdlib": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/stdlib": "workspace:*",
       },
     },
     "packages/interfaces": {
-      "name": "@essence/interfaces",
-      "version": "0.0.1",
+      "name": "@essence-lang/interfaces",
+      "version": "0.1.0",
     },
     "packages/language-server": {
-      "name": "@essence/language-server",
-      "version": "0.0.1",
+      "name": "@essence-lang/language-server",
+      "version": "0.1.0",
       "bin": {
         "esls": "bin/esls",
       },
       "dependencies": {
-        "@essence/compiler": "workspace:*",
-        "@essence/formatter": "workspace:*",
-        "@essence/interfaces": "workspace:*",
+        "@essence-lang/compiler": "workspace:*",
+        "@essence-lang/formatter": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
         "vscode-languageserver": "10.1.0",
         "vscode-languageserver-textdocument": "1.0.12",
       },
       "devDependencies": {
-        "@essence/fixtures": "workspace:*",
-        "@essence/stdlib": "workspace:*",
+        "@essence-lang/fixtures": "workspace:*",
+        "@essence-lang/stdlib": "workspace:*",
       },
     },
     "packages/runtime": {
-      "name": "@essence/runtime",
-      "version": "0.0.1",
+      "name": "@essence-lang/runtime",
+      "version": "0.1.0",
       "dependencies": {
-        "@essence/interfaces": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
       },
     },
     "packages/stdlib": {
-      "name": "@essence/stdlib",
-      "version": "0.0.1",
+      "name": "@essence-lang/stdlib",
+      "version": "0.1.0",
     },
     "packages/vscode-extension": {
       "name": "essence-language",
       "version": "0.3.0",
       "devDependencies": {
-        "@essence/language-server": "workspace:*",
+        "@essence-lang/language-server": "workspace:*",
         "@vscode/vsce": "3.9.2",
         "vscode-languageclient": "9.0.1",
       },
     },
     "packages/website": {
-      "name": "@essence/website",
+      "name": "@essence-lang/website",
       "version": "0.0.1",
       "devDependencies": {
-        "@essence/interfaces": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
       },
     },
   },
@@ -233,29 +233,29 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A=="],
 
-    "@essence/ariadne": ["@essence/ariadne@workspace:packages/ariadne"],
+    "@essence-lang/ariadne": ["@essence-lang/ariadne@workspace:packages/ariadne"],
 
-    "@essence/cli": ["@essence/cli@workspace:packages/cli"],
+    "@essence-lang/cli": ["@essence-lang/cli@workspace:packages/cli"],
 
-    "@essence/compiler": ["@essence/compiler@workspace:packages/compiler"],
+    "@essence-lang/compiler": ["@essence-lang/compiler@workspace:packages/compiler"],
 
-    "@essence/debug-adapter": ["@essence/debug-adapter@workspace:packages/debug-adapter"],
+    "@essence-lang/debug-adapter": ["@essence-lang/debug-adapter@workspace:packages/debug-adapter"],
 
-    "@essence/escodegen": ["@essence/escodegen@workspace:packages/escodegen"],
+    "@essence-lang/escodegen": ["@essence-lang/escodegen@workspace:packages/escodegen"],
 
-    "@essence/fixtures": ["@essence/fixtures@workspace:packages/fixtures"],
+    "@essence-lang/fixtures": ["@essence-lang/fixtures@workspace:packages/fixtures"],
 
-    "@essence/formatter": ["@essence/formatter@workspace:packages/formatter"],
+    "@essence-lang/formatter": ["@essence-lang/formatter@workspace:packages/formatter"],
 
-    "@essence/interfaces": ["@essence/interfaces@workspace:packages/interfaces"],
+    "@essence-lang/interfaces": ["@essence-lang/interfaces@workspace:packages/interfaces"],
 
-    "@essence/language-server": ["@essence/language-server@workspace:packages/language-server"],
+    "@essence-lang/language-server": ["@essence-lang/language-server@workspace:packages/language-server"],
 
-    "@essence/runtime": ["@essence/runtime@workspace:packages/runtime"],
+    "@essence-lang/runtime": ["@essence-lang/runtime@workspace:packages/runtime"],
 
-    "@essence/stdlib": ["@essence/stdlib@workspace:packages/stdlib"],
+    "@essence-lang/stdlib": ["@essence-lang/stdlib@workspace:packages/stdlib"],
 
-    "@essence/website": ["@essence/website@workspace:packages/website"],
+    "@essence-lang/website": ["@essence-lang/website@workspace:packages/website"],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 

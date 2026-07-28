@@ -116,7 +116,7 @@ async function runFormat(
 	context: CLIContext,
 	rawArguments: Array<string>,
 ): Promise<number> {
-	let { run: runFormatter } = await import("@essence/formatter/cli")
+	let { run: runFormatter } = await import("@essence-lang/formatter/cli")
 
 	return runFormatter(rawArguments, {
 		programName: `${context.programName} format`,
@@ -124,7 +124,7 @@ async function runFormat(
 }
 
 async function runLanguageServer(): Promise<number> {
-	let { startServer } = await import("@essence/language-server")
+	let { startServer } = await import("@essence-lang/language-server")
 
 	// NOTE: The Server does not return: it holds stdio open and answers
 	// requests until the Editor closes the connection, which ends the process.
@@ -135,7 +135,7 @@ async function runLanguageServer(): Promise<number> {
 }
 
 async function runDebugAdapter(): Promise<number> {
-	let { startAdapter } = await import("@essence/debug-adapter")
+	let { startAdapter } = await import("@essence-lang/debug-adapter")
 	let { compileFile } = await import("./pipeline")
 
 	// NOTE: The Adapter does not know how to compile — it is handed what

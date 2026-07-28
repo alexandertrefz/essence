@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import { canonicalPath, parseDocument } from "@essence/compiler/documents"
-import type { common } from "@essence/interfaces"
+import { canonicalPath, parseDocument } from "@essence-lang/compiler/documents"
+import type { common } from "@essence-lang/interfaces"
 
 import { analyseDocument, documentFilePath } from "../analyse"
 import { insertImportEdit, relativeSpecifier } from "../autoImport"

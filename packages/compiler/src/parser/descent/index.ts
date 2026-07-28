@@ -1,4 +1,4 @@
-import { type common, lexer, type parser } from "@essence/interfaces"
+import { type common, lexer, type parser } from "@essence-lang/interfaces"
 
 // NOTE: Hand-written recursive descent parser — the compiler's parser,
 // re-exported through src/parser. It builds its ASTs through the shared

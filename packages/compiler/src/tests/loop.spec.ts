@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
+import { fixturePath } from "@essence-lang/fixtures"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"

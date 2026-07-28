@@ -1,4 +1,4 @@
-# @essence/cli
+# @essence-lang/cli
 
 `essence` — the command line for the
 [Essence](https://github.com/alexandertrefz/essence) programming language. One
@@ -8,7 +8,7 @@ Server and the Debug Adapter.
 ## Install
 
 ```sh
-npm install -g @essence/cli
+npm install -g @essence-lang/cli
 ```
 
 This puts `essence` on PATH, along with `esc`, the same binary under its

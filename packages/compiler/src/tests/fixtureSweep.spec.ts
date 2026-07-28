@@ -9,8 +9,8 @@ import {
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { FIXTURES_DIRECTORY, fixturePath } from "@essence/fixtures"
-import type { common } from "@essence/interfaces"
+import { FIXTURES_DIRECTORY, fixturePath } from "@essence-lang/fixtures"
+import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { renderDiagnostics } from "../diagnostics/render"

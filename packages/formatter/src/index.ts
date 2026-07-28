@@ -1,5 +1,5 @@
-import { parseDocument } from "@essence/compiler/documents"
-import type { common, parser } from "@essence/interfaces"
+import { parseDocument } from "@essence-lang/compiler/documents"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { printDoc } from "./doc"
 import { Printer } from "./printer"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseWithDiagnostics } from "@essence/compiler/parser"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 
 import { findSelectionRanges } from "../selectionRanges"
 

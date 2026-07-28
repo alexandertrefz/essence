@@ -1,4 +1,4 @@
-# @essence/runtime
+# @essence-lang/runtime
 
 The [Essence](https://github.com/alexandertrefz/essence) language runtime —
 the native halves of the standard library, inlined into every compiled
@@ -22,5 +22,5 @@ pretty-printer behind `__print` lives here too, in `functions.ts`.
 
 You would depend on this package directly only to build tooling that
 manipulates compiled Essence values —
-[`@essence/compiler`](https://www.npmjs.com/package/@essence/compiler) brings
+[`@essence-lang/compiler`](https://www.npmjs.com/package/@essence-lang/compiler) brings
 it along for everything else.

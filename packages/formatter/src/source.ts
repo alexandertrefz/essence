@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: Some things are safest reprinted exactly as they were written rather
 // than rebuilt from the AST — a grouped Number (`1_000` reaches the AST as

@@ -7,8 +7,8 @@ import {
 	paint,
 	Report,
 	Source,
-} from "@essence/ariadne"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/ariadne"
+import type { common } from "@essence-lang/interfaces"
 
 import { countOf } from "../helpers/index"
 
