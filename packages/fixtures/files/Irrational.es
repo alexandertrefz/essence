@@ -1,7 +1,8 @@
 implementation {
 
 	§ Exact square roots — perfect squares collapse to whole numbers,
-	§ everything else stays exact and symbolic.
+	§ everything else stays exact and symbolic. A negative has no real root, so
+	§ the answer is an Optional and `__print` shows the whole of it.
 	__print(9::squareRoot())
 	__print(2::squareRoot())
 	__print(12::squareRoot())
@@ -9,25 +10,31 @@ implementation {
 	constant rootTwo = 2::squareRoot()
 
 	__print(match rootTwo -> String {
-		case Algebraic {
-			§ The round-trip is exact: √2 · √2 is exactly 2.
-			__print(@::multiply(with @))
+		case #Value(root) {
+			<- match root -> String {
+				case Algebraic {
+					§ The round-trip is exact: √2 · √2 is exactly 2.
+					__print(@::multiply(with @))
 
-			§ Arithmetic stays symbolic.
-			__print(@::add(1))
-			__print(@::multiply(with 3))
+					§ Arithmetic stays symbolic.
+					__print(@::add(1))
+					__print(@::multiply(with 3))
 
-			§ Dividing by an Irrational can never fail — no Nothing here.
-			__print(1::divide(by @))
+					§ Dividing by an Irrational can never fail — the answer is
+					§ not an Optional at all.
+					__print(1::divide(by @))
 
-			§ Ordering is exact, too: √2 is below 3/2.
-			__print(@::compare(to 3/2)::toString())
+					§ Ordering is exact, too: √2 is below 3/2.
+					__print(@::compare(to 3/2)::toString())
 
-			<- @::toString()
+					<- @::toString()
+				}
+
+				case Integer { <- @::toString() }
+			}
 		}
 
-		case Integer { <- @::toString() }
-		case Nothing { <- "not representable" }
+		case #Empty { <- "not representable" }
 	})
 
 	§ π and TAU are exact Transcendentals now, not approximations.
@@ -57,13 +64,17 @@ implementation {
 
 	§ An Integer against √2, through Number — √2 ≈ 1.414.
 	__print(match 2::squareRoot() -> String {
-		case Algebraic {
-			<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
-				2::isGreaterThan(@)
-			}, 1 + √2 = {1::add(@)}"
+		case #Value(root) {
+			<- match root -> String {
+				case Algebraic {
+					<- "1 < √2: {1::isLessThan(@)}, 2 > √2: {
+						2::isGreaterThan(@)
+					}, 1 + √2 = {1::add(@)}"
+				}
+				case Integer   { <- "collapsed" }
+			}
 		}
-		case Integer   { <- "collapsed" }
-		case Nothing   { <- "none" }
+		case #Empty { <- "none" }
 	})
 
 	§ `Irrational` names exactly the Union of the two new Types.

@@ -54,14 +54,27 @@ Error: No Method named 'lenght' for this value
     │ 
     │ Help: Did you mean 'length'?
     │ 
-    │ Note: Searched Namespaces 'String', 'Optional'.
+    │ Note: Searched Namespace 'String'.
+────╯
+
+[unknown-method]
+Error: No Method named 'lenght' for this value
+    ╭─┤ Dispatch.es:17:26 │
+    │
+ 17 │     constant magnitude = 1::lenght()
+    │                          ▲  ───┬──  
+    │                          ╰─────│──── this is an Integer
+    │                                │    
+    │                                ╰──── no Method of this name
+    │ 
+    │ Note: Searched Namespaces 'Integer', 'Number'.
 ────╯
 
 [no-matching-overload]
 Error: No overload of 'prepend' accepts these Arguments
-    ╭─┤ Dispatch.es:16:19 │
+    ╭─┤ Dispatch.es:20:19 │
     │
- 16 │     constant piece = "essence"::prepend()
+ 20 │     constant piece = "essence"::prepend()
     │                      ──────────┬─────────  
     │                                ╰─────────── this call passes 0 Arguments
     │ 
@@ -70,22 +83,22 @@ Error: No overload of 'prepend' accepts these Arguments
 
 [unknown-method]
 Error: No Method named 'describe' for this value
-    ╭─┤ Dispatch.es:19:32 │
+    ╭─┤ Dispatch.es:23:32 │
     │
- 19 │     constant nowhere = { x = 1 }::describe()
+ 23 │     constant nowhere = { x = 1 }::describe()
     │                        ────┬────  ────┬───  
     │                            ╰──────────│───── this is a { x: Integer }
     │                                       │     
     │                                       ╰───── no Method of this name
     │ 
-    │ Note: Searched Namespaces 'Optional', 'Record'.
+    │ Note: Searched Namespace 'Record'.
 ────╯
 
 [unknown-name]
 Error: 'nmae' is not declared
-    ╭─┤ Dispatch.es:23:19 │
+    ╭─┤ Dispatch.es:27:19 │
     │
- 23 │     constant shout = nmae
+ 27 │     constant shout = nmae
     │                      ──┬─  
     │                        ╰─── no such Variable or Constant
     │ 
@@ -94,16 +107,16 @@ Error: 'nmae' is not declared
 
 [unknown-member]
 Error: { x: Integer, y: Integer } has no member 'z'
-    ╭─┤ Dispatch.es:27:25 │
+    ╭─┤ Dispatch.es:31:25 │
     │
- 27 │     constant depth = point.z
+ 31 │     constant depth = point.z
     │                            ▲  
     │                            ╰── no such member
     │ 
     │ Note: { x: Integer, y: Integer } has 'x', 'y'.
 ────╯
 
-─── 5 errors
+─── 6 errors
 "
 `;
 
@@ -313,6 +326,93 @@ Error: Match Expressions require a Union Type
 "
 `;
 
+exports[`Diagnostic Showcase RecursiveTypes.es should render the same report every time 1`] = `
+"[recursive-type-declaration]
+Error: Type 'Node' names itself
+    ╭─┤ RecursiveTypes.es:20:38 │
+    │
+ 20 │     type Node = { value: Integer, next: Node }
+    │                                         ──┬─  
+    │                                           ╰─── this names the declaration being made
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+[recursive-type-declaration]
+Error: Choice 'Signal' names itself through 'Command'
+    ╭─┤ RecursiveTypes.es:25:22 │
+    │
+ 25 │        Wrapped { command: Command },
+    │                           ───┬───  
+    │                              ╰───── this names 'Command'
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note 1: 'Signal' names 'Command', which names 'Signal' again.
+    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+[recursive-type-declaration]
+Error: Choice 'Command' names itself through 'Signal'
+    ╭─┤ RecursiveTypes.es:29:22 │
+    │
+ 29 │        Wrapping { signal: Signal },
+    │                           ───┬──  
+    │                              ╰──── this names 'Signal'
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note 1: 'Command' names 'Signal', which names 'Command' again.
+    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+[recursive-type-declaration]
+Error: Type 'Wrapper' names itself through 'Wrapped'
+    ╭─┤ RecursiveTypes.es:34:17 │
+    │
+ 34 │     type Wrapper = Wrapped
+    │                    ───┬───  
+    │                       ╰───── this names 'Wrapped'
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note 1: 'Wrapper' names 'Wrapped', which names 'Wrapper' again.
+    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+[recursive-type-declaration]
+Error: Choice 'Wrapped' names itself through 'Wrapper'
+    ╭─┤ RecursiveTypes.es:37:20 │
+    │
+ 37 │        Inner { wrapper: Wrapper },
+    │                         ───┬───  
+    │                            ╰───── this names 'Wrapper'
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note 1: 'Wrapped' names 'Wrapper', which names 'Wrapped' again.
+    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+[recursive-type-declaration]
+Error: Type 'Boxed' names itself
+    ╭─┤ RecursiveTypes.es:42:20 │
+    │
+ 42 │     type Boxed<Item = Boxed<Integer>> = { value: Item }
+    │                       ──┬──  
+    │                         ╰──── this names the declaration being made
+    │ 
+    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
+    │ 
+    │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
+────╯
+
+─── 6 errors
+"
+`;
+
 exports[`Diagnostic Showcase Syntax.es should render the same report every time 1`] = `
 "[syntax-error]
 Error: Expected '=' but found '42'.
@@ -400,93 +500,6 @@ Error: This Argument does not fit Parameter 'times'
 ────╯
 
 ─── 5 errors
-"
-`;
-
-exports[`Diagnostic Showcase RecursiveTypes.es should render the same report every time 1`] = `
-"[recursive-type-declaration]
-Error: Type 'Node' names itself
-    ╭─┤ RecursiveTypes.es:20:38 │
-    │
- 20 │     type Node = { value: Integer, next: Node }
-    │                                         ──┬─  
-    │                                           ╰─── this names the declaration being made
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-[recursive-type-declaration]
-Error: Choice 'Signal' names itself through 'Command'
-    ╭─┤ RecursiveTypes.es:25:22 │
-    │
- 25 │        Wrapped { command: Command },
-    │                           ───┬───  
-    │                              ╰───── this names 'Command'
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note 1: 'Signal' names 'Command', which names 'Signal' again.
-    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-[recursive-type-declaration]
-Error: Choice 'Command' names itself through 'Signal'
-    ╭─┤ RecursiveTypes.es:29:22 │
-    │
- 29 │        Wrapping { signal: Signal },
-    │                           ───┬──  
-    │                              ╰──── this names 'Signal'
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note 1: 'Command' names 'Signal', which names 'Command' again.
-    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-[recursive-type-declaration]
-Error: Type 'Wrapper' names itself through 'Wrapped'
-    ╭─┤ RecursiveTypes.es:34:17 │
-    │
- 34 │     type Wrapper = Wrapped
-    │                    ───┬───  
-    │                       ╰───── this names 'Wrapped'
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note 1: 'Wrapper' names 'Wrapped', which names 'Wrapper' again.
-    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-[recursive-type-declaration]
-Error: Choice 'Wrapped' names itself through 'Wrapper'
-    ╭─┤ RecursiveTypes.es:37:20 │
-    │
- 37 │        Inner { wrapper: Wrapper },
-    │                         ───┬───  
-    │                            ╰───── this names 'Wrapper'
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note 1: 'Wrapped' names 'Wrapper', which names 'Wrapped' again.
-    │ Note 2: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-[recursive-type-declaration]
-Error: Type 'Boxed' names itself
-    ╭─┤ RecursiveTypes.es:42:20 │
-    │
- 42 │     type Boxed<Item = Boxed<Integer>> = { value: Item }
-    │                       ──┬──  
-    │                         ╰──── this names the declaration being made
-    │ 
-    │ Help: Recursive Type declarations are not part of the language yet — break the cycle.
-    │ 
-    │ Note: A Type declaration is substituted wherever it is named, so a declaration that names itself would never finish resolving.
-────╯
-
-─── 6 errors
 "
 `;
 

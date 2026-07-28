@@ -863,6 +863,13 @@ describe("Standard Library Loader", () => {
 			"Number",
 			"Nothing",
 			"Optional",
+			// NOTE: The one Namespace an Optional value can reach besides
+			// `Optional`, listed after it for the same reason `NestedList` is
+			// listed after `List` — see `builtinMemberOrder`. `Optional` has to
+			// be searched FIRST for an `Optional<Optional<…>>` receiver, so
+			// that `NestedOptional::flatten` reads as the extra a nested
+			// Optional has.
+			"NestedOptional",
 			"Ordering",
 			"Side",
 			"Case",

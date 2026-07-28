@@ -16,9 +16,9 @@ import type { BooleanType } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import type { ListType } from "./List"
 import type { NormalizationFormType } from "./NormalizationForm"
-import type { NothingType } from "./Nothing"
 import type { NumberType } from "./Number"
 import type { NumberFormatType } from "./NumberFormat"
+import type { OptionalType } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
@@ -103,15 +103,15 @@ export type IntegerNatives = {
 	// multiply(with: Integer) -> Integer
 	multiply__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// squareRoot() -> Optional<Integer | Algebraic>
-	squareRoot: (self: IntegerType) => IntegerType | AlgebraicType | NothingType
+	squareRoot: (self: IntegerType) => OptionalType<IntegerType | AlgebraicType>
 	// negate() -> Integer
 	negate: (self: IntegerType) => IntegerType
 	// remainder(dividingBy: Integer) -> Optional<Integer>
-	remainder: (self: IntegerType, dividingBy: IntegerType) => IntegerType | NothingType
+	remainder: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
 	// quotient(dividingBy: Integer) -> Optional<Integer>
-	quotient: (self: IntegerType, dividingBy: IntegerType) => IntegerType | NothingType
+	quotient: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
 	// raise(to: Integer) -> Optional<Integer | Rational>
-	raise: (self: IntegerType, to: IntegerType) => IntegerType | RationalType | NothingType
+	raise: (self: IntegerType, to: IntegerType) => OptionalType<IntegerType | RationalType>
 	// toString() -> String
 	toString: (self: IntegerType) => StringType
 	// compare(to: Integer) -> Ordering
@@ -120,17 +120,17 @@ export type IntegerNatives = {
 
 export type RationalNatives = {
 	// static of(_: Integer, over: Integer) -> Optional<Rational>
-	of: (argument0: IntegerType, over: IntegerType) => RationalType | NothingType
+	of: (argument0: IntegerType, over: IntegerType) => OptionalType<RationalType>
 	// divide(by: Algebraic) -> Algebraic | Rational
 	divide__overload$3: (self: RationalType, by: AlgebraicType) => AlgebraicType | RationalType
 	// squareRoot() -> Optional<Rational | Algebraic>
-	squareRoot: (self: RationalType) => RationalType | AlgebraicType | NothingType
+	squareRoot: (self: RationalType) => OptionalType<RationalType | AlgebraicType>
 	// numerator() -> Integer
 	numerator: (self: RationalType) => IntegerType
 	// denominator() -> Integer
 	denominator: (self: RationalType) => IntegerType
 	// raise(to: Integer) -> Optional<Rational>
-	raise: (self: RationalType, to: IntegerType) => RationalType | NothingType
+	raise: (self: RationalType, to: IntegerType) => OptionalType<RationalType>
 	// toString(formatAs: NumberFormat) -> String
 	toString__overload$2: (self: RationalType, formatAs: NumberFormatType) => StringType
 	// compare(to: Rational) -> Ordering
@@ -145,19 +145,19 @@ export type AlgebraicNatives = {
 	// add(_: Rational) -> Algebraic
 	add__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType
 	// add(_: Algebraic) -> Optional<Rational | Algebraic>
-	add__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
+	add__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
 	// multiply(with: Integer) -> Algebraic | Rational
 	multiply__overload$1: (self: AlgebraicType, argument1: IntegerType) => AlgebraicType | RationalType
 	// multiply(with: Rational) -> Algebraic | Rational
 	multiply__overload$2: (self: AlgebraicType, argument1: RationalType) => AlgebraicType | RationalType
 	// multiply(with: Algebraic) -> Optional<Rational | Algebraic>
-	multiply__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => RationalType | AlgebraicType | NothingType
+	multiply__overload$3: (self: AlgebraicType, argument1: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
 	// divide(by: Integer) -> Optional<Algebraic>
-	divide__overload$1: (self: AlgebraicType, by: IntegerType) => AlgebraicType | NothingType
+	divide__overload$1: (self: AlgebraicType, by: IntegerType) => OptionalType<AlgebraicType>
 	// divide(by: Rational) -> Optional<Algebraic>
-	divide__overload$2: (self: AlgebraicType, by: RationalType) => AlgebraicType | NothingType
+	divide__overload$2: (self: AlgebraicType, by: RationalType) => OptionalType<AlgebraicType>
 	// divide(by: Algebraic) -> Optional<Rational | Algebraic>
-	divide__overload$3: (self: AlgebraicType, by: AlgebraicType) => RationalType | AlgebraicType | NothingType
+	divide__overload$3: (self: AlgebraicType, by: AlgebraicType) => OptionalType<RationalType | AlgebraicType>
 	// negate() -> Algebraic
 	negate: (self: AlgebraicType) => AlgebraicType
 	// toString() -> String
@@ -176,11 +176,11 @@ export type TranscendentalNatives = {
 	// multiply(with: Rational) -> Transcendental | Rational
 	multiply__overload$2: (self: TranscendentalType, argument1: RationalType) => TranscendentalType | RationalType
 	// divide(by: Integer) -> Optional<Transcendental>
-	divide__overload$1: (self: TranscendentalType, by: IntegerType) => TranscendentalType | NothingType
+	divide__overload$1: (self: TranscendentalType, by: IntegerType) => OptionalType<TranscendentalType>
 	// divide(by: Rational) -> Optional<Transcendental>
-	divide__overload$2: (self: TranscendentalType, by: RationalType) => TranscendentalType | NothingType
+	divide__overload$2: (self: TranscendentalType, by: RationalType) => OptionalType<TranscendentalType>
 	// divide(by: Transcendental) -> Optional<Rational>
-	divide__overload$3: (self: TranscendentalType, by: TranscendentalType) => RationalType | NothingType
+	divide__overload$3: (self: TranscendentalType, by: TranscendentalType) => OptionalType<RationalType>
 	// negate() -> Transcendental
 	negate: (self: TranscendentalType) => TranscendentalType
 	// toString() -> String
@@ -201,6 +201,10 @@ export type NothingNatives = {
 }
 
 export type OptionalNatives = {
+
+}
+
+export type NestedOptionalNatives = {
 
 }
 
@@ -253,7 +257,7 @@ export type ListNatives = {
 	// keepEvery<ItemType>(where: (_: ItemType) -> Boolean) -> List<ItemType>
 	keepEvery: <ItemType extends AnyType>(self: ListType<ItemType>, where: (argument0: ItemType) => BooleanType) => ListType<ItemType>
 	// item<ItemType>(at: Integer) -> Optional<ItemType>
-	item: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => ItemType | NothingType
+	item: <ItemType extends AnyType>(self: ListType<ItemType>, at: IntegerType) => OptionalType<ItemType>
 	// slice<ItemType>(from: Integer, to: Integer) -> List<ItemType>
 	slice: <ItemType extends AnyType>(self: ListType<ItemType>, from: IntegerType, to: IntegerType) => ListType<ItemType>
 	// reverse<ItemType>() -> List<ItemType>
@@ -269,7 +273,7 @@ export type ListNatives = {
 	// pair<ItemType, Other>(with: List<Other>) -> List<{ first: ItemType, second: Other }>
 	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
 	// split<ItemType>(intoGroupsOf: Integer) -> Optional<List<List<ItemType>>>
-	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => ListType<ListType<ItemType>> | NothingType
+	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => OptionalType<ListType<ListType<ItemType>>>
 	// static of(integersFrom: Integer, through: Integer) -> List<Integer>
 	of: (integersFrom: IntegerType, through: IntegerType) => ListType<IntegerType>
 }
@@ -391,7 +395,11 @@ export const $NothingAbsent: AssertNoEssenceExports<typeof import("./Nothing"), 
 
 declare const OptionalModule: typeof import("./Optional")
 export const $Optional: OptionalNatives = OptionalModule
-export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "otherwise" | "hasValue" | "isNothing"> = true
+export const $OptionalAbsent: AssertNoEssenceExports<typeof import("./Optional"), "toString" | "otherwise" | "hasValue" | "isEmpty" | "map" | "keep"> = true
+
+declare const NestedOptionalModule: typeof import("./NestedOptional")
+export const $NestedOptional: NestedOptionalNatives = NestedOptionalModule
+export const $NestedOptionalAbsent: AssertNoEssenceExports<typeof import("./NestedOptional"), "flatten"> = true
 
 declare const OrderingModule: typeof import("./Ordering")
 export const $Ordering: OrderingNatives = OrderingModule

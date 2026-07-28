@@ -7,6 +7,7 @@ import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
 import * as list from "@essence-lang/runtime/List"
 import { createNothing } from "@essence-lang/runtime/Nothing"
 import * as number from "@essence-lang/runtime/Number"
+import * as optional from "@essence-lang/runtime/Optional"
 import * as ordering from "@essence-lang/runtime/Ordering"
 import * as rational from "@essence-lang/runtime/Rational"
 import * as record from "@essence-lang/runtime/Record"
@@ -824,16 +825,21 @@ describe("Rewriter", () => {
 		})
 
 		describe("Rational", () => {
+			// NOTE: `of` is fallible, and `Optional` is a nominal generic Choice
+			// now rather than a Type Alias for `Rational | Nothing` — so the
+			// answer is a tagged Case either way: `#Value` carrying the Rational
+			// under `item`, or the payload-less `#Empty`. The Rational itself is
+			// still asserted on in full, one wrapper deeper.
 			describe("of", () => {
 				it("creates a rational", () => {
 					expect(rational.of(integerOne(), integerTwo())).toEqual(
-						rationalOneHalf(),
+						optional.createValue(rationalOneHalf()),
 					)
 				})
 
-				it("returns Nothing for a zero denominator", () => {
+				it("is empty for a zero denominator", () => {
 					expect(rational.of(integerOne(), integerZero())).toEqual(
-						nothing(),
+						optional.createEmpty(),
 					)
 				})
 			})
@@ -1101,6 +1107,12 @@ describe("Rewriter", () => {
 				})
 			})
 
+			// NOTE: `item` is fallible, and `Optional` is a nominal generic
+			// Choice now rather than a Type Alias for `ItemType | Nothing` — so
+			// a hit answers `#Value` carrying the item under `item`, and a miss
+			// answers the payload-less `#Empty`. Which item was found is still
+			// asserted on in full, one wrapper deeper; the wrapper is also what
+			// keeps a List whose items are themselves Optionals unambiguous.
 			describe("item", () => {
 				it("returns the item at a position inside the list", () => {
 					expect(
@@ -1108,16 +1120,16 @@ describe("Rewriter", () => {
 							list.createList([integerOne(), integerTwo()]),
 							integerOne(),
 						),
-					).toEqual(integerTwo())
+					).toEqual(optional.createValue(integerTwo()))
 				})
 
-				it("returns nothing for a position outside the list", () => {
+				it("is empty for a position outside the list", () => {
 					expect(
 						list.item(
 							list.createList([integerOne()]),
 							integerTwo(),
 						),
-					).toEqual(nothing())
+					).toEqual(optional.createEmpty())
 					// NOTE: -1 names the last item, so the position that falls
 					// outside a one-item List from below is -2.
 					expect(
@@ -1125,7 +1137,7 @@ describe("Rewriter", () => {
 							list.createList([integerOne()]),
 							integer.createInteger(-2n),
 						),
-					).toEqual(nothing())
+					).toEqual(optional.createEmpty())
 				})
 
 				it("counts a negative position back from the end", () => {
@@ -1134,13 +1146,13 @@ describe("Rewriter", () => {
 							list.createList([integerOne(), integerTwo()]),
 							integer.createInteger(-1n),
 						),
-					).toEqual(integerTwo())
+					).toEqual(optional.createValue(integerTwo()))
 					expect(
 						list.item(
 							list.createList([integerOne(), integerTwo()]),
 							integer.createInteger(-2n),
 						),
-					).toEqual(integerOne())
+					).toEqual(optional.createValue(integerOne()))
 				})
 			})
 

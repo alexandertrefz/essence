@@ -42,6 +42,7 @@ export const runtimeNamespaceNames = [
 	"Boolean",
 	"Nothing",
 	"Optional",
+	"NestedOptional",
 	"Ordering",
 	"Side",
 	"Case",

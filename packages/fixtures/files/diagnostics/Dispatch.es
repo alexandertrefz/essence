@@ -12,6 +12,10 @@ implementation {
 	§ unknown-method — with a near miss offered from the same Namespaces.
 	constant length = "essence"::lenght()
 
+	§ unknown-method again, on a receiver several Namespaces answer for — the
+	§ Note names every one that was searched, not just the first.
+	constant magnitude = 1::lenght()
+
 	§ no-matching-overload — every candidate signature is listed.
 	constant piece = "essence"::prepend()
 

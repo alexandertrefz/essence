@@ -1643,9 +1643,14 @@ export {
 
 				// NOTE: The builtins come first — they are the parent of every
 				// import — and `Alpha` precedes `Zulu` although `Zulu` was
-				// written first.
+				// written first. Only the Namespaces an Integer can actually
+				// reach are listed: `Optional` used to appear here as well,
+				// because `Optional<ItemType>` was a Type Alias for
+				// `ItemType | Nothing` and an Integer is a member of
+				// `Integer | Nothing`. Now that `Optional` is a nominal Choice
+				// an Integer is not one, so its Namespace is not searched.
 				expect(unknownMethod?.notes[0]).toContain(
-					"'Integer', 'Number', 'Optional', 'Alpha', 'Zulu'",
+					"'Integer', 'Number', 'Alpha', 'Zulu'",
 				)
 			},
 		)

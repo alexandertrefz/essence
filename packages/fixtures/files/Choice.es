@@ -16,26 +16,33 @@ implementation {
 
 	constant operation: CalculatorOperation = #Add({ left = 1, right = 1 })
 
-	constant result = match operation -> Number | Nothing {
-		case #Add        { <- @.left::add(@.right) }
+	§ `divide` and `squareRoot` are already fallible, so their arms hand their
+	§ Optional on; the total ones wrap what they computed.
+	constant result = match operation -> Optional<Number> {
+		case #Add        { <- #Value(@.left::add(@.right)) }
 
-		case #Subtract   { <- @.left::subtract(@.right) }
+		case #Subtract   { <- #Value(@.left::subtract(@.right)) }
 
 		case #Divide     { <- @.left::divide(by @.right) }
 
-		case #Multiply   { <- @.left::multiply(with @.right) }
+		case #Multiply   { <- #Value(@.left::multiply(with @.right)) }
 
 		case #SquareRoot { <- @.number::squareRoot() }
 
-		case _           { <- nothing }
+		case _           { <- #Empty }
 	}
 
 	__print(match result -> String {
-		case Nothing        { <- "nothing" }
-		case Integer        { <- @::toString() }
-		case Rational       { <- @::toString() }
-		case Algebraic      { <- @::toString() }
-		case Transcendental { <- @::toString() }
+		case #Empty { <- "nothing" }
+
+		case #Value(value) {
+			<- match value -> String {
+				case Integer        { <- @::toString() }
+				case Rational       { <- @::toString() }
+				case Algebraic      { <- @::toString() }
+				case Transcendental { <- @::toString() }
+			}
+		}
 	})
 
 	constant cleared: CalculatorOperation = #ClearAll

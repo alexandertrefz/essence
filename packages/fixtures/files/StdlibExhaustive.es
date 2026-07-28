@@ -22,8 +22,9 @@ implementation {
 	§ to be able to find where the label ends.
 
 	§ `show` takes anything Printable, which is every Type a standard library
-	§ Method returns except an `Optional` — an `ItemType | Nothing` Union
-	§ belongs to no Namespace, so `showMaybe` matches it apart first.
+	§ Method returns — an `Optional` included, since it is a Choice with a
+	§ Namespace of its own and conforms whenever its payload does. It used to
+	§ need a `showMaybe` beside it that matched the Optional apart first.
 	function show<infer Value is Printable>(
 		_ label: String,
 		_ value: Value,
@@ -32,25 +33,20 @@ implementation {
 		<- nothing
 	}
 
-	function showMaybe<infer Value is Printable>(
-		_ label: String,
-		_ value: Optional<Value>,
-	) -> Nothing {
-		<- show(label, match value -> String {
-			case Nothing { <- "Nothing" }
-			case Value   { <- @::toString() }
-		})
-	}
-
 	§ An Algebraic can not be written as a literal — it is only ever reached
 	§ through `squareRoot`, whose result is an Optional the caller has to
 	§ match apart. These two hand one to a body so that the Methods needing
 	§ an Algebraic receiver or Argument read as ordinary calls.
 	function withRootTwo(_ body: (_ rootTwo: Algebraic) -> Nothing) -> Nothing {
 		<- match 2::squareRoot() -> Nothing {
-			case Algebraic { <- body(@) }
-			case Integer   { <- nothing }
-			case Nothing   { <- nothing }
+			case #Value(root) {
+				<- match root -> Nothing {
+					case Algebraic { <- body(@) }
+					case Integer   { <- nothing }
+				}
+			}
+
+			case #Empty { <- nothing }
 		}
 	}
 
@@ -59,9 +55,14 @@ implementation {
 	) -> Nothing {
 		<- withRootTwo((_ rootTwo: Algebraic) -> Nothing {
 			<- match 3::squareRoot() -> Nothing {
-				case Algebraic { <- body(rootTwo, @) }
-				case Integer   { <- nothing }
-				case Nothing   { <- nothing }
+				case #Value(root) {
+					<- match root -> Nothing {
+						case Algebraic { <- body(rootTwo, @) }
+						case Integer   { <- nothing }
+					}
+				}
+
+				case #Empty { <- nothing }
 			}
 		})
 	}
@@ -123,21 +124,18 @@ third"::lines())
 	show("String.length() [astral]", "a😀b"::length())
 	show("String.characters()", "a😀b"::characters())
 	show("String.characters() [empty]", emptyText::characters())
-	showMaybe("String.character(at: Integer)", greeting::character(at 1))
-	showMaybe("String.character(at: Integer) [zero]", greeting::character(at 0))
-	showMaybe(
-		"String.character(at: Integer) [negative]",
-		greeting::character(at -1),
-	)
-	showMaybe(
+	show("String.character(at: Integer)", greeting::character(at 1))
+	show("String.character(at: Integer) [zero]", greeting::character(at 0))
+	show("String.character(at: Integer) [negative]", greeting::character(at -1))
+	show(
 		"String.character(at: Integer) [at length]",
 		greeting::character(at greeting::length()),
 	)
-	showMaybe(
+	show(
 		"String.character(at: Integer) [from the end, first]",
 		greeting::character(at 0::subtract(greeting::length())),
 	)
-	showMaybe(
+	show(
 		"String.character(at: Integer) [before the start]",
 		greeting::character(at -99),
 	)
@@ -222,16 +220,13 @@ third"::lines())
 		"String.slice(from: Integer, to: Integer) [negative past the start]",
 		greeting::slice(from -99, to 5),
 	)
-	showMaybe("String.firstIndex(of: String)", greeting::firstIndex(of "World"))
-	showMaybe(
+	show("String.firstIndex(of: String)", greeting::firstIndex(of "World"))
+	show(
 		"String.firstIndex(of: String) [absent]",
 		greeting::firstIndex(of "zz"),
 	)
-	showMaybe("String.lastIndex(of: String)", "a-b-a"::lastIndex(of "a"))
-	showMaybe(
-		"String.lastIndex(of: String) [absent]",
-		greeting::lastIndex(of "zz"),
-	)
+	show("String.lastIndex(of: String)", "a-b-a"::lastIndex(of "a"))
+	show("String.lastIndex(of: String) [absent]", greeting::lastIndex(of "zz"))
 	show("String.pad(to: Integer, with: String)", "7"::pad(to 3, with "0"))
 	show(
 		"String.pad(to: Integer, with: String) [already long enough]",
@@ -329,10 +324,10 @@ third"::lines())
 	show("Integer.subtract(_ Integer)", 1234::subtract(234))
 	show("Integer.subtract(_ Rational)", 1::subtract(1/2))
 	show("Integer.subtract(_ Transcendental)", 1::subtract(Number.PI))
-	showMaybe("Integer.divide(by: Integer)", 1110::divide(by 2))
-	showMaybe("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
-	showMaybe("Integer.divide(by: Rational)", 1::divide(by 1/2))
-	showMaybe("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
+	show("Integer.divide(by: Integer)", 1110::divide(by 2))
+	show("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
+	show("Integer.divide(by: Rational)", 1::divide(by 1/2))
+	show("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
 	show("Integer.multiply(with: Integer)", 100::multiply(with 1000))
 	show(
 		"Integer.multiply(with: Integer) [beyond IEEE 754]",
@@ -378,10 +373,10 @@ third"::lines())
 		"Integer.isGreaterThanOrEqualTo(_ Rational) [less]",
 		1::isGreaterThanOrEqualTo(3/2),
 	)
-	showMaybe("Integer.squareRoot() [perfect square]", 9::squareRoot())
-	showMaybe("Integer.squareRoot() [irrational]", 2::squareRoot())
-	showMaybe("Integer.squareRoot() [zero]", 0::squareRoot())
-	showMaybe("Integer.squareRoot() [negative]", -1::squareRoot())
+	show("Integer.squareRoot() [perfect square]", 9::squareRoot())
+	show("Integer.squareRoot() [irrational]", 2::squareRoot())
+	show("Integer.squareRoot() [zero]", 0::squareRoot())
+	show("Integer.squareRoot() [negative]", -1::squareRoot())
 	show("Integer.absolute()", -5::absolute())
 	show("Integer.absolute() [positive]", 5::absolute())
 	show("Integer.negate()", 5::negate())
@@ -396,67 +391,61 @@ third"::lines())
 	show("Integer.isNegative() [zero]", 0::isNegative())
 	show("Integer.isZero()", 0::isZero())
 	show("Integer.isZero() [non zero]", 1::isZero())
-	showMaybe(
-		"Integer.remainder(dividingBy: Integer)",
-		7::remainder(dividingBy 3),
-	)
-	showMaybe(
+	show("Integer.remainder(dividingBy: Integer)", 7::remainder(dividingBy 3))
+	show(
 		"Integer.remainder(dividingBy: Integer) [negative dividend]",
 		-7::remainder(dividingBy 3),
 	)
-	showMaybe(
+	show(
 		"Integer.remainder(dividingBy: Integer) [by zero]",
 		7::remainder(dividingBy 0),
 	)
-	showMaybe(
-		"Integer.quotient(dividingBy: Integer)",
-		7::quotient(dividingBy 3),
-	)
-	showMaybe(
+	show("Integer.quotient(dividingBy: Integer)", 7::quotient(dividingBy 3))
+	show(
 		"Integer.quotient(dividingBy: Integer) [negative dividend]",
 		-7::quotient(dividingBy 3),
 	)
-	showMaybe(
+	show(
 		"Integer.quotient(dividingBy: Integer) [negative divisor]",
 		7::quotient(dividingBy -3),
 	)
-	showMaybe(
+	show(
 		"Integer.quotient(dividingBy: Integer) [by zero]",
 		7::quotient(dividingBy 0),
 	)
-	showMaybe("Integer.raise(to: Integer)", 2::raise(to 10))
-	showMaybe("Integer.raise(to: Integer) [zero exponent]", 2::raise(to 0))
-	showMaybe("Integer.raise(to: Integer) [negative exponent]", 2::raise(to -2))
-	showMaybe(
+	show("Integer.raise(to: Integer)", 2::raise(to 10))
+	show("Integer.raise(to: Integer) [zero exponent]", 2::raise(to 0))
+	show("Integer.raise(to: Integer) [negative exponent]", 2::raise(to -2))
+	show(
 		"Integer.raise(to: Integer) [zero to a negative power]",
 		0::raise(to -1),
 	)
-	showMaybe(
+	show(
 		"Integer.clamp(between: Integer, and: Integer) [above]",
 		15::clamp(between 1, and 10),
 	)
-	showMaybe(
+	show(
 		"Integer.clamp(between: Integer, and: Integer) [below]",
 		-2::clamp(between 1, and 10),
 	)
-	showMaybe(
+	show(
 		"Integer.clamp(between: Integer, and: Integer) [within]",
 		5::clamp(between 1, and 10),
 	)
-	showMaybe(
+	show(
 		"Integer.clamp(between: Integer, and: Integer) [inverted bounds]",
 		5::clamp(between 10, and 1),
 	)
-	showMaybe("Integer.parse(_ String)", Integer.parse("42"))
-	showMaybe("Integer.parse(_ String) [negative]", Integer.parse("-42"))
-	showMaybe("Integer.parse(_ String) [not a number]", Integer.parse("nope"))
-	showMaybe("Integer.parse(_ String) [empty]", Integer.parse(emptyText))
-	showMaybe("Integer.parse(_ String) [leading zeroes]", Integer.parse("007"))
-	showMaybe("Integer.parse(_ String) [plus sign]", Integer.parse("+42"))
-	showMaybe("Integer.parse(_ String) [decimal point]", Integer.parse("4.2"))
-	showMaybe("Integer.parse(_ String) [double sign]", Integer.parse("--42"))
-	showMaybe("Integer.parse(_ String) [sign alone]", Integer.parse("-"))
-	showMaybe("Integer.parse(_ String) [inner sign]", Integer.parse("4-2"))
+	show("Integer.parse(_ String)", Integer.parse("42"))
+	show("Integer.parse(_ String) [negative]", Integer.parse("-42"))
+	show("Integer.parse(_ String) [not a number]", Integer.parse("nope"))
+	show("Integer.parse(_ String) [empty]", Integer.parse(emptyText))
+	show("Integer.parse(_ String) [leading zeroes]", Integer.parse("007"))
+	show("Integer.parse(_ String) [plus sign]", Integer.parse("+42"))
+	show("Integer.parse(_ String) [decimal point]", Integer.parse("4.2"))
+	show("Integer.parse(_ String) [double sign]", Integer.parse("--42"))
+	show("Integer.parse(_ String) [sign alone]", Integer.parse("-"))
+	show("Integer.parse(_ String) [inner sign]", Integer.parse("4-2"))
 	show("Integer.toString()", 42::toString())
 	show("Integer.toString() [negative]", -42::toString())
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
@@ -476,12 +465,12 @@ third"::lines())
 	})
 
 	§ ——— Rational —————————————————————————————————————————————————————————
-	showMaybe("Rational.of(_ Integer, over: Integer)", Rational.of(1, over 2))
-	showMaybe(
+	show("Rational.of(_ Integer, over: Integer)", Rational.of(1, over 2))
+	show(
 		"Rational.of(_ Integer, over: Integer) [over zero]",
 		Rational.of(1, over 0),
 	)
-	showMaybe(
+	show(
 		"Rational.of(_ Integer, over: Integer) [not reduced]",
 		Rational.of(4, over 8),
 	)
@@ -496,10 +485,10 @@ third"::lines())
 	show("Rational.subtract(_ Rational)", 1/2::subtract(1/3))
 	show("Rational.subtract(_ Integer)", 1/2::subtract(1))
 	show("Rational.subtract(_ Transcendental)", 1/2::subtract(Number.PI))
-	showMaybe("Rational.divide(by: Rational)", 1/2::divide(by 1/6))
-	showMaybe("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
-	showMaybe("Rational.divide(by: Integer)", 1/2::divide(by 2))
-	showMaybe("Rational.divide(by: Integer) [by zero]", 1/2::divide(by 0))
+	show("Rational.divide(by: Rational)", 1/2::divide(by 1/6))
+	show("Rational.divide(by: Rational) [by zero]", 1/2::divide(by 0/1))
+	show("Rational.divide(by: Integer)", 1/2::divide(by 2))
+	show("Rational.divide(by: Integer) [by zero]", 1/2::divide(by 0))
 	show("Rational.multiply(with: Rational)", 1/2::multiply(with 2/3))
 	show("Rational.multiply(with: Integer)", 1/2::multiply(with 2))
 	show(
@@ -547,15 +536,15 @@ third"::lines())
 		"Rational.isGreaterThanOrEqualTo(_ Integer) [less]",
 		1/2::isGreaterThanOrEqualTo(1),
 	)
-	showMaybe("Rational.squareRoot() [perfect square]", 1/4::squareRoot())
-	showMaybe("Rational.squareRoot() [irrational]", 1/2::squareRoot())
-	showMaybe("Rational.squareRoot() [negative]", -1/2::squareRoot())
+	show("Rational.squareRoot() [perfect square]", 1/4::squareRoot())
+	show("Rational.squareRoot() [irrational]", 1/2::squareRoot())
+	show("Rational.squareRoot() [negative]", -1/2::squareRoot())
 	show("Rational.numerator()", 3/4::numerator())
 	show("Rational.denominator()", 3/4::denominator())
 	show("Rational.absolute()", -3/4::absolute())
 	show("Rational.negate()", 3/4::negate())
-	showMaybe("Rational.reciprocal()", 3/4::reciprocal())
-	showMaybe("Rational.reciprocal() [of zero]", 0/1::reciprocal())
+	show("Rational.reciprocal()", 3/4::reciprocal())
+	show("Rational.reciprocal() [of zero]", 0/1::reciprocal())
 	show("Rational.isWholeNumber()", 4/2::isWholeNumber())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
 	show("Rational.round()", 7/2::round())
@@ -591,50 +580,35 @@ third"::lines())
 		"Rational.round(toward: Rounding) [below a half]",
 		1/4::round(toward #Nearest),
 	)
-	showMaybe("Rational.raise(to: Integer)", 2/3::raise(to 2))
-	showMaybe("Rational.raise(to: Integer) [zero exponent]", 2/3::raise(to 0))
-	showMaybe(
-		"Rational.raise(to: Integer) [negative exponent]",
-		2/3::raise(to -2),
-	)
-	showMaybe(
+	show("Rational.raise(to: Integer)", 2/3::raise(to 2))
+	show("Rational.raise(to: Integer) [zero exponent]", 2/3::raise(to 0))
+	show("Rational.raise(to: Integer) [negative exponent]", 2/3::raise(to -2))
+	show(
 		"Rational.raise(to: Integer) [zero to a negative power]",
 		0/1::raise(to -1),
 	)
-	showMaybe("Rational.parse(_ String)", Rational.parse("0.75"))
-	showMaybe("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
-	showMaybe("Rational.parse(_ String) [fraction]", Rational.parse("3/4"))
-	showMaybe(
-		"Rational.parse(_ String) [negative fraction]",
-		Rational.parse("-3/4"),
-	)
-	showMaybe(
+	show("Rational.parse(_ String)", Rational.parse("0.75"))
+	show("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
+	show("Rational.parse(_ String) [fraction]", Rational.parse("3/4"))
+	show("Rational.parse(_ String) [negative fraction]", Rational.parse("-3/4"))
+	show(
 		"Rational.parse(_ String) [unreduced fraction]",
 		Rational.parse("-3/6"),
 	)
-	showMaybe(
-		"Rational.parse(_ String) [negative decimal]",
-		Rational.parse("-1.5"),
-	)
-	showMaybe("Rational.parse(_ String) [whole]", Rational.parse("5"))
-	showMaybe(
-		"Rational.parse(_ String) [zero denominator]",
-		Rational.parse("1/0"),
-	)
-	showMaybe(
+	show("Rational.parse(_ String) [negative decimal]", Rational.parse("-1.5"))
+	show("Rational.parse(_ String) [whole]", Rational.parse("5"))
+	show("Rational.parse(_ String) [zero denominator]", Rational.parse("1/0"))
+	show(
 		"Rational.parse(_ String) [signed denominator]",
 		Rational.parse("1/-2"),
 	)
-	showMaybe("Rational.parse(_ String) [double sign]", Rational.parse("--1/2"))
-	showMaybe("Rational.parse(_ String) [two slashes]", Rational.parse("1/2/3"))
-	showMaybe("Rational.parse(_ String) [trailing dot]", Rational.parse("1."))
-	showMaybe("Rational.parse(_ String) [leading dot]", Rational.parse(".5"))
-	showMaybe("Rational.parse(_ String) [two dots]", Rational.parse("1.2.3"))
-	showMaybe(
-		"Rational.parse(_ String) [trailing zeroes]",
-		Rational.parse("0.750"),
-	)
-	showMaybe("Rational.parse(_ String) [empty]", Rational.parse(emptyText))
+	show("Rational.parse(_ String) [double sign]", Rational.parse("--1/2"))
+	show("Rational.parse(_ String) [two slashes]", Rational.parse("1/2/3"))
+	show("Rational.parse(_ String) [trailing dot]", Rational.parse("1."))
+	show("Rational.parse(_ String) [leading dot]", Rational.parse(".5"))
+	show("Rational.parse(_ String) [two dots]", Rational.parse("1.2.3"))
+	show("Rational.parse(_ String) [trailing zeroes]", Rational.parse("0.750"))
+	show("Rational.parse(_ String) [empty]", Rational.parse(emptyText))
 	show("Rational.toString()", 3/4::toString())
 	show("Rational.toString() [whole]", 4/2::toString())
 	show(
@@ -681,21 +655,18 @@ third"::lines())
 		)
 		show("Algebraic.add(_ Integer)", rootTwo::add(1))
 		show("Algebraic.add(_ Rational)", rootTwo::add(1/2))
-		showMaybe(
-			"Algebraic.add(_ Algebraic) [same radical]",
-			rootTwo::add(rootTwo),
-		)
-		showMaybe(
+		show("Algebraic.add(_ Algebraic) [same radical]", rootTwo::add(rootTwo))
+		show(
 			"Algebraic.add(_ Algebraic) [differing radicals]",
 			rootTwo::add(rootThree),
 		)
 		show("Algebraic.subtract(_ Integer)", rootTwo::subtract(1))
 		show("Algebraic.subtract(_ Rational)", rootTwo::subtract(1/2))
-		showMaybe(
+		show(
 			"Algebraic.subtract(_ Algebraic) [same radical]",
 			rootTwo::subtract(rootTwo),
 		)
-		showMaybe(
+		show(
 			"Algebraic.subtract(_ Algebraic) [differing radicals]",
 			rootTwo::subtract(rootThree),
 		)
@@ -705,29 +676,26 @@ third"::lines())
 			rootTwo::multiply(with 0),
 		)
 		show("Algebraic.multiply(with: Rational)", rootTwo::multiply(with 1/2))
-		showMaybe(
+		show(
 			"Algebraic.multiply(with: Algebraic) [same radical]",
 			rootTwo::multiply(with rootTwo),
 		)
-		showMaybe(
+		show(
 			"Algebraic.multiply(with: Algebraic) [differing radicals]",
 			rootTwo::multiply(with rootThree),
 		)
-		showMaybe("Algebraic.divide(by: Integer)", rootTwo::divide(by 2))
-		showMaybe(
-			"Algebraic.divide(by: Integer) [by zero]",
-			rootTwo::divide(by 0),
-		)
-		showMaybe("Algebraic.divide(by: Rational)", rootTwo::divide(by 1/2))
-		showMaybe(
+		show("Algebraic.divide(by: Integer)", rootTwo::divide(by 2))
+		show("Algebraic.divide(by: Integer) [by zero]", rootTwo::divide(by 0))
+		show("Algebraic.divide(by: Rational)", rootTwo::divide(by 1/2))
+		show(
 			"Algebraic.divide(by: Rational) [by zero]",
 			rootTwo::divide(by 0/1),
 		)
-		showMaybe(
+		show(
 			"Algebraic.divide(by: Algebraic) [same radical]",
 			rootTwo::divide(by rootTwo),
 		)
-		showMaybe(
+		show(
 			"Algebraic.divide(by: Algebraic) [differing radicals]",
 			rootTwo::divide(by rootThree),
 		)
@@ -771,17 +739,17 @@ third"::lines())
 		"Transcendental.multiply(with: Rational)",
 		Number.PI::multiply(with 1/2),
 	)
-	showMaybe("Transcendental.divide(by: Integer)", Number.PI::divide(by 2))
-	showMaybe(
+	show("Transcendental.divide(by: Integer)", Number.PI::divide(by 2))
+	show(
 		"Transcendental.divide(by: Integer) [by zero]",
 		Number.PI::divide(by 0),
 	)
-	showMaybe("Transcendental.divide(by: Rational)", Number.PI::divide(by 1/2))
-	showMaybe(
+	show("Transcendental.divide(by: Rational)", Number.PI::divide(by 1/2))
+	show(
 		"Transcendental.divide(by: Rational) [by zero]",
 		Number.PI::divide(by 0/1),
 	)
-	showMaybe(
+	show(
 		"Transcendental.divide(by: Transcendental) [proportional]",
 		Number.TAU::divide(by Number.PI),
 	)
@@ -950,21 +918,15 @@ third"::lines())
 		"Number.product(_ List<Integer | Rational>) [empty]",
 		Number.product(noMixedNumbers),
 	)
-	showMaybe("Number.average(_ List<Integer>)", Number.average([1, 2]))
-	showMaybe(
-		"Number.average(_ List<Integer>) [empty]",
-		Number.average(noNumbers),
-	)
-	showMaybe("Number.average(_ List<Rational>)", Number.average([1/2, 1/3]))
-	showMaybe(
+	show("Number.average(_ List<Integer>)", Number.average([1, 2]))
+	show("Number.average(_ List<Integer>) [empty]", Number.average(noNumbers))
+	show("Number.average(_ List<Rational>)", Number.average([1/2, 1/3]))
+	show(
 		"Number.average(_ List<Rational>) [empty]",
 		Number.average(noRationals),
 	)
-	showMaybe(
-		"Number.average(_ List<Integer | Rational>)",
-		Number.average([1, 1/2]),
-	)
-	showMaybe(
+	show("Number.average(_ List<Integer | Rational>)", Number.average([1, 1/2]))
+	show(
 		"Number.average(_ List<Integer | Rational>) [empty]",
 		Number.average(noMixedNumbers),
 	)
@@ -981,27 +943,24 @@ third"::lines())
 		"Number.lowestNumber(_ Rational, _ Integer)",
 		Number.lowestNumber(2/3, 1),
 	)
-	showMaybe(
-		"Number.lowestNumber(_ List<Integer>)",
-		Number.lowestNumber([3, 1, 2]),
-	)
-	showMaybe(
+	show("Number.lowestNumber(_ List<Integer>)", Number.lowestNumber([3, 1, 2]))
+	show(
 		"Number.lowestNumber(_ List<Integer>) [empty]",
 		Number.lowestNumber(noNumbers),
 	)
-	showMaybe(
+	show(
 		"Number.lowestNumber(_ List<Rational>)",
 		Number.lowestNumber([1/2, 1/3]),
 	)
-	showMaybe(
+	show(
 		"Number.lowestNumber(_ List<Rational>) [empty]",
 		Number.lowestNumber(noRationals),
 	)
-	showMaybe(
+	show(
 		"Number.lowestNumber(_ List<Integer | Rational>)",
 		Number.lowestNumber([1, 1/2]),
 	)
-	showMaybe(
+	show(
 		"Number.lowestNumber(_ List<Integer | Rational>) [empty]",
 		Number.lowestNumber(noMixedNumbers),
 	)
@@ -1021,27 +980,27 @@ third"::lines())
 		"Number.greatestNumber(_ Rational, _ Integer)",
 		Number.greatestNumber(2/3, 1),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Integer>)",
 		Number.greatestNumber([3, 1, 2]),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Integer>) [empty]",
 		Number.greatestNumber(noNumbers),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Rational>)",
 		Number.greatestNumber([1/2, 1/3]),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Rational>) [empty]",
 		Number.greatestNumber(noRationals),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Integer | Rational>)",
 		Number.greatestNumber([1, 1/2]),
 	)
-	showMaybe(
+	show(
 		"Number.greatestNumber(_ List<Integer | Rational>) [empty]",
 		Number.greatestNumber(noMixedNumbers),
 	)
@@ -1053,22 +1012,86 @@ third"::lines())
 
 	§ ——— Optional —————————————————————————————————————————————————————————
 	show(
+		"Optional.toString<ItemType is Printable>()",
+		numbers::firstItem()::toString(),
+	)
+	show(
+		"Optional.toString<ItemType is Printable>() [empty]",
+		noNumbers::firstItem()::toString(),
+	)
+	show(
 		"Optional.otherwise<ItemType>(_ ItemType) [present]",
 		numbers::firstItem()::otherwise(0),
 	)
 	show(
-		"Optional.otherwise<ItemType>(_ ItemType) [Nothing]",
+		"Optional.otherwise<ItemType>(_ ItemType) [empty]",
 		noNumbers::firstItem()::otherwise(42),
 	)
 	show("Optional.hasValue<ItemType>()", numbers::firstItem()::hasValue())
 	show(
-		"Optional.hasValue<ItemType>() [Nothing]",
+		"Optional.hasValue<ItemType>() [empty]",
 		noNumbers::firstItem()::hasValue(),
 	)
-	show("Optional.isNothing<ItemType>()", noNumbers::firstItem()::isNothing())
+	show("Optional.isEmpty<ItemType>()", noNumbers::firstItem()::isEmpty())
 	show(
-		"Optional.isNothing<ItemType>() [present]",
-		numbers::firstItem()::isNothing(),
+		"Optional.isEmpty<ItemType>() [present]",
+		numbers::firstItem()::isEmpty(),
+	)
+	show(
+		"Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType)",
+		numbers::firstItem()::map((item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"Optional.map<ItemType, ResultType>(_ (_ ItemType) -> ResultType) [empty]",
+		noNumbers::firstItem()::map((item) { <- item::multiply(with 10) }),
+	)
+	show(
+		"Optional.keep<ItemType>(where: (_ ItemType) -> Boolean)",
+		numbers::firstItem()::keep(where (item) { <- item::isPositive() }),
+	)
+	show(
+		"Optional.keep<ItemType>(where: (_ ItemType) -> Boolean) [rejected]",
+		numbers::firstItem()::keep(where (item) { <- item::isNegative() }),
+	)
+
+	§ Equality is DERIVED, not written — a Choice compares by tag and then by
+	§ payload, through the payload's own `is`.
+	show(
+		"Choice_Equatable.is(_ Optional<ItemType>)",
+		numbers::firstItem()::is(#Value(3)),
+	)
+	show(
+		"Choice_Equatable.is(_ Optional<ItemType>) [different payload]",
+		numbers::firstItem()::is(#Value(1)),
+	)
+	show(
+		"Choice_Equatable.is(_ Optional<ItemType>) [empty against value]",
+		noNumbers::firstItem()::is(#Value(3)),
+	)
+	show(
+		"Choice_Equatable.is(_ Optional<ItemType>) [both empty]",
+		noNumbers::firstItem()::is(#Empty),
+	)
+	show(
+		"Choice_Equatable.isNot(_ Optional<ItemType>)",
+		numbers::firstItem()::isNot(#Value(2)),
+	)
+
+	§ The nesting a Union-shaped Optional could not represent: the outer
+	§ Optional says whether an item was found, the inner one what it holds.
+	constant nestedOptionals: List<Optional<Integer>> = [#Empty, #Value(7)]
+
+	show(
+		"NestedOptional.flatten<ItemType>()",
+		nestedOptionals::lastItem()::flatten(),
+	)
+	show(
+		"NestedOptional.flatten<ItemType>() [outer empty]",
+		nestedOptionals::item(at 9)::flatten(),
+	)
+	show(
+		"NestedOptional.flatten<ItemType>() [inner empty]",
+		nestedOptionals::firstItem()::flatten(),
 	)
 
 	§ ——— Ordering —————————————————————————————————————————————————————————
@@ -1268,19 +1291,19 @@ third"::lines())
 		"List.doesNotContain<ItemType is Equatable>(_ ItemType) [present]",
 		numbers::doesNotContain(4),
 	)
-	showMaybe("List.firstItem<ItemType>()", numbers::firstItem())
-	showMaybe("List.firstItem<ItemType>() [empty]", noNumbers::firstItem())
-	showMaybe(
+	show("List.firstItem<ItemType>()", numbers::firstItem())
+	show("List.firstItem<ItemType>() [empty]", noNumbers::firstItem())
+	show(
 		"List.firstItem<ItemType>(where: (_ ItemType) -> Boolean)",
 		numbers::firstItem(where (item) { <- item::isGreaterThan(2) }),
 	)
-	showMaybe(
+	show(
 		"List.firstItem<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::firstItem(where (item) { <- item::isGreaterThan(9) }),
 	)
-	showMaybe("List.lastItem<ItemType>()", numbers::lastItem())
-	showMaybe("List.lastItem<ItemType>() [empty]", noNumbers::lastItem())
-	showMaybe("List.lastItem<ItemType>() [single]", singleNumber::lastItem())
+	show("List.lastItem<ItemType>()", numbers::lastItem())
+	show("List.lastItem<ItemType>() [empty]", noNumbers::lastItem())
+	show("List.lastItem<ItemType>() [single]", singleNumber::lastItem())
 	show("List.removeFirst<ItemType>()", numbers::removeFirst())
 	show("List.removeFirst<ItemType>() [empty]", noNumbers::removeFirst())
 	show("List.removeFirst<ItemType>(_ Integer)", numbers::removeFirst(2))
@@ -1412,30 +1435,27 @@ third"::lines())
 		"List.keepEvery<ItemType>(where: (_ ItemType) -> Boolean) [no match]",
 		numbers::keepEvery(where (item) { <- item::isGreaterThan(9) }),
 	)
-	showMaybe("List.item<ItemType>(at: Integer)", numbers::item(at 2))
-	showMaybe("List.item<ItemType>(at: Integer) [zero]", numbers::item(at 0))
-	showMaybe(
-		"List.item<ItemType>(at: Integer) [negative]",
-		numbers::item(at -1),
-	)
-	showMaybe(
+	show("List.item<ItemType>(at: Integer)", numbers::item(at 2))
+	show("List.item<ItemType>(at: Integer) [zero]", numbers::item(at 0))
+	show("List.item<ItemType>(at: Integer) [negative]", numbers::item(at -1))
+	show(
 		"List.item<ItemType>(at: Integer) [at length]",
 		numbers::item(at numbers::length()),
 	)
-	showMaybe("List.item<ItemType>(at: Integer) [empty]", noNumbers::item(at 0))
-	showMaybe(
+	show("List.item<ItemType>(at: Integer) [empty]", noNumbers::item(at 0))
+	show(
 		"List.item<ItemType>(at: Integer) [from the end, first]",
 		numbers::item(at 0::subtract(numbers::length())),
 	)
-	showMaybe(
+	show(
 		"List.item<ItemType>(at: Integer) [before the start]",
 		numbers::item(at -99),
 	)
-	showMaybe(
+	show(
 		"List.firstIndex<ItemType is Equatable>(of: ItemType)",
 		numbers::firstIndex(of 1),
 	)
-	showMaybe(
+	show(
 		"List.firstIndex<ItemType is Equatable>(of: ItemType) [absent]",
 		numbers::firstIndex(of 9),
 	)
@@ -1579,11 +1599,11 @@ third"::lines())
 		"List.replace<ItemType>(_ ItemType, at: Integer) [before the start]",
 		numbers::replace(99, at -99),
 	)
-	showMaybe(
+	show(
 		"List.lastIndex<ItemType is Equatable>(of: ItemType)",
 		numbers::lastIndex(of 1),
 	)
-	showMaybe(
+	show(
 		"List.lastIndex<ItemType is Equatable>(of: ItemType) [absent]",
 		numbers::lastIndex(of 9),
 	)
@@ -1622,19 +1642,19 @@ third"::lines())
 		"List.pair<ItemType, Other>(with: List<Other>) [empty]",
 		["a", "b"]::pair(with noNumbers),
 	)
-	showMaybe(
+	show(
 		"List.split<ItemType>(intoGroupsOf: Integer)",
 		[1, 2, 3, 4, 5]::split(intoGroupsOf 2),
 	)
-	showMaybe(
+	show(
 		"List.split<ItemType>(intoGroupsOf: Integer) [zero]",
 		numbers::split(intoGroupsOf 0),
 	)
-	showMaybe(
+	show(
 		"List.split<ItemType>(intoGroupsOf: Integer) [negative]",
 		numbers::split(intoGroupsOf -1),
 	)
-	showMaybe(
+	show(
 		"List.split<ItemType>(intoGroupsOf: Integer) [empty]",
 		noNumbers::split(intoGroupsOf 2),
 	)

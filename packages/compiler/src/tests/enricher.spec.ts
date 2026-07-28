@@ -85,6 +85,35 @@ function lastConstantFunctionInvocation(
 	return value
 }
 
+// NOTE: The Type an applied `Optional<ItemType>` enriches to. It is no longer
+// the Union `ItemType | Nothing` an Alias expanded to, but the Union of the two
+// Cases the `Optional` Choice declares — each carrying the Type Arguments the
+// application bound, under the applied spelling as the display alias. Written
+// once here because the shape is long and says nothing a test is about; what a
+// test is about is the item Type threaded through it.
+function optionalOf(itemType: common.Type): common.Type {
+	return {
+		type: "UnionType",
+		alias: { name: "Optional", typeArguments: [itemType] },
+		types: [
+			{
+				type: "Case",
+				choice: "Optional",
+				name: "Value",
+				members: { item: itemType },
+				typeArguments: [itemType],
+			},
+			{
+				type: "Case",
+				choice: "Optional",
+				name: "Empty",
+				members: {},
+				typeArguments: [itemType],
+			},
+		],
+	}
+}
+
 // NOTE: The LIVE Namespace of that name — the one read from `packages/stdlib/sources/*.es`
 // and handed to every Program's top level Scope. Asserting against this rather
 // than against a declaration read straight out of a source file is the point:
@@ -522,20 +551,57 @@ describe("Enricher", () => {
 			}
 		})
 
+		// NOTE: A Function is the hole this reaches for because the answer of a
+		// fallible call is no longer one. `3::squareRoot()` used to be an
+		// `Integer | Algebraic | Nothing`, a bare Union belonging to no
+		// Namespace and so conforming to nothing; `Optional<ItemType>` is a
+		// Choice with a Namespace that conforms to `Printable` exactly when its
+		// payload does, so the same call interpolates cleanly today. A Function
+		// conforms to nothing at all, whatever it returns.
 		it("should refuse a hole that is not Printable", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				constant maybe = 3::squareRoot()
-				constant message = "root: {maybe}"
+				constant greet = (subject: String) -> String { <- subject }
+				constant message = "greeting: {greet}"
 			}`)
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("interpolation-not-printable")
+			expect(diagnostics[0].message).toBe(
+				"(subject: String) -> String can not be interpolated into a String",
+			)
+		})
+
+		it("should accept an Optional hole whose payload is Printable", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant maybe = 3::squareRoot()
+					constant message = "root: {maybe}"
+				}`),
+			).toEqual([])
+		})
+
+		it("should refuse an Optional hole whose payload is not Printable", () => {
+			// NOTE: The conditional half of the conformance — the Optional
+			// itself is the same Type as the one accepted above, and it is the
+			// payload that decides. A List of Functions is the shortest way to
+			// hand `firstItem` a payload nothing can print.
+			let diagnostics = diagnosticsFor(`implementation {
+				constant greet = (subject: String) -> String { <- subject }
+				constant maybe = [greet]::firstItem()
+				constant message = "greeting: {maybe}"
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("interpolation-not-printable")
+			expect(diagnostics[0].message).toBe(
+				"Optional<(subject: String) -> String> can not be interpolated into a String",
+			)
 		})
 
 		it("should still enrich the Statements around a bad hole", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				constant maybe = 3::squareRoot()
-				constant message = "root: {maybe}"
+				constant greet = (subject: String) -> String { <- subject }
+				constant message = "greeting: {greet}"
 				constant after = 5
 			}`)
 
@@ -792,14 +858,7 @@ describe("Enricher", () => {
 				typeOfFirstConstant(`implementation {
 					constant first = [1, 2]::firstItem()
 				}`),
-			).toEqual({
-				type: "UnionType",
-				alias: {
-					name: "Optional",
-					typeArguments: [{ type: "Integer" }],
-				},
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			})
+			).toEqual(optionalOf({ type: "Integer" }))
 		})
 
 		it("should infer map's result Type from the callback's return", () => {
@@ -841,14 +900,7 @@ describe("Enricher", () => {
 				typeOfFirstConstant(`implementation {
 					constant found = [1, 2]::firstItem(where (n) { <- n::isGreaterThan(1) })
 				}`),
-			).toEqual({
-				type: "UnionType",
-				alias: {
-					name: "Optional",
-					typeArguments: [{ type: "Integer" }],
-				},
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			})
+			).toEqual(optionalOf({ type: "Integer" }))
 		})
 
 		it("should substitute the receiver's item Type into List returns", () => {
@@ -882,18 +934,19 @@ describe("Enricher", () => {
 			// early-stopping entry into an `Optional<ItemType>` Result. `reduce`'s
 			// own Namespace Generic is ALSO `ItemType`, so binding it off the
 			// receiver records `ItemType := ItemType`; treated as still open to
-			// binding, matching that self-reference against `Nothing` (or the
-			// `ItemType` arm of the bound `ItemType | Nothing` Result) sent
+			// binding, matching that self-reference against the members of the
+			// bound `Optional<ItemType>` Result — `Optional#Empty`, or the
+			// `ItemType` the `Optional#Value` Case carries as its payload — sent
 			// inference into an endless loop. `isOpenBindable` pins it as opaque,
 			// so this terminates and the fold's Result is `Optional<Integer>`.
 			expect(
 				typeOfFirstConstant(`implementation {
 					namespace Finder<infer ItemType> for List<ItemType> {
 						firstMatch(where check: (_: ItemType) -> Boolean) -> Optional<ItemType> {
-							constant start: Optional<ItemType> = nothing
+							constant start: Optional<ItemType> = #Empty
 
 							<- @::reduce(startingWith start, step (found, item) {
-								if check(item) { <- #Done(item) }
+								if check(item) { <- #Done(#Value(item)) }
 
 								<- #Continue(found)
 							})
@@ -902,14 +955,7 @@ describe("Enricher", () => {
 
 					constant found = [1, 2, 3]::firstMatch(where (n) { <- n::isGreaterThan(1) })
 				}`),
-			).toEqual({
-				type: "UnionType",
-				alias: {
-					name: "Optional",
-					typeArguments: [{ type: "Integer" }],
-				},
-				types: [{ type: "Integer" }, { type: "Nothing" }],
-			})
+			).toEqual(optionalOf({ type: "Integer" }))
 		})
 
 		it("freshens callee Generics so a same-named caller Generic can not collide", () => {
@@ -1477,16 +1523,24 @@ describe("Enricher", () => {
 			// is a real one. This is `List.firstItem(where:)` spelled out: the
 			// fold's `Result` is bound by the annotated seed, so `reduce` hands
 			// the callback a `Step<Optional<Item>, Optional<Item>>`, and the
-			// `#Done(item)` in it is decided by that rather than by the one
+			// `#Done(…)` in it is decided by that rather than by the one
 			// Parameter its own payload happens to mention.
+			//
+			// NOTE: The `#Value(item)` inside that `#Done` is the same question
+			// one level down, and it is there because `Optional` is a Choice: a
+			// Method answering an `Optional<Item>` hands back a Case it built,
+			// never a bare `item` that widened into a Union. Both it and the
+			// `#Empty` seed print terse — `Optional#Value` — because their one
+			// Type Argument is still the unbound `Item`, which is exactly what
+			// `caseHeader` leaves out.
 			it("decides a Case in a callback by the enclosing Namespace's Type Parameter", () => {
 				let { program, diagnostics } = enrichSource(`implementation {
 					namespace Finder<infer Item> for List<Item> {
 						firstMatch(where check: (_ item: Item) -> Boolean) -> Optional<Item> {
-							constant start: Optional<Item> = nothing
+							constant start: Optional<Item> = #Empty
 
 							<- @::reduce(startingWith start, step (found, item) {
-								if check(item) { <- #Done(item) }
+								if check(item) { <- #Done(#Value(item)) }
 
 								<- #Continue(found)
 							})
@@ -1498,7 +1552,9 @@ describe("Enricher", () => {
 
 				expect(diagnostics).toEqual([])
 				expect(collectCaseTypes(program).map(printType)).toEqual([
+					"Optional#Empty",
 					"Step<Optional<Item>, Optional<Item>>#Done",
+					"Optional#Value",
 					"Step<Optional<Item>, Optional<Item>>#Continue",
 				])
 			})
@@ -1669,6 +1725,13 @@ describe("Enricher", () => {
 			)
 		})
 
+		// NOTE: The receiver is a Function's declared `Maybe<Integer>` rather
+		// than a `firstItem()` — the stdlib no longer produces a Union of this
+		// shape at all. `Optional` is a Choice now, so `[1, 2]::firstItem()` is
+		// a Union of `Optional#Value` and `Optional#Empty`, and matching THAT
+		// against `Maybe<Value>` binds `Value := Optional#Value` and asks
+		// `withDefault` to take one. What this is about is a Namespace whose
+		// target is an APPLIED Alias, which a hand-written `Maybe` still is.
 		it("should match Generic Namespaces through applied Alias targets", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
@@ -1683,7 +1746,11 @@ describe("Enricher", () => {
 						}
 					}
 
-					constant first = [1, 2]::firstItem()::withDefault(0)
+					function maybeOne() -> Maybe<Integer> {
+						<- 1
+					}
+
+					constant first = maybeOne()::withDefault(0)
 				}`),
 			).toEqual({ type: "Integer" })
 		})
@@ -3523,10 +3590,10 @@ describe("Enricher", () => {
 				diagnosticsFor(`implementation {
 					constant count: Integer = "hi"::length()
 					constant chars: List<String> = "hi"::characters()
-					constant char: String | Nothing = "hi"::character(at 0)
+					constant char: Optional<String> = "hi"::character(at 0)
 					constant loud: String = "hi"::uppercase()::trim()
 					constant begins: Boolean = "hi"::starts(with "h")
-					constant at: Integer | Nothing = "hello"::firstIndex(of "l")
+					constant at: Optional<Integer> = "hello"::firstIndex(of "l")
 					constant padded: String = "7"::pad(to 3, with "0")
 				}`),
 			).toEqual([])
@@ -3722,13 +3789,25 @@ describe("Enricher", () => {
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
+		// NOTE: The Union is written out rather than read off `10::divide(by 0)`,
+		// which used to answer a `Rational | Nothing`. That call answers an
+		// `Optional<Rational>` today, and `Optional` has a Namespace covering
+		// the whole of it — so it resolves the way `Ordering` does above, with
+		// no dispatch at all, which is the case this one is NOT about. Two
+		// Namespaces that know nothing of each other, each declaring `toString`
+		// for one member, is what a dispatch has to be built out of.
 		it("should dispatch across unrelated member Namespaces", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
-				constant quotient = 10::divide(by 0)
+				constant quotient: Rational | Nothing = 1/2
 				constant text = quotient::toString()
 			}`)
 
-			expect(invocation.dispatch).not.toBeNull()
+			expect(invocation.namespace.name).toBe("")
+			expect(
+				invocation.dispatch?.map(
+					(dispatchCase) => dispatchCase.namespaceName,
+				),
+			).toEqual(["Rational", "Nothing"])
 			expect(invocation.type).toEqual({ type: "String" })
 		})
 
@@ -4163,13 +4242,30 @@ describe("Enricher", () => {
 
 			it("should refuse an undecided member of a Union receiver", () => {
 				// NOTE: Per-member dispatch reaches the same order, so it
-				// refuses on the same terms — the `firstItem` of a List holding
-				// one empty List is an `Optional<List<Unknown>>`, whose List
-				// member both Namespaces match.
+				// refuses on the same terms — one member of the Union the
+				// callback's two returns build is the `List<Unknown>` both
+				// Namespaces match, and the refusal comes before the Integer
+				// member is ever asked for the `tag` it does not have.
+				//
+				// The Union is built by a callback rather than read off
+				// `[[]]::firstItem()`, which used to answer one. That call
+				// answers an `Optional<List<Unknown>>` today, and the undecided
+				// List is the PAYLOAD of a `Optional#Value` member rather than a
+				// member itself, so no member of it is undecided at all.
 				let diagnostics = diagnosticsFor(`implementation {
 				${overlappingNamespaces}
 
-				constant tagged = [[]]::firstItem()::tag()
+				namespace Picker for Integer {
+					pick<infer Result>(_ choose: (_ value: Integer) -> Result) -> Result {
+						<- choose(@)
+					}
+				}
+
+				constant tagged = 1::pick((value) {
+					if value::isGreaterThan(0) { <- [] }
+
+					<- value
+				})::tag()
 			}`)
 
 				expect(

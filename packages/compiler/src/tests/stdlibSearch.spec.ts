@@ -13,9 +13,10 @@ import { validate } from "../validator/index"
 
 // NOTE: The full pipeline minus bundling, mirroring loop.spec — the searching
 // Methods below are only proven once the emitted JavaScript RUNS, because what
-// went wrong in them was never a Type error: a `List<Nothing>`, a
-// `List<Optional<Integer>>` and `"aaa"::lastIndex(of "aa")` all compiled
-// without a single Diagnostic and answered the wrong value.
+// went wrong in them was never a Type error: a List that STORES an empty
+// Optional, a `List<Optional<Integer>>` walked by `anyItem` and
+// `"aaa"::lastIndex(of "aa")` all compiled without a single Diagnostic and
+// answered the wrong value.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -53,12 +54,13 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// NOTE: An `Integer | Nothing` conformance spelled by hand — the second way a
-// Program reaches an item Type that CONTAINS `Nothing` and still conforms to
-// `Equatable` (the first is the builtin `List<Nothing>`). The narrowed Integer
-// can not answer with its own `is` here: with the other side still a Union that
-// call resolves back to this very Method and never returns, so the comparison
-// goes through `compare`, the way `String.is` does.
+// NOTE: An `Integer | Nothing` conformance spelled by hand — an item Type that
+// still CONTAINS `Nothing` now that `Optional` does not, and the hand-written
+// counterpart to the equality a Choice derives for `Optional<Integer>` above
+// it. The narrowed Integer can not answer with its own `is` here: with the
+// other side still a Union that call resolves back to this very Method and
+// never returns, so the comparison goes through `compare`, the way `String.is`
+// does.
 const maybeIntegers = `namespace MaybeInts for Integer | Nothing is Equatable {
 	is(_ other: Integer | Nothing) -> Boolean {
 		<- match @ -> Boolean {
@@ -86,50 +88,115 @@ const maybeIntegers = `namespace MaybeInts for Integer | Nothing is Equatable {
 }`
 
 describe("Stdlib searching Methods", () => {
-	// NOTE: The whole point of this block: a `nothing` STORED in a List is an
-	// item like any other, and the Methods that search by value have to compare
-	// it rather than read it as "no item here". Walking the positions with
-	// `item(at:)` can not tell the two apart — its `Optional<ItemType>` answer
-	// is the same value for a stored `nothing` and for a position past the end
-	// — so `firstIndex`/`lastIndex` count their way through the ITEMS instead.
-	describe("a stored nothing is an item like any other", () => {
-		it("finds the positions of nothing in a List<Nothing>", async () => {
+	// NOTE: The whole point of this block: an EMPTY Optional stored in a List
+	// is an item like any other, and the Methods that search by value have to
+	// compare it rather than read it as "no item here".
+	//
+	// This used to be a claim about `item(at:)` as much as about the search:
+	// while `Optional<ItemType>` collapsed when nested, its answer for a
+	// stored empty item and its answer for a position past the end were the
+	// SAME value, so no amount of reading could tell them apart and
+	// `firstIndex`/`lastIndex` had to count their way through the ITEMS
+	// instead. A nominal Choice nests, so `#Value(#Empty)` and `#Empty` are
+	// now different values and the distinction is finally observable — the
+	// test below pins it. The counting stays, but for the smaller reason the
+	// Stdlib gives it: `reduce` hands each item as it stands, where walking
+	// the positions would build and take apart a wrapper per item.
+	describe("a stored empty Optional is an item like any other", () => {
+		it("finds the positions of an empty Optional in a List of them", async () => {
 			expect(
 				await run(`implementation {
-					constant nothings: List<Nothing> = [nothing, nothing]
+					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(nothings::firstIndex(of nothing)::toString())
-					__print(nothings::lastIndex(of nothing)::toString())
+					__print(empties::firstIndex(of #Empty)::toString())
+					__print(empties::lastIndex(of #Empty)::toString())
 				}`),
-			).toEqual(['"0"', '"1"'])
+			).toEqual(['"Value(0)"', '"Value(1)"'])
 		})
 
-		it("sees a stored nothing from contains and count", async () => {
+		it("sees a stored empty Optional from contains and count", async () => {
 			expect(
 				await run(`implementation {
-					constant nothings: List<Nothing> = [nothing, nothing]
+					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(nothings::contains(nothing)::toString())
-					__print(nothings::doesNotContain(nothing)::toString())
-					__print(nothings::count(of nothing)::toString())
+					__print(empties::contains(#Empty)::toString())
+					__print(empties::doesNotContain(#Empty)::toString())
+					__print(empties::count(of #Empty)::toString())
 				}`),
 			).toEqual(['"true"', '"false"', '"2"'])
 		})
 
 		// NOTE: `removeDuplicates` asks `contains` whether it has kept an item
-		// already, so it inherits the answer — with `contains` blind to a stored
-		// `nothing` it kept every one of them.
-		it("keeps one nothing when duplicates are removed", async () => {
+		// already, so it inherits the answer — with `contains` blind to a
+		// stored empty Optional it kept every one of them.
+		it("keeps one empty Optional when duplicates are removed", async () => {
 			expect(
 				await run(`implementation {
-					constant nothings: List<Nothing> = [nothing, nothing]
+					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
 
-					__print(nothings::removeDuplicates()::length()::toString())
+					__print(empties::removeDuplicates()::length()::toString())
 				}`),
 			).toEqual(['"1"'])
 		})
 
-		it("finds nothing among the items of a Union item Type", async () => {
+		// NOTE: The sharper half of the block, and the one that could not be
+		// written at all while `Optional` was a Type Alias: reading a stored
+		// empty item now answers `Value(Empty)` — a value that IS there and
+		// happens to be empty — where reading past the end answers `Empty`.
+		// Two levels, two different answers, from the same `Optional<Integer>`
+		// item Type.
+		it("tells a stored empty Optional apart from a position past the end", async () => {
+			expect(
+				await run(`implementation {
+					constant empties: List<Optional<Integer>> = [#Empty, #Empty]
+					constant none: List<Optional<Integer>> = []
+
+					__print(empties::item(at 0)::toString())
+					__print(empties::item(at 5)::toString())
+					__print(empties::firstItem()::toString())
+					__print(none::firstItem()::toString())
+				}`),
+			).toEqual([
+				'"Value(Empty)"',
+				'"Empty"',
+				'"Value(Empty)"',
+				'"Empty"',
+			])
+		})
+
+		// NOTE: The searches run on the equality a Choice DERIVES from its
+		// tags and its payloads, so `#Empty` matches only the empty items and
+		// `#Value(1)` only the one holding a 1 — no Namespace is written for
+		// `Optional<Integer>` anywhere in this Program.
+		it("finds the empty Optionals among the values beside them", async () => {
+			expect(
+				await run(`implementation {
+					constant mixed: List<Optional<Integer>> = [
+						#Empty,
+						#Value(1),
+						#Empty,
+					]
+
+					__print(mixed::firstIndex(of #Empty)::toString())
+					__print(mixed::lastIndex(of #Empty)::toString())
+					__print(mixed::count(of #Empty)::toString())
+					__print(mixed::firstIndex(of #Value(1))::toString())
+					__print(mixed::lastIndex(of #Value(1))::toString())
+					__print(mixed::firstIndex(of #Value(7))::toString())
+					__print(mixed::lastIndex(of #Value(7))::toString())
+				}`),
+			).toEqual([
+				'"Value(0)"',
+				'"Value(2)"',
+				'"2"',
+				'"Value(1)"',
+				'"Value(1)"',
+				'"Empty"',
+				'"Empty"',
+			])
+		})
+
+		it("finds the nothing among the items of a hand-written Union item Type", async () => {
 			expect(
 				await run(`implementation {
 					${maybeIntegers}
@@ -140,7 +207,7 @@ describe("Stdlib searching Methods", () => {
 					__print(mixed::lastIndex(of nothing)::toString())
 					__print(mixed::count(of nothing)::toString())
 				}`),
-			).toEqual(['"0"', '"2"', '"2"'])
+			).toEqual(['"Value(0)"', '"Value(2)"', '"2"'])
 		})
 
 		it("still finds the ordinary items beside them", async () => {
@@ -155,17 +222,21 @@ describe("Stdlib searching Methods", () => {
 					__print(mixed::firstIndex(of 7)::toString())
 					__print(mixed::lastIndex(of 7)::toString())
 				}`),
-			).toEqual(['"1"', '"1"', '"Nothing"', '"Nothing"'])
+			).toEqual(['"Value(1)"', '"Value(1)"', '"Empty"', '"Empty"'])
 		})
 	})
 
 	// NOTE: `anyItem`/`everyItem` used to be `firstItem(where:)::hasValue()`,
-	// which reads the matching item back out — and a matching item that IS
-	// `nothing` is the same value the Method answers when nothing matched at
-	// all. They carry a Boolean through the fold now, which has no second
-	// reading.
+	// which reads the matching item back out — and while `Optional` collapsed
+	// when nested, a matching item that was itself empty came back as the very
+	// value the Method answers when nothing matched at all. That is no longer
+	// so: `#Value(#Empty)` is not `#Empty`, so the reading formulation would
+	// answer these correctly today, and the test below holds it to that. The
+	// Boolean fold stays for the remaining reason — it carries the ANSWER
+	// through `reduce` and builds nothing, where reading builds an Optional
+	// per call only to throw it away.
 	describe("anyItem and everyItem decide on the check", () => {
-		it("answers true when the matching item is itself nothing", async () => {
+		it("answers true when the matching item is itself empty", async () => {
 			expect(
 				await run(`implementation {
 					constant parsed: List<Optional<Integer>> = [
@@ -174,13 +245,13 @@ describe("Stdlib searching Methods", () => {
 					]
 
 					__print(parsed::anyItem(where (value) {
-						<- value::isNothing()
+						<- value::isEmpty()
 					})::toString())
 				}`),
 			).toEqual(['"true"'])
 		})
 
-		it("answers false when the failing item is itself nothing", async () => {
+		it("answers false when the failing item is itself empty", async () => {
 			expect(
 				await run(`implementation {
 					constant parsed: List<Optional<Integer>> = [
@@ -193,6 +264,39 @@ describe("Stdlib searching Methods", () => {
 					})::toString())
 				}`),
 			).toEqual(['"false"'])
+		})
+
+		// NOTE: The claim the NOTE above makes, pinned: the Optional the
+		// reading formulation builds is `Value(Empty)` for the empty item it
+		// FOUND and `Empty` for the List that holds no empty item at all, so
+		// `hasValue` agrees with `anyItem` on both. Nothing depends on this —
+		// it is the evidence that the fold is now a cost decision rather than
+		// a correctness one.
+		it("agrees with the reading formulation now that Optionals nest", async () => {
+			expect(
+				await run(`implementation {
+					constant parsed: List<Optional<Integer>> = [
+						Integer.parse("nope"),
+						Integer.parse("5"),
+					]
+					constant allValues: List<Optional<Integer>> = [
+						Integer.parse("5"),
+					]
+
+					__print(parsed::firstItem(where (value) {
+						<- value::isEmpty()
+					})::toString())
+					__print(parsed::firstItem(where (value) {
+						<- value::isEmpty()
+					})::hasValue()::toString())
+					__print(allValues::firstItem(where (value) {
+						<- value::isEmpty()
+					})::toString())
+					__print(allValues::anyItem(where (value) {
+						<- value::isEmpty()
+					})::toString())
+				}`),
+			).toEqual(['"Value(Empty)"', '"true"', '"Empty"', '"false"'])
 		})
 
 		it("keeps the answers an ordinary List already had", async () => {
@@ -266,7 +370,7 @@ describe("Stdlib searching Methods", () => {
 					__print("banana"::lastIndex(of "ana")::toString())
 					__print("mississippi"::lastIndex(of "issi")::toString())
 				}`),
-			).toEqual(['"1"', '"2"', '"3"', '"4"'])
+			).toEqual(['"Value(1)"', '"Value(2)"', '"Value(3)"', '"Value(4)"'])
 		})
 
 		it("keeps the answers the non-overlapping cases had", async () => {
@@ -278,7 +382,13 @@ describe("Stdlib searching Methods", () => {
 					__print("hello, World"::lastIndex(of "World")::toString())
 					__print("hello, World"::lastIndex(of "zz")::toString())
 				}`),
-			).toEqual(['"4"', '"10"', '"0"', '"7"', '"Nothing"'])
+			).toEqual([
+				'"Value(4)"',
+				'"Value(10)"',
+				'"Value(0)"',
+				'"Value(7)"',
+				'"Empty"',
+			])
 		})
 
 		it("answers the length for the empty part, as its mirror does", async () => {
@@ -289,7 +399,7 @@ describe("Stdlib searching Methods", () => {
 					__print(""::lastIndex(of "a")::toString())
 					__print("hello"::firstIndex(of "")::toString())
 				}`),
-			).toEqual(['"5"', '"0"', '"Nothing"', '"0"'])
+			).toEqual(['"Value(5)"', '"Value(0)"', '"Empty"', '"Value(0)"'])
 		})
 
 		// NOTE: Positions are by GRAPHEME everywhere in the Namespace, and the
@@ -301,14 +411,14 @@ describe("Stdlib searching Methods", () => {
 					__print("😀a😀"::lastIndex(of "😀")::toString())
 					__print("😀a😀"::firstIndex(of "😀")::toString())
 				}`),
-			).toEqual(['"2"', '"0"'])
+			).toEqual(['"Value(2)"', '"Value(0)"'])
 		})
 	})
 
 	// NOTE: The List Methods that were already right, kept right — the reversal
 	// `lastIndex` is written on has to leave an ordinary List's positions where
-	// they were, and the fold `firstIndex` counts with has to keep answering
-	// `Nothing` for an absent item rather than the length it settles on.
+	// they were, and the fold `firstIndex` counts with has to keep answering an
+	// EMPTY Optional for an absent item rather than the length it settles on.
 	describe("List.firstIndex and List.lastIndex on ordinary items", () => {
 		it("answers the first and last position of a repeated item", async () => {
 			expect(
@@ -320,10 +430,10 @@ describe("Stdlib searching Methods", () => {
 					__print(numbers::firstIndex(of 3)::toString())
 					__print(numbers::lastIndex(of 3)::toString())
 				}`),
-			).toEqual(['"0"', '"3"', '"2"', '"2"'])
+			).toEqual(['"Value(0)"', '"Value(3)"', '"Value(2)"', '"Value(2)"'])
 		})
 
-		it("answers Nothing for an absent item and for the empty List", async () => {
+		it("answers an empty Optional for an absent item and for the empty List", async () => {
 			expect(
 				await run(`implementation {
 					constant numbers = [1, 2, 3, 1]
@@ -334,7 +444,7 @@ describe("Stdlib searching Methods", () => {
 					__print(none::firstIndex(of 1)::toString())
 					__print(none::lastIndex(of 1)::toString())
 				}`),
-			).toEqual(['"Nothing"', '"Nothing"', '"Nothing"', '"Nothing"'])
+			).toEqual(['"Empty"', '"Empty"', '"Empty"', '"Empty"'])
 		})
 
 		// NOTE: The bound is what carries equality down: a `List<List<Integer>>`
@@ -348,7 +458,7 @@ describe("Stdlib searching Methods", () => {
 					__print([[1], [2], [1]]::firstIndex(of [1])::toString())
 					__print([[1], [2], [1]]::lastIndex(of [1])::toString())
 				}`),
-			).toEqual(['"2"', '"0"', '"2"'])
+			).toEqual(['"Value(2)"', '"Value(0)"', '"Value(2)"'])
 		})
 	})
 })

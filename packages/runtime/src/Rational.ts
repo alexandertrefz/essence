@@ -6,9 +6,9 @@ import {
 import type { BigRational } from "./bigRational"
 import { bigRationalOf, reduced } from "./bigRational"
 import type { IntegerType } from "./Integer"
-import type { NothingType } from "./Nothing"
-import { createNothing } from "./Nothing"
 import type { NumberFormatType } from "./NumberFormat"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { StringType } from "./String"
@@ -51,12 +51,12 @@ export function createRational(
 export function of(
 	numerator: IntegerType,
 	denominator: IntegerType,
-): RationalType | NothingType {
+): OptionalType<RationalType> {
 	if (denominator.value === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createRational(numerator.value, denominator.value)
+	return createValue(createRational(numerator.value, denominator.value))
 }
 
 // NOTE: The lowest-terms form with the sign on the numerator — the shape the
@@ -84,23 +84,27 @@ export function denominator(rational: RationalType): IntegerType {
 export function raise(
 	rational: RationalType,
 	exponent: IntegerType,
-): RationalType | NothingType {
+): OptionalType<RationalType> {
 	let parts = reducedParts(rational)
 
 	if (exponent.value >= 0n) {
-		return createRational(
-			parts.numerator ** exponent.value,
-			parts.denominator ** exponent.value,
+		return createValue(
+			createRational(
+				parts.numerator ** exponent.value,
+				parts.denominator ** exponent.value,
+			),
 		)
 	}
 
 	if (parts.numerator === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createRational(
-		parts.denominator ** -exponent.value,
-		parts.numerator ** -exponent.value,
+	return createValue(
+		createRational(
+			parts.denominator ** -exponent.value,
+			parts.numerator ** -exponent.value,
+		),
 	)
 }
 
@@ -198,7 +202,9 @@ export function divide__overload$3(
 
 export function squareRoot(
 	rational: RationalType,
-): RationalType | AlgebraicType | NothingType {
+): OptionalType<RationalType | AlgebraicType> {
+	// NOTE: Handed straight on — `squareRootOfRational` already answers the
+	// Optional, so wrapping it here would nest one inside another.
 	return squareRootOfRational(bigRationalOf(rational))
 }
 

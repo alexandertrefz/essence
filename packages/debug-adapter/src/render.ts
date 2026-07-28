@@ -97,6 +97,19 @@ function describeEssenceValues(...values: Array<unknown>): string {
 			return tag === "Record" ? "{}" : tag
 		}
 
+		// NOTE: A ONE-member Case renders its payload bare, in parentheses —
+		// `Optional#Value(3)`, not `Optional#Value { item = 3 }` — because that
+		// is how the language writes one. Mirrors `getStringRepresentation` in
+		// the runtime, which `src/tests/render.spec.ts` pins the two together
+		// against.
+		if (
+			tag !== "Record" &&
+			tag.indexOf("#") !== -1 &&
+			entries.length === 1
+		) {
+			return `${tag}(${render(entries[0]![1], depth + 1) ?? "…"})`
+		}
+
 		if (depth >= 2) {
 			return `${prefix}{ … }`
 		}

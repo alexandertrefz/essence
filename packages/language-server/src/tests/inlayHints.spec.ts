@@ -280,7 +280,7 @@ describe("Inlay Hints", () => {
 				"implementation {",
 				"\tnamespace Firsts<infer Item> for List<Item> {",
 				"\t\tmaybeFirst() -> Optional<Item> {",
-				"\t\t\t<- nothing",
+				"\t\t\t<- #Empty",
 				"\t\t}",
 				"\t}",
 				"",
@@ -310,7 +310,7 @@ describe("Inlay Hints", () => {
 		it("should resolve `otherwise` on an `Optional`-annotated value", () => {
 			let source = [
 				"implementation {",
-				"\tconstant maybe: Optional<Integer> = nothing",
+				"\tconstant maybe: Optional<Integer> = #Empty",
 				"\tconstant certain = maybe::otherwise(0)",
 				"}",
 			].join("\n")
@@ -320,44 +320,73 @@ describe("Inlay Hints", () => {
 			)
 		})
 
-		it("should resolve `otherwise` on a flat spelled-out Union", () => {
-			// NOTE: Unions are built canonical — `Integer | Rational | Nothing`
-			// carries its payload as one nested member, so `otherwise` binds
-			// it in one piece even when the source spells the Union out flat.
+		it("should not resolve `otherwise` on a flat spelled-out Union", () => {
+			// NOTE: `Optional` is a nominal Choice, not a second spelling of
+			// `… | Nothing`, so `otherwise` is a Method of that Choice and of
+			// nothing else. A hand-written Union that merely CONTAINS `Nothing`
+			// never reaches it — a Method called on a Union has to be a Method
+			// of every member, and `Integer` has none — so `sure` is left
+			// without a Type and takes no Hint at all. The same payload wrapped
+			// in an `Optional` collapses to `Integer | Rational` exactly as it
+			// always did, which is the one Hint expected below: the collapse
+			// did not go away, the accidental Union-shaped spelling of it did.
 			let source = [
 				"implementation {",
 				"\tconstant flat: Integer | Rational | Nothing = 1",
 				"\tconstant sure = flat::otherwise(0)",
+				"\tconstant wrapped: Optional<Integer | Rational> = #Empty",
+				"\tconstant collapsed = wrapped::otherwise(0)",
 				"}",
 			].join("\n")
 
-			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
-				": Integer | Rational",
+			expect(hintsOf(source)).toEqual([
+				{
+					position: { line: 5, column: 20 },
+					label: ": Integer | Rational",
+					kind: "type",
+				},
 			])
 		})
 
-		it("should resolve `otherwise` when Nothing hides inside a named member", () => {
+		it("should not resolve `otherwise` when `Nothing` hides inside a named member", () => {
 			// NOTE: `MaybeInt` keeps its name — and its buried `Nothing` — as
-			// a member of the wider Union. The remainder fallback lets the
-			// expected `Nothing` claim it, so `otherwise` still resolves and
-			// types the payload as `Integer | Rational`.
+			// a member of the wider Union, and that used to be enough: a
+			// remainder fallback let the `Nothing` an `otherwise` expected
+			// claim the buried one, and typed the payload as
+			// `Integer | Rational`. There is no such fallback left to fall
+			// into, because there is no Union SHAPE that means "fallible" any
+			// more — only the Choice does, and naming a Union does not make it
+			// one. The surviving Hint says the rest of the file is unharmed:
+			// `mixed` still enriches, and still reads back under its own alias.
+			// It simply has no `otherwise` to offer.
 			let source = [
 				"implementation {",
 				"\ttype MaybeInt = Integer | Nothing",
 				"\tconstant mixed: MaybeInt | Rational = 1",
+				"\tconstant echoed = mixed",
 				"\tconstant sure = mixed::otherwise(0)",
 				"}",
 			].join("\n")
 
-			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
-				": Integer | Rational",
+			expect(hintsOf(source)).toEqual([
+				{
+					position: { line: 4, column: 17 },
+					label: ": MaybeInt | Rational",
+					kind: "type",
+				},
 			])
 		})
 
-		it("should resolve `otherwise` on a Union inferred from mixed branches", () => {
+		it("should keep an `Optional` branch whole in a Union inferred from mixed branches", () => {
 			// NOTE: One branch returns `Optional<Rational>`, the other a bare
-			// Integer — the inferred Union hoists the Optional's `Nothing` to
-			// the top level, so the result stays fallible-shaped.
+			// Integer, and the inferred Union keeps the two side by side — the
+			// Optional stays ONE nested member rather than dissolving into a
+			// top-level `Nothing` that the Integer then sits next to. That is
+			// what a nominal Optional buys: a Union cannot become
+			// fallible-shaped by accident, so `merged` reads back as
+			// `Optional<Rational> | Integer` and has no `otherwise` to call —
+			// `sure` gets no Type and no Hint. A value that is fallible has to
+			// say so by being an `Optional` the whole way out.
 			let source = [
 				"implementation {",
 				"\tnamespace Picker for Integer {",
@@ -375,10 +404,23 @@ describe("Inlay Hints", () => {
 				"}",
 			].join("\n")
 
-			let labels = hintsOf(source).map((hint) => hint.label)
-
-			expect(labels).toContain(": Rational | Integer | Nothing")
-			expect(labels).toContain(": Rational | Integer")
+			expect(hintsOf(source)).toEqual([
+				{
+					position: { line: 8, column: 17 },
+					label: ": Optional<Rational> | Integer",
+					kind: "type",
+				},
+				{
+					position: { line: 8, column: 34 },
+					label: ": Integer",
+					kind: "type",
+				},
+				{
+					position: { line: 8, column: 35 },
+					label: " -> Optional<Rational> | Integer",
+					kind: "type",
+				},
+			])
 		})
 
 		it("should keep a compound payload whole — and `otherwise` collapses it", () => {

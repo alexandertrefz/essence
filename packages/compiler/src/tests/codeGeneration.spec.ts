@@ -959,41 +959,57 @@ describe("Code Generation", () => {
 			expect(code).toContain("$es_Rational_multiply__overload$")
 		})
 
-		// NOTE: `firstItem()` returns `Item | Nothing`, so `toString` dispatches
-		// over a Union — the `Item` case through the conformance witness, the
-		// `Nothing` case to `Nothing.toString`, which is implemented in Essence.
-		// This is the Union-dispatch-to-an-Essence-Method path: the case target
-		// is the bare `$es_Nothing_toString`, and the reachability gate has to
-		// pull that const in off the emitted dispatch triple for the Program to
-		// run.
+		// NOTE: `fallback` is `Item | Boolean`, so `toString` dispatches over a
+		// Union — the `Item` case through the conformance witness, the
+		// `Boolean` case to `Boolean.toString`, which is implemented in
+		// Essence. This is the Union-dispatch-to-an-Essence-Method path: the
+		// case target is the bare `$es_Boolean_toString`, and the reachability
+		// gate has to pull that const in off the emitted dispatch triple for
+		// the Program to run — no other expression in the Program names it.
+		//
+		// NOTE: The Union is spelled out by hand and `Item` is inferred from a
+		// second Parameter, because an argument that lands on the concrete
+		// member leaves `Item` unbound and the call is rejected as
+		// uninferable. This pair of tests used to reach the same shape through
+		// `items::firstItem()::toString()`, back when `Optional<Item>` was a
+		// Type Alias for `Item | Nothing`; `Optional` is a Choice now, so
+		// `toString` on it resolves statically to `$es_Optional_toString` and
+		// dispatches over nothing at all.
 		it("should dispatch a bounded Type Parameter member through the conformance parameter", async () => {
 			const source = `implementation {
-				function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
-					<- items::firstItem()::toString()
+				function describe <infer Item is Printable>(_ item: Item, or fallback: Item | Boolean) -> String {
+					<- fallback::toString()
 				}
 
-				__print(firstText([1, 2]))
+				__print(describe(1, or 2))
+				__print(describe(1, or true))
 			}`
 			const code = generate(source)
 
 			expect(code).toContain("$type.dispatchMethod")
-			expect(code).toContain("$es_Nothing_toString")
-			expect(code).toContain("const $es_Nothing_toString")
+			expect(code).toContain("$es_Boolean_toString")
+			expect(code).toContain("const $es_Boolean_toString")
 			expect(code).toContain("Item__conformance.toString")
-			expect(await run(source)).toEqual(['"1"'])
+			expect(await run(source)).toEqual(['"2"', '"true"'])
 		})
 
 		it("should order the catch-all Type Parameter case last", () => {
 			const code = generate(`implementation {
-				function firstText <infer Item is Printable>(_ items: List<Item>) -> String {
-					<- items::firstItem()::toString()
+				function describe <infer Item is Printable>(_ item: Item, or fallback: Item | Boolean) -> String {
+					<- fallback::toString()
 				}
 
-				__print(firstText([1, 2]))
+				__print(describe(1, or 2))
+				__print(describe(1, or true))
 			}`)
 
-			expect(code.indexOf("$es_Nothing_toString")).toBeGreaterThan(-1)
-			expect(code.indexOf("$es_Nothing_toString")).toBeLessThan(
+			// NOTE: `lastIndexOf` is what picks the dispatch triple out —
+			// `$es_Boolean_toString` is also the name of the prelude const,
+			// which is emitted above every Function and would otherwise be the
+			// occurrence found. The conformance read appears in the triple and
+			// nowhere else.
+			expect(code.lastIndexOf("$es_Boolean_toString")).toBeGreaterThan(-1)
+			expect(code.lastIndexOf("$es_Boolean_toString")).toBeLessThan(
 				code.indexOf("Item__conformance.toString"),
 			)
 		})

@@ -38,7 +38,7 @@ declarations {
 
 			(_ other: Rational) -> Algebraic
 
-			§§ Adds another Algebraic. Over the same radical the sum stays exact — and may collapse to a Rational. Over different radicals the sum is not representable yet and gives Nothing.
+			§§ Adds another Algebraic. Over the same radical the sum stays exact — and may collapse to a Rational. Over different radicals the sum is not representable yet and is empty.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic>
 		}
 
@@ -63,11 +63,11 @@ declarations {
 
 			(with other: Rational) -> Algebraic | Rational
 
-			§§ Multiplies with another Algebraic. Over the same radical the product stays exact — √2·√2 is exactly 2. Products of pure radicals combine across radicals (√2·√3 is √6); anything else gives Nothing.
+			§§ Multiplies with another Algebraic. Over the same radical the product stays exact — √2·√2 is exactly 2. Products of pure radicals combine across radicals (√2·√3 is √6); anything else is empty.
 			(with other: Algebraic) -> Optional<Rational | Algebraic>
 		}
 
-		§§ Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational gives `Nothing` only for zero.
+		§§ Divides this Algebraic by a number, exactly — via the conjugate, so dividing by an Algebraic itself can never fail. Dividing by an Integer or Rational is empty only for zero.
 		overload divide {
 			(by other: Integer) -> Optional<Algebraic>
 

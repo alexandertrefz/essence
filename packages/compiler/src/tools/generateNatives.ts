@@ -48,6 +48,9 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	DecomposedCanonicalType: "./NormalizationForm",
 	ComposedCompatibilityType: "./NormalizationForm",
 	DecomposedCompatibilityType: "./NormalizationForm",
+	OptionalType: "./Optional",
+	ValueType: "./Optional",
+	EmptyType: "./Optional",
 	RationalType: "./Rational",
 	RecordType: "./Record",
 	StepType: "./Step",
@@ -79,6 +82,7 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 // adds one entry here and its Cases below, nothing more.
 const GENERIC_UNION_ALIASES: Record<string, string> = {
 	Step: "StepType",
+	Optional: "OptionalType",
 }
 
 // NOTE: The Cases of a generic Choice — keyed `Choice#Case`, the sibling of
@@ -89,6 +93,8 @@ const GENERIC_UNION_ALIASES: Record<string, string> = {
 const GENERIC_CASE_TYPES: Record<string, string> = {
 	"Step#Continue": "ContinueType",
 	"Step#Done": "DoneType",
+	"Optional#Value": "ValueType",
+	"Optional#Empty": "EmptyType",
 }
 
 // NOTE: The runtime unit types of the builtin `Ordering` and `Side` Choices — the only

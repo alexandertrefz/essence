@@ -10,7 +10,7 @@ implementation {
 	§ Searching and testing.
 	__print(greeting::starts(with "Hello")) § true
 	__print(greeting::doesNotEnd(with "!")) § true
-	__print(greeting::firstIndex(of "World")) § 7
+	__print(greeting::firstIndex(of "World")) § Optional#Value(7)
 	__print(greeting::contains("lo,")) § true
 
 	§ Producing new Strings.
@@ -25,15 +25,15 @@ implementation {
 	__print("7"::pad(to 3, with ".", at Side#End)) § "7.."
 
 	§ Characters, each its own single-character String.
-	__print(greeting::character(at 1)) § "e"
-	__print(greeting::character(at 99)) § Nothing
+	__print(greeting::character(at 1)) § Optional#Value("e")
+	__print(greeting::character(at 99)) § Optional#Empty
 	__print(greeting::characters()::length()) § 12
 
 	§ Indices count Unicode code points, so an emoji stays whole.
 	constant emoji = "a😀b"
 	__print(emoji::length()) § 3
-	__print(emoji::character(at 1)) § "😀"
-	__print(emoji::firstIndex(of "b")) § 2
+	__print(emoji::character(at 1)) § Optional#Value("😀")
+	__print(emoji::firstIndex(of "b")) § Optional#Value(2)
 	__print(emoji::reverse()) § "b😀a"
 
 	§ String is Comparable now, so a List of Strings sorts with a real

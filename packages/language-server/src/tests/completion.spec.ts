@@ -1310,10 +1310,22 @@ describe("Completion", () => {
 // source declaration is enriched INTO the builtin Scope rather than spread
 // into it — so without `builtinMemberOrder` a conversion moves its Namespace
 // to the end of the member table, and the members another Namespace covers
-// the same receiver with start winning the dedupe. `Boolean` is the first one
-// converted; `otherwise` comes from Optional, which covers every Type.
+// the same receiver with start winning the dedupe.
+//
+// The rule has two halves, and they need two receivers to see. `Boolean` is
+// the first Namespace converted, and it shows the WITHIN-Namespace half: what
+// Completion offers is the order `Boolean.es` writes its Methods in, not the
+// order the Scope happened to be assembled in. It used to show the
+// BETWEEN-Namespace half too — `otherwise`, `hasValue` and `isNothing`
+// trailed its own Methods back when `Optional` was a Type Alias for
+// `ItemType | Nothing`, which made every Type in the language an
+// `Optional<…>` and put Optional's Namespace on every receiver. `Optional` is
+// a nominal Choice now, a Boolean is not one, and a Boolean receiver reaches
+// nothing but `Boolean`. A nested Optional carries that half instead: it is
+// the receiver two converted Namespaces cover, and `builtinMemberOrder` is
+// what decides which of the two is met first.
 describe("Completion of a converted standard library Namespace", () => {
-	it("should offer Boolean's own Methods ahead of the ones it inherits", () => {
+	it("should offer Boolean's own Methods in the order it declares them", () => {
 		let source = ["implementation {", "\ttrue::", "}"].join("\n")
 
 		expect(labelsOf(source, { line: 2, column: 8 })).toEqual([
@@ -1324,9 +1336,33 @@ describe("Completion of a converted standard library Namespace", () => {
 			"or",
 			"exclusiveOr",
 			"toString",
+		])
+	})
+
+	it("should offer Optional's own Methods ahead of the ones a nested Optional adds", () => {
+		let source = [
+			"implementation {",
+			"\tconstant value: Optional<Optional<Integer>> = #Value(#Value(1))",
+			"\tvalue::",
+			"}",
+		].join("\n")
+
+		// NOTE: `flatten` sits after everything `Optional` declares because
+		// `NestedOptional` is listed after `Optional` — the extra a nested
+		// Optional has, offered as an extra. `is` and `isNot` come last
+		// because they are not declared anywhere: a Choice derives them, and
+		// the derived Namespace is only reached once no declared Namespace
+		// answers the name.
+		expect(labelsOf(source, { line: 3, column: 9 })).toEqual([
+			"toString",
 			"otherwise",
 			"hasValue",
-			"isNothing",
+			"isEmpty",
+			"map",
+			"keep",
+			"flatten",
+			"is",
+			"isNot",
 		])
 	})
 })

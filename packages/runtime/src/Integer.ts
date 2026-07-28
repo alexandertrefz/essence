@@ -3,8 +3,8 @@ import {
 	dividedInto as algebraicDividedInto,
 	squareRootOfRational,
 } from "./Algebraic"
-import type { NothingType } from "./Nothing"
-import { createNothing } from "./Nothing"
+import type { OptionalType } from "./Optional"
+import { createEmpty, createValue } from "./Optional"
 import type { OrderingType } from "./Ordering"
 import { equal, greater, less } from "./Ordering"
 import type { RationalType } from "./Rational"
@@ -50,9 +50,9 @@ export function negate(integer: IntegerType): IntegerType {
 export function remainder(
 	integer: IntegerType,
 	divisor: IntegerType,
-): IntegerType | NothingType {
+): OptionalType<IntegerType> {
 	if (divisor.value === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
 	// NOTE: Euclidean remainder — the result is always in
@@ -63,7 +63,7 @@ export function remainder(
 		remainder += divisor.value < 0n ? -divisor.value : divisor.value
 	}
 
-	return createInteger(remainder)
+	return createValue(createInteger(remainder))
 }
 
 // NOTE: The other half of the same division, and it has to agree with
@@ -75,9 +75,9 @@ export function remainder(
 export function quotient(
 	integer: IntegerType,
 	divisor: IntegerType,
-): IntegerType | NothingType {
+): OptionalType<IntegerType> {
 	if (divisor.value === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
 	let truncated = integer.value / divisor.value
@@ -89,22 +89,22 @@ export function quotient(
 		truncated += divisor.value < 0n ? 1n : -1n
 	}
 
-	return createInteger(truncated)
+	return createValue(createInteger(truncated))
 }
 
 export function raise(
 	base: IntegerType,
 	exponent: IntegerType,
-): IntegerType | RationalType | NothingType {
+): OptionalType<IntegerType | RationalType> {
 	if (exponent.value >= 0n) {
-		return createInteger(base.value ** exponent.value)
+		return createValue(createInteger(base.value ** exponent.value))
 	}
 
 	if (base.value === 0n) {
-		return createNothing()
+		return createEmpty()
 	}
 
-	return createRational(1n, base.value ** -exponent.value)
+	return createValue(createRational(1n, base.value ** -exponent.value))
 }
 
 // #endregion
@@ -125,18 +125,26 @@ export function divide__overload$3(
 
 export function squareRoot(
 	integer: IntegerType,
-): IntegerType | AlgebraicType | NothingType {
+): OptionalType<IntegerType | AlgebraicType> {
 	const root = squareRootOfRational({
 		numerator: integer.value,
 		denominator: 1n,
 	})
 
-	if (root[typeKeySymbol] === "Rational") {
-		// NOTE: A whole number's exact root is whole — surface it as one.
-		return createInteger(root.numerator)
+	// NOTE: A negative has no real root, and `squareRootOfRational` has already
+	// said so — this hands its answer on rather than deciding again.
+	if (root[typeKeySymbol] === "Optional#Empty") {
+		return root
 	}
 
-	return root
+	const value = root.item
+
+	if (value[typeKeySymbol] === "Rational") {
+		// NOTE: A whole number's exact root is whole — surface it as one.
+		return createValue(createInteger(value.numerator))
+	}
+
+	return createValue(value)
 }
 
 // #endregion

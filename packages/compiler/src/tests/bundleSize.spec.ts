@@ -75,11 +75,24 @@ describe("Bundle Size", () => {
 	// Rational arithmetic cluster, the Integer mixed-kind entries, the Number
 	// aggregates and both `parse` Methods moved into Essence, and Everyday
 	// deliberately calls every one of them, so it carries every one of those
-	// bodies — a Program pays only for the Methods it reaches. The ceiling
-	// moved with it, keeping ~1.5 kB of headroom; a reintroduced spread is
-	// still several kilobytes past it.
+	// bodies — a Program pays only for the Methods it reaches. It now measures
+	// 59,924: `Optional` became a nominal Choice, so every fallible answer is a
+	// constructed Case rather than a bare value or a shared singleton, and
+	// every producer of one carries the construction. The two `parse` Methods
+	// account for nearly half the rise on their own — they are the densest
+	// fallible code in the library — and `Optional::map` and `keep` are two new
+	// shared bodies the chains they replaced did not need. The ceiling moved
+	// with it, keeping ~1 kB of headroom; a reintroduced spread is still
+	// several kilobytes past it.
+	//
+	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
+	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
+	// 2.4 kB, because a GENERIC Choice's derived equality goes through
+	// `boundChoiceIs` and the descriptor machinery behind it — and almost
+	// everything reaches `isEven`. It is a Match instead. This ceiling is what
+	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(55_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(61_000)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -89,10 +102,14 @@ describe("Bundle Size", () => {
 	// — like the rest of the runtime's Type Module — is carried by every
 	// Program. The ceiling moved with it, keeping the same order of headroom;
 	// it fell to 43,851 when the module labels lost the checkout's path, for
-	// the same reason Everyday's figure did. It now measures 32,717, down
-	// 11 kB with `bigint-fraction`'s departure — same story as Everyday's.
+	// the same reason Everyday's figure did. It fell to 32,717, down
+	// 11 kB with `bigint-fraction`'s departure — same story as Everyday's. It
+	// now measures 34,448: it takes square roots, which are fallible, so it
+	// carries the Case construction a nominal `Optional` needs and `Optional`'s
+	// own bodies. The rise is a fifth of Everyday's because it reaches neither
+	// `parse`.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(34_000)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_500)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
