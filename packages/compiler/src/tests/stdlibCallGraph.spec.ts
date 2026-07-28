@@ -575,6 +575,7 @@ describe("Stdlib Call Graph", () => {
 			"String.is__overload$1",
 			"String.is__overload$2",
 			"String.lastIndex",
+			"String.lines",
 			"String.normalized__overload$1",
 			"String.pad__overload$1",
 			"String.pad__overload$2",

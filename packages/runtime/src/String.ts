@@ -147,17 +147,6 @@ export function normalized__overload$2(
 	}
 }
 
-// NOTE: A line break is `\n`, `\r`, or `\r\n`. Splitting keeps empty lines, so
-// a trailing break leaves a final empty line and the empty String is one empty
-// line — the same shape `split(on:)` gives, over a separator it can not name.
-export function lines(originalString: StringType): ListType<StringType> {
-	return createList(
-		originalString.value
-			.split(/\r\n|\r|\n/)
-			.map((line) => createString(line)),
-	)
-}
-
 // NOTE: Words are the runs of non-whitespace, so the whitespace between them —
 // and the empty pieces a plain split would leave at the ends and between
 // adjacent separators — is dropped. `\s` with the `u` flag is Unicode
