@@ -3,6 +3,8 @@
 .gitignore
 .gitattributes
 bun.lock
+DEVELOPMENT.md
+buildServer.js
 
 # Bundled into dist/extension.js by `bun run build`.
 node_modules/**
