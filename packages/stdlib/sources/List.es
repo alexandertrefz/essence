@@ -584,10 +584,9 @@ declarations {
 		§§ Splits the List in two by the given check — the accepted items and the rest, each in their original order.
 		§§
 		§§ @returns — a Record with the accepted items under `matching` and the others under `rest`.
-		partition(where check: (_: ItemType) -> Boolean) -> {
-			matching: List<ItemType>,
-			rest: List<ItemType>,
-		} {
+		partition(
+			where check: (_: ItemType) -> Boolean,
+		) -> { matching: List<ItemType>, rest: List<ItemType> } {
 			§ Two passes where the native made one, each keeping the original
 			§ order — which is what the halves are specified to do.
 			<- {
@@ -600,10 +599,9 @@ declarations {
 		§§
 		§§ @param other — the List to pair the items with
 		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
-		pair<infer Other>(with other: List<Other>) -> List<{
-			first: ItemType,
-			second: Other,
-		}>
+		pair<infer Other>(
+			with other: List<Other>,
+		) -> List<{ first: ItemType, second: Other }>
 
 		§§ Splits the List into groups of the given size, in order. The last group holds whatever remains, so it may be shorter.
 		§§

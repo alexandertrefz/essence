@@ -156,8 +156,10 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer
-			| Rational {
+			(
+				_ firstNumber: Integer,
+				_ secondNumber: Rational,
+			) -> Integer | Rational {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -165,8 +167,10 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer
-			| Rational {
+			(
+				_ firstNumber: Rational,
+				_ secondNumber: Integer,
+			) -> Integer | Rational {
 				if firstNumber::isLessThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -178,8 +182,9 @@ declarations {
 
 			(_ rationals: List<Rational>) -> Optional<Rational>
 
-			(_ numbers: List<Integer | Rational>) -> Optional<Integer
-			| Rational>
+			(
+				_ numbers: List<Integer | Rational>,
+			) -> Optional<Integer | Rational>
 		}
 
 		§§ The greater of two Numbers, or the greatest in a List of them.
@@ -202,8 +207,10 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Integer, _ secondNumber: Rational) -> Integer
-			| Rational {
+			(
+				_ firstNumber: Integer,
+				_ secondNumber: Rational,
+			) -> Integer | Rational {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -211,8 +218,10 @@ declarations {
 				}
 			}
 
-			(_ firstNumber: Rational, _ secondNumber: Integer) -> Integer
-			| Rational {
+			(
+				_ firstNumber: Rational,
+				_ secondNumber: Integer,
+			) -> Integer | Rational {
 				if firstNumber::isGreaterThanOrEqualTo(secondNumber) {
 					<- firstNumber
 				} else {
@@ -224,8 +233,9 @@ declarations {
 
 			(_ rationals: List<Rational>) -> Optional<Rational>
 
-			(_ numbers: List<Integer | Rational>) -> Optional<Integer
-			| Rational>
+			(
+				_ numbers: List<Integer | Rational>,
+			) -> Optional<Integer | Rational>
 		}
 	}
 }
