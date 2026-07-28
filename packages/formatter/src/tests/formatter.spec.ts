@@ -614,6 +614,19 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: The return clause is measured with the Parameter list as one
+		// header, so a header that does not fit breaks its Parameters — the
+		// return Type follows the `)` whole instead of splitting at a `|` that
+		// lands flush with the body.
+		it("breaks the parameter list before ever splitting the return type", () => {
+			let source =
+				"implementation {\n\tconstant minimum = (_ firstNumber: Integer, _ secondNumber: Rational) -> Integer | Rational {\n\t\tif firstNumber::isLessThanOrEqualTo(secondNumber) {\n\t\t\t<- firstNumber\n\t\t} else {\n\t\t\t<- secondNumber\n\t\t}\n\t}\n}\n"
+
+			expect(formatted(source)).toBe(
+				"implementation {\n\tconstant minimum = (\n\t\t_ firstNumber: Integer,\n\t\t_ secondNumber: Rational,\n\t) -> Integer | Rational {\n\t\tif firstNumber::isLessThanOrEqualTo(secondNumber) {\n\t\t\t<- firstNumber\n\t\t} else {\n\t\t\t<- secondNumber\n\t\t}\n\t}\n}\n",
+			)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\t__print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'

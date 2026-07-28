@@ -1054,19 +1054,19 @@ export class Printer {
 	private printProtocolSignature(
 		signature: parser.ProtocolMethodSignatureNode,
 	): Doc {
-		return concat([
-			this.printParameterList(signature.parameters),
-			text(" -> "),
-			this.printType(signature.returnType),
-		])
+		return this.printParameterList(
+			signature.parameters,
+			concat([text(" -> "), this.printType(signature.returnType)]),
+		)
 	}
 
 	private printSignature(signature: parser.NativeMethodSignatureNode): Doc {
 		return concat([
 			this.printGenericList(signature.generics),
-			this.printParameterList(signature.parameters),
-			text(" -> "),
-			this.printType(signature.returnType),
+			this.printParameterList(
+				signature.parameters,
+				concat([text(" -> "), this.printType(signature.returnType)]),
+			),
 		])
 	}
 
@@ -1119,11 +1119,17 @@ export class Printer {
 	): Doc {
 		let parts: Array<Doc> = [this.printGenericList(definition.generics)]
 
-		parts.push(this.printParameterList(definition.parameters))
-
-		if (definition.returnType !== null) {
-			parts.push(text(" -> "), this.printType(definition.returnType))
-		}
+		parts.push(
+			this.printParameterList(
+				definition.parameters,
+				definition.returnType === null
+					? EMPTY
+					: concat([
+							text(" -> "),
+							this.printType(definition.returnType),
+						]),
+			),
+		)
 
 		parts.push(
 			text(" "),
@@ -1142,9 +1148,19 @@ export class Printer {
 	// whatever the width. Collapsing it would put the block on the same line as
 	// the Parameter below it, and Documentation attaches by line adjacency —
 	// the docs would silently detach.
-	private printParameterList(parameters: Array<parser.ParameterNode>): Doc {
+	//
+	// `suffix` is the return clause, and it lives INSIDE the group so that one
+	// fit decision covers the whole header. Left outside, the list measures
+	// only up to the return Type's first break candidate and stays flat, and
+	// the Union is what gives way — split mid-Type, at the body's indent.
+	// Inside, a header that does not fit breaks its Parameters instead, and
+	// the return Type follows the `)` whole.
+	private printParameterList(
+		parameters: Array<parser.ParameterNode>,
+		suffix: Doc = EMPTY,
+	): Doc {
 		if (parameters.length === 0) {
-			return text("()")
+			return concat([text("()"), suffix])
 		}
 
 		let documented = false
@@ -1178,6 +1194,7 @@ export class Printer {
 				),
 				softline,
 				text(")"),
+				suffix,
 			]),
 			{ shouldBreak: documented },
 		)
@@ -1828,11 +1845,18 @@ export class Printer {
 			case "RecordTypeDeclaration":
 				return this.printRecordType(node)
 
+			// NOTE: A Union in a function header no longer breaks on its own —
+			// the Parameter list gives way first — so this group is the last
+			// resort, for a Union too wide for a line of its own. The indent
+			// keeps that shape a continuation rather than a collision with
+			// whatever block opens after it.
 			case "UnionTypeDeclaration":
 				return group(
-					join(
-						concat([line, text("| ")]),
-						node.types.map((member) => this.printType(member)),
+					indent(
+						join(
+							concat([line, text("| ")]),
+							node.types.map((member) => this.printType(member)),
+						),
 					),
 				)
 
