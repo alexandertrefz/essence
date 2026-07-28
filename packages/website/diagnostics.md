@@ -458,6 +458,17 @@ A Case that carries no payload was given one.
 
 The payload does not match the Type the Case declares.
 
+### `unbindable-case-payload`
+
+A Case Matcher binds a name — `case #Value(item)` — for a Case that has no
+single value to bind.
+
+The binding names what the CONSTRUCTOR takes, so it works on a Case carrying
+exactly one value, the same shorthand that lets `#Value(5)` stand for
+`#Value({ item = 5 })`. A Case carrying none has nothing to name, and one
+carrying several has nothing single to name; both keep their values reachable
+through the Matcher itself, as `@.member`.
+
 ### `recursive-generic-choice`
 
 A generic Choice names itself in one of its payloads. A generic Choice's

@@ -968,6 +968,26 @@ function walkNode(
 					context,
 				)
 
+				// NOTE: A payload binding (`case #Value(item)`) declares a
+				// name for the Handler's body, so it belongs to the Handler's
+				// Scope rather than the enclosing one — and it is declared
+				// BEFORE the body is walked, so a use inside binds to it. It is
+				// deliberately not visible to the Guard, which the Enricher
+				// enriches before the binding exists; the Guard is walked above,
+				// in the enclosing Scope, which already reflects that.
+				if (
+					handler.matcher.nodeType === "CaseMatcher" &&
+					handler.matcher.binding !== null
+				) {
+					declareInScope(
+						handlerScope,
+						"values",
+						handler.matcher.binding,
+						"constant",
+						context,
+					)
+				}
+
 				walkBody(handler.body, handlerScope, context, {
 					hoist: false,
 				})

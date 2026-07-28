@@ -1779,10 +1779,17 @@ export class Printer {
 				return this.printValue(node.value)
 
 			case "CaseMatcher":
+				// NOTE: The payload binder rides on the Matcher's own line
+				// whatever the arm does — `case #Value(item)` is one token to a
+				// reader, and the `match` case-brace alignment measures it as
+				// part of the Matcher's width.
 				return text(
 					(node.choice === null ? "" : node.choice.content) +
 						"#" +
-						node.caseName.content,
+						node.caseName.content +
+						(node.binding === null
+							? ""
+							: `(${node.binding.content})`),
 				)
 
 			case "RecordMatcher": {

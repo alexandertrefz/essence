@@ -201,6 +201,7 @@ export type DiagnosticCode =
 	| "missing-payload"
 	| "unexpected-payload"
 	| "payload-type-mismatch"
+	| "unbindable-case-payload"
 	| "recursive-generic-choice"
 	| "indistinguishable-union-arms"
 	| "undecided-type-arguments"

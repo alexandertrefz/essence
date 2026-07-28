@@ -18,10 +18,10 @@ implementation {
 			step advance: (_ state: State) -> Progress<State, Result>,
 		) -> Result {
 			<- match advance(state) -> Result {
-				case #Going   {
-					<- Loop.run(startingWith @.state, step advance)
+				case #Going(next)   {
+					<- Loop.run(startingWith next, step advance)
 				}
-				case #Stopped { <- @.value }
+				case #Stopped(done) { <- done }
 			}
 		}
 	}
@@ -32,11 +32,12 @@ implementation {
 		total: Integer,
 	}, Integer> = Progress#Going({ state = { index = 1, total = 0 } })
 
-	§ Match narrows an instantiated Case to its concrete member Types —
-	§ `@.state` is the Record, `@.total` inside it is an Integer.
+	§ Match narrows an instantiated Case to its concrete member Types, and the
+	§ Matcher's binding names the payload the constructor took — `carried` is the
+	§ Record, `carried.total` inside it is an Integer.
 	__print(match startState -> Integer {
-		case #Going   { <- @.state.total }
-		case #Stopped { <- @.value }
+		case #Going(carried) { <- carried.total }
+		case #Stopped(total) { <- total }
 	}) § 0
 
 	§ The driver, threading a Record State through `{ state with … }` and
@@ -61,8 +62,8 @@ implementation {
 	constant answer: Progress<Integer, Integer> = #Stopped(42)
 
 	__print(match answer -> Integer {
-		case #Going   { <- @.state }
-		case #Stopped { <- @.value }
+		case #Going(state)  { <- state }
+		case #Stopped(done) { <- done }
 	}) § 42
 
 	§ A generic Choice with a unit Case still constructs and matches.

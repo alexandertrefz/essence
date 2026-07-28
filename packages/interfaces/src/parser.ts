@@ -272,10 +272,19 @@ export type MatcherNode =
 // matched value's own Union, so Cases match without their Choice's name in
 // scope. The prefixed form (`case CalculatorOperation#Add`) disambiguates
 // when two Choices in one Union share a Case name.
+//
+// NOTE: `binding` is the optional payload binder — `case #Value(item)` names
+// the payload for the span of the arm. It binds exactly what the CONSTRUCTOR
+// takes, so a one-member Case binds that member's value through the same
+// shorthand that lets `#Value(5)` stand for `#Value({ item = 5 })`, and any
+// other Case binds the payload Record whole. `@` is untouched by it and still
+// means the scrutinee narrowed to this Matcher — which is what lets an arm
+// bind the payload AND hand the whole Case onwards.
 export interface CaseMatcherNode {
 	nodeType: "CaseMatcher"
 	choice: IdentifierNode | null
 	caseName: IdentifierNode
+	binding: IdentifierNode | null
 	position: Position
 }
 

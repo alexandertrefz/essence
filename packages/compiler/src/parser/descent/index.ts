@@ -1913,15 +1913,17 @@ class DescentParser {
 
 		// NOTE: `case #Add` — the bare form resolves against the matched
 		// value's own Union; `case CalculatorOperation#Add` is the prefixed
-		// form for when that is ambiguous.
+		// form for when that is ambiguous. Either may carry a payload binder,
+		// `case #Value(item)`, parsed by `parseCaseMatcherBinding` below.
 		if (token?.type === TokenType.SymbolHash) {
 			this.tokens.next()
 
 			let caseName = this.parseIdentifier()
+			let binding = this.parseCaseMatcherBinding()
 
-			return generators.caseMatcher(null, caseName, {
+			return generators.caseMatcher(null, caseName, binding, {
 				start: token.position.start,
-				end: caseName.position.end,
+				end: (binding ?? caseName).position.end,
 			})
 		}
 
@@ -1934,14 +1936,38 @@ class DescentParser {
 			this.tokens.expect(TokenType.SymbolHash)
 
 			let caseName = this.parseIdentifier()
+			let binding = this.parseCaseMatcherBinding()
 
-			return generators.caseMatcher(choice, caseName, {
+			return generators.caseMatcher(choice, caseName, binding, {
 				start: choice.position.start,
-				end: caseName.position.end,
+				end: (binding ?? caseName).position.end,
 			})
 		}
 
 		return this.parseType()
+	}
+
+	// NOTE: The payload binder of a Case Matcher — `case #Value(item)`. Parens
+	// bind a NAME; braces are left free for the payload pattern form
+	// (`case #Add { left = 0 }`), which constrains a shape instead. The two can
+	// not be confused at the token level, which is the whole reason for the
+	// split.
+	//
+	// NOTE: A Case Matcher is the only Matcher that takes one. `@` already
+	// answers for every Matcher kind — the scrutinee, narrowed — so this adds a
+	// second name rather than redefining the one that exists.
+	protected parseCaseMatcherBinding(): parser.IdentifierNode | null {
+		if (this.tokens.peek()?.type !== TokenType.SymbolLeftParen) {
+			return null
+		}
+
+		this.tokens.expect(TokenType.SymbolLeftParen)
+
+		let binding = this.parseIdentifier()
+
+		this.tokens.expect(TokenType.SymbolRightParen)
+
+		return binding
 	}
 
 	protected parseRecordMatcher(): parser.RecordMatcherNode {

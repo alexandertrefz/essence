@@ -1784,13 +1784,36 @@ export function enrichMatch(
 
 			// NOTE: The Guard is enriched in the body Scope so that it can use
 			// `@` — narrowing is what makes a Guard worth writing.
+			//
+			// NOTE: The payload binding is declared AFTER this, so a Guard can
+			// not see it. A Guard is emitted into the Handler's TEST, which runs
+			// before the body the binding's constant stands in, so letting it
+			// resolve here would type-check and then read an undeclared name at
+			// runtime. `where` on a bound payload wants the test to become a
+			// closure; until then a Guard naming the binding reports
+			// `unknown-name`, which is true.
 			let guard =
 				handler.guard === null
 					? null
 					: enrichExpression(handler.guard, bodyScope)
 
+			// NOTE: `case #Value(item)` — desugared here rather than carried
+			// through the typed tree, so the Simplifier, Rewriter and every
+			// walker downstream see the constant an author could have written
+			// themselves. `@` is untouched and still means the narrowed
+			// scrutinee, so an arm can bind the payload AND hand the whole Case
+			// onwards.
+			let bindingStatements = enrichCaseMatcherBinding(
+				handler.matcher,
+				matcher,
+				bodyScope,
+			)
+
 			return {
-				body: handler.body.map((node) => enrichNode(node, bodyScope)),
+				body: [
+					...bindingStatements,
+					...handler.body.map((node) => enrichNode(node, bodyScope)),
+				],
 				literal,
 				memberLiterals,
 				guard,
@@ -5981,6 +6004,109 @@ function joinCaseInstantiations(
 // value's own Union — the Case's name never has to be in scope by itself.
 // Ambiguity (two Choices in one Union sharing a Case name) asks for the
 // prefixed form instead of guessing.
+// NOTE: The payload binder of a Case Matcher, desugared into the constant an
+// author could have written: `case #Value(item)` becomes `constant item = @.item`
+// at the head of the arm. It binds what the CONSTRUCTOR takes, which for a
+// one-member Case is that member's value — the same shorthand that lets
+// `#Value(5)` stand for `#Value({ item = 5 })`.
+//
+// A Case with no members has nothing to bind, and one with several has nothing
+// SINGLE to bind: binding the payload Record whole is the destructuring form
+// (`case #Rectangle({ width, height })`), which is deliberately not in this
+// slice. Both are refused here rather than half-answered, and the Diagnostic
+// names `@.member` as the way to read them today.
+function enrichCaseMatcherBinding(
+	node: parser.MatcherNode,
+	matcher: common.Type,
+	bodyScope: enricher.Scope,
+): Array<common.typed.ImplementationNode> {
+	if (node.nodeType !== "CaseMatcher" || node.binding === null) {
+		return []
+	}
+
+	let binding = node.binding
+
+	// NOTE: An unresolved Case already reported; adding a second Diagnostic
+	// about its payload would bury the one that matters.
+	if (matcher.type !== "Case") {
+		return []
+	}
+
+	let memberNames = Object.keys(matcher.members)
+
+	if (memberNames.length !== 1) {
+		reportError(
+			`'${describeType(matcher)}' has no single value to bind`,
+			binding.position,
+			{
+				code: "unbindable-case-payload",
+				labels: [
+					primary(
+						binding.position,
+						memberNames.length === 0
+							? "this Case carries no value"
+							: `this Case carries ${countOf(memberNames.length, "value")}`,
+					),
+				],
+				notes: [
+					memberNames.length === 0
+						? "A binding names the value a Case carries, and this one carries none."
+						: `Its values are ${memberNames.map((name) => `'${name}'`).join(", ")}.`,
+				],
+				helps:
+					memberNames.length === 0
+						? ["Drop the binding — the Matcher alone is the test."]
+						: [
+								`Read them off the Matcher instead: '@.${memberNames[0]}'.`,
+							],
+			},
+		)
+
+		return []
+	}
+
+	let memberName = memberNames[0]!
+	let memberType = matcher.members[memberName]!
+
+	declareVariableInScope(binding, memberType, bodyScope, true)
+
+	return [
+		{
+			nodeType: "ConstantDeclarationStatement",
+			name: {
+				nodeType: "Identifier",
+				content: binding.content,
+				position: binding.position,
+				type: memberType,
+			},
+			value: {
+				nodeType: "Lookup",
+				// NOTE: A `Self` Node, not an Identifier spelled "@" — the
+				// Rewriter escapes an Identifier as a user name, and inside a
+				// lifted Handler the scrutinee is the `_self` Parameter.
+				base: {
+					nodeType: "Self",
+					position: binding.position,
+					type: matcher,
+				},
+				member: {
+					nodeType: "Identifier",
+					content: memberName,
+					position: binding.position,
+					type: memberType,
+				},
+				position: binding.position,
+				type: memberType,
+			},
+			position: binding.position,
+			headPosition: binding.position,
+			declaredType: null,
+			type: memberType,
+			documentation: null,
+		},
+	]
+}
+
 export function resolveCaseMatcherType(
 	node: parser.CaseMatcherNode,
 	valueType: common.Type,
