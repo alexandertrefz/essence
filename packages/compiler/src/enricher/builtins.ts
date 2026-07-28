@@ -47,6 +47,7 @@ export const builtinMemberOrder: Array<string> = [
 	"Case",
 	"NormalizationForm",
 	"NumberFormat",
+	"Rounding",
 	"Record",
 	"List",
 	// NOTE: Directly after `List`, because both target a List and the position
@@ -91,6 +92,7 @@ export const builtinTypeOrder: Array<string> = [
 	"Step",
 	"NormalizationForm",
 	"NumberFormat",
+	"Rounding",
 ]
 
 // NOTE: Accessors rather than consts, because what they answer with is read

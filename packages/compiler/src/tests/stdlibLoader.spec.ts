@@ -868,6 +868,7 @@ describe("Standard Library Loader", () => {
 			"Case",
 			"NormalizationForm",
 			"NumberFormat",
+			"Rounding",
 			"Record",
 			"List",
 			// NOTE: The one Namespace a List value can reach besides `List`,

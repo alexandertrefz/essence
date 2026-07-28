@@ -560,12 +560,37 @@ third"::lines())
 	show("Rational.isWholeNumber() [fractional]", 3/4::isWholeNumber())
 	show("Rational.round()", 7/2::round())
 	show("Rational.round() [negative]", -7/2::round())
-	show("Rational.roundDown()", 7/2::roundDown())
-	show("Rational.roundDown() [negative]", -7/2::roundDown())
-	show("Rational.roundUp()", 7/2::roundUp())
-	show("Rational.roundUp() [negative]", -7/2::roundUp())
-	show("Rational.truncate()", 7/2::truncate())
-	show("Rational.truncate() [negative]", -7/2::truncate())
+	show("Rational.round(toward: Rounding)", 7/2::round(toward #Nearest))
+	show(
+		"Rational.round(toward: Rounding) [negative nearest]",
+		-7/2::round(toward #Nearest),
+	)
+	show("Rational.round(toward: Rounding) [down]", 7/2::round(toward #Down))
+	show(
+		"Rational.round(toward: Rounding) [negative down]",
+		-7/2::round(toward #Down),
+	)
+	show("Rational.round(toward: Rounding) [up]", 7/2::round(toward #Up))
+	show(
+		"Rational.round(toward: Rounding) [negative up]",
+		-7/2::round(toward #Up),
+	)
+	show(
+		"Rational.round(toward: Rounding) [toward zero]",
+		7/2::round(toward #TowardZero),
+	)
+	show(
+		"Rational.round(toward: Rounding) [negative toward zero]",
+		-7/2::round(toward #TowardZero),
+	)
+	show(
+		"Rational.round(toward: Rounding) [whole is its own ceiling]",
+		4/2::round(toward #Up),
+	)
+	show(
+		"Rational.round(toward: Rounding) [below a half]",
+		1/4::round(toward #Nearest),
+	)
 	showMaybe("Rational.raise(to: Integer)", 2/3::raise(to 2))
 	showMaybe("Rational.raise(to: Integer) [zero exponent]", 2/3::raise(to 0))
 	showMaybe(
@@ -1140,6 +1165,21 @@ third"::lines())
 	)
 	show("NumberFormat.toString() [Fraction]", asFraction::toString())
 	show("NumberFormat.toString() [Decimal]", asDecimal::toString())
+
+	§ ——— Rounding —————————————————————————————————————————————————————————
+	constant toNearest: Rounding    = #Nearest
+	constant toDown: Rounding       = #Down
+	constant toUp: Rounding         = #Up
+	constant toTowardZero: Rounding = #TowardZero
+
+	show("Choice_Equatable.is(_ Rounding)", toNearest::is(#Nearest))
+	show("Choice_Equatable.is(_ Rounding) [differing]", toNearest::is(#Down))
+	show("Choice_Equatable.isNot(_ Rounding)", toNearest::isNot(#Down))
+	show("Choice_Equatable.isNot(_ Rounding) [same]", toDown::isNot(#Down))
+	show("Rounding.toString() [Nearest]", toNearest::toString())
+	show("Rounding.toString() [Down]", toDown::toString())
+	show("Rounding.toString() [Up]", toUp::toString())
+	show("Rounding.toString() [TowardZero]", toTowardZero::toString())
 
 	§ ——— Record ———————————————————————————————————————————————————————————
 	§ LOAD-BEARING: `point` prints as `{ x = 1, y = 2 }`, well under sixty

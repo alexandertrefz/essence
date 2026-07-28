@@ -23,7 +23,7 @@ implementation {
 	}
 
 	function centimetres(_ millimetres: Integer) -> Integer {
-		<- millimetres::divide(by 10)::otherwise(0/1)::truncate()
+		<- millimetres::divide(by 10)::otherwise(0/1)::round(toward #TowardZero)
 	}
 }
 

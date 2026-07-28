@@ -14,8 +14,10 @@ implementation {
 	§ The everyday Rational Methods — and the way back to Integer.
 	constant sevenHalves = 7/2
 	__print(sevenHalves::round()) § 4 — halves round away from zero
-	__print(sevenHalves::roundDown()) § 3
-	__print(sevenHalves::negate()::truncate()) § -3 — towards zero
+	__print(sevenHalves::round(toward #Down)) § 3
+	__print(
+		sevenHalves::negate()::round(toward #TowardZero),
+	) § -3 — towards zero
 	__print(3/4::numerator()) § 3
 	__print(3/4::reciprocal()) § 4/3
 	__print(2/3::raise(to 2)) § 4/9
