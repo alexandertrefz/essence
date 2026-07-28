@@ -46,8 +46,7 @@
 	],
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
-		"build:server": "bun build ../language-server/src/serverEntry.ts --target=node --format=esm --outfile=server/server.js && bun run copy:stdlib",
-		"copy:stdlib": "rm -rf server/stdlib && cp -R ../stdlib/sources server/stdlib",
+		"build:server": "bun buildServer.js",
 		"build:extension": "bun build extension.js --target=node --format=esm --external vscode --outfile=dist/extension.js",
 		"package": "bun run build && vsce package --no-dependencies"
 	},
@@ -246,7 +245,8 @@
 		]
 	},
 	"devDependencies": {
-		"@essence-lang/language-server": "workspace:*",
+		"@essence-lang/language-server": "0.1.0",
+		"@essence-lang/stdlib": "0.1.0",
 		"@vscode/vsce": "3.9.2",
 		"vscode-languageclient": "9.0.1"
 	}

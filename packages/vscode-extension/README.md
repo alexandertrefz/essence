@@ -142,20 +142,17 @@ The status bar shows whether the server is running; clicking it restarts it.
 ## Development
 
 The extension is one package of the [Essence
-monorepo](https://github.com/atrefz/essence). The Language Server it bundles is
-another, `@essence-lang/language-server`, a few directories away:
-
-```
-essence/
-  packages/
-    language-server/    ← what `build:server` bundles
-    compiler/
-    vscode-extension/   ← this package
-```
-
-From the repository root, `bun install` links the whole workspace. Then, here:
+monorepo](https://github.com/alexandertrefz/essence), but what it bundles is a
+DEPENDENCY: `@essence-lang/language-server`, pinned by exact version in
+`devDependencies` — the published, compiled package. Inside the monorepo the
+workspace satisfies that pin, so `buildServer.js` resolves to the sibling
+package's TypeScript sources; anywhere else, `bun install` fetches the
+published package and the same build bundles its compiled `dist/`. The
+standard library's `.es` sources are copied beside the bundle the same way,
+resolved off `@essence-lang/stdlib` rather than a relative path.
 
 ```sh
+bun install        # links the workspace, or fetches the published packages
 bun run build      # bundles @essence-lang/language-server into server/server.js
 ```
 

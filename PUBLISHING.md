@@ -18,7 +18,9 @@ its own directory.
 1. Set the new version in every published package's
    `packages/*/package.json`. The versions move in lockstep, and the staging
    script reads them from the manifests — the manifests are the single source
-   of truth, there is no version anywhere else.
+   of truth, there is no version anywhere else. The one consumer to carry
+   along: the VS Code extension pins `@essence-lang/language-server` and
+   `@essence-lang/stdlib` by exact version in its `devDependencies`.
 2. `bun install`, `bun test`, `bun run typecheck` — the tree the release is
    cut from is green.
 3. `bun run publish:smoke` — stages everything and proves the *artifacts*:
