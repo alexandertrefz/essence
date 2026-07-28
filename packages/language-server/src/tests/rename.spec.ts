@@ -627,6 +627,46 @@ describe("Rename of Methods and Record members", () => {
 		expect(rename(source, { line: 10, column: 25 }, "isTiny")).toBe(renamed)
 	})
 
+	it("should rename a Case Matcher's payload binding from Matcher, Guard and body", () => {
+		// NOTE: The Case's own member keeps its name — a payload binding is a
+		// local name for the value, not a second spelling of the member.
+		let source = [
+			"implementation {",
+			"\tchoice Shape {",
+			"\t\tCircle { radius: Integer },",
+			"\t\tDot,",
+			"\t}",
+			"",
+			"\tconstant drawn: Shape = #Circle(3)",
+			"\tconstant size = match drawn -> Integer {",
+			"\t\tcase #Circle(radius) where radius::isLessThan(2) { <- radius }",
+			"\t\tcase #Circle { <- 0 }",
+			"\t\tcase #Dot { <- 0 }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let renamed = [
+			"implementation {",
+			"\tchoice Shape {",
+			"\t\tCircle { radius: Integer },",
+			"\t\tDot,",
+			"\t}",
+			"",
+			"\tconstant drawn: Shape = #Circle(3)",
+			"\tconstant size = match drawn -> Integer {",
+			"\t\tcase #Circle(span) where span::isLessThan(2) { <- span }",
+			"\t\tcase #Circle { <- 0 }",
+			"\t\tcase #Dot { <- 0 }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 9, column: 16 }, "span")).toBe(renamed)
+		expect(rename(source, { line: 9, column: 30 }, "span")).toBe(renamed)
+		expect(rename(source, { line: 9, column: 57 }, "span")).toBe(renamed)
+	})
+
 	it("should rename a Record member looked up in a Match Guard", () => {
 		let source = [
 			"implementation {",
