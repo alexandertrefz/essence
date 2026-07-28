@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
-import type { common } from "@essence/interfaces"
+import { fixturePath } from "@essence-lang/fixtures"
+import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { renderDiagnostics } from "../diagnostics/render"

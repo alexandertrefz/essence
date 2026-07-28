@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: The bare Type tags — the handful of Types that have no declaration
 // anywhere, because they ARE what a declaration bottoms out in. A standard

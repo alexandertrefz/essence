@@ -1,11 +1,11 @@
-# @essence/debug-adapter
+# @essence-lang/debug-adapter
 
 The Debug Adapter for the
 [Essence](https://github.com/alexandertrefz/essence) programming language,
 speaking the Debug Adapter Protocol over stdio.
 
 Start it as `essence dap` from
-[`@essence/cli`](https://www.npmjs.com/package/@essence/cli), or through this
+[`@essence-lang/cli`](https://www.npmjs.com/package/@essence-lang/cli), or through this
 package's own `esdap` launcher. The
 [Essence VS Code extension](https://github.com/alexandertrefz/essence/tree/master/packages/vscode-extension)
 spawns it for every debug session; any DAP client can do the same.

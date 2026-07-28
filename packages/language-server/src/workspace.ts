@@ -6,14 +6,14 @@ import {
 	enrichDocument,
 	isStdlibDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
+} from "@essence-lang/compiler/documents"
 import {
 	linkModuleGraph,
 	loadModuleGraph,
 	type ModuleHost,
 	resolveSpecifier,
-} from "@essence/compiler/modules"
-import type { common, parser } from "@essence/interfaces"
+} from "@essence-lang/compiler/modules"
+import type { common, parser } from "@essence-lang/interfaces"
 
 import { relativeSpecifier } from "./autoImport"
 import {

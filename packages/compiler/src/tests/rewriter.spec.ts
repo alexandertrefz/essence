@@ -1,27 +1,27 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common } from "@essence/interfaces"
-import * as boolean from "@essence/runtime/Boolean"
-import * as integer from "@essence/runtime/Integer"
+import type { common } from "@essence-lang/interfaces"
+import * as boolean from "@essence-lang/runtime/Boolean"
+import * as integer from "@essence-lang/runtime/Integer"
 import {
 	anyIs,
 	anyIsNot,
 	isFirstRationalBigger,
-} from "@essence/runtime/internalHelpers"
-import * as list from "@essence/runtime/List"
-import { createNothing } from "@essence/runtime/Nothing"
-import * as number from "@essence/runtime/Number"
-import * as numberFormat from "@essence/runtime/NumberFormat"
-import * as ordering from "@essence/runtime/Ordering"
-import * as rational from "@essence/runtime/Rational"
-import * as record from "@essence/runtime/Record"
-import * as side from "@essence/runtime/Side"
-import * as string from "@essence/runtime/String"
+} from "@essence-lang/runtime/internalHelpers"
+import * as list from "@essence-lang/runtime/List"
+import { createNothing } from "@essence-lang/runtime/Nothing"
+import * as number from "@essence-lang/runtime/Number"
+import * as numberFormat from "@essence-lang/runtime/NumberFormat"
+import * as ordering from "@essence-lang/runtime/Ordering"
+import * as rational from "@essence-lang/runtime/Rational"
+import * as record from "@essence-lang/runtime/Record"
+import * as side from "@essence-lang/runtime/Side"
+import * as string from "@essence-lang/runtime/String"
 import {
 	dispatchMethod,
 	isValueOfType,
 	noCaseMatched,
-} from "@essence/runtime/type"
+} from "@essence-lang/runtime/type"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"

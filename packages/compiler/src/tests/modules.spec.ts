@@ -10,9 +10,9 @@ import {
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
-import type { common } from "@essence/interfaces"
-import { STDLIB_DIRECTORY } from "@essence/stdlib"
+import { fixturePath } from "@essence-lang/fixtures"
+import type { common } from "@essence-lang/interfaces"
+import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { bundle, type ModuleSources } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"

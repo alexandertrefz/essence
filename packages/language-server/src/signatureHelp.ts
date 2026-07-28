@@ -1,10 +1,10 @@
-import { enrichDocument, parseDocument } from "@essence/compiler/documents"
+import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import {
 	describeSignature,
 	type ParameterRange,
 	signaturesOf,
-} from "@essence/compiler/printType"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/printType"
+import type { common } from "@essence-lang/interfaces"
 
 import { describe, documentationOf } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"

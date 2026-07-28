@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs"
 import path from "node:path"
 
-import type { common } from "@essence/interfaces"
-import { RUNTIME_DIRECTORY } from "@essence/runtime"
+import type { common } from "@essence-lang/interfaces"
+import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
 import { loadStdlib, type Stdlib } from "../enricher/stdlib"
 import {
@@ -11,7 +11,7 @@ import {
 } from "../helpers/index"
 
 // NOTE: The renderer that turns the loaded standard library into a checked-in
-// TypeScript contract for the runtime bindings — `@essence/runtime`.
+// TypeScript contract for the runtime bindings — `@essence-lang/runtime`.
 // A body-less Method signature in `packages/stdlib/sources/*.es` declares a NATIVE bound by
 // NAME ONLY to a runtime export; nothing between the Enricher's tables and the
 // runtime module checks that the export has the RIGHT SHAPE. This module emits

@@ -1,5 +1,5 @@
 {
-	"name": "@essence/website",
+	"name": "@essence-lang/website",
 	"version": "0.0.1",
 	"description": "essence-language.org — the language's documentation.",
 	"private": true,
@@ -7,6 +7,6 @@
 	"author": "Alexander Trefz",
 	"license": "MIT",
 	"devDependencies": {
-		"@essence/interfaces": "workspace:*"
+		"@essence-lang/interfaces": "workspace:*"
 	}
 }

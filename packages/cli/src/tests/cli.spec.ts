@@ -12,10 +12,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { closestMatch } from "@essence/compiler/helpers"
-import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
-import { fixturePath } from "@essence/fixtures"
-import { STDLIB_DIRECTORY } from "@essence/stdlib"
+import { closestMatch } from "@essence-lang/compiler/helpers"
+import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
+import { fixturePath } from "@essence-lang/fixtures"
+import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { runCheck } from "../actions"
 import { type OptionValues, parseArguments, UsageError } from "../args"
@@ -1118,7 +1118,7 @@ describe("delegation stays lazy", () => {
 
 			expect([
 				fileName,
-				/from\s+"@essence\/(?:formatter|language-server|debug-adapter)/.test(
+				/from\s+"@essence-lang\/(?:formatter|language-server|debug-adapter)/.test(
 					source,
 				),
 			]).toEqual([fileName, false])
@@ -1131,9 +1131,11 @@ describe("delegation stays lazy", () => {
 			"utf8",
 		)
 
-		expect(source).toContain('await import("@essence/formatter/cli")')
-		expect(source).toContain('await import("@essence/language-server")')
-		expect(source).toContain('await import("@essence/debug-adapter")')
+		expect(source).toContain('await import("@essence-lang/formatter/cli")')
+		expect(source).toContain(
+			'await import("@essence-lang/language-server")',
+		)
+		expect(source).toContain('await import("@essence-lang/debug-adapter")')
 	})
 })
 

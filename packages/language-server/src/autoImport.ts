@@ -1,6 +1,6 @@
 import * as path from "node:path"
 
-import type { common, parser } from "@essence/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 // NOTE: One edit builder for every feature that adds an `import { … }` entry —
 // the Quick Fixes off an unknown name, and a Completion of something the file

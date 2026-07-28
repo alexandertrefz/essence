@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { common, enricher } from "@essence/interfaces"
+import type { common, enricher } from "@essence-lang/interfaces"
 
 import { collectDiagnostics } from "../diagnostics/index"
 import { builtinMemberOrder, builtinTypeOrder } from "../enricher/builtins"

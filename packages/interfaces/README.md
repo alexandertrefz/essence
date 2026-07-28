@@ -1,4 +1,4 @@
-# @essence/interfaces
+# @essence-lang/interfaces
 
 The types every stage of the
 [Essence](https://github.com/alexandertrefz/essence) compiler agrees on:
@@ -13,8 +13,8 @@ itself.
 
 | Subpath | |
 | --- | --- |
-| `@essence/interfaces` | everything, namespaced by stage |
-| `@essence/interfaces/common` | the shared node and position types |
-| `@essence/interfaces/lexer` | token types |
-| `@essence/interfaces/parser` | parsed AST node types |
-| `@essence/interfaces/enricher` | typed AST node and Type types |
+| `@essence-lang/interfaces` | everything, namespaced by stage |
+| `@essence-lang/interfaces/common` | the shared node and position types |
+| `@essence-lang/interfaces/lexer` | token types |
+| `@essence-lang/interfaces/parser` | parsed AST node types |
+| `@essence-lang/interfaces/enricher` | typed AST node and Type types |

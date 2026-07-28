@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: Documentation reaches an Editor as Markdown. The tagged sections were
 // lifted out of the prose when the `§§` block was parsed, so they are put back

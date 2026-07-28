@@ -1,22 +1,26 @@
 import { describe, expect, it } from "bun:test"
 
-import * as algebraic from "@essence/runtime/Algebraic"
-import { createBoolean } from "@essence/runtime/Boolean"
-import { getStringRepresentation } from "@essence/runtime/functions"
-import * as integer from "@essence/runtime/Integer"
+import * as algebraic from "@essence-lang/runtime/Algebraic"
+import { createBoolean } from "@essence-lang/runtime/Boolean"
+import { getStringRepresentation } from "@essence-lang/runtime/functions"
+import * as integer from "@essence-lang/runtime/Integer"
 import {
 	anyIs,
 	anyIsNot,
 	boundChoiceIs,
 	choiceIs,
-} from "@essence/runtime/internalHelpers"
-import * as list from "@essence/runtime/List"
-import { createNothing } from "@essence/runtime/Nothing"
-import * as number from "@essence/runtime/Number"
-import * as rational from "@essence/runtime/Rational"
-import * as record from "@essence/runtime/Record"
-import * as string from "@essence/runtime/String"
-import { type AnyType, createCase, typeKeySymbol } from "@essence/runtime/type"
+} from "@essence-lang/runtime/internalHelpers"
+import * as list from "@essence-lang/runtime/List"
+import { createNothing } from "@essence-lang/runtime/Nothing"
+import * as number from "@essence-lang/runtime/Number"
+import * as rational from "@essence-lang/runtime/Rational"
+import * as record from "@essence-lang/runtime/Record"
+import * as string from "@essence-lang/runtime/String"
+import {
+	type AnyType,
+	createCase,
+	typeKeySymbol,
+} from "@essence-lang/runtime/type"
 
 // NOTE: The runtime is handed values, never Types — so these are built the way
 // the emitted JavaScript builds them, with the `create…` constructors.

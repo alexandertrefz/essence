@@ -1,5 +1,5 @@
 {
-	"name": "@essence/fixtures",
+	"name": "@essence-lang/fixtures",
 	"version": "0.0.1",
 	"description": "Essence sources the test suite compiles, and the paths to reach them.",
 	"private": true,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
-import { enrich } from "@essence/compiler/enricher"
-import { parseWithDiagnostics } from "@essence/compiler/parser"
+import { enrich } from "@essence-lang/compiler/enricher"
+import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 
 import {
 	type DocumentSymbolEntry,

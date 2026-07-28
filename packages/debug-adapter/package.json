@@ -1,5 +1,5 @@
 {
-	"name": "@essence/debug-adapter",
+	"name": "@essence-lang/debug-adapter",
 	"version": "0.1.0",
 	"description": "The Essence Debug Adapter, spoken over stdio by esdap.",
 	"private": true,
@@ -33,8 +33,8 @@
 		"source-map": "0.6.1"
 	},
 	"devDependencies": {
-		"@essence/fixtures": "workspace:*",
-		"@essence/runtime": "workspace:*",
+		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/runtime": "workspace:*",
 		"@vscode/debugadapter-testsupport": "1.68.0"
 	}
 }

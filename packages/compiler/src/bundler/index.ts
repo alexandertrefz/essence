@@ -1,15 +1,15 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
-import type { common } from "@essence/interfaces"
-import { RUNTIME_DIRECTORY, RUNTIME_TSCONFIG } from "@essence/runtime"
+import type { common } from "@essence-lang/interfaces"
+import { RUNTIME_DIRECTORY, RUNTIME_TSCONFIG } from "@essence-lang/runtime"
 import type { Plugin } from "esbuild"
 import type { RawSourceMap } from "source-map"
 
 import { placelessDiagnostic } from "../diagnostics/index"
 
 // NOTE: The Rewriter emits a module whose imports of the Essence runtime are
-// absolute paths into `@essence/runtime`. Bundling resolves and inlines them,
+// absolute paths into `@essence-lang/runtime`. Bundling resolves and inlines them,
 // tree-shaking away everything the Program does not touch, so that a compiled
 // file is standalone — runnable by Bun or Node, or loadable in a browser, with
 // no dependency on the Compiler being installed.

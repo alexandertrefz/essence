@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 import { type CompileOutcome, ownDiagnostics } from "./pipeline"
 import { displayPath } from "./report"

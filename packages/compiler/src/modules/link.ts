@@ -1,6 +1,6 @@
 import * as path from "node:path"
 
-import type { common, enricher, parser } from "@essence/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import {
 	collectDiagnostics,

@@ -1,5 +1,5 @@
 {
-	"name": "@essence/language-server",
+	"name": "@essence-lang/language-server",
 	"version": "0.1.0",
 	"description": "The Essence Language Server, spoken over stdio by esls.",
 	"private": true,
@@ -27,14 +27,14 @@
 		"language-server"
 	],
 	"dependencies": {
-		"@essence/compiler": "workspace:*",
-		"@essence/formatter": "workspace:*",
-		"@essence/interfaces": "workspace:*",
+		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/formatter": "workspace:*",
+		"@essence-lang/interfaces": "workspace:*",
 		"vscode-languageserver": "10.1.0",
 		"vscode-languageserver-textdocument": "1.0.12"
 	},
 	"devDependencies": {
-		"@essence/fixtures": "workspace:*",
-		"@essence/stdlib": "workspace:*"
+		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/stdlib": "workspace:*"
 	}
 }

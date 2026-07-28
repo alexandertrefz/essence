@@ -17,7 +17,7 @@ native Function with no Namespace to live in — is declared here after all, in
 `Print.es`, as an ordinary body-less free Function.
 
 About half of the declared Method entries are also IMPLEMENTED here, in
-Essence; the rest bind to `@essence/runtime`. What stays native is a
+Essence; the rest bind to `@essence-lang/runtime`. What stays native is a
 deliberate line, not a backlog: the primitives everything else is composed from
 (`Boolean.negate`/`is`/`and`/`or`, integer and rational arithmetic, same-kind
 `compareTo`), the JavaScript intrinsics Essence has no expression for
@@ -298,7 +298,7 @@ A new Namespace is a new runtime module. The Simplifier emits
 `<Namespace>.<method>(…)`, so each name needs
 
 1. an entry in `runtimeNamespaceNames` (`packages/compiler/src/rewriter/index.ts`),
-2. a a `@essence/runtime` module — a re-export of the implementation is
+2. a a `@essence-lang/runtime` module — a re-export of the implementation is
    enough,
 3. a place in `builtinMemberOrder` (`packages/compiler/src/enricher/builtins.ts`), and
 4. a row in `builtins.spec.ts`'s `runtimeModules`.
@@ -321,7 +321,7 @@ rather than rendering the contract. `Side` needed all three, because
 
 ## The native contract
 
-`@essence/runtime`'s `natives.generated.ts` is generated from these
+`@essence-lang/runtime`'s `natives.generated.ts` is generated from these
 declarations by `bun run generate:natives` and checked in. It spells the calling
 convention every native binding must keep as TypeScript, so `tsc` rejects a
 native whose signature has drifted:

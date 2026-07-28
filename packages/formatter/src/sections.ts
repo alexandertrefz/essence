@@ -1,4 +1,4 @@
-import type { parser } from "@essence/interfaces"
+import type { parser } from "@essence-lang/interfaces"
 
 import type { SectionSpan } from "./trivia"
 

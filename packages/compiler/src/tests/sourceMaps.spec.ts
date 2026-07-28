@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
+import { fixturePath } from "@essence-lang/fixtures"
 import { type RawSourceMap, SourceMapConsumer } from "source-map"
 
 import { bundle, moduleSpecifier, PRELUDE_SPECIFIER } from "../bundler/index"

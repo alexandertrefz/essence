@@ -143,7 +143,7 @@ The status bar shows whether the server is running; clicking it restarts it.
 
 The extension is one package of the [Essence
 monorepo](https://github.com/atrefz/essence). The Language Server it bundles is
-another, `@essence/language-server`, a few directories away:
+another, `@essence-lang/language-server`, a few directories away:
 
 ```
 essence/
@@ -156,7 +156,7 @@ essence/
 From the repository root, `bun install` links the whole workspace. Then, here:
 
 ```sh
-bun run build      # bundles @essence/language-server into server/server.js
+bun run build      # bundles @essence-lang/language-server into server/server.js
 ```
 
 Press `F5` ("Extension") to open an Extension Development Host.

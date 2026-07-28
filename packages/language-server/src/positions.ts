@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: Shared Position geometry for the features that search a typed AST
 // for "the smallest node containing the cursor" — Hovers, Completion's

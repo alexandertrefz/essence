@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 import type { BigRational } from "./bigRational"
 import type { BooleanType } from "./Boolean"

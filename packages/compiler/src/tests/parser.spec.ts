@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { parser } from "@essence/interfaces"
+import type { parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { parse, parseWithDiagnostics } from "../parser/index"

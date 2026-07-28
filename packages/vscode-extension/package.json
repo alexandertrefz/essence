@@ -246,7 +246,7 @@
 		]
 	},
 	"devDependencies": {
-		"@essence/language-server": "workspace:*",
+		"@essence-lang/language-server": "workspace:*",
 		"@vscode/vsce": "3.9.2",
 		"vscode-languageclient": "9.0.1"
 	}

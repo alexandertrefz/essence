@@ -1,5 +1,5 @@
 {
-	"name": "@essence/ariadne",
+	"name": "@essence-lang/ariadne",
 	"version": "0.1.0",
 	"description": "A TypeScript port of the ariadne diagnostic renderer.",
 	"private": true,

@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
-import { readStdlibFiles } from "@essence/stdlib"
+import { fixturePath } from "@essence-lang/fixtures"
+import { readStdlibFiles } from "@essence-lang/stdlib"
 
 import { format, guarded } from "../index"
 import { commentAnchors } from "../trivia"

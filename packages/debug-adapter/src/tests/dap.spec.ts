@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
+import { fixturePath } from "@essence-lang/fixtures"
 import { DebugClient } from "@vscode/debugadapter-testsupport"
 import { SourceMapGenerator } from "source-map"
 

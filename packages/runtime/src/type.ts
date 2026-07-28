@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 import type { AlgebraicType } from "./Algebraic"
 import type { BooleanType } from "./Boolean"

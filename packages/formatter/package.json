@@ -1,5 +1,5 @@
 {
-	"name": "@essence/formatter",
+	"name": "@essence-lang/formatter",
 	"version": "0.1.0",
 	"description": "esfmt — the Essence source formatter.",
 	"private": true,
@@ -29,11 +29,11 @@
 		"formatter"
 	],
 	"dependencies": {
-		"@essence/compiler": "workspace:*",
-		"@essence/interfaces": "workspace:*"
+		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/interfaces": "workspace:*"
 	},
 	"devDependencies": {
-		"@essence/fixtures": "workspace:*",
-		"@essence/stdlib": "workspace:*"
+		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/stdlib": "workspace:*"
 	}
 }

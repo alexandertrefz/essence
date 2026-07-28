@@ -3,9 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { fixturePath } from "@essence/fixtures"
-import type { common } from "@essence/interfaces"
-import { readStdlibFiles } from "@essence/stdlib"
+import { fixturePath } from "@essence-lang/fixtures"
+import type { common } from "@essence-lang/interfaces"
+import { readStdlibFiles } from "@essence-lang/stdlib"
 import type * as estree from "estree"
 
 import { containsErrors } from "../diagnostics/index"

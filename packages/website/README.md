@@ -41,7 +41,7 @@ Two things are worth knowing before that work starts:
 `tests/diagnosticCodes.spec.ts` is the gate that every `DiagnosticCode` the
 Compiler can emit has a section in `diagnostics.md`, and that no section
 describes a code that no longer exists. It lives here because the file it holds
-to account lives here — the union it reads is `@essence/interfaces`', resolved
+to account lives here — the union it reads is `@essence-lang/interfaces`', resolved
 through the module loader rather than by counting directories.
 
 A code with no documentation is worse than no code at all: it is printed in

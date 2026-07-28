@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import { Source } from "@essence/ariadne"
-import type { common } from "@essence/interfaces"
+import { Source } from "@essence-lang/ariadne"
+import type { common } from "@essence-lang/interfaces"
 
 import { primary } from "../diagnostics/index"
 import { renderDiagnostic, renderDiagnostics } from "../diagnostics/render"

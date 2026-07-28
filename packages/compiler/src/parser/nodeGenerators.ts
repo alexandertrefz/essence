@@ -1,4 +1,4 @@
-import type { common, parser } from "@essence/interfaces"
+import type { common, parser } from "@essence-lang/interfaces"
 
 // #region Program & Sections
 

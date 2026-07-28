@@ -1,4 +1,4 @@
-# @essence/formatter
+# @essence-lang/formatter
 
 `esfmt` — the source formatter for the
 [Essence](https://github.com/alexandertrefz/essence) programming language.
@@ -18,7 +18,7 @@ is written in.
 ## API
 
 ```ts
-import { format } from "@essence/formatter"
+import { format } from "@essence-lang/formatter"
 
 let result = format(sourceText, { documentPath: "File.es" })
 

@@ -16,10 +16,10 @@ import {
 	enrichDocument,
 	isStdlibDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
-import { testDiagnostic } from "@essence/compiler/tests/diagnosticFactory"
-import { fixturePath } from "@essence/fixtures"
-import { STDLIB_DIRECTORY } from "@essence/stdlib"
+} from "@essence-lang/compiler/documents"
+import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
+import { fixturePath } from "@essence-lang/fixtures"
+import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 import {
 	CodeActionKind,
 	CompletionItemKind,

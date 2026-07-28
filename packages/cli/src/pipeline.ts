@@ -1,18 +1,18 @@
 import { gzipSync } from "node:zlib"
 
-import { bundle, writeOutputs } from "@essence/compiler/bundler"
+import { bundle, writeOutputs } from "@essence-lang/compiler/bundler"
 import {
 	containsErrors,
 	placelessDiagnostic,
-} from "@essence/compiler/diagnostics"
+} from "@essence-lang/compiler/diagnostics"
 import {
 	enrichDocument,
 	isStdlibDocument,
 	parseDocument,
-} from "@essence/compiler/documents"
-import { rewriteModules } from "@essence/compiler/rewriter"
-import { validate } from "@essence/compiler/validator"
-import type { common } from "@essence/interfaces"
+} from "@essence-lang/compiler/documents"
+import { rewriteModules } from "@essence-lang/compiler/rewriter"
+import { validate } from "@essence-lang/compiler/validator"
+import type { common } from "@essence-lang/interfaces"
 
 import { type CompileSession, createCompileSession } from "./session"
 

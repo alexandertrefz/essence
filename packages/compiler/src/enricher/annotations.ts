@@ -1,4 +1,4 @@
-import type { common, enricher, parser } from "@essence/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { modulePathOf } from "./scope"
 

@@ -46,7 +46,7 @@ type JSONReport = {
 
 // NOTE: Which `essence` compiles when none was injected: the CLI sitting
 // beside this package first — `packages/cli/bin/essence` in a checkout, where
-// `bin/esdap` runs from, and `@essence/cli/bin/essence.js` in a published
+// `bin/esdap` runs from, and `@essence-lang/cli/bin/essence.js` in a published
 // install, where the relative depth is the same — and PATH otherwise. Every
 // candidate carries its own shebang, Bun's or Node's, so the command IS the
 // path.

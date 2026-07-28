@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 // NOTE: A Documentation block is a run of `§§` Comments directly above a
 // Declaration. Ordinary `§` Comments stay private notes — doubling the sigil

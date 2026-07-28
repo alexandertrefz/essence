@@ -11,7 +11,7 @@ import { stagePackages } from "./stage"
 //
 // Each staged manifest carries `publishConfig.access: "public"`, so a plain
 // `npm publish` is enough — but it does need `npm login` to have happened,
-// and the @essence organisation to exist on npm.
+// and the @essence-lang organisation to exist on npm.
 
 let dryRun = process.argv.includes("--dry-run")
 

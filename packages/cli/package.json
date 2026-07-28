@@ -1,5 +1,5 @@
 {
-	"name": "@essence/cli",
+	"name": "@essence-lang/cli",
 	"version": "0.1.0",
 	"description": "essence — the Essence command line.",
 	"private": true,
@@ -24,15 +24,15 @@
 		"cli"
 	],
 	"dependencies": {
-		"@essence/ariadne": "workspace:*",
-		"@essence/compiler": "workspace:*",
-		"@essence/debug-adapter": "workspace:*",
-		"@essence/formatter": "workspace:*",
-		"@essence/interfaces": "workspace:*",
-		"@essence/language-server": "workspace:*"
+		"@essence-lang/ariadne": "workspace:*",
+		"@essence-lang/compiler": "workspace:*",
+		"@essence-lang/debug-adapter": "workspace:*",
+		"@essence-lang/formatter": "workspace:*",
+		"@essence-lang/interfaces": "workspace:*",
+		"@essence-lang/language-server": "workspace:*"
 	},
 	"devDependencies": {
-		"@essence/fixtures": "workspace:*",
-		"@essence/stdlib": "workspace:*"
+		"@essence-lang/fixtures": "workspace:*",
+		"@essence-lang/stdlib": "workspace:*"
 	}
 }

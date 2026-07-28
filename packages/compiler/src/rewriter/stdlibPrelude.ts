@@ -1,4 +1,4 @@
-import type { common } from "@essence/interfaces"
+import type { common } from "@essence-lang/interfaces"
 
 import type { NativeBindings, Stdlib } from "../enricher/stdlib"
 import { loadStdlib } from "../enricher/stdlib"

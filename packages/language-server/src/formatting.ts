@@ -1,4 +1,4 @@
-import { format } from "@essence/formatter"
+import { format } from "@essence-lang/formatter"
 
 // NOTE: The shape the LSP wants back, kept structural so this module needs
 // nothing from `vscode-languageserver` and can be tested on its own.

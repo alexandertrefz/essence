@@ -2,7 +2,7 @@ import path from "node:path"
 
 // NOTE: The debugger's pure half — a plain function of its arguments, with no
 // reach into VS Code, so the specs can exercise it without an extension host.
-// Everything else about debugging lives in `@essence/debug-adapter`, which the
+// Everything else about debugging lives in `@essence-lang/debug-adapter`, which the
 // resolved CLI's `dap` command speaks over stdio; the extension's only job is
 // finding that CLI.
 

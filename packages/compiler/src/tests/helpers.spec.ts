@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { lexer } from "@essence/interfaces"
+import { lexer } from "@essence-lang/interfaces"
 import type {
 	ErrorType,
 	FunctionType,
@@ -17,7 +17,7 @@ import type {
 	Type,
 	UnionType,
 	UnknownType,
-} from "@essence/interfaces/common"
+} from "@essence-lang/interfaces/common"
 
 import {
 	applyGenericBindings,
