@@ -427,6 +427,12 @@ third"::lines())
 	showMaybe("Integer.parse(_ String) [negative]", Integer.parse("-42"))
 	showMaybe("Integer.parse(_ String) [not a number]", Integer.parse("nope"))
 	showMaybe("Integer.parse(_ String) [empty]", Integer.parse(emptyText))
+	showMaybe("Integer.parse(_ String) [leading zeroes]", Integer.parse("007"))
+	showMaybe("Integer.parse(_ String) [plus sign]", Integer.parse("+42"))
+	showMaybe("Integer.parse(_ String) [decimal point]", Integer.parse("4.2"))
+	showMaybe("Integer.parse(_ String) [double sign]", Integer.parse("--42"))
+	showMaybe("Integer.parse(_ String) [sign alone]", Integer.parse("-"))
+	showMaybe("Integer.parse(_ String) [inner sign]", Integer.parse("4-2"))
 	show("Integer.toString()", 42::toString())
 	show("Integer.toString() [negative]", -42::toString())
 	show("Integer.compare(to: Integer)", 1::compare(to 2))
@@ -548,6 +554,38 @@ third"::lines())
 	)
 	showMaybe("Rational.parse(_ String)", Rational.parse("0.75"))
 	showMaybe("Rational.parse(_ String) [not a number]", Rational.parse("nope"))
+	showMaybe("Rational.parse(_ String) [fraction]", Rational.parse("3/4"))
+	showMaybe(
+		"Rational.parse(_ String) [negative fraction]",
+		Rational.parse("-3/4"),
+	)
+	showMaybe(
+		"Rational.parse(_ String) [unreduced fraction]",
+		Rational.parse("-3/6"),
+	)
+	showMaybe(
+		"Rational.parse(_ String) [negative decimal]",
+		Rational.parse("-1.5"),
+	)
+	showMaybe("Rational.parse(_ String) [whole]", Rational.parse("5"))
+	showMaybe(
+		"Rational.parse(_ String) [zero denominator]",
+		Rational.parse("1/0"),
+	)
+	showMaybe(
+		"Rational.parse(_ String) [signed denominator]",
+		Rational.parse("1/-2"),
+	)
+	showMaybe("Rational.parse(_ String) [double sign]", Rational.parse("--1/2"))
+	showMaybe("Rational.parse(_ String) [two slashes]", Rational.parse("1/2/3"))
+	showMaybe("Rational.parse(_ String) [trailing dot]", Rational.parse("1."))
+	showMaybe("Rational.parse(_ String) [leading dot]", Rational.parse(".5"))
+	showMaybe("Rational.parse(_ String) [two dots]", Rational.parse("1.2.3"))
+	showMaybe(
+		"Rational.parse(_ String) [trailing zeroes]",
+		Rational.parse("0.750"),
+	)
+	showMaybe("Rational.parse(_ String) [empty]", Rational.parse(emptyText))
 	show("Rational.toString()", 3/4::toString())
 	show("Rational.toString() [whole]", 4/2::toString())
 	show(
