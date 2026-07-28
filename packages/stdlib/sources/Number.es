@@ -99,8 +99,7 @@ declarations {
 		§§ @param and — the upper bound, included
 		§§ @returns — `true` when the Number is within the bounds.
 		isBetween(_ lower: Number, and upper: Number) -> Boolean {
-			<- @
-				::isGreaterThanOrEqualTo(lower)
+			<- @::isGreaterThanOrEqualTo(lower)
 				::and(@::isLessThanOrEqualTo(upper))
 		}
 

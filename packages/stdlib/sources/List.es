@@ -192,8 +192,7 @@ declarations {
 			§ negative one empties the first slice and clamps the second's start
 			§ to zero, and one at or past the end fills the first slice with the
 			§ whole List and empties the second.
-			<- @
-				::slice(from 0, to index)
+			<- @::slice(from 0, to index)
 				::append(
 					contentsOf @::slice(from index::add(1), to @::length()),
 				)
@@ -510,8 +509,7 @@ declarations {
 			§ start empties the first slice and prepends, and one at or past the
 			§ end fills it with the whole List and appends — insertion never
 			§ drops the item.
-			<- @
-				::slice(from 0, to index)
+			<- @::slice(from 0, to index)
 				::append(item)
 				::append(contentsOf @::slice(from index, to @::length()))
 		}

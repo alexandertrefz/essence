@@ -603,6 +603,17 @@ describe("formatter", () => {
 			)
 		})
 
+		// NOTE: A bare `@` is too small to hold a line of its own, so the first
+		// link of a broken chain stays fused to it.
+		it("keeps the first link of a broken chain on a bare @'s line", () => {
+			let source =
+				"implementation {\n\tconstant a: Integer | Nothing = 1\n\n\tconstant b = match a -> Boolean {\n\t\tcase Nothing { <- false }\n\t\tcase Integer {\n\t\t\t<- @\n\t\t\t\t::isGreaterThanOrEqualTo(100)\n\t\t\t\t::and(@::isLessThanOrEqualTo(100000))\n\t\t}\n\t}\n}\n"
+
+			expect(formatted(source)).toContain(
+				"<- @::isGreaterThanOrEqualTo(100)\n\t\t\t\t::and(@::isLessThanOrEqualTo(100000))",
+			)
+		})
+
 		it("adds a trailing comma to a broken argument list", () => {
 			let source =
 				'implementation {\n\t__print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")\n}\n'
