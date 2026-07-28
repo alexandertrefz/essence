@@ -549,6 +549,40 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("redundant-interpolation-to-string", () => {
+		it("should leave the receiver as the whole hole", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant count = 3",
+				'\tconstant message = "count: {count::toString()}"',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Remove the redundant 'toString' call")
+			expect(result[2]).toBe('\tconstant message = "count: {count}"')
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should remove only the redundant call of a chain", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant words = ["a", "b"]',
+				'\tconstant message = "words: {words::length()::toString()}"',
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(applied(lines, fix)[2]).toBe(
+				'\tconstant message = "words: {words::length()}"',
+			)
+		})
+	})
+
 	describe("missing-return", () => {
 		it("should add an else branch when the body ends in an If", () => {
 			let lines = [

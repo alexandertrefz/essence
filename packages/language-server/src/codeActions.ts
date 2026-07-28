@@ -124,6 +124,8 @@ function actionsFor(
 			return listed(constantToVariableAction(diagnostic, program, lines))
 		case "redundant-parameter-label":
 			return listed(removeLabelAction(diagnostic, lines))
+		case "redundant-interpolation-to-string":
+			return listed(removeToStringAction(diagnostic, lines))
 		case "missing-return":
 			return listed(elseBranchAction(diagnostic, program, lines))
 		case "unused-import":
@@ -518,6 +520,32 @@ function removeLabelAction(
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
 		edits: [{ range: diagnostic.position, newText: written[1] }],
+	}
+}
+
+// NOTE: The Diagnostic spans exactly the `::toString()`, so the fix is that
+// same range deleted — what is left is the receiver, which is what the hole
+// interpolates either way. The span is read back off the buffer first because
+// every edit here is measured against the text as it is now: a Position from a
+// stale analysis pointing at whitespace would otherwise delete it silently.
+// The optional `<Namespace>` specifier is part of the call and goes with it.
+function removeToStringAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	let written = sliceOf(lines, diagnostic.position)
+
+	if (!/^::\s*(<\s*[A-Za-z0-9_]+\s*>\s*)?toString\s*\(\s*\)$/.test(written)) {
+		return null
+	}
+
+	return {
+		title: "Remove the redundant 'toString' call",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: diagnostic.position, newText: "" }],
 	}
 }
 
