@@ -321,18 +321,20 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should not resolve `otherwise` on a flat spelled-out Union", () => {
-			// NOTE: `Optional` is a nominal Choice, not a second spelling of
-			// `… | Nothing`, so `otherwise` is a Method of that Choice and of
-			// nothing else. A hand-written Union that merely CONTAINS `Nothing`
-			// never reaches it — a Method called on a Union has to be a Method
-			// of every member, and `Integer` has none — so `sure` is left
-			// without a Type and takes no Hint at all. The same payload wrapped
-			// in an `Optional` collapses to `Integer | Rational` exactly as it
-			// always did, which is the one Hint expected below: the collapse
-			// did not go away, the accidental Union-shaped spelling of it did.
+			// NOTE: `Optional` is a nominal Choice, and `otherwise` is a Method
+			// of that Choice and of nothing else. No SHAPE of Union reaches it:
+			// a Method called on a Union has to be a Method of every member,
+			// and neither `Integer` nor `Rational` has one — so `sure` is left
+			// without a Type and takes no Hint at all. Spelling the same two
+			// Types out used to be a way to write a fallible value, back when
+			// `Optional<X>` was an Alias for a Union; now the Union is only
+			// ever a Union. Wrapping the payload in an `Optional` still
+			// collapses it to `Integer | Rational`, which is the one Hint
+			// expected below: the collapse did not go away, the accidental
+			// Union-shaped spelling of it did.
 			let source = [
 				"implementation {",
-				"\tconstant flat: Integer | Rational | Nothing = 1",
+				"\tconstant flat: Integer | Rational = 1",
 				"\tconstant sure = flat::otherwise(0)",
 				"\tconstant wrapped: Optional<Integer | Rational> = #Empty",
 				"\tconstant collapsed = wrapped::otherwise(0)",

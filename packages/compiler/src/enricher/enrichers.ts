@@ -49,6 +49,7 @@ import {
 	derivedEquatableNamespaceName,
 	invalidateNamespacesInScope,
 	namespacesTargeting,
+	specializedNamespacesFor,
 	listItemTypeOf,
 	lookupTypeOf,
 	recordValueTypeOf,
@@ -4461,25 +4462,32 @@ function describeMethodOverloads(
 	}
 }
 
+// NOTE: One Note per candidate signature, each read off the Namespace
+// SPECIALIZED against this receiver — a `List<Integer>` is told its `prepend`
+// takes an `Integer`, not an `ItemType`. The reader is being shown what the
+// call would have had to pass, and a Namespace Generic is not something they
+// wrote.
+function describeCandidateSignatures(
+	node: parser.MethodInvocationNode,
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+): Array<string> {
+	return [...specializedNamespacesFor(namespaces, baseType)].flatMap(
+		([namespaceName, namespaceType]) =>
+			describeMethodOverloads(
+				namespaceType.methods[node.member.content],
+			).map(
+				(parameterTypes) =>
+					`'${namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
+			),
+	)
+}
+
 function reportNoMatchingOverload(
 	node: parser.MethodInvocationNode,
-	candidates: Array<{
-		namespaceName: string
-		methodType: common.Type | undefined
-	}>,
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
 ): void {
-	let notes: Array<string> = []
-
-	for (let candidate of candidates) {
-		for (let parameterTypes of describeMethodOverloads(
-			candidate.methodType,
-		)) {
-			notes.push(
-				`'${candidate.namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
-			)
-		}
-	}
-
 	reportError(
 		`No overload of '${node.member.content}' accepts these Arguments`,
 		node.position,
@@ -4491,7 +4499,7 @@ function reportNoMatchingOverload(
 					`this call passes ${countOf(node.arguments.length, "Argument")}`,
 				),
 			],
-			notes,
+			notes: describeCandidateSignatures(node, namespaces, baseType),
 		},
 	)
 }
@@ -4755,7 +4763,13 @@ function resolveMethodInvocation(
 		// reject the Arguments — per-member dispatch may still accept them,
 		// since each member is matched with its own receiver Type.
 		if (baseType.type === "UnionType") {
-			return resolveUnionMethodDispatch(node, baseType, scope, typer)
+			return resolveUnionMethodDispatch(
+				node,
+				baseType,
+				scope,
+				typer,
+				matchingNamespaces,
+			)
 		}
 
 		// NOTE: No candidate to commit, so the last probe's recordings stand
@@ -4764,15 +4778,7 @@ function resolveMethodInvocation(
 		// the Diagnostic below.
 		commitContextualFunctionTypes(lastRecording)
 
-		reportNoMatchingOverload(
-			node,
-			[...matchingNamespaces.entries()].map(
-				([namespaceName, namespaceType]) => ({
-					namespaceName,
-					methodType: namespaceType.methods[node.member.content],
-				}),
-			),
-		)
+		reportNoMatchingOverload(node, matchingNamespaces, baseType)
 
 		return resolveFailedMethodInvocation()
 	} else if (resolvedMethods.length === 1) {
@@ -4840,6 +4846,19 @@ function resolveUnionMethodDispatch(
 	unionType: common.UnionType,
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
+	// NOTE: The Namespaces that cover the WHOLE Union and declare this Method,
+	// when per-member dispatch is being tried as a second chance after their
+	// Overloads rejected the Arguments. Empty when the whole-receiver lookup
+	// found nothing, which is the other way in here.
+	//
+	// It decides what a failure says. With a covering Namespace in hand the
+	// truth is "the receiver has this Method and the Arguments are wrong", so
+	// the report names the receiver as written; without one it is "no member
+	// provides this Method", and naming the member is the whole point. Reporting
+	// the member either way was how `firstItem()::otherwise(0)` on an
+	// `Optional<Rational>` came to say `for Optional#Value` — a Case the writer
+	// never mentioned.
+	coveringNamespaces: Map<string, common.NamespaceType> = new Map(),
 ): ResolvedMethodInvocation {
 	let members = flattenUnionMembers(unionType)
 	let dispatchCases: Array<common.DispatchCase> = []
@@ -4874,6 +4893,16 @@ function resolveUnionMethodDispatch(
 					memberType,
 					staticNamespaces,
 				)
+
+				return resolveFailedMethodInvocation()
+			}
+
+			// NOTE: A covering Namespace declares the Method — this member
+			// simply does not, which is not what went wrong. What went wrong is
+			// the Arguments, and the receiver they were passed to is the Union
+			// as written.
+			if (coveringNamespaces.size > 0) {
+				reportNoMatchingOverload(node, coveringNamespaces, unionType)
 
 				return resolveFailedMethodInvocation()
 			}
@@ -4983,6 +5012,15 @@ function resolveUnionMethodDispatch(
 		if (resolvedMethods.length === 0) {
 			commitContextualFunctionTypes(lastRecording)
 
+			// NOTE: As above — a covering Namespace's rejection is the one
+			// worth reporting, since it is the receiver the call was written
+			// against.
+			if (coveringNamespaces.size > 0) {
+				reportNoMatchingOverload(node, coveringNamespaces, unionType)
+
+				return resolveFailedMethodInvocation()
+			}
+
 			reportError(
 				`No overload of '${node.member.content}' accepts these Arguments for ${describeType(memberType)}`,
 				node.position,
@@ -4998,14 +5036,10 @@ function resolveUnionMethodDispatch(
 							`${describeType(memberType)} is a member of this Union`,
 						),
 					],
-					notes: [...matchingNamespaces.entries()].flatMap(
-						([namespaceName, namespaceType]) =>
-							describeMethodOverloads(
-								namespaceType.methods[node.member.content],
-							).map(
-								(parameterTypes) =>
-									`'${namespaceName}::${node.member.content}' ${describeSignature(parameterTypes)}.`,
-							),
+					notes: describeCandidateSignatures(
+						node,
+						matchingNamespaces,
+						memberType,
 					),
 				},
 			)
