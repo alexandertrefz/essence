@@ -133,6 +133,14 @@ third"::lines())
 		"String.character(at: Integer) [at length]",
 		greeting::character(at greeting::length()),
 	)
+	showMaybe(
+		"String.character(at: Integer) [from the end, first]",
+		greeting::character(at 0::subtract(greeting::length())),
+	)
+	showMaybe(
+		"String.character(at: Integer) [before the start]",
+		greeting::character(at -99),
+	)
 	show("String.uppercased()", greeting::uppercased())
 	show("String.uppercased() [empty]", emptyText::uppercased())
 	show("String.lowercased()", greeting::lowercased())
@@ -197,6 +205,22 @@ third"::lines())
 	show(
 		"String.slice(from: Integer, to: Integer) [past the end]",
 		greeting::slice(from 7, to 99),
+	)
+	show(
+		"String.slice(from: Integer, to: Integer) [negative to]",
+		greeting::slice(from 0, to -1),
+	)
+	show(
+		"String.slice(from: Integer, to: Integer) [negative from]",
+		greeting::slice(from -5, to 12),
+	)
+	show(
+		"String.slice(from: Integer, to: Integer) [both negative]",
+		greeting::slice(from -5, to -1),
+	)
+	show(
+		"String.slice(from: Integer, to: Integer) [negative past the start]",
+		greeting::slice(from -99, to 5),
 	)
 	showMaybe("String.firstIndex(of: String)", greeting::firstIndex(of "World"))
 	showMaybe(
@@ -1243,6 +1267,14 @@ third"::lines())
 		numbers::remove(at numbers::length()),
 	)
 	show(
+		"List.remove<ItemType>(at: Integer) [from the end, first]",
+		numbers::remove(at 0::subtract(numbers::length())),
+	)
+	show(
+		"List.remove<ItemType>(at: Integer) [before the start]",
+		numbers::remove(at -99),
+	)
+	show(
 		"List.removeEvery<ItemType is Equatable>(_ ItemType)",
 		numbers::removeEvery(1),
 	)
@@ -1352,6 +1384,14 @@ third"::lines())
 	)
 	showMaybe("List.item<ItemType>(at: Integer) [empty]", noNumbers::item(at 0))
 	showMaybe(
+		"List.item<ItemType>(at: Integer) [from the end, first]",
+		numbers::item(at 0::subtract(numbers::length())),
+	)
+	showMaybe(
+		"List.item<ItemType>(at: Integer) [before the start]",
+		numbers::item(at -99),
+	)
+	showMaybe(
 		"List.firstIndex<ItemType is Equatable>(of: ItemType)",
 		numbers::firstIndex(of 1),
 	)
@@ -1370,6 +1410,22 @@ third"::lines())
 	show(
 		"List.slice<ItemType>(from: Integer, to: Integer) [past the end]",
 		numbers::slice(from 3, to 99),
+	)
+	show(
+		"List.slice<ItemType>(from: Integer, to: Integer) [negative to]",
+		numbers::slice(from 0, to -1),
+	)
+	show(
+		"List.slice<ItemType>(from: Integer, to: Integer) [negative from]",
+		numbers::slice(from -2, to 5),
+	)
+	show(
+		"List.slice<ItemType>(from: Integer, to: Integer) [both negative]",
+		numbers::slice(from -3, to -1),
+	)
+	show(
+		"List.slice<ItemType>(from: Integer, to: Integer) [negative past the start]",
+		numbers::slice(from -99, to 2),
 	)
 	show("List.reverse<ItemType>()", numbers::reverse())
 	show("List.reverse<ItemType>() [empty]", noNumbers::reverse())
@@ -1460,6 +1516,10 @@ third"::lines())
 		numbers::insert(99, at -1),
 	)
 	show(
+		"List.insert<ItemType>(_ ItemType, at: Integer) [before the start]",
+		numbers::insert(99, at -99),
+	)
+	show(
 		"List.replace<ItemType>(_ ItemType, at: Integer)",
 		numbers::replace(99, at 0),
 	)
@@ -1470,6 +1530,14 @@ third"::lines())
 	show(
 		"List.replace<ItemType>(_ ItemType, at: Integer) [negative]",
 		numbers::replace(99, at -1),
+	)
+	show(
+		"List.replace<ItemType>(_ ItemType, at: Integer) [from the end, first]",
+		numbers::replace(99, at 0::subtract(numbers::length())),
+	)
+	show(
+		"List.replace<ItemType>(_ ItemType, at: Integer) [before the start]",
+		numbers::replace(99, at -99),
 	)
 	showMaybe(
 		"List.lastIndex<ItemType is Equatable>(of: ItemType)",
