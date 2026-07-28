@@ -4,7 +4,7 @@ declarations {
 	§ display-only — Hovers, Inlay Hints and Diagnostics print this Union as
 	§ `Number` instead of spelling out all four members. Assignability
 	§ ignores Union names entirely.
-	type Number = Integer | Rational | Algebraic | Transcendental
+	type Number = Integer | Rational | Irrational
 
 	§ `Irrational` is a transparent alias for `Algebraic | Transcendental`
 	§ — the pair are definitional complements (transcendental means "not
