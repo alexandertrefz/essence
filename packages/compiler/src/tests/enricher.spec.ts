@@ -3309,6 +3309,24 @@ describe("Enricher", () => {
 				])
 			})
 
+			// NOTE: A Namespace Generic is not something a caller wrote, so a
+			// Note that spells one leaves them to work out what it stands for.
+			// The signature is read off the Namespace SPECIALIZED against this
+			// receiver instead — `List<Integer>` is told its `prepend` takes an
+			// Integer.
+			it("should spell a Namespace Generic as the receiver decided it", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant list = [1, 2]::prepend("nope")
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("no-matching-overload")
+				expect(diagnostics[0].notes).toEqual([
+					"'List::prepend' takes 1 Argument: Parameter 1 is Integer.",
+					"'List::prepend' takes 1 Argument: Parameter 'contentsOf' is List<Integer>.",
+				])
+			})
+
 			// NOTE: The free-Function half of the same site, which only the
 			// standard library can declare — and the half whose Notes carry the
 			// most, since an `overload function`'s entries are told apart by

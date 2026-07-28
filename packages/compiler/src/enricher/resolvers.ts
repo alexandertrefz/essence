@@ -989,6 +989,38 @@ function specializeNamespace(
 	}
 }
 
+// NOTE: The Namespaces that target a receiver, each SPECIALIZED against it —
+// `List<ItemType>` against a `List<Integer>` receiver comes back with `ItemType`
+// replaced by `Integer` throughout. Only a Diagnostic asks: selection re-binds
+// the Generics from the receiver Argument and has no use for this, but a Note
+// spelling a Parameter as `ItemType` names something the reader never wrote and
+// leaves them to work out what it stands for. A Namespace whose target does not
+// unify is passed through as it is, so nothing is ever lost by asking.
+export function specializedNamespacesFor(
+	namespaces: Map<string, common.NamespaceType>,
+	baseType: common.Type,
+): Map<string, common.NamespaceType> {
+	let specialized: Map<string, common.NamespaceType> = new Map()
+
+	for (let [name, namespace] of namespaces) {
+		if (namespace.generics.length === 0 || namespace.targetType === null) {
+			specialized.set(name, namespace)
+			continue
+		}
+
+		let context = createInferenceContext(namespace.generics)
+
+		specialized.set(
+			name,
+			matchesTypeWithBindings(namespace.targetType, baseType, context)
+				? specializeNamespace(namespace, context.bindings)
+				: namespace,
+		)
+	}
+
+	return specialized
+}
+
 // NOTE: The outcome of solving one (binding, Protocol) conformance. A success
 // carries the witness source (recursively including its own `where`
 // conditions); a failure carries the because-chain, outermost first, or an

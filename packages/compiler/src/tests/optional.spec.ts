@@ -247,6 +247,48 @@ describe("Optional", () => {
 			)
 		})
 
+		it("names the receiver as written when the Arguments are wrong", () => {
+			// NOTE: `otherwise` is declared on the Namespace covering BOTH
+			// Cases, so a rejected Argument falls through to per-member
+			// dispatch — which is a second chance, not the failure worth
+			// reporting. Reporting the member said `for Optional#Value`, a Case
+			// the writer never mentioned, and spelled the Parameter as the
+			// Namespace's own `ItemType`.
+			let diagnostics = diagnosticsOf(`implementation {
+				constant maybe: Optional<Rational> = #Empty
+
+				__print(maybe::otherwise(0))
+			}`)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"no-matching-overload",
+			])
+			expect(diagnostics[0]!.message).toBe(
+				"No overload of 'otherwise' accepts these Arguments",
+			)
+			expect(diagnostics[0]!.notes).toEqual([
+				"'Optional::otherwise' takes 1 Argument: Parameter 1 is Rational.",
+			])
+		})
+
+		it("still names the member when no Namespace covers the receiver", () => {
+			// NOTE: The other side of the same rail. Nothing covers
+			// `Integer | String`, so the failure really is "this member has no
+			// such Method" and naming the member is the whole point.
+			let diagnostics = diagnosticsOf(`implementation {
+				constant mixed: Integer | String = 1
+
+				__print(mixed::isEven())
+			}`)
+
+			expect(diagnostics.map(({ code }) => code)).toEqual([
+				"unknown-method",
+			])
+			expect(diagnostics[0]!.message).toBe(
+				"No Method named 'isEven' for String",
+			)
+		})
+
 		it("is exhaustive over the two Cases and nothing more", () => {
 			expect(
 				diagnosticsOf(`implementation {
