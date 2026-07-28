@@ -67,14 +67,19 @@ describe("Bundle Size", () => {
 	// Program already carried. It fell to 55,407 when anchoring esbuild's
 	// working directory to the runtime took the checkout's path back out of
 	// every inlined module's label, which is worth about 370 bytes here and
-	// over a kilobyte to anyone whose checkout sits deeper. It now measures
-	// 44,190: the in-house bigint-rational core replaced `bigint-fraction`,
-	// whose CJS-only bundle — ~9.4 kB no tree shaking could reach, plus the
-	// interop wrappers esbuild grew around it — rode in every Program that
-	// touched a Rational. The ceiling moved down with it, keeping ~1.3 kB of
-	// headroom.
+	// over a kilobyte to anyone whose checkout sits deeper. It fell to
+	// 44,190 when the in-house bigint-rational core replaced
+	// `bigint-fraction`, whose CJS-only bundle — ~9.4 kB no tree shaking
+	// could reach, plus the interop wrappers esbuild grew around it — rode in
+	// every Program that touched a Rational. It now measures 53,466: the
+	// Rational arithmetic cluster, the Integer mixed-kind entries, the Number
+	// aggregates and both `parse` Methods moved into Essence, and Everyday
+	// deliberately calls every one of them, so it carries every one of those
+	// bodies — a Program pays only for the Methods it reaches. The ceiling
+	// moved with it, keeping ~1.5 kB of headroom; a reintroduced spread is
+	// still several kilobytes past it.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(45_500)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(55_000)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -105,7 +110,10 @@ describe("Bundle Size", () => {
 	// so two `$es_List_sorted` become `$es_List_sorted` and `$es_List_sorted2`
 	// and a test that only deduplicated the names would pass. The ceiling
 	// catches a copy that arrives by some other route again. Measured 12,067
-	// bytes.
+	// bytes; now 17,444 — the fixtures' `truncate`, `divide` and `toString`
+	// chains moved into Essence, so the prelude carries those bodies and the
+	// `Rational.of`/accessor natives behind them. A duplicated per-Module
+	// prelude would still overshoot the moved ceiling by kilobytes.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
@@ -141,6 +149,6 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(13_000)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(18_500)
 	})
 })

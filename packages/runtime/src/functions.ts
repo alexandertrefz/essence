@@ -1,7 +1,7 @@
 import { toString as algebraicToString } from "./Algebraic"
 import type { BooleanType } from "./Boolean"
 import { toString as integerToString } from "./Integer"
-import { toString__overload$1 as rationalToString } from "./Rational"
+import { formatAsRational } from "./Rational"
 import type { StepType } from "./Step"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
@@ -76,7 +76,9 @@ export function getStringRepresentation(obj: AnyType, indentLevel = 0): string {
 			return "[]"
 		}
 	} else if (obj[typeKeySymbol] === "Rational") {
-		return rationalToString(obj).value
+		// NOTE: `Rational.toString` is implemented in Essence now — this is
+		// the same lowest-terms fraction form it answers with.
+		return formatAsRational(obj)
 	} else if (obj[typeKeySymbol] === "Algebraic") {
 		return algebraicToString(obj).value
 	} else if (obj[typeKeySymbol] === "Transcendental") {

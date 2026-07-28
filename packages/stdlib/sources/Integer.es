@@ -21,6 +21,11 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
+		§ The mixed-kind entries of `add` and `multiply` lean on commutativity:
+		§ the other operand's Namespace already declares the same sum or
+		§ product with an Integer, so each entry is the flipped call. Only the
+		§ Integer-Integer entry is a primitive of this Namespace's own.
+
 		§§ Adds a number to this Integer.
 		overload add {
 			§§ Adds two Integers, giving an Integer.
@@ -31,17 +36,23 @@ declarations {
 			§§ Adds a Rational to an Integer. The result is a Rational, since the sum need not be whole.
 			§§
 			§§ @param other — the Rational to add
-			(_ other: Rational) -> Rational
+			(_ other: Rational) -> Rational {
+				<- other::add(@)
+			}
 
 			§§ Adds an Algebraic to an Integer. Shifting the rational part of `a + b·√d` leaves the radical untouched, so the sum is exact.
 			§§
 			§§ @param other — the Algebraic to add
-			(_ other: Algebraic) -> Algebraic
+			(_ other: Algebraic) -> Algebraic {
+				<- other::add(@)
+			}
 
 			§§ Adds a Transcendental to an Integer. Shifting the rational part of `a + b·π` leaves the π term untouched, so the sum is exact.
 			§§
 			§§ @param other — the Transcendental to add
-			(_ other: Transcendental) -> Transcendental
+			(_ other: Transcendental) -> Transcendental {
+				<- other::add(@)
+			}
 		}
 
 		§§ Subtracts a number from this Integer, staying exact for every member of the numeric tower.
@@ -84,11 +95,17 @@ declarations {
 		overload multiply {
 			(with other: Integer) -> Integer
 
-			(with other: Rational) -> Rational
+			(with other: Rational) -> Rational {
+				<- other::multiply(with @)
+			}
 
-			(with other: Algebraic) -> Algebraic | Rational
+			(with other: Algebraic) -> Algebraic | Rational {
+				<- other::multiply(with @)
+			}
 
-			(with other: Transcendental) -> Transcendental | Rational
+			(with other: Transcendental) -> Transcendental | Rational {
+				<- other::multiply(with @)
+			}
 		}
 
 		§ THE INEQUALITIES LOOK LIKE DUPLICATION OF `Number`'s AND ARE NOT.
@@ -107,7 +124,9 @@ declarations {
 		§ same-kind entry is written on the same-kind native, and only the
 		§ mixed-kind ones need the covering Namespace. The same reading applies
 		§ to `Rational`'s four, and to `isPositive`/`isNegative`/`isZero`
-		§ below, which are written on these.
+		§ below, which are written on these. The Rational entries are each the
+		§ flipped call — `@` is below the Rational exactly when the Rational is
+		§ above `@` — so Rational's own mixed entries answer all four.
 
 		§§ Whether this Integer is strictly below the given number.
 		overload isLessThan {
@@ -115,7 +134,9 @@ declarations {
 				<- @::compare(to other)::is(#Less)
 			}
 
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- other::isGreaterThan(@)
+			}
 		}
 
 		§§ Whether this Integer is below the given number, or equal to it.
@@ -124,7 +145,9 @@ declarations {
 				<- @::isGreaterThan(other)::negate()
 			}
 
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- other::isGreaterThanOrEqualTo(@)
+			}
 		}
 
 		§§ Whether this Integer is strictly above the given number.
@@ -133,7 +156,9 @@ declarations {
 				<- @::compare(to other)::is(#Greater)
 			}
 
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- other::isLessThan(@)
+			}
 		}
 
 		§§ Whether this Integer is above the given number, or equal to it.
@@ -142,7 +167,9 @@ declarations {
 				<- @::isLessThan(other)::negate()
 			}
 
-			(_ other: Rational) -> Boolean
+			(_ other: Rational) -> Boolean {
+				<- other::isLessThanOrEqualTo(@)
+			}
 		}
 
 		§§ The exact square root. A perfect square gives a Integer; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.

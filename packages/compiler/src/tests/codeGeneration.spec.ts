@@ -952,8 +952,11 @@ describe("Code Generation", () => {
 				__print(number::multiply(with 2)::toString())
 			}`)
 
+			// NOTE: The mangled name survives into both spellings — the
+			// Integer entry is native, a member read off the plain import,
+			// while the Rational entry is Essence and so is its own const.
 			expect(code).toContain("Integer.multiply__overload$")
-			expect(code).toContain("Rational.multiply__overload$")
+			expect(code).toContain("$es_Rational_multiply__overload$")
 		})
 
 		// NOTE: `firstItem()` returns `Item | Nothing`, so `toString` dispatches

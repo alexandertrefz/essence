@@ -54,15 +54,43 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
+		§ The arithmetic here is written on the lowest-terms accessors and
+		§ `Rational.of`, so every result passes through the one gateway a
+		§ Rational may be built by. `of` can only answer `Nothing` for a zero
+		§ denominator, and a product of two denominators — each positive in
+		§ lowest terms — never is one, so each `otherwise` below is
+		§ unreachable. The irrational entries lean on commutativity: the other
+		§ operand's own Namespace already declares the sum with a Rational.
+
 		§§ Adds a number to this Rational, staying exact for every member of the numeric tower.
 		overload add {
-			(_ other: Rational) -> Rational
+			(_ other: Rational) -> Rational {
+				§ The schoolbook cross-multiplication — both numerators scaled
+				§ onto the shared denominator, then added.
+				<- Rational.of(
+					@::numerator()
+						::multiply(with other::denominator())
+						::add(
+							other::numerator()::multiply(with @::denominator()),
+						),
+					over @::denominator()::multiply(with other::denominator()),
+				)::otherwise(0/1)
+			}
 
-			(_ other: Integer) -> Rational
+			(_ other: Integer) -> Rational {
+				<- Rational.of(
+					@::numerator()::add(other::multiply(with @::denominator())),
+					over @::denominator(),
+				)::otherwise(0/1)
+			}
 
-			(_ other: Algebraic) -> Algebraic
+			(_ other: Algebraic) -> Algebraic {
+				<- other::add(@)
+			}
 
-			(_ other: Transcendental) -> Transcendental
+			(_ other: Transcendental) -> Transcendental {
+				<- other::add(@)
+			}
 		}
 
 		§§ Subtracts a number from this Rational, staying exact for every member of the numeric tower.
@@ -86,29 +114,62 @@ declarations {
 
 		§§ Divides this Rational by a number, exactly. Dividing by a possibly-zero Integer or Rational gives `Nothing` for zero; dividing by an Algebraic can never fail — an irrational is never zero.
 		overload divide {
-			(by other: Rational) -> Optional<Rational>
+			(by other: Rational) -> Optional<Rational> {
+				§ Division is multiplication by the reciprocal, and `reciprocal`
+				§ already answers `Nothing` for zero — the same shape
+				§ `Integer::divide(by:)` has.
+				constant dividend = @
 
-			(by other: Integer) -> Optional<Rational>
+				<- match other::reciprocal() -> Optional<Rational> {
+					case Rational { <- dividend::multiply(with @) }
+
+					case Nothing  { <- nothing }
+				}
+			}
+
+			(by other: Integer) -> Optional<Rational> {
+				§ A zero divisor widens to the Rational `0/1`, whose reciprocal
+				§ the entry above already refuses — so the zero case needs no
+				§ guard of its own.
+				<- @::divide(by Rational.of(other, over 1)::otherwise(0/1))
+			}
 
 			(by other: Algebraic) -> Algebraic | Rational
 		}
 
 		§§ Multiplies this Rational with a number, staying exact for every member of the numeric tower.
 		overload multiply {
-			(with other: Rational) -> Rational
+			(with other: Rational) -> Rational {
+				<- Rational.of(
+					@::numerator()::multiply(with other::numerator()),
+					over @::denominator()::multiply(with other::denominator()),
+				)::otherwise(0/1)
+			}
 
-			(with other: Integer) -> Rational
+			(with other: Integer) -> Rational {
+				<- Rational.of(
+					@::numerator()::multiply(with other),
+					over @::denominator(),
+				)::otherwise(0/1)
+			}
 
-			(with other: Algebraic) -> Algebraic | Rational
+			(with other: Algebraic) -> Algebraic | Rational {
+				<- other::multiply(with @)
+			}
 
-			(with other: Transcendental) -> Transcendental | Rational
+			(with other: Transcendental) -> Transcendental | Rational {
+				<- other::multiply(with @)
+			}
 		}
 
 		§ These four are not a copy of `Number`'s — see the note above
 		§ `Integer::isLessThan`. The same-kind entry is written on Rational's
 		§ OWN `compare`, a cross-multiplication, so that comparing two
 		§ Rationals does not reach the sixteen-cell cross-kind table and drag
-		§ the Algebraic and Transcendental machinery in behind it.
+		§ the Algebraic and Transcendental machinery in behind it. The
+		§ Integer entries cross-multiply the same way, in Integer arithmetic:
+		§ the denominator is positive in lowest terms, so scaling the Integer
+		§ by it leaves both sides ordered as the values are.
 
 		§§ Whether this Rational is strictly below the given number.
 		overload isLessThan {
@@ -116,7 +177,10 @@ declarations {
 				<- @::compare(to other)::is(#Less)
 			}
 
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::numerator()
+					::isLessThan(other::multiply(with @::denominator()))
+			}
 		}
 
 		§§ Whether this Rational is below the given number, or equal to it.
@@ -125,7 +189,9 @@ declarations {
 				<- @::isGreaterThan(other)::negate()
 			}
 
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::isGreaterThan(other)::negate()
+			}
 		}
 
 		§§ Whether this Rational is strictly above the given number.
@@ -134,7 +200,10 @@ declarations {
 				<- @::compare(to other)::is(#Greater)
 			}
 
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::numerator()
+					::isGreaterThan(other::multiply(with @::denominator()))
+			}
 		}
 
 		§§ Whether this Rational is above the given number, or equal to it.
@@ -143,7 +212,9 @@ declarations {
 				<- @::isLessThan(other)::negate()
 			}
 
-			(_ other: Integer) -> Boolean
+			(_ other: Integer) -> Boolean {
+				<- @::isLessThan(other)::negate()
+			}
 		}
 
 		§§ The exact square root. A perfect square gives a Rational; any other non-negative value gives an exact Algebraic — and a negative gives Nothing.
@@ -185,7 +256,23 @@ declarations {
 		}
 
 		§§ The nearest Integer. A value exactly halfway between two rounds away from zero — `1/2` gives `1`, `0 - 1/2` gives `0 - 1`.
-		round() -> Integer
+		round() -> Integer {
+			§ The distance from the truncated Integer is the fractional part,
+			§ and a fractional part of at least one half rounds the value one
+			§ further from zero — which is a step DOWN for a negative value.
+			constant truncated      = @::truncate()
+			constant fractionalPart = @::subtract(truncated)::absolute()
+
+			if fractionalPart::isGreaterThanOrEqualTo(1/2) {
+				if @::isLessThan(0/1) {
+					<- truncated::subtract(1)
+				} else {
+					<- truncated::add(1)
+				}
+			} else {
+				<- truncated
+			}
+		}
 
 		§§ The greatest Integer at or below the Rational — the floor.
 		roundDown() -> Integer {
@@ -208,7 +295,22 @@ declarations {
 		}
 
 		§§ The Integer part of the Rational — the fractional part cut off, rounding towards zero.
-		truncate() -> Integer
+		truncate() -> Integer {
+			§ The denominator is positive in lowest terms, so the Euclidean
+			§ quotient is the FLOOR — for a negative value that is one below
+			§ the truncation, unless the value is whole and the two agree.
+			§ `quotient` can only answer `Nothing` for a zero divisor, and a
+			§ denominator never is one.
+			constant floored = @::numerator()
+				::quotient(dividingBy @::denominator())
+				::otherwise(0)
+
+			if @::isLessThan(0/1)::and(@::isWholeNumber()::negate()) {
+				<- floored::add(1)
+			} else {
+				<- floored
+			}
+		}
 
 		§§ Raises the Rational to the given power. A negative exponent gives the exact reciprocal power. Zero to the power of zero is one.
 		§§
@@ -232,7 +334,17 @@ declarations {
 		§§
 		§§ @returns — the String representation of the Rational.
 		overload toString {
-			() -> String
+			() -> String {
+				§ The fraction form off the accessors, NOT `formatAs #Fraction`
+				§ — deliberately. The entries of an Overload are separate
+				§ emitted Functions, so delegating would make every Program
+				§ that merely prints a Rational carry the whole long-division
+				§ decimal formatter behind the other entry.
+				<- @::numerator()
+					::toString()
+					::append("/")
+					::append(@::denominator()::toString())
+			}
 
 			§§ @param formatAs — the form to represent the Rational in
 			(formatAs: NumberFormat) -> String
