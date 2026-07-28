@@ -1,6 +1,5 @@
 import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
-import { getStringRepresentation } from "./functions"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
 import { getInt32 } from "./internalHelpers"
@@ -63,13 +62,6 @@ export function append__overload$2<ItemType extends AnyType>(
 	contentsOf: ListType<ItemType>,
 ): ListType<ItemType> {
 	return createList([...originalList.value, ...contentsOf.value])
-}
-
-// biome-ignore lint/suspicious/noShadowRestrictedNames: This is a runtime function
-export function toString<ItemType extends AnyType>(
-	originalList: ListType<ItemType>,
-): StringType {
-	return createString(getStringRepresentation(originalList))
 }
 
 export function map<ItemType extends AnyType, Result extends AnyType>(

@@ -17,14 +17,15 @@ declarations {
 	§ holds `flatten`, because no bound can say "the items are themselves
 	§ Lists" and still name the inner item Type.
 	§
-	§ The Equatable and Comparable conformances are BOTH conditional — a List is
-	§ equatable exactly when its items are, and orderable exactly when its items
-	§ are. `is` and `compare` carry the same bound as their own Method
-	§ Generic, so a use site solving `List<ItemType> is Equatable` recursively
-	§ solves `ItemType is Equatable` and hands the item equality in as the
-	§ hidden conformance Argument. That recursion is what makes a
-	§ `List<List<Integer>>` compare through Integer's own `is`, one nesting
-	§ level at a time.
+	§ Every conformance here is conditional — a List is printable exactly when
+	§ its items are, equatable exactly when its items are, and orderable
+	§ exactly when its items are. `toString`, `is` and `compare` carry the
+	§ same bound as their own Method Generic, so a use site solving
+	§ `List<ItemType> is Equatable` recursively solves `ItemType is Equatable`
+	§ and hands the item equality in as the hidden conformance Argument. That
+	§ recursion is what makes a `List<List<Integer>>` compare through
+	§ Integer's own `is`, one nesting level at a time — and print through
+	§ Integer's own `toString` the same way.
 	§
 	§ Every Method that asks whether two ITEMS are equal — `is`, `contains`,
 	§ `firstIndex`, `lastIndex`, `count(of:)`, `removeEvery(_:)` and
@@ -35,7 +36,7 @@ declarations {
 	§ language could name, and gave `1/2` and `2/4` whatever answer the runtime
 	§ representation happened to give.
 	namespace List<infer ItemType> for List<ItemType>
-		is Printable,
+		is Printable where ItemType is Printable,
 		is Equatable where ItemType is Equatable,
 		is Comparable where ItemType is Comparable {
 		§ NOTE: This would read better in Essence — length equality AND
@@ -64,10 +65,21 @@ declarations {
 			<- @::is(other)::negate()
 		}
 
-		§§ Represents the List and its items as a String.
+		§§ Represents the List and its items as a String — `[ 1, 2, 3 ]`, each item as its own `toString`. Available whenever the items conform to `Printable`.
 		§§
 		§§ @returns — the String representation of the List.
-		toString() -> String
+		toString<infer ItemType is Printable>() -> String {
+			§ The items' own representations, joined — `join(with:)` carries
+			§ the same `Printable` bound, so the witness this Method receives
+			§ flows straight through to it. Only the empty List needs a word
+			§ of its own: it has no items to space, so it prints as `[]`
+			§ rather than `[  ]`.
+			if @::isEmpty() {
+				<- "[]"
+			} else {
+				<- "[ "::append(@::join(with ", "))::append(" ]")
+			}
+		}
 
 		§§ How many items the List has.
 		§§

@@ -529,6 +529,7 @@ describe("Stdlib Call Graph", () => {
 			"List.removeLast__overload$2",
 			"List.repeat",
 			"List.replace",
+			"List.toString",
 			"NormalizationForm.toString",
 			"Nothing.is",
 			"Nothing.isNot",

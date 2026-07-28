@@ -1446,15 +1446,10 @@ describe("Rewriter", () => {
 			// (`packages/stdlib/sources/String.es`, `<- @`) and covered by the golden
 			// harness; only `List.toString`, which has a representation to
 			// build, is still native.
-
-			it("represents a List with its items", () => {
-				expect(
-					list.toString(
-						list.createList([integerOne(), integerTwo()]),
-					),
-				).toEqual(string.createString("[ 1, 2 ]"))
-			})
-
+			// NOTE: `List.toString` is written in Essence now
+			// (`packages/stdlib/sources/List.es`) — the Printable conformance
+			// is conditional on the items, and the golden harness covers the
+			// filled, empty and single-item renderings.
 			// NOTE: `Nothing.is`, `isNot` and `toString` are implemented in
 			// Essence now (`packages/stdlib/sources/Nothing.es`) and covered by the golden
 			// harness; only the value constructor stays native.
