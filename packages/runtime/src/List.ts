@@ -2,7 +2,6 @@ import type { BooleanType } from "./Boolean"
 import { createBoolean } from "./Boolean"
 import type { IntegerType } from "./Integer"
 import { createInteger } from "./Integer"
-import { getInt32 } from "./internalHelpers"
 import type { NothingType } from "./Nothing"
 import { createNothing } from "./Nothing"
 import { equal, greater, less, type OrderingType } from "./Ordering"
@@ -132,12 +131,23 @@ export function keepEvery<ItemType extends AnyType>(
 	return createList(keptList)
 }
 
+// NOTE: A negative position counts back from the end — -1 is the last item, and
+// -length the first. The arithmetic stays in bigint and narrows to a Number only
+// once the position is known to sit inside the List: narrowing first would wrap
+// a position past 2³¹ into an unrelated one.
+export function positionFromEnd(index: bigint, length: bigint): bigint {
+	return index < 0n ? index + length : index
+}
+
 export function item<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	index: IntegerType,
 ): ItemType | NothingType {
-	if (index.value > -1 && index.value < originalList.value.length) {
-		return originalList.value[getInt32(index)]
+	let length = BigInt(originalList.value.length)
+	let position = positionFromEnd(index.value, length)
+
+	if (position > -1n && position < length) {
+		return originalList.value[Number(position)]
 	} else {
 		return createNothing()
 	}
@@ -158,12 +168,18 @@ export function slice<ItemType extends AnyType>(
 	from: IntegerType,
 	to: IntegerType,
 ): ListType<ItemType> {
-	// NOTE: Half-open [from, to), each end clamped to the List — checked
-	// against the bigint before narrowing, since `getInt32` would wrap a
-	// position past 2³¹ into a negative index and slice from the far end.
+	// NOTE: Half-open [from, to). A negative end counts back from the List's
+	// end — `slice(from 0, to -1)` drops the last item — and only THEN is each
+	// end clamped, so a position that reaches back past the start settles on
+	// zero rather than wrapping a second time. Kept in bigint throughout:
+	// narrowing first would turn a position past 2³¹ into a negative one and
+	// slice from the far end.
 	let length = BigInt(originalList.value.length)
-	let start = from.value < 0n ? 0n : from.value > length ? length : from.value
-	let end = to.value < 0n ? 0n : to.value > length ? length : to.value
+	let fromPosition = positionFromEnd(from.value, length)
+	let toPosition = positionFromEnd(to.value, length)
+	let start =
+		fromPosition < 0n ? 0n : fromPosition > length ? length : fromPosition
+	let end = toPosition < 0n ? 0n : toPosition > length ? length : toPosition
 
 	if (end <= start) {
 		return createList([])

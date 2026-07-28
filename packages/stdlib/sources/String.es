@@ -212,7 +212,7 @@ declarations {
 			<- @::split(on "")
 		}
 
-		§§ The character at the given position, counting from zero.
+		§§ The character at the given position, counting from zero — or, for a negative position, counting back from the end: -1 is the last character and -length the first.
 		§§
 		§§ @returns — the character, or `Nothing` when the position is outside the String.
 		character(at index: Integer) -> Optional<String> {
@@ -347,15 +347,16 @@ declarations {
 			<- @::characters()::reverse()::join(with "")
 		}
 
-		§§ The characters from one position up to, but not including, another.
+		§§ The characters from one position up to, but not including, another. A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character.
 		§§
-		§§ @param from — the first position to include, counting from zero.
-		§§ @param to — the position to stop before.
+		§§ @param from — the first position to include, counting from zero, or back from the end when negative.
+		§§ @param to — the position to stop before, counting the same way.
 		§§ @returns — the String of that range of characters.
 		slice(from: Integer, to: Integer) -> String {
-			§ `List.slice` clamps each end to the List and answers the empty
-			§ List for an empty or inverted range, which is exactly what a
-			§ String slice does with its own bounds.
+			§ `List.slice` resolves a negative position against the List's
+			§ length, clamps each end to it, and answers the empty List for an
+			§ empty or inverted range — which is exactly what a String slice
+			§ does with its own bounds, the characters being the List.
 			<- @::characters()::slice(from from, to to)::join(with "")
 		}
 

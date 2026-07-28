@@ -1118,12 +1118,29 @@ describe("Rewriter", () => {
 							integerTwo(),
 						),
 					).toEqual(nothing())
+					// NOTE: -1 names the last item, so the position that falls
+					// outside a one-item List from below is -2.
 					expect(
 						list.item(
 							list.createList([integerOne()]),
-							integer.createInteger(-1n),
+							integer.createInteger(-2n),
 						),
 					).toEqual(nothing())
+				})
+
+				it("counts a negative position back from the end", () => {
+					expect(
+						list.item(
+							list.createList([integerOne(), integerTwo()]),
+							integer.createInteger(-1n),
+						),
+					).toEqual(integerTwo())
+					expect(
+						list.item(
+							list.createList([integerOne(), integerTwo()]),
+							integer.createInteger(-2n),
+						),
+					).toEqual(integerOne())
 				})
 			})
 
@@ -1152,6 +1169,9 @@ describe("Rewriter", () => {
 				})
 
 				it("clamps each end to the list", () => {
+					// NOTE: -5 counts back from the end of a four item List,
+					// which reaches past the start — so it settles on zero
+					// rather than wrapping a second time.
 					expect(
 						list.slice(
 							abcd(),
@@ -1159,6 +1179,29 @@ describe("Rewriter", () => {
 							integer.createInteger(99n),
 						),
 					).toEqual(abcd())
+				})
+
+				it("counts a negative end back from the end", () => {
+					expect(
+						list.slice(
+							abcd(),
+							integerZero(),
+							integer.createInteger(-1n),
+						),
+					).toEqual(
+						list.createList([
+							integerZero(),
+							integerOne(),
+							integerTwo(),
+						]),
+					)
+					expect(
+						list.slice(
+							abcd(),
+							integer.createInteger(-2n),
+							integer.createInteger(-1n),
+						),
+					).toEqual(list.createList([integerTwo()]))
 				})
 
 				it("returns empty when the range is empty or reversed", () => {
@@ -1173,6 +1216,16 @@ describe("Rewriter", () => {
 							abcd(),
 							integerZero(),
 							integer.createInteger(2n ** 40n),
+						),
+					).toEqual(abcd())
+					// NOTE: The same in the other direction — counting back
+					// from the end by more than a 32 bit index leaves the
+					// position far below zero, where it clamps to the start.
+					expect(
+						list.slice(
+							abcd(),
+							integer.createInteger(0n - 2n ** 40n),
+							integer.createInteger(4n),
 						),
 					).toEqual(abcd())
 				})
