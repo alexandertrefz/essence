@@ -118,6 +118,74 @@ most: `isLessThan` is `compare(to other)::is(#Less)`, and the other three
 inequalities are written on that, so every comparison in every Program ends in
 this shape.
 
+### `lower-scalar-operations`
+
+Writes the primitive operations out where they were called.
+
+`a::isLessThan(b)` on two Integers went through a Method that called
+`Integer.compare`, which built an `Ordering` Case, which was compared against
+`#Less` — three calls and an allocation to decide something the bigints both
+values were holding all along decide with one `<`:
+
+```js
+a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance
+```
+
+What is lowered, and nothing else:
+
+- **Integer**, where the receiver AND the Argument are exactly `Integer`:
+  `isLessThan`, `isGreaterThan`, `isLessThanOrEqualTo`,
+  `isGreaterThanOrEqualTo`, `is`, `isNot`, and `add`, `subtract`, `multiply`.
+  The comparisons become JavaScript's own operators over the bigints; the
+  arithmetic becomes the operation inside the branded literal
+  `Integer.createInteger` would have built, so `a::subtract(b)` — which is
+  `@::add(other::negate())` — is one allocation where it was two, and no call.
+- **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
+- **String**: `is` and `isNot`, which become one call to the runtime's
+  `stringEquals`. Two Strings are equal when their CHARACTERS are — the same
+  accent written as one code point and as two is one String — so this is not
+  `===`, and the normalising comparison stays in the one place that has always
+  performed it rather than being written out per site.
+
+Mixed kinds are deliberately absent. An Integer beside a Rational is a widening
+the covering `Number` Namespace decides, and it compares by cross-multiplying
+rather than by `===`; a Union-typed or generic operand is not known to be an
+Integer at all. Where the Types are not exactly the named kind, the call stays.
+
+Safe because those Types are exact and those values are what the runtime built.
+An `Integer` is the branded object holding a bigint, and bigint arithmetic is
+exact at any size and totally ordered, with no value that is unequal to itself
+the way a floating-point NaN is — so `!(a < b)` may be asked as `a >= b`, which
+is what makes `isLessThanOrEqualTo` a single `<=` rather than a negated `>`.
+
+**`and` and `or` keep eager evaluation.** Essence evaluates every Argument
+before the call, and JavaScript's `&&` and `||` do not evaluate their right-hand
+side when the left decides — so the two are the same Program only when the
+right-hand side has nothing to say. The pass proves that before it lowers one:
+the operand must reach no `__print`, no assignment, and no call it can not name.
+Names, member reads, literals, values built out of those, and calls to a short
+list of Integer and Boolean Methods qualify. Anything else — a call to a
+Function the Program wrote, an interpolated String, a Match — and the call stays
+exactly as it was, evaluating both operands as it always did.
+
+A Program that declares a Namespace of its own named `Integer`, `Boolean` or
+`String` is left alone entirely. Such a Namespace can only be declared inside a
+block — the name is already taken at a Program's top level — and inside that
+block it REPLACES the builtin, so its `isLessThan` is a Method somebody wrote and
+answers whatever it was written to answer.
+
+This one runs inside the standard library as well, and that is where most of it
+lands: the bodies of `isLessThanOrEqualTo`, `subtract` and `isNot` are written
+in Essence on the ones below them, and the receiver there is typed exactly
+`Integer` — so they lower like any other site, and a Program that reaches the
+comparison family stops carrying those bodies at all.
+
+What it does NOT take away yet: a lowered Boolean used as the Program's own `if`
+still builds the Boolean and reads it back — `(a.value < b.value ?
+Boolean.trueInstance : Boolean.falseInstance).value`. A condition is a Statement's
+question rather than an Expression's, and lowering Statements is
+`lower-matches-to-statements`' half of the work.
+
 ### `elide-final-match-test`
 
 Emits the last Handler of a Match as the `else` of the chain.

@@ -346,6 +346,11 @@ export type IntrinsicNode =
 	| TypeTestNode
 	| TypeDescriptorNode
 	| EssenceBooleanNode
+	| RawBooleanNode
+	| RawBooleanOperationNode
+	| RawCompareNode
+	| RawEqualsNode
+	| RawArithmeticNode
 	| DirectRecordNode
 	| DirectCaseNode
 	| DirectListNode
@@ -436,6 +441,90 @@ export interface EssenceBooleanNode {
 	kind: "essence-boolean"
 	value: ExpressionNode
 	type: BooleanType
+	position?: Position
+}
+
+// NOTE: The JavaScript boolean inside an Essence Boolean — `<value>.value` —
+// which is the exact inverse of `essence-boolean` and the read every emitted
+// condition already performs. It is what lets a lowered operation take an
+// ordinary Boolean-valued Expression as an operand: `raw-boolean-op` works in
+// JavaScript's terms, and this is how a value gets into them.
+//
+// NOTE: A RAW JavaScript boolean, and the one Node that may be handed one that
+// is not: a pass never nests the two, because it unwraps an `essence-boolean`
+// rather than reading `.value` off the object it would have built.
+export interface RawBooleanNode {
+	nodeType: "Intrinsic"
+	kind: "raw-boolean"
+	value: ExpressionNode
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: JavaScript's own logic over RAW booleans — `!a`, `a && b`, `a || b`.
+// Both operands are raw and so is the answer, so a chain of them is one
+// JavaScript expression with no Essence value built in the middle.
+//
+// NOTE: `other` is null exactly for `not`, which is why `and` and `or` may not
+// be built with an operand that could observe anything: JavaScript's `&&` and
+// `||` do not evaluate their right-hand side when the left decides, and Essence
+// evaluates every Argument before the call. `lower-scalar-operations` is what
+// answers that question, and it keeps the call where the answer is no.
+export interface RawBooleanOperationNode {
+	nodeType: "Intrinsic"
+	kind: "raw-boolean-op"
+	operator: "not" | "and" | "or"
+	operand: ExpressionNode
+	other: ExpressionNode | null
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: Two Integers ordered by their `.value` — `<left>.value < <right>.value`
+// — where the bigint each holds IS the number, so JavaScript's own comparison
+// decides exactly what `Integer.compare` decides.
+//
+// NOTE: A RAW JavaScript boolean, like `tag-test`.
+export interface RawCompareNode {
+	nodeType: "Intrinsic"
+	kind: "raw-compare"
+	operator: "<" | ">" | "<=" | ">="
+	left: ExpressionNode
+	right: ExpressionNode
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: Two values of ONE scalar kind compared for equality, decided the way
+// that kind is decided: an Integer holds a bigint and `===` answers it, while a
+// String holds a JavaScript string whose canonically equivalent spellings `===`
+// does NOT see — so `$helpers.stringEquals` answers that one, which is the same
+// normalising comparison the runtime's universal equality performs.
+//
+// NOTE: A RAW JavaScript boolean. `negated` asks the opposite question rather
+// than negating an answer, exactly as `tag-test` does.
+export interface RawEqualsNode {
+	nodeType: "Intrinsic"
+	kind: "raw-equals"
+	scalar: "Integer" | "String"
+	left: ExpressionNode
+	right: ExpressionNode
+	negated: boolean
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: Exact arithmetic over two Integers, built in one allocation — the
+// branded object literal `Integer.createInteger` would have made, around the
+// bigint operation it would have been handed. The ARITHMETIC is raw; the answer
+// is an ordinary Essence Integer and stands wherever one does.
+export interface RawArithmeticNode {
+	nodeType: "Intrinsic"
+	kind: "raw-arithmetic"
+	operator: "+" | "-" | "*"
+	left: ExpressionNode
+	right: ExpressionNode
+	type: IntegerType
 	position?: Position
 }
 

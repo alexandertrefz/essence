@@ -685,16 +685,21 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("List.reduce__overload$1(")
-			expect(generated).toContain("Integer.add__overload$1(")
+			// NOTE: `total::add(n)` on two Integers is lowered to the bigint
+			// addition inside the literal the runtime's constructor would have
+			// built — `lower-scalar-operations` — so what says the callback's
+			// body resolved is the operation rather than the call.
+			expect(generated).toContain("value: total.value + n.value")
 		})
 	})
 
 	describe("Contextual Function literals", () => {
 		// NOTE: The whole point is that the inferred Parameter Type reaches
-		// the body's Scope. `isGreaterThan` is overloaded, so the emitted
-		// `__overload$1` is only chosen if `item` really resolved to an
-		// Integer — a weaker assertion would pass even if the body had been
-		// typed as an Error.
+		// the body's Scope. The comparison is lowered to a bigint one, which
+		// `lower-scalar-operations` does only where the receiver and the
+		// Argument are exactly Integers — so it says what the emitted
+		// `__overload$1` used to say, and says it more strongly: a body typed
+		// as an Error would leave the call standing.
 		it("types the body from the inferred Parameter", () => {
 			let generated = generate(`
 				implementation {
@@ -705,7 +710,7 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("removeEvery__overload$2")
-			expect(generated).toContain("isGreaterThan__overload$1")
+			expect(generated).toContain("item.value > ")
 		})
 
 		it("emits the same JavaScript however the literal was written", () => {
@@ -1237,17 +1242,17 @@ describe("Code Generation", () => {
 			expect(code).not.toContain("$es_String_")
 		})
 
-		// NOTE: The const's body names other Namespaces — `isNot` calls
-		// `Boolean.is` and `Boolean.negate`, both natives, so both are plain
-		// member reads off the runtime module the plain import binds.
+		// NOTE: The const's body names another Namespace — `isNot` is
+		// `@::is(other)::negate()`, and `Boolean.is` is a native, so it is a
+		// plain member read off the runtime module the plain import binds. The
+		// `negate` around it is not a call any more: `lower-scalar-operations`
+		// writes it out as JavaScript's own `!`.
 		it("emits a body that reads the natives off the runtime module", () => {
 			const code = generate(`implementation {
 				__print(true::isNot(false))
 			}`)
 
-			expect(code).toContain(
-				"return Boolean.negate(Boolean.is(_self, other));",
-			)
+			expect(code).toContain("!Boolean.is(_self, other).value")
 		})
 
 		// NOTE: An unused const is not free — it still names the runtime Methods

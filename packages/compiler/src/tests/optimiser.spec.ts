@@ -248,6 +248,53 @@ const unitCaseEquality = `implementation {
 	__print(1::isLessThan(2))
 }`
 
+// NOTE: Every operation `lower-scalar-operations` writes out, beside the ones
+// it must refuse: a mixed-kind comparison and a mixed-kind sum, where the
+// widening the covering Namespace decides is not a bigint operation; the
+// three-Argument `is`, which is a different Method; and an `and` whose Argument
+// PRINTS, which is the whole of what the eager-evaluation rule is for — `noisy`
+// runs in a Program that is right and does not run in one that lowered it to
+// `&&`.
+const scalarOperations = `implementation {
+	§§ Prints as it answers, so that skipping it is visible.
+	§§
+	§§ @returns — always true.
+	function noisy() -> Boolean {
+		__print("evaluated")
+
+		<- true
+	}
+
+	constant a = 3
+	constant b = 5
+	constant text = "ab"
+	constant other = "ba"
+	constant yes = true
+	constant no = false
+
+	__print(a::isLessThan(b))
+	__print(a::isLessThanOrEqualTo(b))
+	__print(a::isGreaterThan(b))
+	__print(a::isGreaterThanOrEqualTo(b))
+	__print(a::is(b))
+	__print(a::isNot(b))
+	__print(a::add(b))
+	__print(a::subtract(b))
+	__print(a::multiply(with b))
+
+	__print(text::is(other))
+	__print(text::isNot(other))
+	__print(text::is("AB", comparing #Insensitive))
+
+	__print(yes::negate())
+	__print(yes::and(no))
+	__print(yes::or(no))
+	__print(no::and(noisy()))
+
+	__print(a::isLessThan(1/2))
+	__print(a::add(1/2))
+}`
+
 // NOTE: Records, Lists, Cases with a payload and without, a payload that is a
 // Record the Program is holding elsewhere, a member name JavaScript can not
 // spell, and a Match reading it all back — the shapes `collapse-construction`
@@ -786,9 +833,18 @@ describe("Optimiser", () => {
 		// written on it, so every comparison in every Program ends in this
 		// shape — inside the standard library, which is optimised with the
 		// Program that reaches it.
+		// NOTE: Asked with `lower-scalar-operations` off, because that pass
+		// takes the same body further — a comparison of two Integers becomes
+		// one bigint comparison and the body stops being emitted at all. What
+		// is being asked here is what THIS pass does to it, so the pass that
+		// runs after it is turned off; the two together are covered where that
+		// one is.
 		it("lowers the standard library's own comparisons", () => {
 			let body = bodyOf(
-				generate(unitCaseEquality),
+				generate(unitCaseEquality, {
+					enabled: true,
+					disabledPasses: new Set(["lower-scalar-operations"]),
+				}),
 				"$es_Integer_isLessThan",
 			)
 
@@ -801,11 +857,14 @@ describe("Optimiser", () => {
 		it("calls the runtime's equality again when it is turned off", () => {
 			// NOTE: And with the pool off as well, so the Case the helper is
 			// handed is written where it is passed rather than read out of the
-			// band — which is not what this asks about.
+			// band — which is not what this asks about. The scalar lowering is
+			// off for the same reason it is off above: it would take the
+			// standard library's comparison out of the emission entirely.
 			let generated = generate(unitCaseEquality, {
 				enabled: true,
 				disabledPasses: new Set([
 					"lower-unit-case-equality",
+					"lower-scalar-operations",
 					"pool-constants",
 				]),
 			})
@@ -854,6 +913,247 @@ describe("Optimiser", () => {
 			await expectSamePrintedOutput(
 				"lower-unit-case-equality",
 				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+		})
+	})
+
+	describe("lower-scalar-operations", () => {
+		it("orders two Integers with JavaScript's own operator", () => {
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("a.value < b.value")
+			expect(generated).toContain("a.value > b.value")
+		})
+
+		it("asks the opposite question rather than negating the answer", () => {
+			// NOTE: `isLessThanOrEqualTo` is `@::isGreaterThan(other)::negate()`
+			// — so what a `!` would have stood in front of is a comparison with
+			// an opposite to ask, and bigints are totally ordered, with no value
+			// unequal to itself the way a floating-point NaN is.
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("a.value <= b.value")
+			expect(generated).toContain("a.value >= b.value")
+			expect(generated).not.toContain("!(a.value")
+		})
+
+		it("compares two Integers by the bigints they hold", () => {
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("a.value === b.value")
+			expect(generated).toContain("a.value !== b.value")
+		})
+
+		it("hands back an interned Boolean", () => {
+			expect(generate(scalarOperations)).toContain(
+				"a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance",
+			)
+		})
+
+		it("builds an Integer answer in one allocation", () => {
+			// NOTE: `subtract` is `@::add(other::negate())`, which was two
+			// allocations and two calls.
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("value: a.value + b.value")
+			expect(generated).toContain("value: a.value - b.value")
+			expect(generated).toContain("value: a.value * b.value")
+			expect(generated).not.toContain("Integer.add__overload$1(a,")
+		})
+
+		it("compares two Strings through the runtime's own comparison", () => {
+			// NOTE: NOT `===`. Two Strings are equal when their characters are,
+			// and the same accent written as one code point and as two is one
+			// String — so the normalising comparison decides it, in the one
+			// place that has always performed it.
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("$helpers.stringEquals(text, other)")
+			expect(generated).toContain("!$helpers.stringEquals(text, other)")
+		})
+
+		it("leaves the String comparison that takes a Case alone", () => {
+			// NOTE: `is(_ other, comparing sensitivity)` is a different Method,
+			// and what it means is whatever the case-insensitive `compare`
+			// means.
+			expect(generate(scalarOperations)).toContain(
+				"$es_String_is__overload$2(text,",
+			)
+		})
+
+		it("writes Boolean logic out as JavaScript's own", () => {
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("!yes.value")
+			expect(generated).toContain("yes.value && no.value")
+			expect(generated).toContain("yes.value || no.value")
+		})
+
+		// NOTE: THE invariant. `a::and(b)` evaluates `b` and then calls; `a &&
+		// b` does not evaluate `b` when `a` is false. Here `b` PRINTS, so the
+		// two are different Programs — and the printed output below is what
+		// says which one was emitted.
+		it("keeps the call where the Argument can be observed", () => {
+			expect(generate(scalarOperations)).toContain(
+				"Boolean.and(no, noisy())",
+			)
+		})
+
+		it("leaves a mixed-kind operation to the Namespace that widens it", () => {
+			// NOTE: An Integer beside a Rational compares by cross-multiplying
+			// and adds by widening — neither is a bigint operation.
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain("$es_Integer_isLessThan__overload$2(a,")
+			expect(generated).toContain("$es_Integer_add__overload$2(a,")
+		})
+
+		it("leaves a Namespace the Program declares of its own alone", () => {
+			// NOTE: `Integer` is free inside a block, and a Namespace declared
+			// there REPLACES the builtin for the rest of it — so `isLessThan`
+			// here is a Method somebody wrote, and it answers what it was
+			// written to answer.
+			let generated = generate(`implementation {
+				§§ Answers the same thing however it is asked.
+				§§
+				§§ @returns — true.
+				function trick() -> Boolean {
+					§§ A liar.
+					namespace Integer for Integer {
+						§§ Always true.
+						§§
+						§§ @param other — ignored
+						§§ @returns — true
+						isLessThan(_ other: Integer) -> Boolean {
+							<- true
+						}
+					}
+
+					<- 5::isLessThan(3)
+				}
+
+				__print(trick())
+			}`)
+
+			expect(generated).toContain("$user_Integer.isLessThan(")
+			expect(generated).not.toContain(".value < ")
+		})
+
+		// NOTE: The standard library is optimised with the Program that reaches
+		// it, and its own bodies are written on the Methods this pass lowers:
+		// the counted loop driver asks `start::isLessThanOrEqualTo(end)` to
+		// decide which way it counts, and `isEven` asks `rest::is(0)`.
+		it("lowers the standard library's own bodies", () => {
+			let generated = generate(`implementation {
+				__print(loop(from 1, through 3, startingWith 0, step (
+					index,
+					total,
+				) { <- total::add(index) }))
+				__print(4::isEven())
+			}`)
+
+			expect(generated).toContain("start.value <= end.value")
+			expect(generated).toContain("current.index.value <= end.value")
+			expect(bodyOf(generated, "$es_Integer_isEven")).toContain(
+				".value === ",
+			)
+		})
+
+		// NOTE: What lowering the standard library's comparison family COSTS a
+		// Program: the bodies stop being reached, so they stop being emitted.
+		it("takes the comparison bodies out of the emission", () => {
+			let source = `implementation {
+				__print(1::isLessThanOrEqualTo(2))
+			}`
+
+			expect(generate(source)).not.toContain(
+				"$es_Integer_isLessThanOrEqualTo",
+			)
+			expect(
+				generate(source, {
+					enabled: true,
+					disabledPasses: new Set(["lower-scalar-operations"]),
+				}),
+			).toContain("$es_Integer_isLessThanOrEqualTo__overload$1")
+		})
+
+		it("reads the operands the passes after it rewrote", () => {
+			// NOTE: The walk descends into a lowered operation like anything
+			// else, so `pool-constants` — which runs last — finds the literal
+			// standing in one and hoists it.
+			expect(
+				generate(`implementation {
+					constant n = 2
+
+					__print(n::add(1))
+					__print(n::multiply(with 1))
+				}`),
+			).toContain("value: n.value + $pool_")
+		})
+
+		it("calls the Methods again when it is turned off", () => {
+			let generated = generate(scalarOperations, {
+				enabled: true,
+				disabledPasses: new Set(["lower-scalar-operations"]),
+			})
+
+			expect(generated).toContain("$es_Integer_isLessThan__overload$1(a,")
+			expect(generated).toContain("Integer.add__overload$1(a, b)")
+			expect(generated).toContain("Boolean.negate(yes)")
+			expect(generated).toContain(
+				"$es_String_is__overload$1(text, other)",
+			)
+			expect(generated).not.toContain("stringEquals")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			// NOTE: `"evaluated"` is in there once, in the middle, which is the
+			// eager-evaluation invariant stated as an output: an `and` lowered
+			// to `&&` over a printing Argument would print it zero times.
+			expect(
+				await expectSamePrintedOutput(
+					"lower-scalar-operations",
+					scalarOperations,
+				),
+			).toEqual([
+				"true",
+				"true",
+				"false",
+				"false",
+				"false",
+				"true",
+				"8",
+				"-2",
+				"15",
+				"false",
+				"true",
+				"true",
+				"false",
+				"false",
+				"true",
+				'"evaluated"',
+				"false",
+				"false",
+				"7/2",
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"lower-scalar-operations",
+				readFileSync(fixturePath("Loops.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-scalar-operations",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-scalar-operations",
+				readFileSync(fixturePath("String.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-scalar-operations",
+				readFileSync(fixturePath("Number.es"), "utf8"),
 			)
 		})
 	})

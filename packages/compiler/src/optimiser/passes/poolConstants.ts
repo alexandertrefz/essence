@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { derivedEquatableNamespaceName } from "../../enricher/resolvers"
 import { runtimeNamespaceNames } from "../../rewriter/runtimeNamespaces"
 import type { OptimiserPass } from "../index"
+import { declaredNamespaces } from "../namespaces"
 import { rewriteExpressions } from "../walk"
 
 // NOTE: A constant written in a Program is BUILT at every site it is written
@@ -36,7 +37,7 @@ export const poolConstants: OptimiserPass = {
 		// are checked against, and a Namespace name a Program declares is
 		// refused whether the name is the Program's own or one it took from the
 		// standard library.
-		let declared = declaredNamespaceNames(program)
+		let declared = declaredNamespaces(program).all
 
 		return rewriteExpressions(program, (node) => pool(node, declared))
 	},
@@ -204,44 +205,3 @@ function conditionKeyOf(
 }
 
 const runtimeNamespaces = new Set<string>(runtimeNamespaceNames)
-
-// NOTE: Every Namespace the Program declares, wherever it declares one — the
-// top level, a Function body, a Method body. A nested one is emitted inside its
-// block, so it is even further out of the band's reach than a top-level one.
-function declaredNamespaceNames(
-	program: common.typedSimple.Program,
-): ReadonlySet<string> {
-	let names = new Set<string>()
-
-	let visit = (value: unknown): void => {
-		if (Array.isArray(value)) {
-			for (let entry of value) {
-				visit(entry)
-			}
-
-			return
-		}
-
-		if (value === null || typeof value !== "object") {
-			return
-		}
-
-		let node = value as Record<string, unknown>
-
-		if (node["nodeType"] === "NamespaceDefinitionStatement") {
-			let name = node["name"] as Record<string, unknown> | undefined
-
-			if (typeof name?.["name"] === "string") {
-				names.add(name["name"])
-			}
-		}
-
-		for (let entry of Object.values(node)) {
-			visit(entry)
-		}
-	}
-
-	visit(program.implementation.nodes)
-
-	return names
-}
