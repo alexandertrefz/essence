@@ -1,14 +1,14 @@
 import {
 	Algebraic      from "./Algebraic.es"
 	Boolean        from "./Boolean.es"
+	Comparable     from "./Comparable.es"
 	List           from "./List.es"
-	Step           from "./Loop.es"
 	Optional       from "./Optional.es"
 	Ordering       from "./Ordering.es"
-	Comparable     from "./Protocols.es"
 	Equatable      from "./Protocols.es"
 	Printable      from "./Protocols.es"
 	Rational       from "./Rational.es"
+	Step           from "./Step.es"
 	String         from "./String.es"
 	Transcendental from "./Transcendental.es"
 }

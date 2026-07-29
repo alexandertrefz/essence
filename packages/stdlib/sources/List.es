@@ -1,12 +1,12 @@
 import {
 	Boolean    from "./Boolean.es"
+	Comparable from "./Comparable.es"
 	Integer    from "./Integer.es"
-	Step       from "./Loop.es"
 	Optional   from "./Optional.es"
 	Ordering   from "./Ordering.es"
-	Comparable from "./Protocols.es"
 	Equatable  from "./Protocols.es"
 	Printable  from "./Protocols.es"
+	Step       from "./Step.es"
 }
 
 declarations {

@@ -1,9 +1,9 @@
 import {
 	Boolean    from "./Boolean.es"
+	Comparable from "./Comparable.es"
 	Integer    from "./Integer.es"
 	Optional   from "./Optional.es"
 	Ordering   from "./Ordering.es"
-	Comparable from "./Protocols.es"
 	Equatable  from "./Protocols.es"
 	Printable  from "./Protocols.es"
 	Rational   from "./Rational.es"
