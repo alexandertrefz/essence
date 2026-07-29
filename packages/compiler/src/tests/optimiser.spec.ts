@@ -83,6 +83,21 @@ async function outputOf(javaScript: string): Promise<Array<string>> {
 	return output
 }
 
+// NOTE: One emitted top-level const, read out by the name it starts with — the
+// standard library's Methods are `$es_<Namespace>_<member>` consts, and an
+// Overload's mangled number is nobody's business here. It is what lets a
+// question be asked of ONE prelude body rather than of the whole emission.
+function bodyOf(generated: string, name: string): string {
+	let start = generated.indexOf(`const ${name}`)
+
+	expect(start).toBeGreaterThan(-1)
+
+	let rest = generated.slice(start)
+	let end = rest.indexOf("\nconst ")
+
+	return end === -1 ? rest : rest.slice(0, end)
+}
+
 // NOTE: The pass contract, as one function: a Program compiled with the named
 // pass turned off prints exactly what it prints with the pass on. Every pass
 // registers a case of this, over a Program that exercises what it rewrites.
@@ -531,10 +546,24 @@ describe("Optimiser", () => {
 			// NOTE: `List<Integer> | Item` — a value of `Item` can be anything
 			// at all, including a List, so the tag does not say which member
 			// arrived and the item walk is what decides.
-			let generated = generate(typeTests)
+			let generated = generate(`implementation {
+				function label<infer Item>(
+					_ items: List<Item>,
+					or fallback: List<Integer> | Item,
+				) -> Integer {
+					<- match fallback -> Integer {
+						case List<Integer> { <- 1 }
+						case _ { <- 0 }
+					}
+				}
 
+				__print(label(["a"], or "b"))
+			}`)
+
+			expect(generated).toContain(
+				'$type.isValueOfType(_self, {\n\t\t\t\ttype: "List",',
+			)
 			expect(generated).toContain('itemType: { type: "Integer" }')
-			expect(generated).toContain('type: "GenericUse"')
 		})
 
 		// NOTE: The standard library's Matches go through the pass as well,
@@ -600,20 +629,6 @@ describe("Optimiser", () => {
 	})
 
 	describe("lower-unit-case-equality", () => {
-		// NOTE: One emitted top-level const, read out by the name it starts
-		// with — the standard library's Methods are `$es_<Namespace>_<member>`
-		// consts and an Overload's mangled number is not this test's business.
-		function bodyOf(generated: string, name: string): string {
-			let start = generated.indexOf(`const ${name}`)
-
-			expect(start).toBeGreaterThan(-1)
-
-			let rest = generated.slice(start)
-			let end = rest.indexOf("\nconst ")
-
-			return end === -1 ? rest : rest.slice(0, end)
-		}
-
 		it("reads a tag instead of calling the runtime's equality", () => {
 			let generated = generate(unitCaseEquality)
 
@@ -784,6 +799,152 @@ describe("Optimiser", () => {
 			await expectSamePrintedOutput(
 				"lower-unit-case-equality",
 				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+		})
+	})
+
+	describe("elide-final-match-test", () => {
+		it("emits the last Handler as the else of the chain", () => {
+			let generated = generate(typeTests)
+
+			// NOTE: Two Handlers, one test — and no fall-through, because
+			// there is nowhere left for a value to fall.
+			expect(generated).toContain(
+				'if (_self[$type.typeKeySymbol] === "Integer") {',
+			)
+			expect(generated).not.toContain(
+				'_self[$type.typeKeySymbol] === "String"',
+			)
+		})
+
+		it("keeps the fall-through where the last Handler is Guarded", () => {
+			// NOTE: A Guard is the Program's own Boolean, and a Guarded
+			// Handler counts toward no exhaustiveness argument — so this one is
+			// tested, and something has to answer for a value it declines.
+			let generated = generate(`implementation {
+				constant scrutinee: Integer | String = 5
+
+				__print(match scrutinee -> String {
+					case String { <- "a String" }
+					case Integer where @::isNegative() { <- "a negative" }
+					case Integer { <- "an Integer" }
+				})
+			}`)
+
+			expect(generated).not.toContain("$type.noCaseMatched(_self)")
+
+			let guardedLast = generate(`implementation {
+				constant scrutinee: Integer | String = 5
+
+				__print(match scrutinee -> String {
+					case String { <- "a String" }
+					case Integer { <- "an Integer" }
+					case Integer where @::isNegative() { <- "unreachable" }
+				})
+			}`)
+
+			expect(guardedLast).toContain("$type.noCaseMatched(_self)")
+		})
+
+		it("keeps the fall-through where the last Matcher is a literal", () => {
+			let generated = generate(`implementation {
+				constant scrutinee: Integer | String = 5
+
+				__print(match scrutinee -> String {
+					case String { <- "a String" }
+					case Integer { <- "an Integer" }
+					case 0 { <- "unreachable" }
+				})
+			}`)
+
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		it("keeps the fall-through where no tag decides the last Handler", () => {
+			// NOTE: A Record Matcher asks about members, and the Compiler can
+			// not reduce that to a tag — which is exactly where a runtime
+			// check and a static Type can part company, so the throw that
+			// names it stays.
+			let generated = generate(`implementation {
+				constant scrutinee: { x: Integer } | String = "text"
+
+				__print(match scrutinee -> String {
+					case String { <- "a String" }
+					case { x: Integer } { <- "a Record" }
+				})
+			}`)
+
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		// NOTE: The standard library reads every fallible answer back through
+		// a two-Handler Match on `Optional`, so this is most of the prelude's
+		// Matches.
+		it("elides the standard library's own final tests", () => {
+			let body = bodyOf(
+				generate(`implementation {
+					__print(Integer.parse("7")::otherwise(0))
+				}`),
+				"$es_Optional_otherwise",
+			)
+
+			expect(body).toContain(
+				'_self[$type.typeKeySymbol] === "Optional#Value"',
+			)
+			expect(body).not.toContain("Optional#Empty")
+			expect(body).not.toContain("noCaseMatched")
+		})
+
+		it("tests every Handler again when it is turned off", () => {
+			let generated = generate(typeTests, {
+				enabled: true,
+				disabledPasses: new Set(["elide-final-match-test"]),
+			})
+
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "String"',
+			)
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"elide-final-match-test",
+					typeTests,
+				),
+			).toEqual(['"integer"', "3", "1", "1", '"click"', "1", "0"])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"elide-final-match-test",
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"elide-final-match-test",
+				readFileSync(fixturePath("Maybe.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"elide-final-match-test",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+		})
+
+		// NOTE: The two Match passes meet on every Handler, and neither may
+		// assume the other ran: with the tests uncompiled, what is dropped
+		// here is the descriptor check instead.
+		it("drops the descriptor check with the other Match pass off", () => {
+			let generated = generate(typeTests, {
+				enabled: true,
+				disabledPasses: new Set(["compile-type-tests"]),
+			})
+
+			expect(generated).toContain(
+				'$type.isValueOfType(_self, { type: "Integer" })',
+			)
+			expect(generated).not.toContain(
+				'$type.isValueOfType(_self, { type: "String" })',
 			)
 		})
 	})

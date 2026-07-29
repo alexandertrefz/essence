@@ -21,7 +21,11 @@ import {
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+} from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { type ModuleInput, rewrite, rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
@@ -1832,7 +1836,11 @@ describe("Rewriter", () => {
 		// enriched as a Module of a bundle straight away. What is under test is
 		// emission, and a graph here would only be a second copy of what
 		// `modules.spec.ts` pins.
-		function moduleOf(filePath: string, source: string): ModuleInput {
+		function moduleOf(
+			filePath: string,
+			source: string,
+			optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+		): ModuleInput {
 			let parsed = parseWithDiagnostics(source)
 
 			expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -1844,7 +1852,7 @@ describe("Rewriter", () => {
 
 			return {
 				filePath,
-				program: optimise(simplify(enriched.program)),
+				program: optimise(simplify(enriched.program), optimiserOptions),
 			}
 		}
 
@@ -1940,8 +1948,18 @@ describe("Rewriter", () => {
 	})
 }
 `
+			// NOTE: The descriptor is what the second half of this asks about,
+			// and a lone Handler is the one `elide-final-match-test` drops the
+			// test of — so the Match is emitted with that pass off. Which
+			// Handler is tested is not this test's business; how an identity
+			// is SPELLED wherever it is written is.
 			let bundle = rewriteModules(
-				[moduleOf("/project/deep/Main.es", source)],
+				[
+					moduleOf("/project/deep/Main.es", source, {
+						enabled: true,
+						disabledPasses: new Set(["elide-final-match-test"]),
+					}),
+				],
 				"/project/deep/Main.es",
 			)
 			let emitted = bundle.sources.get("essence:./Main.es")!
