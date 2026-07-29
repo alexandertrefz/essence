@@ -35,7 +35,7 @@ import {
 	type WorkspaceSymbol as LspWorkspaceSymbol,
 } from "vscode-languageserver/node"
 
-import { analyseDocument, documentFilePath } from "./analyse"
+import { analyseDocument, documentFilePath, isModule } from "./analyse"
 import {
 	type CallHierarchyItem,
 	type CallHierarchyItemKind,
@@ -290,8 +290,11 @@ export function startServer() {
 		// dispatching through an imported Namespace stays unbound. Hover's
 		// annotations come from the same linked enrichment, collected for this
 		// one file — resolved without the graph, an annotation answers 'Error'
-		// for every imported name it writes.
-		if (program.imports !== null || program.exports !== null) {
+		// for every imported name it writes. `isModule` is shared with
+		// `analyse.ts` rather than spelled again here: a standard library source
+		// writes import sections but is deliberately not a graph Module, and two
+		// copies of that question are two chances to answer it differently.
+		if (isModule(program, uri)) {
 			let filePath = documentFilePath(uri)
 
 			if (options.annotations === true) {

@@ -921,6 +921,82 @@ describe("Standard Library Loader", () => {
 		).toEqual([])
 	})
 
+	// NOTE: A standard library Choice is identified by its BARE name. A Module
+	// names its Choices `<modulePath>#<Name>` so that two Modules declaring
+	// `choice Colour` stay distinct; a Program that is no Module passes no path
+	// and keeps the bare name. Nothing else asserts this directly, and the
+	// identity is what the runtime switches on — `Side#Start` and `Step#Done`
+	// are written as bare tags in `runtime/String.ts` and `runtime/List.ts`,
+	// both behind a `default:` arm, so a qualified identity does not throw. It
+	// answers WRONGLY: `trim(at #Start)` trims both ends, and `reduce(step:)`
+	// reads `state` off a `#Done` that has none. The golden capture does catch
+	// both, at the far end of a compile-and-run; this catches it here.
+	it("identifies every standard library Choice by its bare name", () => {
+		let types = loadStdlib().types
+
+		let choicesOf = (type: common.Type | undefined): Array<string> => {
+			let body =
+				type?.type === "GenericAlias"
+					? type.aliasedType
+					: (type ?? null)
+
+			if (body?.type === "UnionType") {
+				return [
+					...new Set(
+						body.types
+							.filter((member) => member.type === "Case")
+							.map((member) => member.choice),
+					),
+				]
+			}
+
+			return body?.type === "Case" ? [body.choice] : []
+		}
+
+		for (let name of [
+			"Ordering",
+			"Optional",
+			"Side",
+			"Case",
+			"Step",
+			"Rounding",
+			"NumberFormat",
+			"NormalizationForm",
+		]) {
+			expect(choicesOf(types[name])).toEqual([name])
+		}
+	})
+
+	// NOTE: The Protocol table is the one of the three with no order list to
+	// cross-check it against, so this states the order outright. It is read in
+	// order wherever a conformance is searched, and `Comparable` must stay last
+	// — it is the only one whose signature names a Type (`Ordering`) rather
+	// than only primitives.
+	it("orders the builtin Protocols", () => {
+		expect(Object.keys(loadStdlib().protocols)).toEqual([
+			"Equatable",
+			"Printable",
+			"Comparable",
+		])
+	})
+
+	// NOTE: The order lists above check NAMES. They say nothing about the
+	// values, and a name bound to `{ type: "Error" }` — what an unresolvable
+	// import is bound to, so that one bad entry does not cascade — passes every
+	// one of them while making the builtin useless at every call site. No
+	// builtin may ever be an Error.
+	it("binds no builtin to an Error Type", () => {
+		let stdlib = loadStdlib()
+
+		for (let table of [stdlib.members, stdlib.types, stdlib.protocols]) {
+			expect(
+				Object.entries(table)
+					.filter(([, type]) => type.type === "Error")
+					.map(([name]) => name),
+			).toEqual([])
+		}
+	})
+
 	// NOTE: The shared Scope, proven on the REAL standard library rather than a
 	// synthetic one. Sorted order hoists `Boolean.es` first, `Ordering.es`
 	// fourth and `Protocols.es` fifth, so each of these resolves a name that a
