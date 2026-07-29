@@ -950,6 +950,72 @@ const orderedLoops = `implementation {
 	}))
 }`
 
+// NOTE: One of everything `fold-constants` works out, beside the operands it
+// must refuse: an Argument that PRINTS, which is the whole of what folding
+// through a call would cost, and a mixed-kind sum, which reaches a Method whose
+// body is not the one being reproduced. The Rationals are the ones that matter
+// most — `1/2 + 1/4` must fold to what the Essence body STORES and not to the
+// lowest-terms value it is worth.
+const constantFolding = `implementation {
+	§§ Prints as it answers, so that an operation folded away would show.
+	§§
+	§§ @returns — two.
+	function noisy() -> Integer {
+		__print("evaluated")
+
+		<- 2
+	}
+
+	constant seconds = 60::multiply(with 60)::multiply(with 24)
+
+	__print(seconds)
+	__print(10::subtract(4))
+	__print(-7::absolute())
+	__print(7::negate())
+	__print(1::isLessThan(2))
+	__print(2::is(2))
+	__print(2::isNot(2))
+	__print(1/2::add(1/4))
+	__print(1/2::subtract(1/4))
+	__print(1/2::multiply(with 2/3))
+	__print(4/2::absolute())
+	__print(1/2::negate())
+	__print(1/2::is(2/4))
+	__print(1/2::isLessThan(2/3))
+	__print("a"::append("b"))
+	__print("b"::prepend("a"))
+	__print("a count: {7}, {1/2}, {true}, {"x"}")
+	__print(3::add(noisy()))
+	__print(1::add(1/2))
+}`
+
+// NOTE: A Program that declares a Namespace named after a builtin, whose `add`
+// answers something no arithmetic would — the shape that decides whether the
+// enumeration a fold rests on may be read by NAME.
+const shadowedArithmetic = `implementation {
+	§§ Answers what a Namespace the Program wrote answers.
+	§§
+	§§ @returns — nine, loudly.
+	function trick() -> Integer {
+		§§ Not the standard library's.
+		namespace Integer for Integer {
+			§§ Nine, whatever it is given.
+			§§
+			§§ @param other — ignored
+			§§ @returns — nine.
+			add(_ other: Integer) -> Integer {
+				__print("the shadow ran")
+
+				<- 9
+			}
+		}
+
+		<- 1::add(2)
+	}
+
+	__print(trick())
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -1514,11 +1580,17 @@ describe("Optimiser", () => {
 		// is being asked here is what THIS pass does to it, so the pass that
 		// runs after it is turned off; the two together are covered where that
 		// one is.
+		// NOTE: And `fold-constants` with it, for the same reason once removed —
+		// `1::isLessThan(2)` is two literals, so the answer is written out and
+		// the body is not reached at all.
 		it("lowers the standard library's own comparisons", () => {
 			let body = bodyOf(
 				generate(unitCaseEquality, {
 					enabled: true,
-					disabledPasses: new Set(["lower-scalar-operations"]),
+					disabledPasses: new Set([
+						"lower-scalar-operations",
+						"fold-constants",
+					]),
 				}),
 				"$es_Integer_isLessThan",
 			)
@@ -1534,12 +1606,14 @@ describe("Optimiser", () => {
 			// handed is written where it is passed rather than read out of the
 			// band — which is not what this asks about. The scalar lowering is
 			// off for the same reason it is off above: it would take the
-			// standard library's comparison out of the emission entirely.
+			// standard library's comparison out of the emission entirely, and
+			// so would folding the two literals it is asked about.
 			let generated = generate(unitCaseEquality, {
 				enabled: true,
 				disabledPasses: new Set([
 					"lower-unit-case-equality",
 					"lower-scalar-operations",
+					"fold-constants",
 					"pool-constants",
 				]),
 			})
@@ -1795,7 +1869,13 @@ describe("Optimiser", () => {
 			expect(
 				generate(source, {
 					enabled: true,
-					disabledPasses: new Set(["lower-scalar-operations"]),
+					// NOTE: And `fold-constants` off with it, because two literals
+					// compared are an answer it writes out — which takes the body
+					// out of the emission for a reason that is not this pass's.
+					disabledPasses: new Set([
+						"lower-scalar-operations",
+						"fold-constants",
+					]),
 				}),
 			).toContain("$es_Integer_isLessThanOrEqualTo__overload$1")
 		})
@@ -2746,6 +2826,180 @@ describe("Optimiser", () => {
 				"inline-loops",
 				readFileSync(fixturePath("List.es"), "utf8"),
 			)
+		})
+	})
+
+	describe("fold-constants", () => {
+		it("writes the answer where the operation was written", () => {
+			let generated = generate(constantFolding)
+
+			expect(generated).toContain("Integer.createInteger(86400n)")
+			expect(generated).toContain("Integer.createInteger(6n)")
+			expect(generated).toContain("Integer.createInteger(7n)")
+			expect(generated).toContain("Integer.createInteger(-7n)")
+			expect(generated).not.toContain("Integer.createInteger(60n)")
+		})
+
+		it("stores a folded Rational as the Essence body would", () => {
+			// NOTE: THE Rational question. `1/2 + 1/4` is worth `3/4` and a
+			// Rational holds the parts it was BUILT with — the Essence body
+			// cross-multiplies the lowest-terms parts and stores 6 over 8 — so a
+			// fold to `3/4` would be a value the unfolded Program never makes.
+			// The band says 6 and 8; the Program prints `3/4`.
+			let generated = generate(constantFolding)
+
+			expect(generated).toContain("Rational.createRational(6n, 8n)")
+			expect(generated).toContain("Rational.createRational(2n, 8n)")
+			expect(generated).toContain("Rational.createRational(2n, 6n)")
+			// NOTE: `absolute` on a value that is not negative answers the
+			// Rational ITSELF, so `4/2` stays four over two.
+			expect(generated).toContain("Rational.createRational(4n, 2n)")
+			expect(generated).toContain("Rational.createRational(-1n, 2n)")
+			// NOTE: The Rational-beside-Rational entries, which are the ones
+			// folded. The entry taking an Integer is still emitted — the mixed
+			// sum at the end of the Program reaches it, and is left alone.
+			expect(generated).not.toContain("$es_Rational_add__overload$1")
+			expect(generated).not.toContain("$es_Rational_multiply")
+		})
+
+		it("renders an interpolation hole whose value is written out", () => {
+			// NOTE: Every hole folds, so the interpolation is a String literal
+			// — no witness, no `toString`, no pieces concatenated at run time.
+			let generated = generate(constantFolding)
+
+			expect(generated).toContain(
+				'String.createString("a count: 7, 1/2, true, x")',
+			)
+			expect(generated).not.toContain("$es_Rational_toString")
+			expect(generated).not.toContain("$es_Boolean_toString")
+		})
+
+		it("concatenates two Strings that were written out", () => {
+			let generated = generate(constantFolding)
+
+			expect(generated).toContain('String.createString("ab")')
+			expect(generated).not.toContain("String.append(")
+		})
+
+		it("leaves an operation whose operand is a call", () => {
+			// NOTE: The whole of what folding through a call would cost: the
+			// print inside `noisy` is the answer's own evaluation, and a fold
+			// that took it would be a Program that says less.
+			expect(generate(constantFolding)).toContain(".value + ")
+		})
+
+		it("leaves a mixed-kind operation to the Namespace that widens it", () => {
+			// NOTE: `1::add(1/2)` reaches the widening entry, whose body is the
+			// Rational addition rather than the bigint one this pass
+			// reproduces — so the call stays and the Rational entry behind it
+			// is still emitted.
+			expect(generate(constantFolding)).toContain(
+				"$es_Integer_add__overload$2(",
+			)
+		})
+
+		it("leaves the arithmetic of a Namespace the Program declares", async () => {
+			// NOTE: A Namespace named after a builtin stands in front of it for
+			// the rest of its block, so `1::add(2)` there is a Method the
+			// Program wrote — and it prints.
+			let generated = generate(shadowedArithmetic)
+
+			expect(generated).not.toContain("Integer.createInteger(3n)")
+			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "9"])
+		})
+
+		it("refuses a fold larger than the cap", () => {
+			// NOTE: 4,096 digits is the ceiling, and no operation folded here
+			// can reach it from a Program that fits in memory — this one is
+			// written to. What a refused fold costs is the optimisation and
+			// nothing else: the Program multiplies where it always did.
+			let large = "9".repeat(4096)
+
+			expect(
+				generate(`implementation {
+					__print(${large}::multiply(with 10))
+				}`),
+			).toContain(".value * ")
+
+			expect(
+				generate(`implementation {
+					__print(${"9".repeat(4090)}::multiply(with 10))
+				}`),
+			).not.toContain(".value * ")
+		})
+
+		it("computes the operations again when it is turned off", () => {
+			let generated = generate(constantFolding, {
+				enabled: true,
+				disabledPasses: new Set(["fold-constants"]),
+			})
+
+			expect(generated).toContain("Integer.createInteger(60n)")
+			expect(generated).toContain("$es_Rational_add__overload$1(")
+			expect(generated).toContain("String.append(")
+			expect(generated).not.toContain("Integer.createInteger(86400n)")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"fold-constants",
+					constantFolding,
+				),
+			).toEqual([
+				"86400",
+				"6",
+				"7",
+				"-7",
+				"true",
+				"true",
+				"false",
+				"3/4",
+				"1/4",
+				"1/3",
+				"2/1",
+				"-1/2",
+				"true",
+				"true",
+				'"ab"',
+				'"ab"',
+				'"a count: 7, 1/2, true, x"',
+				'"evaluated"',
+				"5",
+				"3/2",
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"fold-constants",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"fold-constants",
+				readFileSync(fixturePath("Number.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"fold-constants",
+				readFileSync(fixturePath("Interpolation.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"fold-constants",
+				readFileSync(fixturePath("StdlibExhaustive.es"), "utf8"),
+			)
+		})
+
+		// NOTE: The pass before it takes every Integer operation this one would
+		// otherwise find, so neither may assume the other ran — with the
+		// lowering off, the Invocation is still there and is still folded.
+		it("folds the Invocation with the lowering off", () => {
+			let generated = generate(constantFolding, {
+				enabled: true,
+				disabledPasses: new Set(["lower-scalar-operations"]),
+			})
+
+			expect(generated).toContain("Integer.createInteger(86400n)")
+			expect(generated).not.toContain("Integer.createInteger(60n)")
 		})
 	})
 

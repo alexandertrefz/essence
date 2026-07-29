@@ -529,6 +529,62 @@ inlining in general. What it does instead is inline the walk INSIDE each of them
 once, in the prelude: a Program's call still calls `firstItem(where:)`, and what
 it calls is a `for` that no longer allocates a `Step` per item.
 
+### `fold-constants`
+
+Writes out the answer to an operation whose operands are written out.
+
+`60::multiply(with 60)::multiply(with 24)` allocated three Integers and made
+three calls to arrive at 86,400, every time it was evaluated; `"a count: {7}"`
+built a conformance witness and called `toString` through it to render a digit
+that was standing right there. Both have one answer, so the answer is what is
+emitted:
+
+```js
+Integer.createInteger(86400n)
+String.createString("a count: 7")
+```
+
+What is folded is Integer and Rational arithmetic (`add`, `subtract`,
+`multiply`, `negate`, `absolute`), the comparison and equality family for both,
+String concatenation (`append`, `prepend`), and an interpolation hole whose value
+is a literal and whose witness names a standard library `toString`. Where every
+hole of an interpolated String folds, the whole String becomes a literal — and
+`pool-constants` then declares it once.
+
+Safe because the Compiler works the answer out THE SAME WAY the Program would
+have. Essence arithmetic is exact — bigints, and pairs of bigints — so there is
+no rounding for the two to disagree about, and each fold is the body of the
+Method it replaces carried out on the literals it was given. Where that body is
+a runtime native it is one bigint operation; where it is written in Essence it is
+followed statement by statement.
+
+**Which matters most for Rationals, and is the one place a shorter answer would
+be the wrong one.** A Rational holds the parts it was BUILT with and reduces only
+what it ANSWERS with: `4/2` stores 4 and 2, prints `2/1`, and answers 2 for its
+numerator. So `1/2::add(1/4)` is not folded to `3/4`. The Essence body reads both
+operands' lowest-terms parts, cross-multiplies them and hands the result to
+`Rational.of`, which stores 6 and 8 — and `Rational.createRational(6n, 8n)` is
+what is emitted, printing `3/4` exactly as the unfolded Program does.
+
+Only LITERALS fold, never a name a Program bound a constant to: a binding is a
+place a debugger stops and a name a reader looks for, and what folding through
+one would save is an allocation `pool-constants` already removes. Mixed-kind
+operands (an Integer beside a Rational) are left to the general path, as they are
+by `lower-scalar-operations`, and so is every operand that is a call — the
+enumeration is read by name, so a Program that declares its own
+`namespace Integer for Integer` inside a block folds nothing at all.
+
+**Two things are deliberately not folded.** String equality, because two Strings
+are equal when their CHARACTERS are — a comparison of canonically normalised
+forms, which the JavaScript running the Compiler answers out of its own Unicode
+tables and not necessarily the ones the JavaScript running the Program has.
+And `raise`, whose answer's size is its exponent's VALUE rather than its length:
+every operation above grows an answer by at most the digits of its operands, so a
+whole tree of them is bounded by the digits written in the source. A folded
+number is capped at **4,096 decimal digits** all the same — unreachable by the
+operations listed, and there so that folding an exponent later is a decision
+about that number rather than an emission that quietly balloons.
+
 ### `elide-final-match-test`
 
 Emits the last Handler of a Match as the `else` of the chain.
