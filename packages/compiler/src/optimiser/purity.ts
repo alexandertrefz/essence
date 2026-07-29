@@ -133,6 +133,13 @@ function isPureIntrinsic(
 		// compiled from is.
 		case "dispatch-chain":
 			return false
+		// NOTE: A loop runs its callbacks' bodies, which are Statements — an
+		// assignment among them is exactly the effect this is asked about, and a
+		// walk may not come back at all. Refused whole, for the same reason a
+		// Match is: this function reads Expressions, and what a loop holds is a
+		// body.
+		case "inline-loop":
+			return false
 		case "raw-boolean-op":
 			return (
 				isPure(node.operand) &&

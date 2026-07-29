@@ -779,6 +779,177 @@ const conditions = `implementation {
 	}
 }`
 
+// NOTE: One Program per driver `inline-loops` knows, because each is a
+// different walk and each is emitted from its own reading of the driver it
+// replaces. The counted one first: up, down, and the Statement position that
+// takes it without a closure.
+const countedLoop = `implementation {
+	constant sum = loop(from 1, through 10, startingWith 0, step (
+		index,
+		total,
+	) { <- total::add(index) })
+
+	constant down = loop(from 3, through 1, startingWith 0, step (
+		index,
+		total,
+	) { <- total::add(index) })
+
+	constant once = loop(from 2, through 2, startingWith 0, step (
+		index,
+		total,
+	) { <- total::add(index) })
+
+	__print(sum)
+	__print(down)
+	__print(once)
+}`
+
+// NOTE: The two condition-driven entries, which are one driver read two ways.
+const conditionLoops = `implementation {
+	constant doubled = loop(startingWith 1, while (n) {
+		<- n::isLessThan(100)
+	}, step (n) { <- n::multiply(with 2) })
+
+	constant same = loop(startingWith 1, until (n) {
+		<- n::isGreaterThanOrEqualTo(100)
+	}, step (n) { <- n::multiply(with 2) })
+
+	__print(doubled)
+	__print(same)
+}`
+
+// NOTE: The general entry, whose body answers with a \`Step\` built at the
+// answering position — which is what a body written for it looks like, and what
+// this pass reads rather than allocates.
+const generalLoop = `implementation {
+	constant limit = 5
+
+	constant result = loop(startingWith { index = 1, total = 0 }, step (state) {
+		if state.index::isGreaterThan(limit) {
+			<- #Done(state.total)
+		}
+
+		<- #Continue({ state with index = state.index::add(1),
+		total = state.total::add(state.index) })
+	})
+
+	__print(result)
+}`
+
+// NOTE: And the same entry answering with a \`Step\` the Compiler can NOT see
+// built — held under a name first, which is every other way one can arrive.
+const heldStep = `implementation {
+	constant stopped = loop(startingWith 0, step (n) {
+		constant answer: Step<Integer, Integer> = #Done(n)
+
+		<- answer
+	})
+
+	__print(stopped)
+}`
+
+// NOTE: List's four walking Methods, and the one call that must stay a call:
+// \`map\` given a Function-valued name rather than a literal.
+const listWalks = `implementation {
+	constant items = [1, 2, 3]
+
+	__print(items::reduce(startingWith 0, (total, item) {
+		<- total::add(item)
+	}))
+
+	__print(items::reduce(startingWith 0, step (total, item) {
+		if item::isGreaterThan(2) {
+			<- #Done(total)
+		}
+
+		<- #Continue(total::add(item))
+	})::toString())
+
+	__print(items::map((item) { <- item::multiply(with 2) })::length())
+	__print(items::keepEvery(where (item) {
+		<- item::isGreaterThan(1)
+	})::length())
+
+	constant double = (_ item: Integer) -> Integer { <- item::multiply(with 2) }
+
+	__print(items::map(double)::length())
+}`
+
+// NOTE: A Program that declares a Namespace named \`List\`, which stands in front
+// of the builtin for the rest of its block — so a \`map\` written in it may be a
+// Method the Program wrote, and every walk in the Program is left alone.
+const shadowedList = `implementation {
+	§§ Answers a doubled Integer, from a Namespace named after a builtin.
+	§§
+	§§ @returns — the doubled Integer.
+	function trick() -> Integer {
+		§§ Not the standard library's.
+		namespace List for Integer {
+			§§ Twice the Integer.
+			§§
+			§§ @returns — the doubled Integer.
+			doubled() -> Integer {
+				<- @::multiply(with 2)
+			}
+		}
+
+		<- 21::doubled()
+	}
+
+	__print(trick())
+	__print([1, 2]::map((item) { <- item::add(1) })::length())
+}`
+
+// NOTE: A walk standing in an Argument, where there is nowhere to write a
+// \`while\` and the arrow stays.
+const argumentLoop = `implementation {
+	__print(loop(startingWith 1, while (n) {
+		<- n::isLessThan(10)
+	}, step (n) { <- n::multiply(with 2) }))
+}`
+
+// NOTE: A walk inside a walk's body, which is what numbers the names apart.
+const nestedLoops = `implementation {
+	__print(loop(from 1, through 3, startingWith 0, step (index, total) {
+		<- total::add(loop(from 1, through index, startingWith 0, step (
+			inner,
+			carried,
+		) { <- carried::add(inner) }))
+	}))
+}`
+
+// NOTE: THE Program a rename would answer wrongly. The predicate's Parameter is
+// named after a Constant around the call, and the step's body reads THAT
+// Constant — so the two must not meet, which they do not when each Parameter is
+// bound in a Scope of its own.
+const shadowedParameter = `implementation {
+	constant total = 100
+
+	constant answer = loop(startingWith 1, while (total) {
+		<- total::isLessThan(10)
+	}, step (n) { <- n::add(total) })
+
+	__print(answer)
+
+	constant items = [1, 2, 3]
+
+	__print(items::keepEvery(where (items) {
+		<- items::isGreaterThan(1)
+	})::length())
+	__print(items::map((total) { <- total::add(1) })::length())
+}`
+
+// NOTE: What the call evaluated, in the order it evaluated it — printed,
+// because printing is the only way a Program can tell.
+const orderedLoops = `implementation {
+	__print(loop(from __print(1), through __print(3), startingWith __print(0),
+	step (index, total) { <- total::add(index) }))
+
+	__print(__print([1, 2])::reduce(startingWith __print(0), (total, item) {
+		<- total::add(item)
+	}))
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -1589,12 +1760,18 @@ describe("Optimiser", () => {
 		// it, and its own bodies are written on the Methods this pass lowers:
 		// the counted loop driver asks `start::isLessThanOrEqualTo(end)` to
 		// decide which way it counts, and `isEven` asks `rest::is(0)`.
+		//
+		// NOTE: The step callback is a VALUE rather than a literal, which is
+		// what keeps the driver in the emission at all — `inline-loops` writes
+		// the walk out where every callback is written at the call, and the
+		// driver whose body this reads is then reached by nobody. Bound to a
+		// name it is reached, and this pass lowers it exactly as before.
 		it("lowers the standard library's own bodies", () => {
 			let generated = generate(`implementation {
-				__print(loop(from 1, through 3, startingWith 0, step (
-					index,
-					total,
-				) { <- total::add(index) }))
+				constant advance = (_ index: Integer, _ total: Integer)
+					-> Integer { <- total::add(index) }
+
+				__print(loop(from 1, through 3, startingWith 0, step advance))
 				__print(4::isEven())
 			}`)
 
@@ -2352,6 +2529,226 @@ describe("Optimiser", () => {
 		})
 	})
 
+	describe("inline-loops", () => {
+		it("writes the counted loop as a for over the bigints", () => {
+			// NOTE: The whole of what the counted entry costs, gone: the
+			// direction is decided once, the counter IS the bigint its bounds
+			// hold, and the `{ index, carried }` Record its Essence body threads
+			// through the `while` driver is never built.
+			let generated = generate(countedLoop)
+
+			expect(generated).toContain("const $loop_0_from = $pool_0.value;")
+			expect(generated).toContain(
+				"const $loop_0_up = $loop_0_from <= $loop_0_to;",
+			)
+			expect(generated).toContain(
+				"for (let $loop_0_index = $loop_0_from; $loop_0_up ? $loop_0_index <= $loop_0_to : $loop_0_index >= $loop_0_to; $loop_0_index += $loop_0_delta)",
+			)
+			expect(generated).not.toContain("loop__overload$3")
+			expect(generated).not.toContain("function (")
+		})
+
+		it("hands the body the counter as an Integer", () => {
+			// NOTE: The one allocation a turn of a counted loop still costs,
+			// where the driver built that Integer out of a pooled `1` and an
+			// `add`, inside a Record, behind two closure calls.
+			expect(generate(countedLoop)).toContain(
+				"const index = Integer.createInteger($loop_0_index);",
+			)
+		})
+
+		it("counts down when the first bound is the greater", async () => {
+			expect(
+				await expectSamePrintedOutput("inline-loops", countedLoop),
+			).toEqual(["55", "6", "2"])
+		})
+
+		it("checks a while predicate before each step", () => {
+			// NOTE: The predicate is asked first and the walk is left where it
+			// answers false, which is the order and the meaning
+			// `loop__overload$1` has — a predicate false on the seed answers the
+			// seed and the body never runs.
+			let generated = generate(conditionLoops)
+
+			expect(generated).toContain(
+				"$loop_0:\n\t\twhile (true) {\n\t\t\t{\n\t\t\t\tconst n = $loop_0_state;\n\t\t\t\tif (!(n.value < $pool_1.value))\n\t\t\t\t\tbreak $loop_0;\n\t\t\t}",
+			)
+			expect(generated).not.toContain("loop__overload$1")
+		})
+
+		it("asks an until predicate the opposite question", () => {
+			// NOTE: `until` IS `while` with the predicate negated, and its
+			// Essence body says so by calling `negate` on the Boolean the
+			// predicate answered. Inlined, the question is simply asked the
+			// other way round and no Boolean is built to be flipped.
+			let generated = generate(conditionLoops)
+
+			expect(generated).toContain(
+				"if (n.value >= $pool_1.value)\n\t\t\t\t\tbreak $loop_1;",
+			)
+			expect(generated).not.toContain("loop__overload$2")
+			expect(generated).not.toContain("Boolean.negate(")
+		})
+
+		it("assigns a Step's payload rather than building the Step", () => {
+			// NOTE: `#Done(x)` at the answering position is the walk's answer
+			// and the end of it; `#Continue(x)` is the next State. Both are
+			// written where the Case would have been built.
+			let generated = generate(generalLoop)
+
+			expect(generated).toContain("$loop_0_answer = state.total;")
+			expect(generated).toContain("break $loop_0;")
+			expect(generated).toContain(
+				"$loop_0_state = {\n\t\t\t\t\t...state,",
+			)
+			expect(generated).not.toContain('"Step#Done"')
+			expect(generated).not.toContain('"Step#Continue"')
+		})
+
+		it("reads the tag where the Step is not built at the answer", () => {
+			// NOTE: A `Step` held under a name is a value this Compiler can not
+			// see the construction of, so the tag is read exactly as the driver
+			// read it — at that one answering position, in a block of its own.
+			let generated = generate(heldStep)
+
+			expect(generated).toContain(
+				'const $loop_0_step = answer;\n\t\t\t\t\tif ($loop_0_step[$type.typeKeySymbol] === "Step#Done") {\n\t\t\t\t\t\t$loop_0_answer = $loop_0_step.value;\n\t\t\t\t\t\tbreak $loop_0;',
+			)
+			expect(generated).toContain("$loop_0_state = $loop_0_step.state;")
+		})
+
+		it("walks a List's own positions", () => {
+			let generated = generate(listWalks)
+
+			expect(generated).toContain(
+				"for (let $loop_0_position = 0; $loop_0_position < $loop_0_items.length; $loop_0_position++)",
+			)
+			expect(generated).not.toContain("List.reduce__overload$1(")
+			expect(generated).not.toContain("List.keepEvery(")
+		})
+
+		it("answers the accumulator where an early fold runs to the end", () => {
+			// NOTE: The two ways `reduce`'s early-stopping entry can finish, and
+			// the labelled block is what tells them apart: a `#Done` leaves
+			// through it, and falling out of the walk takes the accumulator.
+			let generated = generate(listWalks)
+
+			expect(generated).toMatch(
+				/\$loop_\d+: \{\n\t\tfor \(let \$loop_\d+_position/,
+			)
+			expect(generated).toMatch(
+				/\t\t\$loop_(\d+)_answer = \$loop_\1_state;\n\t\}/,
+			)
+		})
+
+		it("builds the Array beside the walk and wraps it once", () => {
+			let generated = generate(listWalks)
+
+			expect(generated).toContain("const $loop_2_mapped = [];")
+			expect(generated).toContain("$loop_2_mapped.push(")
+			expect(generated).toContain("List.createList($loop_2_mapped)")
+			expect(generated).toContain("const $loop_3_kept = [];")
+			expect(generated).toContain("$loop_3_kept.push($loop_3_item);")
+		})
+
+		it("leaves the call where a callback is a value", () => {
+			// NOTE: The whole of what decides whether a walk is inlined. A
+			// Function-valued name is whatever was bound to it, which is not
+			// something a Compiler can read — so the same Program holds four
+			// walks written out and one call, and the call is the one whose
+			// callback was bound to a name first.
+			let generated = generate(listWalks)
+
+			expect(generated).toContain("List.map(items, double)")
+			expect(generated).toContain("$loop_2_mapped")
+		})
+
+		it("leaves the call where the Program declares its own List", () => {
+			// NOTE: A Namespace named after a builtin is nested — the name is
+			// taken at the top level — and it REPLACES the builtin for the rest
+			// of its block. So a `map` written anywhere in such a Program may be
+			// a Method the Program wrote, and the whole Program is refused
+			// rather than one Scope of it.
+			let generated = generate(shadowedList)
+
+			expect(generated).toContain("List.map(")
+			expect(generated).not.toContain("$loop_")
+		})
+
+		it("writes a walk in Statement position without a closure", () => {
+			let generated = generate(countedLoop)
+
+			expect(generated).toContain("let sum;\n{\n\tconst $loop_0_from")
+			expect(generated).not.toContain("=> {")
+		})
+
+		it("wraps a walk in an arrow where it stands in an Expression", () => {
+			// NOTE: ONE closure for the whole walk, where the driver built two
+			// per turn of it — and nothing in an Expression position can hold a
+			// `while` any other way.
+			let generated = generate(argumentLoop)
+
+			expect(generated).toContain(
+				"$_.__print((() => {\n\tlet $loop_0_state",
+			)
+			expect(generated).toContain("\treturn $loop_0_state;\n})())")
+		})
+
+		it("numbers a loop inside a loop apart from the one holding it", () => {
+			// NOTE: The names an inlined walk binds stand in the Scope the walk
+			// holding it threads its own State in, so two walks numbered from
+			// zero would declare one name twice.
+			let generated = generate(nestedLoops)
+
+			expect(generated).toContain("$loop_0_state")
+			expect(generated).toContain("$loop_1_state")
+		})
+
+		it("binds a Parameter where the closure bound it", async () => {
+			// NOTE: THE question a rename would answer wrongly. One callback's
+			// Parameter is named after a binding around the call, and the OTHER
+			// callback's body reads that outer binding — so a Parameter bound
+			// anywhere but in a Scope of its own would answer 11 rather than
+			// 101, and no Diagnostic would say so.
+			expect(
+				await expectSamePrintedOutput(
+					"inline-loops",
+					shadowedParameter,
+				),
+			).toEqual(["101", "2", "3"])
+		})
+
+		it("evaluates what the call was given before the walk", async () => {
+			// NOTE: The bounds, the seed and the receiver are evaluated in the
+			// order the call passed them, which is the order the driver's own
+			// Arguments were evaluated in — printed here, because printing is
+			// the only way a Program can tell.
+			expect(
+				await expectSamePrintedOutput("inline-loops", orderedLoops),
+			).toEqual(["1", "3", "0", "6", "[ 1, 2 ]", "0", "3"])
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"inline-loops",
+					readFileSync(fixturePath("Loops.es"), "utf8"),
+				),
+			).toEqual(['"55"', '"15"', '"128"', '"128"', '"2"'])
+		})
+
+		it("prints the same thing with the pass off over a List Program", async () => {
+			// NOTE: The fixture that reaches every walking Method there is, and
+			// the standard library's own — which are written on `reduce` and
+			// `keepEvery` with literal callbacks, so this is where the prelude's
+			// own inlining is exercised.
+			await expectSamePrintedOutput(
+				"inline-loops",
+				readFileSync(fixturePath("List.es"), "utf8"),
+			)
+		})
+	})
+
 	describe("elide-final-match-test", () => {
 		it("emits the last Handler as the else of the chain", () => {
 			let generated = generate(typeTests)
@@ -2717,6 +3114,12 @@ describe("Optimiser", () => {
 		// standard library's driver is where that literal is written — so
 		// before this pass a ten thousand turn loop allocated ten thousand
 		// Integers to count with.
+		//
+		// NOTE: With `inline-loops` on there is one `createInteger` left inside
+		// a walk, and it is not a literal: the counted loop counts with the
+		// bigint its bounds hold and builds the Integer its body is HANDED, once
+		// a turn, where the driver built that Integer out of a pooled `1` and an
+		// `add`. Every other one is a pooled const.
 		it("takes the per-turn Integer out of a loop", () => {
 			let generated = generate(
 				readFileSync(fixturePath("Loops.es"), "utf8"),
@@ -2727,7 +3130,11 @@ describe("Optimiser", () => {
 
 			expect(built.length).toBeGreaterThan(0)
 			expect(
-				built.filter((line) => !line.startsWith("const $pool_")),
+				built.filter(
+					(line) =>
+						!line.startsWith("const $pool_") &&
+						!line.includes("Integer.createInteger($loop_"),
+				),
 			).toEqual([])
 		})
 
