@@ -16,6 +16,7 @@ import {
 	optimiserPasses,
 	optimiserPassNames,
 } from "../optimiser/index"
+import { eliminateDeadCode } from "../optimiser/passes/eliminateDeadCode"
 import { pruneDeadMatchArms } from "../optimiser/passes/pruneDeadMatchArms"
 import {
 	rewriteExpressions,
@@ -85,6 +86,18 @@ function matchMatchers(
 	})
 
 	return matchers
+}
+
+// NOTE: The Constants a Program declares at its top level, by name — what
+// `eliminate-dead-code` either leaves standing or takes away.
+function declaredConstantNames(
+	program: common.typedSimple.Program,
+): Array<string> {
+	return program.implementation.nodes.flatMap((node) =>
+		node.nodeType === "VariableDeclarationStatement" && node.isConstant
+			? [node.name.name]
+			: [],
+	)
 }
 
 function matchHandlerCount(program: common.typedSimple.Program): number {
@@ -1100,6 +1113,46 @@ const deadMatchArms = `implementation {
 	})
 }`
 
+// NOTE: A Constant of each kind `eliminate-dead-code` decides by, at a
+// Program's top level and inside a Function: one nothing reads, one read only
+// from inside a Function, one whose value PRINTS, and a `variable` — which is
+// refused whatever is done with it, because an assignment is a Statement this
+// pass does not read.
+const deadCode = `implementation {
+	constant read = 4
+
+	§§ Prints as it answers, so that a Declaration dropped with it would show.
+	§§
+	§§ @returns — one.
+	function noisy() -> Integer {
+		__print("evaluated")
+
+		<- 1
+	}
+
+	§§ Reads a Constant declared outside it.
+	§§
+	§§ @returns — the sum.
+	function reader() -> Integer {
+		constant droppedInside = 3::add(4)
+		constant keptInside = 5::add(6)
+
+		<- keptInside::add(read)
+	}
+
+	constant dropped = 60::multiply(with 60)
+	constant kept = 2
+	constant loud = noisy()
+
+	variable counted = 7
+
+	counted = counted::add(1)
+
+	__print(kept)
+	__print(reader())
+	__print(counted)
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -1178,6 +1231,41 @@ function everyExpressionIn(program: common.typedSimple.Program): Set<unknown> {
 // like the Expressions above, and for the same reason: a position the walk
 // forgot is one only an independent reading can name.
 const statementFields = new Set(["nodes", "body", "trueBody", "falseBody"])
+
+// NOTE: The ARRAYS themselves rather than what is in them — every run of
+// Statements a body hook has to be offered, gathered by identity from the same
+// independent reading.
+function everyBodyIn(program: common.typedSimple.Program): Set<unknown> {
+	let found = new Set<unknown>()
+
+	let visit = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		for (let [key, entry] of Object.entries(
+			value as Record<string, unknown>,
+		)) {
+			if (statementFields.has(key) && Array.isArray(entry)) {
+				found.add(entry)
+			}
+
+			visit(entry)
+		}
+	}
+
+	visit(program.implementation)
+
+	return found
+}
 
 function everyStatementIn(program: common.typedSimple.Program): Set<unknown> {
 	let found = new Set<unknown>()
@@ -1379,6 +1467,34 @@ describe("Optimiser", () => {
 				expect(offered.length).toBeGreaterThan(20)
 				expect(offered.length).toBe(new Set(offered).size)
 				expect(new Set(offered)).toEqual(everyStatementIn(program))
+				expect(walked).toBe(program)
+			})
+		}
+
+		// NOTE: The body hook, held to the same three promises: every run of
+		// Statements, exactly once, and the Program handed back as itself where
+		// nothing changed. It is the one hook that may answer with a different
+		// NUMBER of Statements, so a body it never reaches is a body
+		// `eliminate-dead-code` can not read.
+		for (let fileName of ["Everyday.es", "Match.es", "Loops.es"]) {
+			it(`reaches every body of ${fileName} exactly once`, () => {
+				let program = simplified(fileName)
+				let offered: Array<unknown> = []
+				let walked = rewriteNodes(program, {
+					body: (nodes) => {
+						offered.push(nodes)
+
+						return nodes
+					},
+				})
+
+				// NOTE: A Program's own nodes are one body and everything else
+				// is a Function, a Handler or a Conditional — Everyday.es is
+				// flat and has two, where Match.es has seventeen. What carries
+				// the weight is the set below.
+				expect(offered.length).toBeGreaterThan(1)
+				expect(offered.length).toBe(new Set(offered).size)
+				expect(new Set(offered)).toEqual(everyBodyIn(program))
 				expect(walked).toBe(program)
 			})
 		}
@@ -3351,6 +3467,94 @@ describe("Optimiser", () => {
 			)
 			expect(generated).not.toContain(
 				'$type.isValueOfType(_self, { type: "String" })',
+			)
+		})
+	})
+
+	describe("eliminate-dead-code", () => {
+		it("drops a Constant nothing reads", () => {
+			let generated = generate(deadCode)
+
+			expect(generated).not.toContain("const dropped")
+			expect(generated).not.toContain("droppedInside")
+			expect(generated).toContain("const kept")
+			expect(generated).toContain("const keptInside")
+		})
+
+		it("keeps a Constant whose value PRINTS", () => {
+			// NOTE: The Declaration is what runs it, so dropping the name would
+			// drop the Program's only way of saying it happened. Purity is the
+			// same question `lower-scalar-operations` asks of an Argument it
+			// would skip.
+			expect(generate(deadCode)).toContain("const loud = noisy()")
+		})
+
+		it("keeps a variable, whatever is done with it", () => {
+			// NOTE: An assignment is a Statement this pass does not read, so a
+			// `variable` is refused outright rather than reasoned about.
+			expect(generate(deadCode)).toContain("let counted")
+		})
+
+		it("keeps a Constant its Module exports", () => {
+			// NOTE: What a Module publishes is read by Modules this compilation
+			// may never see, so every exported name is a root — asked here of
+			// the pass directly, because a Program written as one file has no
+			// export block to write.
+			let program = simplifiedSource(`implementation {
+				constant shared = 1::add(2)
+			}`)
+			let exported: common.typedSimple.Program = {
+				...program,
+				exports: {
+					nodeType: "ExportSection",
+					entries: [
+						{
+							nodeType: "Export",
+							name: "shared",
+							alias: null,
+							modulePath: null,
+							runtime: true,
+						},
+					],
+				},
+			}
+
+			expect(
+				declaredConstantNames(eliminateDeadCode.run(program)),
+			).toEqual([])
+			expect(
+				declaredConstantNames(eliminateDeadCode.run(exported)),
+			).toEqual(["shared"])
+		})
+
+		it("declares them again when it is turned off", () => {
+			let generated = generate(deadCode, {
+				enabled: true,
+				disabledPasses: new Set(["eliminate-dead-code"]),
+			})
+
+			expect(generated).toContain("const dropped")
+			expect(generated).toContain("droppedInside")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput("eliminate-dead-code", deadCode),
+			).toEqual(['"evaluated"', "2", "15", "8"])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"eliminate-dead-code",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"eliminate-dead-code",
+				readFileSync(fixturePath("Loops.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"eliminate-dead-code",
+				readFileSync(fixturePath("StdlibExhaustive.es"), "utf8"),
 			)
 		})
 	})

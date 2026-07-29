@@ -3366,9 +3366,16 @@ describe("Choices", () => {
 		})
 
 		it("emits tagged Case constructions", () => {
+			// NOTE: Printed rather than merely declared, because a Constant
+			// nothing reads is a value the Program builds and drops —
+			// `eliminate-dead-code` takes one out, and a Program with nothing
+			// left in it emits nothing to ask about.
 			let generated = generate(`implementation { ${calculatorChoice}
 				constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 				constant cleared: CalculatorOperation = CalculatorOperation#ClearAll
+
+				__print(operation)
+				__print(cleared)
 			}`)
 
 			// NOTE: A Case carrying a payload is built in one allocation, its
@@ -3528,11 +3535,18 @@ describe("Choices", () => {
 		})
 
 		it("emits the same Record whether written long or short", () => {
+			// NOTE: Printed for the same reason as above: a Constant nothing
+			// reads is one `eliminate-dead-code` drops, and two Programs that
+			// emit nothing are equal for a reason that is not this one.
 			let short = generate(`implementation { ${progressChoice}
 				constant done: Progress<String, Integer> = #Stopped(5)
+
+				__print(done)
 			}`)
 			let long = generate(`implementation { ${progressChoice}
 				constant done: Progress<String, Integer> = #Stopped({ value = 5 })
+
+				__print(done)
 			}`)
 
 			expect(short).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
