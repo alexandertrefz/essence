@@ -960,14 +960,26 @@ describe("Code Generation", () => {
 	})
 
 	describe("Union Method Dispatch", () => {
-		it("should emit a runtime dispatch with one statically resolved target per member", () => {
-			const code = generate(`implementation {
+		it("should emit one statically resolved target per member", () => {
+			const source = `implementation {
 				constant value: Integer | Boolean = 5
 
 				__print(value::toString())
-			}`)
+			}`
+			const code = generate(source)
 
-			expect(code).toContain("$type.dispatchMethod")
+			// NOTE: `compile-union-dispatch` writes the search out where it
+			// stands — a test on the receiver's tag and the branch it selects.
+			// With the pass off the same targets are reached through
+			// `$type.dispatchMethod`, which is what this Namespace asked about
+			// before there was a pass to compile it.
+			expect(code).toContain('value[$type.typeKeySymbol] === "Integer"')
+			expect(
+				generate(source, undefined, {
+					enabled: true,
+					disabledPasses: new Set(["compile-union-dispatch"]),
+				}),
+			).toContain("$type.dispatchMethod")
 			// NOTE: One target per member, and the two are spelled differently
 			// on purpose — `Integer.toString` is native, a member read off the
 			// plain import, while `Boolean.toString` is Essence and so is its
@@ -995,8 +1007,8 @@ describe("Code Generation", () => {
 		// `Boolean` case to `Boolean.toString`, which is implemented in
 		// Essence. This is the Union-dispatch-to-an-Essence-Method path: the
 		// case target is the bare `$es_Boolean_toString`, and the reachability
-		// gate has to pull that const in off the emitted dispatch triple for
-		// the Program to run — no other expression in the Program names it.
+		// gate has to pull that const in off the emitted branch for the Program
+		// to run — no other expression in the Program names it.
 		//
 		// NOTE: The Union is spelled out by hand and `Item` is inferred from a
 		// second Parameter, because an argument that lands on the concrete
@@ -1017,7 +1029,9 @@ describe("Code Generation", () => {
 			}`
 			const code = generate(source)
 
-			expect(code).toContain("$type.dispatchMethod")
+			expect(code).toContain(
+				'fallback[$type.typeKeySymbol] === "Boolean"',
+			)
 			expect(code).toContain("$es_Boolean_toString")
 			expect(code).toContain("const $es_Boolean_toString")
 			expect(code).toContain("Item__conformance.toString")
@@ -1034,11 +1048,13 @@ describe("Code Generation", () => {
 				__print(describe(1, or true))
 			}`)
 
-			// NOTE: `lastIndexOf` is what picks the dispatch triple out —
+			// NOTE: `lastIndexOf` is what picks the emitted branch out —
 			// `$es_Boolean_toString` is also the name of the prelude const,
 			// which is emitted above every Function and would otherwise be the
-			// occurrence found. The conformance read appears in the triple and
-			// nowhere else.
+			// occurrence found. The conformance read appears in the chain and
+			// nowhere else, and it comes after: a catch-all accepts every value
+			// there is, so it can only be tried once everything else has
+			// declined.
 			expect(code.lastIndexOf("$es_Boolean_toString")).toBeGreaterThan(-1)
 			expect(code.lastIndexOf("$es_Boolean_toString")).toBeLessThan(
 				code.indexOf("Item__conformance.toString"),

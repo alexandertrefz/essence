@@ -3,6 +3,7 @@ import type { common } from "@essence-lang/interfaces"
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
+import { compileUnionDispatch } from "./passes/compileUnionDispatch"
 import { devirtualiseWitnesses } from "./passes/devirtualiseWitnesses"
 import { elideFinalMatchTest } from "./passes/elideFinalMatchTest"
 import { lowerScalarOperations } from "./passes/lowerScalarOperations"
@@ -63,6 +64,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	compileTypeTests,
 	lowerUnitCaseEquality,
 	lowerScalarOperations,
+	compileUnionDispatch,
 	devirtualiseWitnesses,
 	elideFinalMatchTest,
 	collapseConstruction,

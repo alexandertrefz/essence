@@ -60,6 +60,17 @@ export function dispatchMethod(
 		}
 	}
 
+	return noDispatchCaseMatched()
+}
+
+// NOTE: The end of a dispatch, whether the search above walked it or
+// `compile-union-dispatch` wrote it out as a chain of tests — one throw for
+// both, so which of the two a Program was built with does not change what it
+// says when it goes wrong. The Enricher emits a dispatch only where every
+// member of the receiver's Union has a case, so this is unreachable in a
+// Program that compiled clean, and reaching it means a case's runtime check
+// disagrees with the Type the Enricher gave it.
+export function noDispatchCaseMatched(): never {
 	throw new Error("No dispatch case matched the receiver.")
 }
 

@@ -39,6 +39,24 @@ export function matcherResidual(
 	matcher: common.Type,
 	valueType: common.Type,
 ): MatcherResidual {
+	return matcherResidualOverMembers(matcher, unionMembersOf(valueType))
+}
+
+// NOTE: The same question asked of the MEMBERS themselves, for a caller holding
+// them rather than the Union they were read out of. A Union dispatch is that
+// caller: the Enricher built one case per member of the receiver's Union, so
+// the case list IS the set of values that can arrive, and reading the Union's
+// spelling a second time would be asking a second source for an answer the
+// cases already give.
+//
+// NOTE: `matcherResidual` is this function with the members flattened out of a
+// Type, and the two therefore can not drift: what a Match Handler's check
+// reduces to and what a dispatch case's check reduces to are decided by the
+// same rules in the same order.
+export function matcherResidualOverMembers(
+	matcher: common.Type,
+	members: ReadonlyArray<common.Type>,
+): MatcherResidual {
 	let tag = lowerableTagOf(matcher)
 
 	if (tag !== null) {
@@ -49,14 +67,17 @@ export function matcherResidual(
 			return { kind: "tag", tag }
 		}
 
-		let claimant = soleClaimantOf(tag, valueType)
+		let claimant = soleClaimantOf(tag, members)
 
 		if (claimant !== null && checkIsImplied(matcher, claimant)) {
 			return { kind: "tag", tag }
 		}
 	}
 
-	if (checkIsImplied(matcher, valueType)) {
+	// NOTE: Every member, because any of them may arrive — which is the arm
+	// `checkIsImplied` takes for a Union-typed value, with the members already
+	// in hand.
+	if (members.every((member) => checkIsImplied(matcher, member))) {
 		return { kind: "always" }
 	}
 
@@ -157,11 +178,11 @@ function checkIsTagAlone(matcher: common.Type): boolean {
 // tag and failing the Matcher's payload check.
 function soleClaimantOf(
 	tag: string,
-	valueType: common.Type,
+	members: ReadonlyArray<common.Type>,
 ): common.Type | null {
 	let claimant: common.Type | null = null
 
-	for (let member of unionMembersOf(valueType)) {
+	for (let member of members) {
 		let memberTag = runtimeTagOf(member)
 
 		if (memberTag === null) {

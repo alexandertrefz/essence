@@ -357,6 +357,7 @@ export type IntrinsicNode =
 	| DirectListNode
 	| SpreadCombinationNode
 	| PooledReferenceNode
+	| DispatchChainNode
 
 // NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
 // "Ordering#Less"`, the whole of what the runtime asks when the answer can not
@@ -597,6 +598,75 @@ export interface DirectListNode {
 	values: Array<ExpressionNode>
 	type: ListType
 	position?: Position
+}
+
+// NOTE: A Method Invocation on a Union-typed receiver, decided where it is
+// written rather than searched for at run time. `$type.dispatchMethod` was
+// handed the receiver, an array of the shared Arguments and an array holding a
+// Type descriptor, a Method, its conformance Arguments and its own Arguments
+// per member Type — and it walked that array asking `isValueOfType` of each
+// descriptor until one accepted. Every part of it is something the Compiler
+// knows: which Methods, in which order, and — through `residual.ts` — what each
+// of those descriptor checks reduces to. So the chain is written out, and what
+// is left at each branch is the question that branch actually turns on.
+//
+// NOTE: The receiver and the shared Arguments are evaluated ONCE, before any
+// case is tried, exactly as building that array evaluated them. `temporaries`
+// holds the ones that have to be BOUND to manage it, in the order they are
+// evaluated; `receiver` and `arguments` are what the branches read, which is
+// those names, or the Expression itself where what was written is a name
+// already and reading it again is reading the same binding.
+//
+// NOTE: A case's OWN Arguments — the conformance witnesses its Method requires,
+// and the Function literals the Enricher compiled against it — are built inside
+// the branch that uses them, where the dispatch built every branch's before
+// choosing one. That is a change in WHEN they are built, and it is invisible
+// for one reason only: both are pure. `compile-union-dispatch` proves it per
+// case and leaves the Invocation alone where it can not.
+export interface DispatchChainNode {
+	nodeType: "Intrinsic"
+	kind: "dispatch-chain"
+	temporaries: Array<DispatchTemporaryNode>
+	receiver: ExpressionNode
+	arguments: Array<ExpressionNode>
+	cases: Array<DispatchChainCase>
+	type: Type
+	position?: Position
+}
+
+// NOTE: One Expression held under a name for the length of the chain, because
+// the chain reads it more than once — the receiver is read by every test and by
+// the branch that answers, and a shared Argument by every branch. The name is
+// the Optimiser's and unspellable in Essence: the Lexer reads `_` as a Symbol,
+// so no name a Program can write contains one.
+export type DispatchTemporaryNode = {
+	name: string
+	value: ExpressionNode
+}
+
+// NOTE: One branch — the test that selects it and the call it makes, which is
+// the Method the Compiler resolved for this member Type, given the receiver,
+// the shared Arguments this branch does not override, and its own hidden
+// conformance Arguments.
+export type DispatchChainCase = {
+	// NOTE: A RAW JavaScript boolean, the same kind of test a Match Handler
+	// carries and built from the same residual, reading the receiver. Null means
+	// the branch is taken whenever it is REACHED: either its check accepts every
+	// value that can arrive, or it is the last branch of a Union the Enricher
+	// covered case by case.
+	test: ExpressionNode | null
+	namespaceName: string
+	methodName: string
+	conformanceArguments: Array<ExpressionNode>
+	// NOTE: The Arguments this branch alone is given, each under the position in
+	// the shared Argument list it stands in for — a Function literal compiled
+	// against THIS branch's Method, which means something different in every
+	// branch because its Parameter Types came from the branch.
+	contextualArguments: Array<{ index: number; value: ExpressionNode }>
+	// NOTE: Present only when this branch resolves to a *generic* Choice's
+	// derived Equatable, exactly as it is on the dispatch case it was built
+	// from — the one function that spells a Method reference reads it.
+	derivedDescriptor?: DerivedEquatableDescriptor
 }
 
 // NOTE: Two Records combined in one allocation — `{ ...lhs, member: … }`, where
