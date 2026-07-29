@@ -2683,9 +2683,23 @@ declarations {
 				let replacedStdlib: Stdlib | null = null
 
 				beforeAll(() => {
+					// NOTE: The prelude is extended along with the sources.
+					// Exporting `Constants` from its own file makes it reachable
+					// by the standard library; it takes a line in `Prelude.es`
+					// to make it a name a user Program can write, which is the
+					// whole of the difference between an internal helper and a
+					// builtin.
 					let sources = readStdlibFiles().map(
 						({ filePath, sourceText }) =>
-							parseStdlibSource(filePath, sourceText),
+							parseStdlibSource(
+								filePath,
+								filePath.endsWith("Prelude.es")
+									? sourceText.replace(
+											/\n}\s*$/,
+											'\n\tConstants from "./Constants.es"\n}\n',
+										)
+									: sourceText,
+							),
 					)
 
 					sources.push(parseStdlibSource("Constants.es", constants))

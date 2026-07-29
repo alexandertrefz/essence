@@ -733,6 +733,105 @@ describe("Standard Library Loader", () => {
 		expect(Object.keys(loadStdlib().members)).toContain("__print")
 	})
 
+	// NOTE: The point of `Prelude.es`. A name reaches the language by being
+	// re-exported there and by nothing else, so a Namespace the library needs
+	// and the language should not grow simply stays off the list — exported by
+	// its own file, imported by its siblings, invisible to every Program. There
+	// was no way to write one while every declaration became a builtin.
+	it("keeps a Namespace the prelude does not re-export out of the language", () => {
+		let stdlib = load(
+			[
+				"Prelude.es",
+				`declarations {}
+
+				export {
+					Public from "./Public.es"
+				}`,
+			],
+			[
+				"Helpers.es",
+				`declarations {
+					namespace Internal for String {
+						§§ The String, doubled.
+						§§ @returns — the String twice over.
+						twice() -> String
+					}
+				}
+
+				export {
+					Internal
+				}`,
+			],
+			[
+				"Public.es",
+				`import { Internal from "./Helpers.es" }
+
+				declarations {
+					namespace Public for String {
+						§§ The String, four times over.
+						§§ @returns — the String four times over.
+						quadrupled() -> String {
+							<- @::twice()::twice()
+						}
+					}
+				}
+
+				export {
+					Public
+				}`,
+			],
+		)
+
+		// NOTE: The helper resolved — `quadrupled` is written on it, and the
+		// load throws on any Diagnostic, so reaching here at all proves the
+		// import bound.
+		expect(Object.keys(stdlib.members)).toContain("Public")
+		expect(Object.keys(stdlib.members)).not.toContain("Internal")
+	})
+
+	// NOTE: The real library's prelude and its files have to agree. A name
+	// exported by a file and forgotten in the prelude is invisible with no
+	// Diagnostic anywhere, and the failure it causes is at a use site in some
+	// user's Program rather than here.
+	it("re-exports every name the standard library declares", () => {
+		let stdlib = loadStdlib()
+		let available = new Set([
+			...Object.keys(stdlib.members),
+			...Object.keys(stdlib.types),
+			...Object.keys(stdlib.protocols),
+		])
+
+		for (let name of [
+			"__print",
+			"loop",
+			"Integer",
+			"String",
+			"List",
+			"NestedList",
+			"Optional",
+			"NestedOptional",
+			"Ordering",
+			"Number",
+			"Irrational",
+			"Rational",
+			"Algebraic",
+			"Transcendental",
+			"Boolean",
+			"Record",
+			"Step",
+			"Side",
+			"Case",
+			"Rounding",
+			"NumberFormat",
+			"NormalizationForm",
+			"Equatable",
+			"Printable",
+			"Comparable",
+		]) {
+			expect(available).toContain(name)
+		}
+	})
+
 	// NOTE: The bare Type tags are held on a PARENT Scope, and this is the test
 	// that says why. `isTaken` — the linker's "is this name already spoken for?"
 	// — reads a Scope's own tables and does not walk to its parent. With the

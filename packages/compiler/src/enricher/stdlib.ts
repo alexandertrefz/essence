@@ -26,6 +26,11 @@ function basenameOf(filePath: string): string {
 	return filePath.slice(filePath.lastIndexOf("/") + 1)
 }
 
+// NOTE: The one file that says what the LANGUAGE offers, as opposed to what a
+// file offers its siblings. It declares nothing itself — it is an export block
+// and the reasoning behind it.
+const PRELUDE_FILE_NAME = "Prelude.es"
+
 // NOTE: A standard library file that writes no `export { … }` block offers
 // everything it declares. The builtin tables are built from the export SURFACES,
 // and a surface forwards only what its block lists — so without this a file with
@@ -569,35 +574,50 @@ export function loadStdlibFrom(
 
 	let validateDuration = performance.now() - validateStarted
 
-	// NOTE: Built from the EXPORT SURFACES rather than by merging the per-file
-	// Scopes. A surface forwards only what its own file declared, read straight
-	// out of that file's Scope — so every entry is the declaring file's original
-	// object. A Scope also holds what the file IMPORTED, and an imported
-	// Namespace is a shallow copy rebranded with the local name, while an entry
-	// that could not be bound is an Error Type. Merging Scopes would put both
-	// into the builtin tables.
-	//
-	// In filename order, which is the order the sources arrive in and the order
-	// the tables were built in before Modules. `inBuiltinOrder` below is what
-	// actually decides the order either way; this only decides the tail it
-	// appends, for a name no order list mentions.
+	// NOTE: In filename order, which is the order the sources arrive in and the
+	// order the tables were built in before Modules.
 	let ordered = sources.map((source) => byPath.get(source.fileName)!)
+
+	// NOTE: The language's public surface is ONE file's export block. `Prelude.es`
+	// re-exports what a Program may use without asking, and the builtin tables are
+	// built from its surface alone — so a name a file exports and the prelude does
+	// not forward is reachable by the standard library's own files, through an
+	// ordinary import, and by nothing else. That is what an internal helper is, and
+	// there was no way to write one while every declaration became a builtin.
+	//
+	// Read off the SURFACE rather than by merging Scopes. A surface forwards only
+	// what was declared, read out of the declaring file's own Scope, so every entry
+	// is that file's original object; a Scope also holds what the file IMPORTED,
+	// where a Namespace is a shallow copy rebranded with the local name and an
+	// unbindable entry is an Error Type.
+	//
+	// A library with no prelude — every one a test writes — falls back to the union
+	// of what its files export, which is the rule that held before this file
+	// existed.
+	let prelude = ordered.find(
+		(module) => basenameOf(module.module.filePath) === PRELUDE_FILE_NAME,
+	)
+
+	let publicSurfaces =
+		prelude === undefined
+			? ordered.map((module) => module.surface)
+			: [prelude.surface]
 
 	let unionScope: enricher.Scope = {
 		parent: primitiveScope,
 		members: Object.assign(
 			scopeMap(),
-			...ordered.map((module) => module.surface.values),
+			...publicSurfaces.map((surface) => surface.values),
 		),
 		declarations: scopeMap(),
 		constants: new Set(),
 		types: Object.assign(
 			scopeMap(),
-			...ordered.map((module) => module.surface.types),
+			...publicSurfaces.map((surface) => surface.types),
 		),
 		protocols: Object.assign(
 			scopeMap(),
-			...ordered.map((module) => module.surface.protocols),
+			...publicSurfaces.map((surface) => surface.protocols),
 		),
 	}
 
