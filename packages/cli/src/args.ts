@@ -1,6 +1,11 @@
 import { parseArgs, type ParseArgsConfig } from "node:util"
 
 import { closestMatch } from "@essence-lang/compiler/helpers"
+import {
+	isOptimiserPassName,
+	type OptimiserOptions,
+	optimiserPassNames,
+} from "@essence-lang/compiler/optimiser"
 
 import {
 	type CommandSpec,
@@ -47,6 +52,11 @@ export type OptionValues = {
 	clear: boolean
 	sourcemap: boolean
 	minify: boolean
+	noOptimise: boolean
+	// NOTE: The pass names `--without-optimisation` was given, already checked
+	// against the registry — an unknown one is a UsageError rather than a flag
+	// that quietly does nothing.
+	withoutOptimisation: Array<string>
 	jobs: number | undefined
 }
 
@@ -79,7 +89,18 @@ export const emptyOptions: OptionValues = {
 	clear: false,
 	sourcemap: false,
 	minify: false,
+	noOptimise: false,
+	withoutOptimisation: [],
 	jobs: undefined,
+}
+
+// NOTE: The two flags as the Compiler reads them. Nothing named means every
+// pass runs, which is what a build the user said nothing about compiles with.
+export function optimiserOptionsFor(options: OptionValues): OptimiserOptions {
+	return {
+		enabled: !options.noOptimise,
+		disabledPasses: new Set(options.withoutOptimisation),
+	}
 }
 
 function toParseArgsOptions(
@@ -225,6 +246,37 @@ function readJobs(
 	return value
 }
 
+// NOTE: A pass name is checked HERE rather than left to the Optimiser, which
+// would simply not find it in the registry and run everything — a misspelt name
+// that silently changed nothing looks exactly like a pass that does not do what
+// its name says. The message lists every valid name, because there is no other
+// place a reader can be sent to that is as short as the answer itself.
+function readDisabledPasses(
+	raw: Array<string> | undefined,
+	command: CommandSpec,
+	programName: string,
+): Array<string> {
+	let names = raw ?? []
+
+	for (let name of names) {
+		if (isOptimiserPassName(name)) {
+			continue
+		}
+
+		let suggestion = closestMatch(name, [...optimiserPassNames])
+
+		throw new UsageError(
+			`There is no optimisation pass named "${name}".`,
+			command,
+			suggestion === null
+				? `The passes are: ${optimiserPassNames.join(", ")}.`
+				: `Did you mean "${programName} ${command.name} --without-optimisation ${suggestion}"?`,
+		)
+	}
+
+	return names
+}
+
 // NOTE: A passthrough Command is recognised before anything else is read: its
 // arguments belong to the tool it delegates to, and reading them here — folding
 // `--` away, or refusing a flag esc has never heard of — would break flags that
@@ -278,7 +330,10 @@ export function parseArguments(
 		)
 	}
 
-	let values = parsed.values as Record<string, string | boolean | undefined>
+	let values = parsed.values as Record<
+		string,
+		string | boolean | Array<string> | undefined
+	>
 
 	if (program.length > 0 && command.acceptsProgramArguments !== true) {
 		throw new UsageError(
@@ -305,6 +360,12 @@ export function parseArguments(
 			clear: values.clear === true,
 			sourcemap: values.sourcemap === true,
 			minify: values.minify === true,
+			noOptimise: values["no-optimise"] === true,
+			withoutOptimisation: readDisabledPasses(
+				values["without-optimisation"] as Array<string> | undefined,
+				command,
+				programName,
+			),
 			jobs: readJobs(values.jobs as string | undefined, command),
 		},
 		files: parsed.positionals.map((positional) => String(positional)),

@@ -1,3 +1,4 @@
+import { optimiserOptionsFor } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
 import {
@@ -118,6 +119,7 @@ export async function runCompilation(
 					minify: context.options.minify,
 					sourcemap: context.options.sourcemap,
 					sourcemapMode: options?.sourcemapMode,
+					optimisation: optimiserOptionsFor(context.options),
 				},
 				(stage) => {
 					progress.update(inputFileName, {
