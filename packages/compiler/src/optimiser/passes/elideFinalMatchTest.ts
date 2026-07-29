@@ -2,7 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
 import { matcherResidual } from "../residual"
-import { rewriteExpressions } from "../walk"
+import { rewriteNodes } from "../walk"
 
 // NOTE: The last Handler of a Match is tested like every other one, and then
 // the chain ends in an `else` that throws — and both of those are answers to a
@@ -41,16 +41,36 @@ import { rewriteExpressions } from "../walk"
 // `residual.ts` the same question rather than reading the test that pass leaves
 // behind. With that pass off, what is dropped here is the descriptor check
 // instead — the same Handler, decided the same way.
+//
+// NOTE: It may not assume `lower-matches-to-statements` did not run either, and
+// that one runs FIRST — so a Match reaching here is either the Expression the
+// Simplifier wrote or the Statement that pass lowered it to. Both carry the same
+// Handlers, the same scrutinee and the same claim, and both are read here: a
+// Match that stopped being elided because it was lowered would be one pass
+// silently taking away another's work.
 
 export const elideFinalMatchTest: OptimiserPass = {
 	name: "elide-final-match-test",
-	run: (program) => rewriteExpressions(program, elide),
+	run: (program) =>
+		rewriteNodes(program, { expression: elide, statement: elide }),
 }
 
-function elide(
-	node: common.typedSimple.ExpressionNode,
-): common.typedSimple.ExpressionNode {
-	if (node.nodeType !== "Match" || node.finalHandlerIsElse) {
+function elide<
+	Node extends
+		| common.typedSimple.ExpressionNode
+		| common.typedSimple.ImplementationNode,
+>(node: Node): Node {
+	if (
+		node.nodeType !== "Match" &&
+		!(
+			node.nodeType === "IntrinsicStatement" &&
+			node.kind === "statement-match"
+		)
+	) {
+		return node
+	}
+
+	if (node.finalHandlerIsElse) {
 		return node
 	}
 

@@ -6,6 +6,7 @@ import { compileTypeTests } from "./passes/compileTypeTests"
 import { compileUnionDispatch } from "./passes/compileUnionDispatch"
 import { devirtualiseWitnesses } from "./passes/devirtualiseWitnesses"
 import { elideFinalMatchTest } from "./passes/elideFinalMatchTest"
+import { lowerMatchesToStatements } from "./passes/lowerMatchesToStatements"
 import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
 import { poolConstants } from "./passes/poolConstants"
@@ -66,6 +67,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	lowerScalarOperations,
 	compileUnionDispatch,
 	devirtualiseWitnesses,
+	lowerMatchesToStatements,
 	elideFinalMatchTest,
 	collapseConstruction,
 	collapseCombinations,

@@ -694,27 +694,48 @@ function rewriteImplementationSection(
 	// of its own for the same reason every inner block is one — the Enricher
 	// refuses a top-level `namespace List` today, but nothing here rests on that.
 	return withNamespaceScope(() =>
-		implementation.nodes.map((node) => rewriteStatement(node)),
+		implementation.nodes.flatMap((node) => rewriteStatements(node)),
 	)
 }
 
 // #region Statements
 
-function rewriteStatement(
+// NOTE: One Statement in, the Statements it emits out — plural, because exactly
+// one shape needs two: a Variable Declaration whose value a lowered Match or a
+// lowered dispatch computes declares its name BEFORE the block that computes it,
+// so the name outlives the block. Every other Statement is one, and each of them
+// carries the Position of the Node it came from.
+function rewriteStatements(
 	node: common.typedSimple.ImplementationNode,
-): estree.Statement {
-	let statement = rewriteStatementByKind(node)
-	let loc = locOf(node.position)
+): Array<estree.Statement> {
+	let statements =
+		node.nodeType === "IntrinsicStatement"
+			? rewriteIntrinsicStatement(node)
+			: [rewriteStatementByKind(node)]
+
+	return withStatementLocation(statements, node.position)
+}
+
+function withStatementLocation(
+	statements: Array<estree.Statement>,
+	position: common.Position | undefined,
+): Array<estree.Statement> {
+	let loc = locOf(position)
 
 	if (loc !== undefined) {
-		statement.loc = loc
+		for (let statement of statements) {
+			statement.loc = loc
+		}
 	}
 
-	return statement
+	return statements
 }
 
 function rewriteStatementByKind(
-	node: common.typedSimple.ImplementationNode,
+	node: Exclude<
+		common.typedSimple.ImplementationNode,
+		common.typedSimple.IntrinsicStatementNode
+	>,
 ): estree.Statement {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
@@ -1814,7 +1835,12 @@ function rewriteConditionalStatement(
 			node.falseBody.length === 1 &&
 			node.falseBody[0].nodeType === "ConditionalStatement"
 		) {
-			alternate = rewriteStatement(node.falseBody[0])
+			let nested = node.falseBody[0]
+
+			alternate = withStatementLocation(
+				[rewriteConditionalStatement(nested)],
+				nested.position,
+			)[0]!
 		} else {
 			alternate = rewriteBlockStatement(node.falseBody)
 		}
@@ -1822,16 +1848,7 @@ function rewriteConditionalStatement(
 
 	return {
 		type: "IfStatement",
-		test: {
-			type: "MemberExpression",
-			optional: false,
-			object: rewriteExpression(node.condition),
-			property: {
-				type: "Identifier",
-				name: "value",
-			},
-			computed: false,
-		},
+		test: valueRead(rewriteExpression(node.condition)),
 		consequent: rewriteBlockStatement(node.trueBody),
 		alternate,
 	}
@@ -1867,7 +1884,7 @@ function rewriteFunctionStatement(
 // builds `{ [$type.typeKeySymbol]: "Record", … }`, whose hidden Type key is a
 // computed SYMBOL. An engine that decides such a literal is unused is free to
 // take it away, and Bun's does — while still evaluating the key as a property
-// NAME, which converts the Symbol to a string and THROWS, out of a Statement
+// name, which converts the Symbol to a string and THROWS, out of a Statement
 // that did nothing. So the value is bound to a name in a block of its own: it is
 // computed exactly as it was, and nothing about it is unused any more. The block
 // is what keeps the name from colliding with a sibling's, and the `_` in the
@@ -3317,188 +3334,184 @@ function memberRead(
 	}
 }
 
+function callIsValueOfType(
+	value: estree.Expression,
+	matcher: common.Type,
+): estree.CallExpression {
+	// TODO: Handle Record Types
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "$type" },
+			"isValueOfType",
+		),
+		arguments: [value, convertObjectToObjectExpression(matcher)],
+	}
+}
+
+function callAnyIs(
+	value: estree.Expression,
+	literal: estree.Expression,
+): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead({ type: "Identifier", name: "$helpers" }, "anyIs"),
+		arguments: [value, literal],
+	}
+}
+
+// NOTE: A literal Matcher needs no Type check in front of it — `anyIs`
+// already answers false across differing Types. A Guard is ANDed on after
+// whichever check the Matcher produced, so it only ever narrows.
+//
+// NOTE: A Handler carrying a residual test was given one by
+// `compile-type-tests`, which found something cheaper that answers what the
+// Matcher's descriptor answers. It reads the value under the same `_self`
+// this binds, so it goes where the descriptor call would have gone and
+// everything ANDed on after it is unchanged.
+function handlerTest(
+	handler: common.typedSimple.MatchHandler,
+	value: estree.Identifier,
+): estree.Expression {
+	let and = (
+		left: estree.Expression,
+		right: estree.Expression,
+	): estree.Expression => ({
+		type: "LogicalExpression",
+		operator: "&&",
+		left,
+		right,
+	})
+
+	let test: estree.Expression
+
+	if (handler.literal !== null) {
+		test = callAnyIs(value, rewriteExpression(handler.literal))
+	} else if (handler.typeTest !== null) {
+		test = rewriteExpression(handler.typeTest)
+	} else {
+		test = callIsValueOfType(value, handler.matcher)
+	}
+
+	// NOTE: The member comparisons come after the Matcher's own check and
+	// rely on `&&` short-circuiting — that check is what guarantees the
+	// value is a Record carrying every member named here, so reading them
+	// is only safe once it has passed.
+	if (handler.memberLiterals !== null) {
+		for (let [name, literal] of Object.entries(handler.memberLiterals)) {
+			test = and(
+				test,
+				callAnyIs(memberRead(value, name), rewriteExpression(literal)),
+			)
+		}
+	}
+
+	if (handler.guard === null) {
+		return test
+	}
+
+	return and(test, valueRead(rewriteExpression(handler.guard)))
+}
+
+// NOTE: The `else` no Handler owns — the one branch taken when every
+// Matcher declined. The Validator has already refused a Match that leaves
+// a member of its Union unhandled, so this is dead code in a Program that
+// compiled clean; it exists because it did NOT used to, and the chain
+// ending in nothing was invisible: the wrapper answered `undefined`, which
+// is not an Essence value, and the Program failed later and elsewhere —
+// with a `TypeError` out of whatever read the missing Type key, or with
+// `undefined` flowing on as if it were a result. It is the innermost
+// `else` rather than a Statement after the chain on purpose: a Handler
+// body is not obliged to return (a Match in Statement position is written
+// for its effects), so a Handler that ran and fell through must NOT reach
+// it.
+function noCaseMatched(value: estree.Identifier): estree.ExpressionStatement {
+	return {
+		type: "ExpressionStatement",
+		expression: {
+			type: "CallExpression",
+			optional: false,
+			callee: memberRead(
+				{ type: "Identifier", name: "$type" },
+				"noCaseMatched",
+			),
+			arguments: [value],
+		},
+	}
+}
+
+// NOTE: `_self` is the name a Match binds the matched value to, and the name
+// `@` lowers to inside a Handler body — one value under one name, so a test
+// written against it reads what the body reads. A fresh Node each time, because
+// a Position may be written onto one of them.
+function selfIdentifier(): estree.Identifier {
+	return { type: "Identifier", name: "_self" }
+}
+
+// NOTE: The chain a Match's Handlers become, and the one place it is built. The
+// Handlers are folded BACK TO FRONT, so that each `if` becomes the `else` of
+// the one before it — the first Handler ends up at the head of the chain and is
+// therefore tested first.
+//
+// NOTE: What the chain ends in, and the Handlers that are tested to reach it.
+// `elide-final-match-test` proved the last Handler is the one taken when every
+// other declined, so its body IS the `else` and the fall-through above is gone
+// with its test — see that pass for what the proof rests on and what it gives
+// up.
+//
+// NOTE: `bodyOf` is what tells the two forms of a Match apart. In an Expression
+// position a Handler's Return Statement is the wrapper Function's Return and the
+// body is emitted as written; in a Statement position it is whatever the
+// Statement's own answer is, and the caller hands in a body that writes it
+// there.
+function matchChain(
+	handlers: Array<common.typedSimple.MatchHandler>,
+	finalHandlerIsElse: boolean,
+	value: estree.Identifier,
+	bodyOf: (handler: common.typedSimple.MatchHandler) => estree.BlockStatement,
+): estree.Statement {
+	let tested = handlers
+	let tail: estree.Statement = {
+		type: "BlockStatement",
+		body: [noCaseMatched(value)],
+	}
+
+	if (finalHandlerIsElse && handlers.length > 0) {
+		tested = handlers.slice(0, -1)
+		tail = bodyOf(handlers.at(-1)!)
+	}
+
+	let ifChain: estree.IfStatement | undefined
+
+	for (let index = tested.length - 1; index >= 0; index--) {
+		let currentHandler = tested[index]!
+
+		ifChain = {
+			type: "IfStatement",
+			test: handlerTest(currentHandler, value),
+			consequent: bodyOf(currentHandler),
+			alternate: ifChain ?? tail,
+		}
+	}
+
+	return ifChain ?? tail
+}
+
+// NOTE: A Match standing in an Expression position, which is the only place
+// JavaScript has no way of saying what a Match says: the chain is Statements,
+// and the one Expression that may hold Statements is a Function call. So the
+// Handlers become the body of a Function of `_self` and the matched value is its
+// Argument — which is also what binds `_self` for the Handlers, shadowing an
+// enclosing one for exactly the length of the chain.
+//
+// NOTE: `lower-matches-to-statements` is what takes the wrapper away wherever
+// the Match stands somewhere a Statement may be written instead.
 function rewriteMatch(
 	node: common.typedSimple.MatchNode,
 ): estree.CallExpression {
-	function callIsValueOfType(
-		value: estree.Expression,
-		matcher: common.Type,
-	): estree.CallExpression {
-		let matcherArgument: estree.ObjectExpression
-
-		// TODO: Handle Record Types
-		matcherArgument = convertObjectToObjectExpression(matcher)
-
-		return {
-			type: "CallExpression",
-			optional: false,
-			callee: {
-				type: "MemberExpression",
-				object: { type: "Identifier", name: "$type" },
-				property: { type: "Identifier", name: "isValueOfType" },
-				optional: false,
-				computed: false,
-			},
-			arguments: [value, matcherArgument],
-		}
-	}
-
-	function callAnyIs(
-		value: estree.Expression,
-		literal: estree.Expression,
-	): estree.CallExpression {
-		return {
-			type: "CallExpression",
-			optional: false,
-			callee: {
-				type: "MemberExpression",
-				object: { type: "Identifier", name: "$helpers" },
-				property: { type: "Identifier", name: "anyIs" },
-				optional: false,
-				computed: false,
-			},
-			arguments: [value, literal],
-		}
-	}
-
-	// NOTE: A literal Matcher needs no Type check in front of it — `anyIs`
-	// already answers false across differing Types. A Guard is ANDed on after
-	// whichever check the Matcher produced, so it only ever narrows.
-	//
-	// NOTE: A Handler carrying a residual test was given one by
-	// `compile-type-tests`, which found something cheaper that answers what the
-	// Matcher's descriptor answers. It reads the value under the same `_self`
-	// this binds, so it goes where the descriptor call would have gone and
-	// everything ANDed on after it is unchanged.
-	function handlerTest(
-		handler: common.typedSimple.MatchHandler,
-		value: estree.Identifier,
-	): estree.Expression {
-		let and = (
-			left: estree.Expression,
-			right: estree.Expression,
-		): estree.Expression => ({
-			type: "LogicalExpression",
-			operator: "&&",
-			left,
-			right,
-		})
-
-		let test: estree.Expression
-
-		if (handler.literal !== null) {
-			test = callAnyIs(value, rewriteExpression(handler.literal))
-		} else if (handler.typeTest !== null) {
-			test = rewriteExpression(handler.typeTest)
-		} else {
-			test = callIsValueOfType(value, handler.matcher)
-		}
-
-		// NOTE: The member comparisons come after the Matcher's own check and
-		// rely on `&&` short-circuiting — that check is what guarantees the
-		// value is a Record carrying every member named here, so reading them
-		// is only safe once it has passed.
-		if (handler.memberLiterals !== null) {
-			for (let [name, literal] of Object.entries(
-				handler.memberLiterals,
-			)) {
-				test = and(
-					test,
-					callAnyIs(
-						memberRead(value, name),
-						rewriteExpression(literal),
-					),
-				)
-			}
-		}
-
-		if (handler.guard === null) {
-			return test
-		}
-
-		return and(test, {
-			type: "MemberExpression",
-			object: rewriteExpression(handler.guard),
-			property: { type: "Identifier", name: "value" },
-			optional: false,
-			computed: false,
-		})
-	}
-
-	// NOTE: The `else` no Handler owns — the one branch taken when every
-	// Matcher declined. The Validator has already refused a Match that leaves
-	// a member of its Union unhandled, so this is dead code in a Program that
-	// compiled clean; it exists because it did NOT used to, and the chain
-	// ending in nothing was invisible: the wrapper answered `undefined`, which
-	// is not an Essence value, and the Program failed later and elsewhere —
-	// with a `TypeError` out of whatever read the missing Type key, or with
-	// `undefined` flowing on as if it were a result. It is the innermost
-	// `else` rather than a Statement after the chain on purpose: a Handler
-	// body is not obliged to return (a Match in Statement position is written
-	// for its effects), so a Handler that ran and fell through must NOT reach
-	// it.
-	function noCaseMatched(
-		value: estree.Identifier,
-	): estree.ExpressionStatement {
-		return {
-			type: "ExpressionStatement",
-			expression: {
-				type: "CallExpression",
-				optional: false,
-				callee: {
-					type: "MemberExpression",
-					object: { type: "Identifier", name: "$type" },
-					property: {
-						type: "Identifier",
-						name: "noCaseMatched",
-					},
-					optional: false,
-					computed: false,
-				},
-				arguments: [value],
-			},
-		}
-	}
-
-	const valueExpression = rewriteExpression(node.value)
-	const selfParameter: estree.Identifier = {
-		type: "Identifier",
-		name: "_self",
-	}
-
-	// NOTE: What the chain ends in, and the Handlers that are tested to reach
-	// it. `elide-final-match-test` proved the last Handler is the one taken
-	// when every other declined, so its body IS the `else` and the
-	// fall-through above is gone with its test — see that pass for what the
-	// proof rests on and what it gives up.
-	let tested = node.handlers
-	let tail: estree.Statement = {
-		type: "BlockStatement",
-		body: [noCaseMatched(selfParameter)],
-	}
-
-	if (node.finalHandlerIsElse && node.handlers.length > 0) {
-		tested = node.handlers.slice(0, -1)
-		tail = rewriteBlockStatement(node.handlers.at(-1)!.body)
-	}
-
-	// NOTE: The Handlers are folded back to front, so that each `if` becomes
-	// the `else` of the one before it — the first Handler ends up at the head
-	// of the chain and is therefore tested first.
-	let ifChain: estree.IfStatement | undefined
-
-	for (let i = tested.length - 1; i >= 0; i--) {
-		const currentHandler = tested[i]
-
-		let ifStatement: estree.IfStatement = {
-			type: "IfStatement",
-			test: handlerTest(currentHandler, selfParameter),
-			consequent: rewriteBlockStatement(currentHandler.body),
-			alternate: ifChain ?? tail,
-		}
-
-		ifChain = ifStatement
-	}
+	let value = selfIdentifier()
 
 	return {
 		type: "CallExpression",
@@ -3506,12 +3519,369 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				body: [ifChain ?? tail],
+				body: [
+					matchChain(
+						node.handlers,
+						node.finalHandlerIsElse,
+						value,
+						(handler) => rewriteBlockStatement(handler.body),
+					),
+				],
 			},
-			params: [selfParameter],
+			params: [value],
 		},
-		arguments: [valueExpression],
+		arguments: [rewriteExpression(node.value)],
 		optional: false,
+	}
+}
+
+// #endregion
+
+// #region Lowered Statements
+
+// NOTE: The Statement half of the intrinsic family — a Match and a compiled
+// Union dispatch written where they stand, with the Function that used to hold
+// their Statements gone. `lower-matches-to-statements` is the one pass that
+// produces these, and everything below is what it means.
+//
+// NOTE: Two Statements come out of exactly one shape: a Variable Declaration.
+// Its name has to outlive the block that computes its value, so the declaration
+// stands before the block and is a `let` — assigned once, by the block, and
+// never again.
+function rewriteIntrinsicStatement(
+	node: common.typedSimple.IntrinsicStatementNode,
+): Array<estree.Statement> {
+	let body = intrinsicStatementBody(node, null)
+
+	if (node.result.kind !== "declaration") {
+		return [body]
+	}
+
+	return [
+		{
+			type: "VariableDeclaration",
+			kind: "let",
+			declarations: [
+				{
+					type: "VariableDeclarator",
+					id: rewriteIdentifier(node.result.name),
+					init: null,
+				},
+			],
+		},
+		body,
+	]
+}
+
+// NOTE: Where a lowered Expression's answer goes, written as the Statement that
+// puts it there.
+function resultStatement(
+	result: common.typedSimple.StatementResult,
+	answer: estree.Expression,
+): estree.Statement {
+	switch (result.kind) {
+		case "return":
+			return { type: "ReturnStatement", argument: answer }
+		case "declaration":
+		case "assignment":
+			return {
+				type: "ExpressionStatement",
+				expression: {
+					type: "AssignmentExpression",
+					operator: "=",
+					left: rewriteIdentifier(result.name),
+					right: answer,
+				},
+			}
+		// NOTE: Evaluated and dropped — through the same rule every discarded
+		// Expression is emitted by, because a Handler may answer with a value as
+		// well as with a call. Where evaluating it observes nothing the pass has
+		// already taken the Return Statement away.
+		case "discard":
+			return discardedExpressionStatement(answer)
+	}
+}
+
+// NOTE: What a lowered Statement standing INSIDE a Handler body is emitted
+// against, when that body's Return Statements are being written somewhere other
+// than a JavaScript Return. A Match in Statement position holds a Match in
+// Return position holds another, and each of them answers the OUTERMOST one's
+// question — so the redirect travels down and the label is the outermost one's.
+type ReturnRedirect = {
+	result: common.typedSimple.StatementResult
+	label: string
+	// NOTE: True only for the LAST Statement of a Handler's own body, where
+	// nothing follows the answer and there is nothing to break out of.
+	isTail: boolean
+	broke: () => void
+}
+
+function intrinsicStatementBody(
+	node: common.typedSimple.IntrinsicStatementNode,
+	redirect: ReturnRedirect | null,
+): estree.Statement {
+	return node.kind === "statement-match"
+		? statementMatch(node, redirect)
+		: heldExpression(node, redirect)
+}
+
+// NOTE: `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
+// dispatch holds, as the `const`s of a block. The block is what keeps one
+// chain's names its own: they are numbered from zero per chain, so two chains
+// lifted into one Scope would otherwise declare one name twice.
+function heldExpression(
+	node: common.typedSimple.HeldExpressionNode,
+	redirect: ReturnRedirect | null,
+): estree.Statement {
+	let result = redirect === null ? node.result : redirect.result
+	let answer = resultStatement(result, rewriteExpression(node.expression))
+
+	return {
+		type: "BlockStatement",
+		body: [
+			...node.temporaries.map(
+				(temporary): estree.Statement => ({
+					type: "VariableDeclaration",
+					kind: "const",
+					declarations: [
+						{
+							type: "VariableDeclarator",
+							id: { type: "Identifier", name: temporary.name },
+							init: rewriteExpression(temporary.value),
+						},
+					],
+				}),
+			),
+			answer,
+			...breakOut(redirect),
+		],
+	}
+}
+
+// NOTE: A Match written as the Statements it always was. What the three
+// bindings mean is stated where they are declared; what is common to them is
+// that `_self` names the matched value for the length of the chain and for
+// nothing else.
+function statementMatch(
+	node: common.typedSimple.StatementMatchNode,
+	redirect: ReturnRedirect | null,
+): estree.Statement {
+	let result = redirect === null ? node.result : redirect.result
+	let label = redirect === null ? node.label : redirect.label
+	let broke = false
+	// NOTE: A redirected Match breaks out of the label its redirect names, which
+	// is the OUTER Match's — so it is the outer Match that has to hear about it,
+	// and the flag below stays false.
+	let markBroke =
+		redirect === null
+			? (): void => {
+					broke = true
+				}
+			: redirect.broke
+	let value = selfIdentifier()
+	let bodyOf = (
+		handler: common.typedSimple.MatchHandler,
+	): estree.BlockStatement =>
+		result.kind === "return"
+			? rewriteBlockStatement(handler.body)
+			: {
+					type: "BlockStatement",
+					body: withNamespaceScope(() =>
+						redirectedStatements(handler.body, {
+							result,
+							label,
+							// NOTE: A Handler's last Statement is the end of its
+							// branch, and the `if` chain is the end of the block
+							// — so its answer needs nothing after it. Unless this
+							// Match is itself inside a Handler being redirected
+							// somewhere that is NOT the end of ITS body, where
+							// the rest of that body follows the chain.
+							isTail: redirect === null || redirect.isTail,
+							broke: markBroke,
+						}),
+					),
+				}
+
+	let chain = matchChain(
+		node.handlers,
+		node.finalHandlerIsElse,
+		value,
+		bodyOf,
+	)
+	let body = boundChain(node, chain, value)
+
+	// NOTE: The label is emitted only where something breaks out of it, which is
+	// where a Handler answered somewhere other than its last Statement. A
+	// redirected Match breaks out of the label its redirect names, and that one
+	// is the outer Match's to declare.
+	if (!broke || redirect !== null) {
+		return body
+	}
+
+	return {
+		type: "LabeledStatement",
+		label: { type: "Identifier", name: label },
+		body,
+	}
+}
+
+// NOTE: The chain with the matched value bound in front of it, in as few blocks
+// as the binding needs.
+function boundChain(
+	node: common.typedSimple.StatementMatchNode,
+	chain: estree.Statement,
+	value: estree.Identifier,
+): estree.Statement {
+	if (node.binding.kind === "self") {
+		return chain
+	}
+
+	let bind = (
+		id: estree.Identifier,
+		init: estree.Expression,
+	): estree.Statement => ({
+		type: "VariableDeclaration",
+		kind: "const",
+		declarations: [{ type: "VariableDeclarator", id, init }],
+	})
+
+	if (node.binding.kind === "block") {
+		return {
+			type: "BlockStatement",
+			body: [bind(value, rewriteExpression(node.value)), chain],
+		}
+	}
+
+	let held: estree.Identifier = {
+		type: "Identifier",
+		name: node.binding.name,
+	}
+
+	return {
+		type: "BlockStatement",
+		body: [
+			bind(held, rewriteExpression(node.value)),
+			{
+				type: "BlockStatement",
+				body: [bind(value, held), chain],
+			},
+		],
+	}
+}
+
+function breakOut(redirect: ReturnRedirect | null): Array<estree.Statement> {
+	if (redirect === null || redirect.isTail) {
+		return []
+	}
+
+	redirect.broke()
+
+	return [
+		{
+			type: "BreakStatement",
+			label: { type: "Identifier", name: redirect.label },
+		},
+	]
+}
+
+// NOTE: A Handler's body, with every Return Statement in it written where the
+// lowered Statement's answer goes instead. Only three kinds of Statement can
+// hold one: a Return itself, a Conditional's bodies, and a lowered Statement
+// that answers with a Return of its own. Everything else is emitted exactly as
+// it always is — a Function declared inside a Handler has Returns of its own and
+// they are ITS Returns, which is why this descends by name rather than by
+// searching.
+function redirectedStatements(
+	nodes: Array<common.typedSimple.ImplementationNode>,
+	redirect: ReturnRedirect,
+): Array<estree.Statement> {
+	return nodes.flatMap((node, index) =>
+		redirectedStatement(node, {
+			...redirect,
+			isTail: redirect.isTail && index === nodes.length - 1,
+		}),
+	)
+}
+
+function redirectedStatement(
+	node: common.typedSimple.ImplementationNode,
+	redirect: ReturnRedirect,
+): Array<estree.Statement> {
+	switch (node.nodeType) {
+		case "ReturnStatement":
+			return withStatementLocation(
+				[
+					resultStatement(
+						redirect.result,
+						rewriteExpression(node.expression),
+					),
+					...breakOut(redirect),
+				],
+				node.position,
+			)
+		case "ConditionalStatement":
+			return withStatementLocation(
+				[redirectedConditional(node, redirect)],
+				node.position,
+			)
+		case "IntrinsicStatement":
+			// NOTE: A lowered Statement answering with a Return of its own is
+			// answering THIS Match — it stood in the Return position of a Handler
+			// body. One that answers a name of its own is answering that name,
+			// and is emitted as it stands.
+			if (node.result.kind === "return") {
+				return withStatementLocation(
+					[intrinsicStatementBody(node, redirect)],
+					node.position,
+				)
+			}
+
+			break
+		default:
+			break
+	}
+
+	return rewriteStatements(node)
+}
+
+// NOTE: A branch of a Conditional is in tail position exactly where the
+// Conditional is: an answer written at the end of a branch of a Conditional that
+// ends the Handler body has nothing after it either, in the branch or after the
+// `if`.
+function redirectedConditional(
+	node: common.typedSimple.ConditionalStatementNode,
+	redirect: ReturnRedirect,
+): estree.IfStatement {
+	let nested = redirect
+	let block = (
+		nodes: Array<common.typedSimple.ImplementationNode>,
+	): estree.BlockStatement => ({
+		type: "BlockStatement",
+		body: withNamespaceScope(() => redirectedStatements(nodes, nested)),
+	})
+	let alternate: estree.Statement | null = null
+
+	if (node.falseBody.length > 0) {
+		if (
+			node.falseBody.length === 1 &&
+			node.falseBody[0].nodeType === "ConditionalStatement"
+		) {
+			let inner = node.falseBody[0]
+
+			alternate = withStatementLocation(
+				[redirectedConditional(inner, nested)],
+				inner.position,
+			)[0]!
+		} else {
+			alternate = block(node.falseBody)
+		}
+	}
+
+	return {
+		type: "IfStatement",
+		test: valueRead(rewriteExpression(node.condition)),
+		consequent: block(node.trueBody),
+		alternate,
 	}
 }
 
@@ -3530,7 +3900,7 @@ function rewriteBlockStatement(
 		// sibling Function beside it keep calling the runtime's List.
 		body: withNamespaceScope(() =>
 			nodes
-				.map((node) => rewriteStatement(node))
+				.flatMap((node) => rewriteStatements(node))
 				.filter((value) => !!value),
 		),
 	}
