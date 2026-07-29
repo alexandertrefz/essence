@@ -18,7 +18,11 @@ import {
 	useStdlib,
 } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+} from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import {
 	checkEssenceMethodsAreDeclared,
@@ -47,7 +51,11 @@ import { validate } from "../validator/index"
 // NOTE: `modulePath` enriches the source as a Module, which identifies its
 // Choices by that path — left out, the Program is no Module and its Cases carry
 // the bare tags every other test here asserts on.
-function generate(source: string, modulePath?: string): string {
+function generate(
+	source: string,
+	modulePath?: string,
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -60,7 +68,10 @@ function generate(source: string, modulePath?: string): string {
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
-	return rewrite(optimise(simplify(enriched.program)))
+	return rewrite(
+		optimise(simplify(enriched.program), optimiserOptions),
+		optimiserOptions,
+	)
 }
 
 // NOTE: Emits the Program, writes it to a throwaway module and imports it so
@@ -299,7 +310,7 @@ describe("Code Generation", () => {
 		})
 
 		it("nests the Handlers so that each one is the alternate of the last", () => {
-			let generated = generate(`
+			const source = `
 				implementation {
 					variable value: Integer | Rational | Boolean = true
 
@@ -309,14 +320,28 @@ describe("Code Generation", () => {
 						case Boolean  { <- "c" }
 					})
 				}
-			`)
+			`
 
 			// NOTE: Three Handlers produce one `if` plus two `else` branches,
 			// and the chain ends in a third `else` that no Handler owns — the
 			// exhaustiveness fallback, which throws rather than letting the
-			// wrapper answer `undefined`.
+			// wrapper answer `undefined`. Asked with `elide-final-match-test`
+			// off, which is the pass that proves the last Handler IS that
+			// third `else` and emits it there.
+			let generated = generate(source, undefined, {
+				enabled: true,
+				disabledPasses: new Set(["elide-final-match-test"]),
+			})
+
 			expect(generated.split("else").length - 1).toBe(3)
 			expect(generated).toContain("$type.noCaseMatched(_self)")
+
+			// NOTE: And with it on, the same chain is two `else`s and no
+			// fallback — the nesting itself is unchanged.
+			let elided = generate(source)
+
+			expect(elided.split("else").length - 1).toBe(2)
+			expect(elided).not.toContain("$type.noCaseMatched(_self)")
 		})
 
 		// NOTE: Regression test — a Union Matcher used to be serialised with

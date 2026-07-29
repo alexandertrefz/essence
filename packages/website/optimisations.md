@@ -118,6 +118,42 @@ most: `isLessThan` is `compare(to other)::is(#Less)`, and the other three
 inequalities are written on that, so every comparison in every Program ends in
 this shape.
 
+### `elide-final-match-test`
+
+Emits the last Handler of a Match as the `else` of the chain.
+
+A Match that compiles is EXHAUSTIVE — the Validator refuses one that leaves a
+member of its Union unhandled, and a Guarded Handler never counts toward that —
+so an unguarded last Handler is what runs when every Handler before it declined.
+Its test is a question with one possible answer, and the `else` after it, which
+throws to name a Compiler bug, is unreachable:
+
+```js
+if (…) { … } else if (…) { … } else { /* the last Handler's body */ }
+```
+
+What is given up is that bug's name. `$type.noCaseMatched` is reached only when
+a Matcher's runtime check disagrees with the Type the Enricher gave it — never
+through a Program's own fault — and it throws saying which value fell through.
+With the last test elided such a value takes the last Handler instead, silently.
+That is the trade, and it is why this is a pass rather than the way a Match is
+emitted: **a Compiler developer chasing a Match that answers the wrong thing
+should build with `--without-optimisation elide-final-match-test`**, which puts
+every test and every fall-through back.
+
+The elision is therefore taken only where the last Handler's check is decided by
+TAGS — where it would be a key comparison, or where it asks nothing at all (a
+wildcard). That is deliberately narrower than exhaustiveness allows, and it is
+exactly where the disagreement above can not come from: a check that could not be
+reduced to a tag is one that walks a payload or a List's items, which is where
+erasure makes the runtime answer and the static Type part company. Those chains
+keep both their test and their fall-through.
+
+A Guard, a literal Matcher (`case 0`) or member literals (`case { x = 0 }`) all
+leave a last Handler that can decline for reasons no exhaustiveness argument
+covers — a Guard is a Program's own Boolean — so a Handler carrying any of them
+is tested exactly as it was.
+
 ### `collapse-construction`
 
 Builds a Record, a Case or a List in one allocation.

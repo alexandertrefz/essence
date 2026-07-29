@@ -198,7 +198,7 @@ describe("Code Generation — Naming and Escaping", () => {
 			// Matchers that can not be compiled keep — and both have to be the
 			// IMPORT.
 			expect(generated).toContain(
-				'_self[$type.typeKeySymbol] === "String"',
+				'_self[$type.typeKeySymbol] === "Integer"',
 			)
 			expect(generate(source, withoutCompiledTypeTests)).toContain(
 				"$type.isValueOfType(",

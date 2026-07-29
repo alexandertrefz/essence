@@ -289,6 +289,12 @@ export interface MatchNode {
 	nodeType: "Match"
 	value: ExpressionNode
 	handlers: Array<MatchHandler>
+	// NOTE: That the LAST Handler is the one that runs when every Handler
+	// before it declined — `elide-final-match-test` proved it, so the Rewriter
+	// emits its body as the `else` of the chain rather than testing it and
+	// following it with the fall-through that names a Compiler bug. False is
+	// the Simplifier's own answer.
+	finalHandlerIsElse: boolean
 	type: Type
 	position?: Position
 }

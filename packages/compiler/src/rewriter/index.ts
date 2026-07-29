@@ -2840,22 +2840,35 @@ function rewriteMatch(
 		name: "_self",
 	}
 
+	// NOTE: What the chain ends in, and the Handlers that are tested to reach
+	// it. `elide-final-match-test` proved the last Handler is the one taken
+	// when every other declined, so its body IS the `else` and the
+	// fall-through above is gone with its test — see that pass for what the
+	// proof rests on and what it gives up.
+	let tested = node.handlers
+	let tail: estree.Statement = {
+		type: "BlockStatement",
+		body: [noCaseMatched(selfParameter)],
+	}
+
+	if (node.finalHandlerIsElse && node.handlers.length > 0) {
+		tested = node.handlers.slice(0, -1)
+		tail = rewriteBlockStatement(node.handlers.at(-1)!.body)
+	}
+
 	// NOTE: The Handlers are folded back to front, so that each `if` becomes
 	// the `else` of the one before it — the first Handler ends up at the head
 	// of the chain and is therefore tested first.
 	let ifChain: estree.IfStatement | undefined
 
-	for (let i = node.handlers.length - 1; i >= 0; i--) {
-		const currentHandler = node.handlers[i]
+	for (let i = tested.length - 1; i >= 0; i--) {
+		const currentHandler = tested[i]
 
 		let ifStatement: estree.IfStatement = {
 			type: "IfStatement",
 			test: handlerTest(currentHandler, selfParameter),
 			consequent: rewriteBlockStatement(currentHandler.body),
-			alternate: ifChain ?? {
-				type: "BlockStatement",
-				body: [noCaseMatched(selfParameter)],
-			},
+			alternate: ifChain ?? tail,
 		}
 
 		ifChain = ifStatement
@@ -2867,7 +2880,7 @@ function rewriteMatch(
 			type: "FunctionExpression",
 			body: {
 				type: "BlockStatement",
-				body: [ifChain ?? noCaseMatched(selfParameter)],
+				body: [ifChain ?? tail],
 			},
 			params: [selfParameter],
 		},

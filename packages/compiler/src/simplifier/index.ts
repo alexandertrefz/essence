@@ -572,6 +572,10 @@ function simplifyMatch(
 				}
 			}),
 		),
+		// NOTE: Every Handler is tested, and the chain ends in the
+		// fall-through that names a Compiler bug — until an Optimiser pass can
+		// say which Handler the end of the chain IS.
+		finalHandlerIsElse: false,
 		type: node.type,
 		position: node.position,
 	}

@@ -7,7 +7,11 @@ import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+} from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
@@ -16,7 +20,10 @@ import { validate } from "../validator/index"
 // NOTE: The same stages the CLI runs, minus bundling — a Match is lowered to
 // an emitted `if` chain, and both halves of what it does wrong are only
 // visible once that chain RUNS, so these go all the way through.
-function generate(source: string): string {
+function generate(
+	source: string,
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -26,7 +33,10 @@ function generate(source: string): string {
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
-	return rewrite(optimise(simplify(enriched.program)))
+	return rewrite(
+		optimise(simplify(enriched.program), optimiserOptions),
+		optimiserOptions,
+	)
 }
 
 // NOTE: Writes the emitted Program to a throwaway module and imports it so its
@@ -236,12 +246,41 @@ describe("Match Lowering", () => {
 	// Type key next.
 	describe("Exhaustiveness fallback", () => {
 		it("ends the emitted chain in an else no Handler owns", () => {
+			// NOTE: Asked with `elide-final-match-test` off, because that pass
+			// is the considered decision to give this up: it proves the last
+			// Handler is what the end of the chain IS, so the fallback goes
+			// with its test. What is pinned here is what the chain ends in when
+			// no such proof has been taken — which is every Match whose last
+			// Handler is Guarded, matches a literal, or asks something no tag
+			// answers.
+			let generated = generate(
+				`implementation {
+					constant scrutinee: Integer | String = 5
+
+					__print(match scrutinee -> String {
+						case Integer { <- "an Integer" }
+						case String { <- "a String" }
+					})
+				}`,
+				{
+					enabled: true,
+					disabledPasses: new Set(["elide-final-match-test"]),
+				},
+			)
+
+			expect(generated).toContain("$type.noCaseMatched(_self)")
+		})
+
+		it("keeps the fallback where the last Handler can decline", () => {
+			// NOTE: A Record Matcher asks about members rather than a tag, so
+			// the elision does not apply and the chain ends where it always
+			// did — under the ordinary, fully optimised build.
 			let generated = generate(`implementation {
-				constant scrutinee: Integer | String = 5
+				constant scrutinee: { x: Integer } | String = "text"
 
 				__print(match scrutinee -> String {
-					case Integer { <- "an Integer" }
 					case String { <- "a String" }
+					case { x: Integer } { <- "a Record" }
 				})
 			}`)
 
