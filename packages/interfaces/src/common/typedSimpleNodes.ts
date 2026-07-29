@@ -288,15 +288,28 @@ export interface CombinationNode {
 export interface MatchNode {
 	nodeType: "Match"
 	value: ExpressionNode
-	handlers: Array<{
-		matcher: Type
-		literal: ExpressionNode | null
-		memberLiterals: Record<string, ExpressionNode> | null
-		guard: ExpressionNode | null
-		body: Array<ImplementationNode>
-	}>
+	handlers: Array<MatchHandler>
 	type: Type
 	position?: Position
+}
+
+export type MatchHandler = {
+	matcher: Type
+	// NOTE: What this Handler's Matcher tests, when the Optimiser has worked
+	// out something cheaper than the Matcher's own descriptor —
+	// `compile-type-tests` puts a raw test here and the Rewriter emits it in
+	// place of `$type.isValueOfType(_self, <descriptor>)`. Null is the
+	// Simplifier's own answer and the full check.
+	//
+	// NOTE: It is a RAW JavaScript boolean, like every intrinsic that stands in
+	// a test position, and it reads the Handler's value under the name the
+	// Rewriter binds it to: `_self`, which is the same Identifier `@` lowers to
+	// inside the body.
+	typeTest: ExpressionNode | null
+	literal: ExpressionNode | null
+	memberLiterals: Record<string, ExpressionNode> | null
+	guard: ExpressionNode | null
+	body: Array<ImplementationNode>
 }
 
 // #endregion

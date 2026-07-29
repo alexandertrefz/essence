@@ -40,6 +40,47 @@ pass added later is inserted where it belongs rather than appended.
 
 ## Passes
 
+### `compile-type-tests`
+
+Answers a Match Handler's Type question by reading the value's tag.
+
+Every value carries a hidden key saying what kind of thing it is — `"Integer"`,
+`"List"`, `"Optional#Value"` — and a Match asked about it in the most general way
+there is. `case #Value(count)` compiled to a descriptor built at the test site and
+handed to a function that walks its ladder of kind tests to find the arm to take,
+reads the tag, and then walks the payload comparing member Types the Compiler
+chose the descriptor from. Where the tag decides, the tag is what is emitted:
+
+```js
+_self[$type.typeKeySymbol] === "Optional#Value"
+```
+
+For a List Matcher this is a change of complexity rather than of constant factor.
+A `List<Integer>` descriptor means "a List, every item of which is an Integer",
+so the runtime check walked EVERY ITEM — `case List` over ten thousand items was
+ten thousand Type checks — and a Match inside a loop paid it per turn.
+
+Safe because the Compiler knows what can arrive. The value's static Type says
+which member Types reach the Match, and the tag is compiled in only where exactly
+ONE of them carries the tag being asked about and that member satisfies the
+Matcher's check outright. Where two members share a tag — `List<Alpha> |
+List<Beta>` are both `"List"`, `Box<Integer>#Holding` and `Box<String>#Holding`
+are both `"Box#Holding"` — the payload is what tells them apart and the full check
+stays. So does a Matcher naming an erased position the Compiler can not see into:
+a Type Parameter or an `Unknown` among the members refuses the question outright,
+because a value of one can be anything, including something carrying the very tag
+being asked about.
+
+Record Matchers keep their descriptor check for now. A Record's tag says only
+that the value is a Record, and a Match over Records distinguishes them by their
+MEMBERS — which is a decision tree over the discriminating members rather than a
+tag test, and a pass of its own that has not been written.
+
+Literal Matchers (`case 0`) are untouched: `anyIs` is their whole test and it
+answers false across differing Types on its own. Member literals and Guards are
+untouched too — they are ANDed onto whichever test the Matcher produced, so
+replacing the Matcher's half leaves them saying what they said.
+
 ### `lower-unit-case-equality`
 
 Compares a Choice with one of its payload-less Cases by reading its tag.

@@ -49,6 +49,11 @@ const withoutLoweredUnitCaseEquality: OptimiserOptions = {
 	disabledPasses: new Set(["lower-unit-case-equality"]),
 }
 
+const withoutCompiledTypeTests: OptimiserOptions = {
+	enabled: true,
+	disabledPasses: new Set(["compile-type-tests"]),
+}
+
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -3382,18 +3387,31 @@ describe("Choices", () => {
 		})
 
 		it("emits nominal Case Matchers", () => {
-			let generated = generate(`implementation { ${calculatorChoice}
+			const source = `implementation { ${calculatorChoice}
 				constant operation: CalculatorOperation = CalculatorOperation#ClearAll
 
 				__print(match operation -> Integer {
 					case #Add { <- @.left }
 					case _ { <- 0 }
 				})
-			}`)
+			}`
 
-			expect(generated).toContain('type: "Case"')
-			expect(generated).toContain('choice: "CalculatorOperation"')
-			expect(generated).toContain('name: "Add"')
+			// NOTE: Nominal, and by the tag alone — the Choice and the Case are
+			// what the value was stamped with, and `compile-type-tests` proved
+			// the stamp is the whole question here: `#Add` is the only member of
+			// this Choice carrying that tag, and its payload is Integers the
+			// Matcher does not narrow.
+			expect(generate(source)).toContain(
+				'_self[$type.typeKeySymbol] === "CalculatorOperation#Add"',
+			)
+
+			// NOTE: The same nominal question as the descriptor the runtime
+			// walks, with the pass that compiles it away turned off.
+			let unoptimised = generate(source, withoutCompiledTypeTests)
+
+			expect(unoptimised).toContain('type: "Case"')
+			expect(unoptimised).toContain('choice: "CalculatorOperation"')
+			expect(unoptimised).toContain('name: "Add"')
 		})
 
 		it("erases the Choice Declaration itself", () => {

@@ -2738,8 +2738,14 @@ function rewriteMatch(
 	// NOTE: A literal Matcher needs no Type check in front of it — `anyIs`
 	// already answers false across differing Types. A Guard is ANDed on after
 	// whichever check the Matcher produced, so it only ever narrows.
+	//
+	// NOTE: A Handler carrying a residual test was given one by
+	// `compile-type-tests`, which found something cheaper that answers what the
+	// Matcher's descriptor answers. It reads the value under the same `_self`
+	// this binds, so it goes where the descriptor call would have gone and
+	// everything ANDed on after it is unchanged.
 	function handlerTest(
-		handler: common.typedSimple.MatchNode["handlers"][number],
+		handler: common.typedSimple.MatchHandler,
 		value: estree.Identifier,
 	): estree.Expression {
 		let and = (
@@ -2752,10 +2758,15 @@ function rewriteMatch(
 			right,
 		})
 
-		let test: estree.Expression =
-			handler.literal === null
-				? callIsValueOfType(value, handler.matcher)
-				: callAnyIs(value, rewriteExpression(handler.literal))
+		let test: estree.Expression
+
+		if (handler.literal !== null) {
+			test = callAnyIs(value, rewriteExpression(handler.literal))
+		} else if (handler.typeTest !== null) {
+			test = rewriteExpression(handler.typeTest)
+		} else {
+			test = callIsValueOfType(value, handler.matcher)
+		}
 
 		// NOTE: The member comparisons come after the Matcher's own check and
 		// rely on `&&` short-circuiting — that check is what guarantees the
