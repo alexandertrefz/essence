@@ -12,6 +12,7 @@ import { lowerMatchesToStatements } from "./passes/lowerMatchesToStatements"
 import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
 import { poolConstants } from "./passes/poolConstants"
+import { pruneDeadMatchArms } from "./passes/pruneDeadMatchArms"
 
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
@@ -72,6 +73,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	lowerMatchesToStatements,
 	inlineLoops,
 	foldConstants,
+	pruneDeadMatchArms,
 	elideFinalMatchTest,
 	collapseConstruction,
 	collapseCombinations,

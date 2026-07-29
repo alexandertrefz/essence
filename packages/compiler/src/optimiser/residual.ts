@@ -14,6 +14,13 @@ import type { common } from "@essence-lang/interfaces"
 // three can not drift apart — which matters, because two of them REMOVE a check
 // on the strength of what the third emits.
 //
+// NOTE: A fourth pass asks the opposite question of the same rules —
+// `prune-dead-match-arms` reads `matcherIsRefuted` below, which proves a check
+// FALSE rather than reducing it. It is written here rather than beside that pass
+// for the same reason the three above share one function: what a Matcher can and
+// can not accept is one reading of `isValueOfType`, and two readings would be
+// two chances to disagree with it.
+//
 // NOTE: Conservative in one direction only. Every rule here narrows a check the
 // runtime would have performed to a cheaper one that answers the same, and where
 // the Compiler can not prove the two agree it says `descriptor` and the full
@@ -82,6 +89,84 @@ export function matcherResidualOverMembers(
 	}
 
 	return { kind: "descriptor" }
+}
+
+// NOTE: The question from the other side: whether `isValueOfType(value,
+// matcher)` answers FALSE for every value that can arrive — the Matcher not
+// merely failing to be implied, but unable to accept anything at all. A Match
+// Handler whose Matcher is refuted is one that can never run, which the
+// Validator has already reported as `unreachable-case`, and
+// `prune-dead-match-arms` is what takes it out of the chain.
+//
+// NOTE: It is asked separately from `matcherResidual` rather than added to it as
+// a fourth answer, so that the three passes reading that function keep reading
+// exactly what they read before: a refuted Matcher still compiles to the test it
+// always compiled to, and the arm is dropped by the pass whose question this is.
+export function matcherIsRefuted(
+	matcher: common.Type,
+	valueType: common.Type,
+): boolean {
+	let members = unionMembersOf(valueType)
+
+	// NOTE: No members is no argument. A Union always has some, and a Type that
+	// is not one is its own member, so this is unreachable — and answering
+	// `true` for it would be answering "nothing can arrive" for a value the
+	// Compiler simply could not enumerate.
+	return (
+		members.length > 0 &&
+		members.every((member) => checkIsRefuted(matcher, member))
+	)
+}
+
+// NOTE: What refutation rests on, and the whole of it: `isValueOfType` compares
+// the value's hidden Type key FIRST in every arm it has, and a value of a Type
+// whose tag the Compiler can name carries that tag and no other. So two tags
+// that differ are a check that fails before it looks at anything else.
+//
+// NOTE: Everything the Compiler can not name a tag for answers `false` — not
+// refuted — which is where erasure is answered from this side. A Type Parameter
+// or an `Unknown` stands for a value of any kind, and a Matcher that accepts
+// every value without looking (`case _`, a Generic Matcher) refutes nothing at
+// all.
+//
+// NOTE: Two Types SHARING a tag are not refuted either, and that is not a
+// conservatism this could be tightened out of: `List<Alpha>` and `List<Beta>`
+// are both `"List"` and the empty List passes both, `Box<Integer>#Holding` and
+// `Box<String>#Holding` are both `"Box#Holding"`, and two Records differing in
+// their members are both `"Record"`. What tells any of those apart is a walk of
+// the value, which is a question about the value rather than about its Type.
+function checkIsRefuted(matcher: common.Type, valueType: common.Type): boolean {
+	if (matcher.type === "Unknown" || matcher.type === "GenericUse") {
+		return false
+	}
+
+	// NOTE: The value's own Union first, where EVERY member has to be refuted
+	// because any of them may arrive. The Matcher's Union after it, where every
+	// arm has to be — `isValueOfType` asks `some` of a Union descriptor, so one
+	// arm that could accept is the whole Matcher accepting.
+	if (valueType.type === "UnionType") {
+		return valueType.types.every((member) =>
+			checkIsRefuted(matcher, member),
+		)
+	}
+
+	if (matcher.type === "UnionType") {
+		return matcher.types.every((member) =>
+			checkIsRefuted(member, valueType),
+		)
+	}
+
+	// NOTE: The tag a value of each Type CARRIES, on both sides — and not
+	// `lowerableTagOf`, which is a narrower question about what a Matcher may
+	// be REWRITTEN to. A Record Matcher can not be lowered to a tag test,
+	// because every Record carries the same tag and the members are what
+	// decide; but a Record Matcher asked about an Integer is refused by that
+	// very tag, before any member is looked at. The same holds for a Function
+	// Matcher, whose check is `typeof` — no value carrying a Type key is one.
+	let matcherTag = runtimeTagOf(matcher)
+	let valueTag = runtimeTagOf(valueType)
+
+	return matcherTag !== null && valueTag !== null && matcherTag !== valueTag
 }
 
 // NOTE: The hidden Type key a value of this Type carries — what
