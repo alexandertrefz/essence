@@ -404,6 +404,13 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain("$es_List_firstItem")
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 
+			// NOTE: And with the collapse off, where the literal names the
+			// import again — the shape the scoping rule is actually about, in
+			// the Function whose block the user's `List` closed inside.
+			expect(generate(source, withoutCollapsedConstruction)).toMatch(
+				/\bList\.createList\(/,
+			)
+
 			expect(await run(source)).toEqual(["1", "42"])
 		})
 
@@ -482,6 +489,14 @@ describe("Code Generation — Naming and Escaping", () => {
 			// key a collapsed List literal brands itself with.
 			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).toMatch(/\bString\.createString\(/)
+
+			// NOTE: The List literal names its Namespace again with the
+			// collapse off, and it is still the import it names — beside a
+			// `class $user_List` holding a static Method of its own, which is
+			// the collision this Program is built out of.
+			expect(generate(source, withoutCollapsedConstruction)).toMatch(
+				/\bList\.createList\(/,
+			)
 
 			expect(await run(source)).toEqual(["[ 1, 2 ]", "0", "2"])
 		})

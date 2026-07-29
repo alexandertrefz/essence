@@ -1626,15 +1626,29 @@ describe("the optimisation Options", () => {
 		}
 	}
 
-	// NOTE: The runtime constructors are read off the BUNDLE, where esbuild has
-	// inlined the runtime — so a Program that has stopped calling one takes the
-	// function with it, and the flag's effect is visible as an absence.
+	// NOTE: An absence is only the Program's to answer for inside the Program's
+	// own emission. What is read back is the whole BUNDLE — the runtime esbuild
+	// inlined ahead of it — and a runtime Method that builds a List goes on
+	// calling `createList` however the Program was compiled, so a bundle-wide
+	// absence is a claim about which runtime Methods this fixture happens to
+	// reach rather than about the Optimiser. esbuild labels each inlined module
+	// with its path and emits the entry last, so the Essence source's own
+	// emission is everything past the final label.
+	function userModuleOf(emitted: string): string {
+		let start = emitted.lastIndexOf("// essence:")
+
+		expect(start).toBeGreaterThan(-1)
+
+		return emitted.slice(start)
+	}
+
 	it("optimises when nothing is said", async () => {
 		let { emitted } = await build(undefined)
+		let program = userModuleOf(emitted)
 
-		expect(emitted).not.toContain("createRecord(")
-		expect(emitted).not.toContain("createList(")
-		expect(emitted).not.toContain("Object.assign(")
+		expect(program).not.toContain("createRecord(")
+		expect(program).not.toContain("createList(")
+		expect(program).not.toContain("Object.assign(")
 	})
 
 	it("emits the Program as written with the phase off", async () => {
@@ -1658,8 +1672,9 @@ describe("the optimisation Options", () => {
 		})
 
 		expect(partial.emitted).toContain("createRecord(")
-		// NOTE: The pass that was NOT named still ran.
-		expect(partial.emitted).not.toContain("Object.assign(")
+		// NOTE: The pass that was NOT named still ran — read off the Program's
+		// own emission for the same reason as above.
+		expect(userModuleOf(partial.emitted)).not.toContain("Object.assign(")
 		expect(partial.printed).toEqual(optimised.printed)
 	})
 })

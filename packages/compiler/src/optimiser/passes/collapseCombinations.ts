@@ -11,11 +11,22 @@ import { rewriteExpressions } from "../walk"
 // NOTE: The two are the same operation on the values this language has.
 // `Object.assign` copies own enumerable properties, Symbol keys included, in
 // their own order, with a later source overwriting an earlier one — and object
-// spread copies exactly the same set in exactly the same order. Neither reaches
-// a prototype, and no runtime value has a getter or a setter to tell the
-// [[Set]] `Object.assign` uses from the plain definition a spread makes. So the
-// combined Record holds the same members, keyed in the same order, and carries
-// the hidden Type key it inherits from the left-hand side either way.
+// spread copies exactly the same set in exactly the same order. Neither form
+// reads through a SOURCE's prototype, and no runtime value has a getter or a
+// setter to tell the [[Set]] `Object.assign` uses from the plain definition a
+// spread makes — the [[Set]] could find a setter on the TARGET's prototype
+// chain, and the target is a fresh object literal in both forms. So the
+// combined Record holds the same members, keyed in the same order.
+//
+// NOTE: What the two forms do NOT share is where the hidden Type key comes
+// from. `Object.assign({}, lhs, rhs)` copied it from whichever source carried
+// it last — the right-hand side, a Record built for the occasion — so the
+// answer was branded no matter what the left-hand side was. A spread of `lhs`
+// inherits the left-hand side's brand instead, which is only the same answer
+// while the left-hand side IS a Record. It always is: the Enricher refuses a
+// Combination whose left-hand side is anything else ('uncombinable-types').
+// The guard below is there so that a day on which that stops being true costs
+// an optimisation rather than a mis-branded value.
 
 export const collapseCombinations: OptimiserPass = {
 	name: "collapse-combinations",
@@ -26,6 +37,13 @@ function collapse(
 	node: common.typedSimple.ExpressionNode,
 ): common.typedSimple.ExpressionNode {
 	if (node.nodeType !== "Combination") {
+		return node
+	}
+
+	// NOTE: The brand the answer carries is the left-hand side's, so a
+	// left-hand side that is not statically a Record keeps the `Object.assign`
+	// emission, which brands from the right instead and is right either way.
+	if (node.lhs.type.type !== "Record") {
 		return node
 	}
 

@@ -144,6 +144,7 @@
       "name": "@essence-lang/website",
       "version": "0.0.1",
       "devDependencies": {
+        "@essence-lang/compiler": "workspace:*",
         "@essence-lang/interfaces": "workspace:*",
       },
     },

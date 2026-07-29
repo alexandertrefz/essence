@@ -6,9 +6,12 @@ import type { common } from "@essence-lang/interfaces"
 // position is not a crash: it is an optimisation that silently does not happen
 // where it was written to, and, once passes begin rewriting into intrinsics
 // that later passes read, a Node the walk does not reach is a Node a pass can
-// not fix up either. So the switches below are exhaustive rather than
-// defaulting, and TypeScript refuses a Node kind added to `typedSimple` that
-// nothing here descends into.
+// not fix up either. So every kind is handled by name: the Expression and
+// intrinsic switches are exhaustive and answer nothing by default, and the
+// Statement switch names each Statement kind before falling through to the
+// Expressions — which is what makes a Statement kind added to `typedSimple`
+// a compile error, since the fall-through narrows to `ExpressionNode` and a
+// Statement is not one.
 //
 // NOTE: The walk is BOTTOM-UP: a Node's children are rewritten before the Node
 // itself is offered to the pass, so a pass reading its own output reads the
