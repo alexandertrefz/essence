@@ -366,8 +366,12 @@ class DescentParser {
 		})
 	}
 
+	// NOTE: `parseNativeSigilName` rather than `parseIdentifier`, because
+	// `__print` lexes as two Underscore Symbols and an Identifier rather than as
+	// one name — a name a Program can DECLARE has to be a name its sections can
+	// spell, or the standard library's one free Function could never be exported.
 	protected parseImportEntry(): parser.ImportNode {
-		let name = this.parseIdentifier()
+		let name = this.parseNativeSigilName()
 		let alias = this.parseOptionalAlias()
 
 		this.tokens.expect(TokenType.KeywordFrom)
@@ -385,7 +389,7 @@ class DescentParser {
 	// `from` is read the specifier is required, so a `from` with nothing after it
 	// is a Diagnostic rather than a second entry that happens to be named `from`.
 	protected parseExportEntry(): parser.ExportNode {
-		let name = this.parseIdentifier()
+		let name = this.parseNativeSigilName()
 		let alias = this.parseOptionalAlias()
 		let end = (alias ?? name).position.end
 		let source: parser.ModuleSpecifierNode | null = null

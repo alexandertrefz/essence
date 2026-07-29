@@ -1,3 +1,17 @@
+import {
+	Algebraic      from "./Algebraic.es"
+	Boolean        from "./Boolean.es"
+	Integer        from "./Integer.es"
+	List           from "./List.es"
+	Optional       from "./Optional.es"
+	Ordering       from "./Ordering.es"
+	Comparable     from "./Protocols.es"
+	Equatable      from "./Protocols.es"
+	Printable      from "./Protocols.es"
+	String         from "./String.es"
+	Transcendental from "./Transcendental.es"
+}
+
 declarations {
 
 	§ The forms a Rational can be written in. `Fraction` is `"3/4"`, the
@@ -523,4 +537,10 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Rational) -> Ordering
 	}
+}
+
+export {
+	NumberFormat
+	Rational
+	Rounding
 }

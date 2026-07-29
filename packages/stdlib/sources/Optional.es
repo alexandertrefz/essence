@@ -1,3 +1,8 @@
+import {
+	Boolean   from "./Boolean.es"
+	Printable from "./Protocols.es"
+}
+
 declarations {
 
 	§ The global spelling of fallibility — the answer of every Method that can
@@ -149,4 +154,9 @@ declarations {
 			}
 		}
 	}
+}
+
+export {
+	NestedOptional
+	Optional
 }

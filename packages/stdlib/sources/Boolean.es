@@ -1,3 +1,8 @@
+import {
+	Equatable from "./Protocols.es"
+	Printable from "./Protocols.es"
+}
+
 declarations {
 
 	§§ The two truth values, `true` and `false`, and the logic that combines them.
@@ -50,4 +55,8 @@ declarations {
 			}
 		}
 	}
+}
+
+export {
+	Boolean
 }

@@ -1,3 +1,8 @@
+import {
+	Equatable from "./Protocols.es"
+	Printable from "./Protocols.es"
+}
+
 declarations {
 
 	§ `Ordering` is the builtin Choice — three unit Cases, written
@@ -27,4 +32,8 @@ declarations {
 			}
 		}
 	}
+}
+
+export {
+	Ordering
 }

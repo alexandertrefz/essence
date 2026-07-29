@@ -1,3 +1,9 @@
+import {
+	Boolean   from "./Boolean.es"
+	Equatable from "./Protocols.es"
+	Printable from "./Protocols.es"
+}
+
 declarations {
 
 	namespace Record for Record is Equatable, is Printable {
@@ -29,4 +35,8 @@ declarations {
 		§§ @returns — the String representation of the Record.
 		toString() -> String
 	}
+}
+
+export {
+	Record
 }
