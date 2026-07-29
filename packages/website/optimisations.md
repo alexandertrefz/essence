@@ -187,11 +187,12 @@ in Essence on the ones below them, and the receiver there is typed exactly
 `Integer` — so they lower like any other site, and a Program that reaches the
 comparison family stops carrying those bodies at all.
 
-What it does NOT take away yet: a lowered Boolean used as the Program's own `if`
-still builds the Boolean and reads it back — `(a.value < b.value ?
-Boolean.trueInstance : Boolean.falseInstance).value`. A condition is a Statement's
-question rather than an Expression's, and lowering Statements is
-`lower-matches-to-statements`' half of the work.
+A lowered Boolean used as the Program's own `if` is not read back off the
+Boolean it builds — `(a.value < b.value ? Boolean.trueInstance :
+Boolean.falseInstance).value` is `a.value < b.value`. A condition is a
+Statement's question rather than an Expression's, so that collapse belongs to
+`lower-matches-to-statements` and is documented there; with THAT pass off, the
+Boolean is built and read back exactly as written here.
 
 ### `compile-union-dispatch`
 
@@ -386,8 +387,8 @@ thing that would otherwise be emitted for no reason. A Return that answers with
 a call is kept and evaluated; only the last Statement of a body is ever
 considered, because a Return anywhere else is control flow as well as an answer.
 
-One more thing rides with this pass, because it is about what a Statement can
-say that an Expression can not:
+Two more things ride with this pass, because both are about what a Statement
+can say that an Expression can not:
 
 **A compiled Union dispatch that holds operands is lifted too.**
 `compile-union-dispatch` evaluates the receiver and the shared Arguments once,
@@ -397,6 +398,16 @@ the dispatch is what a Statement computes, the names become the `const`s of a
 block and the arrow is gone. The block is not decoration: a chain numbers its
 names from zero, so two chains lifted into one Scope would otherwise declare one
 name twice.
+
+**A lowered Boolean consumed by an `if` is collapsed.** A condition is read as
+`condition.value`, because an Essence Boolean is an object and every object is
+true — so `if a::isLessThan(b)`, which `lower-scalar-operations` had already
+reduced to a JavaScript comparison, ended up as
+`(a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value`. Where
+the condition IS such a lowering, the test it was built from is what the `if`
+asks and the Boolean between them is never built. Only that exact shape is
+collapsed: a condition that is anything else is a value, and its `value` is what
+JavaScript has to be asked.
 
 ### `elide-final-match-test`
 
