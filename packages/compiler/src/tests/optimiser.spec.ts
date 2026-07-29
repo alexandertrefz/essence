@@ -1111,6 +1111,14 @@ const deadMatchArms = `implementation {
 		case String         { <- "a String" }
 		case { x: Integer } { <- "a Record" }
 	})
+
+	§ The dead Handler LAST, where dropping it leaves a chain
+	§ 'elide-final-match-test' then ends in the Handler above it.
+	__print(match scalar -> String {
+		case Integer { <- "the Integer" }
+		case String  { <- "the String" }
+		case Boolean { <- "never" }
+	})
 }`
 
 // NOTE: A Constant of each kind `eliminate-dead-code` decides by, at a
@@ -3201,6 +3209,19 @@ describe("Optimiser", () => {
 			expect(generated).toContain("Integer.createInteger(86400n)")
 			expect(generated).not.toContain("Integer.createInteger(60n)")
 		})
+
+		// NOTE: And the same on the other side of the hole. A witness is a
+		// `direct-method` by the time this pass sees one, because
+		// `devirtualise-witnesses` runs first — but it is a `ConformanceValue`
+		// with that pass off, and the Method it names is read out of either.
+		it("renders a hole whose witness is still a map", () => {
+			expect(
+				generate(constantFolding, {
+					enabled: true,
+					disabledPasses: new Set(["devirtualise-witnesses"]),
+				}),
+			).toContain('String.createString("a count: 7, 1/2, true, x")')
+		})
 	})
 
 	describe("prune-dead-match-arms", () => {
@@ -3222,7 +3243,7 @@ describe("Optimiser", () => {
 				(diagnostic) => diagnostic.code === "unreachable-case",
 			)
 
-			expect(unreachable).toHaveLength(2)
+			expect(unreachable).toHaveLength(3)
 			expect(
 				unreachable.every(
 					(diagnostic) => diagnostic.severity === "warning",
@@ -3297,7 +3318,13 @@ describe("Optimiser", () => {
 					"prune-dead-match-arms",
 					deadMatchArms,
 				),
-			).toEqual(['"an Integer"', '"Blank"', '"Integers"', '"a Record"'])
+			).toEqual([
+				'"an Integer"',
+				'"Blank"',
+				'"Integers"',
+				'"a Record"',
+				'"the Integer"',
+			])
 		})
 
 		it("prints the same thing with the pass off for every fixture shape", async () => {
