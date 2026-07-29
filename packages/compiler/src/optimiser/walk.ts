@@ -535,6 +535,79 @@ function walkIntrinsicChildren(
 
 			return values === node.values ? node : { ...node, values }
 		}
+		// NOTE: A compiled dispatch is walked in the order it evaluates: the
+		// Expressions it holds under a name, then the reads of them, then each
+		// branch's test and the Arguments that branch alone passes. The reads
+		// are ordinary Expressions and are offered like any other — a later pass
+		// finding a name there has nothing to do with it, and one finding the
+		// Expression itself (where the chain has one branch and holds nothing)
+		// may rewrite it exactly as it would anywhere else.
+		case "dispatch-chain": {
+			let temporaries = mapArray(node.temporaries, (temporary) => {
+				let value = walkExpression(temporary.value, rewrite)
+
+				return value === temporary.value
+					? temporary
+					: { ...temporary, value }
+			})
+			let receiver = walkExpression(node.receiver, rewrite)
+			let args = mapArray(node.arguments, (value) =>
+				walkExpression(value, rewrite),
+			)
+			let cases = mapArray(node.cases, (dispatchCase) => {
+				let test =
+					dispatchCase.test === null
+						? null
+						: walkExpression(dispatchCase.test, rewrite)
+				let conformanceArguments = mapArray(
+					dispatchCase.conformanceArguments,
+					(value) => walkExpression(value, rewrite),
+				)
+				let contextualArguments = mapArray(
+					dispatchCase.contextualArguments,
+					(contextual) => {
+						let value = walkExpression(contextual.value, rewrite)
+
+						return value === contextual.value
+							? contextual
+							: { ...contextual, value }
+					},
+				)
+
+				if (
+					test === dispatchCase.test &&
+					conformanceArguments ===
+						dispatchCase.conformanceArguments &&
+					contextualArguments === dispatchCase.contextualArguments
+				) {
+					return dispatchCase
+				}
+
+				return {
+					...dispatchCase,
+					test,
+					conformanceArguments,
+					contextualArguments,
+				}
+			})
+
+			if (
+				temporaries === node.temporaries &&
+				receiver === node.receiver &&
+				args === node.arguments &&
+				cases === node.cases
+			) {
+				return node
+			}
+
+			return {
+				...node,
+				temporaries,
+				receiver,
+				arguments: args,
+				cases,
+			}
+		}
 		case "spread-combination": {
 			let lhs = walkExpression(node.lhs, rewrite)
 			let members = mapRecord(node.members, (value) =>

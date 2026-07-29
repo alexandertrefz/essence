@@ -1499,6 +1499,17 @@ export function reachableEssenceMethods(
 //   ConformanceValue         a witness `{ m: X.m }` — namespaceName + each
 //                            methodMap value; a conditional one nests more
 //                            ConformanceValues in `conditions`, reached below
+//   dispatch-chain           a compiled Union dispatch — each branch's
+//                            namespaceName + methodName, the same edges the
+//                            Invocation it replaced drew
+//   direct-method            a devirtualised witness — namespaceName +
+//                            memberName, the one Method of the witness it
+//                            stands in for
+//
+// The last two are the Optimiser's, and are here because the Optimiser rewrites
+// the PRELUDE's bodies as well as a Program's: a Method reached only through a
+// shape a pass introduced is a Method this search would otherwise stop drawing
+// an edge to the moment that pass was turned on.
 //
 // One more shape draws a free-Function edge rather than a Method one: a
 // `FunctionInvocation` off a bare Identifier — `loop__overload$2(…)` by the time
@@ -1579,7 +1590,9 @@ export function essenceMethodReferences(
 			record["nodeType"] === "MethodInvocation" ||
 			record["nodeType"] === "UnionMethodInvocation" ||
 			record["nodeType"] === "FunctionInvocation" ||
-			record["nodeType"] === "NativeFunctionInvocation"
+			record["nodeType"] === "NativeFunctionInvocation" ||
+			(record["nodeType"] === "Intrinsic" &&
+				record["kind"] === "dispatch-chain")
 		) {
 			isStored = false
 		}
@@ -1596,6 +1609,36 @@ export function essenceMethodReferences(
 				consider(
 					dispatch["namespaceName"],
 					dispatch["methodName"],
+					implemented,
+					true,
+				)
+			}
+		} else if (record["nodeType"] === "Intrinsic") {
+			// NOTE: The two intrinsics that name a Namespace member — a
+			// compiled dispatch's per-branch call and a devirtualised witness's
+			// Method — both of which the Optimiser writes INTO a prelude body,
+			// where this search is what pulls the const in. They are the same
+			// edges the Nodes they replace drew: `dispatch-chain` for a
+			// `UnionMethodInvocation`'s cases, `direct-method` for the one
+			// Method of the `ConformanceValue` it stood in for. A witness
+			// handed on rather than called keeps `isStored`, so a
+			// devirtualised one — which is a Function reference at a site that
+			// calls it — says evaluated.
+			if (record["kind"] === "dispatch-chain") {
+				for (let dispatchCase of (record["cases"] as Array<
+					Record<string, unknown>
+				>) ?? []) {
+					consider(
+						dispatchCase["namespaceName"],
+						dispatchCase["methodName"],
+						implemented,
+						true,
+					)
+				}
+			} else if (record["kind"] === "direct-method") {
+				consider(
+					record["namespaceName"],
+					record["memberName"],
 					implemented,
 					true,
 				)
@@ -2064,6 +2107,8 @@ function rewriteIntrinsic(
 					...memberProperties(node.members),
 				],
 			}
+		case "dispatch-chain":
+			return dispatchChain(node)
 		case "direct-list":
 			return {
 				type: "ObjectExpression",
@@ -2085,6 +2130,124 @@ function rewriteIntrinsic(
 					},
 				],
 			}
+	}
+}
+
+// NOTE: A Union dispatch decided where it stands — a conditional for each case
+// that still has a question, and the call the Compiler resolved for it:
+//
+//   value[$type.typeKeySymbol] === "Shape#Circle"
+//     ? Shapes.area(value)
+//     : Shapes.area(value)
+//
+// The cases are folded back to front, so each conditional becomes the
+// `alternate` of the one before it and the first case is tested first. A case
+// with no test IS the answer from there on: it stands where the alternate would
+// have gone, and whatever the Optimiser left after it — nothing, since it drops
+// what such a case makes unreachable — goes with it.
+//
+// NOTE: The chain ends in `$type.noDispatchCaseMatched()` only where the LAST
+// case still has a test, which is the same throw the runtime's own search ends
+// with. Where the Optimiser could elide that test the last call is simply the
+// alternate, and the throw is gone with the question it answered.
+function dispatchChain(
+	node: common.typedSimple.DispatchChainNode,
+): estree.Expression {
+	let chain: estree.Expression | null = null
+
+	for (let index = node.cases.length - 1; index >= 0; index--) {
+		let dispatchCase = node.cases[index]!
+		let call = dispatchCaseCall(node, dispatchCase)
+
+		chain =
+			dispatchCase.test === null
+				? call
+				: {
+						type: "ConditionalExpression",
+						test: rewriteExpression(dispatchCase.test),
+						consequent: call,
+						alternate: chain ?? noDispatchCaseMatched(),
+					}
+	}
+
+	let answer = chain ?? noDispatchCaseMatched()
+
+	if (node.temporaries.length === 0) {
+		return answer
+	}
+
+	// NOTE: The Expressions the branches read more than once, held for the
+	// length of the chain — as the Parameters of an arrow the chain is the body
+	// of, called at once with them. JavaScript evaluates a call's Arguments left
+	// to right and before the call, which is the order and the once-ness the
+	// dispatch's own Argument array had; a `let` would say the same thing and
+	// can not be said in an Expression position, which is where a Method
+	// Invocation stands.
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "ArrowFunctionExpression",
+			expression: true,
+			params: node.temporaries.map(
+				(temporary): estree.Pattern => ({
+					type: "Identifier",
+					name: temporary.name,
+				}),
+			),
+			body: answer,
+		},
+		arguments: node.temporaries.map((temporary) =>
+			rewriteExpression(temporary.value),
+		),
+	}
+}
+
+// NOTE: One branch's call — the Method the Compiler resolved for this member
+// Type, spelled through the one function every reference to a Namespace member
+// goes through, and given the receiver, the shared Arguments and this case's
+// own hidden conformance Arguments, in the order the runtime handed them over.
+// An Argument this branch overrides stands in the position it stands in for,
+// where the search wrote it into a COPY of the shared array; the copy is what
+// kept one branch's Arguments from becoming another's, and writing each branch's
+// call out is what makes it unnecessary.
+function dispatchCaseCall(
+	node: common.typedSimple.DispatchChainNode,
+	dispatchCase: common.typedSimple.DispatchChainCase,
+): estree.CallExpression {
+	let values = [...node.arguments]
+
+	for (let contextual of dispatchCase.contextualArguments) {
+		values[contextual.index] = contextual.value
+	}
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: namespaceMember(
+			dispatchCase.namespaceName,
+			dispatchCase.methodName,
+			dispatchCase.derivedDescriptor,
+		),
+		arguments: [
+			rewriteExpression(node.receiver),
+			...values.map((value) => rewriteExpression(value)),
+			...dispatchCase.conformanceArguments.map((value) =>
+				rewriteExpression(value),
+			),
+		],
+	}
+}
+
+function noDispatchCaseMatched(): estree.CallExpression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "$type" },
+			"noDispatchCaseMatched",
+		),
+		arguments: [],
 	}
 }
 

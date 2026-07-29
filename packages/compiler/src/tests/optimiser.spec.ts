@@ -301,6 +301,125 @@ const scalarOperations = `implementation {
 	__print(a::add(1/2))
 }`
 
+// NOTE: One dispatch of each shape `compile-union-dispatch` has to answer for:
+// a Union two tags tell apart, one where two members share a tag and the
+// descriptors stay, a call whose Arguments are compiled per branch (`map`), one
+// whose branches need a conformance witness each (`sort`), a Union of a Record
+// and a Boolean, an Argument that PRINTS, a receiver that is a call rather than
+// a name, a bounded Type Parameter's catch-all branch, and a four member Union
+// whose Methods are overload-mangled. Between them they cover every part of the
+// dispatch the runtime used to be handed.
+const unionDispatch = `implementation {
+	§§ Prints as it answers, so that a skipped or repeated evaluation is visible.
+	§§
+	§§ @returns — a suffix.
+	function noisy() -> String {
+		__print("evaluated")
+
+		<- "!"
+	}
+
+	§§ Answers what it is given, so that a dispatch's receiver is a call.
+	§§
+	§§ @param value — a member of the Union
+	§§ @returns — the value.
+	function identity(_ value: Integer | Boolean) -> Integer | Boolean {
+		<- value
+	}
+
+	§§ Renders the fallback, whichever member of the Union it is.
+	§§
+	§§ @param item — decides what the Type Parameter is
+	§§ @param fallback — the value to render
+	§§ @returns — the value, written out.
+	function describe<infer Item is Printable>(
+		_ item: Item,
+		or fallback: Item | Boolean,
+	) -> String {
+		<- fallback::toString()
+	}
+
+	type Box = { size: Integer }
+
+	namespace Boxes for Box {
+		§§ Names the Box.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "box{suffix}"
+		}
+	}
+
+	namespace Flags for Boolean {
+		§§ Names the Boolean.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "flag{suffix}"
+		}
+	}
+
+	constant number: Number = 5
+	constant value: Integer | Boolean = 5
+	constant items: List<Integer> | List<String> = ["b", "a"]
+	constant either: Box | Boolean = { size = 3 }
+
+	__print(value::toString())
+	__print(items::length())
+	__print(items::map((item) { <- "{item}!" }))
+	__print(items::sort())
+	__print(either::tagged(with "?"))
+	__print(either::tagged(with noisy()))
+	__print(identity(5)::toString())
+	__print(describe(1, or 2))
+	__print(describe(1, or true))
+	__print(number::multiply(with 2)::toString())
+}`
+
+// NOTE: The dispatch whose ANSWER depends on the order the operands are
+// evaluated in: `flip` assigns the very variable the dispatch is reading, so a
+// chain that read the receiver where the branch uses it — after the Argument —
+// would call the other Namespace's Method and print `"flag!"`. The dispatch
+// reads it before the Argument is evaluated, and so does the chain.
+const dispatchOrder = `implementation {
+	type Box = { size: Integer }
+
+	namespace Boxes for Box {
+		§§ Names the Box.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "box{suffix}"
+		}
+	}
+
+	namespace Flags for Boolean {
+		§§ Names the Boolean.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "flag{suffix}"
+		}
+	}
+
+	variable either: Box | Boolean = { size = 3 }
+
+	§§ Changes the receiver out from under the dispatch.
+	§§
+	§§ @returns — a suffix.
+	function flip() -> String {
+		either = true
+
+		<- "!"
+	}
+
+	__print(either::tagged(with flip()))
+}`
+
 // NOTE: A witness of each kind a hole can be given — a standard library
 // Namespace's, a Namespace this Program DECLARES, and a CONDITIONAL one, which
 // is the one that must stay an object because the Function behind its Method is
@@ -1197,6 +1316,234 @@ describe("Optimiser", () => {
 				"lower-scalar-operations",
 				readFileSync(fixturePath("Number.es"), "utf8"),
 			)
+		})
+	})
+
+	describe("compile-union-dispatch", () => {
+		it("reads a tag instead of searching at run time", () => {
+			let generated = generate(unionDispatch)
+
+			expect(generated).toContain(
+				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString(value) : $es_Boolean_toString(value)',
+			)
+			expect(generated).not.toContain("$type.dispatchMethod")
+		})
+
+		it("leaves no dispatch search in a dispatch-heavy Program", () => {
+			// NOTE: The array per call, the tuple per case and the copy of the
+			// Argument list go with it — they were the search's Arguments and
+			// nothing else's.
+			expect(generate(unionDispatch)).not.toContain("dispatchMethod")
+			expect(
+				generate(unionDispatch, {
+					enabled: true,
+					disabledPasses: new Set(["compile-union-dispatch"]),
+				}),
+			).toContain("$type.dispatchMethod(")
+		})
+
+		it("takes the last case as the else, and the throw with it", () => {
+			// NOTE: Two members, one test — the Enricher gave every member of
+			// the Union a case, so a value that declined the first has nowhere
+			// else to go, and there is nothing left for a fall-through to
+			// answer for.
+			let generated = generate(`implementation {
+				constant value: Integer | Boolean = 5
+
+				__print(value::toString())
+			}`)
+
+			expect(generated).toContain(
+				'value[$type.typeKeySymbol] === "Integer" ? Integer.toString(value) : $es_Boolean_toString(value)',
+			)
+			expect(generated).not.toContain('=== "Boolean"')
+			expect(generated).not.toContain("noDispatchCaseMatched")
+		})
+
+		it("keeps the full check where two member Types share a tag", () => {
+			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, so the
+			// tag says nothing about which case is meant and the item walk is
+			// what decides — the same rule a Match Handler is decided by, asked
+			// of the same residual.
+			let generated = generate(unionDispatch)
+
+			expect(generated).toMatch(/isValueOfType\(items, \$pool_\d+\)/)
+			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "List"/)
+		})
+
+		it("ends the chain in a throw where the last case still asks something", () => {
+			// NOTE: The counterpart to a Match's fall-through, and the same
+			// trade: a check that could not be reduced to a tag is one where a
+			// runtime answer and a static Type can part company, so the throw
+			// that names it stays.
+			expect(generate(unionDispatch)).toContain(
+				"$type.noDispatchCaseMatched()",
+			)
+		})
+
+		it("builds a branch's own Arguments only in that branch", () => {
+			// NOTE: The Function literal `map` is given is compiled once per
+			// branch, because what `item` means comes from the branch. The
+			// dispatch built the shared one AND both copies at every call and
+			// used one; the chain builds the one the branch it takes needs.
+			let closures = (generated: string): number =>
+				generated.split("function (item)").length - 1
+
+			expect(closures(generate(unionDispatch))).toBe(2)
+			expect(
+				closures(
+					generate(unionDispatch, {
+						enabled: true,
+						disabledPasses: new Set(["compile-union-dispatch"]),
+					}),
+				),
+			).toBe(3)
+		})
+
+		it("gives each branch the conformance witness its Method requires", () => {
+			// NOTE: `sort` is bounded by `Comparable`, so each branch carries the
+			// witness for ITS item Type — two witnesses, one per branch, each
+			// built once by the pool rather than per call by the dispatch.
+			expect(generate(unionDispatch)).toMatch(
+				/List\.sort__overload\$1\(items, \$pool_\d+\).*List\.sort__overload\$1\(items, \$pool_\d+\)/,
+			)
+		})
+
+		it("writes a name and a literal where the branches use them", () => {
+			// NOTE: Nothing is held here: the receiver is a name and the
+			// Argument a literal, so each branch reads what the call would have
+			// read and there is no wrapper at all.
+			let generated = generate(unionDispatch)
+
+			expect(generated).toMatch(
+				/\? Boxes\.tagged\(either, \$pool_\d+\) : Flags\.tagged\(either, \$pool_\d+\)/,
+			)
+		})
+
+		it("holds an operand that can not be read again", () => {
+			// NOTE: A receiver that is a CALL is evaluated once, before any
+			// test, and read from a name after that — the chain reads it three
+			// times over, and calling `identity` three times is not what the
+			// Program says.
+			expect(generate(unionDispatch)).toContain(
+				'($dispatch_0 => $dispatch_0[$type.typeKeySymbol] === "Integer" ? Integer.toString($dispatch_0) : $es_Boolean_toString($dispatch_0))(identity(',
+			)
+		})
+
+		it("holds the receiver where an Argument could change it", async () => {
+			// NOTE: THE order invariant. `flip` assigns `either`, and the
+			// dispatch read the receiver BEFORE evaluating the Argument — so a
+			// chain that left the receiver where the branches use it would
+			// answer for the value after the assignment. Both are held, in the
+			// order they were written.
+			let generated = generate(dispatchOrder)
+
+			expect(generated).toContain("($dispatch_0, $dispatch_1) =>")
+			expect(generated).toContain("(either, flip())")
+			expect(
+				await expectSamePrintedOutput(
+					"compile-union-dispatch",
+					dispatchOrder,
+				),
+			).toEqual(['"box!"'])
+		})
+
+		it("evaluates an Argument that can be observed exactly once", async () => {
+			// NOTE: One `"evaluated"`, wherever the chain goes — the Argument is
+			// evaluated before any test, as the dispatch's Argument array was
+			// built before any case was tried, and no branch evaluates it again.
+			let output = await outputOf(generate(unionDispatch))
+
+			expect(
+				output.filter((line) => line === '"evaluated"'),
+			).toHaveLength(1)
+		})
+
+		it("keeps the cases in the order the Enricher put them", () => {
+			// NOTE: A four member Union, tested in declaration order with the
+			// last case's test elided — and the overload-mangled name each
+			// member resolved to carried through per branch.
+			expect(generate(unionDispatch)).toContain(
+				'number[$type.typeKeySymbol] === "Integer" ? Integer.multiply__overload$1(number, $pool_',
+			)
+			expect(generate(unionDispatch)).toMatch(
+				/=== "Rational" \? \$es_Rational_multiply__overload\$2.*=== "Algebraic" \? Algebraic\.multiply__overload\$1.*: Transcendental\.multiply__overload\$1/,
+			)
+		})
+
+		it("puts a catch-all branch last and asks nothing of it", () => {
+			// NOTE: A bounded Type Parameter accepts every value there is, so
+			// its case can only be tried once everything else has declined —
+			// and once it is reached there is nothing left to ask.
+			expect(generate(unionDispatch)).toContain(
+				'fallback[$type.typeKeySymbol] === "Boolean" ? $es_Boolean_toString(fallback) : Item__conformance.toString(fallback)',
+			)
+		})
+
+		it("searches again when it is turned off", () => {
+			let generated = generate(unionDispatch, {
+				enabled: true,
+				disabledPasses: new Set(["compile-union-dispatch"]),
+			})
+
+			expect(generated).toContain("$type.dispatchMethod(value, [], [")
+			expect(generated).not.toContain("$dispatch_0")
+		})
+
+		it("compiles the chain with the Match tests uncompiled", () => {
+			// NOTE: Neither pass depends on the other having run: this one asks
+			// `residual.ts` itself rather than reading what `compile-type-tests`
+			// left behind, so a dispatch is compiled the same either way.
+			expect(
+				generate(unionDispatch, {
+					enabled: true,
+					disabledPasses: new Set(["compile-type-tests"]),
+				}),
+			).toContain('value[$type.typeKeySymbol] === "Integer"')
+		})
+
+		it("compiles the chain with the pool turned off", () => {
+			// NOTE: With nothing pooled, the descriptor a case still checks
+			// against is written at the test, exactly as the search's own tuple
+			// carried it.
+			expect(
+				generate(unionDispatch, {
+					enabled: true,
+					disabledPasses: new Set(["pool-constants"]),
+				}),
+			).toContain('$type.isValueOfType(items, {\n\ttype: "List"')
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"compile-union-dispatch",
+					unionDispatch,
+				),
+			).toEqual([
+				'"5"',
+				"2",
+				'[ "b!", "a!" ]',
+				'[ "a", "b" ]',
+				'"box?"',
+				'"evaluated"',
+				'"box!"',
+				'"5"',
+				'"2"',
+				'"true"',
+				'"10"',
+			])
+		})
+
+		it("prints the same thing with the whole phase off", async () => {
+			expect(
+				await outputOf(
+					generate(unionDispatch, {
+						enabled: false,
+						disabledPasses: new Set(),
+					}),
+				),
+			).toEqual(await outputOf(generate(unionDispatch)))
 		})
 	})
 

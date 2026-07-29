@@ -186,6 +186,94 @@ Boolean.trueInstance : Boolean.falseInstance).value`. A condition is a Statement
 question rather than an Expression's, and lowering Statements is
 `lower-matches-to-statements`' half of the work.
 
+### `compile-union-dispatch`
+
+Decides a Union receiver's Method where the call is written.
+
+A Method called on a `Integer | Boolean` is answered by one of two Methods, and
+which one depends on the value — so the Compiler resolved both statically and
+then handed the choice to the runtime:
+
+```js
+$type.dispatchMethod(value, [], [
+	[{ type: "Integer" }, Integer.toString, []],
+	[{ type: "Boolean" }, $es_Boolean_toString, []],
+])
+```
+
+Everything there but the receiver and the shared Arguments is built to be read
+once and thrown away: an array per call, a tuple per case, a Type descriptor
+tree per case, a copy of the Argument array wherever a case passes something of
+its own — and then a search that asks `isValueOfType` of descriptors the
+Compiler wrote itself. What the search decides is what is emitted:
+
+```js
+value[$type.typeKeySymbol] === "Integer"
+	? Integer.toString(value)
+	: $es_Boolean_toString(value)
+```
+
+Each case's test is the same residual `compile-type-tests` computes for a Match
+Handler, asked of the case's member Type against the members of the Union — so
+a case a tag decides becomes a key comparison, and one where two members share
+a tag (`List<Alpha>` beside `List<Beta>`) keeps `isValueOfType` against a
+descriptor that `pool-constants` then builds once instead of per call.
+
+The cases keep their order, which the Enricher chose most specific first
+because a check is open — `{ width: Integer }` accepts a value carrying a
+height as well — and the first test that answers selects the branch, exactly as
+the search took the first case that accepted. A case whose check accepts every
+value that can arrive ends the chain, and the cases after it, which the search
+could never have reached either, are dropped.
+
+**The receiver and the shared Arguments are evaluated once, before any test**,
+which is where and when building the search's arrays evaluated them. What the
+chain holds under a name is what it would otherwise have to evaluate twice or
+write out per branch; a name or a literal is written where the branches use it
+instead, because reading a binding observes nothing and a literal is the same
+value however often it is built — and `pool-constants` then declares that value
+once for every branch that names it. Where a temporary is needed the chain is
+the body of an arrow called at once with it, because a Method Invocation stands
+in an Expression position and `let` can not; where none is, there is no wrapper
+at all.
+
+A name is held all the same when a held operand FOLLOWS it, and that is not a
+nicety. Held operands are evaluated ahead of the tests, so a name left where the
+branches read it would be read after them — and in `either::tagged(with
+flip())`, where `flip` assigns `either`, the dispatch answers for the value the
+receiver had BEFORE the Argument was evaluated. Reading it later is a different
+Program.
+
+**A branch's own Arguments are built only in the branch that uses them.** The
+dispatch built every branch's before choosing one — one conformance witness and
+one Function literal per case, per call, of which exactly one was used. That
+change is observable only through an effect, and neither kind can have one: a
+witness is a map of Method references, and an Argument compiled for one branch
+is a Function LITERAL, whose body does not run because the closure was built.
+The pass proves that per case rather than assuming it, and leaves the call as it
+was where the proof fails. An Argument EVERY branch replaces is not built at
+all, which is the one evaluation the chain drops that the search performed.
+
+**The last case is the `else`**, on the argument `elide-final-match-test` makes
+for a Match's last Handler and with the same thing given up. The Enricher emits
+a dispatch only where every member of the receiver's Union has a case, so a
+value reaching the last case has nowhere else to go. What is given up is the
+throw that names a Compiler bug: with the test elided, a receiver that satisfies
+NO case — which can only happen where a runtime check and the static Type part
+company — takes the last branch silently. So the elision is taken only where
+that last check is decided by TAGS, which is exactly where the two can not part
+company; a case that still needs a descriptor keeps its test, and the chain ends
+in `$type.noDispatchCaseMatched()` — the same throw the runtime's own search
+ends with. **A Compiler developer chasing a dispatch that answers the wrong
+thing should build with `--without-optimisation compile-union-dispatch`**, which
+puts the search and its throw back. That trade rides with this pass rather than
+with `elide-final-match-test`, whose name and whose documented trade are about a
+Match: here the chain and its `else` are one rewrite, and the flag that takes
+away the second is the one that takes away the first.
+
+`$type.dispatchMethod` stays in the runtime. It is what the Program calls with
+this pass off, and it is where the shared behaviour is written down.
+
 ### `devirtualise-witnesses`
 
 Calls the Method a witness names, rather than the witness.
@@ -370,11 +458,12 @@ witness can name is a runtime module bound by an `import` before any Statement
 runs. A witness carrying a conformance forwarded from its enclosing Function is
 left alone too: that is a different value per call and no constant at all.
 
-Two things are not pooled yet, both for the same reason — the descriptor hangs
-off a Node rather than standing in an Expression position, so nothing can reach
-it: the plan a generic Choice's derived equality follows where it is called
-directly, and a Union dispatch's per-case member Types. `compile-union-dispatch`
-rebuilds those sites and is where they will be picked up.
+One thing is not pooled yet, because the descriptor hangs off a Node rather
+than standing in an Expression position and nothing can reach it: the plan a
+generic Choice's derived equality follows where it is called directly. A Union
+dispatch's per-case member Types used to be in the same position and are not
+any more — `compile-union-dispatch` rebuilds those sites, and the descriptors
+its cases still need are pooled like a Match Handler's.
 
 ## Runtime improvements
 

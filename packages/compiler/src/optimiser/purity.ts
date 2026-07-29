@@ -110,6 +110,11 @@ function isPureIntrinsic(node: common.typedSimple.IntrinsicNode): boolean {
 		case "type-descriptor":
 		case "direct-method":
 			return true
+		// NOTE: A Method call with the search in front of it taken out, which is
+		// a Method call — refused exactly as the `UnionMethodInvocation` it was
+		// compiled from is.
+		case "dispatch-chain":
+			return false
 		case "raw-boolean-op":
 			return (
 				isPureExpression(node.operand) &&
