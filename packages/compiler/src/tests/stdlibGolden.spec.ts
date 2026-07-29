@@ -28,9 +28,17 @@ const goldenPath = resolve(import.meta.dirname, goldenFile)
 
 type CompiledProgram = {
 	output: Array<string>
-	// NOTE: The simplified/optimised Program the emitted JavaScript was made
-	// from — retained so the label↔call correspondence test can walk each
-	// `show(…)` call's second Argument without compiling the harness twice.
+	// NOTE: The simplified Program the emitted JavaScript was made from —
+	// retained so the label↔call correspondence test can walk each `show(…)`
+	// call's second Argument without compiling the harness twice.
+	//
+	// NOTE: Before the Optimiser, deliberately. That test asks which Method a
+	// call invokes, which is a question about the harness as written, and the
+	// Optimiser's whole business is replacing a call with the operation it
+	// performs — a comparison against a payload-less Case is a tag test by the
+	// time it is emitted, and invokes nothing. What RUNS below is the optimised
+	// Program, so the golden file goes on holding the standard library to
+	// account through every pass.
 	program: common.typedSimple.Program
 }
 
@@ -56,8 +64,8 @@ function compileProgram(source: string): CompiledProgram {
 		throw new Error(`${harnessFile} does not validate`)
 	}
 
-	let simplified = optimise(simplify(enriched.program))
-	let javaScript = rewrite(simplified)
+	let simplified = simplify(enriched.program)
+	let javaScript = rewrite(optimise(simplified))
 	let directory = mkdtempSync(join(tmpdir(), "essence-golden-"))
 	let file = join(directory, "program.ts")
 

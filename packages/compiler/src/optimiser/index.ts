@@ -2,6 +2,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
+import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
 
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
@@ -54,6 +55,7 @@ export const defaultOptimiserOptions: OptimiserOptions = {
 // in front of it is part of what it was written against. Turning one off never
 // reorders the rest.
 export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
+	lowerUnitCaseEquality,
 	collapseConstruction,
 	collapseCombinations,
 ]

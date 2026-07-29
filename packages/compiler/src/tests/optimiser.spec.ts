@@ -103,6 +103,44 @@ async function expectSamePrintedOutput(
 	return withPass
 }
 
+// NOTE: A payload-less Case on either side of the comparison, both spellings of
+// the question, a Case that DOES carry a payload, and a generic Choice of each
+// — the shapes `lower-unit-case-equality` must rewrite beside the ones it must
+// leave alone. `1::isLessThan(2)` is here because the Method it reaches is in
+// the standard library, which the pass runs over as well.
+const unitCaseEquality = `implementation {
+	choice Colour { Red, Green }
+
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	choice Box<Item> {
+		Holding { item: Item },
+		Void,
+	}
+
+	constant red: Colour = #Red
+	constant green: Colour = #Green
+	constant circle: Shape = Shape#Circle({ radius = 1 })
+	constant blank: Shape = #Blank
+	constant void: Box<Integer> = #Void
+	constant held: Box<Integer> = Box#Holding({ item = 1 })
+
+	__print(red::is(#Green))
+	__print(red::isNot(#Green))
+	__print(Colour#Red::is(red))
+	__print(Colour#Red::isNot(green))
+	__print(blank::is(#Blank))
+	__print(circle::is(#Blank))
+	__print(circle::is(Shape#Circle({ radius = 1 })))
+	__print(void::is(#Void))
+	__print(held::is(#Void))
+	__print(held::is(Box#Holding({ item = 1 })))
+	__print(1::isLessThan(2))
+}`
+
 // NOTE: Records, Lists, Cases with a payload and without, a payload that is a
 // Record the Program is holding elsewhere, a member name JavaScript can not
 // spell, and a Match reading it all back — the shapes `collapse-construction`
@@ -379,6 +417,195 @@ describe("Optimiser", () => {
 			// NOTE: A pass that wrote into its input would corrupt the standard
 			// library for every later compilation in the process.
 			expect(markers(program)).toBe(0)
+		})
+	})
+
+	describe("lower-unit-case-equality", () => {
+		// NOTE: One emitted top-level const, read out by the name it starts
+		// with — the standard library's Methods are `$es_<Namespace>_<member>`
+		// consts and an Overload's mangled number is not this test's business.
+		function bodyOf(generated: string, name: string): string {
+			let start = generated.indexOf(`const ${name}`)
+
+			expect(start).toBeGreaterThan(-1)
+
+			let rest = generated.slice(start)
+			let end = rest.indexOf("\nconst ")
+
+			return end === -1 ? rest : rest.slice(0, end)
+		}
+
+		it("reads a tag instead of calling the runtime's equality", () => {
+			let generated = generate(unitCaseEquality)
+
+			expect(generated).toContain(
+				'red[$type.typeKeySymbol] === "Colour#Green"',
+			)
+			expect(generated).not.toContain("$helpers.choiceIs(red,")
+		})
+
+		it("asks the opposite question for isNot", () => {
+			// NOTE: `!==`, not a negation of the answer — `isNot` costs what
+			// `is` costs.
+			expect(generate(unitCaseEquality)).toContain(
+				'red[$type.typeKeySymbol] !== "Colour#Green"',
+			)
+		})
+
+		it("hands back an interned Boolean", () => {
+			expect(generate(unitCaseEquality)).toContain(
+				"? Boolean.trueInstance : Boolean.falseInstance",
+			)
+		})
+
+		it("reads the value's tag with the Case on the receiver side", () => {
+			// NOTE: `#Red::is(red)` asks the same question of the same two
+			// values, and the Case that is dropped holds no Expression to
+			// evaluate — so there is no work and no order to preserve.
+			expect(generate(unitCaseEquality)).toContain(
+				'red[$type.typeKeySymbol] === "Colour#Red"',
+			)
+		})
+
+		it("leaves a Case carrying a payload to the runtime", () => {
+			// NOTE: The tag does not decide this one — two Circles differ by
+			// their radius — so the comparison stays the call it was.
+			expect(generate(unitCaseEquality)).toContain(
+				"$helpers.choiceIs(circle,",
+			)
+		})
+
+		it("lowers a generic Choice's payload-less Case", () => {
+			// NOTE: A generic Choice compares through a descriptor, which names
+			// the payload members each tag carries. `#Void` carries none, so the
+			// descriptor would have read the tags and stopped.
+			let generated = generate(unitCaseEquality)
+
+			expect(generated).toContain(
+				'_void[$type.typeKeySymbol] === "Box#Void"',
+			)
+			expect(generated).toContain(
+				'held[$type.typeKeySymbol] === "Box#Void"',
+			)
+			// NOTE: The one descriptor left is the payload comparison below —
+			// the only one of the three that needs it, and the only one carrying
+			// the witness that is the whole reason a payload can not be answered
+			// by a tag.
+			expect(generated.split("boundChoiceIs").length - 1).toBe(1)
+		})
+
+		it("leaves a generic Choice's payload-carrying Case to its descriptor", () => {
+			// NOTE: `#Holding` holds an `Item`, which compares through the
+			// witness the caller passed rather than structurally — the one thing
+			// a tag can not answer.
+			expect(generate(unitCaseEquality)).toContain(
+				"$helpers.boundChoiceIs(",
+			)
+		})
+
+		it("leaves an equality a Namespace writes alone", () => {
+			// NOTE: Only equality a Choice DERIVES is a question about tags. A
+			// written `is` is a Method, and is called.
+			let generated = generate(`implementation {
+				choice Colour { Red, Green }
+
+				namespace Colour for Colour is Equatable {
+					§§ Every Colour is every other Colour.
+					§§
+					§§ @param other — the Colour to compare with
+					§§ @returns — always true.
+					is(_ other: Colour) -> Boolean {
+						<- true
+					}
+
+					§§ The negation.
+					§§
+					§§ @param other — the Colour to compare with
+					§§ @returns — always false.
+					isNot(_ other: Colour) -> Boolean {
+						<- @::is(other)::negate()
+					}
+				}
+
+				constant red: Colour = #Red
+
+				__print(red::is(#Green))
+			}`)
+
+			expect(generated).toContain("Colour.is(red,")
+			expect(generated).not.toContain(
+				'[$type.typeKeySymbol] === "Colour#',
+			)
+		})
+
+		// NOTE: The lever this pass was written for. `isLessThan` is
+		// `@::compare(to other)::is(#Less)` and the other three inequalities are
+		// written on it, so every comparison in every Program ends in this
+		// shape — inside the standard library, which is optimised with the
+		// Program that reaches it.
+		it("lowers the standard library's own comparisons", () => {
+			let body = bodyOf(
+				generate(unitCaseEquality),
+				"$es_Integer_isLessThan",
+			)
+
+			expect(body).toContain(
+				'Integer.compare(_self, other)[$type.typeKeySymbol] === "Ordering#Less"',
+			)
+			expect(body).not.toContain("choiceIs(")
+		})
+
+		it("calls the runtime's equality again when it is turned off", () => {
+			let generated = generate(unitCaseEquality, {
+				enabled: true,
+				disabledPasses: new Set(["lower-unit-case-equality"]),
+			})
+
+			expect(generated).toContain(
+				'$helpers.choiceIs(red, $type.createCase("Colour#Green"))',
+			)
+			expect(generated).toContain(
+				'$helpers.choiceIsNot(red, $type.createCase("Colour#Green"))',
+			)
+			expect(bodyOf(generated, "$es_Integer_isLessThan")).toContain(
+				"$helpers.choiceIs(Integer.compare(",
+			)
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"lower-unit-case-equality",
+					unitCaseEquality,
+				),
+			).toEqual([
+				"false",
+				"true",
+				"true",
+				"true",
+				"true",
+				"false",
+				"true",
+				"true",
+				"false",
+				"true",
+				"true",
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"lower-unit-case-equality",
+				readFileSync(fixturePath("Choice.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-unit-case-equality",
+				readFileSync(fixturePath("GenericChoice.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-unit-case-equality",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
 		})
 	})
 

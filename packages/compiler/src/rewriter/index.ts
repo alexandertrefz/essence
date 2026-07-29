@@ -1630,6 +1630,29 @@ function rewriteIntrinsic(
 	node: common.typedSimple.IntrinsicNode,
 ): estree.Expression {
 	switch (node.kind) {
+		// NOTE: The tag as the value carries it — through `renderIdentity`, like
+		// every other place a tag is written, so a Choice declared in a Module
+		// is asked about under the same spelling it was stamped with.
+		case "tag-test":
+			return {
+				type: "BinaryExpression",
+				operator: node.negated ? "!==" : "===",
+				left: typeKeyRead(rewriteExpression(node.value)),
+				right: { type: "Literal", value: renderIdentity(node.tag) },
+			}
+		case "essence-boolean":
+			return {
+				type: "ConditionalExpression",
+				test: rewriteExpression(node.value),
+				consequent: memberRead(
+					{ type: "Identifier", name: "Boolean" },
+					"trueInstance",
+				),
+				alternate: memberRead(
+					{ type: "Identifier", name: "Boolean" },
+					"falseInstance",
+				),
+			}
 		case "direct-record":
 			return {
 				type: "ObjectExpression",
@@ -1708,15 +1731,31 @@ function rewriteIntrinsic(
 // imports. It is a Symbol, so it is invisible to `Object.keys` — which is what
 // Record equality, the printer and the runtime Type checks read with — and a
 // value branded here is indistinguishable from one the runtime branded.
+function typeKey(): estree.MemberExpression {
+	return memberRead({ type: "Identifier", name: "$type" }, "typeKeySymbol")
+}
+
 function typeKeyProperty(tag: string): estree.Property {
 	return {
 		type: "Property",
-		key: memberRead({ type: "Identifier", name: "$type" }, "typeKeySymbol"),
+		key: typeKey(),
 		value: { type: "Literal", value: tag },
 		kind: "init",
 		computed: true,
 		method: false,
 		shorthand: false,
+	}
+}
+
+// NOTE: The same key, read off a value — what the runtime's own Type checks ask
+// and what a `tag-test` is.
+function typeKeyRead(object: estree.Expression): estree.MemberExpression {
+	return {
+		type: "MemberExpression",
+		optional: false,
+		computed: true,
+		object,
+		property: typeKey(),
 	}
 }
 

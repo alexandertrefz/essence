@@ -315,11 +315,54 @@ export interface MatchNode {
 // `position` — the Rewriter maps Statements and outermost Expressions onto the
 // source through it, and a pass that dropped it would silently unmap the line a
 // debugger stops on.
+//
+// NOTE: A few of them answer a RAW JavaScript value rather than an Essence one
+// — a `tag-test` is a JavaScript boolean, not a Boolean — because the JavaScript
+// a lowering produces has to say `if (…)` and `? :` in JavaScript's own terms.
+// Each says so in its own note, and each names the Node that turns one back
+// into an Essence value: nothing may put a raw intrinsic where the Program
+// expects a value.
 export type IntrinsicNode =
+	| TagTestNode
+	| EssenceBooleanNode
 	| DirectRecordNode
 	| DirectCaseNode
 	| DirectListNode
 	| SpreadCombinationNode
+
+// NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
+// "Ordering#Less"`, the whole of what the runtime asks when the answer can not
+// depend on a payload.
+//
+// NOTE: It answers a RAW JavaScript boolean. `type` is `Boolean` because
+// Boolean is what the question decides, not because this Node may stand where a
+// Boolean value is expected: `essence-boolean` is what makes one of those. A
+// `tag-test` belongs in a test position — a Conditional, another raw operation,
+// or wrapped.
+//
+// NOTE: `negated` asks the opposite question rather than negating the answer:
+// the emission is `!==`, so `isNot` costs exactly what `is` does.
+export interface TagTestNode {
+	nodeType: "Intrinsic"
+	kind: "tag-test"
+	value: ExpressionNode
+	tag: string
+	negated: boolean
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: A raw JavaScript boolean as an Essence Boolean — `<test> ?
+// Boolean.trueInstance : Boolean.falseInstance`, which is `createBoolean`
+// written out at the site. There are exactly two Boolean objects and these are
+// they, so this allocates nothing.
+export interface EssenceBooleanNode {
+	nodeType: "Intrinsic"
+	kind: "essence-boolean"
+	value: ExpressionNode
+	type: BooleanType
+	position?: Position
+}
 
 // NOTE: A Record built in one allocation: the branded object literal
 // `Record.createRecord` would have built from a literal it was handed — the

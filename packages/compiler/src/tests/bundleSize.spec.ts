@@ -107,6 +107,16 @@ describe("Bundle Size", () => {
 	// RUNS is one allocation per value instead of two. Irrational.es, which
 	// constructs no Record and no List, is unchanged to the byte.
 	//
+	// NOTE: It now measures 59,658, down 2,730, and the ceiling came DOWN with
+	// it to keep the same ~1 kB of headroom — a ceiling three kilobytes above
+	// the measurement stops catching the kilobyte-scale mistakes it is here for.
+	// `lower-unit-case-equality` is what shrank it: a comparison against a
+	// payload-less Case is a tag test now, so the Programs that only ever
+	// compared that way stop reaching the universal structural equality, and its
+	// whole ladder of kind tests — Records, Lists, the cross-kind rational
+	// arithmetic — falls out of the bundle with it. HelloWorld.es, which reaches
+	// it through nothing but a comparison, lost a quarter of its bytes.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -114,7 +124,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(63_400)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(60_700)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -129,9 +139,12 @@ describe("Bundle Size", () => {
 	// now measures 34,448: it takes square roots, which are fallible, so it
 	// carries the Case construction a nominal `Optional` needs and `Optional`'s
 	// own bodies. The rise is a fifth of Everyday's because it reaches neither
-	// `parse`.
+	// `parse`. It now measures 31,932 — down 3,198 for the same reason
+	// Everyday's figure fell, and by more of its own size, because a Program
+	// this small carried structural equality for the sake of two comparisons.
+	// The ceiling came down with it.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(35_500)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(33_000)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
