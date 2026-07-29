@@ -8,6 +8,7 @@ import {
 import {
 	canonicalPath,
 	enrichDocument,
+	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
 import {
@@ -70,7 +71,10 @@ export function analyseDocument(
 		// is analysed as one — no graph is loaded, nothing is read off disk, and
 		// its Diagnostics are the ones it always had. It may well be some other
 		// Module's dependency; that Module's own analysis is what covers it.
-		if (isModule(parsedProgram) && documentPath !== undefined) {
+		if (
+			isModule(parsedProgram, documentPath) &&
+			documentPath !== undefined
+		) {
 			let analysis = analyseModuleGraph(
 				source,
 				documentPath,
@@ -122,11 +126,22 @@ export function analyse(
 	return analyseDocument(source, documentPath, options).diagnostics
 }
 
-// NOTE: A `declarations { … }` Program can carry neither section, so a standard
-// library source never reaches the graph — the Parser refuses the sections
-// there, and `documents.ts` is what draws that line for everything else.
-function isModule(program: parser.Program): boolean {
-	return program.imports !== null || program.exports !== null
+// NOTE: A standard library source writes import sections like any other Module,
+// but it is not analysed through the graph: the process-wide loader has already
+// hoisted every one of its files into the builtin tables, and `enrichDocument`
+// subtracts the file's own names back out so that editing it does not read as a
+// redeclaration of itself. The graph path has no equivalent of that correction,
+// so routing a standard library source through it would give one file two
+// enrichments that disagree. It is analysed as the single declaration space the
+// loader made it.
+export function isModule(
+	program: parser.Program,
+	documentPath: string | undefined,
+): boolean {
+	return (
+		(program.imports !== null || program.exports !== null) &&
+		!(documentPath !== undefined && isStdlibDocument(documentPath))
+	)
 }
 
 // NOTE: The Language Server is handed URIs and the tests plain paths, and a

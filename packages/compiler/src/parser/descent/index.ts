@@ -271,7 +271,9 @@ class DescentParser {
 	// NOTE: Which of the blocks read on either side the Program keeps, and which
 	// are refused. A refused block is dropped rather than carried along broken:
 	// every later stage may read the sections a Program has as the sections it
-	// meant, and a standard library Program must never carry one at all.
+	// meant. A `declarations { … }` Program carries them on the same terms as
+	// any other — the standard library's files are Modules too, each importing
+	// what it uses from its siblings.
 	protected resolveModuleSections(
 		sections: Array<ModuleSectionRead>,
 		implementationPosition: common.Position,
@@ -283,12 +285,6 @@ class DescentParser {
 		let exports: parser.ExportSectionNode | null = null
 
 		for (let section of sections) {
-			if (this.allowDeclarationsHeader) {
-				this.reportSectionOutsideModule(section)
-
-				continue
-			}
-
 			if (section.node.nodeType === "ImportSection") {
 				if (section.side === "above") {
 					imports = section.node
@@ -340,33 +336,6 @@ class DescentParser {
 				helps: [
 					`Move the '${keyword} { … }' block ${expectedSide} 'implementation { … }'.`,
 				],
-			},
-		)
-	}
-
-	protected reportSectionOutsideModule(section: ModuleSectionRead): void {
-		if (this.suppressDiagnostics) {
-			return
-		}
-
-		let keyword =
-			section.node.nodeType === "ImportSection" ? "import" : "export"
-
-		reportError(
-			`The standard library may not carry an '${keyword} { … }' block`,
-			section.keywordPosition,
-			{
-				code: "misplaced-module-section",
-				labels: [
-					primary(
-						section.keywordPosition,
-						`'${keyword}' is not allowed here`,
-					),
-				],
-				notes: [
-					"The standard library is one shared declaration space rather than a graph of Modules — every one of its files sees every other, and none of them is importable.",
-				],
-				helps: [`Remove the '${keyword} { … }' block.`],
 			},
 		)
 	}

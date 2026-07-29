@@ -2572,8 +2572,13 @@ export { Rectangle from "./Geometry.es" }`,
 			})
 		})
 
+		// NOTE: A `declarations { … }` Program carries its sections on exactly
+		// the same terms as an `implementation { … }` one — the standard
+		// library's files are Modules too, each importing what it uses from its
+		// siblings. Only the SIDE a block is written on is still refused, and it
+		// is refused by the same check that refuses it anywhere else.
 		describe("Declarations Programs", () => {
-			it("should refuse an import section in a standard library file", () => {
+			it("should keep an import section in a standard library file", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`import { Rectangle from "./Geometry.es" }
 
@@ -2581,16 +2586,15 @@ export { Rectangle from "./Geometry.es" }`,
 					{ allowDeclarationsHeader: true },
 				)
 
-				expect(diagnostics).toHaveLength(1)
-				expect(diagnostics[0].code).toBe("misplaced-module-section")
-				expect(diagnostics[0].message).toBe(
-					"The standard library may not carry an 'import { … }' block",
-				)
+				expect(diagnostics).toHaveLength(0)
 				expect(program.kind).toBe("declarations")
-				expect(program.imports).toBeNull()
+				expect(program.imports?.entries).toHaveLength(1)
+				expect(program.imports?.entries[0].name.content).toBe(
+					"Rectangle",
+				)
 			})
 
-			it("should refuse an export section in a standard library file", () => {
+			it("should keep an export section in a standard library file", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`declarations { }
 
@@ -2598,29 +2602,37 @@ export { Rectangle from "./Geometry.es" }`,
 					{ allowDeclarationsHeader: true },
 				)
 
-				expect(diagnostics).toHaveLength(1)
-				expect(diagnostics[0].code).toBe("misplaced-module-section")
-				expect(diagnostics[0].message).toBe(
-					"The standard library may not carry an 'export { … }' block",
-				)
-				expect(program.exports).toBeNull()
+				expect(diagnostics).toHaveLength(0)
+				expect(program.exports?.entries).toHaveLength(1)
+				expect(program.exports?.entries[0].name.content).toBe("Number")
 			})
 
-			it("should refuse both sections of a standard library file at once", () => {
-				let { diagnostics } = parseWithDiagnostics(
+			it("should keep both sections of a standard library file at once", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
 					`import { A from "./A.es" }
 					declarations { }
 					export { B }`,
 					{ allowDeclarationsHeader: true },
 				)
 
-				expect(diagnostics).toHaveLength(2)
-				expect(
-					diagnostics.every(
-						(diagnostic) =>
-							diagnostic.code === "misplaced-module-section",
-					),
-				).toBe(true)
+				expect(diagnostics).toHaveLength(0)
+				expect(program.imports?.entries).toHaveLength(1)
+				expect(program.exports?.entries).toHaveLength(1)
+			})
+
+			// NOTE: The side check is what survives. An `import` written BELOW
+			// the header is still misplaced in a declarations Program, exactly
+			// as it is in an implementation one.
+			it("should still refuse a misplaced section in a standard library file", () => {
+				let { program, diagnostics } = parseWithDiagnostics(
+					`declarations { }
+					import { A from "./A.es" }`,
+					{ allowDeclarationsHeader: true },
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("misplaced-module-section")
+				expect(program.imports).toBeNull()
 			})
 		})
 
