@@ -36,6 +36,22 @@ function denominatorOf(number: IntegerType | RationalType): bigint {
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {
+	// NOTE: A value is equal to itself, whatever kind it is, so the one
+	// comparison that costs nothing is asked first. This is not a shortcut past
+	// a different answer: equality here is structural and therefore reflexive,
+	// there is no float in the language and so no NaN to be unequal to itself,
+	// and a Function is compared by identity anyway. What it skips is the whole
+	// recursive walk of a Record, a List or a Case payload compared against
+	// itself.
+	//
+	// NOTE: It earns its place because identical operands are ORDINARY rather
+	// than freakish: the two Boolean values, every unit Case and — once the
+	// Optimiser pools them — every literal are one shared instance each, so a
+	// comparison that used to be two objects is now one object twice.
+	if (a === b) {
+		return true
+	}
+
 	// NOTE: A Function is the one runtime value carrying no Type key — it is
 	// emitted as a bare JavaScript function, not a tagged object — so it is
 	// answered before anything reads that key. Without this, comparing a
