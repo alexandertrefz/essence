@@ -5,6 +5,7 @@ import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
 import { elideFinalMatchTest } from "./passes/elideFinalMatchTest"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
+import { poolConstants } from "./passes/poolConstants"
 
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
@@ -62,6 +63,7 @@ export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	elideFinalMatchTest,
 	collapseConstruction,
 	collapseCombinations,
+	poolConstants,
 ]
 
 export const optimiserPassNames: ReadonlyArray<string> = optimiserPasses.map(

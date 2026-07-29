@@ -204,6 +204,68 @@ along on the spread of the left-hand side. A right-hand side that is not
 written as a literal is spread whole instead of member by member, which is
 what `Object.assign` did with it.
 
+### `pool-constants`
+
+Builds each constant once, in a band of consts, instead of at every site.
+
+A constant written in a Program was built at every site it was written at, and
+built again on every turn of whatever loop reached it. `1` is
+`Integer.createInteger(1n)` — an object, a bigint and a call, per turn.
+`"{value}"` builds `{ toString: Integer.toString }` before it renders anything,
+once per hole. A Match's Record Matcher rebuilds `{ type: "Record", members: … }`
+to hand to the check, per test, per turn. None of them can differ from one
+evaluation to the next, so each is built once and read by name:
+
+```js
+const $pool_0 = Integer.createInteger(1n);
+const $pool_1 = { compare: Integer.compare };
+```
+
+The band sits between the standard library's Function-valued consts and its
+static Property values, which is the one place it can sit: a pooled conformance
+witness reads the Functions above it, and a Property's value — which runs where
+its const is emitted — may read a pooled constant. Each emitted Module has its
+own band, because a name declared in one Module is not in scope in another: a
+build emits the standard library as a Module of its own, so its band stands
+there and each Module's own band stands with its code, even where the build is
+of a single file. Where a Program is emitted as ONE Module — the Compiler's
+single-Program form — the two are one band, and a constant the prelude and the
+Program both want is declared once. Only the constants something actually reads
+are declared.
+
+What is pooled: Integer, String and Rational literals; Cases with no payload;
+the Type descriptors a Match Handler's check still needs; and conformance
+witnesses, including the `boundConformance(…)` a conditional one is built by.
+A conditional witness is told from another by which witnesses are curried onto
+it, all the way down — sorting a `List<List<Item>>` and sorting a `List<Item>`
+both build `{ compare: List.compare }`, and they are two constants, because the
+witness inside is the whole of what says which comparison is meant.
+
+Safe on exactly what the interning in the runtime rests on. Every Essence value
+is immutable, and the language has no operator asking whether two values are the
+SAME value — only whether they are EQUAL — so one shared value is
+indistinguishable from twenty equal ones, and one built before the Program's
+first Statement is indistinguishable from one built where it was written. What
+would not be indistinguishable is a value whose construction can fail or observe
+something, and none of these can: a literal, a payload-less Case, a descriptor
+and a method map are all data.
+
+Booleans are deliberately absent: there are exactly two Boolean objects in a
+running Program already, and pooling one would name what it already has.
+
+A witness naming a Namespace the Program DECLARES is left where it was. Such a
+Namespace is emitted as a `class`, which is not hoisted, so a const above it
+reading one would be a `ReferenceError` at import — every other Namespace a
+witness can name is a runtime module bound by an `import` before any Statement
+runs. A witness carrying a conformance forwarded from its enclosing Function is
+left alone too: that is a different value per call and no constant at all.
+
+Two things are not pooled yet, both for the same reason — the descriptor hangs
+off a Node rather than standing in an Expression position, so nothing can reach
+it: the plan a generic Choice's derived equality follows where it is called
+directly, and a Union dispatch's per-case member Types. `compile-union-dispatch`
+rebuilds those sites and is where they will be picked up.
+
 ## Runtime improvements
 
 These are improvements to the runtime itself rather than to the code the

@@ -343,11 +343,14 @@ export type MatchHandler = {
 // expects a value.
 export type IntrinsicNode =
 	| TagTestNode
+	| TypeTestNode
+	| TypeDescriptorNode
 	| EssenceBooleanNode
 	| DirectRecordNode
 	| DirectCaseNode
 	| DirectListNode
 	| SpreadCombinationNode
+	| PooledReferenceNode
 
 // NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
 // "Ordering#Less"`, the whole of what the runtime asks when the answer can not
@@ -368,6 +371,59 @@ export interface TagTestNode {
 	tag: string
 	negated: boolean
 	type: BooleanType
+	position?: Position
+}
+
+// NOTE: The general Type check, as the runtime performs it —
+// `$type.isValueOfType(<value>, <descriptor>)` — where the tag does not decide
+// and the descriptor has to be walked. It is what a Match Handler's Matcher
+// compiles to when it can not compile to a `tag-test`, and it exists as a Node
+// of its own so that the descriptor stands in an Expression position: that is
+// what lets `pool-constants` hoist it, where a Type hanging off a Handler is
+// reachable by nothing.
+//
+// NOTE: A RAW JavaScript boolean, like `tag-test`, and belongs in the same
+// places.
+export interface TypeTestNode {
+	nodeType: "Intrinsic"
+	kind: "type-test"
+	value: ExpressionNode
+	descriptor: ExpressionNode
+	type: BooleanType
+	position?: Position
+}
+
+// NOTE: One Type as the runtime's own checks read it — the object literal
+// `{ type: "Record", members: { … } }` that `isValueOfType` walks. It is DATA
+// rather than an Essence value: nothing may hand one to a Method or store it in
+// a Variable, and `type` is `Unknown` because there is no Essence Type it has.
+// Only a `type-test` and the pool may hold one.
+export interface TypeDescriptorNode {
+	nodeType: "Intrinsic"
+	kind: "type-descriptor"
+	descriptor: Type
+	type: Type
+	position?: Position
+}
+
+// NOTE: A read of a value the Program builds ONCE, in a const band of its own,
+// instead of building it again at each site that wants it. `key` is what makes
+// two of them one — a canonical spelling of the value, so that the same literal
+// written in twenty places is one object — and `value` is what the band
+// declares. The NAME is not here: it is decided per emitted Module, where the
+// standard library's pooled constants and the Program's own meet and have to be
+// told apart.
+//
+// NOTE: What may be pooled is decided by `pool-constants` and rests on the same
+// property interning does: every Essence value is immutable and no operator
+// asks whether two values are the SAME value, so one shared value is
+// indistinguishable from many equal ones.
+export interface PooledReferenceNode {
+	nodeType: "Intrinsic"
+	kind: "pooled-reference"
+	key: string
+	value: ExpressionNode
+	type: Type
 	position?: Position
 }
 
