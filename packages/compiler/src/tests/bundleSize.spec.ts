@@ -149,6 +149,17 @@ describe("Bundle Size", () => {
 	// paid once: a Program reaching any rounding at all now reaches the same
 	// body. A duplicated per-Module prelude would still overshoot the moved
 	// ceiling by kilobytes.
+	//
+	// NOTE: It now measures 20,693 and the ceiling moves to 21,200. 530 of the
+	// rise came with the nominal `Optional` and went unrecorded here — the
+	// figure above stayed at 19,499 while the measurement moved to 20,030 — and
+	// 663 are the unconditional runtime improvements: 137 for the interned
+	// Booleans, 275 for the interned unit Cases, 38 for the reflexive equality
+	// shortcut and 213 for remembering a Rational's lowest-terms form. This
+	// bundle reaches no String Method that segments, so the grapheme view costs
+	// it nothing. The ceiling keeps ~500 bytes of headroom deliberately: the
+	// duplication it exists to catch is about a kilobyte here, so it has to stay
+	// nearer than that to the measurement to catch one.
 	it("carries one copy of the prelude across a bundle of Modules", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
@@ -184,6 +195,6 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(20_500)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(21_200)
 	})
 })
