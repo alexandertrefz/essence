@@ -12,6 +12,7 @@ import {
 import {
 	applyGenericBindings,
 	buildUnion,
+	canonicalPredicateConjuncts,
 	choiceIdentity,
 	closestMatch,
 	countOf,
@@ -55,6 +56,7 @@ import {
 	recordValueTypeOf,
 	parameterDocumentation,
 	reportUnknownDocumentationParameters,
+	resolveAliasedType,
 	resolveChoiceDeclarationStatementType,
 	resolveConformances,
 	resolveDeclaredType,
@@ -68,7 +70,6 @@ import {
 	resolveProtocolDeclarationStatementType,
 	resolveSelfType,
 	resolveType,
-	resolveTypeAliasStatementType,
 	scopeWithGenerics,
 	silentCheckedConformances,
 	solveConformance,
@@ -2688,9 +2689,38 @@ export function enrichTypeAliasStatement(
 			enrichGenericDeclarationNode(generic, scope),
 		),
 		type,
+		predicate:
+			node.predicate === null
+				? null
+				: enrichAliasPredicate(node.predicate, type, scope),
 		position: node.position,
 		documentation: node.documentation,
 	}
+}
+
+// NOTE: The typed predicate the Node carries, for the Language Server alone —
+// the Type above already holds the conjunct keys the Compiler compares, and the
+// clause was resolved to reach them.
+//
+// Its Diagnostics are DROPPED, which is the whole reason this is a function of
+// its own. Whatever the clause has to be told was told: either hoisting resolved
+// it cleanly, in which case a second reading finds nothing, or it did not, in
+// which case the line above resolved it in place and reported. Re-reporting here
+// would say it twice for every refined Alias in the Program.
+function enrichAliasPredicate(
+	predicate: parser.ExpressionNode,
+	type: common.Type,
+	scope: enricher.Scope,
+): common.typed.ExpressionNode {
+	return collectDiagnostics(() =>
+		enrichExpression(
+			predicate,
+			scopeWithRefinedSelf(
+				type.type === "Refinement" ? type.base : type,
+				scope,
+			),
+		),
+	).result
 }
 
 export function enrichChoiceDeclarationStatement(
@@ -3437,9 +3467,10 @@ function inferReturnTypeFromBody(
 // #region Invocation, contextual Function & CaseValue resolution
 //
 // NOTE: Typing an invocation, a contextually typed Function literal, a
-// CaseValue Expression, or a Namespace's property values all needs to enrich
-// Expressions — so it lives here, on the enrichment side, rather than in the
-// Resolver. Enrichment imports the Resolver, never the other way round.
+// CaseValue Expression, a Namespace's property values, or a Type Alias' `where`
+// clause all needs to enrich Expressions — so it lives here, on the enrichment
+// side, rather than in the Resolver. Enrichment imports the Resolver, never the
+// other way round.
 
 // NOTE: Enriches each Argument value at most once per invocation resolution.
 // The typed Node is reused for every overload probe and, afterwards, for the
@@ -6821,6 +6852,294 @@ function functionLiteralPosition(
 	node: parser.FunctionDefinitionNode,
 ): common.Position | null {
 	return node.parameters[0]?.position ?? null
+}
+
+// NOTE: What a Type Alias means, `where` clause and all. Without a clause this
+// is nothing but `resolveAliasedType`; with one the Alias declares a checked
+// refinement, and the Type it answers with is the evidence every value of the
+// name carries.
+//
+// NOTE: The predicate is enriched on EVERY call, and no resolution of it is kept
+// anywhere. Hoisting resolves speculatively, round after round, and the first
+// round a refined Alias is offered in may well be the one before the Namespace
+// answering its predicate has hoisted at all — the standard library declares
+// `type NonZeroInteger` in the same file as `namespace Integer`. That round
+// reports `unknown-method` into a collection it then throws away, and the next
+// one resolves cleanly. A cached first answer would be the wrong one forever.
+export function resolveTypeAliasStatementType(
+	node: parser.TypeAliasStatementNode,
+	scope: enricher.Scope,
+): common.Type {
+	let aliasedType = resolveAliasedType(node, scope)
+
+	if (node.predicate === null) {
+		return aliasedType
+	}
+
+	// NOTE: Poison recovery — a refused clause leaves the Alias meaning exactly
+	// what it would have meant without one. A Diagnostic has already named the
+	// clause, and every use of the name downstream is then about itself rather
+	// than about an Error Type nobody wrote.
+	return (
+		refineAliasedType(node, node.predicate, aliasedType, scope) ??
+		aliasedType
+	)
+}
+
+// NOTE: The Scope a predicate is read in — the surrounding one plus `@`, bound
+// to the base as a CONSTANT, which is what a Match Handler's `@` is too. A child
+// Scope, so the binding never reaches the Program's own.
+function scopeWithRefinedSelf(
+	base: common.Type,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return declareVariableInScope("@", base, childScope(scope), true)
+}
+
+function refineAliasedType(
+	node: parser.TypeAliasStatementNode,
+	predicateNode: parser.ExpressionNode,
+	aliasedType: common.Type,
+	scope: enricher.Scope,
+): common.RefinementType | null {
+	// NOTE: A generic refinement is v2 — `type NonEmpty<Item> = List<Item> where
+	// @::hasItems()` would have to carry its Type Arguments into the conjunct
+	// keys assignability compares, and a Namespace written for it would be a
+	// generic Namespace targeting a refinement. Refused outright rather than
+	// half-supported, so nothing depends on a shape that is going to change.
+	if (node.generics.length > 0) {
+		reportError(
+			`Type Alias '${node.name.content}' can not be generic and refined`,
+			predicateNode.position,
+			{
+				code: "invalid-refinement-predicate",
+				labels: [
+					primary(
+						predicateNode.position,
+						"this predicate refines a Type Parameter",
+					),
+					secondary(
+						node.generics[0].position,
+						"declared with a Type Parameter here",
+					),
+				],
+				notes: [
+					"A 'where' clause on a Type Alias proves something about the values of ONE Type, and a generic Alias stands for a different Type at every use.",
+				],
+				helps: [
+					`Drop the Type Parameters, or drop the 'where' clause from '${node.name.content}'.`,
+				],
+			},
+		)
+
+		return null
+	}
+
+	// NOTE: A poisoned base says nothing about the clause — the Type it names is
+	// not declared, or names itself — and whatever produced the Error has already
+	// been reported. Refused silently, exactly as the Boolean check below refuses
+	// an Error-typed predicate.
+	if (typeContainsError(aliasedType)) {
+		return null
+	}
+
+	if (!isRefinableBase(aliasedType)) {
+		let described = describeRefinementBase(aliasedType)
+
+		reportError(
+			`A 'where' clause can not refine ${described}`,
+			node.type.position,
+			{
+				code: "invalid-refinement-predicate",
+				labels: [primary(node.type.position, `this is ${described}`)],
+				notes: [
+					"A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.",
+				],
+				helps: [`Drop the 'where' clause from '${node.name.content}'.`],
+			},
+		)
+
+		return null
+	}
+
+	let predicate = enrichExpression(
+		predicateNode,
+		scopeWithRefinedSelf(aliasedType, scope),
+	)
+
+	// NOTE: The same question `validateCondition` asks of an `if` — a predicate
+	// that is not a Boolean proves nothing — and an Error Type is let through
+	// silently, because whatever produced it has already been reported.
+	if (predicate.type.type !== "Boolean") {
+		if (predicate.type.type !== "Error") {
+			reportError(
+				"This predicate is not a Boolean",
+				predicateNode.position,
+				{
+					code: "predicate-not-boolean",
+					labels: [
+						primary(
+							predicateNode.position,
+							`this is ${describeType(predicate.type)}`,
+						),
+					],
+					notes: [
+						"A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.",
+					],
+				},
+			)
+		}
+
+		return null
+	}
+
+	let conjuncts = extractPredicateConjuncts(predicate)
+
+	if (conjuncts === null) {
+		return null
+	}
+
+	return {
+		type: "Refinement",
+		name: node.name.content,
+		base: aliasedType,
+		conjuncts: canonicalPredicateConjuncts(conjuncts),
+	}
+}
+
+// NOTE: The v1 bases. Integer and String are the two scalars every predicate in
+// the standard library's own slice is about, and an APPLIED List is the third —
+// `List<String>`, never a bare `List`, whose item Type nothing has decided. The
+// list is short because each base is a promise: every Method a base answers, a
+// refinement of it answers too, and every one of those has to keep meaning what
+// it meant.
+function isRefinableBase(type: common.Type): boolean {
+	return (
+		type.type === "Integer" ||
+		type.type === "String" ||
+		type.type === "List"
+	)
+}
+
+// NOTE: An anonymous Union takes the Alias' own name as it resolves, so
+// describing a refused base straight would report that 'Weird' is Weird. The
+// refusal is about the SHAPE, so the borrowed name is dropped and the members
+// are spelled out.
+function describeRefinementBase(type: common.Type): string {
+	return type.type === "UnionType" && type.name !== undefined
+		? describeType({ ...type, name: undefined })
+		: describeType(type)
+}
+
+// NOTE: The conjunct set a typed predicate spells, or null when it spells
+// something a refinement can not be compared by — every refusal reports before
+// it returns, so a null here is always a Diagnostic there.
+//
+// A predicate is a conjunction, flattened: `@::isPositive()::and(@::isNot(1))`
+// is two conjuncts and so is the mirror image of it, which is what makes
+// assignability set inclusion rather than Expression comparison. Everything else
+// is one leaf, and a leaf is a single Method call directly on `@` with literal
+// Arguments — a chain (`@::trim()::hasAnyContent()`) would need the intermediate
+// value's evidence, and a computed Argument would need evaluating.
+function extractPredicateConjuncts(
+	predicate: common.typed.ExpressionNode,
+): Array<common.PredicateConjunct> | null {
+	if (predicate.nodeType !== "MethodInvocation") {
+		reportInvalidPredicateLeaf(
+			predicate.position,
+			"this is not a Method call on '@'",
+			"Write a Method call on '@' — '@::isNot(0)' — optionally joined with '::and(…)'.",
+		)
+
+		return null
+	}
+
+	if (
+		predicate.namespace.name === "Boolean" &&
+		predicate.member.name === "and" &&
+		predicate.arguments.length === 1
+	) {
+		let left = extractPredicateConjuncts(predicate.base)
+		let right = extractPredicateConjuncts(predicate.arguments[0].value)
+
+		return left === null || right === null ? null : [...left, ...right]
+	}
+
+	if (predicate.base.nodeType !== "Self") {
+		reportInvalidPredicateLeaf(
+			predicate.base.position,
+			"this is not '@'",
+			"Call the Method on '@' directly.",
+		)
+
+		return null
+	}
+
+	let args: Array<string | boolean> = []
+
+	for (let argument of predicate.arguments) {
+		let literal = literalPredicateArgument(argument.value)
+
+		if (literal === null) {
+			reportInvalidPredicateLeaf(
+				argument.value.position,
+				"this is not a literal value",
+				"Pass a written Integer, Rational, String or Boolean.",
+			)
+
+			return null
+		}
+
+		args.push(literal)
+	}
+
+	return [
+		{
+			namespaceName: predicate.namespace.name,
+			methodName: predicate.member.name,
+			overloadIndex: predicate.overloadedMethodIndex,
+			args,
+		},
+	]
+}
+
+function reportInvalidPredicateLeaf(
+	position: common.Position,
+	label: string,
+	help: string,
+): void {
+	reportError(
+		"This is not a predicate a refinement can be checked by",
+		position,
+		{
+			code: "invalid-refinement-predicate",
+			labels: [primary(position, label)],
+			notes: [
+				"A predicate is one Method call on '@' with literal Arguments, or several of them joined with '::and(…)'.",
+			],
+			helps: [help],
+		},
+	)
+}
+
+// NOTE: A literal Argument as the stable scalar a conjunct key is built from.
+// The Integer's digits rather than its value, because a value is a bigint at run
+// time and JSON has no bigint; the Rational's two halves under the slash it was
+// written with, which no Integer's digits can spell.
+function literalPredicateArgument(
+	value: common.typed.ExpressionNode,
+): string | boolean | null {
+	switch (value.nodeType) {
+		case "IntegerValue":
+		case "StringValue":
+			return value.value
+		case "BooleanValue":
+			return value.value
+		case "RationalValue":
+			return `${value.numerator}/${value.denominator}`
+		default:
+			return null
+	}
 }
 
 // NOTE: A Namespace's own name, bound to the Namespace itself — what makes

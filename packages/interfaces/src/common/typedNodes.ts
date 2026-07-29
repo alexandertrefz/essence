@@ -455,6 +455,18 @@ export interface TypeAliasStatementNode {
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	type: Type
+	// NOTE: A checked refinement's predicate, enriched — `@::isNot(0)` with `@`
+	// typed as the base. This is the ONE place the typed Expression is kept: the
+	// Type carries the conjunct KEYS the Compiler compares, and keeping the
+	// Expression out of it is what keeps `conformanceKey` and its memo keys the
+	// size they were. Null for every ordinary Alias, and for a refinement whose
+	// clause was refused — a Diagnostic said so, and the Alias means its base.
+	//
+	// NOTE: Nothing downstream of the Enricher reads it — a Type Alias erases to
+	// nothing at all, so the simplified mirror carries no predicate — it is here
+	// for the Language Server, which reads the typed tree to answer about the
+	// text a reader's cursor sits on.
+	predicate: ExpressionNode | null
 	position: Position
 	documentation: Documentation | null
 }

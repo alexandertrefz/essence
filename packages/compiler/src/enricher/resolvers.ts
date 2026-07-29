@@ -3049,7 +3049,13 @@ export function checkProtocolConformance(
 	return checked
 }
 
-export function resolveTypeAliasStatementType(
+// NOTE: What a Type Alias means WITHOUT its `where` clause — the Type its body
+// resolves to, which is also the base a checked refinement refines. A refined
+// Alias needs Expressions enriched, and enrichment imports the Resolver rather
+// than the other way round, so the clause is read by
+// `resolveTypeAliasStatementType` over in `enrichers.ts` and this is the half
+// that stayed here.
+export function resolveAliasedType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 ): common.Type {

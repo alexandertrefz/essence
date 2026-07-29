@@ -20645,6 +20645,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
             "line": 1,
           },
         },
+        "predicate": null,
         "type": {
           "nodeType": "IdentifierTypeDeclaration",
           "position": {
@@ -20735,6 +20736,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
             "line": 1,
           },
         },
+        "predicate": null,
         "type": {
           "members": {},
           "nodeType": "RecordTypeDeclaration",
@@ -20812,6 +20814,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
             "line": 1,
           },
         },
+        "predicate": null,
         "type": {
           "members": {
             "key": {
@@ -20933,6 +20936,7 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
             "line": 1,
           },
         },
+        "predicate": null,
         "type": {
           "members": {
             "key": {
@@ -21083,6 +21087,157 @@ exports[`Parser Statements TypeAliasStatements should parse TypeAlias Statements
   "position": {
     "end": {
       "column": 68,
+      "line": 1,
+    },
+    "start": {
+      "column": 1,
+      "line": 1,
+    },
+  },
+}
+`;
+
+exports[`Parser Statements Refinement predicates should parse a predicate on a SimpleType 1`] = `
+{
+  "exports": null,
+  "implementation": {
+    "nodeType": "ImplementationSection",
+    "nodes": [
+      {
+        "documentation": null,
+        "generics": [],
+        "name": {
+          "content": "NonZeroInteger",
+          "nodeType": "Identifier",
+          "position": {
+            "end": {
+              "column": 37,
+              "line": 1,
+            },
+            "start": {
+              "column": 23,
+              "line": 1,
+            },
+          },
+        },
+        "nodeType": "TypeAliasStatement",
+        "position": {
+          "end": {
+            "column": 65,
+            "line": 1,
+          },
+          "start": {
+            "column": 18,
+            "line": 1,
+          },
+        },
+        "predicate": {
+          "arguments": [
+            {
+              "name": null,
+              "nodeType": "Argument",
+              "value": {
+                "nodeType": "IntegerValue",
+                "position": {
+                  "end": {
+                    "column": 64,
+                    "line": 1,
+                  },
+                  "start": {
+                    "column": 63,
+                    "line": 1,
+                  },
+                },
+                "value": "0",
+              },
+            },
+          ],
+          "base": {
+            "nodeType": "Self",
+            "position": {
+              "end": {
+                "column": 55,
+                "line": 1,
+              },
+              "start": {
+                "column": 54,
+                "line": 1,
+              },
+            },
+          },
+          "member": {
+            "content": "isNot",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 62,
+                "line": 1,
+              },
+              "start": {
+                "column": 57,
+                "line": 1,
+              },
+            },
+          },
+          "namespaceSpecifier": null,
+          "nodeType": "MethodInvocation",
+          "position": {
+            "end": {
+              "column": 65,
+              "line": 1,
+            },
+            "start": {
+              "column": 54,
+              "line": 1,
+            },
+          },
+        },
+        "type": {
+          "nodeType": "IdentifierTypeDeclaration",
+          "position": {
+            "end": {
+              "column": 47,
+              "line": 1,
+            },
+            "start": {
+              "column": 40,
+              "line": 1,
+            },
+          },
+          "type": {
+            "content": "Integer",
+            "nodeType": "Identifier",
+            "position": {
+              "end": {
+                "column": 47,
+                "line": 1,
+              },
+              "start": {
+                "column": 40,
+                "line": 1,
+              },
+            },
+          },
+        },
+      },
+    ],
+    "position": {
+      "end": {
+        "column": 67,
+        "line": 1,
+      },
+      "start": {
+        "column": 1,
+        "line": 1,
+      },
+    },
+  },
+  "imports": null,
+  "kind": "implementation",
+  "nodeType": "Program",
+  "position": {
+    "end": {
+      "column": 67,
       "line": 1,
     },
     "start": {

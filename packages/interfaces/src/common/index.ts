@@ -183,6 +183,8 @@ export type DiagnosticCode =
 	| "infer-on-applied-parameter"
 	| "uninferred-namespace-parameter"
 	| "zero-denominator"
+	| "invalid-refinement-predicate"
+	| "predicate-not-boolean"
 	// Dispatch — which Method, in which Namespace, with which overload.
 	| "no-matching-overload"
 	| "ambiguous-namespace"

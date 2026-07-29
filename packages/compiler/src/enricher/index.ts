@@ -14,6 +14,7 @@ import {
 	enrichOverloadedFunctionStatement,
 	type HoistedTypes,
 	resolveNamespaceDefinitionStatementType,
+	resolveTypeAliasStatementType,
 } from "./enrichers"
 import {
 	invalidateNamespacesInScope,
@@ -23,7 +24,6 @@ import {
 	resolveNativeFunctionStatementType,
 	resolveOverloadedFunctionStatementType,
 	resolveProtocolDeclarationStatementType,
-	resolveTypeAliasStatementType,
 } from "./resolvers"
 import { scopeMap } from "./scope"
 

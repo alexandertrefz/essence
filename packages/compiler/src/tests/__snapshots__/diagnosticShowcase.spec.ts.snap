@@ -663,3 +663,99 @@ Warning: This Statement runs in an order the cycle does not state
 ─── 1 warning
 "
 `;
+
+exports[`Diagnostic Showcase Refinements.es should render the same report every time 1`] = `
+"[invalid-refinement-predicate]
+Error: Type Alias 'NonEmpty' can not be generic and refined
+    ╭─┤ Refinements.es:19:41 │
+    │
+ 19 │     type NonEmpty<Item> = List<Item> where @::hasItems()
+    │                   ──┬─                     ──────┬──────  
+    │                     ╰────────────────────────────│──────── declared with a Type Parameter here
+    │                                                  │        
+    │                                                  ╰──────── this predicate refines a Type Parameter
+    │ 
+    │ Help: Drop the Type Parameters, or drop the 'where' clause from 'NonEmpty'.
+    │ 
+    │ Note: A 'where' clause on a Type Alias proves something about the values of ONE Type, and a generic Alias stands for a different Type at every use.
+────╯
+
+[invalid-refinement-predicate]
+Error: A 'where' clause can not refine Boolean
+    ╭─┤ Refinements.es:23:13 │
+    │
+ 23 │     type Yes = Boolean where @::is(true)
+    │                ───┬───  
+    │                   ╰───── this is Boolean
+    │ 
+    │ Help: Drop the 'where' clause from 'Yes'.
+    │ 
+    │ Note: A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.
+────╯
+
+[invalid-refinement-predicate]
+Error: A 'where' clause can not refine List
+    ╭─┤ Refinements.es:27:17 │
+    │
+ 27 │     type Several = List where @::hasItems()
+    │                    ──┬─  
+    │                      ╰─── this is List
+    │ 
+    │ Help: Drop the 'where' clause from 'Several'.
+    │ 
+    │ Note: A checked refinement is written on an Integer, a String or an applied List — 'List<String>', never a bare 'List'.
+────╯
+
+[invalid-refinement-predicate]
+Error: This is not a predicate a refinement can be checked by
+    ╭─┤ Refinements.es:31:29 │
+    │
+ 31 │     type Named = Integer where "essence"::hasAnyContent()
+    │                                ────┬────  
+    │                                    ╰────── this is not '@'
+    │ 
+    │ Help: Call the Method on '@' directly.
+    │ 
+    │ Note: A predicate is one Method call on '@' with literal Arguments, or several of them joined with '::and(…)'.
+────╯
+
+[invalid-refinement-predicate]
+Error: This is not a predicate a refinement can be checked by
+    ╭─┤ Refinements.es:35:30 │
+    │
+ 35 │     type Trimmed = String where @::trim()::hasAnyContent()
+    │                                 ────┬────  
+    │                                     ╰────── this is not '@'
+    │ 
+    │ Help: Call the Method on '@' directly.
+    │ 
+    │ Note: A predicate is one Method call on '@' with literal Arguments, or several of them joined with '::and(…)'.
+────╯
+
+[invalid-refinement-predicate]
+Error: This is not a predicate a refinement can be checked by
+    ╭─┤ Refinements.es:41:45 │
+    │
+ 41 │     type Bounded = Integer where @::isLessThan(limit)
+    │                                                ──┬──  
+    │                                                  ╰──── this is not a literal value
+    │ 
+    │ Help: Pass a written Integer, Rational, String or Boolean.
+    │ 
+    │ Note: A predicate is one Method call on '@' with literal Arguments, or several of them joined with '::and(…)'.
+────╯
+
+[predicate-not-boolean]
+Error: This predicate is not a Boolean
+    ╭─┤ Refinements.es:45:29 │
+    │
+ 45 │     type Sized = Integer where @::absolute()
+    │                                ──────┬──────  
+    │                                      ╰──────── this is Integer
+    │ 
+    │ Note: A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.
+────╯
+
+─── 7 errors
+"
+`;

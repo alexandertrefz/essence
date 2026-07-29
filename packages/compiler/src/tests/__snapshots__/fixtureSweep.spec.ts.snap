@@ -251,3 +251,13 @@ Optional#Value(2)
 `;
 
 exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `""`;
+
+exports[`Fixture Sweep Refinements.es should print what it printed before 1`] = `
+"Optional#Value(2/1)
+Optional#Empty
+true
+true
+true
+true
+true"
+`;

@@ -665,6 +665,7 @@ export function typeAliasStatement(
 	name: parser.IdentifierNode,
 	generics: Array<parser.GenericDeclarationNode>,
 	type: parser.TypeDeclarationNode,
+	predicate: parser.ExpressionNode | null,
 	position: common.Position,
 	documentation: common.Documentation | null = null,
 ): parser.TypeAliasStatementNode {
@@ -673,6 +674,7 @@ export function typeAliasStatement(
 		name,
 		generics,
 		type,
+		predicate,
 		position,
 		documentation,
 	}

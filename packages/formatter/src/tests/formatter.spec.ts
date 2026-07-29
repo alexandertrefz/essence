@@ -170,6 +170,81 @@ describe("formatter", () => {
 		})
 	})
 
+	// NOTE: A checked refinement's `where` clause has to come back on the Type's
+	// own line, because that is the only line the Parser reads it on — a clause
+	// broken onto the next one would be a Statement beginning with the name
+	// `where`, and the safety gate would catch it as a meaning that changed.
+	describe("Predicate Type Aliases", () => {
+		it("round-trips a predicate", () => {
+			let source = [
+				"implementation {",
+				"\ttype NonZeroInteger = Integer where @::isNot(0)",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("round-trips a conjunction and a labelled Argument", () => {
+			let source = [
+				"implementation {",
+				"\ttype Digit = Integer where @::isBetween(0, and 9)",
+				"",
+				"\ttype SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+
+		it("is idempotent over a predicate written loosely", () => {
+			let source = [
+				"implementation {",
+				"\ttype   NonEmptyStrings = List<String>   where   @::hasItems()",
+				"}",
+				"",
+			].join("\n")
+
+			let once = format(source)
+			let twice = format(once.text)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(
+				[
+					"implementation {",
+					"\ttype NonEmptyStrings = List<String> where @::hasItems()",
+					"}",
+					"",
+				].join("\n"),
+			)
+			expect(twice.text).toBe(once.text)
+		})
+
+		// NOTE: An unrefined Alias prints exactly as it always did — the clause
+		// is the only thing the printer learned, so nothing else may move.
+		it("leaves an unrefined Alias alone", () => {
+			let source = [
+				"implementation {",
+				"\ttype Coordinate = { x: Integer, y: Integer }",
+				"}",
+				"",
+			].join("\n")
+
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(result.text).toBe(source)
+		})
+	})
+
 	describe("Comments above the Program", () => {
 		// NOTE: The blank line that separates a file's header from its
 		// `implementation {` used to be found under EVERY line of that header,

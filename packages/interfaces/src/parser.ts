@@ -555,6 +555,13 @@ export interface TypeAliasStatementNode {
 	name: IdentifierNode
 	generics: Array<GenericDeclarationNode>
 	type: TypeDeclarationNode
+	// NOTE: The `where` clause of a checked refinement — `type NonZeroInteger =
+	// Integer where @::isNot(0)` — where `@` stands for the value being refined.
+	// Null for an ordinary Alias, which is every Alias the language had before
+	// refinements. It is an arbitrary Expression here on purpose: what a
+	// predicate is allowed to say is a question about Types, so the Enricher
+	// answers it and the Parser only reads the clause.
+	predicate: ExpressionNode | null
 	position: Position
 	documentation: Documentation | null
 }

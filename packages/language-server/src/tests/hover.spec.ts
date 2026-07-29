@@ -726,6 +726,30 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		expect(hover(source, { line: 2, column: 27 })).toBe("Result")
 		expect(hover(source, { line: 2, column: 36 })).toBe("String")
 	})
+
+	// NOTE: A checked refinement reads back as its BASE on its own Declaration —
+	// `NonZeroInteger: NonZeroInteger` is what naming it would say there, and the
+	// predicate is on the line the cursor is already on — while a value of it
+	// reads back as the NAME, because that is the Type the value has and the
+	// evidence is the whole point of it.
+	it("should describe a checked refinement", () => {
+		let source = [
+			"implementation {",
+			"\ttype NonZeroInteger = Integer where @::isNot(0)",
+			"",
+			"\tfunction doubled(_ n: NonZeroInteger) -> Integer {",
+			"\t\t<- n::multiply(with 2)",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 10 })).toBe(
+			"NonZeroInteger: Integer",
+		)
+		expect(hover(source, { line: 2, column: 26 })).toBe("Integer")
+		expect(hover(source, { line: 4, column: 27 })).toBe("NonZeroInteger")
+		expect(hover(source, { line: 5, column: 7 })).toBe("n: NonZeroInteger")
+	})
 })
 
 describe("Hover of conformance clauses", () => {
