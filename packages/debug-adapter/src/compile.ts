@@ -82,6 +82,13 @@ export function compileViaCli(): CompileFunction {
 					"--out",
 					outputFile,
 					"--sourcemap",
+					// NOTE: The Program as WRITTEN, which is what a debug
+					// session steps through — the same choice `essence dap`
+					// makes when it injects its own compile, made here so that
+					// a host reaching the CLI this way debugs the same
+					// JavaScript. Half the Optimiser's registry exists to drop
+					// Statements, bindings and tests a debugger stops on.
+					"--no-optimise",
 					"--json",
 					"--quiet",
 				],

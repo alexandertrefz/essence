@@ -61,6 +61,17 @@ export const defaultOptimiserOptions: OptimiserOptions = {
 	disabledPasses: new Set(),
 }
 
+// NOTE: Everything off — the Program as written. `--no-optimise` is this, and so
+// is what `essence dap` compiles a debug session with: what a debugger steps
+// through has to be the Program its author wrote, with the Statements in the
+// order they were written, every Constant still bound to its name, and every
+// Match Handler still tested. Half of the registry exists to take exactly those
+// things away.
+export const unoptimisedOptions: OptimiserOptions = {
+	enabled: false,
+	disabledPasses: new Set(),
+}
+
 // NOTE: THE canonical order. It is fixed: a pass added by a later work package
 // is INSERTED where it belongs rather than appended, because what a pass finds
 // in front of it is part of what it was written against. Turning one off never

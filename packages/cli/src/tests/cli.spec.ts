@@ -34,7 +34,7 @@ import {
 	renderUsageLine,
 	wrap,
 } from "../help"
-import { run } from "../index"
+import { debugAdapterCompile, run } from "../index"
 import {
 	defaultOutputFor,
 	looksLikeGlob,
@@ -1676,6 +1676,50 @@ describe("the optimisation Options", () => {
 		// own emission for the same reason as above.
 		expect(userModuleOf(partial.emitted)).not.toContain("Object.assign(")
 		expect(partial.printed).toEqual(optimised.printed)
+	})
+})
+
+// NOTE: What a debug session builds. The Adapter is handed what compiling
+// MEANS, and this is the function that means it — driven here rather than
+// through a spawned adapter, so the claim is about the compile itself.
+describe("the Debug Adapter's compile", () => {
+	it("emits the Program as written", async () => {
+		let directory = mkdtempSync(path.join(tmpdir(), "esc-dap-"))
+
+		try {
+			let outputFileName = path.join(directory, "Loops.js")
+			let result = await debugAdapterCompile()(
+				fixturePath("Loops.es"),
+				outputFileName,
+			)
+
+			expect(result.diagnostics).toEqual([])
+			expect(result.ok).toBe(true)
+			expect(result.bundlePath).toBe(outputFileName)
+
+			let emitted = readFileSync(outputFileName, "utf8")
+
+			// NOTE: The shapes the registry takes away, all still standing —
+			// a debugger steps through Statements, stops on bindings and reads
+			// their values back, and half of the passes exist to drop exactly
+			// those.
+			expect(emitted).toContain("createRecord(")
+			expect(emitted).toContain("createList(")
+			expect(emitted).toContain("Object.assign(")
+			expect(emitted).not.toContain("$pool_")
+			expect(emitted).not.toContain("$loop_")
+			// NOTE: And it still runs, and prints what an optimised build of
+			// the same file prints.
+			expect(await runBundle(outputFileName)).toEqual([
+				'"55"',
+				'"15"',
+				'"128"',
+				'"128"',
+				'"2"',
+			])
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
 	})
 })
 

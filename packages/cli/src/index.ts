@@ -134,42 +134,71 @@ async function runLanguageServer(): Promise<number> {
 	return EXIT_SUCCESS
 }
 
+// NOTE: How `essence dap` compiles — this CLI's own in-process pipeline,
+// answering in the Adapter's report shape. Exported so that WHAT a debug
+// session builds can be asked of the same function the command hands over.
+//
+// NOTE: The Optimiser is OFF, and that is the whole reason this is not simply
+// what `build` does. A debug session steps through Statements, stops on
+// bindings and reads their values back, and half the registry exists to take
+// exactly those things away: a Constant nothing reads is dropped, a Match
+// Handler nothing can reach is dropped, an operation over literals becomes its
+// answer, a walk is written out where it stood. Stepping through the Program as
+// WRITTEN is worth more to a debug session than any of that.
+export function debugAdapterCompile(): (
+	programPath: string,
+	outputFile: string,
+) => Promise<{
+	ok: boolean
+	bundlePath: string | null
+	diagnostics: Array<{
+		file: string
+		severity: string
+		message: string
+		code: string | null
+		line: number | null
+		column: number | null
+	}>
+}> {
+	return async (programPath: string, outputFile: string) => {
+		let { unoptimisedOptions } =
+			await import("@essence-lang/compiler/optimiser")
+		let { compileFile } = await import("./pipeline")
+
+		let outcome = await compileFile({
+			inputFileName: programPath,
+			outputFileName: outputFile,
+			minify: false,
+			sourcemap: true,
+			optimisation: unoptimisedOptions,
+		})
+
+		return {
+			ok: outcome.ok,
+			bundlePath: outcome.ok
+				? (outcome.outputFileName ?? outputFile)
+				: null,
+			diagnostics: outcome.modules.flatMap((module) =>
+				module.diagnostics.map((diagnostic) => ({
+					file: module.fileName,
+					severity: diagnostic.severity,
+					message: diagnostic.message,
+					code: diagnostic.code ?? null,
+					line: diagnostic.position?.start.line ?? null,
+					column: diagnostic.position?.start.column ?? null,
+				})),
+			),
+		}
+	}
+}
+
 async function runDebugAdapter(): Promise<number> {
 	let { startAdapter } = await import("@essence-lang/debug-adapter")
-	let { compileFile } = await import("./pipeline")
 
 	// NOTE: The Adapter does not know how to compile — it is handed what
-	// compiling MEANS, and here that is this CLI's own in-process pipeline,
-	// answering in the Adapter's report shape. stdout belongs to the protocol
-	// from this point on, which is why the command is a passthrough that
-	// prints nothing.
-	startAdapter({
-		compile: async (programPath: string, outputFile: string) => {
-			let outcome = await compileFile({
-				inputFileName: programPath,
-				outputFileName: outputFile,
-				minify: false,
-				sourcemap: true,
-			})
-
-			return {
-				ok: outcome.ok,
-				bundlePath: outcome.ok
-					? (outcome.outputFileName ?? outputFile)
-					: null,
-				diagnostics: outcome.modules.flatMap((module) =>
-					module.diagnostics.map((diagnostic) => ({
-						file: module.fileName,
-						severity: diagnostic.severity,
-						message: diagnostic.message,
-						code: diagnostic.code ?? null,
-						line: diagnostic.position?.start.line ?? null,
-						column: diagnostic.position?.start.column ?? null,
-					})),
-				),
-			}
-		},
-	})
+	// compiling MEANS. stdout belongs to the protocol from this point on, which
+	// is why the command is a passthrough that prints nothing.
+	startAdapter({ compile: debugAdapterCompile() })
 
 	return EXIT_SUCCESS
 }
