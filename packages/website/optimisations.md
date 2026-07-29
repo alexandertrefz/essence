@@ -38,6 +38,21 @@ build, not half of it.
 **The order is fixed.** Passes run in the order they are listed below, and a
 pass added later is inserted where it belongs rather than appended.
 
+## Debugging
+
+**`essence dap` builds with the whole phase off.** A debug session steps through
+Statements, stops on bindings and reads their values back — and half of the
+registry exists to take exactly those away: a Constant nothing reads is dropped,
+a Match Handler nothing can reach is dropped, an operation over literals becomes
+its answer, a walk is written out where it stood. Stepping through the Program as
+WRITTEN is worth more to a debug session than any of it, so the Adapter is handed
+a compile that passes `--no-optimise` and nothing about that is configurable.
+
+That holds however the Adapter was started: the CLI injects its own in-process
+compile when `essence dap` runs, and the fallback that shells out to `essence
+build` — for `bin/esdap` and any DAP client that spawned the adapter directly —
+passes the flag itself, so both paths debug the same JavaScript.
+
 ## Passes
 
 ### `compile-type-tests`
