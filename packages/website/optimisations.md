@@ -585,6 +585,42 @@ number is capped at **4,096 decimal digits** all the same — unreachable by the
 operations listed, and there so that folding an exponent later is a decision
 about that number rather than an emission that quietly balloons.
 
+### `prune-dead-match-arms`
+
+Drops a Match Handler that can never run.
+
+```essence
+match value -> String {
+	case Integer { <- "an Integer" }
+	case Boolean { <- "never" }      § dropped
+	case String  { <- "a String" }
+}
+```
+
+The Compiler already knows: `value` is an `Integer | String`, so no Boolean can
+reach the Handler, and the Validator reported it as `unreachable-case` before the
+Optimiser saw the Program. A Program that builds with that Warning standing was
+emitting the Handler, testing it at every evaluation, and declining it every
+time.
+
+Safe because a Handler that can never run has no behavior to preserve. What
+decides is the same analysis the rest of the Optimiser reads — a Matcher is
+refuted only where its runtime check FAILS for every member of the scrutinee's
+Type, which it can only do where the hidden Type keys differ. Two Types SHARING
+a key are never refuted, and that is not a conservatism to tighten out of:
+`List<Alpha>` and `List<Beta>` are both `"List"` and the empty List passes both,
+`Box<Integer>#Holding` and `Box<String>#Holding` are both `"Box#Holding"`, and
+two Records that differ in their members are both `"Record"`. What tells any of
+those apart is a walk of the value.
+
+**The survivors are never reordered.** A Match is first-match-wins, so the order
+the Handlers are written in is the whole of what decides which one answers.
+
+This is deliberately narrower than the Validator's Warning, which also reports a
+Handler that every earlier Handler already answers for — `case Integer` written
+twice, or anything below a `case _`. Deciding that needs the order as well as the
+Types, and a Handler kept is only a Handler tested.
+
 ### `elide-final-match-test`
 
 Emits the last Handler of a Match as the `else` of the chain.

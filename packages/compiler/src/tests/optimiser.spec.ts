@@ -16,6 +16,7 @@ import {
 	optimiserPasses,
 	optimiserPassNames,
 } from "../optimiser/index"
+import { pruneDeadMatchArms } from "../optimiser/passes/pruneDeadMatchArms"
 import {
 	rewriteExpressions,
 	rewriteNodes,
@@ -48,6 +49,49 @@ function simplifiedSource(source: string): common.typedSimple.Program {
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
 	return simplify(enriched.program)
+}
+
+// NOTE: What the Validator says about a source, which for a Program that
+// compiles is Warnings — `unreachable-case` above all, which is the Diagnostic
+// `prune-dead-match-arms` acts on. Asked here rather than assumed, so that the
+// pass and the Warning can be held to each other.
+function validatedDiagnostics(source: string): Array<common.Diagnostic> {
+	let parsed = parseWithDiagnostics(source)
+
+	expect(containsErrors(parsed.diagnostics)).toBe(false)
+
+	let enriched = enrich(parsed.program)
+
+	expect(containsErrors(enriched.diagnostics)).toBe(false)
+
+	return validate(enriched.program)
+}
+
+// NOTE: Every Match's Matchers, in the order the walk reaches the Matches and
+// each chain is written — the shape of a Program's Matches, read off the Nodes
+// rather than off the emission, so that what a pass does to a chain can be
+// stated as what it does to a chain.
+function matchMatchers(
+	program: common.typedSimple.Program,
+): Array<Array<common.Type>> {
+	let matchers: Array<Array<common.Type>> = []
+
+	rewriteExpressions(program, (node) => {
+		if (node.nodeType === "Match") {
+			matchers.push(node.handlers.map((handler) => handler.matcher))
+		}
+
+		return node
+	})
+
+	return matchers
+}
+
+function matchHandlerCount(program: common.typedSimple.Program): number {
+	return matchMatchers(program).reduce(
+		(total, handlers) => total + handlers.length,
+		0,
+	)
 }
 
 // NOTE: The Options reach the Rewriter as well as the Optimiser — the standard
@@ -1014,6 +1058,46 @@ const shadowedArithmetic = `implementation {
 	}
 
 	__print(trick())
+}`
+
+// NOTE: A Handler of each shape `prune-dead-match-arms` decides by. Two that
+// can never run — a scalar Matcher naming a Type the Union does not have, and
+// one naming a Type that is not a member of the Choice being matched — beside
+// the ones that must stay: two List members sharing the one runtime tag, where
+// the items are what tell them apart, and a Record Matcher beside a Record
+// scrutinee, where the members are.
+const deadMatchArms = `implementation {
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	constant scalar: Integer | String = 5
+	constant shape: Shape = #Blank
+	constant items: List<Integer> | List<String> = [1, 2]
+	constant record: { x: Integer } | String = { x = 1 }
+
+	__print(match scalar -> String {
+		case Integer { <- "an Integer" }
+		case Boolean { <- "never" }
+		case String  { <- "a String" }
+	})
+
+	__print(match shape -> String {
+		case #Circle { <- "a Circle" }
+		case Integer { <- "never" }
+		case #Blank  { <- "Blank" }
+	})
+
+	__print(match items -> String {
+		case List<String>  { <- "Strings" }
+		case List<Integer> { <- "Integers" }
+	})
+
+	__print(match record -> String {
+		case String         { <- "a String" }
+		case { x: Integer } { <- "a Record" }
+	})
 }`
 
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
@@ -3000,6 +3084,128 @@ describe("Optimiser", () => {
 
 			expect(generated).toContain("Integer.createInteger(86400n)")
 			expect(generated).not.toContain("Integer.createInteger(60n)")
+		})
+	})
+
+	describe("prune-dead-match-arms", () => {
+		it("takes a Handler that can never run out of the chain", () => {
+			let generated = generate(deadMatchArms)
+
+			expect(generated).not.toContain('"never"')
+			expect(generated).not.toContain(
+				'_self[$type.typeKeySymbol] === "Boolean"',
+			)
+		})
+
+		// NOTE: THE correspondence this pass rests on. What it drops is a
+		// Handler the Validator has already told the author can never match, so
+		// the two are held to each other here rather than each to its own
+		// reading: the count of Warnings is the count of Handlers dropped.
+		it("drops exactly the Handlers the Validator called unreachable", () => {
+			let unreachable = validatedDiagnostics(deadMatchArms).filter(
+				(diagnostic) => diagnostic.code === "unreachable-case",
+			)
+
+			expect(unreachable).toHaveLength(2)
+			expect(
+				unreachable.every(
+					(diagnostic) => diagnostic.severity === "warning",
+				),
+			).toBe(true)
+
+			let program = simplifiedSource(deadMatchArms)
+
+			expect(
+				matchHandlerCount(program) -
+					matchHandlerCount(pruneDeadMatchArms.run(program)),
+			).toBe(unreachable.length)
+		})
+
+		it("keeps a Handler two Types share a tag with", () => {
+			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, and
+			// the empty List passes either — so neither Handler is refuted by
+			// what the Compiler knows, and the item walk is what decides.
+			let generated = generate(deadMatchArms)
+
+			expect(generated).toContain('itemType: { type: "String" }')
+			expect(generated).toContain('itemType: { type: "Integer" }')
+		})
+
+		it("keeps a Record Handler beside a Record scrutinee", () => {
+			// NOTE: Every Record carries the one tag, so what tells two apart is
+			// their members — which is a walk of the value rather than a
+			// question about its Type.
+			expect(generate(deadMatchArms)).toContain('type: "Record"')
+		})
+
+		it("leaves the survivors in the order they were written", () => {
+			// NOTE: A Match is first-match-wins, so the order the survivors are
+			// written in is the whole of what decides which one answers. Read
+			// off the Matchers themselves, by identity: every survivor is the
+			// Handler that was there, and their positions in the original chain
+			// only ever ascend.
+			let program = simplifiedSource(deadMatchArms)
+			let before = matchMatchers(program)
+			let after = matchMatchers(pruneDeadMatchArms.run(program))
+
+			expect(after).toHaveLength(before.length)
+
+			for (let [index, survivors] of after.entries()) {
+				let original = before[index]!
+				let positions = survivors.map((matcher) =>
+					original.indexOf(matcher),
+				)
+
+				expect(positions).not.toContain(-1)
+				expect(positions).toEqual(
+					[...positions].sort((first, second) => first - second),
+				)
+			}
+		})
+
+		it("tests them again when it is turned off", () => {
+			let generated = generate(deadMatchArms, {
+				enabled: true,
+				disabledPasses: new Set(["prune-dead-match-arms"]),
+			})
+
+			expect(generated).toContain('"never"')
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "Boolean"',
+			)
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"prune-dead-match-arms",
+					deadMatchArms,
+				),
+			).toEqual(['"an Integer"', '"Blank"', '"Integers"', '"a Record"'])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"prune-dead-match-arms",
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"prune-dead-match-arms",
+				readFileSync(fixturePath("Tree.es"), "utf8"),
+			)
+		})
+
+		// NOTE: The Match passes meet on every Handler and none of them may
+		// assume another ran. With the tests uncompiled the same Handlers go,
+		// and the descriptor that was built to decline them goes with them.
+		it("drops the same Handlers with the tests uncompiled", () => {
+			let generated = generate(deadMatchArms, {
+				enabled: true,
+				disabledPasses: new Set(["compile-type-tests"]),
+			})
+
+			expect(generated).not.toContain('"never"')
+			expect(generated).not.toContain('{ type: "Boolean" }')
 		})
 	})
 
