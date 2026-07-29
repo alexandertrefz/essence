@@ -445,5 +445,23 @@ function walkIntrinsicChildren(
 
 			return values === node.values ? node : { ...node, values }
 		}
+		case "spread-combination": {
+			let lhs = walkExpression(node.lhs, rewrite)
+			let members = mapRecord(node.members, (value) =>
+				walkExpression(value, rewrite),
+			)
+			let rhs =
+				node.rhs === null ? null : walkExpression(node.rhs, rewrite)
+
+			if (
+				lhs === node.lhs &&
+				members === node.members &&
+				rhs === node.rhs
+			) {
+				return node
+			}
+
+			return { ...node, lhs, members, rhs }
+		}
 	}
 }

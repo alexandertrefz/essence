@@ -140,6 +140,26 @@ const constructions = `implementation {
 	})
 }`
 
+// NOTE: A Combination whose right-hand side is a literal, one whose right-hand
+// side is a Record the Program is holding, one member overridden and both — the
+// shapes `collapse-combinations` rewrites. A right-hand side may only be a
+// Partial of what it updates, so there is no member here the left-hand side
+// does not already have.
+const combinations = `implementation {
+	constant base = { x = 1, y = 2 }
+	constant changes = { x = 9 }
+
+	constant overridden = { base with changes }
+	constant both = { base with x = 8, y = 9 }
+	constant replaced = { base with x = 7 }
+
+	__print(base)
+	__print(overridden)
+	__print(both)
+	__print(replaced)
+	__print(base::is({ x = 1, y = 2 }))
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -460,6 +480,79 @@ describe("Optimiser", () => {
 				"collapse-construction",
 				readFileSync(fixturePath("Everyday.es"), "utf8"),
 			)
+		})
+	})
+
+	describe("collapse-combinations", () => {
+		it("combines two Records with one spread", () => {
+			let generated = generate(combinations)
+
+			expect(generated).toContain("...base")
+			expect(generated).not.toContain("Object.assign(")
+		})
+
+		it("spreads a right-hand side that is not a literal", () => {
+			expect(generate(combinations)).toContain("...changes")
+		})
+
+		it("assigns again when it is turned off", () => {
+			let generated = generate(combinations, {
+				enabled: true,
+				disabledPasses: new Set(["collapse-combinations"]),
+			})
+
+			expect(generated).toContain("Object.assign(")
+		})
+
+		// NOTE: The two collapses meet on `{ base with x = 1 }`, whose
+		// right-hand side is a Record literal — and neither may assume the
+		// other ran. With construction off the literal is still written out
+		// member by member rather than built and copied.
+		it("writes the members out with the other collapse off", () => {
+			let generated = generate(combinations, {
+				enabled: true,
+				disabledPasses: new Set(["collapse-construction"]),
+			})
+
+			expect(generated).toContain("...base")
+			expect(generated).not.toContain("Object.assign(")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"collapse-combinations",
+					combinations,
+				),
+			).toEqual([
+				"{ x = 1, y = 2 }",
+				"{ x = 9, y = 2 }",
+				"{ x = 8, y = 9 }",
+				"{ x = 7, y = 2 }",
+				"true",
+			])
+		})
+
+		it("prints the same thing with both collapses off", async () => {
+			let all = await outputOf(generate(combinations))
+			let neither = await outputOf(
+				generate(combinations, {
+					enabled: true,
+					disabledPasses: new Set([
+						"collapse-construction",
+						"collapse-combinations",
+					]),
+				}),
+			)
+			let none = await outputOf(
+				generate(combinations, {
+					enabled: false,
+					disabledPasses: new Set(),
+				}),
+			)
+
+			expect(neither).toEqual(all)
+			expect(none).toEqual(all)
 		})
 	})
 })

@@ -315,7 +315,11 @@ export interface MatchNode {
 // `position` — the Rewriter maps Statements and outermost Expressions onto the
 // source through it, and a pass that dropped it would silently unmap the line a
 // debugger stops on.
-export type IntrinsicNode = DirectRecordNode | DirectCaseNode | DirectListNode
+export type IntrinsicNode =
+	| DirectRecordNode
+	| DirectCaseNode
+	| DirectListNode
+	| SpreadCombinationNode
 
 // NOTE: A Record built in one allocation: the branded object literal
 // `Record.createRecord` would have built from a literal it was handed — the
@@ -360,6 +364,25 @@ export interface DirectListNode {
 	kind: "direct-list"
 	values: Array<ExpressionNode>
 	type: ListType
+	position?: Position
+}
+
+// NOTE: Two Records combined in one allocation — `{ ...lhs, member: … }`, where
+// `Object.assign({}, lhs, rhs)` built an empty object and copied both into it.
+// The hidden Type key rides along on the spread of `lhs`, which carries it like
+// any other of its own keys.
+//
+// The right-hand side is written out MEMBER BY MEMBER when it is a Record
+// literal, which is what `{ base with x = 1 }` spells and the Record it would
+// have built never exists. Any other right-hand side — a name, a call — is
+// spread as a whole. As with a Case's payload, exactly one of the two is set.
+export interface SpreadCombinationNode {
+	nodeType: "Intrinsic"
+	kind: "spread-combination"
+	lhs: ExpressionNode
+	members: Record<string, ExpressionNode>
+	rhs: ExpressionNode | null
+	type: Type
 	position?: Position
 }
 
