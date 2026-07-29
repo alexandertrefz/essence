@@ -10,7 +10,12 @@ import {
 	type ModuleHost,
 	resolveSpecifier,
 } from "@essence-lang/compiler/modules"
-import { optimise } from "@essence-lang/compiler/optimiser"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+	optimiserOptionsKey,
+} from "@essence-lang/compiler/optimiser"
 import { simplify } from "@essence-lang/compiler/simplifier"
 import type { common } from "@essence-lang/interfaces"
 
@@ -56,8 +61,15 @@ export type CompileSession = {
 	// every entry that imports it, so each is put through once — keyed by the
 	// Program itself, because that is what may not be simplified twice.
 	simplify: (program: common.typed.Program) => common.typedSimple.Program
+	// NOTE: Optimising is safe to repeat — a pass is a pure function of its
+	// input — so this cache is only about not paying twice for one answer. It is
+	// keyed by the Options as well as by the Program: what the passes make of a
+	// Program is exactly what the Options asked for, and a Session that answered
+	// one set of Options with another's work would emit a build nobody asked
+	// for.
 	optimise: (
 		program: common.typedSimple.Program,
+		options?: OptimiserOptions,
 	) => common.typedSimple.Program
 }
 
@@ -131,7 +143,7 @@ export function createCompileSession(
 	>()
 	let optimised = new WeakMap<
 		common.typedSimple.Program,
-		common.typedSimple.Program
+		Map<string, common.typedSimple.Program>
 	>()
 
 	// NOTE: A group already held is a group already parsed: a Strongly
@@ -350,12 +362,21 @@ export function createCompileSession(
 
 		optimise: (
 			program: common.typedSimple.Program,
+			options: OptimiserOptions = defaultOptimiserOptions,
 		): common.typedSimple.Program => {
-			let result = optimised.get(program)
+			let byOptions = optimised.get(program)
+
+			if (byOptions === undefined) {
+				byOptions = new Map()
+				optimised.set(program, byOptions)
+			}
+
+			let key = optimiserOptionsKey(options)
+			let result = byOptions.get(key)
 
 			if (result === undefined) {
-				result = optimise(program)
-				optimised.set(program, result)
+				result = optimise(program, options)
+				byOptions.set(key, result)
 			}
 
 			return result

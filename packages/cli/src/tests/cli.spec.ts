@@ -13,12 +13,18 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { closestMatch } from "@essence-lang/compiler/helpers"
+import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 import { testDiagnostic } from "@essence-lang/compiler/tests/diagnosticFactory"
 import { fixturePath } from "@essence-lang/fixtures"
 import { STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { runCheck } from "../actions"
-import { type OptionValues, parseArguments, UsageError } from "../args"
+import {
+	optimiserOptionsFor,
+	type OptionValues,
+	parseArguments,
+	UsageError,
+} from "../args"
 import { commands, findCommand, globalOptions, PROGRAM } from "../commands"
 import { colorChoiceFor, createContext, version } from "../context"
 import { runtimeArguments } from "../execute"
@@ -36,7 +42,11 @@ import {
 	resolveOutputFiles,
 } from "../inputs"
 import { type JSONReport, toJSONReport } from "../json"
-import { type CompileOutcome, compileFile } from "../pipeline"
+import {
+	type CompileOutcome,
+	compileFile,
+	type CompileRequest,
+} from "../pipeline"
 import { defaultWorkerCount, shouldUseWorkers, workerFileName } from "../pool"
 import {
 	countDiagnostics,
@@ -204,6 +214,89 @@ describe("CLI", () => {
 				expect.unreachable()
 			} catch (error) {
 				expect((error as UsageError).suggestion).toContain("--minify")
+			}
+		})
+
+		it("reads the optimisation Options", () => {
+			let invocation = parseArguments([
+				"build",
+				"--no-optimise",
+				"--without-optimisation",
+				"collapse-construction",
+				"--without-optimisation",
+				"collapse-combinations",
+				"a.es",
+			])
+
+			expect(invocation.options.noOptimise).toBe(true)
+			expect(invocation.options.withoutOptimisation).toEqual([
+				"collapse-construction",
+				"collapse-combinations",
+			])
+			expect(invocation.files).toEqual(["a.es"])
+		})
+
+		it("leaves every pass on when neither is given", () => {
+			let options = parseArguments(["build", "a.es"]).options
+
+			expect(options.noOptimise).toBe(false)
+			expect(options.withoutOptimisation).toEqual([])
+			expect(optimiserOptionsFor(options)).toEqual({
+				enabled: true,
+				disabledPasses: new Set(),
+			})
+		})
+
+		// NOTE: A pass name that names no pass is a mistake the user can only
+		// see if it is reported: silently, every pass would keep running and
+		// the flag would look like a pass that does nothing.
+		it("refuses an optimisation pass it does not have", () => {
+			try {
+				parseArguments([
+					"build",
+					"--without-optimisation",
+					"collapse-nonsense",
+					"a.es",
+				])
+				expect.unreachable()
+			} catch (error) {
+				expect(error).toBeInstanceOf(UsageError)
+				expect((error as UsageError).command?.name).toBe("build")
+				expect((error as UsageError).message).toContain(
+					"collapse-nonsense",
+				)
+			}
+		})
+
+		it("names every pass when the misspelling is not a near miss", () => {
+			try {
+				parseArguments([
+					"build",
+					"--without-optimisation",
+					"zzzzzzzzzz",
+					"a.es",
+				])
+				expect.unreachable()
+			} catch (error) {
+				for (let name of optimiserPassNames) {
+					expect((error as UsageError).suggestion).toContain(name)
+				}
+			}
+		})
+
+		it("suggests a near-miss pass name", () => {
+			try {
+				parseArguments([
+					"build",
+					"--without-optimisation",
+					"collapse-constructions",
+					"a.es",
+				])
+				expect.unreachable()
+			} catch (error) {
+				expect((error as UsageError).suggestion).toContain(
+					"collapse-construction",
+				)
 			}
 		})
 
@@ -1197,6 +1290,8 @@ function testOptions(overrides: Partial<OptionValues> = {}): OptionValues {
 		clear: false,
 		sourcemap: false,
 		minify: false,
+		noOptimise: false,
+		withoutOptimisation: [],
 		jobs: 1,
 		...overrides,
 	}
@@ -1496,6 +1591,76 @@ describe("CLI on a Module graph", () => {
 				expect(groups).toContainEqual(["Other.es"])
 			},
 		)
+	})
+})
+
+// NOTE: The flags are only worth having if they reach the Compiler, so this
+// drives them through the same `compileFile` the commands run and reads the
+// file that comes out. A fixture, rather than a snippet: what the Options have
+// to hold for is a real build.
+describe("the optimisation Options", () => {
+	async function build(
+		optimisation: CompileRequest["optimisation"],
+	): Promise<{ emitted: string; printed: Array<string> }> {
+		let directory = mkdtempSync(path.join(tmpdir(), "esc-optimise-"))
+
+		try {
+			let outputFileName = path.join(directory, "Loops.js")
+			let compiled = await compileFile({
+				inputFileName: fixturePath("Loops.es"),
+				outputFileName,
+				minify: false,
+				sourcemap: false,
+				optimisation,
+			})
+
+			expect(compiled.diagnostics).toEqual([])
+			expect(compiled.ok).toBe(true)
+
+			return {
+				emitted: readFileSync(outputFileName, "utf8"),
+				printed: await runBundle(outputFileName),
+			}
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	}
+
+	// NOTE: The runtime constructors are read off the BUNDLE, where esbuild has
+	// inlined the runtime — so a Program that has stopped calling one takes the
+	// function with it, and the flag's effect is visible as an absence.
+	it("optimises when nothing is said", async () => {
+		let { emitted } = await build(undefined)
+
+		expect(emitted).not.toContain("createRecord(")
+		expect(emitted).not.toContain("createList(")
+		expect(emitted).not.toContain("Object.assign(")
+	})
+
+	it("emits the Program as written with the phase off", async () => {
+		let optimised = await build(undefined)
+		let plain = await build({
+			enabled: false,
+			disabledPasses: new Set(),
+		})
+
+		expect(plain.emitted).toContain("createRecord(")
+		expect(plain.emitted).toContain("createList(")
+		expect(plain.emitted).toContain("Object.assign(")
+		expect(plain.printed).toEqual(optimised.printed)
+	})
+
+	it("turns one named pass off and leaves the rest running", async () => {
+		let optimised = await build(undefined)
+		let partial = await build({
+			enabled: true,
+			disabledPasses: new Set(["collapse-construction"]),
+		})
+
+		expect(partial.emitted).toContain("createRecord(")
+		// NOTE: The pass that was NOT named still ran.
+		expect(partial.emitted).not.toContain("Object.assign(")
+		expect(partial.printed).toEqual(optimised.printed)
 	})
 })
 

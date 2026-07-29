@@ -129,6 +129,33 @@ const minifyOption: OptionSpec = {
 	summary: "Minify the emitted JavaScript",
 }
 
+// NOTE: Optimisation is on for every build, and these two are how it is turned
+// down. Both exist for the same reason the passes have names at all: when a
+// Program misbehaves, the question "does it still do that with the optimiser
+// off?" has to be answerable in one run, and "which pass is it?" in a few more.
+const noOptimiseOption: OptionSpec = {
+	name: "no-optimise",
+	type: "boolean",
+	summary: "Emit the Program as written, running no optimisation pass",
+	details:
+		"Every pass is on by default. This turns the whole phase off, for the " +
+		"user Program and the standard library alike — the shape to compare " +
+		"against when an optimised build misbehaves.",
+}
+
+const withoutOptimisationOption: OptionSpec = {
+	name: "without-optimisation",
+	type: "string",
+	multiple: true,
+	placeholder: "pass",
+	summary: "Turn one optimisation pass off, by name",
+	details:
+		"Repeatable, and the name is the one the pass is documented under at " +
+		"essence-language.org/optimisations. Every other pass keeps running: " +
+		"no pass depends on another, so any set of them emits a correct " +
+		"Program, and turning one off is how a suspect is named.",
+}
+
 const jobsOption: OptionSpec = {
 	name: "jobs",
 	short: "j",
@@ -181,6 +208,8 @@ export const commands: Array<CommandSpec> = [
 			},
 			sourcemapOption,
 			minifyOption,
+			noOptimiseOption,
+			withoutOptimisationOption,
 			jobsOption,
 		],
 		examples: [
@@ -225,6 +254,8 @@ export const commands: Array<CommandSpec> = [
 			},
 			sourcemapOption,
 			minifyOption,
+			noOptimiseOption,
+			withoutOptimisationOption,
 		],
 		examples: [
 			{
@@ -301,6 +332,8 @@ export const commands: Array<CommandSpec> = [
 			},
 			sourcemapOption,
 			minifyOption,
+			noOptimiseOption,
+			withoutOptimisationOption,
 			jobsOption,
 		],
 		examples: [

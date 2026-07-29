@@ -10,6 +10,10 @@ import {
 	isStdlibDocument,
 	parseDocument,
 } from "@essence-lang/compiler/documents"
+import {
+	defaultOptimiserOptions,
+	type OptimiserOptions,
+} from "@essence-lang/compiler/optimiser"
 import { rewriteModules } from "@essence-lang/compiler/rewriter"
 import { validate } from "@essence-lang/compiler/validator"
 import type { common } from "@essence-lang/interfaces"
@@ -61,6 +65,12 @@ export type CompileRequest = {
 	// `inline` inside it, which is what `run`'s transient output needs. Read
 	// only when `sourcemap` is set.
 	sourcemapMode?: "linked" | "inline"
+	// NOTE: Which Optimiser passes to run. Absent means every one of them, which
+	// is what a caller that offers no say — the Debug Adapter, a spec — compiles
+	// with. It travels to a worker as part of the request, so a batch spread
+	// across threads compiles every file under the Options the command line
+	// asked for.
+	optimisation?: OptimiserOptions
 }
 
 // NOTE: One file of the compiled graph, with the text its Diagnostics are
@@ -435,12 +445,16 @@ export async function compileFile(
 			return finish(true, null)
 		}
 
+		let optimisation = request.optimisation ?? defaultOptimiserOptions
+
 		let simplified = await timeline.run("simplify", () =>
 			programs.map((program) => session.simplify(program)),
 		)
 
 		let optimised = await timeline.run("optimise", () =>
-			simplified.map((program) => session.optimise(program)),
+			simplified.map((program) =>
+				session.optimise(program, optimisation),
+			),
 		)
 
 		// NOTE: The whole graph is rewritten in one call, which is what shares
@@ -455,7 +469,11 @@ export async function compileFile(
 					sourceText: modules[index]!.sourceText,
 				})),
 				front.entryPath,
-				{ sourcemap: request.sourcemap },
+				// NOTE: The Options the user Program was optimised under reach
+				// the Rewriter too: the standard library's bodies are optimised
+				// inside the prelude it builds, and a Program compiled with a
+				// pass off must not import one compiled with it on.
+				{ sourcemap: request.sourcemap, optimiser: optimisation },
 			),
 		)
 
