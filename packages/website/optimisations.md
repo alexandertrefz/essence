@@ -657,6 +657,42 @@ leave a last Handler that can decline for reasons no exhaustiveness argument
 covers — a Guard is a Program's own Boolean — so a Handler carrying any of them
 is tested exactly as it was.
 
+### `eliminate-dead-code`
+
+Drops a Constant nothing reads.
+
+```essence
+constant unused = 60::multiply(with 60)   § gone
+```
+
+Rarely written that way on purpose — what leaves them behind is the passes ahead
+of this one, which fold an operation into its answer and inline a walk where it
+stood. What one costs is an allocation at the Statement it stands on and, at a
+Program's top level, a `const` nothing ever collects.
+
+What may go is decided by one question asked twice. **Is the name READ
+anywhere** — anywhere in the whole Program rather than in the Scope the Constant
+stands in, because a name read in a Function three blocks away is the same
+string, and refusing on the string refuses on more than necessary, which is the
+direction to be wrong in. And **is the value something the Program can tell the
+absence of** — the same purity question `lower-scalar-operations` asks of an
+Argument it would skip, so a Declaration whose value PRINTS is a Statement with
+an effect and stays exactly where it is.
+
+Constants alone: a `variable` can be assigned after it is declared, and an
+assignment is a Statement this does not read. **Everything a Module exports is a
+root**, whether or not this compilation can see who reads it.
+
+One reading, not a fixed point. A Constant read only by another Constant that is
+itself dropped stays, because the reference was counted before either went —
+running this to exhaustion would take a pass allowed to loop, and what it would
+buy is the second link of a chain nobody wrote on purpose.
+
+This is the one pass that changes what a build of a Program with no output at all
+emits: a file that declares values and prints nothing compiles to nothing.
+`essence dap` builds with the whole phase off, so a debug session still stops on
+every binding as written.
+
 ### `collapse-construction`
 
 Builds a Record, a Case or a List in one allocation.

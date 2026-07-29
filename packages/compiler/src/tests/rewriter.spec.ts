@@ -1983,6 +1983,7 @@ describe("Rewriter", () => {
 
 	constant chosen: Colour = #Red
 
+	__print(chosen)
 	__print(true::toString())
 }
 `)

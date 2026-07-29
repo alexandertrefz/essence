@@ -43,13 +43,28 @@ export type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 // hooks, the Expression one first, because it is both things at once.
 export type StatementRewrite = (node: ImplementationNode) => ImplementationNode
 
-// NOTE: The hooks a pass asks for, and it may ask for either or both. Both are
+// NOTE: And the same for a BODY — every place a run of Statements stands, which
+// is a Program's own nodes, a Function's body, a Match Handler's, a Conditional's
+// two and an inlined callback's. It is the one hook that can answer with a
+// DIFFERENT NUMBER of Statements than it was given, which is what
+// `eliminate-dead-code` needs and what neither hook above can do: a Statement
+// rewrite maps one Node to one Node.
+//
+// NOTE: Offered AFTER every Statement in it has been walked, like everything
+// else here, and expected to answer with the array it was GIVEN where it changes
+// nothing — the structural sharing the rest of this file keeps rests on it.
+export type BodyRewrite = (
+	nodes: Array<ImplementationNode>,
+) => Array<ImplementationNode>
+
+// NOTE: The hooks a pass asks for, and it may ask for any of them. All are
 // offered by ONE walk: `elide-final-match-test` reads a Match that is still an
 // Expression and one that has been lowered to a Statement, and two walks would
 // be two chances to disagree about what was reached.
 export type NodeRewrites = {
 	expression?: ExpressionRewrite
 	statement?: StatementRewrite
+	body?: BodyRewrite
 }
 
 // NOTE: BOTTOM-UP for Statements as well: a Statement's children — its
@@ -61,9 +76,7 @@ export function rewriteNodes(
 	program: common.typedSimple.Program,
 	rewrites: NodeRewrites,
 ): common.typedSimple.Program {
-	let nodes = mapArray(program.implementation.nodes, (node) =>
-		walkImplementation(node, rewrites),
-	)
+	let nodes = walkBody(program.implementation.nodes, rewrites)
 
 	if (nodes === program.implementation.nodes) {
 		return program
@@ -87,6 +100,19 @@ export function rewriteStatements(
 	rewrite: StatementRewrite,
 ): common.typedSimple.Program {
 	return rewriteNodes(program, { statement: rewrite })
+}
+
+// NOTE: One run of Statements, walked and then offered whole. Every place a body
+// can stand goes through this — which is what makes "every body, exactly once"
+// a property of this function rather than of five call sites remembering to
+// agree.
+function walkBody(
+	nodes: Array<ImplementationNode>,
+	rewrites: NodeRewrites,
+): Array<ImplementationNode> {
+	let walked = mapArray(nodes, (node) => walkImplementation(node, rewrites))
+
+	return rewrites.body === undefined ? walked : rewrites.body(walked)
 }
 
 function mapArray<Value>(
@@ -183,12 +209,8 @@ function walkImplementationChildren(
 		}
 		case "ConditionalStatement": {
 			let condition = walkExpression(node.condition, rewrites)
-			let trueBody = mapArray(node.trueBody, (entry) =>
-				walkImplementation(entry, rewrites),
-			)
-			let falseBody = mapArray(node.falseBody, (entry) =>
-				walkImplementation(entry, rewrites),
-			)
+			let trueBody = walkBody(node.trueBody, rewrites)
+			let falseBody = walkBody(node.falseBody, rewrites)
 
 			if (
 				condition === node.condition &&
@@ -370,9 +392,7 @@ function walkInlineLoopCallback(
 	callback: common.typedSimple.InlineLoopCallback,
 	rewrites: NodeRewrites,
 ): common.typedSimple.InlineLoopCallback {
-	let body = mapArray(callback.body, (entry) =>
-		walkImplementation(entry, rewrites),
-	)
+	let body = walkBody(callback.body, rewrites)
 
 	return body === callback.body ? callback : { ...callback, body }
 }
@@ -381,9 +401,7 @@ function walkFunctionDefinition(
 	node: FunctionDefinitionNode,
 	rewrites: NodeRewrites,
 ): FunctionDefinitionNode {
-	let body = mapArray(node.body, (entry) =>
-		walkImplementation(entry, rewrites),
-	)
+	let body = walkBody(node.body, rewrites)
 
 	return body === node.body ? node : { ...node, body }
 }
@@ -619,9 +637,7 @@ function walkHandlers(
 			handler.guard === null
 				? null
 				: walkExpression(handler.guard, rewrites)
-		let body = mapArray(handler.body, (entry) =>
-			walkImplementation(entry, rewrites),
-		)
+		let body = walkBody(handler.body, rewrites)
 
 		if (
 			typeTest === handler.typeTest &&
