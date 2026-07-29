@@ -152,6 +152,18 @@ describe("Bundle Size", () => {
 	// a tenth of its size, because the `isLessThan`/`isGreaterThan` bodies and
 	// the `Ordering` Cases they built stop being reached at all.
 	//
+	// NOTE: It now measures 52,781, up 1,854, and the ceiling moves up with it.
+	// `inline-loops` is what grew it, and it grew the SOURCE far more than what
+	// ships: measured minified, where what ships is measured, the same change is
+	// 17,695 to 17,748 — fifty-three bytes, a third of a percent. The
+	// unminified figure is mostly the indentation escodegen puts a walk's body
+	// under. What the bytes buy is every `reduce`, `keepEvery` and `map` written
+	// with a literal callback — the standard library's own derived Methods
+	// among them — becoming a `for` with the callback's body in it, where each
+	// was a call per item into a native that called a closure per item. Loops.es
+	// measures the other direction, 11,281 to 10,488 unminified and 4,682 to
+	// 3,941 minified, because the four `loop` drivers stop being reached at all.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -159,7 +171,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(52_600)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_800)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.

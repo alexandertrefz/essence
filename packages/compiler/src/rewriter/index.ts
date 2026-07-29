@@ -1613,7 +1613,12 @@ export function essenceMethodReferences(
 			record["nodeType"] === "FunctionInvocation" ||
 			record["nodeType"] === "NativeFunctionInvocation" ||
 			(record["nodeType"] === "Intrinsic" &&
-				record["kind"] === "dispatch-chain")
+				record["kind"] === "dispatch-chain") ||
+			// NOTE: An inlined loop RUNS the bodies it holds, which is what the
+			// call it replaced did with the closures it was handed — so a
+			// Function-valued reference inside one is evaluated, exactly as it
+			// was when it stood under the call.
+			record["kind"] === "inline-loop"
 		) {
 			isStored = false
 		}
@@ -2184,6 +2189,12 @@ function rewriteIntrinsic(
 			}
 		case "dispatch-chain":
 			return dispatchChain(node)
+		// NOTE: A walk written where it stands, wrapped in an arrow because an
+		// Expression position has nowhere to write a `while`. Where it stands in
+		// a Statement position the Optimiser lifted it to the Statement form
+		// above, and there is no arrow at all.
+		case "inline-loop":
+			return inlineLoopExpression(node)
 		case "direct-list":
 			return {
 				type: "ObjectExpression",
@@ -3589,7 +3600,7 @@ function rewriteIntrinsicStatement(
 // NOTE: Where a lowered Expression's answer goes, written as the Statement that
 // puts it there.
 function resultStatement(
-	result: common.typedSimple.StatementResult,
+	result: PlacedTarget,
 	answer: estree.Expression,
 ): estree.Statement {
 	switch (result.kind) {
@@ -3606,6 +3617,12 @@ function resultStatement(
 					right: answer,
 				},
 			}
+		// NOTE: A name the Compiler binds for itself — an inlined loop's State,
+		// its answer, the Boolean a predicate settled on. It is emitted verbatim
+		// rather than through `rewriteIdentifier`, because it is not a name any
+		// Essence Program could have written.
+		case "temporary":
+			return loopAssignment(result.name, answer)
 		// NOTE: Evaluated and dropped — through the same rule every discarded
 		// Expression is emitted by, because a Handler may answer with a value as
 		// well as with a call. Where evaluating it observes nothing the pass has
@@ -3615,13 +3632,59 @@ function resultStatement(
 	}
 }
 
+// NOTE: Where an answer GOES, for the answers that go somewhere: a Statement
+// position's own result, or a name the Rewriter itself binds.
+type PlacedTarget =
+	| common.typedSimple.StatementResult
+	| { kind: "temporary"; name: string }
+
+// NOTE: And the whole of what an answer may be written as, which is wider by one
+// — an inlined loop's callback does not merely PUT its answer somewhere: a
+// predicate's answer decides whether the walk goes round again, and a `Step`
+// decides both where the answer goes and whether the walk is over. So the target
+// may be a writer of its own, handed the answer and the redirect it stands in.
+type RedirectTarget =
+	| PlacedTarget
+	| {
+			kind: "answer"
+			write: (
+				answer: LoopAnswer,
+				redirect: ReturnRedirect | null,
+			) => Array<estree.Statement>
+	  }
+
+// NOTE: One answer, as the two things a writer can need of it: the Node it was
+// written as — which is what lets `#Done(…)` be recognised where it is BUILT,
+// and the Case never built at all — and the JavaScript it emits, asked for only
+// where the Node was not enough. `node` is null where no Node stands behind the
+// answer: a nested inlined loop's own answer is read out of the name that walk
+// settled in, and the writer falls back to reading the tag.
+type LoopAnswer = {
+	node: common.typedSimple.ExpressionNode | null
+	value: () => estree.Expression
+}
+
+// NOTE: One answer, written where its target says — and the way OUT of the body
+// it was written in, where the answer was not the last thing in it.
+function answerStatements(
+	result: RedirectTarget,
+	answer: LoopAnswer,
+	redirect: ReturnRedirect | null,
+): Array<estree.Statement> {
+	if (result.kind === "answer") {
+		return result.write(answer, redirect)
+	}
+
+	return [resultStatement(result, answer.value()), ...breakOut(redirect)]
+}
+
 // NOTE: What a lowered Statement standing INSIDE a Handler body is emitted
 // against, when that body's Return Statements are being written somewhere other
 // than a JavaScript Return. A Match in Statement position holds a Match in
 // Return position holds another, and each of them answers the OUTERMOST one's
 // question — so the redirect travels down and the label is the outermost one's.
 type ReturnRedirect = {
-	result: common.typedSimple.StatementResult
+	result: RedirectTarget
 	label: string
 	// NOTE: True only for the LAST Statement of a Handler's own body, where
 	// nothing follows the answer and there is nothing to break out of.
@@ -3633,9 +3696,14 @@ function intrinsicStatementBody(
 	node: common.typedSimple.IntrinsicStatementNode,
 	redirect: ReturnRedirect | null,
 ): estree.Statement {
-	return node.kind === "statement-match"
-		? statementMatch(node, redirect)
-		: heldExpression(node, redirect)
+	switch (node.kind) {
+		case "statement-match":
+			return statementMatch(node, redirect)
+		case "held-expression":
+			return heldExpression(node, redirect)
+		case "inline-loop":
+			return inlineLoopStatement(node, redirect)
+	}
 }
 
 // NOTE: `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
@@ -3647,7 +3715,6 @@ function heldExpression(
 	redirect: ReturnRedirect | null,
 ): estree.Statement {
 	let result = redirect === null ? node.result : redirect.result
-	let answer = resultStatement(result, rewriteExpression(node.expression))
 
 	return {
 		type: "BlockStatement",
@@ -3665,8 +3732,14 @@ function heldExpression(
 					],
 				}),
 			),
-			answer,
-			...breakOut(redirect),
+			...answerStatements(
+				result,
+				{
+					node: node.expression,
+					value: () => rewriteExpression(node.expression),
+				},
+				redirect,
+			),
 		],
 	}
 }
@@ -3823,13 +3896,14 @@ function redirectedStatement(
 	switch (node.nodeType) {
 		case "ReturnStatement":
 			return withStatementLocation(
-				[
-					resultStatement(
-						redirect.result,
-						rewriteExpression(node.expression),
-					),
-					...breakOut(redirect),
-				],
+				answerStatements(
+					redirect.result,
+					{
+						node: node.expression,
+						value: () => rewriteExpression(node.expression),
+					},
+					redirect,
+				),
 				node.position,
 			)
 		case "ConditionalStatement":
@@ -3896,6 +3970,780 @@ function redirectedConditional(
 		consequent: block(node.trueBody),
 		alternate,
 	}
+}
+
+// #endregion
+
+// #region Inlined loops
+
+// NOTE: A walk written out — the Statements that run it, and the Expression that
+// reads what it settled on. Which of the two a caller needs is what the position
+// the loop stood in decides: a Statement position holds both as they are, and an
+// Expression position has to wrap them in something callable.
+type InlinedWalk = {
+	statements: Array<estree.Statement>
+	answer: estree.Expression
+}
+
+// NOTE: An arrow called at once, which is what an Expression position leaves: a
+// `while` is a Statement and there is nowhere in an Expression to write one. It
+// is ONE closure for the whole walk where the driver called two or three per
+// turn of it — and where the loop stands in a Statement position instead, there
+// is no closure at all.
+function inlineLoopExpression(
+	node: common.typedSimple.InlineLoopNode,
+): estree.Expression {
+	let walk = inlinedLoop(node)
+
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: {
+			type: "ArrowFunctionExpression",
+			expression: false,
+			params: [],
+			body: loopBlock([
+				...walk.statements,
+				{ type: "ReturnStatement", argument: walk.answer },
+			]),
+		},
+		arguments: [],
+	}
+}
+
+// NOTE: The same walk with nothing around it, and its answer written where the
+// Statement position says. The block is what keeps the names one walk binds its
+// own — every one of them is spelled from this loop's prefix, so two walks in
+// one Scope can not collide, and the block is there for the reader as much as
+// for the Compiler.
+function inlineLoopStatement(
+	node: common.typedSimple.InlineLoopStatementNode,
+	redirect: ReturnRedirect | null,
+): estree.Statement {
+	let result = redirect === null ? node.result : redirect.result
+	let walk = inlinedLoop(node)
+
+	return loopBlock([
+		...walk.statements,
+		// NOTE: No Node stands behind this answer — it is the name the walk
+		// settled in — so a writer expecting one reads the value instead. That
+		// is the one place a `Step` reaches the tag read rather than being
+		// recognised where it was built: a loop answering with a `Step` that
+		// another loop then reads.
+		...answerStatements(
+			result,
+			{ node: null, value: () => walk.answer },
+			redirect,
+		),
+	])
+}
+
+function inlinedLoop(loop: common.typedSimple.InlineLoop): InlinedWalk {
+	switch (loop.driver.kind) {
+		case "condition":
+			return conditionWalk(loop.name, loop.driver)
+		case "counted":
+			return countedWalk(loop.name, loop.driver)
+		case "general":
+			return generalWalk(loop.name, loop.driver)
+		case "fold":
+			return foldWalk(loop.name, loop.driver)
+		case "map":
+			return mapWalk(loop.name, loop.driver)
+		case "keep":
+			return keepWalk(loop.name, loop.driver)
+	}
+}
+
+// NOTE: `loop(startingWith:while:step:)` — the predicate checked BEFORE each
+// step, exactly as the driver checks it, so a predicate false on the seed
+// answers the seed and the body never runs. `until` is the same walk with the
+// answer read the other way round, which is what its own Essence body does by
+// negating the Boolean; here the question is simply asked the other way.
+function conditionWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "condition" }>,
+): InlinedWalk {
+	let state = `${prefix}_state`
+	// NOTE: What the call was given is written out before the bodies are, so
+	// that everything the emission collects on the way — a pooled constant above
+	// all — is collected in the order the Program says it.
+	let seed = loopDeclaration("let", state, rewriteExpression(driver.seed))
+	let check = inlinedCallback(
+		driver.predicate,
+		[loopIdentifier(state)],
+		`${prefix}_check`,
+		{
+			kind: "answer",
+			write: (answer, redirect) => [
+				{
+					type: "IfStatement",
+					// NOTE: The walk is left where a `while` predicate answers
+					// false and where an `until` predicate answers true, which
+					// is the whole of the difference between the two entries.
+					test: driver.until
+						? rawAnswer(answer)
+						: negatedAnswer(rawAnswer(answer)),
+					consequent: loopBreak(prefix),
+					alternate: null,
+				},
+				...breakOut(redirect),
+			],
+		},
+	)
+	let step = inlinedCallback(
+		driver.step,
+		[loopIdentifier(state)],
+		`${prefix}_body`,
+		{ kind: "temporary", name: state },
+	)
+
+	return {
+		statements: [
+			seed,
+			labelled(prefix, {
+				type: "WhileStatement",
+				test: { type: "Literal", value: true },
+				body: loopBlock([check, step]),
+			}),
+		],
+		answer: loopIdentifier(state),
+	}
+}
+
+// NOTE: `loop(from:through:startingWith:step:)`, and the one entry that does not
+// go through its driver at all. Its Essence body threads `{ index, carried }`
+// through the `while` driver — a Record and an Integer built per turn, a closure
+// asking whether the index has passed the end and another advancing it. All of
+// it is decided here: the direction once, before the first turn, exactly as that
+// body decides it, and then a `for` over the bigints the two bounds hold.
+//
+// NOTE: The bounds and the seed are evaluated in the order the call passed them,
+// which is the order the driver would have evaluated them in. What follows —
+// which way the count runs — is a comparison of two bigints and observes
+// nothing.
+function countedWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "counted" }>,
+): InlinedWalk {
+	let from = `${prefix}_from`
+	let to = `${prefix}_to`
+	let ascending = `${prefix}_up`
+	let delta = `${prefix}_delta`
+	let index = `${prefix}_index`
+	let state = `${prefix}_state`
+	// NOTE: The bounds and the seed, in the order the call passed them and
+	// before the body is written, so that what the emission collects on the way
+	// is collected in the order the Program says it.
+	let bounds = [
+		loopDeclaration(
+			"const",
+			from,
+			valueRead(rewriteExpression(driver.from)),
+		),
+		loopDeclaration(
+			"const",
+			to,
+			valueRead(rewriteExpression(driver.through)),
+		),
+		loopDeclaration("let", state, rewriteExpression(driver.seed)),
+	]
+	let body = inlinedCallback(
+		driver.step,
+		// NOTE: The body is handed the counter as the Integer it was always
+		// handed — the one allocation a turn of this loop still costs, where it
+		// used to cost that Integer, the Record around it and two calls.
+		[createdInteger(loopIdentifier(index)), loopIdentifier(state)],
+		`${prefix}_body`,
+		{ kind: "temporary", name: state },
+	)
+
+	return {
+		statements: [
+			...bounds,
+			loopDeclaration("const", ascending, {
+				type: "BinaryExpression",
+				operator: "<=",
+				left: loopIdentifier(from),
+				right: loopIdentifier(to),
+			}),
+			loopDeclaration("const", delta, {
+				type: "ConditionalExpression",
+				test: loopIdentifier(ascending),
+				consequent: countLiteral(1n),
+				alternate: countLiteral(-1n),
+			}),
+			{
+				type: "ForStatement",
+				init: loopDeclaration("let", index, loopIdentifier(from)),
+				// NOTE: Counting up runs while the index has not passed the end
+				// from below and counting down while it has not passed it from
+				// above — the two predicates the Essence body writes, asked of
+				// the bigint rather than through a closure and an Ordering.
+				test: {
+					type: "ConditionalExpression",
+					test: loopIdentifier(ascending),
+					consequent: {
+						type: "BinaryExpression",
+						operator: "<=",
+						left: loopIdentifier(index),
+						right: loopIdentifier(to),
+					},
+					alternate: {
+						type: "BinaryExpression",
+						operator: ">=",
+						left: loopIdentifier(index),
+						right: loopIdentifier(to),
+					},
+				},
+				update: {
+					type: "AssignmentExpression",
+					operator: "+=",
+					left: loopIdentifier(index),
+					right: loopIdentifier(delta),
+				},
+				body: loopBlock([body]),
+			},
+		],
+		answer: loopIdentifier(state),
+	}
+}
+
+// NOTE: `loop(startingWith:step:)` — the walk whose body decides when it is
+// over. Each turn answers with a `Step`: `#Done` stops with its value and
+// `#Continue` carries the next State, which is what `steppedTarget` writes where
+// the answer is written.
+function generalWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "general" }>,
+): InlinedWalk {
+	let state = `${prefix}_state`
+	let answer = `${prefix}_answer`
+	let stops = false
+	let seed = loopDeclaration("let", state, rewriteExpression(driver.seed))
+	let body = inlinedCallback(
+		driver.step,
+		[loopIdentifier(state)],
+		`${prefix}_body`,
+		steppedTarget(prefix, state, answer, () => {
+			stops = true
+		}),
+	)
+	let walk: estree.Statement = {
+		type: "WhileStatement",
+		test: { type: "Literal", value: true },
+		body: loopBlock([body]),
+	}
+
+	return {
+		statements: [
+			seed,
+			loopDeclaration("let", answer, null),
+			// NOTE: The label is emitted only where something leaves through it.
+			// A body that never answers `#Done` is a walk that never ends, which
+			// is exactly what the driver does with one.
+			stops ? labelled(prefix, walk) : walk,
+		],
+		answer: loopIdentifier(answer),
+	}
+}
+
+// NOTE: `List.reduce`, both entries. The plain fold always runs to the end and
+// answers the accumulator; the early-stopping one may leave on a `#Done`, so its
+// walk stands in a labelled block with the accumulator written after it — which
+// is what "the accumulated value, or the value the first `#Done` carries" means
+// written out.
+function foldWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "fold" }>,
+): InlinedWalk {
+	let items = `${prefix}_items`
+	let position = `${prefix}_position`
+	let state = `${prefix}_state`
+	let answer = `${prefix}_answer`
+	let stops = false
+	let target: RedirectTarget = driver.stepped
+		? steppedTarget(prefix, state, answer, () => {
+				stops = true
+			})
+		: { kind: "temporary", name: state }
+	// NOTE: The receiver before the seed, which is the order the call evaluated
+	// them in — a Method's receiver is its first Argument — and both before the
+	// body, so that what the emission collects on the way is collected in the
+	// order the Program says it.
+	let held = [
+		loopDeclaration(
+			"const",
+			items,
+			valueRead(rewriteExpression(driver.items)),
+		),
+		loopDeclaration("let", state, rewriteExpression(driver.seed)),
+	]
+	let body = inlinedCallback(
+		driver.step,
+		[loopIdentifier(state), itemAt(items, position)],
+		`${prefix}_body`,
+		target,
+	)
+	let walk = itemsWalk(items, position, [body])
+
+	if (!driver.stepped) {
+		return {
+			statements: [...held, walk],
+			answer: loopIdentifier(state),
+		}
+	}
+
+	let tail = [walk, loopAssignment(answer, loopIdentifier(state))]
+
+	return {
+		statements: [
+			...held,
+			loopDeclaration("let", answer, null),
+			...(stops ? [labelled(prefix, loopBlock(tail))] : tail),
+		],
+		answer: loopIdentifier(answer),
+	}
+}
+
+// NOTE: `List.map` — the Array built beside the walk and wrapped once at the
+// end, which is what the native does with the Array `Array.prototype.map`
+// returns.
+function mapWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "map" }>,
+): InlinedWalk {
+	let items = `${prefix}_items`
+	let position = `${prefix}_position`
+	let mapped = `${prefix}_mapped`
+	let held = loopDeclaration(
+		"const",
+		items,
+		valueRead(rewriteExpression(driver.items)),
+	)
+	let body = inlinedCallback(
+		driver.transform,
+		[itemAt(items, position)],
+		`${prefix}_body`,
+		{
+			kind: "answer",
+			write: (answer, redirect) => [
+				pushed(mapped, answer.value()),
+				...breakOut(redirect),
+			],
+		},
+	)
+
+	return {
+		statements: [
+			held,
+			loopDeclaration("const", mapped, {
+				type: "ArrayExpression",
+				elements: [],
+			}),
+			itemsWalk(items, position, [body]),
+		],
+		answer: createdList(loopIdentifier(mapped)),
+	}
+}
+
+// NOTE: `List.keepEvery` — the same walk, keeping the ITEM where the check
+// accepts it. The item is bound first because two places read it: the check is
+// handed it, and the Array it is kept in is given the same value.
+function keepWalk(
+	prefix: string,
+	driver: Extract<common.typedSimple.InlineLoopDriver, { kind: "keep" }>,
+): InlinedWalk {
+	let items = `${prefix}_items`
+	let position = `${prefix}_position`
+	let item = `${prefix}_item`
+	let kept = `${prefix}_kept`
+	let held = loopDeclaration(
+		"const",
+		items,
+		valueRead(rewriteExpression(driver.items)),
+	)
+	let body = inlinedCallback(
+		driver.check,
+		[loopIdentifier(item)],
+		`${prefix}_body`,
+		{
+			kind: "answer",
+			write: (answer, redirect) => [
+				{
+					type: "IfStatement",
+					test: rawAnswer(answer),
+					consequent: pushed(kept, loopIdentifier(item)),
+					alternate: null,
+				},
+				...breakOut(redirect),
+			],
+		},
+	)
+
+	return {
+		statements: [
+			held,
+			loopDeclaration("const", kept, {
+				type: "ArrayExpression",
+				elements: [],
+			}),
+			itemsWalk(items, position, [
+				loopDeclaration("const", item, itemAt(items, position)),
+				body,
+			]),
+		],
+		answer: createdList(loopIdentifier(kept)),
+	}
+}
+
+// NOTE: What a `Step`-answering body's answer is written as, and the whole of
+// what makes the `Step` disappear. Where the Compiler can SEE the Case being
+// built at the answering position — `<- #Done(x)`, which is what such a body is
+// made of — the walk assigns and leaves, and the Case is never built. Where it
+// can not, the tag is read exactly as the driver read it, at that one site: a
+// `Step` held under a name, one a Method answers with, one a nested walk
+// settled on.
+//
+// NOTE: `#Continue` is written like any other answer — the State takes the
+// value and the body is left through its own label, which is the way out the
+// redirect already knows about. `#Done` is not: it leaves the WALK, so it breaks
+// the label the walk carries, wherever in the body it stands.
+function steppedTarget(
+	prefix: string,
+	state: string,
+	answer: string,
+	stop: () => void,
+): RedirectTarget {
+	return {
+		kind: "answer",
+		write: (written, redirect) => {
+			let step = stepConstruction(written.node)
+
+			if (step !== null) {
+				if (!step.done) {
+					return [
+						loopAssignment(state, rewriteExpression(step.value)),
+						...breakOut(redirect),
+					]
+				}
+
+				stop()
+
+				return [
+					loopAssignment(answer, rewriteExpression(step.value)),
+					loopBreak(prefix),
+				]
+			}
+
+			stop()
+
+			// NOTE: A block of its own, so that two answers falling back to the
+			// tag read in one body each hold their `Step` under a name of their
+			// own.
+			let held = `${prefix}_step`
+
+			return [
+				loopBlock([
+					loopDeclaration("const", held, written.value()),
+					{
+						type: "IfStatement",
+						test: {
+							type: "BinaryExpression",
+							operator: "===",
+							left: typeKeyRead(loopIdentifier(held)),
+							right: {
+								type: "Literal",
+								value: renderIdentity(doneTag),
+							},
+						},
+						consequent: loopBlock([
+							loopAssignment(
+								answer,
+								memberRead(loopIdentifier(held), "value"),
+							),
+							loopBreak(prefix),
+						]),
+						alternate: null,
+					},
+					loopAssignment(
+						state,
+						memberRead(loopIdentifier(held), "state"),
+					),
+				]),
+				...breakOut(redirect),
+			]
+		},
+	}
+}
+
+// NOTE: The two Cases of the builtin `Step`, and the single member each carries
+// — `#Done(x)` is `Step#Done { value: x }` and `#Continue(x)` is
+// `Step#Continue { state: x }`. Nothing else may be read this way: a `Step` is
+// the Type the two drivers take, and the Enricher admits no other value there.
+const doneTag = "Step#Done"
+const continueTag = "Step#Continue"
+
+// NOTE: A `Step` the Compiler can see being BUILT, and null for every other
+// answer. Both shapes of a construction are read, because both can arrive:
+// `collapse-construction` runs AFTER the pass that inlines loops and turns a
+// Case with a Record payload into the literal it emits, so a body holds a
+// `CaseValue` with that pass off and a `direct-case` with it on. Reading one and
+// not the other would make an optimisation depend on another being enabled,
+// which is the one thing a pass may not do.
+function stepConstruction(
+	node: common.typedSimple.ExpressionNode | null,
+): { done: boolean; value: common.typedSimple.ExpressionNode } | null {
+	if (node === null) {
+		return null
+	}
+
+	if (node.nodeType === "CaseValue") {
+		return node.value !== null && node.value.nodeType === "RecordValue"
+			? stepPayload(node.tag, node.value.members)
+			: null
+	}
+
+	if (
+		node.nodeType === "Intrinsic" &&
+		node.kind === "direct-case" &&
+		node.payload === null
+	) {
+		return stepPayload(node.tag, node.members)
+	}
+
+	return null
+}
+
+// NOTE: The payload of a `Step`, and the one member each Case declares. A
+// payload holding anything MORE than that member is refused rather than read:
+// taking the Case away takes the construction of every member with it, and a
+// member the walk does not read is one that would stop being evaluated. `Step`
+// declares exactly one member per Case today, so this refuses nothing — it is
+// what keeps a second member from silently disappearing if one is ever added.
+function stepPayload(
+	tag: string,
+	members: Record<string, common.typedSimple.ExpressionNode>,
+): { done: boolean; value: common.typedSimple.ExpressionNode } | null {
+	let names = Object.keys(members)
+
+	if (names.length !== 1) {
+		return null
+	}
+
+	let done = members["value"]
+	let carried = members["state"]
+
+	if (tag === doneTag && done !== undefined) {
+		return { done: true, value: done }
+	}
+
+	if (tag === continueTag && carried !== undefined) {
+		return { done: false, value: carried }
+	}
+
+	return null
+}
+
+// NOTE: One callback's body, where the call to it was. The Parameters are bound
+// as the `const`s of a block around it, which is the Scope the closure gave them
+// and nothing more: the body reads its Parameters and everything enclosing the
+// call under the same names it always did, and a Parameter standing in front of
+// an outer binding stands in front of it for exactly the length of the block. No
+// name is rewritten, so no name can be rewritten wrongly.
+//
+// NOTE: The body's Return Statements are what the walk reads, and the redirect
+// is what writes them where they go — the same machinery a lowered Match's
+// Handlers are written through, so a Match, a Conditional or another lowered
+// loop inside a callback answers the walk exactly as a bare Return does. A
+// Function DECLARED in the body keeps its own Returns, because that machinery
+// descends by name and a Function is not one of the names it descends into.
+function inlinedCallback(
+	callback: common.typedSimple.InlineLoopCallback,
+	args: Array<estree.Expression>,
+	label: string,
+	result: RedirectTarget,
+): estree.Statement {
+	let broke = false
+	let body = withNamespaceScope(() => [
+		...callback.parameters.map(
+			(parameter, index): estree.Statement => ({
+				type: "VariableDeclaration",
+				kind: "const",
+				declarations: [
+					{
+						type: "VariableDeclarator",
+						id: rewriteIdentifier(parameter),
+						init: args[index]!,
+					},
+				],
+			}),
+		),
+		...redirectedStatements(callback.body, {
+			result,
+			label,
+			// NOTE: The body IS the block, so its last Statement has nothing
+			// after it to skip — an answer written there needs no way out.
+			isTail: true,
+			broke: () => {
+				broke = true
+			},
+		}),
+	])
+
+	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
+}
+
+// NOTE: The walk every List Method performs — over the positions of the Array
+// the List holds, which is the walk the natives perform and the one shape a
+// `for` says better than an iterator does. The Array can not change under it:
+// every Essence value is immutable, and the callbacks below build their own.
+function itemsWalk(
+	items: string,
+	position: string,
+	body: Array<estree.Statement>,
+): estree.Statement {
+	return {
+		type: "ForStatement",
+		init: loopDeclaration("let", position, { type: "Literal", value: 0 }),
+		test: {
+			type: "BinaryExpression",
+			operator: "<",
+			left: loopIdentifier(position),
+			right: memberRead(loopIdentifier(items), "length"),
+		},
+		update: {
+			type: "UpdateExpression",
+			operator: "++",
+			prefix: false,
+			argument: loopIdentifier(position),
+		},
+		body: loopBlock(body),
+	}
+}
+
+function itemAt(items: string, position: string): estree.MemberExpression {
+	return {
+		type: "MemberExpression",
+		optional: false,
+		computed: true,
+		object: loopIdentifier(items),
+		property: loopIdentifier(position),
+	}
+}
+
+// NOTE: The raw JavaScript boolean a predicate's answer decides by — and, where
+// the answer is a Boolean an earlier pass BUILT out of a JavaScript test, the
+// test it was built from. It is the same collapse an `if` performs on its
+// condition, in the one other place a Boolean is built only to be read back.
+function rawAnswer(answer: LoopAnswer): estree.Expression {
+	let node = answer.node
+
+	return node !== null &&
+		node.nodeType === "Intrinsic" &&
+		node.kind === "essence-boolean"
+		? rewriteExpression(node.value)
+		: valueRead(answer.value())
+}
+
+function negatedAnswer(test: estree.Expression): estree.Expression {
+	return {
+		type: "UnaryExpression",
+		operator: "!",
+		prefix: true,
+		argument: test,
+	}
+}
+
+// NOTE: The literal constructors, spelled exactly as every other emission site
+// spells them — a read off the `import * as <Namespace>` the Program opens with.
+function createdInteger(value: estree.Expression): estree.Expression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(loopIdentifier("Integer"), "createInteger"),
+		arguments: [value],
+	}
+}
+
+// NOTE: One step of the counter, as the bigint an Integer holds — the same
+// literal an Integer's own emission writes, and the only kind of number the
+// counted walk's bounds can be.
+function countLiteral(value: bigint): estree.BigIntLiteral {
+	return { type: "Literal", bigint: value.toString(), value }
+}
+
+function createdList(value: estree.Expression): estree.Expression {
+	return {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(loopIdentifier("List"), "createList"),
+		arguments: [value],
+	}
+}
+
+function pushed(array: string, value: estree.Expression): estree.Statement {
+	return {
+		type: "ExpressionStatement",
+		expression: {
+			type: "CallExpression",
+			optional: false,
+			callee: memberRead(loopIdentifier(array), "push"),
+			arguments: [value],
+		},
+	}
+}
+
+// NOTE: The names an inlined loop binds are the Compiler's own and are emitted
+// verbatim — every one of them is spelled from the loop's prefix, which holds a
+// `_` and is therefore a name no Essence Program can write.
+function loopIdentifier(name: string): estree.Identifier {
+	return { type: "Identifier", name }
+}
+
+function loopDeclaration(
+	kind: "let" | "const",
+	name: string,
+	init: estree.Expression | null,
+): estree.VariableDeclaration {
+	return {
+		type: "VariableDeclaration",
+		kind,
+		declarations: [
+			{
+				type: "VariableDeclarator",
+				id: loopIdentifier(name),
+				init,
+			},
+		],
+	}
+}
+
+function loopAssignment(
+	name: string,
+	value: estree.Expression,
+): estree.Statement {
+	return {
+		type: "ExpressionStatement",
+		expression: {
+			type: "AssignmentExpression",
+			operator: "=",
+			left: loopIdentifier(name),
+			right: value,
+		},
+	}
+}
+
+function loopBreak(label: string): estree.Statement {
+	return { type: "BreakStatement", label: loopIdentifier(label) }
+}
+
+function labelled(label: string, body: estree.Statement): estree.Statement {
+	return { type: "LabeledStatement", label: loopIdentifier(label), body }
+}
+
+function loopBlock(body: Array<estree.Statement>): estree.BlockStatement {
+	return { type: "BlockStatement", body }
 }
 
 // #endregion

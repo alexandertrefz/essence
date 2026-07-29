@@ -739,8 +739,15 @@ describe("Code Generation", () => {
 	describe("Higher-order List Methods", () => {
 		// NOTE: `map`/`reduce` are the first builtins with a Method-level
 		// Generic and the first to take a contextually typed callback all the
-		// way through codegen. This pins the emitted call and that the callback
-		// became a plain JS closure.
+		// way through codegen. This pins that the callback's body reached the
+		// emitted JavaScript with its Parameters bound and its Types resolved.
+		//
+		// NOTE: The CALL is no longer here to pin: a walk whose callback is
+		// written AT the call is written out where it stands — `inline-loops` —
+		// so the Method is reached only where the callback is a value instead.
+		// The pass's own spec pins both halves of that; these two pin what the
+		// Enricher and the Simplifier made of the literal, which is the same
+		// either way.
 		it("emits map with an inferred callback", () => {
 			let generated = generate(`
 				implementation {
@@ -748,7 +755,7 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			expect(generated).toContain("List.map(")
+			expect(generated).toContain("const n = $loop_0_items[")
 			expect(generated).toContain("Integer.toString(")
 		})
 
@@ -762,12 +769,29 @@ describe("Code Generation", () => {
 				}
 			`)
 
-			expect(generated).toContain("List.reduce__overload$1(")
+			expect(generated).toContain("let $loop_0_state = $pool_")
 			// NOTE: `total::add(n)` on two Integers is lowered to the bigint
 			// addition inside the literal the runtime's constructor would have
 			// built — `lower-scalar-operations` — so what says the callback's
 			// body resolved is the operation rather than the call.
 			expect(generated).toContain("value: total.value + n.value")
+		})
+
+		// NOTE: And the Method itself, which is reached exactly where the
+		// callback is not written at the call — the same Program with the
+		// literal bound to a name first.
+		it("emits the call where the callback is a value", () => {
+			let generated = generate(`
+				implementation {
+					constant double = (_ n: Integer) -> Integer {
+						<- n::multiply(with 2)
+					}
+
+					__print([1, 2]::map(double))
+				}
+			`)
+
+			expect(generated).toContain("List.map(")
 		})
 	})
 

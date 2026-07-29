@@ -358,6 +358,7 @@ export type IntrinsicNode =
 	| SpreadCombinationNode
 	| PooledReferenceNode
 	| DispatchChainNode
+	| InlineLoopNode
 
 // NOTE: Whether a value is a Case carrying this tag — `value[<Type key>] ===
 // "Ordering#Less"`, the whole of what the runtime asks when the answer can not
@@ -669,6 +670,93 @@ export type DispatchChainCase = {
 	derivedDescriptor?: DerivedEquatableDescriptor
 }
 
+// NOTE: A call of the `loop` family or of one of List's walking Methods, with
+// the walk written out where it stands and the callbacks' bodies written into
+// it. Essence has no loop Statement — a walk is a driver Function handed
+// callbacks — so every turn of every loop called two or three closures and built
+// the values they threaded between them. The driver is a `while` or a `for`; the
+// callbacks are their bodies; and none of it needs a Function once the Compiler
+// can see which driver it is and what the callbacks are.
+//
+// NOTE: `name` is the prefix every name this loop binds is spelled from —
+// `$loop_0_state`, `$loop_0_items`, and the label `$loop_0` the walk is left
+// through. Numbered across the whole Program, so that a loop inlined inside
+// another loop's body can not declare the name that one is threading its State
+// under. Unspellable in Essence: the Lexer reads `_` as a Symbol, so no name a
+// Program can write holds one.
+//
+// NOTE: What is NOT here is a rename. A callback's Parameters are bound as the
+// `const`s of a block around its body, which is exactly the Scope the closure
+// gave them — the body reads its Parameters and the enclosing Scope through the
+// same names, in the same order, and a Parameter that shadows an outer binding
+// shadows it for exactly the length of the block. See `optimisations.md`.
+export interface InlineLoopNode extends InlineLoop {
+	nodeType: "Intrinsic"
+	kind: "inline-loop"
+	type: Type
+	position?: Position
+}
+
+// NOTE: The loop itself, shared by the Expression form above and the Statement
+// form below — one description of a walk, emitted into whichever of the two
+// positions it stands in.
+export type InlineLoop = {
+	name: string
+	driver: InlineLoopDriver
+}
+
+// NOTE: One callback, reduced to what inlining needs of it: the names its body
+// reads its Arguments under, and the body. A Function literal is the only thing
+// that can become one — a Function-valued name is whatever was bound to it, and
+// the call stays a call.
+export type InlineLoopCallback = {
+	parameters: Array<IdentifierNode>
+	body: Array<ImplementationNode>
+}
+
+// NOTE: WHICH walk, and the Expressions it was given. Each mirrors one driver
+// exactly — the predicate is checked before each step because `loop__overload$1`
+// checks it before each step, the counted entry counts down when `from` is the
+// greater because `loop__overload$3` does — and each is emitted in the order the
+// call evaluated its Arguments.
+export type InlineLoopDriver =
+	// NOTE: `loop(startingWith:while:step:)` and its `until` sibling, which is
+	// the same driver with the predicate read the other way round.
+	| {
+			kind: "condition"
+			until: boolean
+			seed: ExpressionNode
+			predicate: InlineLoopCallback
+			step: InlineLoopCallback
+	  }
+	// NOTE: `loop(from:through:startingWith:step:)`, which is written in Essence
+	// on the `while` driver and threads a `{ index, carried }` Record through it.
+	// Inlined it is a `for` over the bigint the Integers hold, and neither the
+	// Record nor the Essence driver is reached at all.
+	| {
+			kind: "counted"
+			from: ExpressionNode
+			through: ExpressionNode
+			seed: ExpressionNode
+			step: InlineLoopCallback
+	  }
+	// NOTE: `loop(startingWith:step:)`, whose step answers with a `Step` —
+	// `#Done` stops the walk with its value, `#Continue` carries the next State.
+	| { kind: "general"; seed: ExpressionNode; step: InlineLoopCallback }
+	// NOTE: `List.reduce`, both entries. `stepped` is the early-stopping one,
+	// whose combiner answers with a `Step` exactly as the general loop's does.
+	| {
+			kind: "fold"
+			stepped: boolean
+			items: ExpressionNode
+			seed: ExpressionNode
+			step: InlineLoopCallback
+	  }
+	// NOTE: `List.map` and `List.keepEvery` — a walk that builds an Array and
+	// wraps it, with the callback deciding what goes in it.
+	| { kind: "map"; items: ExpressionNode; transform: InlineLoopCallback }
+	| { kind: "keep"; items: ExpressionNode; check: InlineLoopCallback }
+
 // NOTE: Two Records combined in one allocation — `{ ...lhs, member: … }`, where
 // `Object.assign({}, lhs, rhs)` built an empty object and copied both into it.
 // The hidden Type key rides along on the spread of `lhs`, which carries it like
@@ -793,7 +881,10 @@ export interface FunctionStatementNode {
 // Nothing downstream may move one into an Expression position: these are
 // Statements, and a Statement is not an Expression here as it is not one in
 // JavaScript.
-export type IntrinsicStatementNode = StatementMatchNode | HeldExpressionNode
+export type IntrinsicStatementNode =
+	| StatementMatchNode
+	| HeldExpressionNode
+	| InlineLoopStatementNode
 
 // NOTE: Where a lowered Expression's answer goes, which is the whole of what the
 // Statement position it stood in decides.
@@ -870,6 +961,18 @@ export interface HeldExpressionNode {
 	kind: "held-expression"
 	temporaries: Array<DispatchTemporaryNode>
 	expression: ExpressionNode
+	result: StatementResult
+	position?: Position
+}
+
+// NOTE: An inlined loop where the Statement position it stands in can simply
+// hold it. The Expression form has to wrap the walk in an arrow and call it,
+// because a `while` is not an Expression; here the Statements are written where
+// they are, and `result` says where the walk's answer goes — exactly as it does
+// for a lowered Match.
+export interface InlineLoopStatementNode extends InlineLoop {
+	nodeType: "IntrinsicStatement"
+	kind: "inline-loop"
 	result: StatementResult
 	position?: Position
 }

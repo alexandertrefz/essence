@@ -264,7 +264,117 @@ function walkIntrinsicStatementChildren(
 
 			return { ...node, temporaries, expression }
 		}
+		case "inline-loop": {
+			let driver = walkInlineLoopDriver(node.driver, rewrites)
+
+			return driver === node.driver ? node : { ...node, driver }
+		}
 	}
+}
+
+// NOTE: An inlined loop is walked like the call it replaced: the Expressions it
+// was given, and the Statements of each callback's body — which are Statements
+// standing in a Statement position and are offered to BOTH hooks, exactly as the
+// Function literal's body was before it was inlined. That is what keeps
+// `pool-constants` reaching a literal written inside a loop body and
+// `elide-final-match-test` reading a Match written there.
+//
+// NOTE: A Parameter is a binding rather than a value and is not offered, which
+// is how every other Parameter position in this walk is treated.
+function walkInlineLoopDriver(
+	driver: common.typedSimple.InlineLoopDriver,
+	rewrites: NodeRewrites,
+): common.typedSimple.InlineLoopDriver {
+	switch (driver.kind) {
+		case "condition": {
+			let seed = walkExpression(driver.seed, rewrites)
+			let predicate = walkInlineLoopCallback(driver.predicate, rewrites)
+			let step = walkInlineLoopCallback(driver.step, rewrites)
+
+			if (
+				seed === driver.seed &&
+				predicate === driver.predicate &&
+				step === driver.step
+			) {
+				return driver
+			}
+
+			return { ...driver, seed, predicate, step }
+		}
+		case "counted": {
+			let from = walkExpression(driver.from, rewrites)
+			let through = walkExpression(driver.through, rewrites)
+			let seed = walkExpression(driver.seed, rewrites)
+			let step = walkInlineLoopCallback(driver.step, rewrites)
+
+			if (
+				from === driver.from &&
+				through === driver.through &&
+				seed === driver.seed &&
+				step === driver.step
+			) {
+				return driver
+			}
+
+			return { ...driver, from, through, seed, step }
+		}
+		case "general": {
+			let seed = walkExpression(driver.seed, rewrites)
+			let step = walkInlineLoopCallback(driver.step, rewrites)
+
+			if (seed === driver.seed && step === driver.step) {
+				return driver
+			}
+
+			return { ...driver, seed, step }
+		}
+		case "fold": {
+			let items = walkExpression(driver.items, rewrites)
+			let seed = walkExpression(driver.seed, rewrites)
+			let step = walkInlineLoopCallback(driver.step, rewrites)
+
+			if (
+				items === driver.items &&
+				seed === driver.seed &&
+				step === driver.step
+			) {
+				return driver
+			}
+
+			return { ...driver, items, seed, step }
+		}
+		case "map": {
+			let items = walkExpression(driver.items, rewrites)
+			let transform = walkInlineLoopCallback(driver.transform, rewrites)
+
+			if (items === driver.items && transform === driver.transform) {
+				return driver
+			}
+
+			return { ...driver, items, transform }
+		}
+		case "keep": {
+			let items = walkExpression(driver.items, rewrites)
+			let check = walkInlineLoopCallback(driver.check, rewrites)
+
+			if (items === driver.items && check === driver.check) {
+				return driver
+			}
+
+			return { ...driver, items, check }
+		}
+	}
+}
+
+function walkInlineLoopCallback(
+	callback: common.typedSimple.InlineLoopCallback,
+	rewrites: NodeRewrites,
+): common.typedSimple.InlineLoopCallback {
+	let body = mapArray(callback.body, (entry) =>
+		walkImplementation(entry, rewrites),
+	)
+
+	return body === callback.body ? callback : { ...callback, body }
 }
 
 function walkFunctionDefinition(
@@ -726,6 +836,14 @@ function walkIntrinsicChildren(
 			}
 
 			return { ...node, lhs, members, rhs }
+		}
+		// NOTE: The same walk the Statement form gets, because it is the same
+		// loop — one written where a Statement can hold it, one wrapped in an
+		// arrow because its position can not.
+		case "inline-loop": {
+			let driver = walkInlineLoopDriver(node.driver, rewrites)
+
+			return driver === node.driver ? node : { ...node, driver }
 		}
 	}
 }

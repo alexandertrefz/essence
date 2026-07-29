@@ -409,6 +409,126 @@ asks and the Boolean between them is never built. Only that exact shape is
 collapsed: a condition that is anything else is a value, and its `value` is what
 JavaScript has to be asked.
 
+### `inline-loops`
+
+Writes a loop out where it is written, instead of calling a driver that calls
+callbacks.
+
+Essence has no loop Statement. A walk is a driver Function handed callbacks —
+`loop(startingWith 0, while (n) { … }, step (n) { … })` — and the driver calls
+them, threading whatever they answer with from one turn to the next. That is the
+language's whole answer to iteration, and it is a good one: the control flow is a
+value, so a Match can read it, an early exit is an ordinary `#Done`, and `<-`
+keeps its one meaning. It is also the most expensive shape a Program can be
+written in, because the Compiler knows every part of it and emitted none of it:
+
+```js
+loop__overload$1(state, function (n) { … }, function (n) { … })
+```
+
+Which driver it is, is the name it resolved to. What the callbacks do, is their
+bodies. So the walk is written out at the call, with each body where the call to
+it was:
+
+```js
+let $loop_0_state = state;
+$loop_0: while (true) {
+	{ const n = $loop_0_state; if (!(n.value < 100n)) break $loop_0; }
+	{ const n = $loop_0_state; $loop_0_state = { …, value: n.value * 2n }; }
+}
+```
+
+Seven entries are inlined: the four `loop` Overloads — `while`, `until`, the
+counted `from`/`through` one and the general `Step` one — and List's `map`,
+`keepEvery` and both `reduce` entries.
+
+**A callback is inlined only where it is WRITTEN at the call.** A
+Function-valued name is whatever was bound to it, which is not something a
+Compiler can read, so a call passing one stays exactly the call it was. That is
+also the only thing to know about when a loop is not inlined.
+
+**The Parameters are bound, not renamed.** Each callback's body is emitted inside
+a block whose `const`s are its Parameters, which is exactly the Scope the closure
+gave it: the body reads its Parameters and everything enclosing the call under
+the same names, and a Parameter standing in front of an outer binding stands in
+front of it for the length of the block and no further. Renaming is what would
+need to be careful here — a body that reads an outer `total` while a sibling
+callback's Parameter is also called `total` is precisely the case a rename gets
+wrong — and no name is rewritten at all. The names the walk itself binds are
+spelled from a per-loop prefix (`$loop_0_state`, `$loop_0_items`) that holds a
+`_`, which no Essence name can, and is numbered across the whole Program so a
+loop inlined inside another loop's body can not take a name that one is using.
+
+**Evaluation order is the call's.** The seed, the bounds and the receiver are
+evaluated before the walk in the order the call passed them, which is the order
+the driver's Arguments were evaluated in. Each driver's own order is mirrored
+exactly: `while` and `until` check the predicate BEFORE each step, so a predicate
+decided on the seed answers the seed and the body never runs; the counted entry
+fixes its direction once, before the first turn.
+
+**The counted loop does not go through its driver at all.**
+`loop(from:through:startingWith:step:)` is written in Essence on the `while`
+driver and threads a `{ index, carried }` Record through it — a Record and an
+Integer built per turn, a closure asking whether the index has passed the end,
+another advancing it. Inlined it is a `for` over the bigint the two bounds hold,
+counting up when `from` is the lesser and down when it is the greater exactly as
+that body decides it, and the only allocation a turn still costs is the Integer
+the body is HANDED.
+
+**A `Step` is read where it is built.** The general loop and `reduce`'s
+early-stopping entry both decide by a tag the body has just written — `#Done(x)`
+stops the walk with `x`, `#Continue(x)` carries `x` on. Where the answer IS such
+a construction, which is what those bodies are made of, the walk assigns and
+leaves and the Case is never built. Where it is not — a `Step` held under a name,
+one a Method answers with, one another walk settled on — the tag is read at that
+one site, exactly as the driver read it.
+
+**Where it stands decides whether there is a closure at all.** A loop that is
+what a Statement computes — a Return, a Variable Declaration's value, a walk
+written for its effects — is written as Statements. A loop written anywhere else,
+an Argument or an interpolation hole, is wrapped in an arrow and called: still one
+closure for the whole walk, where the driver built two or three per turn of it.
+
+Safe because the driver is the only thing that goes away. Every Argument is
+evaluated where it was, each body runs where and as often as the driver ran it,
+the callbacks' own Returns answer the walk exactly as they answered the driver —
+and a Function DECLARED inside a body keeps its own Returns, because the
+machinery that writes them descends by Statement kind and a Function is not one
+of the kinds it descends into. Capture needs no argument at all: the body is
+emitted at the call, in the Scope it closed over.
+
+What it costs is text. A walk written at three sites is three walks, where it was
+three calls to one driver, and the standard library's own derived Methods —
+`firstItem(where:)`, `firstIndex(of:)`, `count(where:)`, `removeEvery(where:)` —
+are each written on `reduce` or `keepEvery` with a literal callback, so each
+carries its own. Measured on Everyday.es that is 1,854 bytes unminified and
+fifty-three minified; Loops.es, where the four drivers stop being reached at all,
+falls by 793 bytes unminified and 741 minified.
+
+**What it is worth, honestly, depends on the driver — and on what the passes
+before it already took away.** Measured on Bun, best of five, process start
+subtracted: a three million turn counted loop is **1.24×** faster with this pass
+than with it alone turned off, a million turn `Step` loop threading a Record
+**1.04×**, and a `keepEvery` into a `reduce` over two hundred thousand items
+**1.04×**. The same three Programs with the WHOLE registry turned off are 3.40×,
+3.42× and 1.85× slower than with all of it on — so most of what a loop-heavy
+Program gains is `lower-scalar-operations`, `collapse-construction` and
+`pool-constants` taking the per-turn calls and allocations out of the BODY, and
+what is left for this pass is the driver's own overhead. That overhead is real
+where the driver is written in Essence and threads a Record — the counted entry,
+which is why it is the one that gains — and small where the driver is a native
+whose closure call an engine's inline caches already resolve. It earns its place
+by taking a shape away rather than by being a lever: after it there is no
+closure, no `Step` and no driver between a loop as written and the `for` a
+JavaScript author would have written.
+
+**`firstItem(where:)` and its siblings are reached through their own bodies, not
+at the call.** Inlining a call to one of them would mean inlining an ordinary
+Essence Method, which this pass does not do — it knows seven drivers, not
+inlining in general. What it does instead is inline the walk INSIDE each of them,
+once, in the prelude: a Program's call still calls `firstItem(where:)`, and what
+it calls is a `for` that no longer allocates a `Step` per item.
+
 ### `elide-final-match-test`
 
 Emits the last Handler of a Match as the `else` of the chain.
