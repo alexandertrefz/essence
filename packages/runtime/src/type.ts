@@ -94,10 +94,35 @@ export type CaseInstanceType = {
 	[key: string]: AnyType
 }
 
+// NOTE: A unit Case carries nothing but its tag, so every value of one holds
+// exactly what every other value of it holds — and Case equality goes by that
+// tag, with no operator anywhere in the language asking whether two values are
+// the SAME value. So one instance per tag is built and handed out ever after,
+// which is what `Ordering`, `Side` and the other builtin Choices have always
+// done with their Cases as Module consts; this does it for the ones a Program
+// declares.
+//
+// NOTE: The Map is bounded by how many distinct unit Case tags the Program
+// CONSTRUCTS, which is a property of its text rather than of its work — a
+// constant pool that fills once, not a cache that grows with what the Program
+// is asked to do.
+const unitCaseInstances = new Map<string, CaseInstanceType>()
+
 export function createCase(
 	tag: string,
 	payload?: Record<string, AnyType>,
 ): CaseInstanceType {
+	if (payload === undefined) {
+		let instance = unitCaseInstances.get(tag)
+
+		if (instance === undefined) {
+			instance = { [typeKeySymbol]: tag }
+			unitCaseInstances.set(tag, instance)
+		}
+
+		return instance
+	}
+
 	return { ...payload, [typeKeySymbol]: tag }
 }
 
