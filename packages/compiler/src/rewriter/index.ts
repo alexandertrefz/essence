@@ -1946,6 +1946,64 @@ function rewriteIntrinsic(
 					"falseInstance",
 				),
 			}
+		// NOTE: The read back off an Essence Boolean — the same `.value` an
+		// emitted condition performs, standing where a raw operand belongs.
+		case "raw-boolean":
+			return memberRead(rewriteExpression(node.value), "value")
+		case "raw-boolean-op":
+			// NOTE: `&&` and `||` do not evaluate their right-hand side when
+			// the left decides, which is a difference from the Method call
+			// they replace — `lower-scalar-operations` is what proves the
+			// right-hand side has nothing to say, and only builds one of these
+			// where it does.
+			return node.other === null
+				? {
+						type: "UnaryExpression",
+						operator: "!",
+						prefix: true,
+						argument: rewriteExpression(node.operand),
+					}
+				: {
+						type: "LogicalExpression",
+						operator: node.operator === "and" ? "&&" : "||",
+						left: rewriteExpression(node.operand),
+						right: rewriteExpression(node.other),
+					}
+		// NOTE: The bigint each Integer holds, compared by JavaScript's own
+		// operator — which is what `Integer.compare` compares, and it is exact
+		// for a bigint at any size.
+		case "raw-compare":
+			return {
+				type: "BinaryExpression",
+				operator: node.operator,
+				left: valueRead(rewriteExpression(node.left)),
+				right: valueRead(rewriteExpression(node.right)),
+			}
+		case "raw-equals":
+			return rawEquals(node)
+		// NOTE: The branded literal `createInteger` builds, around the
+		// operation the Method would have handed it.
+		case "raw-arithmetic":
+			return {
+				type: "ObjectExpression",
+				properties: [
+					typeKeyProperty("Integer"),
+					{
+						type: "Property",
+						key: { type: "Identifier", name: "value" },
+						value: {
+							type: "BinaryExpression",
+							operator: node.operator,
+							left: valueRead(rewriteExpression(node.left)),
+							right: valueRead(rewriteExpression(node.right)),
+						},
+						kind: "init",
+						computed: false,
+						method: false,
+						shorthand: false,
+					},
+				],
+			}
 		case "direct-record":
 			return {
 				type: "ObjectExpression",
@@ -2017,6 +2075,51 @@ function rewriteIntrinsic(
 				],
 			}
 	}
+}
+
+// NOTE: The value a scalar wrapper holds — the bigint under an Integer, the
+// JavaScript boolean under a Boolean. Not a member the language has: it is the
+// runtime's own field, read here exactly as every runtime Method reads it.
+function valueRead(object: estree.Expression): estree.MemberExpression {
+	return memberRead(object, "value")
+}
+
+// NOTE: Two Strings are equal when their CHARACTERS are, which is not what
+// `===` decides — the same accent written as one code point and as two is one
+// String — so the runtime helper that normalises decides it, and the double
+// normalisation stays in the one place that has always performed it. An Integer
+// holds a bigint, where `===` is the whole answer.
+function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
+	if (node.scalar === "Integer") {
+		return {
+			type: "BinaryExpression",
+			operator: node.negated ? "!==" : "===",
+			left: valueRead(rewriteExpression(node.left)),
+			right: valueRead(rewriteExpression(node.right)),
+		}
+	}
+
+	let equals: estree.Expression = {
+		type: "CallExpression",
+		optional: false,
+		callee: memberRead(
+			{ type: "Identifier", name: "$helpers" },
+			"stringEquals",
+		),
+		arguments: [
+			rewriteExpression(node.left),
+			rewriteExpression(node.right),
+		],
+	}
+
+	return node.negated
+		? {
+				type: "UnaryExpression",
+				operator: "!",
+				prefix: true,
+				argument: equals,
+			}
+		: equals
 }
 
 // NOTE: The hidden Type key every runtime value carries, as emitted code

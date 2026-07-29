@@ -4,6 +4,7 @@ import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
 import { elideFinalMatchTest } from "./passes/elideFinalMatchTest"
+import { lowerScalarOperations } from "./passes/lowerScalarOperations"
 import { lowerUnitCaseEquality } from "./passes/lowerUnitCaseEquality"
 import { poolConstants } from "./passes/poolConstants"
 
@@ -60,6 +61,7 @@ export const defaultOptimiserOptions: OptimiserOptions = {
 export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
 	compileTypeTests,
 	lowerUnitCaseEquality,
+	lowerScalarOperations,
 	elideFinalMatchTest,
 	collapseConstruction,
 	collapseCombinations,

@@ -7,6 +7,7 @@ import type { ListType } from "./List"
 import type { RationalType } from "./Rational"
 import type { RecordType } from "./Record"
 import { is as recordIs } from "./Record"
+import type { StringType } from "./String"
 import type { AnyType } from "./type"
 import { isValueOfType, typeKeySymbol } from "./type"
 
@@ -33,6 +34,29 @@ function numeratorOf(number: IntegerType | RationalType): bigint {
 
 function denominatorOf(number: IntegerType | RationalType): bigint {
 	return number[typeKeySymbol] === "Integer" ? 1n : number.denominator
+}
+
+// NOTE: Whether two Strings hold the same CHARACTERS, which is what `String.is`
+// decides and what `===` does not: `String.compare` is lexicographic by code
+// point over the NFC-normalised String, so an accent written as one code point
+// and the same accent written as two are one String. Two NFC Strings are equal
+// exactly when their code points match, which is what `===` decides — so
+// normalising both sides is the same answer as walking the comparison, without
+// importing it.
+//
+// NOTE: Identical code units are already canonically equivalent, so the
+// normalisation — which allocates twice — only has to run for a pair that
+// differs.
+//
+// NOTE: It is exported because the Compiler emits a call to it:
+// `lower-scalar-operations` compiles `a::is(b)` on two Strings to this, rather
+// than writing the double normalisation out at every site. `anyIs` reads it too,
+// so there is one answer to the question rather than two that must agree.
+export function stringEquals(a: StringType, b: StringType): boolean {
+	return (
+		a.value === b.value ||
+		a.value.normalize("NFC") === b.value.normalize("NFC")
+	)
 }
 
 export function anyIs(a: AnyType, b: AnyType): boolean {
@@ -74,19 +98,11 @@ export function anyIs(a: AnyType, b: AnyType): boolean {
 		// NOTE: String.is is written in Essence now — it reads `compare`,
 		// which is lexicographic by code point over the NFC-normalised String,
 		// so it answers `Equal` for any two canonically equivalent Strings (an
-		// accent composed or decomposed). Normalising both sides here is the
-		// same answer without importing the whole comparison: two NFC Strings
-		// are `Equal` exactly when their code points match, which is what `===`
-		// decides. Comparing the RAW representations, as this did, made the same
-		// pair of Strings equal on their own and unequal inside a Record.
-		//
-		// NOTE: Identical code units are already canonically equivalent, so the
-		// normalisation — which allocates twice — only has to run for a pair
-		// that differs.
-		return (
-			a.value === b.value ||
-			a.value.normalize("NFC") === b.value.normalize("NFC")
-		)
+		// accent composed or decomposed). `stringEquals` above is that same
+		// answer without importing the whole comparison. Comparing the RAW
+		// representations, as this did, made the same pair of Strings equal on
+		// their own and unequal inside a Record.
+		return stringEquals(a, b)
 	} else if (isRationalKind(a) && isRationalKind(b)) {
 		// NOTE: ONE cell for the two rational kinds, because that is what the
 		// language promises: `Number.is` is `compare(other)::is(#Equal)` over

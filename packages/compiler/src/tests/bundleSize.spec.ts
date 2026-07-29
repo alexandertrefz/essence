@@ -134,6 +134,24 @@ describe("Bundle Size", () => {
 	// every site. What it takes out of the RUN is larger than what it takes out
 	// of the file — every one of those was an allocation per evaluation.
 	//
+	// NOTE: It now measures 51,560, up 1,079, and the ceiling moves UP with it
+	// — the second pass to grow this file rather than shrink it, and for the
+	// same reason `collapse-construction` did. `lower-scalar-operations` writes
+	// `a::add(b)` out as the branded literal the runtime's constructor would
+	// have built, `{ [$type.typeKeySymbol]: "Integer", value: a.value + b.value }`,
+	// which is more characters than `Integer.add__overload$1(a, b)` and one
+	// allocation and no call where that was one allocation and one — and for
+	// `subtract`, which is `@::add(other::negate())`, two allocations and two
+	// calls. Everyday deliberately exercises the whole numeric surface, so it
+	// pays that text at every arithmetic site: minified, where what ships is
+	// measured, the same change is 17,345 to 18,120.
+	//
+	// It is the WRONG WAY ROUND on files that mostly compare: Irrational.es
+	// measures 28,129, down 136, and HelloWorld.es — which reaches the standard
+	// library through a comparison and little else — falls from 10,563 to 9,525,
+	// a tenth of its size, because the `isLessThan`/`isGreaterThan` bodies and
+	// the `Ordering` Cases they built stop being reached at all.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -141,7 +159,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(51_500)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(52_600)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.

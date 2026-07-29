@@ -448,6 +448,11 @@ function walkIntrinsicChildren(
 		// those is a raw one.
 		case "tag-test":
 		case "essence-boolean":
+		// NOTE: A `raw-boolean`'s value is the Essence Boolean it reads the
+		// JavaScript one out of, and is an ordinary position like the two
+		// above — with the same rule about kinds, from the other side: what
+		// stands here is a value, and what this Node ANSWERS is raw.
+		case "raw-boolean":
 		// NOTE: A pooled reference's value is the value the const band
 		// declares, and it is walked like any other — with the one thing a
 		// pass may not do being to change it without changing the `key` that
@@ -472,6 +477,33 @@ function walkIntrinsicChildren(
 		// whole of what this Node holds.
 		case "type-descriptor":
 			return node
+		// NOTE: A lowered operation's operands are the Expressions the
+		// Invocation was given, in the order it was given them — so a pass
+		// running after the one that lowered it reads them, and
+		// `pool-constants` finds the literal standing in one.
+		case "raw-boolean-op": {
+			let operand = walkExpression(node.operand, rewrite)
+			let other =
+				node.other === null ? null : walkExpression(node.other, rewrite)
+
+			if (operand === node.operand && other === node.other) {
+				return node
+			}
+
+			return { ...node, operand, other }
+		}
+		case "raw-compare":
+		case "raw-equals":
+		case "raw-arithmetic": {
+			let left = walkExpression(node.left, rewrite)
+			let right = walkExpression(node.right, rewrite)
+
+			if (left === node.left && right === node.right) {
+				return node
+			}
+
+			return { ...node, left, right }
+		}
 		case "direct-record": {
 			let members = mapRecord(node.members, (value) =>
 				walkExpression(value, rewrite),
