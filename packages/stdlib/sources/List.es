@@ -1,3 +1,14 @@
+import {
+	Boolean    from "./Boolean.es"
+	Integer    from "./Integer.es"
+	Step       from "./Loop.es"
+	Optional   from "./Optional.es"
+	Ordering   from "./Ordering.es"
+	Comparable from "./Protocols.es"
+	Equatable  from "./Protocols.es"
+	Printable  from "./Protocols.es"
+}
+
 declarations {
 
 	§ The ordered sequence, and everything that reads or rebuilds one. Every
@@ -714,4 +725,9 @@ declarations {
 		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
 	}
+}
+
+export {
+	List
+	NestedList
 }

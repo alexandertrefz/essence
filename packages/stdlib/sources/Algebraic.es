@@ -1,3 +1,14 @@
+import {
+	Boolean    from "./Boolean.es"
+	Integer    from "./Integer.es"
+	Optional   from "./Optional.es"
+	Ordering   from "./Ordering.es"
+	Comparable from "./Protocols.es"
+	Equatable  from "./Protocols.es"
+	Printable  from "./Protocols.es"
+	Rational   from "./Rational.es"
+}
+
 declarations {
 
 	§ A real algebraic irrational — for now the quadratic slice `a + b·√d`.
@@ -97,4 +108,8 @@ declarations {
 		§§ The exact symbolic form — `√2`, `3·√2` or `1 + √2`.
 		toString() -> String
 	}
+}
+
+export {
+	Algebraic
 }

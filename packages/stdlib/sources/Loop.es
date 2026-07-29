@@ -1,3 +1,8 @@
+import {
+	Boolean from "./Boolean.es"
+	Integer from "./Integer.es"
+}
+
 declarations {
 
 	§ `Step` is how a loop decides whether to go round again. Essence has no
@@ -168,4 +173,9 @@ declarations {
 			step advance: (_: State) -> Step<State, Result>,
 		) -> Result
 	}
+}
+
+export {
+	Step
+	loop
 }

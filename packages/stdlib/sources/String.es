@@ -1,3 +1,14 @@
+import {
+	Boolean    from "./Boolean.es"
+	Integer    from "./Integer.es"
+	List       from "./List.es"
+	Optional   from "./Optional.es"
+	Ordering   from "./Ordering.es"
+	Comparable from "./Protocols.es"
+	Equatable  from "./Protocols.es"
+	Printable  from "./Protocols.es"
+}
+
 declarations {
 
 	§ Which end of a String a Method works on. It lives here because both of
@@ -543,4 +554,11 @@ declarations {
 			<- @
 		}
 	}
+}
+
+export {
+	Case
+	NormalizationForm
+	Side
+	String
 }

@@ -1,3 +1,12 @@
+import {
+	Boolean   from "./Boolean.es"
+	Integer   from "./Integer.es"
+	Optional  from "./Optional.es"
+	Equatable from "./Protocols.es"
+	Printable from "./Protocols.es"
+	Rational  from "./Rational.es"
+}
+
 declarations {
 
 	§ A number that is provably not algebraic — for now the linear-in-π
@@ -84,4 +93,8 @@ declarations {
 		§§ The exact symbolic form — `π`, `2·π` or `1 + π`.
 		toString() -> String
 	}
+}
+
+export {
+	Transcendental
 }

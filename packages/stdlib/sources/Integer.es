@@ -1,3 +1,18 @@
+import {
+	Algebraic      from "./Algebraic.es"
+	Boolean        from "./Boolean.es"
+	List           from "./List.es"
+	Step           from "./Loop.es"
+	Optional       from "./Optional.es"
+	Ordering       from "./Ordering.es"
+	Comparable     from "./Protocols.es"
+	Equatable      from "./Protocols.es"
+	Printable      from "./Protocols.es"
+	Rational       from "./Rational.es"
+	String         from "./String.es"
+	Transcendental from "./Transcendental.es"
+}
+
 declarations {
 
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
@@ -328,4 +343,8 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Integer) -> Ordering
 	}
+}
+
+export {
+	Integer
 }

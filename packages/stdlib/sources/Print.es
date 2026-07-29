@@ -6,3 +6,7 @@ declarations {
 	§§ @returns — the value it was given, unchanged.
 	function __print<infer Item>(_ value: Item) -> Item
 }
+
+export {
+	__print
+}

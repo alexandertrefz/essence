@@ -1,3 +1,7 @@
+import {
+	Ordering from "./Ordering.es"
+}
+
 declarations {
 
 	§ The core Protocols every conforming builtin Namespace fulfills. `Self`
@@ -34,4 +38,10 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Self) -> Ordering
 	}
+}
+
+export {
+	Comparable
+	Equatable
+	Printable
 }
