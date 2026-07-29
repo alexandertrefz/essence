@@ -1,7 +1,3 @@
-import {
-	Ordering from "./Ordering.es"
-}
-
 declarations {
 
 	§ The core Protocols every conforming builtin Namespace fulfills. `Self`
@@ -29,19 +25,9 @@ declarations {
 		§§ @returns — the String representation of the value.
 		toString() -> String
 	}
-
-	§§ Anything with a total order among its values.
-	protocol Comparable {
-		§§ Orders the value against another one of the same Type.
-		§§
-		§§ @param other — the value to compare with
-		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
-		compare(to other: Self) -> Ordering
-	}
 }
 
 export {
-	Comparable
 	Equatable
 	Printable
 }

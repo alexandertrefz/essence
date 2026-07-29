@@ -1,10 +1,11 @@
 import type { common, enricher, parser } from "@essence-lang/interfaces"
-import { readStdlibFiles } from "@essence-lang/stdlib"
+import { readStdlibFiles, STDLIB_DIRECTORY } from "@essence-lang/stdlib"
 
 import { renderDiagnostics } from "../diagnostics/render"
 import {
 	linkModuleGraph,
 	loadModuleGraphOver,
+	type ModuleGraph,
 	type SpecifierResolver,
 } from "../modules/index"
 import { parseWithDiagnostics } from "../parser/index"
@@ -30,6 +31,63 @@ function basenameOf(filePath: string): string {
 // file offers its siblings. It declares nothing itself — it is an export block
 // and the reasoning behind it.
 const PRELUDE_FILE_NAME = "Prelude.es"
+
+// NOTE: The one group of files allowed to depend on each other in a circle, and
+// the whole of it. Every other file must stand alone in the graph.
+//
+// This group is not an oversight. Cross-kind arithmetic means each numeric kind
+// names the others — `Rational::add(_ other: Algebraic) -> Algebraic` — a
+// String's characters ARE a `List<String>`, a List is indexed by an Integer, and
+// both `parse`s consume a String. Breaking it would mean moving those Methods
+// off the Namespace they belong to, and a Type's Namespace being one findable
+// thing was judged worth more than a graph with no cycle in it.
+//
+// What this refuses is a cycle NOBODY decided on. A new one anywhere, or a
+// seventh file joining this one, is a dependency someone added without noticing
+// what it closed — which is exactly the mistake the import blocks were written
+// to make visible.
+const EXPECTED_CYCLE = [
+	"Algebraic.es",
+	"Integer.es",
+	"List.es",
+	"Rational.es",
+	"String.es",
+	"Transcendental.es",
+]
+
+function refuseUnexpectedCycles(graph: ModuleGraph): void {
+	let cycles = graph.groups
+		.filter((group) => group.length > 1)
+		.map((group) =>
+			group.map((module) => basenameOf(module.filePath)).sort(),
+		)
+
+	// NOTE: Only checked for the library ON DISK, told apart by where its files
+	// are rather than by what they are called — a test may well write a file
+	// named `Prelude.es`, and does. The frozen set is a fact about
+	// `packages/stdlib/sources`, not about the loader.
+	let isRealLibrary = [...graph.modules.keys()].some((filePath) =>
+		filePath.startsWith(`${STDLIB_DIRECTORY}/`),
+	)
+
+	if (!isRealLibrary) {
+		return
+	}
+
+	let expected = [...EXPECTED_CYCLE].sort().join(", ")
+	let found = cycles.map((cycle) => cycle.join(", "))
+
+	if (found.length === 1 && found[0] === expected) {
+		return
+	}
+
+	throw new Error(
+		`The standard library's dependency graph changed shape.\n\n` +
+			`Expected exactly one cycle:\n  ${expected}\n\n` +
+			`Found ${found.length === 0 ? "none" : `${found.length}:`}\n${found.map((cycle) => `  ${cycle}`).join("\n")}\n\n` +
+			`An import closed a circle that was not there before. Either remove the dependency, or — if the cycle is genuinely wanted — say so in EXPECTED_CYCLE and write down why.`,
+	)
+}
 
 // NOTE: A standard library file that writes no `export { … }` block offers
 // everything it declares. The builtin tables are built from the export SURFACES,
@@ -537,6 +595,8 @@ export function loadStdlibFrom(
 	})
 
 	let enrichDuration = performance.now() - enrichStarted
+
+	refuseUnexpectedCycles(graph)
 
 	// NOTE: Keyed by PATH, never by position. Linking answers in dependency-first
 	// group order while `sources` is in filename order, so pairing the two by
