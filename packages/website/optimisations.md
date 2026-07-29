@@ -392,6 +392,16 @@ that merely mentions `_self`, like `match @.item -> …`, reads it in a Scope of
 its own before the block that shadows it. Everything else is one block, which
 shadows for exactly the length of the chain as the Parameter did.
 
+**And a Handler can shadow the name the answer is written to.** The wrapper
+answered with a Return, which names nothing; a lowered Match assigns, and the
+assignment stands INSIDE the Handler's block — so a Handler that declares
+`answer` while the Match is what `constant answer` is bound to would have
+written its own binding instead of the Declaration. Where a Handler binds that
+name, the answer is written to a name of the Compiler's own and the Program's
+name is assigned from it once the block has closed, after the label a Handler
+leaves the chain through. Where no Handler binds it, which is every Match anyone
+writes on purpose, the answer goes straight to the name and nothing is held.
+
 Safe because nothing about the chain changes: the same tests in the same order
 over the same value, the same bodies, the same fall-through. What changes is
 where the Statements are written, and one thing more — a Match written for its

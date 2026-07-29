@@ -3572,29 +3572,117 @@ function rewriteMatch(
 // Its name has to outlive the block that computes its value, so the declaration
 // stands before the block and is a `let` — assigned once, by the block, and
 // never again.
+//
+// NOTE: And the answer is written from INSIDE that block, which is a Scope the
+// Program writes Statements into: a Handler that binds the very name being
+// written to stands in front of it, and the assignment then lands on the
+// Handler's own binding rather than on the declaration. Where that is so, the
+// answer is written to a name of the Compiler's own first and the Program's
+// name is assigned from it once the block has closed — one block deeper than
+// the chain, so nothing a Handler binds can reach it and nothing it binds can
+// collide with a sibling's.
 function rewriteIntrinsicStatement(
 	node: common.typedSimple.IntrinsicStatementNode,
 ): Array<estree.Statement> {
-	let body = intrinsicStatementBody(node, null)
+	let result = node.result
 
-	if (node.result.kind !== "declaration") {
-		return [body]
+	if (result.kind !== "declaration" && result.kind !== "assignment") {
+		return [intrinsicStatementBody(node, null, null)]
 	}
 
+	let declaration =
+		result.kind === "declaration"
+			? [
+					{
+						type: "VariableDeclaration",
+						kind: "let",
+						declarations: [
+							{
+								type: "VariableDeclarator",
+								id: rewriteIdentifier(result.name),
+								init: null,
+							},
+						],
+					} satisfies estree.Statement,
+				]
+			: []
+
+	if (!bindsAnswerName(node, result.name.name)) {
+		return [...declaration, intrinsicStatementBody(node, null, null)]
+	}
+
+	let held: PlacedTarget = { kind: "temporary", name: heldAnswerName }
+
 	return [
+		...declaration,
 		{
-			type: "VariableDeclaration",
-			kind: "let",
-			declarations: [
-				{
-					type: "VariableDeclarator",
-					id: rewriteIdentifier(node.result.name),
-					init: null,
-				},
+			type: "BlockStatement",
+			body: [
+				loopDeclaration("let", heldAnswerName, null),
+				intrinsicStatementBody(node, null, held),
+				// NOTE: After the chain and after the label a Handler leaves
+				// through, which both end here — so every way out of the chain
+				// passes through this one assignment.
+				resultStatement(result, loopIdentifier(heldAnswerName)),
 			],
 		},
-		body,
 	]
+}
+
+// NOTE: Unspellable in Essence for the reason every Compiler-bound name is: the
+// Lexer reads `_` as a Symbol, so no user identifier holds one. It needs no
+// number — the block it is declared in holds exactly one of them, and the only
+// blocks nested inside it that declare it again are lowered Statements of their
+// own, which write their own answers and never this one's.
+const heldAnswerName = "$held_answer"
+
+// NOTE: Whether the name a lowered Statement writes its answer to is a name the
+// Statements it holds BIND. Only the Scopes an answer can actually be written
+// into are asked, which is the same descent `redirectedStatements` makes: a
+// Handler body, a Conditional branch inside one, and a lowered Statement in
+// Return position, whose own Handlers answer THIS Statement's question. A
+// compiled dispatch holds `const`s of the Compiler's own and an inlined loop
+// writes its answer beside them, so neither of those can hold a Program's
+// binding where the answer is written.
+function bindsAnswerName(
+	node: common.typedSimple.IntrinsicStatementNode,
+	name: string,
+): boolean {
+	if (node.kind !== "statement-match") {
+		return false
+	}
+
+	return node.handlers.some((handler) => bodyBindsName(handler.body, name))
+}
+
+function bodyBindsName(
+	nodes: Array<common.typedSimple.ImplementationNode>,
+	name: string,
+): boolean {
+	return nodes.some((node) => {
+		switch (node.nodeType) {
+			// NOTE: The four Statements that bind a name in the block they stand
+			// in — a `let`, a `function`, a `class`, and the `let` a lowered
+			// Statement in declaration position is emitted as. A Type Alias and a
+			// Protocol bind nothing at all: they are emitted as nothing.
+			case "VariableDeclarationStatement":
+			case "FunctionStatement":
+			case "NamespaceDefinitionStatement":
+				return node.name.name === name
+			case "IntrinsicStatement":
+				return node.result.kind === "return"
+					? bindsAnswerName(node, name)
+					: node.result.kind === "declaration" &&
+							node.result.name.name === name
+			case "ConditionalStatement":
+				return (
+					bodyBindsName(node.trueBody, name) ||
+					bodyBindsName(node.falseBody, name)
+				)
+			default:
+				return false
+		}
+	})
 }
 
 // NOTE: Where a lowered Expression's answer goes, written as the Statement that
@@ -3695,15 +3783,32 @@ type ReturnRedirect = {
 function intrinsicStatementBody(
 	node: common.typedSimple.IntrinsicStatementNode,
 	redirect: ReturnRedirect | null,
+	held: PlacedTarget | null,
 ): estree.Statement {
 	switch (node.kind) {
 		case "statement-match":
-			return statementMatch(node, redirect)
+			return statementMatch(node, redirect, held)
 		case "held-expression":
-			return heldExpression(node, redirect)
+			return heldExpression(node, redirect, held)
 		case "inline-loop":
-			return inlineLoopStatement(node, redirect)
+			return inlineLoopStatement(node, redirect, held)
 	}
+}
+
+// NOTE: Where a lowered Statement's answer goes: the name the Statement
+// position it stood in decides, the outer question it is answering where it
+// stands inside one, or a name of the Compiler's own where the Program binds
+// the first of those itself.
+function placedResult(
+	node: common.typedSimple.IntrinsicStatementNode,
+	redirect: ReturnRedirect | null,
+	held: PlacedTarget | null,
+): RedirectTarget {
+	if (held !== null) {
+		return held
+	}
+
+	return redirect === null ? node.result : redirect.result
 }
 
 // NOTE: `{ const $dispatch_0 = …; return <the chain>; }` — the names a compiled
@@ -3713,8 +3818,9 @@ function intrinsicStatementBody(
 function heldExpression(
 	node: common.typedSimple.HeldExpressionNode,
 	redirect: ReturnRedirect | null,
+	held: PlacedTarget | null,
 ): estree.Statement {
-	let result = redirect === null ? node.result : redirect.result
+	let result = placedResult(node, redirect, held)
 
 	return {
 		type: "BlockStatement",
@@ -3751,8 +3857,9 @@ function heldExpression(
 function statementMatch(
 	node: common.typedSimple.StatementMatchNode,
 	redirect: ReturnRedirect | null,
+	held: PlacedTarget | null,
 ): estree.Statement {
-	let result = redirect === null ? node.result : redirect.result
+	let result = placedResult(node, redirect, held)
 	let label = redirect === null ? node.label : redirect.label
 	let broke = false
 	// NOTE: A redirected Match breaks out of the label its redirect names, which
@@ -3918,7 +4025,7 @@ function redirectedStatement(
 			// and is emitted as it stands.
 			if (node.result.kind === "return") {
 				return withStatementLocation(
-					[intrinsicStatementBody(node, redirect)],
+					[intrinsicStatementBody(node, redirect, null)],
 					node.position,
 				)
 			}
@@ -4019,8 +4126,9 @@ function inlineLoopExpression(
 function inlineLoopStatement(
 	node: common.typedSimple.InlineLoopStatementNode,
 	redirect: ReturnRedirect | null,
+	held: PlacedTarget | null,
 ): estree.Statement {
-	let result = redirect === null ? node.result : redirect.result
+	let result = placedResult(node, redirect, held)
 	let walk = inlinedLoop(node)
 
 	return loopBlock([
