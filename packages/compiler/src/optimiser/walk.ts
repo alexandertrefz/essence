@@ -447,11 +447,31 @@ function walkIntrinsicChildren(
 		// every pass matches the shapes the Simplifier produces, and none of
 		// those is a raw one.
 		case "tag-test":
-		case "essence-boolean": {
+		case "essence-boolean":
+		// NOTE: A pooled reference's value is the value the const band
+		// declares, and it is walked like any other — with the one thing a
+		// pass may not do being to change it without changing the `key` that
+		// says which pooled constant it IS. Nothing does: `pool-constants` is
+		// the last pass to run, so nothing reads its output but the Rewriter.
+		case "pooled-reference": {
 			let value = walkExpression(node.value, rewrite)
 
 			return value === node.value ? node : { ...node, value }
 		}
+		case "type-test": {
+			let value = walkExpression(node.value, rewrite)
+			let descriptor = walkExpression(node.descriptor, rewrite)
+
+			if (value === node.value && descriptor === node.descriptor) {
+				return node
+			}
+
+			return { ...node, value, descriptor }
+		}
+		// NOTE: A leaf: a Type is not an Expression, and the descriptor is the
+		// whole of what this Node holds.
+		case "type-descriptor":
+			return node
 		case "direct-record": {
 			let members = mapRecord(node.members, (value) =>
 				walkExpression(value, rewrite),

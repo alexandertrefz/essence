@@ -477,8 +477,15 @@ describe("Resolvers", () => {
 		})
 
 		it("should curry the Item witness onto the call above the Namespace", () => {
-			expect(emitted(sortable(false))).toContain(
-				"Boxes.rank(a, b, { compare: Integer.compare })",
+			// NOTE: The witness is a constant — a map of Method references, the
+			// same one at every site — so `pool-constants` declares it once and
+			// the call reads it by name. What it is a witness FOR is the
+			// question here, so the map itself is read out of the band.
+			let generated = emitted(sortable(false))
+
+			expect(generated).toMatch(/Boxes\.rank\(a, b, \$pool_\d+\)/)
+			expect(generated).toMatch(
+				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
 			)
 		})
 	})

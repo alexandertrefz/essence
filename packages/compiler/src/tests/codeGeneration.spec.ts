@@ -28,6 +28,7 @@ import {
 	checkEssenceMethodsAreDeclared,
 	type EssenceMember,
 	essenceMethodReferences,
+	essenceMemberBands,
 	orderEssenceMembers,
 	reachableEssenceMethods,
 	rewrite,
@@ -2479,6 +2480,30 @@ describe("Code Generation", () => {
 					]),
 				)
 			}
+
+			// NOTE: The seam between the two bands, asked for directly —
+			// the pooled constants are emitted BETWEEN them, so which
+			// declaration is in which band decides whether a Program's
+			// constants can be read where they are needed. `orderEssenceMembers`
+			// above is the same answer with the seam closed up.
+			it("keeps the Function-valued members apart from the Properties", () => {
+				let bands = essenceMemberBands(
+					band(
+						{
+							$es_A_ONE: ["$es_F_reads"],
+							$es_F_reads: [],
+							$es_B_TWO: [],
+						},
+						["$es_F_reads"],
+					),
+				)
+
+				expect(bands.functions.map(nameOf)).toEqual(["$es_F_reads"])
+				expect(bands.values.map(nameOf)).toEqual([
+					"$es_A_ONE",
+					"$es_B_TWO",
+				])
+			})
 
 			it("refuses two Properties that read each other", () => {
 				expect(() =>

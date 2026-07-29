@@ -174,6 +174,42 @@ const typeTests = `implementation {
 	__print(label(["a"], or "b"))
 }`
 
+// NOTE: One of each thing `pool-constants` declares once — a literal written
+// twice, a Rational, a payload-less Case, a Record Matcher's descriptor, a
+// conformance witness the standard library answers for, and a witness for a
+// Namespace this Program DECLARES, which is the one that must stay where it was
+// written. The Boolean is here to be left alone.
+const constants = `implementation {
+	type Box = { value: Integer }
+
+	namespace Boxes for Box is Comparable {
+		§§ Compares two Boxes by the value each holds.
+		§§
+		§§ @param other — the Box to compare with
+		§§ @returns — how this Box orders against it.
+		compare(to other: Box) -> Ordering {
+			<- @.value::compare(to other.value)
+		}
+	}
+
+	choice Colour { Red, Green }
+
+	constant boxes: List<Box> = [{ value = 3 }, { value = 1 }]
+	constant shape: { x: Integer } | String = { x = 7 }
+	constant chosen: Colour = #Red
+
+	__print(1::add(1))
+	__print(1/2)
+	__print(chosen::is(#Red))
+	__print(true)
+	__print("a count: {7}")
+	__print(boxes::sort())
+	__print(match shape -> String {
+		case String            { <- "text" }
+		case { x: Integer }    { <- "a Record" }
+	})
+}`
+
 // NOTE: A payload-less Case on either side of the comparison, both spellings of
 // the question, a Case that DOES carry a payload, and a generic Choice of each
 // — the shapes `lower-unit-case-equality` must rewrite beside the ones it must
@@ -560,9 +596,7 @@ describe("Optimiser", () => {
 				__print(label(["a"], or "b"))
 			}`)
 
-			expect(generated).toContain(
-				'$type.isValueOfType(_self, {\n\t\t\t\ttype: "List",',
-			)
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
 			expect(generated).toContain('itemType: { type: "Integer" }')
 		})
 
@@ -750,9 +784,15 @@ describe("Optimiser", () => {
 		})
 
 		it("calls the runtime's equality again when it is turned off", () => {
+			// NOTE: And with the pool off as well, so the Case the helper is
+			// handed is written where it is passed rather than read out of the
+			// band — which is not what this asks about.
 			let generated = generate(unitCaseEquality, {
 				enabled: true,
-				disabledPasses: new Set(["lower-unit-case-equality"]),
+				disabledPasses: new Set([
+					"lower-unit-case-equality",
+					"pool-constants",
+				]),
 			})
 
 			expect(generated).toContain(
@@ -1047,6 +1087,162 @@ describe("Optimiser", () => {
 				"collapse-construction",
 				readFileSync(fixturePath("Everyday.es"), "utf8"),
 			)
+		})
+	})
+
+	describe("pool-constants", () => {
+		it("builds a constant once and reads it by name", () => {
+			let generated = generate(constants)
+
+			expect(generated).toMatch(
+				/const \$pool_\d+ = Integer\.createInteger\(1n\);/,
+			)
+			expect(generated).toMatch(
+				/const \$pool_\d+ = Rational\.createRational\(1n, 2n\);/,
+			)
+			expect(generated).toMatch(
+				/const \$pool_\d+ = \$type\.createCase\("Colour#Red"\);/,
+			)
+		})
+
+		it("declares one constant for a value written many times", () => {
+			// NOTE: `1::add(1)` writes it twice and the standard library writes
+			// it many times over; one const answers for all of them.
+			let generated = generate(constants)
+			let declarations = [
+				...generated.matchAll(
+					/const \$pool_\d+ = Integer\.createInteger\(1n\)/g,
+				),
+			]
+
+			expect(declarations).toHaveLength(1)
+		})
+
+		it("pools the descriptor a Match still checks against", () => {
+			// NOTE: The one that costs most: this object was REBUILT at every
+			// test, of every turn of whatever loop the Match sits in.
+			let generated = generate(constants)
+
+			expect(generated).toMatch(/isValueOfType\(_self, \$pool_\d+\)/)
+			expect(generated).toMatch(/const \$pool_\d+ = \{\n\ttype: "Record"/)
+		})
+
+		it("pools a conformance witness", () => {
+			expect(generate(constants)).toMatch(
+				/const \$pool_\d+ = \{ toString: Integer\.toString \}/,
+			)
+		})
+
+		it("leaves a witness naming a Namespace the Program declares", () => {
+			// NOTE: `class Boxes` is emitted below the band and a class is not
+			// hoisted, so a const reading one would be a `ReferenceError` at
+			// import. The witness stays where it was written.
+			expect(generate(constants)).toContain("{ compare: Boxes.compare }")
+		})
+
+		it("leaves Booleans alone", () => {
+			// NOTE: There are exactly two Boolean objects in a running Program
+			// already — pooling one would name what it already has.
+			let generated = generate(constants)
+
+			expect(generated).toContain("Boolean.createBoolean(true)")
+			expect(generated).not.toMatch(
+				/const \$pool_\d+ = Boolean\.createBoolean/,
+			)
+		})
+
+		it("declares the band between the standard library and the Program", () => {
+			// NOTE: The one place it can stand: a pooled witness reads the
+			// Function-valued consts above it, and a static Property's value —
+			// which runs where its const is emitted — may read a pooled
+			// constant.
+			let generated = generate(constants)
+
+			expect(generated.indexOf("const $pool_0")).toBeGreaterThan(
+				generated.indexOf("const $es_"),
+			)
+			expect(generated.indexOf("const $pool_0")).toBeLessThan(
+				generated.indexOf("$_.__print("),
+			)
+		})
+
+		// NOTE: The counted loop adds ONE to its index on every turn, and the
+		// standard library's driver is where that literal is written — so
+		// before this pass a ten thousand turn loop allocated ten thousand
+		// Integers to count with.
+		it("takes the per-turn Integer out of a loop", () => {
+			let generated = generate(
+				readFileSync(fixturePath("Loops.es"), "utf8"),
+			)
+			let built = generated
+				.split("\n")
+				.filter((line) => line.includes("createInteger("))
+
+			expect(built.length).toBeGreaterThan(0)
+			expect(
+				built.filter((line) => !line.startsWith("const $pool_")),
+			).toEqual([])
+		})
+
+		it("builds them at the site again when it is turned off", () => {
+			let generated = generate(constants, {
+				enabled: true,
+				disabledPasses: new Set(["pool-constants"]),
+			})
+
+			expect(generated).not.toContain("$pool_")
+			expect(generated).toContain("Integer.createInteger(1n)")
+			expect(generated).toContain("{ toString: Integer.toString }")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput("pool-constants", constants),
+			).toEqual([
+				"2",
+				"1/2",
+				"true",
+				"true",
+				'"a count: 7"',
+				"[ { value = 1 }, { value = 3 } ]",
+				'"a Record"',
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"pool-constants",
+				readFileSync(fixturePath("Loops.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"pool-constants",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"pool-constants",
+				readFileSync(fixturePath("Interpolation.es"), "utf8"),
+			)
+		})
+
+		// NOTE: A pooled constant may only be built where a Program can read
+		// it, and the descriptors are only in reach at all because
+		// `compile-type-tests` put them in an Expression position — so with
+		// that pass off there is less to pool and nothing to go wrong.
+		it("pools what it can with the Match tests uncompiled", async () => {
+			let generated = generate(constants, {
+				enabled: true,
+				disabledPasses: new Set(["compile-type-tests"]),
+			})
+
+			expect(generated).toMatch(
+				/const \$pool_\d+ = Integer\.createInteger\(1n\);/,
+			)
+			expect(generated).toContain("$type.isValueOfType(_self, {")
+
+			let all = await outputOf(generate(constants))
+			let uncompiled = await outputOf(generated)
+
+			expect(uncompiled).toEqual(all)
 		})
 	})
 

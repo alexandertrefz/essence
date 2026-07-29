@@ -15,6 +15,7 @@ import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
 } from "../optimiser/index"
+import { runtimeNamespaceNames } from "./runtimeNamespaces"
 import {
 	ESSENCE_METHOD_PREFIX,
 	essenceMethodIdentifier,
@@ -28,35 +29,10 @@ import {
 	withOptimiserOptions,
 } from "./stdlibPrelude"
 
-// NOTE: The builtin Namespaces that have a runtime module in `@essence-lang/runtime`, in
-// the order their imports are emitted. Every one is imported unconditionally,
-// under its own name, and a Namespace no Program references costs nothing —
-// esbuild shakes an unused `import * as <Name>` away entirely. A Method the
-// standard library implements in Essence is NOT a member of one of these; it is
-// its own `$es_<Namespace>_<member>` const, emitted alongside. Exported so the
-// tests cross-check it against the other registration sites — a Namespace here
-// but missing a runtime module, or declared in `packages/stdlib/sources` but missing here,
-// emits a call to `undefined`.
-export const runtimeNamespaceNames = [
-	"String",
-	"Integer",
-	"Rational",
-	"Algebraic",
-	"Transcendental",
-	"Number",
-	"Boolean",
-	"Optional",
-	"NestedOptional",
-	"Ordering",
-	"Side",
-	"Case",
-	"NormalizationForm",
-	"NumberFormat",
-	"Rounding",
-	"Record",
-	"List",
-	"NestedList",
-]
+// NOTE: The builtin Namespaces with a runtime module, re-exported from the file
+// that holds the list — every emission site here reads it, and so does
+// `pool-constants`, which may not reach this Module without closing a cycle.
+export { runtimeNamespaceNames }
 
 // NOTE: The Rewriter is a typed simple Program in, JavaScript source text out —
 // no bundling, no minifying, nothing written to disk; that is the Bundler's job.
@@ -93,12 +69,31 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 	// would have to know about each of those shapes and would silently drop a
 	// Namespace the moment a new one was added.
 	const freeFunctions = stdlibFreeFunctions()
-	const implementation = rewriteImplementationSection(program.implementation)
-	const essenceMembers = reachableEssenceMethods(
-		prelude,
-		implementation,
-		freeFunctions,
-	)
+	// NOTE: One pool for the whole file, because a lone Program is one emitted
+	// Module: the standard library's pooled constants and the Program's own are
+	// declared side by side and a constant both of them want is declared once.
+	const { value: rewritten, pool } = collectingConstantPool(() => {
+		let implementation = rewriteImplementationSection(
+			program.implementation,
+		)
+
+		return {
+			implementation,
+			essenceMembers: reachableEssenceMethods(
+				prelude,
+				implementation,
+				freeFunctions,
+				[...pooledConstants.values()],
+			),
+		}
+	})
+	const bands = essenceMemberBands(rewritten.essenceMembers)
+	const constantPool = constantPoolBand(pool, [
+		bands.functions,
+		bands.values,
+		rewritten.implementation,
+	])
+	const essenceMembers = rewritten.essenceMembers
 
 	const rewrittenProgram: estree.Program = {
 		type: "Program",
@@ -112,11 +107,19 @@ function rewriteProgram(program: common.typedSimple.Program): string {
 			...runtimeImports(allRuntimeNames()),
 			// NOTE: Imports first — an Essence Method's const reads the runtime
 			// modules those imports bind. Then the Essence-implemented members,
-			// in the two bands `orderEssenceMembers` puts them in: the
+			// in the two bands `essenceMemberBands` puts them in: the
 			// Function-valued ones in any order, and the static Properties, whose
 			// values are computed HERE, after them.
-			...orderEssenceMembers(essenceMembers),
-			...implementation,
+			...bands.functions,
+			// NOTE: The pooled constants sit BETWEEN the two, and that is the
+			// only place they can sit. A pooled conformance witness reads the
+			// Function-valued consts above it, and a static Property's value —
+			// which runs where its const is emitted — may read a pooled
+			// constant, so the band has to stand between what it reads and what
+			// reads it.
+			...constantPool,
+			...bands.values,
+			...rewritten.implementation,
 		],
 	}
 
@@ -270,28 +273,40 @@ function rewriteModuleGraph(
 	return withModuleSpellings(spellings, () => {
 		let prelude = stdlibPrelude()
 		let freeFunctions = stdlibFreeFunctions()
-		let bodies = modules.map((module) => ({
-			module,
-			body: withSourcePath(module.filePath, () =>
-				rewriteImplementationSection(module.program.implementation),
-			),
-		}))
+		// NOTE: A pool per Module, because a Module's constants are declared in
+		// it and a name declared in one Module is not in scope in another. The
+		// band is built here, before anything is asked of the Module's names:
+		// what a Module READS includes what its pooled constants read, and the
+		// runtime imports and the prelude import are both decided by that.
+		let bodies = modules.map((module) => {
+			let { value: body, pool } = collectingConstantPool(() =>
+				withSourcePath(module.filePath, () =>
+					rewriteImplementationSection(module.program.implementation),
+				),
+			)
 
-		let essenceMembers = reachableEssenceMethods(
-			prelude,
-			bodies.flatMap((rewritten) => rewritten.body),
-			freeFunctions,
-		)
+			return { module, body, pool: constantPoolBand(pool, body) }
+		})
+
+		let { value: essenceMembers, pool: preludePool } =
+			collectingConstantPool(() =>
+				reachableEssenceMethods(
+					prelude,
+					bodies.flatMap((rewritten) => rewritten.body),
+					freeFunctions,
+					bodies.map((rewritten) => rewritten.pool),
+				),
+			)
 
 		let declared = new Set(essenceMembers.keys())
 		let sources = new Map<string, string>()
-		let preludeProgram = preludeModule(essenceMembers)
+		let preludeProgram = preludeModule(essenceMembers, preludePool)
 
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
 
-		for (let { module, body } of bodies) {
-			let names = referencedNames(body)
+		for (let { module, body, pool } of bodies) {
+			let names = referencedNames([body, pool])
 			let preludeNames = [...essenceMembers.keys()].filter((name) =>
 				names.has(name),
 			)
@@ -310,6 +325,7 @@ function rewriteModuleGraph(
 								),
 							]),
 					...moduleImports(module.program, spellings),
+					...pool,
 					...body,
 					...moduleExports(module.program, spellings),
 				],
@@ -341,16 +357,24 @@ function rewriteModuleGraph(
 // whether or not anything imports it — esbuild shakes the unimported ones away,
 // and deciding here which are named would mean running the fixed point once per
 // Module to find out.
-function preludeModule(members: Map<string, EssenceMember>): estree.Program {
-	let declarations = orderEssenceMembers(members)
+function preludeModule(
+	members: Map<string, EssenceMember>,
+	pool: Map<string, PooledConstant>,
+): estree.Program {
+	let bands = essenceMemberBands(members)
+	let constantPool = constantPoolBand(pool, [bands.functions, bands.values])
 	let names = [...members.keys()]
 
 	return {
 		type: "Program",
 		sourceType: "module",
 		body: [
-			...runtimeImports(referencedNames(declarations)),
-			...declarations,
+			...runtimeImports(
+				referencedNames([bands.functions, constantPool, bands.values]),
+			),
+			...bands.functions,
+			...constantPool,
+			...bands.values,
 			...(names.length === 0
 				? []
 				: [namedExport(names.map((name) => [name, name]))]),
@@ -594,7 +618,10 @@ function withModuleSpellings<Value>(
 // and emit no mapping.
 let currentSourcePath: string | null = null
 
-function withSourcePath<Value>(sourcePath: string, emit: () => Value): Value {
+function withSourcePath<Value>(
+	sourcePath: string | null,
+	emit: () => Value,
+): Value {
 	let previousSourcePath = currentSourcePath
 	currentSourcePath = sourcePath
 
@@ -603,6 +630,14 @@ function withSourcePath<Value>(sourcePath: string, emit: () => Value): Value {
 	} finally {
 		currentSourcePath = previousSourcePath
 	}
+}
+
+// NOTE: What the Compiler emits of its OWN accord, which no source names and
+// nothing should map to. It is the same answer `locOf` gives outside a Module —
+// no source path, no `loc`, no mapping — asked for deliberately rather than by
+// standing where no Module is being emitted.
+function unmapped<Value>(emit: () => Value): Value {
+	return withSourcePath(null, emit)
 }
 
 // NOTE: An Essence Position is 1-based on both axes, while escodegen reads
@@ -898,6 +933,24 @@ export type EssenceMember = {
 export function orderEssenceMembers(
 	members: Map<string, EssenceMember>,
 ): Array<estree.VariableDeclaration | estree.FunctionDeclaration> {
+	let bands = essenceMemberBands(members)
+
+	return [...bands.functions, ...bands.values]
+}
+
+// NOTE: The same answer with the seam between the two bands still visible,
+// because one thing is emitted BETWEEN them: the pooled constants. A pooled
+// conformance witness reads the Function-valued consts, and a static Property's
+// value — which runs where its const is emitted — may read a pooled constant,
+// so the pool has to stand between what it reads and what reads it. Everything
+// that does not care asks `orderEssenceMembers` above and reads one list.
+export function essenceMemberBands(members: Map<string, EssenceMember>): {
+	functions: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
+	values: Array<estree.VariableDeclaration | estree.FunctionDeclaration>
+} {
+	let functions: Array<
+		estree.VariableDeclaration | estree.FunctionDeclaration
+	> = []
 	let ordered: Array<
 		estree.VariableDeclaration | estree.FunctionDeclaration
 	> = []
@@ -907,7 +960,7 @@ export function orderEssenceMembers(
 
 	for (let member of members.values()) {
 		if (member.kind === "function") {
-			ordered.push(member.declaration)
+			functions.push(member.declaration)
 		}
 	}
 
@@ -1024,8 +1077,221 @@ export function orderEssenceMembers(
 		}
 	}
 
-	return ordered
+	return { functions, values: ordered }
 }
+
+// #region The constant pool
+
+// NOTE: One constant the emitted Module builds once and reads by name ever
+// after. `marker` is a placeholder name, not the emitted one: which constants
+// are DECLARED is only known when the Module is finished — the search above
+// rewrites every candidate standard library body and keeps a fraction of them,
+// so a name handed out while rewriting would leave the band numbered in gaps.
+// So each site is given a marker, the finished Module is read for the markers
+// that survived, and those are numbered `$pool_0` upward and renamed in place.
+type PooledConstant = { marker: string; value: estree.Expression }
+
+// NOTE: Ambient, like the source path and the Namespace scopes, and for the
+// same reason: a pooled reference is emitted deep inside expression rewriting,
+// several layers below anything that knows which Module is being emitted.
+let pooledConstants = new Map<string, PooledConstant>()
+
+// NOTE: One pool per emitted Module, because a name declared in one Module is
+// not in scope in another. The single-Program form above is one Module, so its
+// standard library prelude and its own code share a pool and a constant both
+// want is declared once. A BUILD is the other form whatever it is given: one
+// file or twenty, it emits the prelude as a Module of its own and each Module
+// beside it, so there each has a pool of its own.
+function collectingConstantPool<Value>(emit: () => Value): {
+	value: Value
+	pool: Map<string, PooledConstant>
+} {
+	let previous = pooledConstants
+
+	pooledConstants = new Map()
+
+	try {
+		return { value: emit(), pool: pooledConstants }
+	} finally {
+		pooledConstants = previous
+	}
+}
+
+// NOTE: `_` in both, so neither can collide with anything a user writes — the
+// Lexer reads `_` as a Symbol, so no Essence identifier holds one, which is the
+// same guarantee `$es_` rests on. The marker carries `at` so that a marker and
+// a finished name can never be confused for one another either.
+const POOL_MARKER_PREFIX = "$pool_at_"
+const POOL_NAME_PREFIX = "$pool_"
+
+function pooledReference(
+	node: common.typedSimple.PooledReferenceNode,
+): estree.Expression {
+	let known = pooledConstants.get(node.key)
+
+	if (known === undefined) {
+		// NOTE: The value is emitted at MODULE scope, which is where its const
+		// stands — a user Namespace shadowing a builtin does so for its own
+		// block, and a constant hoisted out of that block is no longer in it.
+		// `pool-constants` refuses to pool anything that could read such a name
+		// in the first place; this is the other half of the same answer, so
+		// that the two can not disagree.
+		//
+		// NOTE: Rewritten BEFORE it is recorded, because the value may itself
+		// hold a pooled reference — a conditional conformance's witnesses are
+		// conformances — and recording the inner one first is what puts it
+		// above this one in the band.
+		//
+		// NOTE: And rewritten UNMAPPED. The value still carries the Position of
+		// a site it was hoisted out of — whichever site was rewritten first,
+		// which is an arbitrary one of however many wrote the same constant —
+		// and a debugger stepping the band would be sent to a line the constant
+		// has nothing in particular to do with. The band is machinery no source
+		// was written for, so it maps to no source; the REFERENCE at each site
+		// keeps its own Position, which is where the value is read.
+		let value = unmapped(() =>
+			atModuleScope(() => rewriteExpression(node.value)),
+		)
+
+		known = {
+			marker: `${POOL_MARKER_PREFIX}${pooledConstants.size}`,
+			value,
+		}
+
+		pooledConstants.set(node.key, known)
+	}
+
+	return { type: "Identifier", name: known.marker }
+}
+
+function atModuleScope<Value>(emit: () => Value): Value {
+	let previous = shadowingNamespaceScopes
+
+	shadowingNamespaceScopes = [new Set()]
+
+	try {
+		return emit()
+	} finally {
+		shadowingNamespaceScopes = previous
+	}
+}
+
+// NOTE: The band, and the renaming that finishes it. `roots` is everything the
+// emitted Module will hold apart from the band itself, read for the markers
+// that survived — a constant collected while rewriting a standard library
+// Method the Program turned out not to reach is not declared, because its
+// marker is nowhere. The survivors pull in what THEY read, so a witness kept
+// for one site keeps the witnesses curried onto it.
+//
+// NOTE: The order is the order the constants were recorded, which is the order
+// they must be declared in: a value is recorded after everything inside it, so
+// a constant reading another always stands below it.
+function constantPoolBand(
+	pool: Map<string, PooledConstant>,
+	roots: unknown,
+): Array<estree.VariableDeclaration> {
+	if (pool.size === 0) {
+		return []
+	}
+
+	let constants = [...pool.values()]
+	let byMarker = new Map(
+		constants.map((constant) => [constant.marker, constant]),
+	)
+	let used = new Set<string>()
+	let pending = [...referencedNames(roots)].filter((name) =>
+		byMarker.has(name),
+	)
+
+	while (pending.length > 0) {
+		let marker = pending.pop()!
+
+		if (used.has(marker)) {
+			continue
+		}
+
+		used.add(marker)
+
+		for (let name of referencedNames(byMarker.get(marker)!.value)) {
+			if (byMarker.has(name)) {
+				pending.push(name)
+			}
+		}
+	}
+
+	let names = new Map<string, string>()
+	let band: Array<estree.VariableDeclaration> = []
+
+	for (let constant of constants) {
+		if (!used.has(constant.marker)) {
+			continue
+		}
+
+		let name = `${POOL_NAME_PREFIX}${names.size}`
+
+		names.set(constant.marker, name)
+		band.push({
+			type: "VariableDeclaration",
+			kind: "const",
+			declarations: [
+				{
+					type: "VariableDeclarator",
+					id: { type: "Identifier", name },
+					init: constant.value,
+				},
+			],
+		})
+	}
+
+	renamePooledReferences(roots, names)
+	renamePooledReferences(band, names)
+
+	return band
+}
+
+// NOTE: The markers replaced by the names the band declares, in place. A marker
+// can stand nowhere but where this Module put one — no Essence identifier holds
+// a `_`, and nothing else in emission spells one — so a name match IS the
+// reference, and every position is looked at rather than only the ones a
+// reference is expected in.
+function renamePooledReferences(
+	root: unknown,
+	names: ReadonlyMap<string, string>,
+): void {
+	let visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (let entry of node) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (node === null || typeof node !== "object") {
+			return
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (record["type"] === "Identifier") {
+			let name = names.get(record["name"] as string)
+
+			if (name !== undefined) {
+				record["name"] = name
+			}
+
+			return
+		}
+
+		for (let value of Object.values(record)) {
+			visit(value)
+		}
+	}
+
+	visit(root)
+}
+
+// #endregion
 
 // NOTE: Which Essence-implemented Methods the emitted Program actually needs,
 // and the const for each. A const is emitted only where something names it:
@@ -1058,6 +1324,12 @@ export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
 	freeFunctions: Array<PreludeFreeFunction> = [],
+	// NOTE: The pooled constants already collected, which are part of what the
+	// emitted Module names even though they are not in its body yet: a pooled
+	// conformance witness holds the `$es_…` reference that used to stand at the
+	// site the witness was hoisted out of, and a search seeded only by the body
+	// would lose that edge and emit a Module naming a const nobody declared.
+	poolRoots: unknown = null,
 ): Map<string, EssenceMember> {
 	let reachable = new Map<string, EssenceMember>()
 
@@ -1199,7 +1471,7 @@ export function reachableEssenceMethods(
 	// NOTE: The seed is what the emitted user Program names — a plain call, a
 	// conformance witness and a `dispatchMethod` target are all bare `$es_…`
 	// Identifiers by now, so `referencedNames` finds them all alike.
-	include(referencedNames(implementation))
+	include(referencedNames([implementation, poolRoots]))
 
 	while (pending.length > 0) {
 		include(candidates.get(pending.pop()!)!.references)
@@ -1640,6 +1912,27 @@ function rewriteIntrinsic(
 				left: typeKeyRead(rewriteExpression(node.value)),
 				right: { type: "Literal", value: renderIdentity(node.tag) },
 			}
+		// NOTE: The general check, byte for byte what a Match Handler emitted
+		// before there was a pass to compile one — the descriptor stands in an
+		// Expression position now, which is what lets it be pooled, and that is
+		// the whole of the difference.
+		case "type-test":
+			return {
+				type: "CallExpression",
+				optional: false,
+				callee: memberRead(
+					{ type: "Identifier", name: "$type" },
+					"isValueOfType",
+				),
+				arguments: [
+					rewriteExpression(node.value),
+					rewriteExpression(node.descriptor),
+				],
+			}
+		case "type-descriptor":
+			return convertObjectToObjectExpression(node.descriptor)
+		case "pooled-reference":
+			return pooledReference(node)
 		case "essence-boolean":
 			return {
 				type: "ConditionalExpression",

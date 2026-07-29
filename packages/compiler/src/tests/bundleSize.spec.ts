@@ -126,6 +126,14 @@ describe("Bundle Size", () => {
 	// 59,690 again. What is left of the runtime's Type Module is the hidden key,
 	// `createCase` and `noCaseMatched`.
 	//
+	// NOTE: It now measures 50,481, down another 2,392, and the ceiling follows
+	// it down. `pool-constants` is what shrank it, and this one shrinks the TEXT
+	// as well as the work: a Program the size of Everyday writes the same
+	// handful of small Integers, the same conformance witnesses and the same
+	// Type descriptors over and over, and each is now one const and a name at
+	// every site. What it takes out of the RUN is larger than what it takes out
+	// of the file — every one of those was an allocation per evaluation.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -133,7 +141,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_900)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(51_500)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -152,8 +160,20 @@ describe("Bundle Size", () => {
 	// Everyday's figure fell, and by more of its own size, because a Program
 	// this small carried structural equality for the sake of two comparisons.
 	// The ceiling came down with it.
+	//
+	// NOTE: It now measures 28,265, and the two passes that moved it are worth
+	// separating, because they moved it in OPPOSITE directions. Compiling a
+	// Match's Type check to a tag test took 2,752 out (turning that pass off
+	// puts the file back at 31,017), and letting the last Handler be the end of
+	// its chain took 769 more — both of them by taking the last reference to a
+	// runtime function out with the check, so the function leaves the bundle
+	// too. `pool-constants` PUT 348 back: this Program writes few constants
+	// twice, so what it gains in allocations it pays for in a band of consts
+	// and a name at every site. That is the honest shape of that pass — it is
+	// measured on what a Program DOES, and Everyday, which writes the same
+	// handful of Integers and witnesses over and over, lost 2,392 bytes to it.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(29_700)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(29_300)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
@@ -187,8 +207,11 @@ describe("Bundle Size", () => {
 	// read fallible answers back through `Optional`, so every Match in them and
 	// in the prelude they share was a descriptor handed to `isValueOfType`, and
 	// with the descriptors gone the function is unreferenced and leaves the
-	// bundle. The headroom is what matters here rather than the figure — the
-	// duplication this test exists to catch is about a kilobyte.
+	// bundle. `pool-constants` took 19 bytes more off it: these Modules are
+	// small enough that most of their constants are written once, and a const
+	// and a name cost about what the value cost inline. The headroom is what
+	// matters here rather than the figure — the duplication this test exists to
+	// catch is about a kilobyte.
 	//
 	// NOTE: It measured 20,693 before that, and the ceiling was 21,200. 530 of the
 	// rise came with the nominal `Optional` and went unrecorded here — the

@@ -53,11 +53,13 @@ function compile(
 
 		let residual = matcherResidual(handler.matcher, node.value.type)
 
-		if (residual.kind !== "tag") {
-			return handler
+		return {
+			...handler,
+			typeTest:
+				residual.kind === "tag"
+					? tagTest(node.value.type, residual.tag)
+					: typeTest(node.value.type, handler.matcher),
 		}
-
-		return { ...handler, typeTest: tagTest(node.value.type, residual.tag) }
 	})
 
 	if (handlers.every((handler, index) => handler === node.handlers[index])) {
@@ -84,9 +86,40 @@ function tagTest(
 	return {
 		nodeType: "Intrinsic",
 		kind: "tag-test",
-		value: { nodeType: "Identifier", name: "_self", type: valueType },
+		value: matchedValue(valueType),
 		tag,
 		negated: false,
 		type: { type: "Boolean" },
 	}
+}
+
+// NOTE: The check the runtime performs, written out where the Matcher stood.
+// The BYTES are what they were — this is the same call over the same
+// descriptor, which is what the Rewriter emits for a Handler this pass left
+// alone — and what changes is where the descriptor sits: in an Expression
+// position, which is a place another pass can reach. `pool-constants` is what
+// reaches it, and hoists a descriptor rebuilt at every test into a constant
+// built once.
+function typeTest(
+	valueType: common.Type,
+	matcher: common.Type,
+): common.typedSimple.ExpressionNode {
+	return {
+		nodeType: "Intrinsic",
+		kind: "type-test",
+		value: matchedValue(valueType),
+		descriptor: {
+			nodeType: "Intrinsic",
+			kind: "type-descriptor",
+			descriptor: matcher,
+			type: { type: "Unknown" },
+		},
+		type: { type: "Boolean" },
+	}
+}
+
+function matchedValue(
+	valueType: common.Type,
+): common.typedSimple.ExpressionNode {
+	return { nodeType: "Identifier", name: "_self", type: valueType }
 }

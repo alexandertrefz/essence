@@ -141,6 +141,40 @@ describe("Source Maps", () => {
 		).toBe(false)
 	})
 
+	// NOTE: The band of pooled constants is emitted by the Compiler's own
+	// reckoning — the same `1` written on four lines is one const there — so the
+	// value in it belongs to no one site and maps to none. Without this it
+	// carried the Position of whichever site was rewritten first, and stepping
+	// the band in a debugger jumped into a line that merely happened to write
+	// that constant.
+	it("gives the pooled constants no mapping", () => {
+		let { inputs, entryPath } = moduleInputs()
+		let { sources } = rewriteModules(inputs, entryPath, { sourcemap: true })
+		let moduleText = sources.get(moduleSpecifier("./Main.es"))!
+		let lines = moduleText.split("\n")
+		let bandLines = new Set(
+			lines.flatMap((line, index) =>
+				line.startsWith("const $pool_") ? [index + 1] : [],
+			),
+		)
+
+		expect(bandLines.size).toBeGreaterThan(0)
+
+		let consumer = new SourceMapConsumer(decodeInlineMap(moduleText))
+		let mappedBandLines: Array<string> = []
+
+		consumer.eachMapping((mapping) => {
+			if (
+				mapping.source !== null &&
+				bandLines.has(mapping.generatedLine)
+			) {
+				mappedBandLines.push(lines[mapping.generatedLine - 1]!)
+			}
+		})
+
+		expect(mappedBandLines).toEqual([])
+	})
+
 	it("emits no comment at all when no map was asked for", () => {
 		let { inputs, entryPath } = moduleInputs()
 		let { sources } = rewriteModules(inputs, entryPath)
