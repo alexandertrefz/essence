@@ -821,6 +821,45 @@ dispatch's per-case member Types used to be in the same position and are not
 any more — `compile-union-dispatch` rebuilds those sites, and the descriptors
 its cases still need are pooled like a Match Handler's.
 
+## Not done yet
+
+Four things the passes above deliberately leave undone. Each is written here
+rather than left for a reader to notice, because a rule that is missing and a
+rule that was decided against look the same from the outside.
+
+**A decision tree over a Record Matcher's members.** `compile-type-tests` reduces
+a Matcher to a tag where the tag decides, and a Record's tag says only that the
+value is a Record — so a Match that distinguishes Records keeps the full
+`isValueOfType` walk against a pooled descriptor. What would replace it is a tree
+over the members that actually discriminate, read in an order the Compiler picks,
+which is a pass of its own with its own argument to make about erasure. Nothing
+about the current emission is wrong; it is more work than it needs to be.
+
+**The derived-equality descriptor of a generic Choice, pooled.** `pool-constants`
+hoists every descriptor standing in an Expression position, and this one does
+not: where a generic Choice's derived equality is called directly, the plan it
+follows hangs off the Invocation Node itself, where no pass can reach it, and is
+rebuilt at every call. `compile-union-dispatch` moved the per-case member Types
+out of that position and they are pooled now; this one needs the same treatment
+and has not had it.
+
+**A Handler whose check accepts everything, ending its chain.** The residual
+analysis already answers "nothing left to test" for a Matcher that accepts every
+value which can arrive, and `elide-final-match-test` acts on it only for the LAST
+Handler. A Handler in the middle that accepts everything makes every Handler
+after it dead — which the Validator reports as an unreachable Case — and the
+chain could end there, with its own test dropped as well.
+`compile-union-dispatch` does exactly this for dispatch cases; a Match does not.
+
+**Statement-form dispatch beyond what a lowered Match gives it.** A compiled
+Union dispatch that has to hold operands under names is written as the `const`s
+of a block wherever `lower-matches-to-statements` can put it in a Statement
+position — a Return, a Declaration, an assignment, a Statement written for its
+effects. Anywhere else it is an arrow called at once with the operands, exactly
+as a Match written mid-Expression stays a Function call. Widening that means
+lifting operands out of the Expression they stand in, which is a transform on the
+enclosing Statement rather than on the dispatch.
+
 ## Runtime improvements
 
 These are improvements to the runtime itself rather than to the code the
