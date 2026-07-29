@@ -14,7 +14,8 @@ this directory and deploys it, so the URLs are unchanged.
 |---|---|
 | `index.md` | the language's pitch — goals, principles, `essence` usage |
 | `diagnostics.md` | every Diagnostic code, one section each |
-| `tests/` | what keeps `diagnostics.md` honest, see below |
+| `optimisations.md` | every Optimiser pass, one section each, plus the runtime improvements |
+| `tests/` | what keeps both pages honest, see below |
 
 ## What is not here yet
 
@@ -36,7 +37,7 @@ Two things are worth knowing before that work starts:
   directly. The site should use that file rather than a second grammar that can
   drift from it.
 
-## The test in a documentation package
+## The tests in a documentation package
 
 `tests/diagnosticCodes.spec.ts` is the gate that every `DiagnosticCode` the
 Compiler can emit has a section in `diagnostics.md`, and that no section
@@ -47,3 +48,9 @@ through the module loader rather than by counting directories.
 A code with no documentation is worse than no code at all: it is printed in
 every terminal report and handed to every Language Server client, and the whole
 point of a stable identifier is that it can be looked up.
+
+`tests/optimisationPasses.spec.ts` is the same gate for `optimisations.md`,
+against the Optimiser's pass registry — and it holds the ORDER as well as the
+set, because the order the passes run in is part of what the page states. A pass
+name is what `--without-optimisation` takes, so a pass nobody can look up is a
+flag nobody can use.
