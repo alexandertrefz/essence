@@ -2004,6 +2004,17 @@ function rewriteIntrinsic(
 					},
 				],
 			}
+		// NOTE: Through the one function every reference to a standard library
+		// member routes through, so a devirtualised Method is spelled exactly
+		// as the witness spelled it — an Essence-implemented one as its own
+		// const, a native one as a read off the runtime module, and a Choice's
+		// derived equality as the runtime helper.
+		case "direct-method":
+			return namespaceMember(
+				node.namespaceName,
+				node.memberName,
+				node.derivedDescriptor,
+			)
 		case "direct-record":
 			return {
 				type: "ObjectExpression",
@@ -2620,6 +2631,20 @@ function rewriteStringValue(
 // first thing written is a hole), so the fold starts from a Literal. No runtime
 // helper is added: this is the same `toString` call `List::join` makes at run
 // time, inlined per hole.
+// NOTE: What renders one hole — `<witness>.toString` read off the method map,
+// and the Method ITSELF where `devirtualise-witnesses` has already said which
+// one it is. This is the one emission site that consumes a witness rather than
+// passing it on, which is why it is the one site that pass has anything to do.
+function holeRenderer(
+	witness: common.typedSimple.ExpressionNode,
+): estree.Expression {
+	if (witness.nodeType === "Intrinsic" && witness.kind === "direct-method") {
+		return rewriteExpression(witness)
+	}
+
+	return memberRead(rewriteExpression(witness), "toString")
+}
+
 function rewriteInterpolatedStringValue(
 	node: common.typedSimple.InterpolatedStringValueNode,
 ): estree.CallExpression {
@@ -2632,10 +2657,7 @@ function rewriteInterpolatedStringValue(
 			{
 				type: "CallExpression",
 				optional: false,
-				callee: memberRead(
-					rewriteExpression(segment.witness),
-					"toString",
-				),
+				callee: holeRenderer(segment.witness),
 				arguments: [rewriteExpression(segment.expression)],
 			},
 			"value",

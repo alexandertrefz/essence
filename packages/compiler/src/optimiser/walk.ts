@@ -473,9 +473,11 @@ function walkIntrinsicChildren(
 
 			return { ...node, value, descriptor }
 		}
-		// NOTE: A leaf: a Type is not an Expression, and the descriptor is the
-		// whole of what this Node holds.
+		// NOTE: The leaves. A Type is not an Expression, and the descriptor is
+		// the whole of what a `type-descriptor` holds; a `direct-method` holds
+		// two names and no Expression at all.
 		case "type-descriptor":
+		case "direct-method":
 			return node
 		// NOTE: A lowered operation's operands are the Expressions the
 		// Invocation was given, in the order it was given them — so a pass
