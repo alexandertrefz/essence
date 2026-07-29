@@ -40,6 +40,43 @@ pass added later is inserted where it belongs rather than appended.
 
 ## Passes
 
+### `lower-unit-case-equality`
+
+Compares a Choice with one of its payload-less Cases by reading its tag.
+
+`ordering::is(#Less)` compiled to a call into the runtime that worked the
+answer out again every time: it looked the interned `#Less` up, called the
+universal structural equality, walked its ladder of kind tests down to the Case
+arm, read both tags — and then compared the payloads neither value has. All of
+that is one question, so the question is what is emitted:
+
+```js
+ordering[$type.typeKeySymbol] === "Ordering#Less"
+	? Boolean.trueInstance
+	: Boolean.falseInstance
+```
+
+`isNot` asks `!==` rather than negating the answer, and either side may be the
+Case: `#Less::is(ordering)` is the same question about the same two values.
+
+Safe because a Choice's derived equality decides a Case by its tag — nominally,
+never by identity — and then compares payload members as a Record's. A Case
+declaring no members has none to compare, so the tag was always the whole
+answer. A value that is not a Case answers `false` either way: a Function
+carries no hidden Type key, so the read gives `undefined` and the comparison is
+false rather than a crash, which is what the runtime answers for a Function
+beside a Case too. A *generic* Choice compares through a descriptor instead,
+and the pass reads that descriptor rather than assuming what is in it: a tag
+whose plan names members is left to the runtime.
+
+Only equality a Choice DERIVES is lowered. A Namespace that writes its own `is`
+is called, exactly as written.
+
+This one runs inside the standard library as well, which is where it earns
+most: `isLessThan` is `compare(to other)::is(#Less)`, and the other three
+inequalities are written on that, so every comparison in every Program ends in
+this shape.
+
 ### `collapse-construction`
 
 Builds a Record, a Case or a List in one allocation.

@@ -419,6 +419,20 @@ function walkIntrinsicChildren(
 	rewrite: ExpressionRewrite,
 ): ExpressionNode {
 	switch (node.kind) {
+		// NOTE: A `tag-test`'s value and an `essence-boolean`'s test are
+		// ordinary positions and are offered like any other — what a later pass
+		// may not do is answer one of them with a Node of the wrong KIND. The
+		// value under a test is an Essence value, but the test itself is a raw
+		// JavaScript boolean, and a pass that rewrote it into an Essence Boolean
+		// would leave a value object where a condition belongs. Nothing does:
+		// every pass matches the shapes the Simplifier produces, and none of
+		// those is a raw one.
+		case "tag-test":
+		case "essence-boolean": {
+			let value = walkExpression(node.value, rewrite)
+
+			return value === node.value ? node : { ...node, value }
+		}
 		case "direct-record": {
 			let members = mapRecord(node.members, (value) =>
 				walkExpression(value, rewrite),

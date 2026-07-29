@@ -8,7 +8,11 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+} from "../optimiser/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
@@ -17,7 +21,17 @@ import { validate } from "../validator/index"
 
 // NOTE: The full pipeline minus bundling, mirroring codeGeneration.spec — a
 // Choice is only implemented once every stage agrees on it.
-function generate(source: string): string {
+//
+// NOTE: The Options are a Parameter because one question below is about what
+// the Rewriter emits for a derived equality, and the Optimiser answers a
+// comparison against a payload-less Case without reaching the Rewriter's
+// emission at all. Turning that one pass off is how the emission is asked
+// about directly; what the Optimiser does with it instead is pinned in
+// `optimiserPasses.spec.ts`.
+function generate(
+	source: string,
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -27,7 +41,12 @@ function generate(source: string): string {
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
-	return rewrite(optimise(simplify(enriched.program)))
+	return rewrite(optimise(simplify(enriched.program), optimiserOptions))
+}
+
+const withoutLoweredUnitCaseEquality: OptimiserOptions = {
+	enabled: true,
+	disabledPasses: new Set(["lower-unit-case-equality"]),
 }
 
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
@@ -3264,13 +3283,16 @@ describe("Choices", () => {
 		// the flat helper — the guarantee that this whole feature adds nothing to
 		// the code a non-generic Choice already generated.
 		it("leaves a non-generic Choice emitting the flat helper", () => {
-			let generated = generate(`implementation {
+			let generated = generate(
+				`implementation {
 				choice Colour { Red, Green }
 
 				constant red: Colour = #Red
 
 				__print(red::is(#Green))
-			}`)
+			}`,
+				withoutLoweredUnitCaseEquality,
+			)
 
 			expect(generated).toContain("$helpers.choiceIs(red,")
 			expect(generated).not.toContain("boundChoiceIs")
@@ -3279,14 +3301,17 @@ describe("Choices", () => {
 
 	describe("Code Generation", () => {
 		it("emits the runtime helper for a derived 'is'", () => {
-			let generated = generate(`implementation {
+			let generated = generate(
+				`implementation {
 				choice Colour { Red, Green }
 
 				constant red: Colour = #Red
 
 				__print(red::is(#Green))
 				__print(red::isNot(#Green))
-			}`)
+			}`,
+				withoutLoweredUnitCaseEquality,
+			)
 
 			expect(generated).toContain("$helpers.choiceIs(")
 			expect(generated).toContain("$helpers.choiceIsNot(")
