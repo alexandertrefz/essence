@@ -1,5 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { collapseConstruction } from "./passes/collapseConstruction"
+
 // NOTE: The Optimiser is a registry of NAMED passes, run in one fixed order.
 // Every transform the Compiler performs on a simplified Program is one of them,
 // each is documented in `packages/website/optimisations.md` under the name it
@@ -50,7 +52,9 @@ export const defaultOptimiserOptions: OptimiserOptions = {
 // is INSERTED where it belongs rather than appended, because what a pass finds
 // in front of it is part of what it was written against. Turning one off never
 // reorders the rest.
-export const optimiserPasses: ReadonlyArray<OptimiserPass> = []
+export const optimiserPasses: ReadonlyArray<OptimiserPass> = [
+	collapseConstruction,
+]
 
 export const optimiserPassNames: ReadonlyArray<string> = optimiserPasses.map(
 	(pass) => pass.name,

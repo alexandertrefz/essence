@@ -3341,9 +3341,16 @@ describe("Choices", () => {
 				constant cleared: CalculatorOperation = CalculatorOperation#ClearAll
 			}`)
 
+			// NOTE: A Case carrying a payload is built in one allocation, its
+			// tag written straight onto the object its members are written into
+			// — `collapse-construction`, which is what a Case construction
+			// comes out as unless that pass is turned off.
 			expect(generated).toContain(
-				'$type.createCase("CalculatorOperation#Add", Record.createRecord',
+				'[$type.typeKeySymbol]: "CalculatorOperation#Add"',
 			)
+			// NOTE: A unit Case keeps its constructor: `createCase` hands out
+			// one instance per tag rather than building a literal per
+			// construction.
 			expect(generated).toContain(
 				'$type.createCase("CalculatorOperation#ClearAll")',
 			)
@@ -3485,9 +3492,13 @@ describe("Choices", () => {
 				constant done: Progress<String, Integer> = #Stopped({ value = 5 })
 			}`)
 
-			expect(short).toContain('$type.createCase("Progress#Stopped"')
+			expect(short).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
 			expect(short).toContain("value")
-			expect(long).toContain('$type.createCase("Progress#Stopped"')
+			expect(long).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
+			// NOTE: The whole claim, and the reason the two above are worth
+			// asserting separately: the shorthand is REWRAPPED into the Record
+			// the long form writes, so the two emit the same text.
+			expect(short).toBe(long)
 		})
 
 		it("reads a Record that fits the shape as the Record, not the value", () => {

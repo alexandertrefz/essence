@@ -97,6 +97,16 @@ describe("Bundle Size", () => {
 	// still catches is unchanged: a reintroduced `Number` spread was over five
 	// kilobytes here, and the `isEven` shape below was 2.4.
 	//
+	// NOTE: It now measures 62,388, up 788, and the ceiling moved to keep the
+	// same ~1 kB of headroom. `collapse-construction` is what grew it, and it
+	// grew the TEXT rather than the work: fifteen `Record.createRecord(…)` and
+	// eighteen `List.createList(…)` calls became branded object literals, which
+	// are more characters than the calls they replace — an extra key, and
+	// escodegen puts each member of a two-member object on its own line. What
+	// ships is minified, where the same change is 23,722 to 23,944, and what
+	// RUNS is one allocation per value instead of two. Irrational.es, which
+	// constructs no Record and no List, is unchanged to the byte.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -104,7 +114,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(62_700)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(63_400)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
