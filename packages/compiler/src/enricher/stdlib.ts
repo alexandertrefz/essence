@@ -376,17 +376,41 @@ export function loadStdlibFrom(
 	// NOTE: A standard library file starts from the bare Type tags alone — the
 	// handful of Types a declaration bottoms out in. Everything else in the
 	// language, `__print` and every other free Function included, is declared by
-	// the sources being loaded here, into this same Scope.
+	// the sources being loaded here.
+	//
+	// The tags sit on a PARENT Scope rather than in the declaring one, because
+	// the two questions asked about a name answer differently and have to. A
+	// lookup walks the chain — `findTypeInScope` and `findProtocolInScope` both
+	// do — so `Integer` the Type resolves from anywhere. "Is this name already
+	// taken?" does NOT walk it: the Module linker's `isTaken` reads the own
+	// tables alone, so a file writing `import { Integer from "./Integer.es" }`
+	// would otherwise collide with the TAG rather than with the Namespace it
+	// asked for, be refused as a `duplicate-import`, and lose Integer dispatch
+	// entirely. Every one of the eight tags is also a Namespace some file
+	// declares, so that would fire eight ways over.
+	//
+	// It costs one thing, stated here rather than left to be discovered: a
+	// standard library file writing `type Integer = …` now shadows the tag
+	// silently instead of reporting `duplicate-type`. No file does.
 	let members: Record<string, common.Type> = scopeMap()
 
-	let scope: enricher.Scope = {
+	let primitiveScope: enricher.Scope = {
 		parent: null,
+		members: scopeMap(),
+		declarations: scopeMap(),
+		constants: new Set(),
+		types: scopeMap(primitiveTypes),
+		protocols: scopeMap(),
+	}
+
+	let scope: enricher.Scope = {
+		parent: primitiveScope,
 		members,
 		// NOTE: As in a user Program's top level Scope — what is already in
 		// scope before the first line has no Position to point a Diagnostic at.
 		declarations: scopeMap(),
 		constants: new Set(Object.keys(members)),
-		types: scopeMap(primitiveTypes),
+		types: scopeMap(),
 		protocols: scopeMap(),
 	}
 
@@ -425,7 +449,15 @@ export function loadStdlibFrom(
 
 	return {
 		members: orderedMembers,
-		types: inBuiltinOrder(scope.types, builtinTypeOrder),
+		// NOTE: The bare Type tags are handed out as builtins alongside what the
+		// sources declared, and they live on the parent Scope now rather than in
+		// the declaring one — so the table is rebuilt from both halves. A user
+		// Program has to find `Integer` the Type in `builtinTypes()`; only the
+		// standard library's own files needed the tags held one Scope out.
+		types: inBuiltinOrder(
+			scopeMap({ ...primitiveTypes, ...scope.types }),
+			builtinTypeOrder,
+		),
 		protocols: scope.protocols,
 		namespaces,
 		typedPrograms: enriched.map((result) => result.program),
