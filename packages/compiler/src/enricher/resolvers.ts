@@ -129,6 +129,11 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Records"
 		case "Case":
 			return "Cases"
+		// NOTE: A refinement is combined exactly as much as its base is, which
+		// for every v1 base is not at all — so it is described as what it is,
+		// under the name the Declaration gave it.
+		case "Refinement":
+			return `'${type.name}' values`
 	}
 }
 
@@ -1303,6 +1308,11 @@ function typeMentionsGenerics(
 			return type.types.some((member) =>
 				typeMentionsGenerics(member, generics),
 			)
+		// NOTE: Only the base can name a Type Parameter — a conjunct is a key
+		// over literals — and a List base carries item Types, which is where one
+		// would be.
+		case "Refinement":
+			return typeMentionsGenerics(type.base, generics)
 		default:
 			return false
 	}
@@ -1378,6 +1388,10 @@ function runtimeTagOf(type: common.Type): string | null {
 			return "List"
 		case "Case":
 			return `${type.choice}#${type.name}`
+		// NOTE: A refinement's values ARE its base's values — nothing about the
+		// evidence reaches run time, so the tag they carry is the base's.
+		case "Refinement":
+			return runtimeTagOf(type.base)
 		default:
 			return null
 	}
@@ -1751,6 +1765,12 @@ function runtimeShapeOf(type: common.Type): common.Type {
 			}
 		case "UnionType":
 			return { type: "UnionType", types: type.types.map(runtimeShapeOf) }
+		// NOTE: The predicate is not a part the runtime can check — it is not a
+		// part the runtime ever HEARS of — so a refinement shapes as its base
+		// does. This is the same erasure the Optimiser performs on the tree,
+		// stated where a descriptor is built.
+		case "Refinement":
+			return runtimeShapeOf(type.base)
 		default:
 			return type
 	}
@@ -3852,10 +3872,34 @@ function namespaceCandidatesFor(
 		namespaceIndexes.set(namespaces, index)
 	}
 
-	let candidates = index.always
+	return index.always
+		.concat(kindCandidatesFor(index, baseType))
+		.sort((lhs, rhs) => lhs.order - rhs.order)
+}
+
+// NOTE: The buckets a receiver of this KIND can be answered by — everything but
+// the blanket ones every lookup pays for.
+//
+// NOTE: A refined receiver reads two of them. Evidence adds Methods to a Type
+// and never takes any away, so a `NonZeroInteger` keeps every Method an Integer
+// has — and a Namespace written `for NonZeroInteger` is the one place a `divide`
+// that can not fail may live. Left out, the first half would leave a refined
+// value with no Methods at all and the second would make refining one
+// pointless. Every Namespace targeting ANY refinement is offered, which is a
+// superset exactly as this function promises: `matchTypes` is what decides that
+// a `NonEmptyString` Namespace does not answer for a `NonZeroInteger`.
+function kindCandidatesFor(
+	index: NamespaceIndex,
+	baseType: common.Type,
+): Array<IndexedNamespace> {
+	if (baseType.type === "Refinement") {
+		return (index.byKind.get("Refinement") ?? []).concat(
+			kindCandidatesFor(index, baseType.base),
+		)
+	}
 
 	if (baseType.type === "Record") {
-		candidates = candidates.concat(index.recordsWithoutMembers)
+		let candidates = index.recordsWithoutMembers
 
 		for (let memberName in baseType.members) {
 			let bucket = index.recordsByMember.get(memberName)
@@ -3864,13 +3908,15 @@ function namespaceCandidatesFor(
 				candidates = candidates.concat(bucket)
 			}
 		}
-	} else if (baseType.type === "List" || baseType.type === "GenericList") {
-		candidates = candidates.concat(index.byKind.get("List") ?? [])
-	} else {
-		candidates = candidates.concat(index.byKind.get(baseType.type) ?? [])
+
+		return candidates
 	}
 
-	return candidates.sort((lhs, rhs) => lhs.order - rhs.order)
+	if (baseType.type === "List" || baseType.type === "GenericList") {
+		return index.byKind.get("List") ?? []
+	}
+
+	return index.byKind.get(baseType.type) ?? []
 }
 
 // NOTE: Which of the given Namespaces target `baseType`, in the order they were

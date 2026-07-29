@@ -7,6 +7,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import {
 	bodyDefinitelyReturns,
 	isUnitType,
@@ -1360,6 +1361,18 @@ export function acceptsAllAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
+	// NOTE: A checked refinement is the third thing that erases, and the most
+	// completely: its predicate is not a check the runtime declines to make, it
+	// is a check the runtime never hears of. So both sides are unwrapped before
+	// anything else is asked, and a refinement answers exactly as its base does
+	// — which is what the emitted check will do.
+	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
+		return acceptsAllAtRuntime(
+			eraseRefinements(matcher),
+			eraseRefinements(memberType),
+		)
+	}
+
 	if (matcher.type === "GenericUse" || matcher.type === "Unknown") {
 		return true
 	}
@@ -1440,6 +1453,14 @@ export function overlapsAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
+	// NOTE: Unwrapped for the reason its sibling above unwraps.
+	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
+		return overlapsAtRuntime(
+			eraseRefinements(matcher),
+			eraseRefinements(memberType),
+		)
+	}
+
 	if (acceptsAllAtRuntime(matcher, memberType)) {
 		return true
 	}

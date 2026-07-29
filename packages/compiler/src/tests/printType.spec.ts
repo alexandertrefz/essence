@@ -185,4 +185,53 @@ describe("printType", () => {
 			])
 		})
 	})
+
+	// NOTE: A checked refinement is named, never spelled out. The predicate is
+	// what the DECLARATION says — a Hover over a value is about the Type it has,
+	// and `Integer where @::isNot(0)` would answer a question nobody asked in
+	// every Signature the alias appears in.
+	describe("Checked refinements", () => {
+		let nonZeroInteger: common.Type = {
+			type: "Refinement",
+			name: "NonZeroInteger",
+			base: integer,
+			conjuncts: [
+				{
+					namespaceName: "Integer",
+					methodName: "isNot",
+					overloadIndex: null,
+					args: ["0"],
+				},
+			],
+		}
+
+		it("should print under the alias name", () => {
+			expect(printType(nonZeroInteger)).toBe("NonZeroInteger")
+		})
+
+		it("should print inside the Types that hold one", () => {
+			expect(printType({ type: "List", itemType: nonZeroInteger })).toBe(
+				"List<NonZeroInteger>",
+			)
+			expect(
+				printType({
+					type: "Record",
+					members: { divisor: nonZeroInteger },
+				}),
+			).toBe("{ divisor: NonZeroInteger }")
+		})
+
+		it("should print a Signature taking and answering one", () => {
+			expect(
+				describeSignature(
+					{
+						parameterTypes: [{ name: "by", type: nonZeroInteger }],
+						generics: [],
+						returnType: nonZeroInteger,
+					},
+					"divide",
+				).label,
+			).toBe("divide(by: NonZeroInteger) -> NonZeroInteger")
+		})
+	})
 })

@@ -482,6 +482,49 @@ export type GenericAliasType = {
 	aliasedType: Type
 }
 
+// NOTE: One leaf of a checked refinement's predicate — a single Method call on
+// the value being refined, resolved to the Namespace that answers it. It is a
+// KEY, not an Expression: two refinements are compared by their conjunct sets,
+// so what is stored is exactly what makes two leaves the same question and
+// nothing that only makes them the same source text. The typed predicate
+// Expression lives on the Type Alias Statement it was written on, which keeps
+// `conformanceKey` and its memo keys off the whole of it.
+//
+// `overloadIndex` is null for a Method that is not overloaded (`Integer.isNot`
+// is one), and the index of the resolved Overload where it is — the two spell
+// different questions under one name.
+//
+// NOTE: An Argument is kept as a stable scalar rather than as a Type: an
+// Integer's value is a string because it is a bigint at run time and JSON has
+// no bigint, and every consumer — the canonical key, the literal evaluator, a
+// Diagnostic naming the predicate — reads it back the same way.
+export type PredicateConjunct = {
+	namespaceName: string
+	methodName: string
+	overloadIndex: number | null
+	args: Array<string | boolean>
+}
+
+// NOTE: A checked refinement — a base Type together with the predicate every
+// value of it has been proven to satisfy. `type NonZeroInteger = Integer where
+// @::isNot(0)` is one, and the alias' name is its printing identity: a reader
+// wrote `NonZeroInteger`, so that is what a Hover and a Diagnostic say.
+//
+// Assignability is directional. A refinement flows freely into its base — the
+// evidence is simply forgotten — while the other direction needs evidence, and
+// a refinement accepts another only when its conjuncts are a SUBSET of the
+// other's: proving more than was asked is proof enough.
+//
+// NOTE: Refinements are erased before emission — nothing about one survives
+// into the JavaScript, and the Optimiser stage is where they go. `base` is
+// Integer, String or an applied List in v1.
+export type RefinementType = {
+	type: "Refinement"
+	name: string
+	base: Type
+	conjuncts: Array<PredicateConjunct>
+}
+
 // NOTE: The compile-time plan a *generic* Choice's derived Equatable follows
 // at runtime — one entry per Case tag, mapping each payload member's name to
 // how that member is compared. A member mentioning no Type Parameter compares
@@ -588,5 +631,6 @@ export type Type =
 	| GenericListType
 	| GenericAliasType
 	| GenericUse
+	| RefinementType
 
 export { typed, typedSimple }

@@ -222,6 +222,13 @@ function mapType(
 		case "List":
 			ctx.used.add("ListType")
 			return `ListType<${mapType(type.itemType, ctx, where)}>`
+		// NOTE: A checked refinement erases to its base before anything runs, so
+		// a native written against one is handed exactly the runtime type its
+		// base has — a `NonZeroInteger` Parameter is an `IntegerType`. The
+		// contract can not say more than that: the predicate was decided while
+		// compiling, and TypeScript has no way to be told it holds.
+		case "Refinement":
+			return mapType(type.base, ctx, where)
 		case "Record": {
 			ctx.used.add("RecordType")
 
@@ -404,6 +411,10 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			return "Transcendental"
 		case "List":
 			return `List<${describeEssenceType(type.itemType)}>`
+		// NOTE: Named, not spelled out — the comment is there so an Overload
+		// reorder reads as a diff, and the alias is what the Declaration wrote.
+		case "Refinement":
+			return type.name
 		case "Record": {
 			let entries = Object.entries(type.members)
 

@@ -382,4 +382,100 @@ describe("Runtime Agreement", () => {
 			false,
 		)
 	})
+
+	// NOTE: A checked refinement is the third thing that erases, and it is not
+	// sampled as a row of its own for exactly that reason: no value ever reaches
+	// the runtime UNDER one. `isValueOfType` is never handed a refinement — the
+	// Optimiser stage takes them out of the tree and the Rewriter refuses one
+	// outright — so what has to be true is not that the runtime agrees about a
+	// refinement, but that both edges answer about one EXACTLY as they answer
+	// about its base. That is what makes the sandwich above cover refined Types
+	// too: every question asked of one is a question already answered here.
+	describe("A checked refinement", () => {
+		function refined(base: common.Type): common.Type {
+			return {
+				type: "Refinement",
+				name: "Proven",
+				base,
+				conjuncts: [
+					{
+						namespaceName: "Integer",
+						methodName: "isNot",
+						overloadIndex: null,
+						args: ["0"],
+					},
+				],
+			}
+		}
+
+		// NOTE: Every base in the table, against every Type in it, on both sides
+		// of both edges — because a refinement can stand wherever its base can,
+		// and an unwrap written at one head and forgotten at the other would
+		// leave a Match reachable one way and dead the other.
+		it("should answer at both edges exactly as its base does", () => {
+			let disagreements: Array<string> = []
+
+			for (let base of samples) {
+				for (let other of samples) {
+					let asked: Array<
+						[
+							string,
+							(
+								matcher: common.Type,
+								member: common.Type,
+							) => boolean,
+						]
+					> = [
+						["accepts all", acceptsAllAtRuntime],
+						["overlaps", overlapsAtRuntime],
+					]
+
+					for (let [edge, ask] of asked) {
+						if (
+							ask(refined(base.type), other.type) !==
+							ask(base.type, other.type)
+						) {
+							disagreements.push(
+								`'${base.name}' refined ${edge} '${other.name}' differently as a Matcher`,
+							)
+						}
+
+						if (
+							ask(other.type, refined(base.type)) !==
+							ask(other.type, base.type)
+						) {
+							disagreements.push(
+								`'${other.name}' ${edge} a refined '${base.name}' differently as a member Type`,
+							)
+						}
+					}
+				}
+			}
+
+			expect(disagreements).toEqual([])
+		})
+
+		// NOTE: And a refinement nested inside a Type is unwrapped too — the head
+		// of each edge erases the whole Type rather than one layer of it, so a
+		// refined item Type is a `List<Integer>` to both of them.
+		it("should answer the same for one buried in a List", () => {
+			let refinedItems: common.Type = {
+				type: "List",
+				itemType: refined(integerType),
+			}
+
+			expect(acceptsAllAtRuntime(refinedItems, integerListType)).toBe(
+				true,
+			)
+			expect(acceptsAllAtRuntime(integerListType, refinedItems)).toBe(
+				true,
+			)
+			expect(
+				acceptsAllAtRuntime(refinedItems, {
+					type: "List",
+					itemType: stringType,
+				}),
+			).toBe(false)
+		})
+	})
 })

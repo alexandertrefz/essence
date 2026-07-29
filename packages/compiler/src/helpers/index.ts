@@ -112,6 +112,11 @@ export function describeType(type: common.Type): string {
 			return type.types.map(describeType).join(" | ")
 		case "Case":
 			return `${displayChoiceName(type.choice)}#${type.name}`
+		// NOTE: A checked refinement is named, never spelled out — the reader
+		// wrote `NonZeroInteger`, and `Integer where @::isNot(0)` is the
+		// Declaration rather than the Type a Diagnostic is about.
+		case "Refinement":
+			return type.name
 		case "List":
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
@@ -723,6 +728,16 @@ export function applyGenericBindings(
 				? type
 				: { type: "List", itemType }
 		}
+		// NOTE: A refinement's conjuncts are keys rather than Types, so only the
+		// base can hold a Generic — and in v1 it never does, since the bases are
+		// Integer, String and applied Lists. The recursion is here so that the
+		// day one can, substituting a refinement is not the one place that
+		// silently stops.
+		case "Refinement": {
+			let base = applyGenericBindings(type.base, bindings)
+
+			return base === type.base ? type : { ...type, base }
+		}
 		case "UnionType": {
 			let types = type.types.map((memberType) =>
 				applyGenericBindings(memberType, bindings),
@@ -1111,6 +1126,57 @@ export function typeContainsError(type: common.Type): boolean {
 	return typeWalkFinds(type, (record) => record.type === "Error")
 }
 
+// NOTE: Whether a checked refinement sits anywhere in this Type — the same
+// structural walk again, and for one purpose: refinements erase before
+// emission, so a Type still carrying one where the Rewriter is about to
+// SERIALIZE it names a Compiler bug rather than a Program's mistake. The walk
+// reads every field so that a refinement buried in a List's items or a Record's
+// member is found too, which is exactly where a hand written eraser would miss
+// one.
+export function typeContainsRefinement(type: common.Type): boolean {
+	return typeWalkFinds(type, (record) => record.type === "Refinement")
+}
+
+// NOTE: What makes two predicate leaves the SAME question — the Namespace that
+// answers it, the Method, which Overload of it, and the Arguments. Assignability
+// between two refinements is set inclusion over these keys, so nothing may spell
+// two questions alike. Which is why the separator is a COLON and the Arguments
+// are JSON: the Lexer reads `:` as a Symbol, so no name a Program can write
+// holds one, while `$` is an ordinary Identifier character — a Method called
+// `isNot$1` would otherwise key exactly as Overload 1 of `isNot` — and a String
+// Argument may hold whatever a joined list's separator would have been.
+export function predicateConjunctKey(
+	conjunct: common.PredicateConjunct,
+): string {
+	return `${conjunct.namespaceName}::${conjunct.methodName}:${
+		conjunct.overloadIndex ?? ""
+	}${JSON.stringify(conjunct.args)}`
+}
+
+// NOTE: The canonical form a refinement's conjuncts are stored in — sorted by
+// key, with duplicates dropped, so that one predicate spells one conjunct set
+// however it was written. Two aliases proving the same thing are then the same
+// Type to every reader of `conjuncts`, and the inclusion check above never has
+// to care that `@::isNot(0)::and(@::isPositive())` and its mirror image are the
+// same predicate.
+export function canonicalPredicateConjuncts(
+	conjuncts: Array<common.PredicateConjunct>,
+): Array<common.PredicateConjunct> {
+	let byKey = new Map<string, common.PredicateConjunct>()
+
+	for (let conjunct of conjuncts) {
+		let key = predicateConjunctKey(conjunct)
+
+		if (!byKey.has(key)) {
+			byKey.set(key, conjunct)
+		}
+	}
+
+	return [...byKey.entries()]
+		.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+		.map(([, conjunct]) => conjunct)
+}
+
 // NOTE: Whether a slot nothing has decided yet sits anywhere in this Type. It
 // enumerates the shapes on purpose, unlike its Error-hunting sibling: an
 // Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
@@ -1128,6 +1194,10 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return Object.values(type.members).some(typeContainsUnknown)
 		case "UnionType":
 			return type.types.some(typeContainsUnknown)
+		// NOTE: A refinement decides nothing its base has not decided — what is
+		// still undecided about `List<Unknown> where …` is the item Type.
+		case "Refinement":
+			return typeContainsUnknown(type.base)
 		default:
 			return false
 	}
@@ -1614,6 +1684,38 @@ function matchTypes(
 	// follow-up Diagnostics.
 	if (lhs.type === "Error" || rhs.type === "Error") {
 		return true
+	}
+
+	// NOTE: A checked refinement flows into anything its BASE flows into — the
+	// evidence is simply forgotten, and every value of `NonZeroInteger` is an
+	// Integer. This unwrapping sits ahead of Generic binding below on purpose:
+	// it is what makes a Type Parameter bind the base, so `T` inferred from a
+	// refined Argument is `Integer` and never `NonZeroInteger`. A refined
+	// Generic binding (`List<NonZeroInteger>` produced by inference) would
+	// carry evidence into positions nothing proved anything about, and it is
+	// explicitly not part of v1.
+	if (rhs.type === "Refinement" && lhs.type !== "Refinement") {
+		return matchTypes(lhs, rhs.base, context)
+	}
+
+	// NOTE: The other direction needs the evidence. A refinement is accepted by
+	// a refinement over the same base whose conjuncts INCLUDE its own — proving
+	// more than was asked is proof enough, proving less is no proof at all — and
+	// by nothing else: a bare Integer arriving where `NonZeroInteger` stands is
+	// exactly the mistake the Type exists to name.
+	if (lhs.type === "Refinement") {
+		if (rhs.type !== "Refinement") {
+			return false
+		}
+
+		let proven = new Set(rhs.conjuncts.map(predicateConjunctKey))
+
+		return (
+			matchTypes(lhs.base, rhs.base, context) &&
+			lhs.conjuncts.every((conjunct) =>
+				proven.has(predicateConjunctKey(conjunct)),
+			)
+		)
 	}
 
 	// NOTE: Two opaque Generics of the same name are the same Generic and match.

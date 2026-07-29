@@ -11,6 +11,7 @@ import {
 	PRELUDE_SPECIFIER,
 } from "../bundler/index"
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
+import { typeContainsRefinement } from "../helpers/index"
 import {
 	defaultOptimiserOptions,
 	type OptimiserOptions,
@@ -2053,7 +2054,10 @@ function rewriteIntrinsic(
 				],
 			}
 		case "type-descriptor":
-			return convertObjectToObjectExpression(node.descriptor)
+			return typeDescriptorExpression(
+				node.descriptor,
+				"a pooled Type descriptor",
+			)
 		case "pooled-reference":
 			return pooledReference(node)
 		case "essence-boolean":
@@ -2724,8 +2728,9 @@ function rewriteUnionMethodInvocation(
 					(dispatchCase): estree.ArrayExpression => ({
 						type: "ArrayExpression",
 						elements: [
-							convertObjectToObjectExpression(
+							typeDescriptorExpression(
 								dispatchCase.memberType,
+								"a Union dispatch case",
 							),
 							namespaceMember(
 								dispatchCase.namespaceName,
@@ -3370,7 +3375,10 @@ function callIsValueOfType(
 			{ type: "Identifier", name: "$type" },
 			"isValueOfType",
 		),
-		arguments: [value, convertObjectToObjectExpression(matcher)],
+		arguments: [
+			value,
+			typeDescriptorExpression(matcher, "a Match Handler's Matcher"),
+		],
 	}
 }
 
@@ -5023,5 +5031,30 @@ function convertObjectToObjectExpression(
 			},
 		),
 	}
+}
+
+// NOTE: A Type SERIALIZED for the runtime, which is every place a Type stops
+// being something the Compiler reasons about and becomes data a Program carries.
+// A checked refinement may not reach one: its predicate is not a check the
+// runtime can make, so an emitted descriptor naming it would ask
+// `isValueOfType` a question it has no answer to and quietly claim every value
+// fails it.
+//
+// So this refuses, loudly and at compile time, rather than emitting it. Nothing
+// a Program can WRITE gets here — the Optimiser stage erases every refinement
+// out of the tree before the Rewriter sees it — which is exactly why this is
+// worth having: it is the assertion that the erasure was complete, and it names
+// the Compiler, not the reader, when it is not.
+function typeDescriptorExpression(
+	type: common.Type,
+	where: string,
+): estree.ObjectExpression {
+	if (typeContainsRefinement(type)) {
+		throw new Error(
+			`Internal Compiler Error: a checked refinement reached ${where} — refinements are erased in the Optimiser stage and can not be emitted.`,
+		)
+	}
+
+	return convertObjectToObjectExpression(type)
 }
 // #endregion
