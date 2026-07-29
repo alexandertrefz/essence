@@ -844,6 +844,70 @@ const shadowedAnswerNames = `implementation {
 	__print(answerF)
 }`
 
+// NOTE: A Match written for its effects whose Handler answers a call that only
+// LOOKS like arithmetic — the `Integer` it is answered by is the Program's own,
+// and it prints. Whether `"the shadow ran"` is printed is the whole of the
+// difference between a Handler whose Return may be dropped and one whose may
+// not.
+const shadowedDiscardedAnswer = `implementation {
+	§§ Runs a Match for its effects, and answers nothing much.
+	§§
+	§§ @returns — zero.
+	function trick() -> Integer {
+		§§ Not the standard library's.
+		namespace Integer for Integer {
+			§§ Nine, whatever it is given.
+			§§
+			§§ @param other — ignored
+			§§ @returns — nine.
+			add(_ other: Integer) -> Integer {
+				__print("the shadow ran")
+
+				<- 9
+			}
+		}
+
+		constant scrutinee: Integer | String = 5
+
+		match scrutinee -> Integer {
+			case Integer { <- 1::add(2) }
+			case String { <- 0 }
+		}
+
+		<- 0
+	}
+
+	__print(trick())
+}`
+
+// NOTE: The same shadow, standing where a Constant nobody reads is bound to it.
+// Dropping the Declaration would drop the only thing the call does.
+const shadowedDeadCode = `implementation {
+	§§ Binds a name nothing reads, and answers zero.
+	§§
+	§§ @returns — zero.
+	function trick() -> Integer {
+		§§ Not the standard library's.
+		namespace Integer for Integer {
+			§§ Nine, whatever it is given.
+			§§
+			§§ @param other — ignored
+			§§ @returns — nine.
+			add(_ other: Integer) -> Integer {
+				__print("the shadow ran")
+
+				<- 9
+			}
+		}
+
+		constant unread = 1::add(2)
+
+		<- 0
+	}
+
+	__print(trick())
+}`
+
 // NOTE: A compiled Union dispatch that HOLDS operands, in each Statement
 // position the wrapper can be taken off in — a Return, a Declaration and a
 // Statement written for its effects — beside `either::tagged(with flip())`,
@@ -2695,6 +2759,16 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("$discarded")
 		})
 
+		it("keeps the answer of a Handler answered by a Namespace the Program declares", async () => {
+			// NOTE: Whether answering can be OBSERVED is the question, and a
+			// Namespace named after a builtin answers it: `1::add(2)` under one
+			// is a Method the Program wrote, and it prints. Asked of the
+			// Program's own Namespaces rather than of the name alone.
+			let generated = generate(shadowedDiscardedAnswer)
+
+			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "0"])
+		})
+
 		it("breaks out of the chain where a Handler answers early", () => {
 			// NOTE: A Return in the middle of a Handler body says the rest of the
 			// body does not run, which an assignment does not — so the labelled
@@ -3673,6 +3747,17 @@ describe("Optimiser", () => {
 			// same question `lower-scalar-operations` asks of an Argument it
 			// would skip.
 			expect(generate(deadCode)).toContain("const loud = noisy()")
+		})
+
+		it("keeps a Constant answered by a Namespace the Program declares", async () => {
+			// NOTE: The same question, asked of a Program that answers it the
+			// other way: `1::add(2)` under a Namespace named after the builtin
+			// is a Method the Program wrote, and it prints — so the Declaration
+			// nothing reads is the only thing running it, and it stays.
+			let generated = generate(shadowedDeadCode)
+
+			expect(generated).toContain("const unread")
+			expect(await outputOf(generated)).toEqual(['"the shadow ran"', "0"])
 		})
 
 		it("keeps a variable, whatever is done with it", () => {
