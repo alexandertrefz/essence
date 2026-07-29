@@ -13,6 +13,7 @@ import {
 	resolveSpecifier,
 	type SpecifierRejection,
 	type SpecifierResolution,
+	type SpecifierResolver,
 } from "./resolve"
 
 // NOTE: One file, parsed once, named by the one canonical spelling of its path.
@@ -210,6 +211,7 @@ function reportMissingModule(
 function resolveDependencies(
 	module: Module,
 	readModule: (filePath: string) => Module | null,
+	resolveFor: SpecifierResolver,
 ): Array<Module> {
 	let resolutions = new Map<string, SpecifierResolution>()
 	let dependencies: Array<Module> = []
@@ -219,7 +221,7 @@ function resolveDependencies(
 		let resolution = resolutions.get(source.path)
 
 		if (resolution === undefined) {
-			resolution = resolveSpecifier(source.path, module.filePath)
+			resolution = resolveFor(source.path, module.filePath)
 			resolutions.set(source.path, resolution)
 		}
 
@@ -251,9 +253,12 @@ function resolveDependencies(
 // NOTE: Tarjan's algorithm, over the edges each Module resolved. An SCC is only
 // closed once every Module reachable from it has been, so the groups come out
 // dependency-first — which is both the order they have to be enriched in and
-// the order their bodies run in.
+// the order their bodies run in. That holds per root and across roots, so
+// several roots may be given: an entry Program reaches every Module that
+// matters to it, but a collection loaded as a whole — the standard library —
+// has files nothing imports, and visiting only the first would drop them.
 function groupModules(
-	entry: Module,
+	roots: Array<Module>,
 	loaded: Map<string, Module>,
 ): Array<Array<Module>> {
 	let indices = new Map<string, number>()
@@ -324,7 +329,11 @@ function groupModules(
 		}
 	}
 
-	visit(entry)
+	for (let root of roots) {
+		if (!indices.has(root.filePath)) {
+			visit(root)
+		}
+	}
 
 	return groups
 }
@@ -395,12 +404,31 @@ export function loadModuleGraph(
 		}
 	}
 
-	// NOTE: A work list rather than a recursive descent, so that a Module's
-	// entries are resolved inside its OWN Diagnostic collection. Resolving a
-	// dependency's entries from inside its importer's collection would nest the
-	// two, and per-Module collection is what keeps two Modules' identical errors
-	// from deduplicating against each other.
-	let pending = [entryModule]
+	resolveAll([entryModule], readModule, resolveSpecifier)
+
+	let groups = groupModules([entryModule], loaded)
+
+	return {
+		entryPath: entry,
+		modules: new Map(
+			groups.flat().map((module) => [module.filePath, module]),
+		),
+		groups,
+		diagnostics: [],
+	}
+}
+
+// NOTE: A work list rather than a recursive descent, so that a Module's entries
+// are resolved inside its OWN Diagnostic collection. Resolving a dependency's
+// entries from inside its importer's collection would nest the two, and
+// per-Module collection is what keeps two Modules' identical errors from
+// deduplicating against each other.
+function resolveAll(
+	roots: Array<Module>,
+	readModule: (filePath: string) => Module | null,
+	resolveFor: SpecifierResolver,
+): void {
+	let pending = [...roots]
 	let resolved = new Set<string>()
 
 	while (pending.length > 0) {
@@ -413,18 +441,53 @@ export function loadModuleGraph(
 		resolved.add(module.filePath)
 
 		let { result, diagnostics } = collectDiagnostics(() =>
-			resolveDependencies(module, readModule),
+			resolveDependencies(module, readModule, resolveFor),
 		)
 
 		module.dependencies = result.map((dependency) => dependency.filePath)
 		module.diagnostics.push(...diagnostics)
 		pending.push(...result)
 	}
+}
 
-	let groups = groupModules(entryModule, loaded)
+// NOTE: A graph over Programs that are already parsed and already in memory,
+// with a resolver of the caller's choosing — the standard library, which is read
+// and parsed by its own package before the Compiler ever sees it, resolves a
+// specifier against that set by name rather than against the file system.
+// EVERY entry is a root: a collection loaded as a whole has files nothing
+// imports, and `Print.es` is exactly that. Nothing reaches it, so a graph rooted
+// at one entry would leave `__print` out of the language.
+export function loadModuleGraphOver(
+	entries: Array<{
+		filePath: string
+		sourceText: string
+		program: parser.Program
+		diagnostics: Array<common.Diagnostic>
+	}>,
+	resolveFor: SpecifierResolver,
+): ModuleGraph {
+	let loaded = new Map<string, Module>(
+		entries.map((entry) => [
+			entry.filePath,
+			{
+				filePath: entry.filePath,
+				sourceText: entry.sourceText,
+				program: entry.program,
+				diagnostics: [...entry.diagnostics],
+				dependencies: [],
+				resolutions: new Map(),
+			},
+		]),
+	)
+
+	let roots = entries.map((entry) => loaded.get(entry.filePath)!)
+
+	resolveAll(roots, (filePath) => loaded.get(filePath) ?? null, resolveFor)
+
+	let groups = groupModules(roots, loaded)
 
 	return {
-		entryPath: entry,
+		entryPath: roots[0]?.filePath ?? "",
 		modules: new Map(
 			groups.flat().map((module) => [module.filePath, module]),
 		),

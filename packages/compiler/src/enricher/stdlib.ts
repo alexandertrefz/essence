@@ -2,13 +2,76 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 import { readStdlibFiles } from "@essence-lang/stdlib"
 
 import { renderDiagnostics } from "../diagnostics/render"
+import {
+	linkModuleGraph,
+	loadModuleGraphOver,
+	type SpecifierResolver,
+} from "../modules/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
-import { builtinMemberOrder, builtinTypeOrder } from "./builtins"
-import { enrichPrograms } from "./index"
+import {
+	builtinMemberOrder,
+	builtinProtocolOrder,
+	builtinTypeOrder,
+} from "./builtins"
 import { primitiveTypes } from "./primitives"
 import { nativeMethodEntries } from "./resolvers"
 import { scopeMap } from "./scope"
+
+// NOTE: The last segment of a path, for both spellings a source arrives under —
+// an absolute path from the standard library's own package, and a bare file name
+// from a test that wrote its library inline. A specifier names a sibling, so the
+// segment is the whole of the identity a specifier has to match.
+function basenameOf(filePath: string): string {
+	return filePath.slice(filePath.lastIndexOf("/") + 1)
+}
+
+// NOTE: A standard library file that writes no `export { … }` block offers
+// everything it declares. The builtin tables are built from the export SURFACES,
+// and a surface forwards only what its block lists — so without this a file with
+// no block would contribute nothing and the name would simply not exist in the
+// language. Writing the block out is what a source SHOULD do, and every file in
+// `packages/stdlib/sources` does; this is what keeps a library assembled in a
+// test from having to, and what makes the rule "everything declared is a
+// builtin" hold whether or not the block was written.
+function exportingEverything(program: parser.Program): parser.Program {
+	if (program.exports !== null) {
+		return program
+	}
+
+	let entries: Array<parser.ExportNode> = []
+
+	for (let node of program.implementation.nodes) {
+		switch (node.nodeType) {
+			case "TypeAliasStatement":
+			case "ChoiceDeclarationStatement":
+			case "ProtocolDeclarationStatement":
+			case "NamespaceDefinitionStatement":
+			case "FunctionStatement":
+			case "NativeFunctionStatement":
+			case "OverloadedFunctionStatement":
+				entries.push({
+					nodeType: "Export",
+					name: node.name,
+					alias: null,
+					source: null,
+					position: node.name.position,
+				})
+				break
+			default:
+				break
+		}
+	}
+
+	return {
+		...program,
+		exports: {
+			nodeType: "ExportSection",
+			entries,
+			position: program.implementation.position,
+		},
+	}
+}
 
 // NOTE: Which entries of a Namespace member are bound to the runtime rather
 // than implemented in Essence. Methods carry ONE FLAG PER OVERLOAD, in written
@@ -109,18 +172,22 @@ function throwRenderedDiagnostics(
 
 // NOTE: Runs `check` over every source and throws once if any of them failed,
 // so one broken file can not mask another.
+// NOTE: `check` is handed the source and nothing else, deliberately. It used to
+// take the position too, and every caller used it to index a parallel Array —
+// which stops being the same file the moment the stages answer in an order of
+// their own.
 function throwOnAnyDiagnostics(
 	stage: string,
 	sources: Array<StdlibSource>,
-	check: (source: StdlibSource, index: number) => Array<common.Diagnostic>,
+	check: (source: StdlibSource) => Array<common.Diagnostic>,
 ): void {
 	let failures: Array<{
 		source: StdlibSource
 		diagnostics: Array<common.Diagnostic>
 	}> = []
 
-	sources.forEach((source, index) => {
-		let diagnostics = check(source, index)
+	sources.forEach((source) => {
+		let diagnostics = check(source)
 
 		if (diagnostics.length > 0) {
 			failures.push({ source, diagnostics })
@@ -187,11 +254,11 @@ export function declaredNames(programs: Array<parser.Program>): {
 // Namespace search. Sorting the finished table against `builtinMemberOrder`
 // makes the position a property of the name. Anything unlisted keeps its
 // insertion order, after the listed ones.
-function inBuiltinOrder(
-	members: Record<string, common.Type>,
+function inBuiltinOrder<Entry>(
+	members: Record<string, Entry>,
 	order: Array<string>,
-): Record<string, common.Type> {
-	let ordered: Record<string, common.Type> = {}
+): Record<string, Entry> {
+	let ordered: Record<string, Entry> = {}
 
 	for (let name of order) {
 		if (Object.hasOwn(members, name)) {
@@ -392,8 +459,6 @@ export function loadStdlibFrom(
 	// It costs one thing, stated here rather than left to be discovered: a
 	// standard library file writing `type Integer = …` now shadows the tag
 	// silently instead of reporting `duplicate-type`. No file does.
-	let members: Record<string, common.Type> = scopeMap()
-
 	let primitiveScope: enricher.Scope = {
 		parent: null,
 		members: scopeMap(),
@@ -403,29 +468,94 @@ export function loadStdlibFrom(
 		protocols: scopeMap(),
 	}
 
-	let scope: enricher.Scope = {
-		parent: primitiveScope,
-		members,
-		// NOTE: As in a user Program's top level Scope — what is already in
-		// scope before the first line has no Position to point a Diagnostic at.
-		declarations: scopeMap(),
-		constants: new Set(Object.keys(members)),
-		types: scopeMap(),
-		protocols: scopeMap(),
+	// NOTE: Resolved against the sources handed in rather than against the file
+	// system. They are already read and already parsed — the standard library's
+	// own package does that — and a test drives this with sources that have no
+	// directory to be relative to. `resolveSpecifier` is deliberately not used:
+	// it canonicalises through the file system, and it REFUSES a specifier that
+	// lands inside the standard library, which is the rule that keeps a user
+	// Program from importing one of these files.
+	let byBasename = new Map(
+		sources.map((source) => [basenameOf(source.fileName), source.fileName]),
+	)
+
+	let resolveFor: SpecifierResolver = (specifier) => {
+		if (!specifier.startsWith("./")) {
+			return { kind: "rejected", reason: "not-relative" }
+		}
+
+		if (!specifier.endsWith(".es")) {
+			return { kind: "rejected", reason: "missing-extension" }
+		}
+
+		// NOTE: An unknown name resolves to the text as written, so the graph
+		// answers `module-not-found` against the specifier the author typed
+		// rather than this returning a rejection reason that means something
+		// else.
+		return {
+			kind: "module",
+			filePath: byBasename.get(specifier.slice(2)) ?? specifier,
+		}
 	}
 
 	let enrichStarted = performance.now()
-	// NOTE: The same Scope for every file — the standard library is one shared
-	// declaration space, and its sources are not Modules.
-	let enriched = enrichPrograms(
-		programs.map((program) => ({ program, scope })),
+
+	// NOTE: One Scope per file, seeded by what that file imports — the standard
+	// library is a graph of Modules like any other, and its files say what they
+	// use. Two things differ from a user Program's Scope, and both are why this
+	// hands one in rather than letting `linkGroup` build it. It carries no
+	// `modulePath`, because that is what would name a Choice
+	// `<modulePath>#<Name>`, and a builtin Choice is named by its bare name —
+	// `Side#Start` and `Step#Done` are what the runtime switches on. And it does
+	// not start from `builtinMembers()`: the standard library IS the builtins,
+	// and asking for them from inside the load that produces them would not
+	// terminate.
+	let graph = loadModuleGraphOver(
+		sources.map((source) => ({
+			filePath: source.fileName,
+			sourceText: source.sourceText,
+			program: exportingEverything(source.program),
+			diagnostics: [],
+		})),
+		resolveFor,
 	)
+
+	let linked = linkModuleGraph(graph, {
+		scopeFor: () => ({
+			parent: primitiveScope,
+			members: scopeMap(),
+			declarations: scopeMap(),
+			constants: new Set(),
+			types: scopeMap(),
+			protocols: scopeMap(),
+		}),
+	})
+
 	let enrichDuration = performance.now() - enrichStarted
+
+	// NOTE: Keyed by PATH, never by position. Linking answers in dependency-first
+	// group order while `sources` is in filename order, so pairing the two by
+	// index would render one file's Diagnostic against another file's text,
+	// under that file's name, underlining a line that is fine — and it would not
+	// throw, because the renderer clamps a Position that points past the end.
+	let byPath = new Map(
+		sources.map((source) => {
+			let module = linked.modules.get(source.fileName)
+
+			if (module === undefined) {
+				throw new Error(
+					`The standard library file '${source.fileName}' was not linked — the Module graph reached ${linked.modules.size} of ${sources.length} sources`,
+				)
+			}
+
+			return [source.fileName, module]
+		}),
+	)
 
 	throwOnAnyDiagnostics(
 		"enrich",
 		sources,
-		(_source, index) => enriched[index]!.diagnostics,
+		(source) => byPath.get(source.fileName)!.diagnostics,
 	)
 
 	// NOTE: The Validator runs over the standard library too. It is the stage
@@ -433,19 +563,51 @@ export function loadStdlibFrom(
 	// declaration file is exactly as capable of those as a user Program is.
 	let validateStarted = performance.now()
 
-	throwOnAnyDiagnostics("validate", sources, (_source, index) =>
-		validate(enriched[index]!.program),
+	throwOnAnyDiagnostics("validate", sources, (source) =>
+		validate(byPath.get(source.fileName)!.program),
 	)
 
 	let validateDuration = performance.now() - validateStarted
 
-	let orderedMembers = inBuiltinOrder(scope.members, builtinMemberOrder)
+	// NOTE: Built from the EXPORT SURFACES rather than by merging the per-file
+	// Scopes. A surface forwards only what its own file declared, read straight
+	// out of that file's Scope — so every entry is the declaring file's original
+	// object. A Scope also holds what the file IMPORTED, and an imported
+	// Namespace is a shallow copy rebranded with the local name, while an entry
+	// that could not be bound is an Error Type. Merging Scopes would put both
+	// into the builtin tables.
+	//
+	// In filename order, which is the order the sources arrive in and the order
+	// the tables were built in before Modules. `inBuiltinOrder` below is what
+	// actually decides the order either way; this only decides the tail it
+	// appends, for a name no order list mentions.
+	let ordered = sources.map((source) => byPath.get(source.fileName)!)
+
+	let unionScope: enricher.Scope = {
+		parent: primitiveScope,
+		members: Object.assign(
+			scopeMap(),
+			...ordered.map((module) => module.surface.values),
+		),
+		declarations: scopeMap(),
+		constants: new Set(),
+		types: Object.assign(
+			scopeMap(),
+			...ordered.map((module) => module.surface.types),
+		),
+		protocols: Object.assign(
+			scopeMap(),
+			...ordered.map((module) => module.surface.protocols),
+		),
+	}
+
+	let orderedMembers = inBuiltinOrder(unionScope.members, builtinMemberOrder)
 
 	let namespaces = Object.values(orderedMembers).filter(
 		(member): member is common.NamespaceType => member.type === "Namespace",
 	)
 
-	stripDeclaredDocumentationPositions(scope, declared)
+	stripDeclaredDocumentationPositions(unionScope, declared)
 
 	return {
 		members: orderedMembers,
@@ -455,12 +617,22 @@ export function loadStdlibFrom(
 		// Program has to find `Integer` the Type in `builtinTypes()`; only the
 		// standard library's own files needed the tags held one Scope out.
 		types: inBuiltinOrder(
-			scopeMap({ ...primitiveTypes, ...scope.types }),
+			scopeMap({ ...primitiveTypes, ...unionScope.types }),
 			builtinTypeOrder,
 		),
-		protocols: scope.protocols,
+		protocols: inBuiltinOrder(unionScope.protocols, builtinProtocolOrder),
 		namespaces,
-		typedPrograms: enriched.map((result) => result.program),
+		// NOTE: In the order the sources arrived, not the order they linked, so
+		// that `typedPrograms[i]` still answers for `sources[i]` — the Rewriter's
+		// free-Function binding order and every test that reaches for the first
+		// Program depend on it. The sections are dropped: they were read, they
+		// are how the Scopes above were seeded, and the standard library reaches
+		// a Program as builtins rather than as anything importable.
+		typedPrograms: ordered.map((module) => ({
+			...module.program,
+			imports: null,
+			exports: null,
+		})),
 		nativeBindings: collectNativeBindings(programs),
 		functionBindings: collectFunctionBindings(programs),
 		timing: {

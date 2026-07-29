@@ -23,6 +23,16 @@ export type SpecifierResolution =
 	| { kind: "module"; filePath: string }
 	| { kind: "rejected"; reason: SpecifierRejection }
 
+// NOTE: How a specifier becomes a path, as a parameter. `resolveSpecifier` below
+// is the one every user Program is built with; the standard library hands in its
+// own, because its sources are already parsed and in memory and it must resolve
+// against that set rather than against the file system — and because the rule
+// below deliberately refuses a specifier that lands inside it.
+export type SpecifierResolver = (
+	specifier: string,
+	importerPath: string,
+) => SpecifierResolution
+
 // NOTE: The one spelling of a path every other spelling of it agrees with is
 // what makes one file one Module, so it is answered by `documents.ts` rather
 // than by a rule of this stage's own: two paths for one file would be two
