@@ -285,6 +285,21 @@ const constructions = `implementation {
 	})
 }`
 
+// NOTE: The witnesses a CONDITIONAL conformance is built from — `List` is
+// Comparable where its Item is, so sorting a List of Lists curries a witness
+// onto a witness, and sorting a List of Lists of Lists curries that onto
+// another. Two things are asked of this Program: that the
+// `boundConformance(…)` call is itself pooled, and — the one that decides
+// whether it may be — that the two depths are told APART. They are spelled
+// alike down to the last character apart from which witness is curried onto
+// them, so a constant answering for both would sort the deeper Lists by the
+// shallower one's comparison, which is a wrong ANSWER rather than a slower one.
+const conditionalConformances = `implementation {
+	__print([[3], [1, 2]]::sort())
+	__print([[[2]], [[1]]]::sort())
+	__print([1, 2]::compare(to [1, 2, 3])::toString())
+}`
+
 // NOTE: A Combination whose right-hand side is a literal, one whose right-hand
 // side is a Record the Program is holding, one member overridden and both — the
 // shapes `collapse-combinations` rewrites. A right-hand side may only be a
@@ -1133,6 +1148,44 @@ describe("Optimiser", () => {
 			)
 		})
 
+		it("pools the call a conditional witness is bound by", () => {
+			// NOTE: `boundConformance` curries witnesses onto Methods and reads
+			// nothing else, so the call is as constant as the map it is given —
+			// and it was being made at every site and on every turn of the loop
+			// that reached one.
+			expect(generate(conditionalConformances)).toMatch(
+				/const \$pool_\d+ = \$type\.boundConformance\(\{ compare: List\.compare \}, \[\$pool_\d+\]\);/,
+			)
+		})
+
+		it("tells two depths of curried witness apart", () => {
+			// NOTE: The witness for a List of Lists and the witness for a List of
+			// Lists of Lists are the same map with a different witness curried
+			// onto it. Two constants, and the deeper one reads the shallower.
+			let declarations = [
+				...generate(conditionalConformances).matchAll(
+					/const (\$pool_\d+) = \$type\.boundConformance\(\{ compare: List\.compare \}, \[(\$pool_\d+)\]\);/g,
+				),
+			]
+
+			expect(declarations).toHaveLength(2)
+
+			let [shallower, deeper] = declarations
+
+			expect(deeper![2]).toEqual(shallower![1]!)
+		})
+
+		it("sorts by the witness each depth was given", async () => {
+			// NOTE: What a shared constant would answer instead: the inner Lists
+			// compared by the comparison written for their items, which orders
+			// `[[[2]], [[1]]]` the wrong way round.
+			expect(await outputOf(generate(conditionalConformances))).toEqual([
+				"[ [ 1, 2 ], [ 3 ] ]",
+				"[ [ [ 1 ] ], [ [ 2 ] ] ]",
+				'"Less"',
+			])
+		})
+
 		it("leaves a witness naming a Namespace the Program declares", () => {
 			// NOTE: `class Boxes` is emitted below the band and a class is not
 			// hoisted, so a const reading one would be a `ReferenceError` at
@@ -1221,6 +1274,10 @@ describe("Optimiser", () => {
 			await expectSamePrintedOutput(
 				"pool-constants",
 				readFileSync(fixturePath("Interpolation.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"pool-constants",
+				readFileSync(fixturePath("ConditionalConformance.es"), "utf8"),
 			)
 		})
 

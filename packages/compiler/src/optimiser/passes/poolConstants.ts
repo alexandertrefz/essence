@@ -126,57 +126,81 @@ function poolKeyOf(
 // bound by an `import * as` before any Statement runs, or the fabricated
 // Namespace a Choice's derived equality names, which is emitted as a read off
 // the runtime helpers.
+//
+// NOTE: The key and the refusals are ONE function on purpose. They answer the
+// same question — what of this witness reaches the emitted JavaScript — and two
+// functions answering it separately is how a witness gets pooled under a key
+// that does not say which witness it is.
 function conformanceKeyOf(
 	node: common.typedSimple.ConformanceValueNode,
 	declaredNamespaces: ReadonlySet<string>,
 ): string | null {
-	if (!isPoolableConformance(node, declaredNamespaces)) {
-		return null
-	}
-
-	return `conformance:${JSON.stringify(conformanceShapeOf(node))}`
-}
-
-function isPoolableConformance(
-	node: common.typedSimple.ConformanceValueNode,
-	declaredNamespaces: ReadonlySet<string>,
-): boolean {
 	if (
 		node.namespaceName !== derivedEquatableNamespaceName &&
 		!runtimeNamespaces.has(node.namespaceName)
 	) {
-		return false
+		return null
 	}
 
 	if (declaredNamespaces.has(node.namespaceName)) {
-		return false
+		return null
 	}
 
-	return node.conditions.every(
-		(condition) =>
-			condition.nodeType === "ConformanceValue" &&
-			isPoolableConformance(condition, declaredNamespaces),
-	)
-}
+	let conditions: Array<string> = []
 
-// NOTE: Everything about a witness that reaches the emitted JavaScript, and
-// nothing else — the Namespace, the map, the plan a generic Choice's equality
-// follows, and the conditions curried onto it, each read the same way. The
-// witness's `type` is left out: it is what the Compiler called the conformance,
-// and two witnesses spelled alike emit alike whatever it says.
-function conformanceShapeOf(
-	node: common.typedSimple.ConformanceValueNode,
-): unknown {
-	return {
+	for (let condition of node.conditions) {
+		let key = conditionKeyOf(condition, declaredNamespaces)
+
+		if (key === null) {
+			return null
+		}
+
+		conditions.push(key)
+	}
+
+	// NOTE: Everything about a witness that reaches the emitted JavaScript, and
+	// nothing else — the Namespace, the map, the plan a generic Choice's
+	// equality follows, and the KEY of each condition curried onto it. The
+	// conditions are read as keys rather than as Namespaces because that is the
+	// whole of what tells two curried witnesses apart: sorting a
+	// `List<List<Box>>` and sorting a `List<Box>` both build
+	// `{ compare: List.compare }` and differ in nothing but which witness is
+	// curried onto it, so a key that dropped the difference would declare one
+	// const, hand it to both, and compare the deeper Lists by the shallower
+	// one's comparison. The witness's `type` is left out: it is what the
+	// Compiler called the conformance, and two witnesses spelled alike emit
+	// alike whatever it says.
+	return `conformance:${JSON.stringify({
 		namespace: node.namespaceName,
 		methods: node.methodMap,
 		descriptor: node.derivedDescriptor ?? null,
-		conditions: node.conditions.map((condition) =>
-			condition.nodeType === "ConformanceValue"
-				? conformanceShapeOf(condition)
-				: null,
-		),
+		conditions,
+	})}`
+}
+
+// NOTE: The walk is BOTTOM-UP, so a condition that CAN be pooled already IS by
+// the time the witness carrying it is offered: what stands in that position is
+// a `pooled-reference`, and its `key` is exactly the identity of the constant
+// the band will declare for it — which is what makes it the right thing to key
+// the witness above it by, and what makes the `boundConformance(…)` call
+// itself, curried onto a name the band declares above it, a constant like any
+// other. A witness refused for its Namespace is still a `ConformanceValue` and
+// is asked again here, reaching the same refusal; an Identifier is a
+// `parameter`-sourced condition, which is not a constant at all.
+function conditionKeyOf(
+	condition: common.typedSimple.ExpressionNode,
+	declaredNamespaces: ReadonlySet<string>,
+): string | null {
+	if (
+		condition.nodeType === "Intrinsic" &&
+		condition.kind === "pooled-reference"
+	) {
+		return condition.key
 	}
+
+	return condition.nodeType === "ConformanceValue"
+		? conformanceKeyOf(condition, declaredNamespaces)
+		: null
 }
 
 const runtimeNamespaces = new Set<string>(runtimeNamespaceNames)
