@@ -179,6 +179,11 @@ const typeTests = `implementation {
 // conformance witness the standard library answers for, and a witness for a
 // Namespace this Program DECLARES, which is the one that must stay where it was
 // written. The Boolean is here to be left alone.
+//
+// NOTE: The witness that gets pooled is the one `sort` is PASSED, rather than
+// the one an interpolated hole reads: a hole's witness is consumed on the spot
+// and `devirtualise-witnesses` takes it away before the pool sees it, which is
+// the coordination between the two written as a Program.
 const constants = `implementation {
 	type Box = { value: Integer }
 
@@ -203,6 +208,7 @@ const constants = `implementation {
 	__print(chosen::is(#Red))
 	__print(true)
 	__print("a count: {7}")
+	__print([2, 1]::sort())
 	__print(boxes::sort())
 	__print(match shape -> String {
 		case String            { <- "text" }
@@ -293,6 +299,42 @@ const scalarOperations = `implementation {
 
 	__print(a::isLessThan(1/2))
 	__print(a::add(1/2))
+}`
+
+// NOTE: A witness of each kind a hole can be given — a standard library
+// Namespace's, a Namespace this Program DECLARES, and a CONDITIONAL one, which
+// is the one that must stay an object because the Function behind its Method is
+// curried rather than named. The `sort` at the end is the other half of the
+// division of labour: its witness is HANDED to it, so it is `pool-constants`'
+// to build once.
+const witnesses = `implementation {
+	type Box = { size: Integer }
+
+	namespace Boxes for Box is Printable, is Comparable {
+		§§ Renders the Box as a String.
+		§§
+		§§ @returns — the Box, written out.
+		toString() -> String {
+			<- "a box of {@.size}"
+		}
+
+		§§ Compares two Boxes by the size each holds.
+		§§
+		§§ @param other — the Box to compare with
+		§§ @returns — how this Box orders against it.
+		compare(to other: Box) -> Ordering {
+			<- @.size::compare(to other.size)
+		}
+	}
+
+	constant count = 3
+	constant box: Box = { size = 3 }
+	constant nested: List<Integer> = [1, 2]
+
+	__print("you have {count} left")
+	__print("{box}")
+	__print("nested: {nested}")
+	__print([2, 1]::sort()::toString())
 }`
 
 // NOTE: Records, Lists, Cases with a payload and without, a payload that is a
@@ -1158,6 +1200,143 @@ describe("Optimiser", () => {
 		})
 	})
 
+	describe("devirtualise-witnesses", () => {
+		it("calls the Method the hole's witness names", () => {
+			let generated = generate(witnesses)
+
+			expect(generated).toContain("Integer.toString(count).value")
+			expect(generated).not.toMatch(/\$pool_\d+\.toString\(count\)/)
+		})
+
+		it("builds no witness for a hole at all", () => {
+			// NOTE: This Program interpolates and passes no witness anywhere,
+			// so the map it used to build is nowhere — pooled or not.
+			expect(
+				generate(`implementation {
+					constant count = 3
+
+					__print("{count}")
+				}`),
+			).not.toContain("toString: Integer.toString")
+		})
+
+		it("reaches a Method a Namespace of the Program's own writes", () => {
+			// NOTE: Through the same reference every other emission site uses,
+			// so a Namespace the Program declares is named as it is named
+			// everywhere else. Nothing MOVES: the call stands where the witness
+			// stood, so a class that is not hoisted is no more of a problem
+			// than it was — which is why this can be taken where
+			// `pool-constants` refuses the same witness.
+			expect(generate(witnesses)).toContain("Boxes.toString(box).value")
+			expect(
+				generate(witnesses, {
+					enabled: true,
+					disabledPasses: new Set(["devirtualise-witnesses"]),
+				}),
+			).toContain("{ toString: Boxes.toString }.toString(box)")
+		})
+
+		it("leaves a conditional conformance's witness alone", () => {
+			// NOTE: `boundConformance` curries witnesses onto every Method in
+			// the map, so what stands behind `toString` is a Function the call
+			// BUILDS. There is no name to put in its place.
+			let generated = generate(witnesses)
+
+			expect(generated).toContain("$type.boundConformance(")
+			expect(generated).toMatch(/\$pool_\d+\.toString\(nested\)/)
+		})
+
+		it("leaves a witness the Program forwards alone", () => {
+			// NOTE: A conformance Argument of the enclosing Function is a
+			// different value per call, and which Method it holds is the
+			// caller's business. The hole INSIDE `show` therefore keeps its
+			// property read; the hole at the call site, whose witness the
+			// Compiler wrote, does not — and asking both in one Program is what
+			// makes this a question about the refusal rather than a question
+			// about whether the pass ran.
+			let generated = generate(`implementation {
+				§§ Renders whatever it is given.
+				§§
+				§§ @param item — the value to render
+				§§ @returns — the value as a String.
+				function show<infer Item is Printable>(
+					_ item: Item,
+				) -> String {
+					<- "it is {item}"
+				}
+
+				constant count = 3
+
+				__print(show(count))
+				__print("and {count}")
+			}`)
+
+			expect(generated).toContain("Item__conformance.toString(item)")
+			expect(generated).toContain("Integer.toString(count).value")
+		})
+
+		it("leaves the witnesses that are passed to the pool", () => {
+			// NOTE: The two passes divide the witnesses between them rather
+			// than competing for one: `sort` is HANDED its witness, so the
+			// object has to exist and the pool builds it once.
+			let generated = generate(witnesses)
+
+			expect(generated).toMatch(
+				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
+			)
+		})
+
+		it("builds the witness again when it is turned off", () => {
+			expect(
+				generate(witnesses, {
+					enabled: true,
+					disabledPasses: new Set(["devirtualise-witnesses"]),
+				}),
+			).toMatch(/\$pool_\d+\.toString\(count\)/)
+		})
+
+		it("devirtualises with the pool turned off", () => {
+			// NOTE: Neither pass depends on the other having run. With the pool
+			// off there is no const to read the witness out of, and the hole
+			// still calls the Method directly.
+			expect(
+				generate(witnesses, {
+					enabled: true,
+					disabledPasses: new Set(["pool-constants"]),
+				}),
+			).toContain("Integer.toString(count).value")
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"devirtualise-witnesses",
+					witnesses,
+				),
+			).toEqual([
+				'"you have 3 left"',
+				'"a box of 3"',
+				'"nested: [ 1, 2 ]"',
+				'"[ 1, 2 ]"',
+			])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"devirtualise-witnesses",
+				readFileSync(fixturePath("Interpolation.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"devirtualise-witnesses",
+				readFileSync(fixturePath("ConditionalConformance.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"devirtualise-witnesses",
+				readFileSync(fixturePath("Protocols.es"), "utf8"),
+			)
+		})
+	})
+
 	describe("elide-final-match-test", () => {
 		it("emits the last Handler as the else of the chain", () => {
 			let generated = generate(typeTests)
@@ -1444,7 +1623,7 @@ describe("Optimiser", () => {
 
 		it("pools a conformance witness", () => {
 			expect(generate(constants)).toMatch(
-				/const \$pool_\d+ = \{ toString: Integer\.toString \}/,
+				/const \$pool_\d+ = \{ compare: Integer\.compare \}/,
 			)
 		})
 
@@ -1545,7 +1724,7 @@ describe("Optimiser", () => {
 
 			expect(generated).not.toContain("$pool_")
 			expect(generated).toContain("Integer.createInteger(1n)")
-			expect(generated).toContain("{ toString: Integer.toString }")
+			expect(generated).toContain("{ compare: Integer.compare }")
 		})
 
 		it("prints the same thing with the pass off", async () => {
@@ -1557,6 +1736,7 @@ describe("Optimiser", () => {
 				"true",
 				"true",
 				'"a count: 7"',
+				"[ 1, 2 ]",
 				"[ { value = 1 }, { value = 3 } ]",
 				'"a Record"',
 			])

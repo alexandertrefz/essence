@@ -186,6 +186,48 @@ Boolean.trueInstance : Boolean.falseInstance).value`. A condition is a Statement
 question rather than an Expression's, and lowering Statements is
 `lower-matches-to-statements`' half of the work.
 
+### `devirtualise-witnesses`
+
+Calls the Method a witness names, rather than the witness.
+
+A conformance witness is a method map — `{ toString: Integer.toString }` —
+built so that a Function bounded by a Protocol can be handed one and read
+whichever Method it needs off it. At a site that reads exactly ONE of them, and
+reads it right there, the map is a detour, because the Compiler already knows
+which Function it would find:
+
+```js
+"You have " + Integer.toString(count).value + " left."
+```
+
+That site is the hole of an interpolated String, and today it is the only one.
+Every other witness the Compiler emits is passed as an ARGUMENT, where the
+callee is what decides which Method to read and the object has to exist —
+`pool-constants` is what makes those cheap, by building each one once. So the
+two passes never contend for the same value: this one runs first and takes the
+witnesses that are consumed on the spot, the pool takes what is left, and
+turning either off leaves the other answering exactly as it did.
+
+Safe because the map's members are references to Methods and nothing else. The
+call `witness.toString(x)` finds `Integer.toString` and calls it with `x`, and
+`Integer.toString(x)` calls the same Function with the same Argument.
+
+A CONDITIONAL conformance is left alone, and the refusal is the whole of what
+makes the rest safe: such a witness is `boundConformance(<map>, [<witnesses>])`,
+which curries its own witnesses onto every Method in the map, so the Function
+behind `toString` is one the call BUILDS rather than one the Program declares —
+there is no name to put in its place. So is a witness forwarded from an
+enclosing Function's own conformance Argument: that is a different value per
+call and the Compiler does not know which Method it will find.
+
+**What it is worth, honestly: not much time.** The hole was already reading one
+property off an object the pool had built once, and a property read is not what
+a Program spends its time on. What it takes away is the object — a Program that
+interpolates and passes no witness anywhere stops building one at all — and one
+step of indirection that an engine's inline caches otherwise have to keep track
+of. It is measured in bytes and in directness rather than in nanoseconds, and it
+is a pass because it is a transform, not because it is a lever.
+
 ### `elide-final-match-test`
 
 Emits the last Handler of a Match as the `else` of the chain.

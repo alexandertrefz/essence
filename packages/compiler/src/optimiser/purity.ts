@@ -105,7 +105,10 @@ function isPureIntrinsic(node: common.typedSimple.IntrinsicNode): boolean {
 				isPureExpression(node.value) &&
 				isPureExpression(node.descriptor)
 			)
+		// NOTE: A descriptor is data, and a `direct-method` is a reference to a
+		// Function rather than a call of one.
 		case "type-descriptor":
+		case "direct-method":
 			return true
 		case "raw-boolean-op":
 			return (

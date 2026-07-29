@@ -351,6 +351,7 @@ export type IntrinsicNode =
 	| RawCompareNode
 	| RawEqualsNode
 	| RawArithmeticNode
+	| DirectMethodNode
 	| DirectRecordNode
 	| DirectCaseNode
 	| DirectListNode
@@ -525,6 +526,30 @@ export interface RawArithmeticNode {
 	left: ExpressionNode
 	right: ExpressionNode
 	type: IntegerType
+	position?: Position
+}
+
+// NOTE: The Function ONE Method of a conformance witness resolves to, standing
+// where the witness stood — `Integer.toString` in place of
+// `{ toString: Integer.toString }`, at a site that was only ever going to read
+// `toString` off it and call it.
+//
+// NOTE: It is not a witness and not an Essence value: it is a Function
+// reference, so only an emission site that CALLS exactly one Method of the
+// witness it replaces may hold one. An interpolated String's hole is such a
+// site; a witness passed as an Argument is not, because the callee decides
+// which of its Methods to read.
+export interface DirectMethodNode {
+	nodeType: "Intrinsic"
+	kind: "direct-method"
+	namespaceName: string
+	memberName: string
+	// NOTE: Carried so that this emits exactly what the witness would have
+	// emitted for the same member — a *generic* Choice's derived Equatable
+	// widens to the descriptor-driven helper, and the one function that decides
+	// that is the one this is emitted through.
+	derivedDescriptor?: DerivedEquatableDescriptor
+	type: Type
 	position?: Position
 }
 
