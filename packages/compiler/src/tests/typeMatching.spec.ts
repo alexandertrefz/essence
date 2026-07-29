@@ -3,7 +3,13 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 
 import { enrich } from "../enricher/index"
-import { describeType, matchesType } from "../helpers/index"
+import {
+	buildUnion,
+	createInferenceContext,
+	describeType,
+	matchesType,
+	matchesTypeWithBindings,
+} from "../helpers/index"
 import { parse } from "../parser/index"
 import { printCaseWithPayload, printType } from "../printType"
 import { validate } from "../validator/index"
@@ -596,6 +602,191 @@ describe("Type matching", () => {
 				"Case 'Result#Ok' has no member 'absent'",
 			)
 			expect(errors[0].notes).toEqual(["Case 'Result#Ok' has 'value'."])
+		})
+	})
+
+	// NOTE: Checked refinements have no syntax yet, so these build the Types
+	// directly — which is also the only way to state the rules on their own,
+	// away from whatever a Declaration will decide about them.
+	//
+	// NOTE: The direction is the whole of it. A refinement flows into its base
+	// for free, because forgetting evidence loses nothing; the base does NOT
+	// flow into the refinement, because that is the mistake the Type exists to
+	// name. Everything else here follows from those two, including the union
+	// collapse — which is not a rule of its own but what `buildUnion`'s
+	// subsumption order already does once assignability answers this way.
+	describe("Checked refinements", () => {
+		const integer: common.Type = { type: "Integer" }
+		const string: common.Type = { type: "String" }
+
+		function conjunct(
+			methodName: string,
+			args: Array<string | boolean> = [],
+			namespaceName: string = "Integer",
+		): common.PredicateConjunct {
+			return { namespaceName, methodName, overloadIndex: null, args }
+		}
+
+		function refinement(
+			name: string,
+			base: common.Type,
+			conjuncts: Array<common.PredicateConjunct>,
+		): common.Type {
+			return { type: "Refinement", name, base, conjuncts }
+		}
+
+		const nonZero = refinement("NonZeroInteger", integer, [
+			conjunct("isNot", ["0"]),
+		])
+		const positiveNonZero = refinement("PositiveNonZeroInteger", integer, [
+			conjunct("isNot", ["0"]),
+			conjunct("isPositive"),
+		])
+		const nonEmpty = refinement("NonEmptyString", string, [
+			conjunct("hasAnyContent", [], "String"),
+		])
+
+		it("should accept a refinement where its base is expected", () => {
+			expect(matchesType(integer, nonZero)).toBe(true)
+		})
+
+		it("should refuse the base where a refinement is expected", () => {
+			expect(matchesType(nonZero, integer)).toBe(false)
+		})
+
+		it("should accept a refinement where itself is expected", () => {
+			expect(matchesType(nonZero, nonZero)).toBe(true)
+		})
+
+		// NOTE: Proving more than was asked is proof enough — a value known to
+		// be non-zero AND positive is a value known to be non-zero.
+		it("should accept a refinement proving a superset of the conjuncts", () => {
+			expect(matchesType(nonZero, positiveNonZero)).toBe(true)
+		})
+
+		it("should refuse a refinement proving only some of the conjuncts", () => {
+			expect(matchesType(positiveNonZero, nonZero)).toBe(false)
+		})
+
+		// NOTE: The conjunct set is compared by KEY, so the same predicate
+		// written the other way round is the same Type. Which is why the
+		// canonical form exists, and why nothing here relies on the order.
+		it("should ignore the order the conjuncts stand in", () => {
+			let reversed = refinement("PositiveNonZeroInteger", integer, [
+				conjunct("isPositive"),
+				conjunct("isNot", ["0"]),
+			])
+
+			expect(matchesType(positiveNonZero, reversed)).toBe(true)
+			expect(matchesType(reversed, positiveNonZero)).toBe(true)
+		})
+
+		// NOTE: A conjunct is the QUESTION, not the name of an alias — two
+		// aliases proving the same thing are the same Type, and two proving
+		// different things are not, whatever they are called.
+		it("should decide by the conjuncts rather than by the alias name", () => {
+			let sameQuestion = refinement("NotZero", integer, [
+				conjunct("isNot", ["0"]),
+			])
+			let otherArgument = refinement("NonOneInteger", integer, [
+				conjunct("isNot", ["1"]),
+			])
+
+			expect(matchesType(nonZero, sameQuestion)).toBe(true)
+			expect(matchesType(nonZero, otherArgument)).toBe(false)
+		})
+
+		it("should refuse a refinement over another base", () => {
+			expect(matchesType(nonZero, nonEmpty)).toBe(false)
+			expect(matchesType(nonEmpty, nonZero)).toBe(false)
+			expect(matchesType(string, nonZero)).toBe(false)
+		})
+
+		it("should unwrap a refinement inside a List", () => {
+			let refinedItems: common.Type = { type: "List", itemType: nonZero }
+			let plainItems: common.Type = { type: "List", itemType: integer }
+
+			expect(matchesType(plainItems, refinedItems)).toBe(true)
+			expect(matchesType(refinedItems, plainItems)).toBe(false)
+		})
+
+		it("should let a Union holding the base accept the refinement", () => {
+			let numberish: common.Type = {
+				type: "UnionType",
+				types: [integer, string],
+			}
+
+			expect(matchesType(numberish, nonZero)).toBe(true)
+		})
+
+		// NOTE: An Error is a poison value and matches in both directions, so
+		// that one mistake does not cascade. A refinement is not an exception to
+		// that, which is what the rules being placed BEHIND the Error guard says.
+		it("should let an Error match a refinement in both directions", () => {
+			let error: common.Type = { type: "Error" }
+
+			expect(matchesType(nonZero, error)).toBe(true)
+			expect(matchesType(error, nonZero)).toBe(true)
+		})
+
+		// NOTE: The widening rule sits ahead of Generic binding on purpose. A
+		// Type Parameter inferred from a refined Argument binds the BASE, so no
+		// inference carries evidence into a position nothing proved anything
+		// about — refinement-typed Generic bindings are explicitly v2.
+		it("should bind a Type Parameter to the base rather than the refinement", () => {
+			let context = createInferenceContext([
+				{ name: "T", infer: true, defaultType: null },
+			])
+
+			expect(
+				matchesTypeWithBindings(
+					{ type: "GenericUse", name: "T" },
+					nonZero,
+					context,
+				),
+			).toBe(true)
+			expect(context.bindings.get("T")).toEqual(integer)
+		})
+
+		// NOTE: Both insertion orders, because Union building is where a
+		// directional rule most easily reads as an order-dependent one:
+		// `subsumesForUnion` asks assignability in one direction and then asks
+		// whether the two subsume each ANOTHER, and only the base does here. So
+		// the refinement is dropped whichever side it was collected from, and
+		// `isLessSpecific` is deliberately left alone — nothing about a
+		// refinement is meant to win a Union.
+		it("should collapse a Union of a refinement and its base, either order", () => {
+			expect(buildUnion([integer, nonZero])).toEqual(integer)
+			expect(buildUnion([nonZero, integer])).toEqual(integer)
+		})
+
+		it("should keep a refinement in a Union nothing there covers", () => {
+			expect(buildUnion([string, nonZero])).toEqual({
+				type: "UnionType",
+				types: [string, nonZero],
+			})
+		})
+
+		// NOTE: And the same collapse one step in: every value proving both
+		// conjuncts is a value proving one of them, so the WIDER refinement
+		// covers the narrower and the narrower goes — again from either side,
+		// since one of the two evicts and the other declines to be collected.
+		// Nothing here is a most-specific-refinement order; it is the same
+		// subsumption asking the same question.
+		it("should collapse two refinements into the wider one, either order", () => {
+			expect(buildUnion([nonZero, positiveNonZero])).toEqual(nonZero)
+			expect(buildUnion([positiveNonZero, nonZero])).toEqual(nonZero)
+			expect(buildUnion([nonZero, positiveNonZero, integer])).toEqual(
+				integer,
+			)
+		})
+
+		it("should describe and print a refinement under its alias name", () => {
+			expect(describeType(nonZero)).toBe("NonZeroInteger")
+			expect(printType(nonZero)).toBe("NonZeroInteger")
+			expect(printType({ type: "List", itemType: nonZero })).toBe(
+				"List<NonZeroInteger>",
+			)
 		})
 	})
 })

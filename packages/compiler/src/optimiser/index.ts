@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import { collapseCombinations } from "./passes/collapseCombinations"
 import { collapseConstruction } from "./passes/collapseConstruction"
 import { compileTypeTests } from "./passes/compileTypeTests"
@@ -115,15 +116,29 @@ export function optimiserOptionsKey(options: OptimiserOptions): string {
 	return `on:${[...options.disabledPasses].sort().join(",")}`
 }
 
+// NOTE: The one transform this stage performs that is NOT a pass, and it runs
+// before the `enabled` check rather than in the registry: erasing checked
+// refinements is what makes the Program emittable at all, not something it is
+// better for. `--no-optimise` compiles the Program as it was written, and a
+// Program as it was written still has no run-time notion of a predicate — so
+// there is no name to turn this off under, and the registry, whose every entry
+// IS such a name, is the wrong place for it. The Rewriter refuses a refinement
+// outright, which is what keeps the two halves of that claim together.
+//
+// NOTE: The stage is where it goes because the stage is wired into every
+// pipeline there is — the Compiler's, the standard library prelude's, the
+// Language Server's — and a Program only reaches emission through one of them.
 export function optimise(
 	program: common.typedSimple.Program,
 	options: OptimiserOptions = defaultOptimiserOptions,
 ): common.typedSimple.Program {
+	let erased = eraseRefinements(program)
+
 	if (!options.enabled) {
-		return program
+		return erased
 	}
 
-	let result = program
+	let result = erased
 
 	for (let pass of optimiserPasses) {
 		if (options.disabledPasses.has(pass.name)) {

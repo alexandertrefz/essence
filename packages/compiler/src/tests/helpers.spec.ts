@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
+import type { common } from "@essence-lang/interfaces"
 import { lexer } from "@essence-lang/interfaces"
 import type {
 	ErrorType,
@@ -19,9 +20,11 @@ import type {
 	UnknownType,
 } from "@essence-lang/interfaces/common"
 
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import {
 	applyGenericBindings,
 	buildUnion,
+	canonicalPredicateConjuncts,
 	computeConformanceMethodMap,
 	createInferenceContext,
 	describeType,
@@ -31,6 +34,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
+	predicateConjunctKey,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
@@ -38,6 +42,8 @@ import {
 	symbol,
 	third,
 	typeContainsError,
+	typeContainsRefinement,
+	typeContainsUnknown,
 	typeMentionsGeneric,
 } from "../helpers/index"
 
@@ -2458,6 +2464,311 @@ describe("Helpers", () => {
 				),
 			).toBe(true)
 			expect(context.bindings.get("ItemType")).toEqual(integer)
+		})
+	})
+
+	// NOTE: What a checked refinement IS, away from assignability — the
+	// canonical key its conjuncts are compared and stored by, and the four Type
+	// walks that have to see through one. Assignability itself is pinned in
+	// `typeMatching.spec.ts`, where the direction is the subject.
+	describe("Checked refinements", () => {
+		const integer: Type = { type: "Integer" }
+		const string: Type = { type: "String" }
+
+		function conjunct(
+			methodName: string,
+			args: Array<string | boolean> = [],
+			overloadIndex: number | null = null,
+			namespaceName: string = "Integer",
+		) {
+			return { namespaceName, methodName, overloadIndex, args }
+		}
+
+		const isNotZero = conjunct("isNot", ["0"])
+
+		function refinementOf(base: Type, name = "NonZeroInteger"): Type {
+			return { type: "Refinement", name, base, conjuncts: [isNotZero] }
+		}
+
+		const nonZero = refinementOf(integer)
+
+		describe("predicateConjunctKey", () => {
+			it("should give one question one key", () => {
+				expect(predicateConjunctKey(isNotZero)).toBe(
+					predicateConjunctKey(conjunct("isNot", ["0"])),
+				)
+			})
+
+			it("should tell the Namespace, the Method and the Overload apart", () => {
+				let keys = new Set(
+					[
+						isNotZero,
+						conjunct("is", ["0"]),
+						conjunct("isNot", ["1"]),
+						conjunct("isNot", ["0"], 2),
+						conjunct("isNot", ["0"], null, "Number"),
+					].map(predicateConjunctKey),
+				)
+
+				expect(keys.size).toBe(5)
+			})
+
+			// NOTE: Two predicates that spelled one key between them would
+			// silently accept each other's evidence, so nothing a Program can
+			// write may reach across a separator: an Argument is JSON rather
+			// than joined, and the Overload is told apart by a colon, which is a
+			// Symbol and so unspellable inside a name — where `$` is an ordinary
+			// Identifier character.
+			it("should not let anything spell another conjunct's key", () => {
+				expect(predicateConjunctKey(conjunct("is", ["a,b"]))).not.toBe(
+					predicateConjunctKey(conjunct("is", ["a", "b"])),
+				)
+				expect(predicateConjunctKey(conjunct("is", ["true"]))).not.toBe(
+					predicateConjunctKey(conjunct("is", [true])),
+				)
+				expect(predicateConjunctKey(conjunct("isNot$1"))).not.toBe(
+					predicateConjunctKey(conjunct("isNot", [], 1)),
+				)
+			})
+		})
+
+		describe("canonicalPredicateConjuncts", () => {
+			it("should sort by key and drop what is asked twice", () => {
+				let canonical = canonicalPredicateConjuncts([
+					conjunct("isPositive"),
+					isNotZero,
+					conjunct("isNot", ["0"]),
+				])
+
+				expect(canonical.map((entry) => entry.methodName)).toEqual([
+					"isNot",
+					"isPositive",
+				])
+			})
+
+			it("should give one predicate one canonical form, however it was written", () => {
+				let one = canonicalPredicateConjuncts([
+					isNotZero,
+					conjunct("isPositive"),
+				])
+				let other = canonicalPredicateConjuncts([
+					conjunct("isPositive"),
+					isNotZero,
+				])
+
+				expect(one).toEqual(other)
+			})
+		})
+
+		describe("Type walks", () => {
+			it("should describe a refinement under its alias name", () => {
+				expect(describeType(nonZero)).toBe("NonZeroInteger")
+			})
+
+			// NOTE: Only the base can hold a Type Parameter — a conjunct is a
+			// key over literals — and the substitution is identity preserving,
+			// which is what keeps `matchesType`'s `lhs === rhs` fast path.
+			it("should substitute Generics inside the base", () => {
+				let refined = refinementOf({
+					type: "List",
+					itemType: { type: "GenericUse", name: "ItemType" },
+				})
+
+				expect(
+					applyGenericBindings(
+						refined,
+						new Map([["ItemType", integer]]),
+					),
+				).toEqual(refinementOf({ type: "List", itemType: integer }))
+				expect(applyGenericBindings(nonZero, new Map())).toBe(nonZero)
+			})
+
+			it("should read an undecided slot through the base", () => {
+				expect(
+					typeContainsUnknown(
+						refinementOf({
+							type: "List",
+							itemType: { type: "Unknown" },
+						}),
+					),
+				).toBe(true)
+				expect(typeContainsUnknown(nonZero)).toBe(false)
+			})
+
+			it("should find a refinement buried anywhere in a Type", () => {
+				expect(typeContainsRefinement(nonZero)).toBe(true)
+				expect(
+					typeContainsRefinement({
+						type: "List",
+						itemType: nonZero,
+					}),
+				).toBe(true)
+				expect(
+					typeContainsRefinement({
+						type: "Record",
+						members: { count: nonZero },
+					}),
+				).toBe(true)
+				expect(
+					typeContainsRefinement({
+						type: "UnionType",
+						types: [string, nonZero],
+					}),
+				).toBe(true)
+				expect(
+					typeContainsRefinement({
+						type: "List",
+						itemType: integer,
+					}),
+				).toBe(false)
+			})
+		})
+
+		// NOTE: Refinements do not survive into the emitted Program, and this is
+		// where they go. What is asserted is completeness — a refinement nested
+		// anywhere in a Type, and a Type hanging anywhere off a Node — plus the
+		// identity preservation the caches around the standard library's
+		// simplified Program rest on.
+		describe("eraseRefinements", () => {
+			it("should replace a refinement with what it refines", () => {
+				expect(eraseRefinements(nonZero)).toEqual(integer)
+			})
+
+			it("should erase one nested anywhere in a Type", () => {
+				expect(
+					eraseRefinements({ type: "List", itemType: nonZero }),
+				).toEqual({ type: "List", itemType: integer })
+				expect(
+					eraseRefinements({
+						type: "Record",
+						members: { count: nonZero, label: string },
+					}),
+				).toEqual({
+					type: "Record",
+					members: { count: integer, label: string },
+				})
+				expect(
+					eraseRefinements({
+						type: "Function",
+						parameterTypes: [{ name: "by", type: nonZero }],
+						generics: [],
+						returnType: nonZero,
+					}),
+				).toEqual({
+					type: "Function",
+					parameterTypes: [{ name: "by", type: integer }],
+					generics: [],
+					returnType: integer,
+				})
+			})
+
+			// NOTE: A refinement over a refinement is not something a Program can
+			// write, but the walk answers it anyway — an eraser that erased one
+			// layer would be a walk that stops where it happened to be called.
+			it("should erase every layer of one", () => {
+				expect(
+					eraseRefinements({
+						type: "Refinement",
+						name: "PositiveNonZeroInteger",
+						base: nonZero,
+						conjuncts: [conjunct("isPositive")],
+					}),
+				).toEqual(integer)
+			})
+
+			it("should hand back a Type carrying none as itself", () => {
+				let plain: Type = { type: "List", itemType: integer }
+
+				expect(eraseRefinements(plain)).toBe(plain)
+			})
+
+			// NOTE: Every field of every Node, which is what a reflective walk
+			// buys and a hand written one has to remember: a Constant's declared
+			// Type, the Type its value carries, a Match Handler's Matcher — and
+			// the same one field in a Node kind nobody has written yet.
+			it("should erase every Type hanging off a Program", () => {
+				let value: common.typedSimple.ExpressionNode = {
+					nodeType: "IntegerValue",
+					value: "3",
+					type: { type: "Integer" },
+				}
+
+				let program: common.typedSimple.Program = {
+					nodeType: "Program",
+					imports: null,
+					exports: null,
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "VariableDeclarationStatement",
+								name: {
+									nodeType: "Identifier",
+									name: "divisor",
+									type: nonZero,
+								},
+								value,
+								type: nonZero,
+								isConstant: true,
+							},
+							{
+								nodeType: "Match",
+								value,
+								handlers: [
+									{
+										matcher: nonZero,
+										typeTest: null,
+										literal: null,
+										memberLiterals: null,
+										guard: null,
+										body: [],
+									},
+								],
+								finalHandlerIsElse: false,
+								type: { type: "List", itemType: nonZero },
+							},
+						],
+					},
+				}
+
+				let erased = eraseRefinements(program)
+				let [declaration, match] = erased.implementation.nodes
+
+				if (
+					declaration?.nodeType !== "VariableDeclarationStatement" ||
+					match?.nodeType !== "Match"
+				) {
+					throw new Error("The erasure rebuilt the wrong Nodes.")
+				}
+
+				expect(declaration.type).toEqual(integer)
+				expect(declaration.name.type).toEqual(integer)
+				expect(match.handlers[0].matcher).toEqual(integer)
+				expect(match.type).toEqual({
+					type: "List",
+					itemType: integer,
+				})
+			})
+
+			it("should hand back a Program carrying none as itself", () => {
+				let program: common.typedSimple.Program = {
+					nodeType: "Program",
+					imports: null,
+					exports: null,
+					implementation: {
+						nodeType: "ImplementationSection",
+						nodes: [
+							{
+								nodeType: "IntegerValue",
+								value: "1",
+								type: { type: "Integer" },
+							},
+						],
+					},
+				}
+
+				expect(eraseRefinements(program)).toBe(program)
+			})
 		})
 	})
 })

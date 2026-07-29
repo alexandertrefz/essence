@@ -6,7 +6,9 @@ import { join } from "node:path"
 import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
-import { enrich } from "../enricher/index"
+import { enrich, topLevelScope } from "../enricher/index"
+import { namespacesTargeting, solveConformance } from "../enricher/resolvers"
+import { loadStdlib } from "../enricher/stdlib"
 import { optimise } from "../optimiser/index"
 import { parse, parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -1043,6 +1045,107 @@ describe("Resolvers", () => {
 					__print(tagged::is(code))
 				}`),
 			).toEqual(["true", "true", "false", "false"])
+		})
+	})
+
+	// NOTE: Checked refinements have no syntax yet, so the receiver is built
+	// directly and asked of the standard library's own Namespaces — which is what
+	// makes these about resolution rather than about a Declaration.
+	//
+	// NOTE: There are two halves and both are load-bearing. A refined receiver
+	// has to keep every Method its base had, or refining a Type would take its
+	// Methods away; and a Namespace written FOR the refinement has to be found,
+	// or refining one would buy nothing. The index buckets Namespaces by the kind
+	// they target, so a refinement that pulled only its own bucket would be a
+	// value with no Methods at all.
+	describe("Refined receivers", () => {
+		const integer: common.Type = { type: "Integer" }
+
+		const nonZeroInteger: common.Type = {
+			type: "Refinement",
+			name: "NonZeroInteger",
+			base: integer,
+			conjuncts: [
+				{
+					namespaceName: "Integer",
+					methodName: "isNot",
+					overloadIndex: null,
+					args: ["0"],
+				},
+			],
+		}
+
+		const position: common.Position = {
+			start: { line: 1, column: 1 },
+			end: { line: 1, column: 1 },
+		}
+
+		function stdlibNamespaces(): Map<string, common.NamespaceType> {
+			let namespaces: Map<string, common.NamespaceType> = new Map()
+
+			for (let namespace of loadStdlib().namespaces) {
+				namespaces.set(namespace.name, namespace)
+			}
+
+			return namespaces
+		}
+
+		it("should offer a refined receiver every Namespace its base has", () => {
+			let namespaces = stdlibNamespaces()
+
+			// NOTE: `Integer` out of the kind bucket the base is filed under,
+			// and `Number` out of the blanket one every lookup pays for — its
+			// target is the Union, which takes a refined Integer through the
+			// same widening rule.
+			expect([
+				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
+			]).toEqual([...namespacesTargeting(namespaces, integer).keys()])
+			expect([
+				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
+			]).toEqual(["Integer", "Number"])
+		})
+
+		it("should find a Namespace written for the refinement itself", () => {
+			let namespaces = stdlibNamespaces()
+
+			namespaces.set("NonZeroInteger", {
+				type: "Namespace",
+				name: "NonZeroInteger",
+				targetType: nonZeroInteger,
+				generics: [],
+				properties: {},
+				methods: {},
+			})
+
+			expect([
+				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
+			]).toContain("NonZeroInteger")
+
+			// NOTE: And not the other way round — a bare Integer has proven
+			// nothing, so the Namespace that promises more than Integer can does
+			// not answer for it.
+			expect([
+				...namespacesTargeting(namespaces, integer).keys(),
+			]).not.toContain("NonZeroInteger")
+		})
+
+		// NOTE: Conformance is found through the same widening rule, which is why
+		// nothing was written for it: `Integer is Comparable` covers every value a
+		// `NonZeroInteger` can hold, so the witness the base declares is the
+		// witness a refined value passes.
+		it("should solve a Protocol conformance through the base's Namespace", () => {
+			let solved = solveConformance(
+				nonZeroInteger,
+				"Comparable",
+				topLevelScope(),
+				position,
+			)
+
+			expect(solved.ok).toBe(true)
+			expect(solved.ok && solved.source).toMatchObject({
+				kind: "namespace",
+				name: "Integer",
+			})
 		})
 	})
 })

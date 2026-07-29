@@ -24,6 +24,11 @@ export function printType(type: common.Type): string {
 			return type.types.map(printType).join(" | ")
 		case "Case":
 			return caseHeader(type)
+		// NOTE: A checked refinement prints as the alias it was declared under —
+		// the predicate is what the Declaration says, and a Hover over a value
+		// is about the Type, not about how it was proven.
+		case "Refinement":
+			return type.name
 		case "List":
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":

@@ -1499,6 +1499,113 @@ describe("Optimiser", () => {
 		})
 	})
 
+	// NOTE: The one transform the stage performs that is NOT a pass. Erasing
+	// checked refinements is what makes a Program emittable rather than better,
+	// so it has no name to be turned off under and runs whether the phase is on
+	// or off — `--no-optimise` compiles the Program as it was written, and a
+	// Program as it was written still has no run-time notion of a predicate.
+	//
+	// NOTE: There is no syntax for a refinement yet, so one is written into a
+	// simplified Program by hand — which is also how the Rewriter's refusal below
+	// can be asked at all, since every route through the stage takes it away
+	// first.
+	describe("erasing checked refinements", () => {
+		const integer: common.Type = { type: "Integer" }
+
+		const nonZeroInteger: common.Type = {
+			type: "Refinement",
+			name: "NonZeroInteger",
+			base: integer,
+			conjuncts: [
+				{
+					namespaceName: "Integer",
+					methodName: "isNot",
+					overloadIndex: null,
+					args: ["0"],
+				},
+			],
+		}
+
+		// NOTE: A Match over a bare Integer, whose one Handler's Matcher is then
+		// refined — the Matcher is the field the Rewriter serializes, so it is
+		// the field both halves of this turn on.
+		function withRefinedMatcher(): common.typedSimple.Program {
+			let program = simplifiedSource(`implementation {
+				constant value: Integer | String = 1
+
+				__print(match value -> String {
+					case Integer { <- "integer" }
+					case String  { <- "string" }
+				})
+			}`)
+
+			let refined = rewriteExpressions(program, (node) => {
+				if (node.nodeType !== "Match") {
+					return node
+				}
+
+				return {
+					...node,
+					handlers: node.handlers.map((handler) =>
+						handler.matcher.type === "Integer"
+							? { ...handler, matcher: nonZeroInteger }
+							: handler,
+					),
+				}
+			})
+
+			expect(matchMatchers(refined)[0]).toEqual([
+				nonZeroInteger,
+				{ type: "String" },
+			])
+
+			return refined
+		}
+
+		// NOTE: Asked of the whole Program rather than of the Matcher, because
+		// with the phase on the Match is lowered to Statements and compiled to a
+		// tag test on its way through — so what is asserted is that nothing
+		// anywhere in what comes out is a refinement, which is the claim.
+		it("erases one with the phase on", () => {
+			expect(
+				JSON.stringify(optimise(withRefinedMatcher())),
+			).not.toContain("Refinement")
+		})
+
+		it("erases one with the phase off", () => {
+			expect(
+				matchMatchers(
+					optimise(withRefinedMatcher(), {
+						enabled: false,
+						disabledPasses: new Set(),
+					}),
+				)[0],
+			).toEqual([integer, { type: "String" }])
+		})
+
+		it("hands a Program carrying none back as itself", () => {
+			let program = simplifiedSource(`implementation {
+				__print("nothing to erase")
+			}`)
+
+			expect(
+				optimise(program, {
+					enabled: false,
+					disabledPasses: new Set(),
+				}),
+			).toBe(program)
+		})
+
+		// NOTE: The second half of the claim, and the reason the first can be
+		// trusted: a refinement that DID reach emission fails the compile by
+		// name instead of emitting a descriptor `isValueOfType` has no answer to.
+		it("refuses to emit one that reached the Rewriter", () => {
+			expect(() => rewrite(withRefinedMatcher())).toThrow(
+				/Internal Compiler Error: a checked refinement reached/,
+			)
+		})
+	})
+
 	describe("the Options key", () => {
 		it("tells the phase turned off from the phase turned on", () => {
 			expect(
