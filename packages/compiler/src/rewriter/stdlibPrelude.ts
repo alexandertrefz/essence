@@ -3,7 +3,12 @@ import type { common } from "@essence-lang/interfaces"
 import type { NativeBindings, Stdlib } from "../enricher/stdlib"
 import { loadStdlib } from "../enricher/stdlib"
 import { resolveOverloadedMethodName } from "../helpers/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+	optimiserOptionsKey,
+} from "../optimiser/index"
 import { simplify } from "../simplifier/index"
 
 // NOTE: A standard library Namespace is written in TWO languages at once: some
@@ -75,7 +80,10 @@ function buildStdlibArtifacts(stdlib: Stdlib): StdlibArtifacts {
 	let freeFunctions: Array<PreludeFreeFunction> = []
 
 	for (let typedProgram of stdlib.typedPrograms) {
-		let program = optimise(simplify(structuredClone(typedProgram)))
+		let program = optimise(
+			simplify(structuredClone(typedProgram)),
+			currentOptimiserOptions,
+		)
 
 		for (let node of program.implementation.nodes) {
 			// NOTE: A bodied free Function is emitted as its own top-level
@@ -154,6 +162,34 @@ export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
 	return buildStdlibArtifacts(stdlib).namespaces
 }
 
+// NOTE: The Optimiser Options the prelude is being built under. The standard
+// library's bodies are optimised HERE, by the same passes and under the same
+// Options as the Program that imports them — `esc build --no-optimise` that
+// left the prelude optimised would be a half-answer, and the passes that pay
+// most (a Choice's equality, a comparison chain) are prelude bodies.
+//
+// NOTE: It is ambient rather than a Parameter for the reason the Rewriter's
+// source path and Namespace scopes are: everything that reads the prelude reads
+// it through a no-argument accessor, several of them from deep inside emission,
+// and threading one compilation-wide constant through all of them would say
+// nothing the `withOptimiserOptions` around the whole rewrite does not.
+let currentOptimiserOptions: OptimiserOptions = defaultOptimiserOptions
+
+export function withOptimiserOptions<Value>(
+	options: OptimiserOptions,
+	build: () => Value,
+): Value {
+	let previous = currentOptimiserOptions
+
+	currentOptimiserOptions = options
+
+	try {
+		return build()
+	} finally {
+		currentOptimiserOptions = previous
+	}
+}
+
 // NOTE: A value read off the standard library and kept, so that walking the
 // library again is paid once per process rather than once per file compiled in a
 // worker. It is keyed by the Stdlib OBJECT and not by a flag some caller has to
@@ -162,19 +198,30 @@ export function buildStdlibPrelude(stdlib: Stdlib): Array<PreludeNamespace> {
 // that will one day answer for a library that is no longer loaded. `loadStdlib`
 // is a null check and a return once the library is in hand, so asking it on
 // every lookup costs nothing.
+//
+// NOTE: And keyed by the Optimiser Options, which decide what the prelude's
+// bodies come out as. One process compiles under several — a test suite turns a
+// pass off and on again, a Language Server and a build share one — so the
+// entries live side by side rather than replacing each other, and each is built
+// once.
 function derivedFromStdlib<Value>(
 	build: (stdlib: Stdlib) => Value,
 ): () => Value {
-	let cache: { stdlib: Stdlib; value: Value } | null = null
+	let cache: { stdlib: Stdlib; values: Map<string, Value> } | null = null
 
 	return () => {
 		let stdlib = loadStdlib()
+		let key = optimiserOptionsKey(currentOptimiserOptions)
 
 		if (cache === null || cache.stdlib !== stdlib) {
-			cache = { stdlib, value: build(stdlib) }
+			cache = { stdlib, values: new Map() }
 		}
 
-		return cache.value
+		if (!cache.values.has(key)) {
+			cache.values.set(key, build(stdlib))
+		}
+
+		return cache.values.get(key) as Value
 	}
 }
 

@@ -12,6 +12,10 @@ import {
 } from "../bundler/index"
 import { derivedEquatableNamespaceName } from "../enricher/resolvers"
 import {
+	defaultOptimiserOptions,
+	type OptimiserOptions,
+} from "../optimiser/index"
+import {
 	ESSENCE_METHOD_PREFIX,
 	essenceMethodIdentifier,
 	essenceMethodName,
@@ -21,6 +25,7 @@ import {
 	type PreludeNamespace,
 	stdlibFreeFunctions,
 	stdlibPrelude,
+	withOptimiserOptions,
 } from "./stdlibPrelude"
 
 // NOTE: The builtin Namespaces that have a runtime module in `@essence-lang/runtime`, in
@@ -65,7 +70,18 @@ export const runtimeNamespaceNames = [
 // ignored here, because a lone Program is a bundle of one and has nobody to
 // import from or publish to. `rewriteModules` is the other form, and the two
 // emit through the same helpers rather than through two copies of them.
-export function rewrite(program: common.typedSimple.Program): string {
+export function rewrite(
+	program: common.typedSimple.Program,
+	// NOTE: The Options the Program was optimised under, so the prelude built
+	// below is built under them too — the standard library's bodies are
+	// optimised where they are collected, and a Program compiled with a pass
+	// turned off must not import a prelude that kept it on.
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+): string {
+	return withOptimiserOptions(optimiserOptions, () => rewriteProgram(program))
+}
+
+function rewriteProgram(program: common.typedSimple.Program): string {
 	const prelude = stdlibPrelude()
 
 	// NOTE: The user Program is rewritten FIRST, so that which merged Namespaces
@@ -218,6 +234,17 @@ export type ModuleInput = {
 // keeps a Module's emitted head to what its body actually reads, which is worth
 // having when there are twenty of them to read through.
 export function rewriteModules(
+	modules: Array<ModuleInput>,
+	entryPath: string,
+	options?: { sourcemap?: boolean; optimiser?: OptimiserOptions },
+): ModuleSources {
+	return withOptimiserOptions(
+		options?.optimiser ?? defaultOptimiserOptions,
+		() => rewriteModuleGraph(modules, entryPath, options),
+	)
+}
+
+function rewriteModuleGraph(
 	modules: Array<ModuleInput>,
 	entryPath: string,
 	options?: { sourcemap?: boolean },
