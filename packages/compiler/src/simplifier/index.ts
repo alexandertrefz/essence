@@ -725,6 +725,11 @@ function simplifyConditional(
 	return {
 		nodeType: "ConditionalStatement",
 		condition: simplifyExpression(convertedNode.condition),
+		// NOTE: An Essence Boolean, which the Rewriter reads the JavaScript one
+		// out of — until an Optimiser pass finds the question already asked in
+		// JavaScript's terms. The Simplifier states what the Program says and
+		// nothing about how it is tested.
+		conditionIsRaw: false,
 		trueBody: convertedNode.trueBody.map((node) =>
 			simplifyImplementationNode(node),
 		),

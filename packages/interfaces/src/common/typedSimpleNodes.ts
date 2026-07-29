@@ -751,6 +751,12 @@ export interface TypeAliasStatementNode {
 export interface ConditionalStatementNode {
 	nodeType: "ConditionalStatement"
 	condition: ExpressionNode
+	// NOTE: That `condition` is a RAW JavaScript boolean rather than an Essence
+	// Boolean, so the Rewriter emits it as the `if`'s question instead of
+	// reading `.value` off it — `lower-matches-to-statements` sets it where the
+	// question was lowered to one already. False is the Simplifier's own answer
+	// and the ordinary read.
+	conditionIsRaw: boolean
 	trueBody: Array<ImplementationNode>
 	falseBody: Array<ImplementationNode>
 	position?: Position

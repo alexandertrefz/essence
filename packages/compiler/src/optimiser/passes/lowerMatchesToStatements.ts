@@ -52,6 +52,14 @@ import { rewriteStatements } from "../walk"
 // binds its names as the Parameters of an arrow it calls at once — for the same
 // reason, and with the same answer where the dispatch is what a Statement
 // computes: the names become the `const`s of a block and the arrow is gone.
+//
+// NOTE: And it collapses the ONE place a lowered Boolean was built only to be
+// read back. `if a::isLessThan(b)` lowers to
+// `(a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value`,
+// because an `if` reads `.value` off the Essence Boolean its condition answers.
+// A condition is a Statement's question, so it belongs to the pass that answers
+// Statements' questions: where the condition IS an `essence-boolean`, the test
+// it was built from is emitted and the Boolean is never built.
 
 export const lowerMatchesToStatements: OptimiserPass = {
 	name: "lower-matches-to-statements",
@@ -90,6 +98,8 @@ class Lowering {
 		node: common.typedSimple.ImplementationNode,
 	): common.typedSimple.ImplementationNode {
 		switch (node.nodeType) {
+			case "ConditionalStatement":
+				return this.collapseCondition(node)
 			case "ReturnStatement":
 				return (
 					this.statement(node.expression, { kind: "return" }, node) ??
@@ -113,7 +123,6 @@ class Lowering {
 				)
 			// NOTE: A declaration, and nothing this pass reads. A lowered
 			// Statement is one this pass already wrote.
-			case "ConditionalStatement":
 			case "NamespaceDefinitionStatement":
 			case "ProtocolDeclarationStatement":
 			case "TypeAliasStatement":
@@ -208,6 +217,30 @@ class Lowering {
 		}
 
 		return { ...handler, body: handler.body.slice(0, -1) }
+	}
+
+	// NOTE: The condition of an `if`, which the Rewriter reads `.value` off
+	// because an Essence Boolean is an object and every object is true. Where
+	// the Boolean is one an earlier pass BUILT out of a JavaScript test — an
+	// `essence-boolean` and nothing else — the test is what the `if` should ask,
+	// and the Boolean between them is built and read back for nothing.
+	private collapseCondition(
+		node: common.typedSimple.ConditionalStatementNode,
+	): common.typedSimple.ConditionalStatementNode {
+		if (node.conditionIsRaw) {
+			return node
+		}
+
+		let condition = node.condition
+
+		if (
+			condition.nodeType !== "Intrinsic" ||
+			condition.kind !== "essence-boolean"
+		) {
+			return node
+		}
+
+		return { ...node, condition: condition.value, conditionIsRaw: true }
 	}
 }
 

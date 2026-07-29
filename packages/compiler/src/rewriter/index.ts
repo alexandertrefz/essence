@@ -1848,10 +1848,23 @@ function rewriteConditionalStatement(
 
 	return {
 		type: "IfStatement",
-		test: valueRead(rewriteExpression(node.condition)),
+		test: conditionTest(node),
 		consequent: rewriteBlockStatement(node.trueBody),
 		alternate,
 	}
+}
+
+// NOTE: What JavaScript is asked. An Essence Boolean is an object, and every
+// object is true, so the question is the `value` it holds — unless
+// `lower-matches-to-statements` found the question already asked in JavaScript's
+// own terms, in which case the Expression IS the question and reading `.value`
+// off a raw boolean would be `undefined`.
+function conditionTest(
+	node: common.typedSimple.ConditionalStatementNode,
+): estree.Expression {
+	let condition = rewriteExpression(node.condition)
+
+	return node.conditionIsRaw ? condition : valueRead(condition)
 }
 
 function rewriteReturnStatement(
@@ -3879,7 +3892,7 @@ function redirectedConditional(
 
 	return {
 		type: "IfStatement",
-		test: valueRead(rewriteExpression(node.condition)),
+		test: conditionTest(node),
 		consequent: block(node.trueBody),
 		alternate,
 	}

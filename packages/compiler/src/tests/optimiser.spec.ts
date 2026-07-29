@@ -748,6 +748,37 @@ const heldDispatches = `implementation {
 	__print(either)
 }`
 
+// NOTE: A Conditional whose question an earlier pass already asked in
+// JavaScript's own terms, beside one whose question is a Boolean the Program
+// computed — a Method a Namespace wrote, which answers an Essence Boolean and
+// has to be read.
+const conditions = `implementation {
+	namespace Flags for Boolean {
+		§§ Answers the Boolean it is called on.
+		§§
+		§§ @returns — the Boolean.
+		itself() -> Boolean {
+			<- @
+		}
+	}
+
+	constant a = 3
+	constant b = 5
+	constant yes = true
+
+	if a::isLessThan(b) {
+		__print("less")
+	} else {
+		__print("more")
+	}
+
+	if yes::itself() {
+		__print("yes")
+	} else {
+		__print("no")
+	}
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -2277,6 +2308,46 @@ describe("Optimiser", () => {
 				}`)
 
 				expect(generated).not.toContain("$dispatch_0")
+			})
+		})
+
+		describe("a condition that was already lowered", () => {
+			it("asks the test rather than the Boolean it built", () => {
+				let generated = generate(conditions)
+
+				expect(generated).toContain("if (a.value < b.value) {")
+				expect(generated).not.toContain("Boolean.falseInstance).value")
+			})
+
+			it("reads the value of a condition the Program computes", () => {
+				// NOTE: A Method a Namespace wrote answers an Essence Boolean,
+				// which is an object — and every object is true, so the `value`
+				// it holds is what JavaScript has to be asked.
+				expect(generate(conditions)).toContain(
+					"if (Flags.itself(yes).value) {",
+				)
+			})
+
+			it("builds the Boolean again when it is turned off", () => {
+				expect(
+					generate(conditions, {
+						enabled: true,
+						disabledPasses: new Set([
+							"lower-matches-to-statements",
+						]),
+					}),
+				).toContain(
+					"if ((a.value < b.value ? Boolean.trueInstance : Boolean.falseInstance).value) {",
+				)
+			})
+
+			it("prints the same thing with the pass off", async () => {
+				expect(
+					await expectSamePrintedOutput(
+						"lower-matches-to-statements",
+						conditions,
+					),
+				).toEqual(['"less"', '"yes"'])
 			})
 		})
 	})
