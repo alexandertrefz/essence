@@ -48,6 +48,11 @@ export const lowerScalarOperations: OptimiserPass = {
 		// not. So a name a Program declares below its top level is refused for
 		// the whole Program, which costs a Program that writes one nothing it
 		// can measure.
+		//
+		// NOTE: The same set answers the purity question, and has to. Refusing
+		// to LOWER `5::isLessThan(3)` says nothing about whether that call may
+		// be skipped where it stands as the Argument of an `and` — and it may
+		// not, for exactly the reason it may not be lowered.
 		let shadowed = declaredNamespaces(program).nested
 
 		return rewriteExpressions(program, (node) => lower(node, shadowed))
@@ -72,7 +77,7 @@ function lower(
 		case "Integer":
 			return lowerInteger(node, member)
 		case "Boolean":
-			return lowerBoolean(node, member)
+			return lowerBoolean(node, member, shadowed)
 		case "String":
 			return lowerString(node, member)
 		default:
@@ -152,6 +157,7 @@ function lowerString(
 function lowerBoolean(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
+	shadowed: ReadonlySet<string>,
 ): common.typedSimple.ExpressionNode {
 	if (node.type.type !== "Boolean") {
 		return node
@@ -199,7 +205,12 @@ function lowerBoolean(
 	// different Programs, and this one stays the call it was. Lowering it
 	// instead would need both operands in temporaries, which is a Statement,
 	// which is a shape this pass does not produce.
-	if (!isPureExpression(right)) {
+	//
+	// NOTE: The whole SUBTREE is asked, not the Node standing at its top. What
+	// `and` skips is everything the Argument would have evaluated, so an
+	// Invocation on a shadowed Namespace nested three Expressions down is as
+	// much a reason to leave the call alone as one written directly.
+	if (!isPureExpression(right, shadowed)) {
 		return node
 	}
 

@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import type { OptimiserPass } from "../index"
+import { declaredNamespaces } from "../namespaces"
 import { isPureExpression } from "../purity"
 import { type MatcherResidual, matcherResidualOverMembers } from "../residual"
 import { rewriteExpressions } from "../walk"
@@ -61,7 +62,18 @@ import { rewriteExpressions } from "../walk"
 
 export const compileUnionDispatch: OptimiserPass = {
 	name: "compile-union-dispatch",
-	run: (program) => rewriteExpressions(program, compile),
+	run: (program) => {
+		// NOTE: The Namespaces the Program declares below its top level, which
+		// is what `isPureExpression` needs to know before it reads a Namespace
+		// name out of its enumeration. This pass never lowers a Method call
+		// itself, so the set changes nothing it does today — it is asked for
+		// because the question the purity of an operand answers is the same one
+		// whoever asks it, and a caller that could not have been wrong is
+		// cheaper than a caller that has to be checked.
+		let shadowed = declaredNamespaces(program).nested
+
+		return rewriteExpressions(program, (node) => compile(node, shadowed))
+	},
 }
 
 // NOTE: Unspellable in Essence, like every other name the Compiler binds for
@@ -75,6 +87,7 @@ const temporaryPrefix = "$dispatch_"
 
 function compile(
 	node: common.typedSimple.ExpressionNode,
+	shadowed: ReadonlySet<string>,
 ): common.typedSimple.ExpressionNode {
 	if (node.nodeType !== "UnionMethodInvocation") {
 		return node
@@ -87,7 +100,11 @@ function compile(
 		return node
 	}
 
-	if (!node.cases.every(caseArgumentsArePure)) {
+	if (
+		!node.cases.every((dispatchCase) =>
+			caseArgumentsArePure(dispatchCase, shadowed),
+		)
+	) {
 		return node
 	}
 
@@ -98,7 +115,7 @@ function compile(
 		node.base,
 		...node.arguments.map((argument) => argument.value),
 	]
-	let isHeld = holdPlan(branches, operands)
+	let isHeld = holdPlan(branches, operands, shadowed)
 	let temporaries: Array<common.typedSimple.DispatchTemporaryNode> = []
 
 	let reads = operands.map((operand, index) => {
@@ -228,6 +245,7 @@ function planBranches(
 function holdPlan(
 	branches: ReadonlyArray<PlannedBranch>,
 	operands: ReadonlyArray<common.typedSimple.ExpressionNode>,
+	shadowed: ReadonlySet<string>,
 ): Array<boolean> {
 	let holdsAnything =
 		branches.length > 1 ||
@@ -236,7 +254,7 @@ function holdPlan(
 		(operand, index) =>
 			index === 0 ||
 			!isOverriddenEverywhere(branches, index - 1) ||
-			!isPureExpression(operand),
+			!isPureExpression(operand, shadowed),
 	)
 	let isHeld = operands.map(
 		(operand, index) =>
@@ -339,13 +357,14 @@ function testOf(
 // change.
 function caseArgumentsArePure(
 	dispatchCase: common.typedSimple.UnionMethodDispatchCase,
+	shadowed: ReadonlySet<string>,
 ): boolean {
 	return (
 		dispatchCase.conformanceArguments.every((argument) =>
-			isPureExpression(argument.value),
+			isPureExpression(argument.value, shadowed),
 		) &&
 		dispatchCase.contextualArguments.every((contextual) =>
-			isPureExpression(contextual.argument.value),
+			isPureExpression(contextual.argument.value, shadowed),
 		)
 	)
 }
