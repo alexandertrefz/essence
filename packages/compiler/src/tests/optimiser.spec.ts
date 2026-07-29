@@ -743,6 +743,107 @@ const nestedStatementMatches = `implementation {
 	__print(named("x"))
 }`
 
+// NOTE: A Handler binding the very name the lowered Match writes its answer to,
+// in each shape a name can be bound in a Scope the answer is written from: a
+// Constant, a Function, a Namespace, a Conditional branch inside a Handler, a
+// Handler of a Match nested in Return position, and an assignment rather than a
+// Declaration. Every one of them stood in front of the Declaration and took the
+// assignment — silently, where the Declaration was a `variable`, and as a
+// bundler's refusal to assign a `const` where it was not.
+const shadowedAnswerNames = `implementation {
+	constant value: Integer | String = 5
+
+	constant answerA = match value -> Integer {
+		case Integer {
+			constant answerA = 1
+
+			<- answerA::add(5)
+		}
+		case String { <- 0 }
+	}
+
+	constant answerB = match value -> Integer {
+		case Integer {
+			§§ Answers what it is given, plus one.
+			§§
+			§§ @param n — the Integer to answer for
+			§§ @returns — one more than it.
+			function answerB(_ n: Integer) -> Integer {
+				<- n::add(1)
+			}
+
+			<- answerB(5)
+		}
+		case String { <- 0 }
+	}
+
+	constant answerC = match value -> Integer {
+		case Integer {
+			if @::isGreaterThan(1) {
+				constant answerC = 7
+
+				<- answerC
+			}
+
+			<- 1
+		}
+		case String { <- 0 }
+	}
+
+	constant answerD = match value -> Integer {
+		case Integer {
+			§§ Not the standard library's, and not read either.
+			namespace answerD for Integer {
+				§§ Twice this Integer.
+				§§
+				§§ @returns — twice it.
+				doubled() -> Integer {
+					<- @::multiply(with 2)
+				}
+			}
+
+			<- 4::doubled()
+		}
+		case String { <- 0 }
+	}
+
+	constant answerE = match value -> Integer {
+		case Integer {
+			<- match value -> Integer {
+				case Integer {
+					constant answerE = 9
+
+					<- answerE
+				}
+				case String { <- 0 }
+			}
+		}
+		case String { <- 0 }
+	}
+
+	variable answerF = 0
+
+	answerF = match value -> Integer {
+		case Integer {
+			constant answerF = 3
+
+			if @::isGreaterThan(1) {
+				<- answerF::add(8)
+			}
+
+			<- answerF
+		}
+		case String { <- 0 }
+	}
+
+	__print(answerA)
+	__print(answerB)
+	__print(answerC)
+	__print(answerD)
+	__print(answerE)
+	__print(answerF)
+}`
+
 // NOTE: A compiled Union dispatch that HOLDS operands, in each Statement
 // position the wrapper can be taken off in — a Return, a Declaration and a
 // Statement written for its effects — beside `either::tagged(with flip())`,
@@ -2704,6 +2805,64 @@ describe("Optimiser", () => {
 					nestedStatementMatches,
 				),
 			).toEqual(['"a positive Integer"', '"an Integer"', '"a String"'])
+		})
+
+		// NOTE: Regression tests — the answer used to be written into the
+		// Program's own name from INSIDE the Handler's block, which is a Scope
+		// the Program writes Statements into. A Handler declaring that name
+		// stood in front of the Declaration: the assignment landed on the
+		// Handler's binding, the Declaration kept whatever it was left with,
+		// and where the source said `constant` the bundler refused the emission
+		// outright rather than run a Program that answers wrongly.
+		describe("a Handler that binds the answer's own name", () => {
+			it("answers what the Program says, for every shape a name is bound in", async () => {
+				expect(await outputOf(generate(shadowedAnswerNames))).toEqual([
+					"6",
+					"6",
+					"7",
+					"8",
+					"9",
+					"11",
+				])
+			})
+
+			it("writes the answer to a name of its own and assigns after the chain", () => {
+				let generated = generate(shadowedAnswerNames)
+
+				expect(generated).toContain(
+					"let answerA;\n{\n\tlet $held_answer;",
+				)
+				expect(generated).toContain("\tanswerA = $held_answer;")
+			})
+
+			it("assigns after the label a Handler leaves the chain through", () => {
+				// NOTE: A `break` past the chain lands after the label, so the
+				// one assignment has to stand outside it — inside, and a
+				// Handler that answered early would answer nothing at all.
+				let generated = generate(shadowedAnswerNames)
+
+				expect(generated).toMatch(
+					/\$held_answer = answerC;\n\t\t\t\tbreak \$match_\d+;/,
+				)
+				expect(generated).toMatch(
+					/\n\t\}\n\tanswerC = \$held_answer;\n\}/,
+				)
+			})
+
+			it("holds nothing where no Handler binds the name", () => {
+				// NOTE: Which is every Match anyone writes on purpose — the
+				// answer goes straight to the name it was always written to.
+				expect(generate(statementMatches)).not.toContain("$held_answer")
+			})
+
+			it("prints the same thing with the pass off", async () => {
+				expect(
+					await expectSamePrintedOutput(
+						"lower-matches-to-statements",
+						shadowedAnswerNames,
+					),
+				).toEqual(["6", "6", "7", "8", "9", "11"])
+			})
 		})
 
 		it("prints the same thing with the pass off for every fixture shape", async () => {
