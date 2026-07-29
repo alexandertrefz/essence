@@ -23,25 +23,67 @@ The form is refused outside this directory, and the loader refuses an
 declare a native at all, so accepting one would silently produce a Namespace
 missing exactly the Methods the file was written to add.
 
-## How it is loaded
+## Every file here is a Module
 
-`packages/compiler/src/enricher/stdlib.ts` reads every `.es` file in this directory, in sorted
-order, hoists them into ONE shared Scope — so a Protocol declared in one file
-and a Namespace conforming to it in another resolve across the file boundary —
-and then enriches and validates them. A single Diagnostic anywhere in here is a
-compiler-developer error and throws, fully rendered by the same renderer the
-CLI prints with.
+Each file writes an `import { … }` block naming what it uses from its siblings
+and an `export { … }` block naming what it offers them. They are linked through
+the same machinery a user Program's Modules go through, one Scope per file.
+
+Two rules the loader enforces, both by throwing:
+
+- **Every import must be USED.** An unused entry is a warning, and a warning
+  anywhere in here takes the whole load down.
+- **Every entry must be UNALIASED.** An imported Namespace is bound as a shallow
+  copy carrying the LOCAL name, and the Rewriter builds `$es_<Namespace>_<member>`
+  from that name — under an alias a call site emits a const nothing declares.
+
+Writing an import is not optional for a Namespace you only DISPATCH through:
+`length::subtract(…)` needs `Integer` imported even though the call never spells
+it. Naming `Integer` as a *Type* needs no import — the nine bare Type tags live
+one Scope out, and are the only names that do.
+
+### The prelude
+
+`Prelude.es` re-exports what the LANGUAGE offers. The builtin tables are built
+from its surface alone, so there are three levels of visibility:
+
+| | |
+|---|---|
+| private to its file | not in that file's `export { … }` |
+| internal to the library | exported, not re-exported by `Prelude.es` |
+| a builtin | re-exported by `Prelude.es` |
+
+Adding a name to `Prelude.es` adds it to the language. A helper the library needs
+and the language should not grow simply stays off the list.
+
+### The shape of the graph is frozen
+
+One cycle is allowed — `Algebraic`, `Integer`, `List`, `Rational`, `String`,
+`Transcendental` — and the loader refuses any other. That group is intrinsic:
+cross-kind arithmetic means each numeric kind names the others, a String's
+characters ARE a `List<String>`, and both `parse`s consume a String. A new cycle
+anywhere, or a seventh file joining that one, means an import closed a circle
+nobody decided on. `EXPECTED_CYCLE` in `packages/compiler/src/enricher/stdlib.ts`
+is where it is stated.
+
+### The rest
+
+A single Diagnostic anywhere in here is a compiler-developer error and throws,
+fully rendered by the same renderer the CLI prints with, against the file it was
+found in.
 
 The load happens once per process and is cached; `loadStdlib()` hands every
 consumer — the Enricher's top level Scope, the Language Server's builtin
-listings, the test suite — the same object. It costs on the order of 15 ms.
+listings, the test suite — the same object. It costs on the order of 60 ms,
+most of it enrichment, since each group hoists to its own fixed point.
 
 The ORDER the builtins are listed in is the one thing a source file can not say
 about itself, because each declares only its own name. It is stated in
-`builtinMemberOrder` and `builtinTypeOrder` (`packages/compiler/src/enricher/builtins.ts`), and it
-is observable: Completion dedupes members first-Namespace-wins, the Enricher
-searches `matchingNamespaces` in that order, and `closestMatch` breaks a "did
-you mean …?" tie on the first candidate.
+`builtinMemberOrder`, `builtinTypeOrder` and `builtinProtocolOrder`
+(`packages/compiler/src/enricher/builtins.ts`), and it is observable: Completion
+dedupes members first-Namespace-wins, the Enricher searches `matchingNamespaces`
+in that order, and `closestMatch` breaks a "did you mean …?" tie on the first
+candidate.
 
 Documentation Positions read out of these files are stripped before the tables
 are handed out — a builtin is sourceless to Hover, Signature Help and `go to
