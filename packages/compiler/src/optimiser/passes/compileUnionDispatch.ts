@@ -237,29 +237,40 @@ function planBranches(
 // branch uses it would answer for the value after the assignment, which is a
 // different Program.
 //
-// NOTE: An Argument every branch overrides is read by no branch and is held
-// only if it could say something. That is the one evaluation the chain drops:
-// the dispatch built the shared Argument array whole, overridden entries and
-// all, and what stands in an overridden one can only be a contextually typed
-// Function LITERAL, which has nothing to say.
+// NOTE: An Argument every branch overrides is read by no branch, and is the one
+// evaluation the chain can drop: the dispatch built the shared Argument array
+// whole, overridden entries and all. What stands in an overridden one can only
+// be a contextually typed Function LITERAL — the Enricher overrides an Argument
+// exactly where the Program wrote a Function literal there, and re-typed it per
+// branch — so it has nothing to say. That is an argument about a shape rather
+// than a promise about every shape, so the plan asks it: an unread operand that
+// can not be shown to have nothing to say is HELD, which evaluates it where the
+// Argument array did and leaves the name unread. That branch is unreachable
+// today and is what makes the sentence above safe to stop checking.
 function holdPlan(
 	branches: ReadonlyArray<PlannedBranch>,
 	operands: ReadonlyArray<common.typedSimple.ExpressionNode>,
 	shadowed: ReadonlySet<string>,
 ): Array<boolean> {
-	let holdsAnything =
-		branches.length > 1 ||
-		branches.some((branch) => branch.residual !== null)
+	// NOTE: The receiver is read by every branch; a shared Argument is read by
+	// none where every branch passes its own in its place.
 	let isRead = operands.map(
-		(operand, index) =>
-			index === 0 ||
-			!isOverriddenEverywhere(branches, index - 1) ||
-			!isPureExpression(operand, shadowed),
+		(_, index) =>
+			index === 0 || !isOverriddenEverywhere(branches, index - 1),
 	)
-	let isHeld = operands.map(
-		(operand, index) =>
-			holdsAnything && isRead[index]! && !isReReadable(operand),
-	)
+	// NOTE: Nothing is written out where the chain is one untested branch: there
+	// is one place each operand is used and one order to use them in, so a name
+	// for it would say what the call already says. An operand no branch reads
+	// has no such place, so that stops being true of it.
+	let writesOperandsOut =
+		branches.length === 1 && branches[0]!.residual === null
+	let isHeld = operands.map((operand, index) => {
+		if (!isRead[index]) {
+			return !isPureExpression(operand, shadowed)
+		}
+
+		return !writesOperandsOut && !isReReadable(operand)
+	})
 
 	// NOTE: Back to front, because what makes a name unsafe to leave where it
 	// stands is what comes AFTER it.
