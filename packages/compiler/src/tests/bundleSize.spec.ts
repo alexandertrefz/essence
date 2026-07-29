@@ -117,6 +117,15 @@ describe("Bundle Size", () => {
 	// arithmetic — falls out of the bundle with it. HelloWorld.es, which reaches
 	// it through nothing but a comparison, lost a quarter of its bytes.
 	//
+	// NOTE: It now measures 52,873, down 6,785, and the ceiling came down with
+	// it. `compile-type-tests` is what shrank it, and by a route worth stating:
+	// a Match's Type check used to be a descriptor written out at the site and
+	// handed to `$type.isValueOfType`, so the descriptors went with the checks
+	// AND the function they were built for left the bundle entirely — measured
+	// by turning the pass off, where `isValueOfType` is back and the bundle is
+	// 59,690 again. What is left of the runtime's Type Module is the hidden key,
+	// `createCase` and `noCaseMatched`.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -124,7 +133,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(60_700)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_900)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
@@ -144,7 +153,7 @@ describe("Bundle Size", () => {
 	// this small carried structural equality for the sake of two comparisons.
 	// The ceiling came down with it.
 	it("keeps Irrational.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(33_000)
+		expect(await bundleSizeOf("Irrational.es")).toBeLessThan(29_700)
 	})
 
 	// NOTE: The same claim for a bundle of several Modules, where it is far
@@ -173,7 +182,15 @@ describe("Bundle Size", () => {
 	// body. A duplicated per-Module prelude would still overshoot the moved
 	// ceiling by kilobytes.
 	//
-	// NOTE: It now measures 20,693 and the ceiling moves to 21,200. 530 of the
+	// NOTE: It now measures 15,259 and the ceiling moves to 15,800, keeping the
+	// same ~500 bytes. The 5,434 bytes are `compile-type-tests`: these Modules
+	// read fallible answers back through `Optional`, so every Match in them and
+	// in the prelude they share was a descriptor handed to `isValueOfType`, and
+	// with the descriptors gone the function is unreferenced and leaves the
+	// bundle. The headroom is what matters here rather than the figure — the
+	// duplication this test exists to catch is about a kilobyte.
+	//
+	// NOTE: It measured 20,693 before that, and the ceiling was 21,200. 530 of the
 	// rise came with the nominal `Optional` and went unrecorded here — the
 	// figure above stayed at 19,499 while the measurement moved to 20,030 — and
 	// 663 are the unconditional runtime improvements: 137 for the interned
@@ -218,6 +235,6 @@ describe("Bundle Size", () => {
 
 		expect(inBundle.length).toBeGreaterThan(0)
 		expect(inBundle.length).toBeLessThanOrEqual(inPrelude.length)
-		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(21_200)
+		expect(result.outputs[0]!.contents.byteLength).toBeLessThan(15_800)
 	})
 })

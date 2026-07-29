@@ -103,6 +103,62 @@ async function expectSamePrintedOutput(
 	return withPass
 }
 
+// NOTE: One Match per rule `compile-type-tests` decides by: a scalar Matcher, a
+// Case Matcher, a List Matcher the scrutinee has one List member for, two List
+// members sharing the one tag, a Record Matcher, and a Type Parameter standing
+// where anything at all could arrive. The last two Matches are the ones that
+// must NOT be compiled to a tag.
+const typeTests = `implementation {
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	function label<infer Item>(
+		_ items: List<Item>,
+		or fallback: List<Integer> | Item,
+	) -> Integer {
+		<- match fallback -> Integer {
+			case List<Integer> { <- 1 }
+			case _ { <- 0 }
+		}
+	}
+
+	constant scalar: Integer | String = 5
+	constant shape: Shape = Shape#Circle({ radius = 3 })
+	constant numbers: List<Integer> | Integer = [1, 2, 3]
+	constant mixed: List<Integer> | List<String> = ["a"]
+	constant clicked: { x: Integer, y: Integer } | String = { x = 1, y = 2 }
+
+	__print(match scalar -> String {
+		case Integer { <- "integer" }
+		case String  { <- "string" }
+	})
+
+	__print(match shape -> Integer {
+		case #Circle { <- @.radius }
+		case #Blank  { <- 0 }
+	})
+
+	__print(match numbers -> Integer {
+		case List<Integer> { <- 1 }
+		case Integer       { <- 2 }
+	})
+
+	__print(match mixed -> Integer {
+		case List<String>  { <- 1 }
+		case List<Integer> { <- 2 }
+	})
+
+	__print(match clicked -> String {
+		case { x: Integer, y: Integer } { <- "click" }
+		case String                     { <- "text" }
+	})
+
+	__print(label(["a"], or [1, 2]))
+	__print(label(["a"], or "b"))
+}`
+
 // NOTE: A payload-less Case on either side of the comparison, both spellings of
 // the question, a Case that DOES carry a payload, and a generic Choice of each
 // — the shapes `lower-unit-case-equality` must rewrite beside the ones it must
@@ -417,6 +473,129 @@ describe("Optimiser", () => {
 			// NOTE: A pass that wrote into its input would corrupt the standard
 			// library for every later compilation in the process.
 			expect(markers(program)).toBe(0)
+		})
+	})
+
+	describe("compile-type-tests", () => {
+		it("reads a tag instead of building a Type descriptor", () => {
+			let generated = generate(typeTests)
+
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "Shape#Circle"',
+			)
+			// NOTE: The whole Choice, gone from the emission — a Case Matcher
+			// is the tag it names and nothing else here.
+			expect(generated).not.toContain('choice: "Shape"')
+		})
+
+		it("compiles a scalar Matcher to its tag", () => {
+			// NOTE: A scalar's descriptor check IS one key comparison, whatever
+			// it is asked about, so this one needs no argument about what can
+			// arrive.
+			expect(generate(typeTests)).toContain(
+				'_self[$type.typeKeySymbol] === "Integer"',
+			)
+		})
+
+		it("stops walking a List to find out that it is one", () => {
+			// NOTE: The change of complexity. `{ type: "List", itemType: {
+			// type: "Integer" } }` means "a List, every item of which is an
+			// Integer", so the runtime check walked every item; the scrutinee
+			// has one List member, so the tag says which member arrived and
+			// the items say nothing further.
+			expect(generate(typeTests)).toContain(
+				'_self[$type.typeKeySymbol] === "List"',
+			)
+		})
+
+		it("keeps the full check where two Types share a tag", () => {
+			// NOTE: `List<Integer>` and `List<String>` are both `"List"`, and
+			// what tells them apart is the items — which is exactly what the
+			// full check walks.
+			expect(generate(typeTests)).toContain(
+				'itemType: { type: "String" }',
+			)
+		})
+
+		it("keeps the full check for a Record Matcher", () => {
+			// NOTE: A Record's tag says only that it is a Record. What picks
+			// this Handler is its MEMBERS, and reading those is a decision tree
+			// rather than a tag test.
+			let generated = generate(typeTests)
+
+			expect(generated).toContain('type: "Record"')
+			expect(generated).toContain('x: { type: "Integer" }')
+		})
+
+		it("keeps the full check where a Type Parameter could carry the tag", () => {
+			// NOTE: `List<Integer> | Item` — a value of `Item` can be anything
+			// at all, including a List, so the tag does not say which member
+			// arrived and the item walk is what decides.
+			let generated = generate(typeTests)
+
+			expect(generated).toContain('itemType: { type: "Integer" }')
+			expect(generated).toContain('type: "GenericUse"')
+		})
+
+		// NOTE: The standard library's Matches go through the pass as well,
+		// inside the prelude the Rewriter builds — `Optional` is a Choice, so
+		// every fallible answer in the library is read back by one of these.
+		it("compiles the standard library's own Matches", () => {
+			let generated = generate(`implementation {
+				__print(Integer.parse("7")::otherwise(0))
+			}`)
+
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "Optional#Value"',
+			)
+			expect(generated).not.toContain('choice: "Optional"')
+		})
+
+		// NOTE: The fixture that is nothing but Matches — every Matcher kind
+		// the language has, including the Record ones this pass leaves alone.
+		it("leaves no Case descriptor in a compiled Match.es", () => {
+			let generated = generate(
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+
+			expect(generated).not.toContain('type: "Case"')
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "Optional#Value"',
+			)
+		})
+
+		it("builds the descriptors again when it is turned off", () => {
+			let generated = generate(typeTests, {
+				enabled: true,
+				disabledPasses: new Set(["compile-type-tests"]),
+			})
+
+			expect(generated).toContain('type: "Case"')
+			expect(generated).toContain('choice: "Shape"')
+			expect(generated).toContain(
+				'$type.isValueOfType(_self, { type: "Integer" })',
+			)
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput("compile-type-tests", typeTests),
+			).toEqual(['"integer"', "3", "1", "1", '"click"', "1", "0"])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"compile-type-tests",
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"compile-type-tests",
+				readFileSync(fixturePath("Maybe.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"compile-type-tests",
+				readFileSync(fixturePath("Tree.es"), "utf8"),
+			)
 		})
 	})
 

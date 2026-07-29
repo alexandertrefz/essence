@@ -54,6 +54,11 @@ const withoutCollapsedCombinations: OptimiserOptions = {
 	disabledPasses: new Set(["collapse-combinations"]),
 }
 
+const withoutCompiledTypeTests: OptimiserOptions = {
+	enabled: true,
+	disabledPasses: new Set(["compile-type-tests"]),
+}
+
 // NOTE: Every fault here compiled green and only showed itself in the emitted
 // JavaScript — a wrong value, a `TypeError`, or a bundler syntax error quoting
 // generated text — so each is pinned by RUNNING the Program as well as reading
@@ -188,7 +193,16 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			expect(generated).toContain("$type.isValueOfType(")
+			// NOTE: A Match reaches `$type` twice over — for the hidden key a
+			// compiled Type test reads, and for the descriptor check the
+			// Matchers that can not be compiled keep — and both have to be the
+			// IMPORT.
+			expect(generated).toContain(
+				'_self[$type.typeKeySymbol] === "String"',
+			)
+			expect(generate(source, withoutCompiledTypeTests)).toContain(
+				"$type.isValueOfType(",
+			)
 			expect(generated).toContain("const $user_$type = ")
 
 			// NOTE: Before the fix: `TypeError: $type.isValueOfType is not a

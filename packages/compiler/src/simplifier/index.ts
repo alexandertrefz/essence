@@ -544,6 +544,11 @@ function simplifyMatch(
 			node.handlers.map((handler) => {
 				return {
 					matcher: handler.matcher,
+					// NOTE: The Matcher's own descriptor check, until an
+					// Optimiser pass finds something cheaper that answers the
+					// same — the Simplifier states what the Program says and
+					// nothing about how it is tested.
+					typeTest: null,
 					literal:
 						handler.literal === null
 							? null

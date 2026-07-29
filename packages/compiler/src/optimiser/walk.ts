@@ -345,6 +345,17 @@ function walkChildren(
 		case "Match": {
 			let value = walkExpression(node.value, rewrite)
 			let handlers = mapArray(node.handlers, (handler) => {
+				// NOTE: A residual Type test is walked like any other
+				// Expression, so a pass that runs after the one which wrote it
+				// reads it — and, as with the test under an `essence-boolean`,
+				// what a later pass may not do is answer it with a Node of the
+				// wrong KIND: it stands where JavaScript says `if (…)`, so an
+				// Essence Boolean value there would be an object, and every
+				// object is true.
+				let typeTest =
+					handler.typeTest === null
+						? null
+						: walkExpression(handler.typeTest, rewrite)
 				let literal =
 					handler.literal === null
 						? null
@@ -364,6 +375,7 @@ function walkChildren(
 				)
 
 				if (
+					typeTest === handler.typeTest &&
 					literal === handler.literal &&
 					memberLiterals === handler.memberLiterals &&
 					guard === handler.guard &&
@@ -372,7 +384,14 @@ function walkChildren(
 					return handler
 				}
 
-				return { ...handler, literal, memberLiterals, guard, body }
+				return {
+					...handler,
+					typeTest,
+					literal,
+					memberLiterals,
+					guard,
+					body,
+				}
 			})
 
 			if (value === node.value && handlers === node.handlers) {
