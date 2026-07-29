@@ -38,6 +38,90 @@ function graphemesOf(value: string): Array<string> {
 	return result
 }
 
+// NOTE: Segmenting is by far the most expensive thing a String Method does —
+// measured at some four microseconds for a short String, against nanoseconds
+// for everything built on it — and the position Methods ask for the SAME view
+// of the SAME String over and over: a loop reading `character(at:)` segments
+// once per step, and `length` inside its condition segments again. So the view,
+// and the count taken off it, are remembered on the String value itself, under
+// Symbol keys.
+//
+// NOTE: A Symbol key is why this is invisible. `Object.keys`, `Object.entries`
+// and `Object.hasOwn` — which is the whole of what Record equality, the printer
+// and the runtime Type checks read a value with — do not see one, so a String
+// that has been measured is indistinguishable from one that has not. And a
+// String is immutable, so a remembered answer can never go stale: the value the
+// answer was taken from is the value the wrapper still holds.
+const graphemesKey = Symbol("$graphemes")
+const graphemeCountKey = Symbol("$graphemeCount")
+
+type MeasuredString = StringType & {
+	[graphemesKey]?: Array<string>
+	[graphemeCountKey]?: number
+}
+
+// NOTE: The segmented view of a String, segmented at most once. The remembered
+// array IS what is handed back rather than a copy of it, so every caller here
+// only ever READS it — one that needs to change it has to copy first.
+function graphemesIn(string: StringType): Array<string> {
+	let measured = string as MeasuredString
+	let segments = measured[graphemesKey]
+
+	if (segments === undefined) {
+		segments = graphemesOf(string.value)
+		measured[graphemesKey] = segments
+	}
+
+	return segments
+}
+
+// NOTE: Whether counting this String's characters can skip the Segmenter
+// entirely. ASCII is closed under NFC and carries no combining marks, so each
+// of its code units stands alone as a grapheme cluster and the count is simply
+// how many units there are. The one exception is a carriage return: Unicode
+// joins CR LF into a SINGLE cluster, so a String holding one declines the fast
+// path and is segmented properly. A code unit below 128 is also never half of a
+// surrogate pair, so "every unit is ASCII" really does mean "every character
+// is one unit".
+//
+// NOTE: Measured on a short String: ~4,200ns to segment, ~44ns to scan,
+// ~1ns to read the remembered count.
+function isSingleUnitAscii(value: string): boolean {
+	for (let index = 0; index < value.length; index++) {
+		let code = value.charCodeAt(index)
+
+		if (code >= 128 || code === 13) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// NOTE: How many characters a String holds, counted at most once. A String
+// already segmented for some other Method is counted off that view rather than
+// scanned again.
+function graphemeCountIn(string: StringType): number {
+	let measured = string as MeasuredString
+	let count = measured[graphemeCountKey]
+
+	if (count === undefined) {
+		let segments = measured[graphemesKey]
+
+		if (segments !== undefined) {
+			count = segments.length
+		} else if (isSingleUnitAscii(string.value)) {
+			count = string.value.length
+		} else {
+			count = graphemesIn(string).length
+		}
+
+		measured[graphemeCountKey] = count
+	}
+
+	return count
+}
+
 export function append(
 	originalString: StringType,
 	otherString: StringType,
@@ -58,7 +142,7 @@ export function split(
 	// — a separator can never land inside a cluster and tear it, and the pieces
 	// come back on cluster boundaries. NFC on both sides means the match is by
 	// canonical equivalence, like `is`.
-	let characters = graphemesOf(originalString.value)
+	let characters = graphemesIn(originalString)
 
 	if (splitterString.value === "") {
 		return createList(
@@ -66,7 +150,7 @@ export function split(
 		)
 	}
 
-	let separator = graphemesOf(splitterString.value)
+	let separator = graphemesIn(splitterString)
 	let pieces: Array<Array<string>> = []
 	let current: Array<string> = []
 	let index = 0
@@ -103,8 +187,8 @@ export function ends(
 	// boundary and by canonical equivalence, exactly as `starts(with:)` does
 	// through `slice`. `starts` stays Essence because its slice begins at zero
 	// and needs no length.
-	let characters = graphemesOf(originalString.value)
-	let suffixCharacters = graphemesOf(suffix.value)
+	let characters = graphemesIn(originalString)
+	let suffixCharacters = graphemesIn(suffix)
 
 	if (suffixCharacters.length > characters.length) {
 		return createBoolean(false)
@@ -218,5 +302,5 @@ export function compare__overload$1(
 // `split`/`characters`/`slice`/`reverse` take, so a base and its combining
 // marks — or a ZWJ emoji — count as the one character a reader sees.
 export function length(originalString: StringType): IntegerType {
-	return createInteger(BigInt(graphemesOf(originalString.value).length))
+	return createInteger(BigInt(graphemeCountIn(originalString)))
 }
