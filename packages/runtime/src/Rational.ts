@@ -15,8 +15,12 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// NOTE: The parts are held unreduced — `4/2` prints as `4/2` — and are treated
-// as immutable everywhere; reduction happens on read, in `reducedParts`.
+// NOTE: The parts are held unreduced — a Rational built from 4 and 2 HOLDS 4
+// and 2 — and are treated as immutable everywhere; reduction happens on read,
+// in `reducedParts`, so that same Rational PRINTS as `2/1`. The two sides matter
+// separately: `compare` and `anyIs` cross-multiply the raw parts, which is what
+// lets `4/2` be equal to `2` and to `2/1`, while every accessor and every
+// formatter answers in lowest terms.
 export type RationalType = {
 	[typeKeySymbol]: "Rational"
 	numerator: bigint
@@ -60,9 +64,36 @@ export function of(
 }
 
 // NOTE: The lowest-terms form with the sign on the numerator — the shape the
-// accessors, the rounding family and the formatters read.
+// accessors, the rounding family and the formatters read. Reducing is a
+// greatest-common-divisor over two bigints, and the SAME Rational is asked for
+// it over and over: printing one as a decimal asks, `raise` asks, and reading
+// its numerator and then its denominator asks twice for one answer. So the
+// answer is remembered on the value itself, under a Symbol key.
+//
+// NOTE: What is stored is untouched by this. A Rational holds its parts exactly
+// as it was built with them — `createRational(4n, 2n)` still holds 4 and 2, and
+// `compare` and `anyIs` still cross-multiply those raw parts — and this is the
+// READ-side view the accessors and the formatters take of them. A Symbol key is
+// invisible to `Object.keys` and `Object.entries`, which is the whole of what
+// Record equality, the printer and the runtime Type checks read a value with,
+// and a Rational is immutable, so a remembered form can never go stale.
+//
+// NOTE: The remembered `BigRational` IS what is handed back rather than a copy,
+// so every caller here only ever READS it.
+const reducedPartsKey = Symbol("$reducedParts")
+
+type ReducedRational = RationalType & { [reducedPartsKey]?: BigRational }
+
 function reducedParts(rational: RationalType): BigRational {
-	return reduced(rational.numerator, rational.denominator)
+	let cached = rational as ReducedRational
+	let parts = cached[reducedPartsKey]
+
+	if (parts === undefined) {
+		parts = reduced(rational.numerator, rational.denominator)
+		cached[reducedPartsKey] = parts
+	}
+
+	return parts
 }
 
 // #region Everyday methods
