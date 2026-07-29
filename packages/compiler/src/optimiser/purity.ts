@@ -26,10 +26,25 @@ import type { common } from "@essence-lang/interfaces"
 // NOTE: Which is why a CALL is impure unless it is one of the shapes named
 // below. Everything else — a literal, a name, a member read, a value built out
 // of pure parts — reaches nothing at all.
+//
+// NOTE: `shadowed` is the set of Namespace names the Program declares below its
+// own top level, which is `declaredNamespaces(program).nested`. It is a REQUIRED
+// Argument rather than a courtesy the callers extend, because the enumeration
+// below reads a Namespace by NAME and a Program may declare a Namespace of its
+// own called `Integer` — nested, where the name is not taken yet — whose Methods
+// would answer under those names and can do anything at all. Asking every caller
+// to have refused those names first is a precondition that was written down and
+// then not met; asking for the set is a precondition the Compiler can not
+// forget. Where the answer does not matter to a caller, the honest Argument is
+// still the Program's set and not an empty one.
 
 export function isPureExpression(
 	node: common.typedSimple.ExpressionNode,
+	shadowed: ReadonlySet<string>,
 ): boolean {
+	let isPure = (child: common.typedSimple.ExpressionNode): boolean =>
+		isPureExpression(child, shadowed)
+
 	switch (node.nodeType) {
 		// NOTE: The leaves. A literal holds its own value; an Identifier is a
 		// binding read, and no Essence value has a getter for the read to run.
@@ -47,20 +62,20 @@ export function isPureExpression(
 		// Every member the Type says is there IS there, so the read can not
 		// fail, and it can not run anything either.
 		case "Lookup":
-			return isPureExpression(node.base)
+			return isPure(node.base)
 		case "RecordValue":
-			return Object.values(node.members).every(isPureExpression)
+			return Object.values(node.members).every(isPure)
 		case "ListValue":
-			return node.values.every(isPureExpression)
+			return node.values.every(isPure)
 		case "CaseValue":
-			return node.value === null || isPureExpression(node.value)
+			return node.value === null || isPure(node.value)
 		case "Combination":
-			return isPureExpression(node.lhs) && isPureExpression(node.rhs)
+			return isPure(node.lhs) && isPure(node.rhs)
 		// NOTE: A witness is a method map — references to Methods, never calls
 		// of them — and a conditional one curries the witnesses below it onto
 		// those references. Nothing in either runs.
 		case "ConformanceValue":
-			return node.conditions.every(isPureExpression)
+			return node.conditions.every(isPure)
 		// NOTE: A call, and the whole of what this function refuses. A native
 		// Function is `__print` itself for all it can tell here, a
 		// Function-valued Expression is whatever was bound to it, and a Union
@@ -70,7 +85,7 @@ export function isPureExpression(
 		case "UnionMethodInvocation":
 			return false
 		case "MethodInvocation":
-			return isPureMethodInvocation(node)
+			return isPureMethodInvocation(node, shadowed)
 		// NOTE: An interpolated String CALLS `toString` on each hole, through a
 		// witness that may name a Method a Namespace wrote — so it is a call
 		// like any other, and refused like one. (`fold-constants` will want
@@ -85,26 +100,29 @@ export function isPureExpression(
 		case "Match":
 			return false
 		case "Intrinsic":
-			return isPureIntrinsic(node)
+			return isPureIntrinsic(node, shadowed)
 	}
 }
 
-function isPureIntrinsic(node: common.typedSimple.IntrinsicNode): boolean {
+function isPureIntrinsic(
+	node: common.typedSimple.IntrinsicNode,
+	shadowed: ReadonlySet<string>,
+): boolean {
+	let isPure = (child: common.typedSimple.ExpressionNode): boolean =>
+		isPureExpression(child, shadowed)
+
 	switch (node.kind) {
 		case "tag-test":
 		case "essence-boolean":
 		case "raw-boolean":
-			return isPureExpression(node.value)
+			return isPure(node.value)
 		// NOTE: The value it reads is hoisted into a const band and the site
 		// holds a NAME. Whether the value itself is pure is `pool-constants`'
 		// question, and its answer is stricter than this one.
 		case "pooled-reference":
 			return true
 		case "type-test":
-			return (
-				isPureExpression(node.value) &&
-				isPureExpression(node.descriptor)
-			)
+			return isPure(node.value) && isPure(node.descriptor)
 		// NOTE: A descriptor is data, and a `direct-method` is a reference to a
 		// Function rather than a call of one.
 		case "type-descriptor":
@@ -117,34 +135,43 @@ function isPureIntrinsic(node: common.typedSimple.IntrinsicNode): boolean {
 			return false
 		case "raw-boolean-op":
 			return (
-				isPureExpression(node.operand) &&
-				(node.other === null || isPureExpression(node.other))
+				isPure(node.operand) &&
+				(node.other === null || isPure(node.other))
 			)
 		case "raw-compare":
 		case "raw-equals":
 		case "raw-arithmetic":
-			return isPureExpression(node.left) && isPureExpression(node.right)
+			return isPure(node.left) && isPure(node.right)
 		case "direct-record":
-			return Object.values(node.members).every(isPureExpression)
+			return Object.values(node.members).every(isPure)
 		case "direct-case":
 			return (
-				Object.values(node.members).every(isPureExpression) &&
-				(node.payload === null || isPureExpression(node.payload))
+				Object.values(node.members).every(isPure) &&
+				(node.payload === null || isPure(node.payload))
 			)
 		case "direct-list":
-			return node.values.every(isPureExpression)
+			return node.values.every(isPure)
 		case "spread-combination":
 			return (
-				isPureExpression(node.lhs) &&
-				Object.values(node.members).every(isPureExpression) &&
-				(node.rhs === null || isPureExpression(node.rhs))
+				isPure(node.lhs) &&
+				Object.values(node.members).every(isPure) &&
+				(node.rhs === null || isPure(node.rhs))
 			)
 	}
 }
 
 // NOTE: THE ENUMERATION. A Method call is impure unless it is a call of one of
-// these, on one of these Namespaces, and every Argument it is given is pure
-// too.
+// these, on one of these Namespaces, with every Argument — the receiver
+// included — of exactly that Namespace's own Type, and every Argument pure too.
+//
+// NOTE: The Namespace name is the Type name on purpose: `Integer`'s entry is the
+// Method called on an Integer and GIVEN an Integer, which is the shape whose
+// body is a bigint operation. `add` and the comparisons are Overloads that also
+// take a Rational, an Algebraic and a Transcendental, and those entries are
+// written on the covering `Number` Namespace rather than on the native — a
+// different Method, weighed separately or not at all. Requiring the Types
+// closes the enumeration over the bodies it was read against instead of over
+// every Overload that happens to share a name.
 //
 // NOTE: It is short on purpose, and every entry is here for the same three
 // reasons: the Method prints nothing and assigns nothing, it answers for EVERY
@@ -181,15 +208,23 @@ const pureMethods: Record<string, ReadonlySet<string>> = {
 
 function isPureMethodInvocation(
 	node: common.typedSimple.MethodInvocationNode,
+	shadowed: ReadonlySet<string>,
 ): boolean {
-	// NOTE: The Namespace is read by NAME, which is safe here for a reason that
-	// is not obvious: a Program may declare a Namespace of its own called
-	// `Integer` — nested, where the name is not taken yet — and its Methods
-	// would answer under these names. That Program's Namespace can do anything
-	// at all, so what saves this is that `lower-scalar-operations` refuses to
-	// lower ANY Invocation on a name a Program declares below its top level,
-	// and it is the only caller. A second caller must ask the same question
-	// before it asks this one.
+	// NOTE: The Namespace is read by NAME, and a name is only the standard
+	// library's where the Program has not taken it. A Program can not take one
+	// at its top level — `Integer` is already declared in that Scope — but a
+	// Namespace declared inside a block REPLACES the builtin for the rest of it,
+	// in Method resolution as in conformance solving, and what it answers is
+	// whatever somebody wrote it to answer. So a name the Program declares
+	// anywhere below its top level is not read out of the enumeration at all,
+	// wherever in an Expression the call turns up. Refused for the whole Program
+	// rather than per Scope: the Optimiser walks Expressions and not Scopes, and
+	// the Program that pays for the difference is the one that shadowed a
+	// builtin.
+	if (shadowed.has(node.base.name)) {
+		return false
+	}
+
 	let members = pureMethods[node.base.name]
 
 	if (members === undefined) {
@@ -200,7 +235,11 @@ function isPureMethodInvocation(
 		return false
 	}
 
-	return node.arguments.every((argument) => isPureExpression(argument.value))
+	return node.arguments.every(
+		(argument) =>
+			argument.value.type.type === node.base.name &&
+			isPureExpression(argument.value, shadowed),
+	)
 }
 
 // NOTE: `isLessThan__overload$1` and `isLessThan` are one Method written with

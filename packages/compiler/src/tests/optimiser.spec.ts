@@ -301,6 +301,41 @@ const scalarOperations = `implementation {
 	__print(a::add(1/2))
 }`
 
+// NOTE: A shadowed Namespace standing where an `and` would skip it. `Integer`
+// is a Program's own Namespace inside this block and `Boolean` is not, so the
+// Invocation being LOWERED is not the one that is shadowed — the shadowed one
+// is its Argument, which JavaScript's `&&` would not evaluate because the
+// receiver is false. Whether `"the shadow ran"` is printed is the whole of the
+// difference between the two Programs.
+const shadowedArgument = `implementation {
+	variable ran = false
+
+	§§ Answers false, having run a Method the Program wrote.
+	§§
+	§§ @returns — false.
+	function trick() -> Boolean {
+		§§ A liar that says so.
+		namespace Integer for Integer {
+			§§ Always true, loudly.
+			§§
+			§§ @param other — ignored
+			§§ @returns — true
+			is(_ other: Integer) -> Boolean {
+				ran = true
+
+				__print("the shadow ran")
+
+				<- true
+			}
+		}
+
+		<- false::and(1::is(2))
+	}
+
+	__print(trick())
+	__print(ran)
+}`
+
 // NOTE: One dispatch of each shape `compile-union-dispatch` has to answer for:
 // a Union two tags tell apart, one where two members share a tag and the
 // descriptors stay, a call whose Arguments are compiled per branch (`map`), one
@@ -1198,6 +1233,48 @@ describe("Optimiser", () => {
 
 			expect(generated).toContain("$user_Integer.isLessThan(")
 			expect(generated).not.toContain(".value < ")
+		})
+
+		it("keeps the call where the Argument reaches a Namespace the Program declares", () => {
+			// NOTE: The refusal above is about the Invocation being LOWERED, and
+			// says nothing about whether that Invocation may be SKIPPED. Here
+			// the shadowed Method stands as the Argument of an `and`, whose
+			// receiver decides the answer without it — so lowering the `and`
+			// puts a Method somebody wrote behind JavaScript's `&&`, and the
+			// `__print` inside it stops happening. `Boolean` is not shadowed and
+			// `Integer` is, which is exactly the shape a per-Invocation check
+			// misses.
+			let generated = generate(shadowedArgument)
+
+			expect(generated).toContain("Boolean.and(")
+			expect(generated).toContain("$user_Integer.is(")
+			expect(generated).not.toContain(".value && ")
+		})
+
+		it("prints the same thing with the pass off where the Argument is shadowed", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"lower-scalar-operations",
+					shadowedArgument,
+				),
+			).toEqual(['"the shadow ran"', "false", "true"])
+		})
+
+		it("keeps the call where the Argument is a mixed-kind comparison", () => {
+			// NOTE: `isLessThan` reads as one of the Methods the purity
+			// enumeration names, and the entry it names is the one written on
+			// the bigint comparison. GIVEN A RATIONAL it is a different entry,
+			// written on the covering `Number` Namespace — an Overload that
+			// shares the name and not the body — so the enumeration does not
+			// answer for it and the `and` stays a call.
+			let generated = generate(`implementation {
+				constant a = 3
+
+				__print(false::and(a::isLessThan(1/2)))
+			}`)
+
+			expect(generated).toContain("Boolean.and(")
+			expect(generated).not.toContain(".value && ")
 		})
 
 		// NOTE: The standard library is optimised with the Program that reaches

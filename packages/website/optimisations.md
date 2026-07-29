@@ -161,18 +161,25 @@ is what makes `isLessThanOrEqualTo` a single `<=` rather than a negated `>`.
 **`and` and `or` keep eager evaluation.** Essence evaluates every Argument
 before the call, and JavaScript's `&&` and `||` do not evaluate their right-hand
 side when the left decides — so the two are the same Program only when the
-right-hand side has nothing to say. The pass proves that before it lowers one:
-the operand must reach no `__print`, no assignment, and no call it can not name.
-Names, member reads, literals, values built out of those, and calls to a short
-list of Integer and Boolean Methods qualify. Anything else — a call to a
-Function the Program wrote, an interpolated String, a Match — and the call stays
-exactly as it was, evaluating both operands as it always did.
+right-hand side has nothing to say. The pass proves that before it lowers one,
+of the WHOLE Argument and not just of the call standing at the top of it: nothing
+anywhere inside it may reach a `__print`, an assignment, or a call the Compiler
+can not name. Names, member reads, literals, values built out of those, and calls
+to a short list of Integer and Boolean Methods — each given values of its own
+kind — qualify. Anything else, a call to a Function the Program wrote, an
+interpolated String, a Match, a mixed-kind comparison that resolves through the
+covering `Number` Namespace, and the call stays exactly as it was, evaluating
+both operands as it always did.
 
-A Program that declares a Namespace of its own named `Integer`, `Boolean` or
-`String` is left alone entirely. Such a Namespace can only be declared inside a
-block — the name is already taken at a Program's top level — and inside that
-block it REPLACES the builtin, so its `isLessThan` is a Method somebody wrote and
-answers whatever it was written to answer.
+A Namespace the Program declares of its own named `Integer`, `Boolean` or
+`String` is not one of those Methods, wherever it turns up. Such a Namespace can
+only be declared inside a block — the name is already taken at a Program's top
+level — and inside that block it REPLACES the builtin, so its `isLessThan` is a
+Method somebody wrote and answers whatever it was written to answer. So a call on
+a name the Program declares is never lowered, and it never counts as an Argument
+with nothing to say either: `false::and(5::isLessThan(3))` stays a call in a
+Program that wrote such a Namespace, because `Integer` there is that Program's
+and `&&` would skip it.
 
 This one runs inside the standard library as well, and that is where most of it
 lands: the bodies of `isLessThanOrEqualTo`, `subtract` and `isNot` are written
