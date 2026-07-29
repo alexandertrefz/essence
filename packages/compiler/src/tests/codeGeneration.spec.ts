@@ -173,6 +173,84 @@ describe("Code Generation", () => {
 		})
 	})
 
+	// NOTE: A value the Program computes and drops. Before `collapse-construction`
+	// every one of them was a runtime CALL, which no engine may take away; now a
+	// Record, a List and a Case are object literals, and an object literal whose
+	// value is unused is something an engine may decide not to build. Bun's
+	// decides exactly that — and still evaluates the computed key, which is the
+	// hidden Type SYMBOL every value carries, as a property NAME: converting a
+	// Symbol to a string throws, out of a Statement that was supposed to do
+	// nothing. So a discarded value is bound to a name, and the Statement it was
+	// written as RUNS.
+	describe("a value written for nothing", () => {
+		it("binds a discarded value rather than dropping it", () => {
+			let generated = generate(`
+				implementation {
+					{ x = 1, y = 2 }
+					[1, 2, 3]
+
+					__print("done")
+				}
+			`)
+
+			expect(generated).toContain("let $discarded_value = {")
+			expect(generated).not.toContain("({\n\t\t[$type.typeKeySymbol]")
+		})
+
+		// NOTE: Regression test — the name held a `$` and no `_`, and `$` is a
+		// legal Essence identifier character while `_` is a Symbol the Lexer
+		// ends an Identifier at. So `$discarded` was a name a Program could
+		// bind, and one bound HERE around an Expression that READS it was read
+		// before it was initialised: a Program that ran under `--no-optimise`
+		// died with a `ReferenceError` with the passes on.
+		it("holds it under a name no Program can write", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant $discarded = 1
+
+						{ x = $discarded }
+
+						__print($discarded)
+					}
+				`),
+			).toEqual(["1"])
+		})
+
+		it("leaves a call where it stands", () => {
+			// NOTE: Which is what every Statement of this kind a real Program
+			// writes actually is — a call can not be taken away, because it may
+			// print.
+			let generated = generate(`
+				implementation {
+					__print("done")
+				}
+			`)
+
+			expect(generated).toContain("$_.__print($pool_0);")
+			expect(generated).not.toContain("$discarded")
+		})
+
+		it("runs the Program that writes one", async () => {
+			expect(
+				await run(`
+					implementation {
+						choice Colour { Red, Green }
+
+						constant base = { x = 1 }
+
+						{ x = 1, y = 2 }
+						[1, 2, 3]
+						{ base with x = 9 }
+						Colour#Red
+
+						__print("done")
+					}
+				`),
+			).toEqual(['"done"'])
+		})
+	})
+
 	// NOTE: `__print` migrated from a TypeScript table to `packages/stdlib/sources/Print.es`
 	// as an ordinary native free Function. Its emission is a read off the runtime
 	// `functions` module under its OWN name now — the `__` prefix used to be

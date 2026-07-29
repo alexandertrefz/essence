@@ -1857,15 +1857,60 @@ function rewriteFunctionStatement(
 	}
 }
 
+// NOTE: An Expression the Program wrote for its effects, and the one shape that
+// may not be emitted as JavaScript writes it. A call and an assignment are what
+// every Statement of this kind actually is, and neither can be taken away by an
+// engine — the call may print and the assignment is the mutation.
+//
+// NOTE: Anything ELSE here is a value the Program computes and drops, and a
+// value in this language can BE an object literal: `collapse-construction`
+// builds `{ [$type.typeKeySymbol]: "Record", … }`, whose hidden Type key is a
+// computed SYMBOL. An engine that decides such a literal is unused is free to
+// take it away, and Bun's does — while still evaluating the key as a property
+// NAME, which converts the Symbol to a string and THROWS, out of a Statement
+// that did nothing. So the value is bound to a name in a block of its own: it is
+// computed exactly as it was, and nothing about it is unused any more. The block
+// is what keeps the name from colliding with a sibling's, and the `_` in the
+// name is what keeps it clear of the Program's own: `$` is a legal Essence
+// identifier character and `_` is not, so `$discarded` is a name a Program can
+// write — and one that, bound here around an Expression READING it, would be
+// read before it is initialised.
+function discardedExpressionStatement(
+	expression: estree.Expression,
+): estree.Statement {
+	if (
+		expression.type === "CallExpression" ||
+		expression.type === "AssignmentExpression"
+	) {
+		return { type: "ExpressionStatement", expression }
+	}
+
+	return {
+		type: "BlockStatement",
+		body: [
+			{
+				type: "VariableDeclaration",
+				kind: "let",
+				declarations: [
+					{
+						type: "VariableDeclarator",
+						id: { type: "Identifier", name: discardedValueName },
+						init: expression,
+					},
+				],
+			},
+		],
+	}
+}
+
+const discardedValueName = "$discarded_value"
+
 function rewriteExpressionStatement(
 	node:
 		| common.typedSimple.ExpressionNode
 		| common.typedSimple.VariableAssignmentStatementNode,
-): estree.ExpressionStatement {
-	return {
-		type: "ExpressionStatement",
-		expression: rewriteExpression(node),
-	}
+): estree.Statement {
+	return discardedExpressionStatement(rewriteExpression(node))
 }
 
 // #endregion
