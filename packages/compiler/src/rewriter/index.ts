@@ -1658,6 +1658,27 @@ function rewriteIntrinsic(
 					...memberProperties(node.members),
 				],
 			}
+		case "spread-combination":
+			// NOTE: No brand of its own — the hidden Type key rides along on the
+			// spread of the left-hand side, which is a Record and carries it.
+			return {
+				type: "ObjectExpression",
+				properties: [
+					{
+						type: "SpreadElement",
+						argument: rewriteExpression(node.lhs),
+					},
+					...(node.rhs === null
+						? []
+						: [
+								{
+									type: "SpreadElement" as const,
+									argument: rewriteExpression(node.rhs),
+								},
+							]),
+					...memberProperties(node.members),
+				],
+			}
 		case "direct-list":
 			return {
 				type: "ObjectExpression",

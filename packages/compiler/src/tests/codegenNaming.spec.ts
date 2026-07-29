@@ -49,6 +49,11 @@ const withoutCollapsedConstruction: OptimiserOptions = {
 	disabledPasses: new Set(["collapse-construction"]),
 }
 
+const withoutCollapsedCombinations: OptimiserOptions = {
+	enabled: true,
+	disabledPasses: new Set(["collapse-combinations"]),
+}
+
 // NOTE: Every fault here compiled green and only showed itself in the emitted
 // JavaScript — a wrong value, a `TypeError`, or a bundler syntax error quoting
 // generated text — so each is pinned by RUNNING the Program as well as reading
@@ -203,8 +208,14 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			expect(generated).toContain("Object.assign(")
+			// NOTE: A collapsed Combination is a spread and names nothing at
+			// all; turn `collapse-combinations` off and `Object.assign` is
+			// back, which is the shape the shadowing could break.
+			expect(generated).toContain("...base")
 			expect(generated).toContain("const $user_Object = ")
+			expect(generate(source, withoutCollapsedCombinations)).toContain(
+				"Object.assign(",
+			)
 
 			// NOTE: Before the fix: `TypeError: Object2.assign is not a
 			// function`, esbuild having renamed the shadowing binding.
@@ -231,7 +242,9 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			expect(generated).toContain("class $user_Object {")
 			expect(generated).toContain("$user_Object.doubled(")
-			expect(generated).toContain("Object.assign(")
+			expect(generate(source, withoutCollapsedCombinations)).toContain(
+				"Object.assign(",
+			)
 
 			expect(await run(source)).toEqual(["6"])
 		})
