@@ -5115,4 +5115,588 @@ describe("Enricher", () => {
 			).toHaveLength(1)
 		})
 	})
+
+	// NOTE: What makes a doorway writable — an `if` whose condition asks a
+	// declared refinement's question narrows the binding it asked it of. Nothing
+	// here reaches the typed tree: a narrowing is a shadow declaration in an
+	// Enricher Scope, and what it is worth is the resolution it changes.
+	describe("Refinement flow narrowing", () => {
+		// NOTE: The Types every use of a name is enriched to, in the order a walk
+		// over the Program finds them — which is how a test asks what a branch
+		// narrowed a binding to without reaching through the Statements around it
+		// by hand. Reflective on purpose: what the narrowed use happens to sit
+		// inside is not what any assertion below is about.
+		function readTypesOf(source: string, name: string): Array<string> {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			let types: Array<string> = []
+			let seen = new Set<object>()
+
+			let walk = (value: unknown): void => {
+				if (
+					value === null ||
+					typeof value !== "object" ||
+					seen.has(value)
+				) {
+					return
+				}
+
+				seen.add(value)
+
+				if (Array.isArray(value)) {
+					for (let item of value) {
+						walk(item)
+					}
+
+					return
+				}
+
+				let record = value as Record<string, unknown>
+
+				if (
+					record.nodeType === "Identifier" &&
+					record.content === name
+				) {
+					types.push(printType(record.type as common.Type))
+				}
+
+				for (let child of Object.values(record)) {
+					walk(child)
+				}
+			}
+
+			walk(program)
+
+			return types
+		}
+
+		// NOTE: Every source below puts the use it is about LAST, so this is the
+		// narrowed one.
+		function narrowedTypeOf(source: string, name: string): string {
+			let types = readTypesOf(source, name)
+
+			if (types.length === 0) {
+				throw new Error(`Nothing named '${name}' is read anywhere.`)
+			}
+
+			return types[types.length - 1]
+		}
+
+		let nonZero = "type NonZeroInteger = Integer where @::isNot(0)"
+
+		it("should narrow a Constant the condition proved the predicate of", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+
+						constant d = 3
+
+						if d::isNot(0) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("NonZeroInteger")
+		})
+
+		// NOTE: The narrowing is worth exactly what it lets a Program write, which
+		// is the call a bare Integer is refused by — asserted end to end in
+		// `codeGeneration.spec.ts`, where the Validator that refuses it runs.
+		it("should let a narrowed Constant reach a refined Parameter", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					${nonZero}
+
+					function doubled(_ n: NonZeroInteger) -> Integer {
+						<- n::multiply(with 2)
+					}
+
+					constant d = 3
+
+					if d::isNot(0) {
+						__print(doubled(d))
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A Variable proven something about can be written to inside the very
+		// branch the narrowing would hold over, so the evidence would be about a
+		// value that is gone.
+		it("should not narrow a Variable", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+
+						variable d = 3
+
+						if d::isNot(0) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("Integer")
+		})
+
+		// NOTE: Two questions about the same value are not the same question. A
+		// refinement is established by the predicate it DECLARES and by nothing
+		// that merely implies it — `isGreaterThan(0)` does imply `isNot(0)`, and
+		// the Compiler has no way to know that.
+		it("should not narrow on a differently spelled predicate", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+
+						constant d = 3
+
+						if d::isGreaterThan(0) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("Integer")
+		})
+
+		it("should not narrow a Constant the condition says nothing about", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+
+						constant d = 3
+						constant e = 4
+
+						if e::isNot(0) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("Integer")
+		})
+
+		// NOTE: Set INCLUSION — a condition proving two things establishes a
+		// refinement asking for one of them.
+		it("should establish a refinement a conjunction includes", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+
+						constant d = 3
+
+						if d::isNot(0)::and(d::isLessThan(10)) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("NonZeroInteger")
+		})
+
+		// NOTE: And where several qualify, the one proving the MOST wins — it is
+		// the one that forgets the least.
+		it("should prefer the refinement proving the most", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						${nonZero}
+						type SmallNonZero = Integer where @::isNot(0)::and(@::isLessThan(10))
+
+						constant d = 3
+
+						if d::isNot(0)::and(d::isLessThan(10)) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("SmallNonZero")
+		})
+
+		// NOTE: A conjunction proves things about each binding it names, and each
+		// of them narrows on its own.
+		it("should narrow both bindings a conjunction names", () => {
+			let source = `implementation {
+				${nonZero}
+				type NonEmptyString = String where @::hasAnyContent()
+
+				constant d = 3
+				constant s = "essence"
+
+				if d::isNot(0)::and(s::hasAnyContent()) {
+					__print(s)
+					__print(d)
+				}
+			}`
+
+			expect(narrowedTypeOf(source, "d")).toBe("NonZeroInteger")
+			expect(narrowedTypeOf(source, "s")).toBe("NonEmptyString")
+		})
+
+		// NOTE: The complement table — the handful of Method pairs the standard
+		// library declares as each other's opposites, which is what makes an `else`
+		// narrow.
+		describe("the else branch", () => {
+			it("should narrow through isNot where the condition asked is", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${nonZero}
+
+							constant d = 3
+
+							if d::is(0) {
+								__print(0)
+							} else {
+								__print(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("NonZeroInteger")
+			})
+
+			it("should narrow through is where the condition asked isNot", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Zero = Integer where @::is(0)
+
+							constant d = 3
+
+							if d::isNot(0) {
+								__print(0)
+							} else {
+								__print(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Zero")
+			})
+
+			it("should narrow a String through hasAnyContent", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type NonEmptyString = String where @::hasAnyContent()
+
+							constant s = "essence"
+
+							if s::isEmpty() {
+								__print(0)
+							} else {
+								__print(s)
+							}
+						}`,
+						"s",
+					),
+				).toBe("NonEmptyString")
+			})
+
+			it("should narrow a List through hasItems", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type NonEmptyStrings = List<String> where @::hasItems()
+
+							constant items = ["a", "b"]
+
+							if items::isEmpty() {
+								__print(0)
+							} else {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("NonEmptyStrings")
+			})
+
+			// NOTE: A conjunction answering `false` says that ONE of its questions
+			// failed and nothing about which.
+			it("should not narrow through a conjunction", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${nonZero}
+
+							constant d = 3
+
+							if d::is(0)::and(d::isLessThan(10)) {
+								__print(0)
+							} else {
+								__print(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+
+			// NOTE: Including one whose OTHER half proves nothing readable. The true
+			// branch may read a conjunction leaf by leaf and ignore the rest, because
+			// each leaf it reads really is proven; the false branch may not, and a
+			// count of the conjuncts that came back could not tell the two apart.
+			it("should not narrow through a conjunction it read half of", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${nonZero}
+
+							constant d = 3
+							constant flag = true
+
+							if d::is(0)::and(flag) {
+								__print(0)
+							} else {
+								__print(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+
+			it("should not narrow through a Method with no declared opposite", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Small = Integer where @::isLessThan(10)
+
+							constant d = 3
+
+							if d::isGreaterThanOrEqualTo(10) {
+								__print(0)
+							} else {
+								__print(d)
+							}
+						}`,
+						"d",
+					),
+				).toBe("Integer")
+			})
+
+			// NOTE: An `else if` needs nothing of its own — the nested If lives in
+			// the `falseBody` Array and is enriched in the Scope the complement was
+			// declared in, so every branch below it inherits the narrowing.
+			it("should carry the narrowing into an else-if chain", () => {
+				let source = `implementation {
+					${nonZero}
+
+					constant d = 3
+
+					if d::is(0) {
+						__print(0)
+					} else if d::isLessThan(0) {
+						__print(d)
+					} else {
+						__print(d)
+					}
+				}`
+
+				// NOTE: The nested condition's own receiver, then both of its
+				// branches — the outer condition's receiver is the Integer before
+				// any of it, and is not among these three.
+				expect(readTypesOf(source, "d").slice(-3)).toEqual([
+					"NonZeroInteger",
+					"NonZeroInteger",
+					"NonZeroInteger",
+				])
+			})
+		})
+
+		// NOTE: The shadow lives in a WRAPPER Scope of its own, so a body that
+		// re-declares the very name the condition narrowed is told nothing — the
+		// declaration it would collide with is one nobody wrote.
+		it("should leave a body free to re-declare the narrowed name", () => {
+			let source = `implementation {
+				${nonZero}
+
+				constant d = 3
+
+				if d::isNot(0) {
+					constant d = 1
+
+					__print(d)
+				}
+			}`
+
+			expect(diagnosticsFor(source)).toEqual([])
+			expect(narrowedTypeOf(source, "d")).toBe("Integer")
+		})
+
+		// NOTE: A shadow that forgets something the binding's Type already carries
+		// is no narrowing at all.
+		it("should not forget evidence the binding's Type already carries", () => {
+			let source = `implementation {
+				${nonZero}
+				type Odd = Integer where @::isOdd()
+
+				function keeps(_ n: NonZeroInteger) -> Integer {
+					if n::isOdd() {
+						<- n::multiply(with 2)
+					}
+
+					<- 0
+				}
+			}`
+
+			expect(readTypesOf(source, "n").slice(-1)).toEqual([
+				"NonZeroInteger",
+			])
+		})
+
+		// NOTE: And evidence a Type already carries counts towards what the branch
+		// proves, which is what lets a condition ADD to it.
+		it("should add the condition's evidence to what the Type carries", () => {
+			let source = `implementation {
+				${nonZero}
+				type SmallNonZero = Integer where @::isNot(0)::and(@::isLessThan(10))
+
+				function adds(_ n: NonZeroInteger) -> Integer {
+					if n::isLessThan(10) {
+						<- n::multiply(with 2)
+					}
+
+					<- 0
+				}
+			}`
+
+			expect(readTypesOf(source, "n").slice(-1)).toEqual(["SmallNonZero"])
+		})
+
+		// NOTE: A Guard proves things about `@` exactly as a condition proves them
+		// about a Constant, and it runs before any Statement of the Handler — the
+		// Matcher's own check is ANDed in front of it — so what it proves holds
+		// throughout the body.
+		it("should narrow '@' by a Match Handler's Guard", () => {
+			let value = lastConstantValue(`implementation {
+				${nonZero}
+
+				constant value: Integer | String = 3
+
+				constant narrowed = match value -> Integer {
+					case Integer where @::isNot(0) {
+						<- @
+					}
+
+					case _ {
+						<- 0
+					}
+				}
+			}`)
+
+			if (value.nodeType !== "Match") {
+				throw new Error("Last Constant is not a Match.")
+			}
+
+			// NOTE: Navigated rather than searched, because a Handler holds TWO
+			// `@`s — its Guard's and its body's — and only the body's is the one
+			// the Guard narrowed.
+			let returned = value.handlers[0].body[0]
+
+			if (returned.nodeType !== "ReturnStatement") {
+				throw new Error("The first Handler does not return.")
+			}
+
+			expect(printType(returned.expression.type)).toBe("NonZeroInteger")
+		})
+
+		it("should leave '@' alone where a Guard proves nothing declared", () => {
+			let value = lastConstantValue(`implementation {
+				${nonZero}
+
+				constant value: Integer | String = 3
+
+				constant narrowed = match value -> Integer {
+					case Integer where @::isGreaterThan(0) {
+						<- @
+					}
+
+					case _ {
+						<- 0
+					}
+				}
+			}`)
+
+			if (value.nodeType !== "Match") {
+				throw new Error("Last Constant is not a Match.")
+			}
+
+			let returned = value.handlers[0].body[0]
+
+			if (returned.nodeType !== "ReturnStatement") {
+				throw new Error("The first Handler does not return.")
+			}
+
+			expect(printType(returned.expression.type)).toBe("Integer")
+		})
+
+		// NOTE: An Error matches everything in both directions, so a poisoned
+		// binding would qualify for whichever refinement is declared first and walk
+		// out of the branch better typed than it went in.
+		it("should not narrow a binding whose Type is poisoned", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type NonEmptyStrings = List<String> where @::hasItems()
+
+				constant items = [nope]
+
+				if items::hasItems() {
+					__print(items)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+				"uninferable-type-parameter",
+			])
+
+			let branch = program.implementation.nodes.find(
+				(node) => node.nodeType === "IfStatement",
+			)
+
+			if (branch?.nodeType !== "IfStatement") {
+				throw new Error("The Program has no IfStatement.")
+			}
+
+			let printed = branch.body[0]
+
+			if (printed.nodeType !== "NativeFunctionInvocation") {
+				throw new Error("The branch does not print.")
+			}
+
+			expect(printType(printed.arguments[0].value.type)).toBe(
+				"List<Error>",
+			)
+		})
+
+		// NOTE: A refinement over a base the binding is not of establishes nothing,
+		// however the predicate is spelled.
+		it("should not narrow across bases", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						type NonEmptyString = String where @::hasAnyContent()
+
+						constant items = ["a", "b"]
+
+						if items::hasItems() {
+							__print(items)
+						}
+					}`,
+					"items",
+				),
+			).toBe("List<String>")
+		})
+	})
 })
