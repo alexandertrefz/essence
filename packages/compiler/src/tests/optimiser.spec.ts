@@ -16,7 +16,11 @@ import {
 	optimiserPasses,
 	optimiserPassNames,
 } from "../optimiser/index"
-import { rewriteExpressions } from "../optimiser/walk"
+import {
+	rewriteExpressions,
+	rewriteNodes,
+	rewriteStatements,
+} from "../optimiser/walk"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { stdlibPrelude, withOptimiserOptions } from "../rewriter/stdlibPrelude"
@@ -563,6 +567,187 @@ const combinations = `implementation {
 	__print(base::is({ x = 1, y = 2 }))
 }`
 
+// NOTE: A Match in each position `lower-matches-to-statements` writes out,
+// beside the ones it must leave alone. `radius` answers with `match @ ->`, whose
+// value is `_self` already; `holding` answers with `match @.held ->`, which
+// READS `_self` and may not bind it in the same Scope; `sized` answers before
+// its last Statement, which is the one shape that needs a labelled break;
+// `described` is a Declaration's initialiser and the `match` after it is written
+// for its effects. The two `__print`s at the end hold a Match mid-Expression,
+// where there is nowhere to write a Statement and the wrapper stays.
+const statementMatches = `implementation {
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	type Box = { held: Integer | String }
+
+	namespace Shapes for Shape {
+		§§ Answers the radius, or zero.
+		§§
+		§§ @returns — the radius.
+		radius() -> Integer {
+			<- match @ -> Integer {
+				case #Circle { <- @.radius }
+				case #Blank { <- 0 }
+			}
+		}
+
+		§§ Names the Shape by how big it is.
+		§§
+		§§ @returns — the name.
+		sized() -> String {
+			constant name = match @ -> String {
+				case #Circle {
+					if @.radius::isGreaterThan(2) {
+						<- "a big circle"
+					}
+
+					<- "a circle"
+				}
+				case #Blank { <- "nothing" }
+			}
+
+			<- name
+		}
+	}
+
+	namespace Boxes for Box {
+		§§ Names what the Box holds.
+		§§
+		§§ @returns — the name.
+		holding() -> String {
+			<- match @.held -> String {
+				case Integer { <- "an Integer" }
+				case String { <- "a String" }
+			}
+		}
+	}
+
+	constant circle: Shape = Shape#Circle({ radius = 3 })
+	constant small: Shape = Shape#Circle({ radius = 1 })
+	constant blank: Shape = #Blank
+	constant box: Box = { held = 5 }
+
+	constant described = match circle -> String {
+		case #Circle { <- "a circle" }
+		case #Blank { <- "nothing" }
+	}
+
+	match blank -> {} {
+		case #Circle { __print("circle") }
+		case #Blank { __print("blank") }
+	}
+
+	__print(circle::radius())
+	__print(circle::sized())
+	__print(small::sized())
+	__print(blank::sized())
+	__print(box::holding())
+	__print(described)
+	__print(match blank -> String {
+		case #Circle { <- "a circle" }
+		case #Blank { <- "nothing" }
+	})
+}`
+
+// NOTE: A Match nested inside another's Handler, in the position whose answer is
+// the OUTER Match's — so the inner Handlers answer the outer Declaration's name
+// and break out of the outer Match's label, and the inner one declares none of
+// its own.
+const nestedStatementMatches = `implementation {
+	§§ Names a value the long way round.
+	§§
+	§§ @param value — the value to name
+	§§ @returns — the name.
+	function named(_ value: Integer | String) -> String {
+		constant name = match value -> String {
+			case Integer {
+				<- match value -> String {
+					case Integer {
+						if @::isGreaterThan(0) {
+							<- "a positive Integer"
+						}
+
+						<- "an Integer"
+					}
+					case String { <- "unreachable" }
+				}
+			}
+			case String { <- "a String" }
+		}
+
+		<- name
+	}
+
+	__print(named(1))
+	__print(named(-1))
+	__print(named("x"))
+}`
+
+// NOTE: A compiled Union dispatch that HOLDS operands, in each Statement
+// position the wrapper can be taken off in — a Return, a Declaration and a
+// Statement written for its effects — beside `either::tagged(with flip())`,
+// whose two held operands must stay in the order they were written.
+const heldDispatches = `implementation {
+	type Box = { size: Integer }
+
+	namespace Boxes for Box {
+		§§ Names the Box.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "box{suffix}"
+		}
+	}
+
+	namespace Flags for Boolean {
+		§§ Names the Boolean.
+		§§
+		§§ @param suffix — appended to the name
+		§§ @returns — the name.
+		tagged(with suffix: String) -> String {
+			<- "flag{suffix}"
+		}
+	}
+
+	§§ Answers what it is given, so that a dispatch's receiver is a call.
+	§§
+	§§ @param value — a member of the Union
+	§§ @returns — the value.
+	function identity(_ value: Integer | Boolean) -> Integer | Boolean {
+		<- value
+	}
+
+	§§ Renders a Union whose receiver is a call.
+	§§
+	§§ @returns — the rendering.
+	function rendered() -> String {
+		<- identity(5)::toString()
+	}
+
+	variable either: Box | Boolean = { size = 3 }
+
+	§§ Changes the receiver out from under the dispatch.
+	§§
+	§§ @returns — a suffix.
+	function flip() -> String {
+		either = true
+
+		<- "!"
+	}
+
+	constant tagged = either::tagged(with flip())
+
+	identity(5)::toString()
+
+	__print(rendered())
+	__print(tagged)
+	__print(either)
+}`
+
 // NOTE: The Node kinds `typedSimple.ExpressionNode` is made of, minus
 // `Identifier`. The three Identifier positions the walk leaves alone — the
 // Namespace a Method Invocation answers on, the runtime Function a native
@@ -632,6 +817,48 @@ function everyExpressionIn(program: common.typedSimple.Program): Set<unknown> {
 	}
 
 	visit(program.implementation.nodes)
+
+	return found
+}
+
+// NOTE: The four fields a Statement POSITION can stand in — a Program's own
+// nodes, a Function or Handler body, and a Conditional's two. Read as plain data
+// like the Expressions above, and for the same reason: a position the walk
+// forgot is one only an independent reading can name.
+const statementFields = new Set(["nodes", "body", "trueBody", "falseBody"])
+
+function everyStatementIn(program: common.typedSimple.Program): Set<unknown> {
+	let found = new Set<unknown>()
+
+	let visit = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			for (let entry of value) {
+				visit(entry)
+			}
+
+			return
+		}
+
+		if (value === null || typeof value !== "object") {
+			return
+		}
+
+		for (let [key, entry] of Object.entries(
+			value as Record<string, unknown>,
+		)) {
+			if (statementFields.has(key) && Array.isArray(entry)) {
+				for (let statement of entry) {
+					if (statement !== null && typeof statement === "object") {
+						found.add(statement)
+					}
+				}
+			}
+
+			visit(entry)
+		}
+	}
+
+	visit(program.implementation)
 
 	return found
 }
@@ -782,6 +1009,56 @@ describe("Optimiser", () => {
 			// NOTE: A pass that wrote into its input would corrupt the standard
 			// library for every later compilation in the process.
 			expect(markers(program)).toBe(0)
+		})
+
+		// NOTE: The Statement hook, held to the same three promises the
+		// Expression one is: every position, exactly once, and the Program
+		// handed back as itself where nothing changed.
+		for (let fileName of ["Everyday.es", "Match.es", "Loops.es"]) {
+			it(`reaches every Statement of ${fileName} exactly once`, () => {
+				let program = simplified(fileName)
+				let offered: Array<unknown> = []
+				let walked = rewriteStatements(program, (node) => {
+					offered.push(node)
+
+					return node
+				})
+
+				expect(offered.length).toBeGreaterThan(20)
+				expect(offered.length).toBe(new Set(offered).size)
+				expect(new Set(offered)).toEqual(everyStatementIn(program))
+				expect(walked).toBe(program)
+			})
+		}
+
+		it("offers a Statement after the Expressions below it", () => {
+			// NOTE: An Expression written for its effects is BOTH, and the order
+			// is what lets a pass reading Statements read what the Expression
+			// hook left — `lower-matches-to-statements` reads a compiled
+			// dispatch, which `compile-union-dispatch` writes as an Expression.
+			let program = simplifiedSource(`implementation {
+				__print(1)
+			}`)
+			let order: Array<string> = []
+
+			rewriteNodes(program, {
+				expression: (node) => {
+					order.push(`expression:${node.nodeType}`)
+
+					return node
+				},
+				statement: (node) => {
+					order.push(`statement:${node.nodeType}`)
+
+					return node
+				},
+			})
+
+			expect(order).toEqual([
+				"expression:IntegerValue",
+				"expression:NativeFunctionInvocation",
+				"statement:NativeFunctionInvocation",
+			])
 		})
 	})
 
@@ -1758,6 +2035,249 @@ describe("Optimiser", () => {
 				"devirtualise-witnesses",
 				readFileSync(fixturePath("Protocols.es"), "utf8"),
 			)
+		})
+	})
+
+	describe("lower-matches-to-statements", () => {
+		it("writes a Match in Return position without a wrapper", () => {
+			let generated = generate(statementMatches)
+
+			expect(generated).toContain(
+				'static radius(_self) {\n\t\tif (_self[$type.typeKeySymbol] === "Shape#Circle") {\n\t\t\treturn _self.radius;',
+			)
+			expect(generated).not.toContain("}(_self)")
+		})
+
+		it("binds nothing where the matched value is already _self", () => {
+			// NOTE: `match @ -> …` matches the receiver, which the Handlers read
+			// under the name it is already bound to — and `const _self = _self`
+			// would read the name being declared rather than the receiver.
+			let generated = generate(statementMatches)
+
+			expect(generated).not.toContain("const _self = _self")
+			expect(generated).toContain("static radius(_self) {\n\t\tif (")
+		})
+
+		it("binds the matched value in a block of its own", () => {
+			// NOTE: The block is what shadows an enclosing `_self` for exactly
+			// the length of the chain, as the wrapper's Parameter did.
+			expect(generate(statementMatches)).toContain(
+				"{\n\tconst _self = circle;\n\tif (",
+			)
+		})
+
+		it("reads a scrutinee that mentions _self in a Scope of its own", () => {
+			// NOTE: `match @.held -> …` READS `_self`, and a `const _self` is
+			// hoisted over its own initialiser — so reading the enclosing one
+			// from the same block is a `ReferenceError` rather than the value.
+			let generated = generate(statementMatches)
+
+			expect(generated).toMatch(
+				/const (\$matched_\d+) = _self\.held;\n\t\t\t\{\n\t\t\t\tconst _self = \1;/,
+			)
+		})
+
+		it("writes a Declaration's Match into the name it declares", () => {
+			let generated = generate(statementMatches)
+
+			expect(generated).toContain(
+				"let described;\n{\n\tconst _self = circle;",
+			)
+			expect(generated).toContain("\t\tdescribed = $pool_")
+		})
+
+		it("drops the answer of a Match written for its effects", () => {
+			// NOTE: The Simplifier gives every Handler body a Return, appending
+			// `<- {}` where it has none — so without this every Handler would
+			// end in an empty Record built, bound to a name and never read.
+			let generated = generate(statementMatches)
+
+			expect(generated).toContain(
+				'{\n\tconst _self = blank;\n\tif (_self[$type.typeKeySymbol] === "Shape#Circle") {\n\t\t$_.__print($pool_',
+			)
+			expect(generated).not.toContain("$discarded")
+		})
+
+		it("breaks out of the chain where a Handler answers early", () => {
+			// NOTE: A Return in the middle of a Handler body says the rest of the
+			// body does not run, which an assignment does not — so the labelled
+			// block is what carries that half of what a Return meant.
+			let generated = generate(statementMatches)
+
+			expect(generated).toMatch(/\$match_\d+:\n/)
+			expect(generated).toMatch(
+				/name = \$pool_\d+;\n\t\t\t\t\tbreak \$match_\d+;/,
+			)
+		})
+
+		it("labels nothing where every Handler answers last", () => {
+			// NOTE: A Handler whose last Statement is its answer has nothing
+			// after it to skip, so there is nothing to break out of.
+			let generated = generate(nestedStatementMatches)
+			let labels = [...generated.matchAll(/\$match_\d+:/g)]
+
+			expect(labels).toHaveLength(1)
+			expect(generate(statementMatches)).not.toContain("break $match_0")
+		})
+
+		it("answers the outer Match from a Match nested in a Handler", () => {
+			// NOTE: The inner Match stands in the Return position of the outer
+			// Handler, so what its Handlers answer is the outer Declaration's
+			// name — and neither of them builds a wrapper.
+			let generated = generate(nestedStatementMatches)
+
+			expect(generated).toContain("let name;")
+			expect(generated).not.toContain("function (_self)")
+			expect(generated).toMatch(/name = \$pool_\d+;\n\t\t\t\t\} else \{/)
+		})
+
+		it("keeps the wrapper where a Match stands mid-Expression", () => {
+			// NOTE: An Argument is not a place a Statement may be written, so
+			// the one Expression JavaScript has that holds Statements is still
+			// what a Match there compiles to.
+			expect(generate(statementMatches)).toContain(
+				"$_.__print(function (_self) {",
+			)
+		})
+
+		// NOTE: The lever this pass was written for. The standard library reads
+		// every fallible answer back through `<- match @ -> …`, which is the one
+		// shape that costs nothing at all to write out: the value is `_self`
+		// already and the Handlers' Returns are the Method's own.
+		it("takes the wrapper off the standard library's own Matches", () => {
+			let source = `implementation {
+				__print(Integer.parse("7")::otherwise(0))
+			}`
+			let body = bodyOf(generate(source), "$es_Optional_otherwise")
+
+			expect(body).toContain(
+				'const $es_Optional_otherwise = function (_self, fallback) {\n\tif (_self[$type.typeKeySymbol] === "Optional#Value") {',
+			)
+			expect(body).not.toContain("function (_self) {\n\t\tif")
+		})
+
+		it("wraps the chain again when it is turned off", () => {
+			let generated = generate(statementMatches, {
+				enabled: true,
+				disabledPasses: new Set(["lower-matches-to-statements"]),
+			})
+
+			expect(generated).toContain("return function (_self) {")
+			expect(generated).not.toContain("const _self = circle")
+			expect(generated).not.toContain("let described;")
+		})
+
+		// NOTE: The two Match passes meet on every Handler and this one runs
+		// FIRST, so what `elide-final-match-test` reads is what this one left —
+		// and it reads a lowered Match exactly as it reads one that was not.
+		it("elides the last test of a lowered Match too", () => {
+			let generated = generate(statementMatches)
+
+			expect(generated).not.toContain('=== "Shape#Blank"')
+			expect(generated).not.toContain("noCaseMatched")
+			expect(
+				generate(statementMatches, {
+					enabled: true,
+					disabledPasses: new Set(["elide-final-match-test"]),
+				}),
+			).toContain('=== "Shape#Blank"')
+		})
+
+		it("prints the same thing with the pass off", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"lower-matches-to-statements",
+					statementMatches,
+				),
+			).toEqual([
+				'"blank"',
+				"3",
+				'"a big circle"',
+				'"a circle"',
+				'"nothing"',
+				'"an Integer"',
+				'"a circle"',
+				'"nothing"',
+			])
+		})
+
+		it("prints the same thing with the pass off for a nested Match", async () => {
+			expect(
+				await expectSamePrintedOutput(
+					"lower-matches-to-statements",
+					nestedStatementMatches,
+				),
+			).toEqual(['"a positive Integer"', '"an Integer"', '"a String"'])
+		})
+
+		it("prints the same thing with the pass off for every fixture shape", async () => {
+			await expectSamePrintedOutput(
+				"lower-matches-to-statements",
+				readFileSync(fixturePath("Match.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-matches-to-statements",
+				readFileSync(fixturePath("Maybe.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-matches-to-statements",
+				readFileSync(fixturePath("Tree.es"), "utf8"),
+			)
+			await expectSamePrintedOutput(
+				"lower-matches-to-statements",
+				readFileSync(fixturePath("Everyday.es"), "utf8"),
+			)
+		})
+
+		describe("a dispatch that holds operands", () => {
+			it("holds the names as the consts of a block", () => {
+				let generated = generate(heldDispatches)
+
+				expect(generated).toContain(
+					"\tconst $dispatch_0 = identity($pool_0);\n\t\treturn $dispatch_0[$type.typeKeySymbol]",
+				)
+				expect(generated).toContain(
+					"let tagged;\n{\n\tconst $dispatch_0 = either;\n\tconst $dispatch_1 = flip();\n\ttagged = ",
+				)
+				expect(generated).not.toContain("=>")
+			})
+
+			it("holds the receiver where an Argument could change it", async () => {
+				// NOTE: THE order invariant, asked of the lifted form. `flip`
+				// assigns `either`, and the dispatch reads the receiver BEFORE
+				// the Argument is evaluated — so the consts stand in the order
+				// the Argument array was built in.
+				expect(
+					await expectSamePrintedOutput(
+						"lower-matches-to-statements",
+						heldDispatches,
+					),
+				).toEqual(['"5"', '"box!"', "true"])
+			})
+
+			it("wraps the chain in an arrow again when it is turned off", () => {
+				expect(
+					generate(heldDispatches, {
+						enabled: true,
+						disabledPasses: new Set([
+							"lower-matches-to-statements",
+						]),
+					}),
+				).toContain("(($dispatch_0, $dispatch_1) =>")
+			})
+
+			it("leaves a chain holding nothing where it stands", () => {
+				// NOTE: There is no wrapper to take away — the chain is the
+				// conditional Expression itself, which stands in a Statement
+				// position as happily as in any other.
+				let generated = generate(`implementation {
+					constant value: Integer | Boolean = 5
+
+					__print(value::toString())
+				}`)
+
+				expect(generated).not.toContain("$dispatch_0")
+			})
 		})
 	})
 

@@ -701,6 +701,7 @@ export type StatementNode =
 	| ConditionalStatementNode
 	| ReturnStatementNode
 	| FunctionStatementNode
+	| IntrinsicStatementNode
 
 export interface VariableDeclarationStatementNode {
 	nodeType: "VariableDeclarationStatement"
@@ -765,6 +766,105 @@ export interface FunctionStatementNode {
 	nodeType: "FunctionStatement"
 	name: IdentifierNode
 	value: FunctionDefinitionNode
+	position?: Position
+}
+
+// #endregion
+
+// #region Statement intrinsics
+
+// NOTE: The Statement half of the intrinsic family, and it exists for one
+// reason: JavaScript can say things in a Statement that it can not say in an
+// Expression. A Match is an Expression in Essence and its Handlers are
+// Statements, so the Rewriter wrapped one in a Function and CALLED it — the
+// only Expression that may hold Statements — and a compiled Union dispatch that
+// has to hold a value under a name did the same with an arrow, because `let` is
+// not an Expression either. Where such an Expression stands in a Statement
+// position, none of that is needed: the Statements can simply be written.
+//
+// NOTE: `lower-matches-to-statements` is the one pass that produces these, and
+// what it needs to know is where the ANSWER goes — which is what `result` says.
+// Nothing downstream may move one into an Expression position: these are
+// Statements, and a Statement is not an Expression here as it is not one in
+// JavaScript.
+export type IntrinsicStatementNode = StatementMatchNode | HeldExpressionNode
+
+// NOTE: Where a lowered Expression's answer goes, which is the whole of what the
+// Statement position it stood in decides.
+export type StatementResult =
+	// NOTE: A Return Statement's Expression. Nothing is held and nothing is
+	// assigned: a Handler's own Return IS the enclosing Function's Return, which
+	// is what the wrapper's Return was standing in for.
+	| { kind: "return" }
+	// NOTE: A Variable Declaration's initialiser. The declaration is emitted
+	// BEFORE the block and left uninitialised, because the name has to outlive
+	// the block that computes it — which is also why it is emitted as a `let`
+	// where the source said `constant`. Nothing assigns it twice.
+	| { kind: "declaration"; name: IdentifierNode }
+	// NOTE: An assignment's right-hand side. The name is already bound, so only
+	// the assignment is emitted.
+	| { kind: "assignment"; name: IdentifierNode }
+	// NOTE: A Statement written for its effects. The answer goes nowhere, so
+	// what a Handler answered is evaluated and dropped — and where answering it
+	// observes nothing, `lower-matches-to-statements` has already taken the
+	// Return Statement away.
+	| { kind: "discard" }
+
+// NOTE: How the matched value reaches `_self`, the name every Handler reads it
+// under — `@` inside a Handler body is that name, and so is the value a
+// compiled Type test reads.
+export type MatchedValueBinding =
+	// NOTE: The value IS `_self` already: the Match's scrutinee is the enclosing
+	// Method's receiver, written `match @ -> …`. Nothing is bound and no block
+	// is needed at all.
+	| { kind: "self" }
+	// NOTE: `{ const _self = <value>; … }`. The block is what shadows an
+	// enclosing `_self` for the length of the chain, exactly as the wrapper's
+	// Parameter did.
+	| { kind: "block" }
+	// NOTE: `{ const <name> = <value>; { const _self = <name>; … } }`. The value
+	// READS `_self` — `match @.item -> …` — and a `const _self` is hoisted over
+	// its own initialiser, so reading the enclosing one from the same block is a
+	// `ReferenceError`. The read happens in a Scope of its own first.
+	| { kind: "held"; name: string }
+
+// NOTE: A Match written as the Statements it always was: the value under a
+// name, a chain of `if`s over the Handlers' tests, and each Handler's body where
+// the Function body was. The wrapper is gone, and with it the closure a Match
+// allocated per evaluation.
+//
+// NOTE: A Handler's Return Statement means "this is the Match's answer", which
+// under the wrapper was a JavaScript Return. It still is where `result` is
+// `return`; for every other result the Rewriter writes the answer where it goes
+// and leaves the chain — `label` is the labelled block it breaks out of, and it
+// is emitted only where something breaks.
+export interface StatementMatchNode {
+	nodeType: "IntrinsicStatement"
+	kind: "statement-match"
+	value: ExpressionNode
+	binding: MatchedValueBinding
+	handlers: Array<MatchHandler>
+	// NOTE: The same claim `MatchNode` carries, and `elide-final-match-test`
+	// makes it here as well — the pass reads a lowered Match as it reads one
+	// that was left alone.
+	finalHandlerIsElse: boolean
+	result: StatementResult
+	label: string
+	position?: Position
+}
+
+// NOTE: An Expression that has to hold values under names, written as the
+// Statements that hold them. A compiled Union dispatch is the one thing that
+// does: it evaluates the receiver and the shared Arguments once, before any
+// test, and every branch then READS them — which in an Expression position
+// costs an arrow called at once with them. In a Statement position the names
+// are `const`s of a block, and the arrow is gone.
+export interface HeldExpressionNode {
+	nodeType: "IntrinsicStatement"
+	kind: "held-expression"
+	temporaries: Array<DispatchTemporaryNode>
+	expression: ExpressionNode
+	result: StatementResult
 	position?: Position
 }
 

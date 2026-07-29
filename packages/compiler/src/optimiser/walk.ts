@@ -35,16 +35,34 @@ type ArgumentNode = common.typedSimple.ArgumentNode
 // structural sharing above is kept.
 export type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 
-// NOTE: There is deliberately no Statement hook yet. Every pass to date
-// rewrites Expressions, and a hook nothing calls is a contract nothing keeps;
-// the walk already REACHES every Statement position, so adding one is a matter
-// of offering the Node rather than of finding it.
-export function rewriteExpressions(
+// NOTE: And the same for a Statement — one Node standing in a Statement
+// POSITION in, its replacement out. "Statement position" is the whole of what
+// this offers and is wider than `StatementNode`: an Expression written for its
+// effects stands in one, and a Match written that way is exactly what
+// `lower-matches-to-statements` is looking for. Such a Node is offered to BOTH
+// hooks, the Expression one first, because it is both things at once.
+export type StatementRewrite = (node: ImplementationNode) => ImplementationNode
+
+// NOTE: The hooks a pass asks for, and it may ask for either or both. Both are
+// offered by ONE walk: `elide-final-match-test` reads a Match that is still an
+// Expression and one that has been lowered to a Statement, and two walks would
+// be two chances to disagree about what was reached.
+export type NodeRewrites = {
+	expression?: ExpressionRewrite
+	statement?: StatementRewrite
+}
+
+// NOTE: BOTTOM-UP for Statements as well: a Statement's children — its
+// Expressions and the Statements of any body it holds — are rewritten before it
+// is offered. So a pass reading its own output reads the finished form of
+// everything below it, and a Match nested in a Handler's body is lowered before
+// the Match holding it is asked about.
+export function rewriteNodes(
 	program: common.typedSimple.Program,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): common.typedSimple.Program {
 	let nodes = mapArray(program.implementation.nodes, (node) =>
-		walkImplementation(node, rewrite),
+		walkImplementation(node, rewrites),
 	)
 
 	if (nodes === program.implementation.nodes) {
@@ -55,6 +73,20 @@ export function rewriteExpressions(
 		...program,
 		implementation: { ...program.implementation, nodes },
 	}
+}
+
+export function rewriteExpressions(
+	program: common.typedSimple.Program,
+	rewrite: ExpressionRewrite,
+): common.typedSimple.Program {
+	return rewriteNodes(program, { expression: rewrite })
+}
+
+export function rewriteStatements(
+	program: common.typedSimple.Program,
+	rewrite: StatementRewrite,
+): common.typedSimple.Program {
+	return rewriteNodes(program, { statement: rewrite })
 }
 
 function mapArray<Value>(
@@ -98,20 +130,35 @@ function mapRecord<Value>(
 	return changed ? mapped : members
 }
 
+// NOTE: Every Statement POSITION, offered once. An Expression written for its
+// effects stands in one and has already been offered to the Expression hook by
+// the time it is offered here — the walk below descends first and asks after,
+// as it does everywhere.
 function walkImplementation(
 	node: ImplementationNode,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
+): ImplementationNode {
+	let walked = walkImplementationChildren(node, rewrites)
+
+	return rewrites.statement === undefined
+		? walked
+		: rewrites.statement(walked)
+}
+
+function walkImplementationChildren(
+	node: ImplementationNode,
+	rewrites: NodeRewrites,
 ): ImplementationNode {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
 		case "VariableAssignmentStatement": {
-			let value = walkExpression(node.value, rewrite)
+			let value = walkExpression(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
 		case "NamespaceDefinitionStatement": {
 			let properties = mapRecord(node.properties, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 			// NOTE: A Method's body is walked, the Function literal holding it is
 			// not offered to the pass: the Rewriter emits it as a class member
@@ -119,7 +166,7 @@ function walkImplementation(
 			// kind of Expression to stand in. A Namespace's static Properties
 			// above ARE values, and are offered like any other.
 			let methods = mapRecord(node.methods, (entry) => {
-				let value = walkFunctionDefinition(entry.method.value, rewrite)
+				let value = walkFunctionDefinition(entry.method.value, rewrites)
 
 				if (value === entry.method.value) {
 					return entry
@@ -135,12 +182,12 @@ function walkImplementation(
 			return { ...node, properties, methods }
 		}
 		case "ConditionalStatement": {
-			let condition = walkExpression(node.condition, rewrite)
+			let condition = walkExpression(node.condition, rewrites)
 			let trueBody = mapArray(node.trueBody, (entry) =>
-				walkImplementation(entry, rewrite),
+				walkImplementation(entry, rewrites),
 			)
 			let falseBody = mapArray(node.falseBody, (entry) =>
-				walkImplementation(entry, rewrite),
+				walkImplementation(entry, rewrites),
 			)
 
 			if (
@@ -154,17 +201,19 @@ function walkImplementation(
 			return { ...node, condition, trueBody, falseBody }
 		}
 		case "ReturnStatement": {
-			let expression = walkExpression(node.expression, rewrite)
+			let expression = walkExpression(node.expression, rewrites)
 
 			return expression === node.expression
 				? node
 				: { ...node, expression }
 		}
 		case "FunctionStatement": {
-			let value = walkFunctionDefinition(node.value, rewrite)
+			let value = walkFunctionDefinition(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
+		case "IntrinsicStatement":
+			return walkIntrinsicStatementChildren(node, rewrites)
 		// NOTE: A Protocol declaration and a Type Alias carry nothing but names
 		// and Types by this point — the Rewriter emits nothing at all for
 		// either.
@@ -172,16 +221,58 @@ function walkImplementation(
 		case "TypeAliasStatement":
 			return node
 		default:
-			return walkExpression(node, rewrite)
+			return walkExpression(node, rewrites)
+	}
+}
+
+// NOTE: A lowered Statement is walked like the Expression it was lowered from:
+// its Handlers' tests, Guards and bodies, and the values it holds under a name,
+// are the same positions in the same order. That is what lets the passes after
+// `lower-matches-to-statements` — the pool above all — reach what a Match holds
+// whether or not it was lowered.
+function walkIntrinsicStatementChildren(
+	node: common.typedSimple.IntrinsicStatementNode,
+	rewrites: NodeRewrites,
+): ImplementationNode {
+	switch (node.kind) {
+		case "statement-match": {
+			let value = walkExpression(node.value, rewrites)
+			let handlers = walkHandlers(node.handlers, rewrites)
+
+			if (value === node.value && handlers === node.handlers) {
+				return node
+			}
+
+			return { ...node, value, handlers }
+		}
+		case "held-expression": {
+			let temporaries = mapArray(node.temporaries, (temporary) => {
+				let value = walkExpression(temporary.value, rewrites)
+
+				return value === temporary.value
+					? temporary
+					: { ...temporary, value }
+			})
+			let expression = walkExpression(node.expression, rewrites)
+
+			if (
+				temporaries === node.temporaries &&
+				expression === node.expression
+			) {
+				return node
+			}
+
+			return { ...node, temporaries, expression }
+		}
 	}
 }
 
 function walkFunctionDefinition(
 	node: FunctionDefinitionNode,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): FunctionDefinitionNode {
 	let body = mapArray(node.body, (entry) =>
-		walkImplementation(entry, rewrite),
+		walkImplementation(entry, rewrites),
 	)
 
 	return body === node.body ? node : { ...node, body }
@@ -189,10 +280,10 @@ function walkFunctionDefinition(
 
 function walkArguments(
 	args: Array<ArgumentNode>,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): Array<ArgumentNode> {
 	return mapArray(args, (argument) => {
-		let value = walkExpression(argument.value, rewrite)
+		let value = walkExpression(argument.value, rewrites)
 
 		return value === argument.value ? argument : { ...argument, value }
 	})
@@ -200,9 +291,13 @@ function walkArguments(
 
 function walkExpression(
 	node: ExpressionNode,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): ExpressionNode {
-	return rewrite(walkChildren(node, rewrite))
+	let walked = walkChildren(node, rewrites)
+
+	return rewrites.expression === undefined
+		? walked
+		: rewrites.expression(walked)
 }
 
 // NOTE: The Expression positions a Node holds — and only those. A `type` is
@@ -215,18 +310,18 @@ function walkExpression(
 // Identifier.
 function walkChildren(
 	node: ExpressionNode,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): ExpressionNode {
 	switch (node.nodeType) {
 		case "NativeFunctionInvocation":
 		case "MethodInvocation": {
-			let args = walkArguments(node.arguments, rewrite)
+			let args = walkArguments(node.arguments, rewrites)
 
 			return args === node.arguments ? node : { ...node, arguments: args }
 		}
 		case "FunctionInvocation": {
-			let name = walkExpression(node.name, rewrite)
-			let args = walkArguments(node.arguments, rewrite)
+			let name = walkExpression(node.name, rewrites)
+			let args = walkArguments(node.arguments, rewrites)
 
 			if (name === node.name && args === node.arguments) {
 				return node
@@ -235,8 +330,8 @@ function walkChildren(
 			return { ...node, name, arguments: args }
 		}
 		case "UnionMethodInvocation": {
-			let base = walkExpression(node.base, rewrite)
-			let args = walkArguments(node.arguments, rewrite)
+			let base = walkExpression(node.base, rewrites)
+			let args = walkArguments(node.arguments, rewrites)
 			// NOTE: A dispatch case carries Arguments of its own — the hidden
 			// conformance witnesses every branch needs, and the Function
 			// literals compiled against THIS branch's Method. Both are ordinary
@@ -244,14 +339,14 @@ function walkChildren(
 			let cases = mapArray(node.cases, (dispatch) => {
 				let conformanceArguments = walkArguments(
 					dispatch.conformanceArguments,
-					rewrite,
+					rewrites,
 				)
 				let contextualArguments = mapArray(
 					dispatch.contextualArguments,
 					(entry) => {
 						let value = walkExpression(
 							entry.argument.value,
-							rewrite,
+							rewrites,
 						)
 
 						return value === entry.argument.value
@@ -288,8 +383,8 @@ function walkChildren(
 			return { ...node, base, arguments: args, cases }
 		}
 		case "Combination": {
-			let lhs = walkExpression(node.lhs, rewrite)
-			let rhs = walkExpression(node.rhs, rewrite)
+			let lhs = walkExpression(node.lhs, rewrites)
+			let rhs = walkExpression(node.rhs, rewrites)
 
 			if (lhs === node.lhs && rhs === node.rhs) {
 				return node
@@ -299,7 +394,7 @@ function walkChildren(
 		}
 		case "RecordValue": {
 			let members = mapRecord(node.members, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 
 			return members === node.members ? node : { ...node, members }
@@ -310,8 +405,8 @@ function walkChildren(
 					return segment
 				}
 
-				let expression = walkExpression(segment.expression, rewrite)
-				let witness = walkExpression(segment.witness, rewrite)
+				let expression = walkExpression(segment.expression, rewrites)
+				let witness = walkExpression(segment.witness, rewrites)
 
 				if (
 					expression === segment.expression &&
@@ -326,73 +421,25 @@ function walkChildren(
 			return segments === node.segments ? node : { ...node, segments }
 		}
 		case "FunctionValue": {
-			let value = walkFunctionDefinition(node.value, rewrite)
+			let value = walkFunctionDefinition(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
 		case "ListValue": {
 			let values = mapArray(node.values, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 
 			return values === node.values ? node : { ...node, values }
 		}
 		case "Lookup": {
-			let base = walkExpression(node.base, rewrite)
+			let base = walkExpression(node.base, rewrites)
 
 			return base === node.base ? node : { ...node, base }
 		}
 		case "Match": {
-			let value = walkExpression(node.value, rewrite)
-			let handlers = mapArray(node.handlers, (handler) => {
-				// NOTE: A residual Type test is walked like any other
-				// Expression, so a pass that runs after the one which wrote it
-				// reads it — and, as with the test under an `essence-boolean`,
-				// what a later pass may not do is answer it with a Node of the
-				// wrong KIND: it stands where JavaScript says `if (…)`, so an
-				// Essence Boolean value there would be an object, and every
-				// object is true.
-				let typeTest =
-					handler.typeTest === null
-						? null
-						: walkExpression(handler.typeTest, rewrite)
-				let literal =
-					handler.literal === null
-						? null
-						: walkExpression(handler.literal, rewrite)
-				let memberLiterals =
-					handler.memberLiterals === null
-						? null
-						: mapRecord(handler.memberLiterals, (member) =>
-								walkExpression(member, rewrite),
-							)
-				let guard =
-					handler.guard === null
-						? null
-						: walkExpression(handler.guard, rewrite)
-				let body = mapArray(handler.body, (entry) =>
-					walkImplementation(entry, rewrite),
-				)
-
-				if (
-					typeTest === handler.typeTest &&
-					literal === handler.literal &&
-					memberLiterals === handler.memberLiterals &&
-					guard === handler.guard &&
-					body === handler.body
-				) {
-					return handler
-				}
-
-				return {
-					...handler,
-					typeTest,
-					literal,
-					memberLiterals,
-					guard,
-					body,
-				}
-			})
+			let value = walkExpression(node.value, rewrites)
+			let handlers = walkHandlers(node.handlers, rewrites)
 
 			if (value === node.value && handlers === node.handlers) {
 				return node
@@ -402,7 +449,7 @@ function walkChildren(
 		}
 		case "ConformanceValue": {
 			let conditions = mapArray(node.conditions, (condition) =>
-				walkExpression(condition, rewrite),
+				walkExpression(condition, rewrites),
 			)
 
 			return conditions === node.conditions
@@ -411,12 +458,14 @@ function walkChildren(
 		}
 		case "CaseValue": {
 			let value =
-				node.value === null ? null : walkExpression(node.value, rewrite)
+				node.value === null
+					? null
+					: walkExpression(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
 		case "Intrinsic":
-			return walkIntrinsicChildren(node, rewrite)
+			return walkIntrinsicChildren(node, rewrites)
 		// NOTE: The leaves — a Literal holds its own value, an Identifier a
 		// name, and neither has anywhere for an Expression to hide.
 		case "StringValue":
@@ -428,6 +477,56 @@ function walkChildren(
 	}
 }
 
+// NOTE: A Match's Handlers, walked the same whether the Match is still an
+// Expression or has been lowered to a Statement — one reading, so the two forms
+// can not be reached differently.
+//
+// NOTE: A residual Type test is walked like any other Expression, so a pass that
+// runs after the one which wrote it reads it — and, as with the test under an
+// `essence-boolean`, what a later pass may not do is answer it with a Node of
+// the wrong KIND: it stands where JavaScript says `if (…)`, so an Essence
+// Boolean value there would be an object, and every object is true.
+function walkHandlers(
+	handlers: Array<common.typedSimple.MatchHandler>,
+	rewrites: NodeRewrites,
+): Array<common.typedSimple.MatchHandler> {
+	return mapArray(handlers, (handler) => {
+		let typeTest =
+			handler.typeTest === null
+				? null
+				: walkExpression(handler.typeTest, rewrites)
+		let literal =
+			handler.literal === null
+				? null
+				: walkExpression(handler.literal, rewrites)
+		let memberLiterals =
+			handler.memberLiterals === null
+				? null
+				: mapRecord(handler.memberLiterals, (member) =>
+						walkExpression(member, rewrites),
+					)
+		let guard =
+			handler.guard === null
+				? null
+				: walkExpression(handler.guard, rewrites)
+		let body = mapArray(handler.body, (entry) =>
+			walkImplementation(entry, rewrites),
+		)
+
+		if (
+			typeTest === handler.typeTest &&
+			literal === handler.literal &&
+			memberLiterals === handler.memberLiterals &&
+			guard === handler.guard &&
+			body === handler.body
+		) {
+			return handler
+		}
+
+		return { ...handler, typeTest, literal, memberLiterals, guard, body }
+	})
+}
+
 // NOTE: An intrinsic is walked like anything else. A pass that runs after the
 // one which produced it reads the shape it left — a `direct-record`'s members
 // are the Record's members, wherever the Record came from — and a pass that
@@ -435,7 +534,7 @@ function walkChildren(
 // registry decides what it can do.
 function walkIntrinsicChildren(
 	node: common.typedSimple.IntrinsicNode,
-	rewrite: ExpressionRewrite,
+	rewrites: NodeRewrites,
 ): ExpressionNode {
 	switch (node.kind) {
 		// NOTE: A `tag-test`'s value and an `essence-boolean`'s test are
@@ -459,13 +558,13 @@ function walkIntrinsicChildren(
 		// says which pooled constant it IS. Nothing does: `pool-constants` is
 		// the last pass to run, so nothing reads its output but the Rewriter.
 		case "pooled-reference": {
-			let value = walkExpression(node.value, rewrite)
+			let value = walkExpression(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
 		case "type-test": {
-			let value = walkExpression(node.value, rewrite)
-			let descriptor = walkExpression(node.descriptor, rewrite)
+			let value = walkExpression(node.value, rewrites)
+			let descriptor = walkExpression(node.descriptor, rewrites)
 
 			if (value === node.value && descriptor === node.descriptor) {
 				return node
@@ -484,9 +583,11 @@ function walkIntrinsicChildren(
 		// running after the one that lowered it reads them, and
 		// `pool-constants` finds the literal standing in one.
 		case "raw-boolean-op": {
-			let operand = walkExpression(node.operand, rewrite)
+			let operand = walkExpression(node.operand, rewrites)
 			let other =
-				node.other === null ? null : walkExpression(node.other, rewrite)
+				node.other === null
+					? null
+					: walkExpression(node.other, rewrites)
 
 			if (operand === node.operand && other === node.other) {
 				return node
@@ -497,8 +598,8 @@ function walkIntrinsicChildren(
 		case "raw-compare":
 		case "raw-equals":
 		case "raw-arithmetic": {
-			let left = walkExpression(node.left, rewrite)
-			let right = walkExpression(node.right, rewrite)
+			let left = walkExpression(node.left, rewrites)
+			let right = walkExpression(node.right, rewrites)
 
 			if (left === node.left && right === node.right) {
 				return node
@@ -508,19 +609,19 @@ function walkIntrinsicChildren(
 		}
 		case "direct-record": {
 			let members = mapRecord(node.members, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 
 			return members === node.members ? node : { ...node, members }
 		}
 		case "direct-case": {
 			let members = mapRecord(node.members, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 			let payload =
 				node.payload === null
 					? null
-					: walkExpression(node.payload, rewrite)
+					: walkExpression(node.payload, rewrites)
 
 			if (members === node.members && payload === node.payload) {
 				return node
@@ -530,7 +631,7 @@ function walkIntrinsicChildren(
 		}
 		case "direct-list": {
 			let values = mapArray(node.values, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 
 			return values === node.values ? node : { ...node, values }
@@ -544,29 +645,29 @@ function walkIntrinsicChildren(
 		// may rewrite it exactly as it would anywhere else.
 		case "dispatch-chain": {
 			let temporaries = mapArray(node.temporaries, (temporary) => {
-				let value = walkExpression(temporary.value, rewrite)
+				let value = walkExpression(temporary.value, rewrites)
 
 				return value === temporary.value
 					? temporary
 					: { ...temporary, value }
 			})
-			let receiver = walkExpression(node.receiver, rewrite)
+			let receiver = walkExpression(node.receiver, rewrites)
 			let args = mapArray(node.arguments, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 			let cases = mapArray(node.cases, (dispatchCase) => {
 				let test =
 					dispatchCase.test === null
 						? null
-						: walkExpression(dispatchCase.test, rewrite)
+						: walkExpression(dispatchCase.test, rewrites)
 				let conformanceArguments = mapArray(
 					dispatchCase.conformanceArguments,
-					(value) => walkExpression(value, rewrite),
+					(value) => walkExpression(value, rewrites),
 				)
 				let contextualArguments = mapArray(
 					dispatchCase.contextualArguments,
 					(contextual) => {
-						let value = walkExpression(contextual.value, rewrite)
+						let value = walkExpression(contextual.value, rewrites)
 
 						return value === contextual.value
 							? contextual
@@ -609,12 +710,12 @@ function walkIntrinsicChildren(
 			}
 		}
 		case "spread-combination": {
-			let lhs = walkExpression(node.lhs, rewrite)
+			let lhs = walkExpression(node.lhs, rewrites)
 			let members = mapRecord(node.members, (value) =>
-				walkExpression(value, rewrite),
+				walkExpression(value, rewrites),
 			)
 			let rhs =
-				node.rhs === null ? null : walkExpression(node.rhs, rewrite)
+				node.rhs === null ? null : walkExpression(node.rhs, rewrites)
 
 			if (
 				lhs === node.lhs &&

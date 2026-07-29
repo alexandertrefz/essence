@@ -242,7 +242,9 @@ value however often it is built — and `pool-constants` then declares that valu
 once for every branch that names it. Where a temporary is needed the chain is
 the body of an arrow called at once with it, because a Method Invocation stands
 in an Expression position and `let` can not; where none is, there is no wrapper
-at all.
+at all. Where the Invocation is what a Statement computes there is no wrapper
+either — `lower-matches-to-statements` writes those names out as the `const`s of
+a block, through the same seam it writes a Match's Handlers through.
 
 A name is held all the same when a held operand FOLLOWS it, and that is not a
 nicety. Held operands are evaluated ahead of the tests, so a name left where the
@@ -322,6 +324,79 @@ interpolates and passes no witness anywhere stops building one at all — and on
 step of indirection that an engine's inline caches otherwise have to keep track
 of. It is measured in bytes and in directness rather than in nanoseconds, and it
 is a pass because it is a transform, not because it is a lever.
+
+### `lower-matches-to-statements`
+
+Writes a Match where it stands, instead of in a Function called on the spot.
+
+A Match is an Expression in Essence and its Handlers are Statements, and
+JavaScript has exactly one Expression that may hold Statements — a Function
+call. So every Match compiled to one:
+
+```js
+(function (_self) {
+	if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
+	return …
+})(value)
+```
+
+That closure is built and called on every evaluation of every Match, of every
+turn of whatever loop reaches one. Where the Match itself stands in a Statement
+position, none of it is needed:
+
+```js
+const _self = value;
+if (_self[$type.typeKeySymbol] === "Optional#Value") { return … }
+return …
+```
+
+Three positions qualify, and they are the three places an Expression's answer
+has somewhere a Statement can name: a Return Statement, a Variable Declaration's
+initialiser (or an assignment's right-hand side), and a Match written for its
+effects. A Match anywhere else — an Argument, a Record member, an interpolation
+hole — keeps its wrapper, because there is nothing there to write Statements
+into.
+
+**What a Handler's Return means is the whole of the difference.** Under the
+wrapper it answered the wrapper. In Return position it answers the enclosing
+Function, which is what a Return already does — so those Handlers are emitted
+exactly as written, nothing is held, and this is where the pass costs least and
+earns most: the standard library reads every fallible answer back through
+`<- match … -> …`. Everywhere else the answer is written where it goes and the
+chain is left through a labelled `break` — emitted only where a Handler answers
+somewhere other than the end of its body, because a Handler that answers last
+has nothing after it to skip.
+
+**`_self` still means the matched value, and still shadows.** It was a
+Parameter, which is bound from OUTSIDE the Scope it declares; a `const` is not,
+and `const _self = _self` reads the name being declared rather than the
+enclosing receiver. So `match @ -> …` binds nothing at all — the value is
+already `_self`, and the Handlers read what is already there — and a scrutinee
+that merely mentions `_self`, like `match @.item -> …`, reads it in a Scope of
+its own before the block that shadows it. Everything else is one block, which
+shadows for exactly the length of the chain as the Parameter did.
+
+Safe because nothing about the chain changes: the same tests in the same order
+over the same value, the same bodies, the same fall-through. What changes is
+where the Statements are written, and one thing more — a Match written for its
+effects drops the Return its Handlers end in where answering it observes
+nothing. The Simplifier gives every Handler body a Return, appending `<- {}`
+where the body has none, and building an empty Record to drop it is the one
+thing that would otherwise be emitted for no reason. A Return that answers with
+a call is kept and evaluated; only the last Statement of a body is ever
+considered, because a Return anywhere else is control flow as well as an answer.
+
+One more thing rides with this pass, because it is about what a Statement can
+say that an Expression can not:
+
+**A compiled Union dispatch that holds operands is lifted too.**
+`compile-union-dispatch` evaluates the receiver and the shared Arguments once,
+before any test, and binds them as the Parameters of an arrow it calls at once —
+the same trick for the same reason, because `let` is not an Expression. Where
+the dispatch is what a Statement computes, the names become the `const`s of a
+block and the arrow is gone. The block is not decoration: a chain numbers its
+names from zero, so two chains lifted into one Scope would otherwise declare one
+name twice.
 
 ### `elide-final-match-test`
 
