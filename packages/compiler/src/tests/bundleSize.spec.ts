@@ -85,6 +85,18 @@ describe("Bundle Size", () => {
 	// with it, keeping ~1 kB of headroom; a reintroduced spread is still
 	// several kilobytes past it.
 	//
+	// NOTE: It now measures 61,600, and the ceiling moved to keep the same
+	// ~1 kB of headroom. The 1,653 bytes are the five unconditional runtime
+	// improvements, measured one at a time on this very file: the interned
+	// Booleans cost 137, the interned unit Cases 275, the reflexive equality
+	// shortcut 38, remembering a String's grapheme view 990, and remembering a
+	// Rational's lowest-terms form 213. Each is a few lines that every Program
+	// carries and that take an allocation, a walk or a segmentation out of a
+	// hot path — the grapheme view alone turns a ~4,200ns call into a ~1ns one
+	// — so this is the one direction the ceiling is meant to allow. What it
+	// still catches is unchanged: a reintroduced `Number` spread was over five
+	// kilobytes here, and the `isEven` shape below was 2.4.
+	//
 	// NOTE: What nearly landed here and did not: writing `Integer::isEven` as
 	// `remainder(dividingBy 2)::is(#Value(0))` reads far better and cost
 	// 2.4 kB, because a GENERIC Choice's derived equality goes through
@@ -92,7 +104,7 @@ describe("Bundle Size", () => {
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(61_000)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(62_700)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.
