@@ -30,6 +30,7 @@ import {
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
+	predicateConjunctKey,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
 	typeContainsError,
@@ -1816,6 +1817,26 @@ export function enrichMatch(
 									),
 						)
 
+			// NOTE: A Guard proves things about `@` the same way an `if`'s
+			// condition proves them about a Constant, and it runs before any
+			// Statement of the body — the Matcher's own check is ANDed in front
+			// of it — so whatever it establishes holds throughout. The body goes
+			// one Scope deeper only when something WAS established, so a Handler
+			// that narrows nothing keeps declaring its payload binding in the
+			// Scope it always did.
+			let guardNarrowings =
+				guard === null
+					? []
+					: narrowingsFor(
+							conditionEvidence(guard, bodyScope),
+							bodyScope,
+							predicateConjunctKey,
+						)
+			let handlerScope =
+				guardNarrowings.length === 0
+					? bodyScope
+					: childScope(scopeShadowing(guardNarrowings, bodyScope))
+
 			// NOTE: `case #Value(item)` — desugared here rather than carried
 			// through the typed tree, so the Simplifier, Rewriter and every
 			// walker downstream see the constant an author could have written
@@ -1825,12 +1846,14 @@ export function enrichMatch(
 			let bindingStatements =
 				binding === null
 					? []
-					: declareCaseMatcherBinding(binding, matcher, bodyScope)
+					: declareCaseMatcherBinding(binding, matcher, handlerScope)
 
 			return {
 				body: [
 					...bindingStatements,
-					...handler.body.map((node) => enrichNode(node, bodyScope)),
+					...handler.body.map((node) =>
+						enrichNode(node, handlerScope),
+					),
 				],
 				literal,
 				memberLiterals,
@@ -2787,16 +2810,22 @@ export function enrichChoiceDeclarationStatement(
 	}
 }
 
+// NOTE: The condition is enriched BEFORE the branch Scopes exist, which is the
+// whole reason this reads the way it does: what a branch narrows is read off the
+// TYPED condition — which Namespace answered each question, which Overload of it,
+// and what the receiver's Type was where it was asked — and none of that is
+// knowable from the Node the Parser produced.
 export function enrichIfElseStatementNode(
 	node: parser.IfElseStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfElseStatementNode {
-	let trueScope = childScope(scope)
-	let falseScope = childScope(scope)
+	let condition = enrichExpression(node.condition, scope)
+	let trueScope = trueBranchScope(condition, scope)
+	let falseScope = falseBranchScope(condition, scope)
 
 	return {
 		nodeType: "IfElseStatement",
-		condition: enrichExpression(node.condition, scope),
+		condition,
 		trueBody: node.trueBody.map((node) => enrichNode(node, trueScope)),
 		falseBody: node.falseBody.map((node) => enrichNode(node, falseScope)),
 		position: node.position,
@@ -2807,11 +2836,12 @@ export function enrichIfStatement(
 	node: parser.IfStatementNode,
 	scope: enricher.Scope,
 ): common.typed.IfStatementNode {
-	let bodyScope = childScope(scope)
+	let condition = enrichExpression(node.condition, scope)
+	let bodyScope = trueBranchScope(condition, scope)
 
 	return {
 		nodeType: "IfStatement",
-		condition: enrichExpression(node.condition, scope),
+		condition,
 		body: node.body.map((node) => enrichNode(node, bodyScope)),
 		position: node.position,
 	}
@@ -3334,6 +3364,396 @@ function enrichParameter(
 		position: node.position,
 		inferredType: node.type === null ? type : null,
 	}
+}
+
+// #endregion
+
+// #region Flow Narrowing
+
+// NOTE: What a condition PROVES about one binding at the point it was asked —
+// the conjuncts spelled about it, and the Type the binding has there. The Type is
+// read off the typed receiver rather than out of the Scope, because a branch may
+// already have narrowed the name: an `else if` asks its question of a binding the
+// `else` around it has shadowed, and the evidence that shadow carries counts
+// towards what the next branch establishes.
+type ProvenConjuncts = {
+	receiverType: common.Type
+	conjuncts: Array<common.PredicateConjunct>
+}
+
+// NOTE: Keyed by the name a shadow is declared under — an Identifier's own, or
+// "@", which is the name a Match Handler's receiver is bound under too.
+type ConditionEvidence = Map<string, ProvenConjuncts>
+
+// NOTE: A binding and the refinement a branch has established for it.
+type Narrowing = { name: string; type: common.RefinementType }
+
+// NOTE: The Scope a true branch's body is enriched in — the surrounding one plus
+// whatever the condition established, and a plain child Scope when it established
+// nothing.
+function trueBranchScope(
+	condition: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return childScope(
+		scopeShadowing(
+			narrowingsFor(
+				conditionEvidence(condition, scope),
+				scope,
+				predicateConjunctKey,
+			),
+			scope,
+		),
+	)
+}
+
+// NOTE: And the Scope for the branch the condition answered `false` in. An
+// `else if` needs nothing of its own here: the nested If lives in the `falseBody`
+// Array and is enriched in this very Scope, so it asks its question of the
+// complement and adds to it.
+function falseBranchScope(
+	condition: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return childScope(
+		scopeShadowing(
+			narrowingsFor(
+				complementEvidence(condition, scope),
+				scope,
+				predicateShapeKey,
+			),
+			scope,
+		),
+	)
+}
+
+// NOTE: The WRAPPER Scope a branch's shadows are declared in, or the Scope itself
+// when there are none. It exists because a shadow is a declaration and the
+// duplicate check is per-Scope: a body that legally re-declares the very name the
+// condition narrowed — `if d::isNot(0) { constant d = 1 … }` — would otherwise be
+// told the name is already declared, by a declaration nobody wrote and no
+// Diagnostic can point at. The body's own Scope nests INSIDE this one, so its
+// declarations shadow the shadows exactly as they shadow anything else.
+function scopeShadowing(
+	narrowings: Array<Narrowing>,
+	scope: enricher.Scope,
+): enricher.Scope {
+	if (narrowings.length === 0) {
+		return scope
+	}
+
+	let narrowScope = childScope(scope)
+
+	for (let narrowing of narrowings) {
+		declareVariableInScope(
+			narrowing.name,
+			narrowing.type,
+			narrowScope,
+			true,
+		)
+	}
+
+	return narrowScope
+}
+
+// NOTE: The evidence a condition hands its true branch. A condition is read as a
+// conjunction and flattened exactly as a `where` clause is — `d::isNot(0)` proves
+// one thing about `d` and `d::isNot(0)::and(d::isLessThan(10))` proves two — and
+// anything else contributes nothing at all.
+//
+// Nothing here reports. A `where` clause is a CLAIM, so a leaf it can not be
+// compared by is a mistake worth naming; an `if` is a question, and a question
+// that happens to prove nothing is an ordinary question.
+function conditionEvidence(
+	condition: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): ConditionEvidence {
+	let evidence: ConditionEvidence = new Map()
+
+	collectConditionEvidence(condition, scope, evidence)
+
+	return evidence
+}
+
+function collectConditionEvidence(
+	condition: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+	evidence: ConditionEvidence,
+): void {
+	if (condition.nodeType !== "MethodInvocation") {
+		return
+	}
+
+	if (isConjunction(condition)) {
+		collectConditionEvidence(condition.base, scope, evidence)
+		collectConditionEvidence(condition.arguments[0].value, scope, evidence)
+
+		return
+	}
+
+	let name = narrowableReceiverName(condition.base, scope)
+
+	if (name === null) {
+		return
+	}
+
+	let args: Array<string | boolean> = []
+
+	for (let argument of condition.arguments) {
+		let literal = literalPredicateArgument(argument.value)
+
+		if (literal === null) {
+			return
+		}
+
+		args.push(literal)
+	}
+
+	let conjunct: common.PredicateConjunct = {
+		namespaceName: condition.namespace.name,
+		methodName: condition.member.name,
+		overloadIndex: condition.overloadedMethodIndex,
+		args,
+	}
+
+	let proven = evidence.get(name)
+
+	if (proven === undefined) {
+		evidence.set(name, {
+			receiverType: condition.base.type,
+			conjuncts: [conjunct],
+		})
+	} else {
+		proven.conjuncts.push(conjunct)
+	}
+}
+
+// NOTE: The name a condition's receiver may be narrowed under, or null when it
+// may not be. A Constant and `@` are the only two, and the reason is
+// reassignment: a Variable a branch has proven something about can be written to
+// inside that very branch, and the evidence would then be about a value that is
+// gone. Nothing carries a narrowing forwards through an assignment in v1, so a
+// Variable simply never narrows.
+function narrowableReceiverName(
+	base: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): string | null {
+	if (base.nodeType === "Self") {
+		return "@"
+	}
+
+	if (base.nodeType !== "Identifier") {
+		return null
+	}
+
+	return findDeclaringScope(base.content, scope)?.constants.has(base.content)
+		? base.content
+		: null
+}
+
+// NOTE: The refinements a branch's evidence establishes. A declared refinement is
+// established for a binding when its base accepts the binding's Type and every
+// conjunct it proves is one the branch has proven — set INCLUSION, so a
+// two-conjunct condition establishes a one-conjunct refinement and never the
+// other way round. Where several qualify, the one proving the MOST wins, because
+// it is the one that forgets the least.
+//
+// `keyOf` is what "the same question" means here, and the complement path passes
+// a looser one — see `predicateShapeKey`.
+function narrowingsFor(
+	evidence: ConditionEvidence,
+	scope: enricher.Scope,
+	keyOf: (conjunct: common.PredicateConjunct) => string,
+): Array<Narrowing> {
+	if (evidence.size === 0) {
+		return []
+	}
+
+	let refinements = refinementsInScope(scope)
+
+	if (refinements.length === 0) {
+		return []
+	}
+
+	let narrowings: Array<Narrowing> = []
+
+	for (let [name, proven] of evidence) {
+		// NOTE: An Error matches everything in both directions, so a poisoned
+		// binding would qualify for whichever refinement is declared first and
+		// walk out of the branch better typed than it went in. Whatever produced
+		// the Error was reported; the branch stays about that.
+		if (typeContainsError(proven.receiverType)) {
+			continue
+		}
+
+		let keys = new Set(proven.conjuncts.map(keyOf))
+
+		// NOTE: Evidence the binding's Type already carries is evidence the branch
+		// has. A Parameter declared `NonZeroInteger` asking `if n::isOdd()` has
+		// proven both things, which is what lets an `else if` inside an `else` add
+		// to what the `else` established rather than start over.
+		if (proven.receiverType.type === "Refinement") {
+			for (let conjunct of proven.receiverType.conjuncts) {
+				keys.add(keyOf(conjunct))
+			}
+		}
+
+		let established: common.RefinementType | null = null
+
+		for (let refinement of refinements) {
+			if (
+				!matchesType(refinement.base, proven.receiverType) ||
+				// NOTE: A shadow that forgets something the binding's Type already
+				// carries is no narrowing — `if n::isOdd()` on a NonZeroInteger must
+				// not hand the branch a plain Odd — and this is exactly the question
+				// assignability answers: the established Type has to flow into the
+				// declared one.
+				!matchesType(proven.receiverType, refinement) ||
+				!refinement.conjuncts.every((conjunct) =>
+					keys.has(keyOf(conjunct)),
+				)
+			) {
+				continue
+			}
+
+			if (
+				established === null ||
+				refinement.conjuncts.length > established.conjuncts.length
+			) {
+				established = refinement
+			}
+		}
+
+		if (established !== null) {
+			narrowings.push({ name, type: established })
+		}
+	}
+
+	return narrowings
+}
+
+// NOTE: Every refinement a Type name in scope stands for — the candidates a
+// branch may establish. Nearest Scope first, and a name already seen is skipped,
+// so an inner declaration shadows an outer one here exactly as it does everywhere
+// else.
+function refinementsInScope(
+	scope: enricher.Scope,
+): Array<common.RefinementType> {
+	let refinements: Array<common.RefinementType> = []
+	let seen = new Set<string>()
+
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		for (let [name, type] of Object.entries(current.types)) {
+			if (seen.has(name)) {
+				continue
+			}
+
+			seen.add(name)
+
+			if (type.type === "Refinement") {
+				refinements.push(type)
+			}
+		}
+	}
+
+	return refinements
+}
+
+// NOTE: `a::and(b)` — the one Expression a condition is read THROUGH rather than
+// as a question of its own.
+function isConjunction(condition: common.typed.MethodInvocationNode): boolean {
+	return (
+		condition.namespace.name === "Boolean" &&
+		condition.member.name === "and" &&
+		condition.arguments.length === 1
+	)
+}
+
+// NOTE: What a condition answering `false` proves, which is only readable where
+// the condition asked exactly ONE question. A conjunction answering false says
+// that one of its questions failed and nothing about which — and that is why the
+// chain is refused HERE rather than by counting the conjuncts that came back:
+// `collectConditionEvidence` drops every leaf it can not read, which is right for
+// the true branch, where each conjunct it DID read really is proven, and would
+// make `d::isNot(0)::and(flag)` look like the single question it is not.
+function complementEvidence(
+	condition: common.typed.ExpressionNode,
+	scope: enricher.Scope,
+): ConditionEvidence {
+	let complemented: ConditionEvidence = new Map()
+
+	if (condition.nodeType !== "MethodInvocation" || isConjunction(condition)) {
+		return complemented
+	}
+
+	let evidence: ConditionEvidence = new Map()
+
+	collectConditionEvidence(condition, scope, evidence)
+
+	for (let [name, proven] of evidence) {
+		let complement = complementConjunct(proven.conjuncts[0])
+
+		if (complement !== null) {
+			complemented.set(name, {
+				receiverType: proven.receiverType,
+				conjuncts: [complement],
+			})
+		}
+	}
+
+	return complemented
+}
+
+// NOTE: The Methods the standard library declares as each other's opposites, for
+// the emptiness pairs that are not spelled `is`/`isNot`. Named per Namespace,
+// because a String's `isEmpty` has a differently spelled opposite than a List's.
+//
+// Hardcoded, deliberately: nothing in Essence lets a Method DECLARE that it
+// answers the negation of another, so a table someone can read is honest where an
+// inference from names would be a guess.
+const predicateOpposites = new Map<string, string>([
+	["String::isEmpty", "hasAnyContent"],
+	["String::hasAnyContent", "isEmpty"],
+	["List::isEmpty", "hasItems"],
+	["List::hasItems", "isEmpty"],
+])
+
+function complementConjunct(
+	conjunct: common.PredicateConjunct,
+): common.PredicateConjunct | null {
+	let opposite =
+		conjunct.methodName === "is"
+			? "isNot"
+			: conjunct.methodName === "isNot"
+				? "is"
+				: predicateOpposites.get(
+						`${conjunct.namespaceName}::${conjunct.methodName}`,
+					)
+
+	// NOTE: The Overload is dropped rather than guessed — see
+	// `predicateShapeKey`, which is the key a complemented conjunct is compared
+	// by.
+	return opposite === undefined
+		? null
+		: { ...conjunct, methodName: opposite, overloadIndex: null }
+}
+
+// NOTE: A conjunct's identity WITHOUT which Overload answered it. Only the
+// complement path compares by this, and it has to: the opposite of `is` is
+// `isNot`, and which Overload of `isNot` a receiver would have answered with is
+// not something a Method name and a list of literals can say — `String::is` is
+// overloaded where `String::isNot` is not, so either spelling of the pair would
+// be wrong for the other half. Two Overloads of one Method taking literals that
+// spell the same are conflated by this, which no Namespace in the standard
+// library declares.
+function predicateShapeKey(conjunct: common.PredicateConjunct): string {
+	return `${conjunct.namespaceName}::${conjunct.methodName}${JSON.stringify(
+		conjunct.args,
+	)}`
 }
 
 // #endregion
@@ -7054,11 +7474,7 @@ function extractPredicateConjuncts(
 		return null
 	}
 
-	if (
-		predicate.namespace.name === "Boolean" &&
-		predicate.member.name === "and" &&
-		predicate.arguments.length === 1
-	) {
+	if (isConjunction(predicate)) {
 		let left = extractPredicateConjuncts(predicate.base)
 		let right = extractPredicateConjuncts(predicate.arguments[0].value)
 

@@ -224,6 +224,26 @@ exports[`Fixture Sweep Protocols.es should print what it printed before 1`] = `
 true"
 `;
 
+exports[`Fixture Sweep Refinements.es should print what it printed before 1`] = `
+"Optional#Value(2/1)
+Optional#Empty
+true
+true
+true
+true
+true
+42
+0
+21
+0
+"essence!"
+""
+2
+0
+8
+0"
+`;
+
 exports[`Fixture Sweep String.es should print what it printed before 1`] = `
 "12
 "HELLO, WORLD"
@@ -251,13 +271,3 @@ Optional#Value(2)
 `;
 
 exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `""`;
-
-exports[`Fixture Sweep Refinements.es should print what it printed before 1`] = `
-"Optional#Value(2/1)
-Optional#Empty
-true
-true
-true
-true
-true"
-`;

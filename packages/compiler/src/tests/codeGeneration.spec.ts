@@ -3012,4 +3012,62 @@ declarations {
 			])
 		})
 	})
+
+	// NOTE: A doorway is an ordinary Function that takes a bare value, asks a
+	// refinement's question of it, and hands the checked value onwards under the
+	// refined name. It is the whole point of flow narrowing, and it needs no code
+	// generation at all: a refinement erases to its base, so what runs here is the
+	// Program someone would have written without one — which is exactly what these
+	// two assertions together say.
+	describe("a hand-written doorway", () => {
+		const SOURCE = `implementation {
+	type NonZeroInteger = Integer where @::isNot(0)
+
+	§ The operation that can not fail, and says so.
+	function doubled(_ d: NonZeroInteger) -> Integer {
+		<- d::multiply(with 2)
+	}
+
+	§ The doorway: a bare Integer goes in, and the branch that proved the
+	§ predicate is the only one that reaches the total operation.
+	function doubledOrZero(_ d: Integer) -> Integer {
+		if d::isNot(0) {
+			<- doubled(d)
+		}
+
+		<- 0
+	}
+
+	__print(doubledOrZero(21))
+	__print(doubledOrZero(0))
+}`
+
+		// NOTE: The same Program with the check taken out, which is the only thing
+		// that makes the run above mean anything — without it the test would pass
+		// just as well with no narrowing and no refinement at all.
+		const UNCHECKED = `implementation {
+	type NonZeroInteger = Integer where @::isNot(0)
+
+	function doubled(_ d: NonZeroInteger) -> Integer {
+		<- d::multiply(with 2)
+	}
+
+	function doubledOrZero(_ d: Integer) -> Integer {
+		<- doubled(d)
+	}
+
+	__print(doubledOrZero(21))
+	__print(doubledOrZero(0))
+}`
+
+		it("runs the checked value through the total operation", async () => {
+			expect(await run(SOURCE)).toEqual(["42", "0"])
+		})
+
+		it("refuses the same call outside the branch", () => {
+			expect(
+				hasCode(diagnosticsOf(UNCHECKED), "argument-type-mismatch"),
+			).toBe(true)
+		})
+	})
 })

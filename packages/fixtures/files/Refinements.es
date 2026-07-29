@@ -7,11 +7,12 @@
 § Compiler compares two refinements by WHAT they prove rather than by how the
 § proof was spelled.
 §
-§ Nothing here builds a refined value yet: a literal is admitted against a
-§ predicate, an `if` narrows a Constant, and a Match narrows `@` in the work
-§ packages after this one. What this file shows is the half that is settled —
-§ what a refinement IS, and that a value of one is its base with more known
-§ about it and never with less.
+§ An `if` whose condition asks a refinement's question narrows the Constant it
+§ asked it of, which is what makes a doorway writable: a bare value goes in, and
+§ the branch that proved the predicate is the only one that reaches the operation
+§ demanding the proof. A literal admitted against a predicate without any `if`
+§ at all, and a Match over a bare Integer, come in the work packages after this
+§ one.
 
 implementation {
 
@@ -48,8 +49,74 @@ implementation {
 		<- n
 	}
 
-	§ Until a doorway exists, the operations these refinements are ABOUT are
-	§ the Optionals they have always been: an Integer divided by an Integer
+	§ The doorway. A bare Integer comes in and the branch that proved the
+	§ predicate is the only one that reaches `doubled`, which is why `doubled`
+	§ needs no fallback and no Optional.
+	function doubledOrZero(_ n: Integer) -> Integer {
+		if n::isNot(0) {
+			<- doubled(n)
+		}
+
+		<- 0
+	}
+
+	§ A conjunction establishes any refinement asking for SOME of what it
+	§ proves — set inclusion — and where several qualify the one proving the
+	§ most wins.
+	function scaledOdd(_ n: Integer) -> Integer {
+		if n::isOdd()::and(n::isLessThan(10)) {
+			<- tripled(n)
+		}
+
+		<- 0
+	}
+
+	function tripled(_ n: SmallOdd) -> Integer {
+		<- n::multiply(with 3)
+	}
+
+	§ The `else` branch narrows too, through the opposite Method: a String that
+	§ is not empty has content, and a List that is not empty has items.
+	function shout(_ text: String) -> String {
+		if text::isEmpty() {
+			<- ""
+		} else {
+			<- exclaimed(text)
+		}
+	}
+
+	function exclaimed(_ text: NonEmptyString) -> String {
+		<- text::append("!")
+	}
+
+	function countOf(_ items: List<String>) -> Integer {
+		if items::isEmpty() {
+			<- 0
+		} else {
+			<- lengthOf(items)
+		}
+	}
+
+	function lengthOf(_ items: NonEmptyStrings) -> Integer {
+		<- items::length()
+	}
+
+	§ A Match Handler's Guard proves things about `@` the same way, and it runs
+	§ before any Statement of the body.
+	function digitOrZero(_ value: Integer | String) -> Integer {
+		<- match value -> Integer {
+			case Integer where @::isBetween(0, and 9) { <- placed(@) }
+
+			case _ { <- 0 }
+		}
+	}
+
+	function placed(_ digit: Digit) -> Integer {
+		<- digit::add(1)
+	}
+
+	§ Until a total division exists, the operations these refinements are ABOUT
+	§ are the Optionals they have always been: an Integer divided by an Integer
 	§ might have been divided by zero, and nothing in the signature says
 	§ otherwise.
 	__print(6::divide(by 3))
@@ -62,4 +129,17 @@ implementation {
 	__print(["a", "b"]::hasItems())
 	__print(7::isBetween(0, and 9))
 	__print(7::isOdd()::and(7::isLessThan(10)))
+
+	§ And the doorways, answering about values nothing had proven anything about
+	§ before they were asked.
+	__print(doubledOrZero(21))
+	__print(doubledOrZero(0))
+	__print(scaledOdd(7))
+	__print(scaledOdd(8))
+	__print(shout("essence"))
+	__print(shout(""))
+	__print(countOf(["a", "b"]))
+	__print(countOf([]))
+	__print(digitOrZero(7))
+	__print(digitOrZero("seven"))
 }
