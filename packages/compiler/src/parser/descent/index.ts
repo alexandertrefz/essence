@@ -829,14 +829,55 @@ class DescentParser {
 		this.tokens.expect(TokenType.SymbolEqual)
 
 		let type = this.parseType()
+		let predicate = this.parseOptionalRefinementPredicate(type)
 
 		return generators.typeAliasStatement(
 			name,
 			generics,
 			type,
-			{ start: keyword.position.start, end: type.position.end },
+			predicate,
+			{
+				start: keyword.position.start,
+				// NOTE: Out to the predicate, not to the Type — the Statement
+				// stands for the whole of `Integer where @::isNot(0)`. The
+				// formatter reads a declaration's own span to decide which
+				// Comments sit above it and which trail it, so a clause left
+				// outside the Node would put a Comment written after it above
+				// the NEXT declaration.
+				end: predicate?.position.end ?? type.position.end,
+			},
 			this.tokens.documentationAbove(keyword.position.start.line),
 		)
+	}
+
+	// NOTE: The `where` clause of a checked refinement. `where` is not a
+	// Keyword — it is an ordinary Identifier used as an Argument label
+	// (`removeEvery(where …)`) and as a Namespace's conformance conditions — so
+	// it is recognised by content, exactly as `parseOptionalGuard` does it.
+	//
+	// NOTE: Only when the `where` sits on the SAME line as the Type it refines,
+	// which is the rule `parseGenericType` keeps for its `<` and for the same
+	// reason: linebreak Tokens are discarded, so a clause opening the NEXT line
+	// is indistinguishable from one continuing this Type. `type Handler = Reader`
+	// followed by a Statement that begins with the name `where` would otherwise
+	// have its Type read as a refinement of the line above it. A refinement is
+	// always written on one line, so this refuses nothing a Declaration means.
+	protected parseOptionalRefinementPredicate(
+		type: parser.TypeDeclarationNode,
+	): parser.ExpressionNode | null {
+		let token = this.tokens.peek()
+
+		if (
+			token?.type !== TokenType.Identifier ||
+			token.value !== "where" ||
+			token.position.start.line !== type.position.end.line
+		) {
+			return null
+		}
+
+		this.tokens.next()
+
+		return this.parseExpression()
 	}
 
 	protected parseChoiceDeclarationStatement(): parser.ChoiceDeclarationStatementNode {

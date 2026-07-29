@@ -447,17 +447,34 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
-		case "TypeAliasStatement":
+		case "TypeAliasStatement": {
+			// NOTE: A checked refinement reads back as what it REFINES on its
+			// own Declaration, because its name would say nothing there:
+			// `NonZeroInteger: NonZeroInteger` is what naming it would answer,
+			// and the predicate is on the very line the cursor is on. Everywhere
+			// a VALUE of one is hovered the name is exactly right, which is what
+			// `printType` answers — the substitution is for this Declaration and
+			// for nowhere else.
+			let declaredType =
+				node.type.type === "Refinement" ? node.type.base : node.type
+
 			consider(
 				state,
 				node.position,
-				node.type,
+				declaredType,
 				node.name.content,
 				node.documentation,
 			)
-			visitIdentifier(node.name, state, undefined, node.documentation)
+			consider(
+				state,
+				node.name.position,
+				declaredType,
+				node.name.content,
+				node.documentation,
+			)
 			visitGenericDeclarations(node.generics, state)
 			return
+		}
 		case "ProtocolDeclarationStatement": {
 			let content = describeProtocol(node.name.content, node.protocolType)
 

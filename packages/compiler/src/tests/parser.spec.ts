@@ -1629,6 +1629,112 @@ describe("Parser", () => {
 			})
 		})
 
+		// NOTE: `where` is an ordinary Identifier — a Namespace's conformance
+		// conditions and `removeEvery(where …)` both write it — so what the
+		// Parser has to get right is WHEN it opens a refinement's predicate. What
+		// the predicate may then SAY is a question about Types, which the
+		// Enricher answers: the refused shapes below parse perfectly well and
+		// carry their clause into enrichment to be reported there.
+		describe("Refinement predicates", () => {
+			function alias(source: string): parser.TypeAliasStatementNode {
+				let node = parse(source).implementation.nodes[0]
+
+				expect(node.nodeType).toBe("TypeAliasStatement")
+
+				if (node.nodeType !== "TypeAliasStatement") {
+					throw new Error("First node is not a TypeAliasStatement.")
+				}
+
+				return node
+			}
+
+			it("should parse a predicate on a SimpleType", () => {
+				let input: parser.Program = parse(
+					"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+				)
+
+				expect(input).toMatchSnapshot()
+			})
+
+			it("should leave an unrefined Alias without a predicate", () => {
+				expect(
+					alias("implementation { type Small = Integer }").predicate,
+				).toBeNull()
+			})
+
+			it("should span the Statement out to the predicate's end", () => {
+				let node = alias(
+					"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+				)
+
+				expect(node.predicate).not.toBeNull()
+				expect(node.position.end).toEqual(node.predicate!.position.end)
+			})
+
+			it("should flatten a conjunction into the Expression it was written as", () => {
+				let node = alias(
+					"implementation { type Positive = Integer where @::isPositive()::and(@::isNot(1)) }",
+				)
+
+				expect(node.predicate?.nodeType).toBe("MethodInvocation")
+			})
+
+			// NOTE: Linebreak Tokens are discarded, so nothing but the line
+			// numbers can tell a clause continuing this Type from a Statement
+			// that happens to begin with the name `where` — which is why the
+			// Parser reads the clause only on the Type's own line. Two
+			// Statements, and the Alias is not refined.
+			it("should not consume a where on the next line", () => {
+				let program = parse(
+					[
+						"implementation {",
+						"\ttype Handler = Integer",
+						"\twhere",
+						"}",
+					].join("\n"),
+				)
+
+				expect(program.implementation.nodes).toHaveLength(2)
+				expect(
+					(
+						program.implementation
+							.nodes[0] as parser.TypeAliasStatementNode
+					).predicate,
+				).toBeNull()
+				expect(program.implementation.nodes[1].nodeType).toBe(
+					"Identifier",
+				)
+			})
+
+			// NOTE: Every base the Enricher refuses still PARSES — a refusal that
+			// came from the Parser would be a Syntax error about a Type, and the
+			// showcase file for these Diagnostics could never reach the Enricher
+			// at all.
+			it("should parse a predicate on the bases the Enricher refuses", () => {
+				for (let base of [
+					"Boolean",
+					"Integer | String",
+					"{ key: Integer }",
+					"List",
+				]) {
+					let node = alias(
+						`implementation { type Refined = ${base} where @::isNot(0) }`,
+					)
+
+					expect(node.predicate).not.toBeNull()
+				}
+			})
+
+			it("should parse a predicate on a generic Alias", () => {
+				let node = alias(
+					"implementation { type NonEmpty<Item> = List<Item> where @::hasItems() }",
+				)
+
+				expect(node.generics).toHaveLength(1)
+				expect(node.predicate).not.toBeNull()
+			})
+		})
+
 		describe("FunctionStatements", () => {
 			it("should parse FunctionStatements with no parameters", () => {
 				let input: parser.Program = parse(

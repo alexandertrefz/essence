@@ -4820,4 +4820,299 @@ describe("Enricher", () => {
 			expect(printType(declaration.type)).toBe("Colour")
 		})
 	})
+
+	// NOTE: What a `where` clause on a Type Alias declares — the Type it
+	// resolves to, the canonical conjuncts it is compared by, and every shape it
+	// is refused for. Assignability between two of them is pinned in
+	// `typeMatching.spec.ts`; this is about the Declaration.
+	describe("Checked refinements", () => {
+		function refinementOf(source: string): common.RefinementType {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			let aliases = program.implementation.nodes.filter(
+				(node) => node.nodeType === "TypeAliasStatement",
+			)
+			let type = aliases[aliases.length - 1].type
+
+			expect(type.type).toBe("Refinement")
+
+			if (type.type !== "Refinement") {
+				throw new Error("The last Type Alias is not a refinement.")
+			}
+
+			return type
+		}
+
+		function aliasOf(source: string): common.typed.TypeAliasStatementNode {
+			let { program } = enrichSource(source)
+			let aliases = program.implementation.nodes.filter(
+				(node) => node.nodeType === "TypeAliasStatement",
+			)
+
+			return aliases[aliases.length - 1]
+		}
+
+		it("should resolve a predicate to a refinement of its base", () => {
+			let refinement = refinementOf(
+				"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+			)
+
+			expect(refinement.name).toBe("NonZeroInteger")
+			expect(refinement.base).toEqual({ type: "Integer" })
+			expect(refinement.conjuncts).toEqual([
+				{
+					namespaceName: "Integer",
+					methodName: "isNot",
+					overloadIndex: null,
+					args: ["0"],
+				},
+			])
+		})
+
+		it("should refine a String and an applied List", () => {
+			expect(
+				refinementOf(
+					"implementation { type NonEmptyString = String where @::hasAnyContent() }",
+				).base,
+			).toEqual({ type: "String" })
+
+			expect(
+				refinementOf(
+					"implementation { type NonEmptyStrings = List<String> where @::hasItems() }",
+				).base,
+			).toEqual({ type: "List", itemType: { type: "String" } })
+		})
+
+		// NOTE: `isBetween` is declared once over the whole numeric tower, so an
+		// Integer's is answered by `Number` — and the conjunct records the
+		// Namespace that ANSWERED, because that is what makes two conjuncts the
+		// same question.
+		it("should key a conjunct by the Namespace that answered it", () => {
+			expect(
+				refinementOf(
+					"implementation { type Digit = Integer where @::isBetween(0, and 9) }",
+				).conjuncts,
+			).toEqual([
+				{
+					namespaceName: "Number",
+					methodName: "isBetween",
+					overloadIndex: null,
+					args: ["0", "9"],
+				},
+			])
+		})
+
+		it("should flatten a conjunction into a canonical conjunct set", () => {
+			let straight = refinementOf(
+				"implementation { type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10)) }",
+			)
+			let mirrored = refinementOf(
+				"implementation { type SmallOdd = Integer where @::isLessThan(10)::and(@::isOdd()) }",
+			)
+
+			expect(straight.conjuncts).toHaveLength(2)
+			expect(straight.conjuncts).toEqual(mirrored.conjuncts)
+		})
+
+		it("should carry the enriched predicate on the typed Node", () => {
+			let alias = aliasOf(
+				"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+			)
+
+			expect(alias.predicate?.nodeType).toBe("MethodInvocation")
+			expect(alias.predicate?.type).toEqual({ type: "Boolean" })
+		})
+
+		it("should leave an unrefined Alias without a predicate", () => {
+			expect(
+				aliasOf("implementation { type Small = Integer }").predicate,
+			).toBeNull()
+		})
+
+		// NOTE: Poison recovery — a refused clause leaves the Alias meaning its
+		// base, so everything naming it stays about itself. What is asserted here
+		// is the underlined text of each refusal, which is the span an Editor
+		// puts the squiggle under.
+		describe("refusals", () => {
+			function refusal(source: string): {
+				code: string
+				underlined: string
+			} {
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+
+				return {
+					code: diagnostics[0].code,
+					underlined: underlinedText(source, diagnostics[0]),
+				}
+			}
+
+			it("should refuse a generic Alias", () => {
+				expect(
+					refusal(
+						"implementation { type NonEmpty<Item> = List<Item> where @::hasItems() }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "@::hasItems()",
+				})
+			})
+
+			it("should refuse a base outside Integer, String and an applied List", () => {
+				expect(
+					refusal(
+						"implementation { type Yes = Boolean where @::is(true) }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "Boolean",
+				})
+
+				expect(
+					refusal(
+						"implementation { type Weird = Integer | String where @::isNot(0) }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "Integer | String",
+				})
+
+				expect(
+					refusal(
+						"implementation { type Several = List where @::hasItems() }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "List",
+				})
+			})
+
+			it("should refuse a receiver that is not '@'", () => {
+				expect(
+					refusal(
+						`implementation { type Named = Integer where "essence"::hasAnyContent() }`,
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: `"essence"`,
+				})
+			})
+
+			it("should refuse a chained receiver", () => {
+				expect(
+					refusal(
+						"implementation { type Trimmed = String where @::trim()::hasAnyContent() }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "@::trim()",
+				})
+			})
+
+			it("should refuse an Argument that is not a literal", () => {
+				expect(
+					refusal(
+						"implementation { constant limit = 3\ntype Bounded = Integer where @::isLessThan(limit) }",
+					),
+				).toEqual({
+					code: "invalid-refinement-predicate",
+					underlined: "limit",
+				})
+			})
+
+			it("should refuse a predicate that is not a Boolean", () => {
+				expect(
+					refusal(
+						"implementation { type Sized = Integer where @::absolute() }",
+					),
+				).toEqual({
+					code: "predicate-not-boolean",
+					underlined: "@::absolute()",
+				})
+
+				expect(
+					refusal("implementation { type Bare = Integer where @ }"),
+				).toEqual({
+					code: "predicate-not-boolean",
+					underlined: "@",
+				})
+			})
+
+			// NOTE: A poisoned base says nothing about the clause, so the clause
+			// says nothing back — one Diagnostic about the name that is missing,
+			// and no second one about a Type nobody wrote.
+			it("should stay silent about a base that is already an Error", () => {
+				expect(
+					diagnosticsFor(
+						"implementation { type Refined = Nope where @::isNot(0) }",
+					).map((diagnostic) => diagnostic.code),
+				).toEqual(["unknown-type"])
+
+				expect(
+					diagnosticsFor(
+						"implementation { type Refined = Refined where @::isNot(0) }",
+					).map((diagnostic) => diagnostic.code),
+				).toEqual(["recursive-type-declaration"])
+			})
+
+			// NOTE: And a predicate that could not be typed is a Diagnostic about
+			// the Method it named, never a second one about the clause holding it.
+			it("should stay silent about a predicate that did not type", () => {
+				expect(
+					diagnosticsFor(
+						"implementation { type Refined = Integer where @::nope(0) }",
+					).map((diagnostic) => diagnostic.code),
+				).toEqual(["unknown-method"])
+			})
+
+			it("should leave a refused Alias meaning its base", () => {
+				let { program } = enrichSource(
+					"implementation { type Sized = Integer where @::absolute() }",
+				)
+
+				expect(program.implementation.nodes[0].nodeType).toBe(
+					"TypeAliasStatement",
+				)
+
+				let alias = program.implementation
+					.nodes[0] as common.typed.TypeAliasStatementNode
+
+				expect(alias.type).toEqual({ type: "Integer" })
+			})
+		})
+
+		// NOTE: A refined receiver keeps every Method its base answers — the
+		// bucketing that makes it so is pinned in `resolvers.spec.ts`, and this is
+		// the Declaration reaching it — and it flows into its base for free, which
+		// is what makes a body written against the base compile unchanged.
+		it("should answer a base's Methods on a refined value", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type NonZeroInteger = Integer where @::isNot(0)
+
+					function doubled(_ n: NonZeroInteger) -> Integer {
+						<- n::multiply(with 2)
+					}
+
+					function forgotten(_ n: NonZeroInteger) -> Integer {
+						<- n
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: The refusal is reported ONCE. A refined Alias is resolved by
+		// hoisting and its predicate is enriched a second time for the typed Node,
+		// so there are two readings of one clause and only one of them may speak.
+		it("should report a refusal exactly once", () => {
+			expect(
+				diagnosticsFor(
+					"implementation { type Yes = Boolean where @::is(true) }",
+				),
+			).toHaveLength(1)
+		})
+	})
 })

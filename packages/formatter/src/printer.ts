@@ -604,13 +604,27 @@ export class Printer {
 			case "IfElseStatement":
 				return this.printIfElse(node)
 
-			case "TypeAliasStatement":
-				return concat([
+			case "TypeAliasStatement": {
+				let parts: Array<Doc> = [
 					text("type " + node.name.content),
 					this.printGenericList(node.generics),
 					text(" = "),
 					this.printType(node.type),
-				])
+				]
+
+				// NOTE: A checked refinement's `where` clause, on one line with
+				// the Type it refines — the same shape a Match Handler's Guard
+				// prints, and it has to stay one line: the Parser reads the
+				// clause only when the `where` sits on the Type's own line.
+				if (node.predicate !== null) {
+					parts.push(
+						text(" where "),
+						this.printExpression(node.predicate),
+					)
+				}
+
+				return concat(parts)
+			}
 
 			case "ChoiceDeclarationStatement":
 				return this.printChoice(node)

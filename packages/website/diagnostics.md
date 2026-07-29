@@ -346,6 +346,40 @@ of the Method written right beside it. Write `infer Item`.
 
 A Rational Literal with a denominator of zero.
 
+### `invalid-refinement-predicate`
+
+The `where` clause of a checked refinement says something a refinement can not
+be compared by. A refinement is a base Type plus a predicate every value of it
+has been proven to satisfy — `type NonZeroInteger = Integer where @::isNot(0)`
+— and two refinements are the same Type when they prove the same things, which
+is why the predicate is stored as a set of resolved Method calls rather than as
+the text that was written. Five shapes are refused:
+
+- a generic Alias (`type NonEmpty<Item> = List<Item> where @::hasItems()`) —
+  the clause would refine a different Type at every use;
+- a base outside Integer, String and an applied List (`List<String>`, never a
+  bare `List`);
+- a receiver that is not `@` — the clause is a question about the value being
+  refined and about nothing else;
+- a chained receiver (`@::trim()::hasAnyContent()`) — the evidence would be
+  about the intermediate value, which nothing proved anything about;
+- an Argument that is not written out as a literal.
+
+Several predicates joined with `::and(…)` are one predicate: the chain is
+flattened, so `@::isPositive()::and(@::isNot(1))` proves two things and the
+mirror image of it proves the same two.
+
+The Alias still means its base afterwards, so everything naming it stays about
+itself rather than cascading.
+
+### `predicate-not-boolean`
+
+A refinement's `where` clause does not answer `true` or `false`. A predicate is
+a question about the value being refined, so `type Small = Integer where @` and
+`type Small = Integer where @::absolute()` are both refused — the first asks
+nothing and the second answers with a number. Call a Method that answers a
+Boolean, the way an `if` condition does.
+
 ## Dispatch
 
 ### `no-matching-overload`
