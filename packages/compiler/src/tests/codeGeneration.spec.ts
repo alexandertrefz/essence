@@ -2654,7 +2654,13 @@ describe("Code Generation", () => {
 				// a Property whose value CALLS a Method, a Property that reads
 				// another one of its OWN Namespace, and a Namespace declared
 				// below every one it names.
-				const constants = `declarations {
+				// NOTE: Appended to the REAL sources, so `./Integer.es` resolves
+				// to the real one — a standard library specifier is matched by
+				// file name against the set being loaded, which is what lets a
+				// library assembled in a test name a file it did not write.
+				const constants = `import { Integer from "./Integer.es" }
+
+declarations {
 
 	§ A Namespace whose static Properties carry values.
 	namespace Constants for Integer {

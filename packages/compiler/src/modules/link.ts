@@ -504,6 +504,15 @@ export function linkModuleGraph(
 		// NOTE: The canonical path of the one Module whose written annotations
 		// are wanted alongside its typed Program — the Hover seam.
 		annotationsFor?: string
+		// NOTE: The Scope each Module is linked into, when the default is wrong.
+		// Two things make it wrong for the standard library. It must carry NO
+		// `modulePath`, because that is what names a Choice
+		// `<modulePath>#<Name>` — and a builtin Choice is named by its bare name,
+		// which the runtime switches on. And it must not start from
+		// `builtinMembers()`, which `topLevelScope` reads: the standard library
+		// IS the builtins, and asking for them while loading them is unbounded
+		// recursion, since the cache is only filled once the load returns.
+		scopeFor?: (module: Module) => enricher.Scope
 	} = {},
 ): LinkedGraph {
 	// NOTE: Every Module's declarations up front, because a Diagnostic about an
@@ -525,6 +534,7 @@ export function linkModuleGraph(
 			declarations,
 			surfaces,
 			options.annotationsFor,
+			options.scopeFor,
 		)) {
 			surfaces.set(result.module.filePath, result.surface)
 			linked.set(result.module.filePath, result)
@@ -549,6 +559,7 @@ function linkGroup(
 	declarations: Map<string, Map<string, Declaration>>,
 	surfaces: Map<string, ExportSurface>,
 	annotationsFor?: string,
+	scopeFor?: (module: Module) => enricher.Scope,
 ): Array<LinkedModule> {
 	let states = new Map<string, ModuleState>()
 	let declares = (filePath: string, name: string): boolean =>
@@ -557,7 +568,9 @@ function linkGroup(
 	for (let module of group) {
 		let state: ModuleState = {
 			module,
-			scope: topLevelScope({ modulePath: module.filePath }),
+			scope:
+				scopeFor?.(module) ??
+				topLevelScope({ modulePath: module.filePath }),
 			declarations: declarations.get(module.filePath) ?? new Map(),
 			exports: exportedEntries(module.program),
 			imports: [],

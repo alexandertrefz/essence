@@ -137,7 +137,9 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Boxes.es",
-				`declarations {
+				`import { Optional from "./Fallible.es" }
+
+				declarations {
 				namespace Boxes <infer ItemType> for List<ItemType> {
 					§§ The first item, if there is one.
 					§§ @returns — the first item.
@@ -153,9 +155,8 @@ describe("Standard Library Loader", () => {
 			],
 			// NOTE: `Optional` is declared in Essence now — a nominal Choice
 			// with a `Value` payload and an `Empty` Case — so a synthetic
-			// library that uses it has to bring its own, which is the point:
-			// the file that USES a name is hoisted alongside the file that
-			// DECLARES it, in either order.
+			// library that uses it has to bring its own, and name the file it
+			// comes from.
 			[
 				"Fallible.es",
 				`declarations {
@@ -388,14 +389,18 @@ describe("Standard Library Loader", () => {
 		expect(stdlib.nativeBindings["Constants"]!.properties["PI"]).toBe(true)
 	})
 
-	// NOTE: The standard library is ONE declaration space, not a chain of
-	// imports — every file is hoisted before any is enriched, so nothing has to
-	// be declared before it is used, in any file.
+	// NOTE: Across a file boundary through an IMPORT — a standard library file
+	// is a Module like any other, and says what it uses. The two are hoisted as
+	// one group, so the Protocol still need not be declared before the Namespace
+	// conforming to it; what changed is that the conforming file has to name the
+	// file it comes from.
 	it("resolves a reference across two files", () => {
 		let stdlib = load(
 			[
 				"Namespaces.es",
-				`declarations {
+				`import { Measurable from "./Protocols.es" }
+
+				declarations {
 					namespace Sized for String is Measurable {
 						size() -> Integer
 					}
@@ -574,7 +579,12 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Boxes.es",
-				`declarations {
+				`import {
+					Comparable from "./Ordered.es"
+					Ordering from "./Ordered.es"
+				}
+
+				declarations {
 				namespace Boxes <infer Item> for { value: Item }
 					is Comparable where Item is Comparable
 				{
@@ -583,10 +593,10 @@ describe("Standard Library Loader", () => {
 				}
 			}`,
 			],
-			// NOTE: `Comparable` and `Ordering` are declared in Essence now.
-			// The conforming file is hoisted BEFORE the one that declares the
-			// Protocol it conforms to, in sorted order — which is exactly what
-			// the shared Scope is for.
+			// NOTE: `Comparable` and `Ordering` are declared in Essence now. The
+			// conforming file is linked in the same group as the one declaring
+			// the Protocol it conforms to, so the conformance still resolves
+			// whichever is hoisted first.
 			[
 				"Ordered.es",
 				`declarations {
@@ -677,6 +687,106 @@ describe("Standard Library Loader", () => {
 		expect(load).toThrow(/Nonexistent/)
 	})
 
+	// NOTE: A Diagnostic has to be rendered against the text of the file it was
+	// found in. The files are handed over in file-name order and linked in
+	// dependency order, and here those two disagree on purpose: `Alpha.es` sorts
+	// first and is linked LAST, because it imports the file that is broken.
+	// Pairing the two orders by position would render `Zulu.es`'s Diagnostic
+	// against `Alpha.es`'s text, under `Alpha.es`'s name, underlining a line
+	// that is fine — and it would not throw while doing it, because the renderer
+	// clamps a Position that points past the end of what it was given.
+	//
+	// Matching the file name alone is not enough to catch that: both names
+	// appear in the message either way. The excerpt has to travel with them.
+	it("renders a Diagnostic against the file it was found in", () => {
+		let load = () =>
+			loadStdlibFrom([
+				parseStdlibSource(
+					"Alpha.es",
+					`import { Measurable from "./Zulu.es" }
+
+					declarations {
+						namespace Sized for String is Measurable {
+							size() -> Integer
+						}
+					}`,
+				),
+				parseStdlibSource(
+					"Zulu.es",
+					`declarations {
+						protocol Measurable {
+							size() -> Nonexistent
+						}
+					}`,
+				),
+			])
+
+		expect(load).toThrow(/Zulu\.es[\s\S]*Nonexistent/)
+		expect(load).not.toThrow(/Alpha\.es:[\s\S]*?Nonexistent/)
+	})
+
+	// NOTE: `Print.es` is reachable from nothing — no standard library file
+	// imports `__print`, and it imports none of them. A graph walked from a
+	// single entry would leave it out and the language would quietly lose its
+	// one free Function, with every other test still green.
+	it("loads a file that nothing imports", () => {
+		expect(Object.keys(loadStdlib().members)).toContain("__print")
+	})
+
+	// NOTE: The bare Type tags are held on a PARENT Scope, and this is the test
+	// that says why. `isTaken` — the linker's "is this name already spoken for?"
+	// — reads a Scope's own tables and does not walk to its parent. With the
+	// tags seeded into the Module's own table, this import would collide with
+	// the TAG `Integer` rather than with the Namespace it names, be refused as a
+	// `duplicate-import`, and take Integer dispatch down with it.
+	it("imports a Namespace that shares a bare Type tag's name", () => {
+		let stdlib = load(
+			[
+				"Counting.es",
+				`import { Integer from "./Integer.es" }
+
+				declarations {
+					namespace Counting for String {
+						size() -> Integer {
+							<- 1::doubled()
+						}
+					}
+				}`,
+			],
+			[
+				"Integer.es",
+				`declarations {
+					namespace Integer for Integer {
+						§§ Twice the Integer.
+						§§ @returns — twice the Integer.
+						doubled() -> Integer
+					}
+				}`,
+			],
+		)
+
+		expect(namespaceNamed(stdlib, "Counting").methods["size"]).toBeDefined()
+	})
+
+	// NOTE: The cycle search runs per Scope, and it skips a declaration whose
+	// name is already in the Scope's OWN Type table. Seeding a Module's table
+	// from `builtinTypes()` rather than from a parent holding only the bare tags
+	// would make it skip every declaration the file writes — the search would
+	// still run, find nothing, and report nothing, on any library.
+	it("still reports a recursive Type declaration", () => {
+		let load = () =>
+			loadStdlibFrom([
+				parseStdlibSource(
+					"Cycles.es",
+					`declarations {
+						type Looping = { next: Looping }
+					}`,
+				),
+			])
+
+		expect(load).toThrow(/recursive/i)
+	})
+
 	// NOTE: A native Property IS its annotation, so without one there is
 	// nothing to declare. Resolving it to Error in silence would let the
 	// zero-Diagnostic gate wave through a Property of no Type at all.
@@ -734,7 +844,9 @@ describe("Standard Library Loader", () => {
 		let stdlib = load(
 			[
 				"Constants.es",
-				`declarations {
+				`import { Echoing from "./Echoing.es" }
+
+				declarations {
 				§ The constants.
 				namespace Constants {
 					§§ The base value, read the long way around.

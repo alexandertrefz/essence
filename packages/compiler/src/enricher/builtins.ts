@@ -98,6 +98,20 @@ export const builtinTypeOrder: Array<string> = [
 	"Rounding",
 ]
 
+// NOTE: The third table's order, stated for the same reason as the two above.
+// It is read in order wherever the builtin Protocols are LISTED rather than
+// looked up — Hover and Completion both build their list by spreading this, and
+// `rename` walks it — so leaving it to fall out of whatever order the sources
+// were merged in makes an editor's list reorder itself for reasons no one
+// editing `packages/stdlib/sources` would think to control. It is the order they
+// are declared in, which is also the order they build on each other: `Comparable`
+// is the only one whose signature names a Type rather than only bare tags.
+export const builtinProtocolOrder: Array<string> = [
+	"Equatable",
+	"Printable",
+	"Comparable",
+]
+
 // NOTE: Accessors rather than consts, because what they answer with is read
 // from Essence source at first call. `loadStdlib` parses, enriches and
 // validates `packages/stdlib/sources/*.es`, caches the result for the process, and hands
