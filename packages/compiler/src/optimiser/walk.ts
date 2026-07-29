@@ -393,6 +393,8 @@ function walkChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
+		case "Intrinsic":
+			return walkIntrinsicChildren(node, rewrite)
 		// NOTE: The leaves — a Literal holds its own value, an Identifier a
 		// name, and neither has anywhere for an Expression to hide.
 		case "StringValue":
@@ -401,5 +403,47 @@ function walkChildren(
 		case "BooleanValue":
 		case "Identifier":
 			return node
+	}
+}
+
+// NOTE: An intrinsic is walked like anything else. A pass that runs after the
+// one which produced it reads the shape it left — a `direct-record`'s members
+// are the Record's members, wherever the Record came from — and a pass that
+// only ever sees the Simplifier's own Nodes is a pass whose order in the
+// registry decides what it can do.
+function walkIntrinsicChildren(
+	node: common.typedSimple.IntrinsicNode,
+	rewrite: ExpressionRewrite,
+): ExpressionNode {
+	switch (node.kind) {
+		case "direct-record": {
+			let members = mapRecord(node.members, (value) =>
+				walkExpression(value, rewrite),
+			)
+
+			return members === node.members ? node : { ...node, members }
+		}
+		case "direct-case": {
+			let members = mapRecord(node.members, (value) =>
+				walkExpression(value, rewrite),
+			)
+			let payload =
+				node.payload === null
+					? null
+					: walkExpression(node.payload, rewrite)
+
+			if (members === node.members && payload === node.payload) {
+				return node
+			}
+
+			return { ...node, members, payload }
+		}
+		case "direct-list": {
+			let values = mapArray(node.values, (value) =>
+				walkExpression(value, rewrite),
+			)
+
+			return values === node.values ? node : { ...node, values }
+		}
 	}
 }

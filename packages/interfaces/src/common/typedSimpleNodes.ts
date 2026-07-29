@@ -86,6 +86,7 @@ export type ExpressionNode =
 	| MatchNode
 	| ConformanceValueNode
 	| CaseValueNode
+	| IntrinsicNode
 
 // NOTE: A Case construction, reduced to its runtime essentials — the tag the
 // value carries (`"CalculatorOperation#Add"`) and the payload Record it is
@@ -295,6 +296,70 @@ export interface MatchNode {
 		body: Array<ImplementationNode>
 	}>
 	type: Type
+	position?: Position
+}
+
+// #endregion
+
+// #region Intrinsics
+
+// NOTE: What an Optimiser pass rewrites an Expression INTO — one closed family
+// of Nodes, each standing for a shape the Rewriter emits directly where the
+// Simplifier's own Node would have gone through a runtime call. They exist only
+// between `optimise` and `rewrite`: the Simplifier never produces one, so every
+// stage ahead of the Optimiser can be read without them in mind, and the
+// Rewriter's switch over `kind` is exhaustive, so a kind added without emission
+// does not compile.
+//
+// NOTE: Each carries the `type` of the Node it replaced and that Node's
+// `position` — the Rewriter maps Statements and outermost Expressions onto the
+// source through it, and a pass that dropped it would silently unmap the line a
+// debugger stops on.
+export type IntrinsicNode = DirectRecordNode | DirectCaseNode | DirectListNode
+
+// NOTE: A Record built in one allocation: the branded object literal
+// `Record.createRecord` would have built from a literal it was handed — the
+// literal, the call and the copy the call makes, replaced by the literal the
+// copy was going to produce.
+export interface DirectRecordNode {
+	nodeType: "Intrinsic"
+	kind: "direct-record"
+	members: Record<string, ExpressionNode>
+	type: RecordType
+	position?: Position
+}
+
+// NOTE: A Case built in one allocation, the tag riding on the hidden Type key
+// exactly as `createCase` stamps it.
+//
+// A payload written as a Record literal is inlined: `members` is the literal's
+// own members, and the Record that would have been built and then copied never
+// exists. That is sound because a Record literal is compiler-fresh — nothing
+// else holds the value it makes — so no other name can see the object the Case
+// is now built out of.
+//
+// A payload that is any OTHER Expression can be aliased, and is spread ahead of
+// the tag instead, which is what `createCase` does with it. Exactly one of the
+// two is ever set: `members` is empty for a spread payload and for a unit Case,
+// which carries no payload at all.
+export interface DirectCaseNode {
+	nodeType: "Intrinsic"
+	kind: "direct-case"
+	tag: string
+	members: Record<string, ExpressionNode>
+	payload: ExpressionNode | null
+	type: CaseType | ErrorType
+	position?: Position
+}
+
+// NOTE: A List built in one allocation — the branded object literal
+// `List.createList` would have wrapped the array in, around the same array
+// literal it would have been handed.
+export interface DirectListNode {
+	nodeType: "Intrinsic"
+	kind: "direct-list"
+	values: Array<ExpressionNode>
+	type: ListType
 	position?: Position
 }
 

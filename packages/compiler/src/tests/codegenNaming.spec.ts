@@ -7,7 +7,11 @@ import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { optimise } from "../optimiser/index"
+import {
+	defaultOptimiserOptions,
+	optimise,
+	type OptimiserOptions,
+} from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
@@ -15,7 +19,16 @@ import { validate } from "../validator/index"
 
 // NOTE: The same stages the CLI runs, minus bundling — the emitted text is what
 // every assertion below is about, so nothing is written to disk to get it.
-function generate(source: string): string {
+//
+// NOTE: A naming rule holds for every build the Compiler can do, and turning an
+// Optimiser pass off is one of them — which is why the Options are a Parameter
+// here. They matter to exactly one question below: an un-optimised List literal
+// is `List.createList(…)` and names a Namespace, where the collapsed one is an
+// object literal that names none.
+function generate(
+	source: string,
+	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
+): string {
 	let parsed = parseWithDiagnostics(source)
 
 	expect(containsErrors(parsed.diagnostics)).toBe(false)
@@ -25,7 +38,15 @@ function generate(source: string): string {
 	expect(containsErrors(enriched.diagnostics)).toBe(false)
 	expect(containsErrors(validate(enriched.program))).toBe(false)
 
-	return rewrite(optimise(simplify(enriched.program)))
+	return rewrite(
+		optimise(simplify(enriched.program), optimiserOptions),
+		optimiserOptions,
+	)
+}
+
+const withoutCollapsedConstruction: OptimiserOptions = {
+	enabled: true,
+	disabledPasses: new Set(["collapse-construction"]),
 }
 
 // NOTE: Every fault here compiled green and only showed itself in the emitted
@@ -128,11 +149,19 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			let generated = generate(source)
 
-			// NOTE: The literal still calls the IMPORT, and the user's own
-			// binding is somewhere else entirely.
-			expect(generated).toContain("List.createList(")
+			// NOTE: The literal is a branded object literal — it names no
+			// Namespace at all — and the user's own binding is somewhere else
+			// entirely.
+			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).toContain("const $user_List = ")
 			expect(generated).not.toMatch(/\bconst List\b/)
+
+			// NOTE: And with the collapse turned off the literal is
+			// `List.createList(…)` again, which is the shape the shadowing
+			// could break: that `List` has to be the IMPORT.
+			expect(generate(source, withoutCollapsedConstruction)).toMatch(
+				/\bList\.createList\(/,
+			)
 
 			// NOTE: Before the fix: `TypeError: List.createList is not a
 			// function`.
@@ -269,14 +298,27 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			expect(generated).toContain("class $user_List {")
 			expect(generated).toContain("$user_List.doubledValue(")
-			// NOTE: `\b` does not fire between `_` and `L`, so this asks for the
-			// BARE name — the import the literal has to keep reaching.
-			expect(generated).toMatch(/\bList\.createList\(/)
+			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).not.toMatch(/\bclass List\b/)
 
 			// NOTE: Before the fix: `TypeError: List.createList is not a
 			// function` — the emitted `class List` had no such static Method.
 			expect(await run(shadowedList)).toEqual(["[ 1, 2 ]", "42"])
+		})
+
+		it("does not shadow it for an un-optimised literal either", () => {
+			// NOTE: The shape the fault was found in. A collapsed List literal
+			// names no Namespace, so the shadowing can not reach it; turn
+			// `collapse-construction` off and the literal is
+			// `List.createList(…)` again, with the same `class $user_List`
+			// beside it.
+			let generated = generate(shadowedList, withoutCollapsedConstruction)
+
+			expect(generated).toContain("class $user_List {")
+			// NOTE: `\b` does not fire between `_` and `L`, so this asks for the
+			// BARE name — the import the literal has to keep reaching.
+			expect(generated).toMatch(/\bList\.createList\(/)
+			expect(generated).not.toMatch(/\bclass List\b/)
 		})
 
 		it("leaves a sibling Function on the runtime Namespace", async () => {
@@ -347,7 +389,7 @@ describe("Code Generation — Naming and Escaping", () => {
 
 			expect(generated).toContain("class $user_List {")
 			expect(generated).toContain("$es_List_firstItem")
-			expect(generated).toMatch(/\bList\.createList\(/)
+			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 
 			expect(await run(source)).toEqual(["1", "42"])
 		})
@@ -423,9 +465,9 @@ describe("Code Generation — Naming and Escaping", () => {
 			expect(generated).toContain("$user_List.describe")
 			expect(generated).toContain("$user_Record.describe")
 			// NOTE: The runtime Namespaces the emitted helpers reach are
-			// untouched — the List literal's, the String literal's and the
-			// Record literal's alike.
-			expect(generated).toMatch(/\bList\.createList\(/)
+			// untouched — the String literal's constructor, and the hidden Type
+			// key a collapsed List literal brands itself with.
+			expect(generated).toContain('[$type.typeKeySymbol]: "List"')
 			expect(generated).toMatch(/\bString\.createString\(/)
 
 			expect(await run(source)).toEqual(["[ 1, 2 ]", "0", "2"])

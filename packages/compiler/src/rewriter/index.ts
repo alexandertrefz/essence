@@ -1616,7 +1616,105 @@ function rewriteExpressionByKind(
 			return rewriteConformanceValue(node)
 		case "CaseValue":
 			return rewriteCaseValue(node)
+		case "Intrinsic":
+			return rewriteIntrinsic(node)
 	}
+}
+
+// NOTE: The Nodes the Optimiser rewrites Expressions into, and the one place
+// they are emitted. Each stands for a shape the runtime's own constructor would
+// have built — so the JavaScript below is what that constructor does, written
+// out at the site instead of called. The switch is exhaustive: an intrinsic kind
+// added without a case here does not compile.
+function rewriteIntrinsic(
+	node: common.typedSimple.IntrinsicNode,
+): estree.Expression {
+	switch (node.kind) {
+		case "direct-record":
+			return {
+				type: "ObjectExpression",
+				properties: [
+					typeKeyProperty("Record"),
+					...memberProperties(node.members),
+				],
+			}
+		case "direct-case":
+			return {
+				type: "ObjectExpression",
+				// NOTE: The payload is spread FIRST and the tag written over it,
+				// exactly as `createCase` does — a payload Record carries the
+				// `"Record"` brand of its own, and whichever of the two is
+				// written last is the one the value ends up with.
+				properties: [
+					...(node.payload === null
+						? []
+						: [
+								{
+									type: "SpreadElement" as const,
+									argument: rewriteExpression(node.payload),
+								},
+							]),
+					typeKeyProperty(renderIdentity(node.tag)),
+					...memberProperties(node.members),
+				],
+			}
+		case "direct-list":
+			return {
+				type: "ObjectExpression",
+				properties: [
+					typeKeyProperty("List"),
+					{
+						type: "Property",
+						key: { type: "Identifier", name: "value" },
+						value: {
+							type: "ArrayExpression",
+							elements: node.values.map((value) =>
+								rewriteExpression(value),
+							),
+						},
+						kind: "init",
+						computed: false,
+						method: false,
+						shorthand: false,
+					},
+				],
+			}
+	}
+}
+
+// NOTE: The hidden Type key every runtime value carries, as emitted code
+// reaches it: `$type.typeKeySymbol`, off the module alias every Program already
+// imports. It is a Symbol, so it is invisible to `Object.keys` — which is what
+// Record equality, the printer and the runtime Type checks read with — and a
+// value branded here is indistinguishable from one the runtime branded.
+function typeKeyProperty(tag: string): estree.Property {
+	return {
+		type: "Property",
+		key: memberRead({ type: "Identifier", name: "$type" }, "typeKeySymbol"),
+		value: { type: "Literal", value: tag },
+		kind: "init",
+		computed: true,
+		method: false,
+		shorthand: false,
+	}
+}
+
+// NOTE: Member names go through the same `memberKey` quoting every other
+// emitted Record member does — an Essence name JavaScript can not spell becomes
+// a string key, and the read of it agrees because both positions ask this one
+// question.
+function memberProperties(
+	members: Record<string, common.typedSimple.ExpressionNode>,
+): Array<estree.Property> {
+	return Object.entries(members).map(([name, value]) => ({
+		type: "Property",
+		key: memberKey(name),
+		value: rewriteExpression(value),
+		kind: "init",
+		computed: false,
+		method: false,
+		shorthand: false,
+	}))
 }
 
 // NOTE: A Case is its payload Record with a nominal tag riding along on the
