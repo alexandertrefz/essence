@@ -9,6 +9,7 @@ import * as integer from "@essence-lang/runtime/Integer"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
+import * as nonZeroInteger from "@essence-lang/runtime/NonZeroInteger"
 import * as normalizationForm from "@essence-lang/runtime/NormalizationForm"
 import * as number from "@essence-lang/runtime/Number"
 import * as numberFormat from "@essence-lang/runtime/NumberFormat"
@@ -35,6 +36,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	String: string,
 	Boolean: boolean,
 	Integer: integer,
+	NonZeroInteger: nonZeroInteger,
 	Rational: rational,
 	Algebraic: algebraic,
 	Transcendental: transcendental,

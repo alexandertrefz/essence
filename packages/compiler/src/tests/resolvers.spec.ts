@@ -1093,16 +1093,23 @@ describe("Resolvers", () => {
 		it("should offer a refined receiver every Namespace its base has", () => {
 			let namespaces = stdlibNamespaces()
 
+			let refined = [
+				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
+			]
+			let base = [...namespacesTargeting(namespaces, integer).keys()]
+
 			// NOTE: `Integer` out of the kind bucket the base is filed under,
 			// and `Number` out of the blanket one every lookup pays for — its
 			// target is the Union, which takes a refined Integer through the
 			// same widening rule.
-			expect([
-				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
-			]).toEqual([...namespacesTargeting(namespaces, integer).keys()])
-			expect([
-				...namespacesTargeting(namespaces, nonZeroInteger).keys(),
-			]).toEqual(["Integer", "Number"])
+			expect(base).toEqual(["Integer", "Number"])
+
+			// NOTE: Evidence ADDS and never takes away, so every Namespace the
+			// base is answered by answers here too — asserted as inclusion
+			// rather than as equality, because the standard library declares one
+			// FOR this refinement and that one is the difference.
+			expect(base.every((name) => refined.includes(name))).toBe(true)
+			expect(refined).toEqual(["Integer", "NonZeroInteger", "Number"])
 		})
 
 		it("should find a Namespace written for the refinement itself", () => {

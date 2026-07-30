@@ -36,6 +36,11 @@ export const builtinMemberOrder: Array<string> = [
 	"String",
 	"Boolean",
 	"Integer",
+	// NOTE: Directly after `Integer`, for the reason `NestedList` sits directly
+	// after `List` — the two Namespaces one Integer value can reach belong
+	// together, and the general one has to be met FIRST so that
+	// `NonZeroInteger::multiply` reads as the extra a proven Integer has.
+	"NonZeroInteger",
 	"Rational",
 	"Algebraic",
 	"Transcendental",

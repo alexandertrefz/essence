@@ -355,6 +355,24 @@ declarations {
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Integer) -> Ordering
 	}
+
+	§ The arithmetic that KEEPS the evidence, rather than forgetting it. Evidence
+	§ adds Methods to a Type and takes none away, so a NonZeroInteger already
+	§ answers every Method above; what a Namespace of its own is for is the
+	§ operations whose answer is a NonZeroInteger too.
+	§
+	§ Only one qualifies, and it qualifies for a reason worth writing down: a
+	§ product is zero exactly when one of its factors is, so neither factor being
+	§ zero is the whole of the proof. Nothing else closes — a sum of two non-zero
+	§ Integers is `1 + (0 - 1)`, a difference the same, and a negation is the one
+	§ operation that would close but which nothing needs.
+	namespace NonZeroInteger for NonZeroInteger {
+		§§ Multiplies this NonZeroInteger with another. The product is never zero either, so the evidence carries through the operation instead of being forgotten at it.
+		§§
+		§§ @param with — the NonZeroInteger to multiply with
+		§§ @returns — the product, which is not zero.
+		multiply(with other: NonZeroInteger) -> NonZeroInteger
+	}
 }
 
 export {

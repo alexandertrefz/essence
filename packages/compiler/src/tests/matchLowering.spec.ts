@@ -399,9 +399,9 @@ describe("Match Lowering", () => {
 	// without it, which is why this goes all the way through.
 	describe("Matches on values", () => {
 		let doubledOrZero = `implementation {
-			type NonZero = Integer where @::isNot(0)
+			type Divisor = Integer where @::isNot(0)
 
-			function doubled(_ d: NonZero) -> Integer {
+			function doubled(_ d: Divisor) -> Integer {
 				<- d::multiply(with 2)
 			}
 
@@ -429,7 +429,14 @@ describe("Match Lowering", () => {
 			// heard of — it erases to the Integer it refines, which is the same
 			// object built by the same constructor.
 			expect(generated).toContain("anyIs")
-			expect(generated).not.toContain("NonZero")
+			expect(generated).not.toContain("Divisor")
+
+			// NOTE: What the product DOES name is `NonZeroInteger`, and that is a
+			// Namespace rather than a Type — the standard library declares one for
+			// exactly this predicate, so a `Divisor` is answered by the total
+			// `multiply` written for it. A Namespace name is emitted text like
+			// every other Namespace's; the refinement above is not emitted at all.
+			expect(generated).toContain("NonZeroInteger.multiply")
 		})
 
 		// NOTE: The last Handler of such a Match asks a tag question — every value
