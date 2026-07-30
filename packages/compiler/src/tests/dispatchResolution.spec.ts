@@ -63,6 +63,27 @@ async function run(
 	return output
 }
 
+// NOTE: The counterpart for the Programs that are supposed to be refused —
+// which is where the probe ORDER is visible as something a reader sees, rather
+// than as which body ran.
+function diagnosticsFor(source: string): Array<common.Diagnostic> {
+	return enrich(parse(source)).diagnostics
+}
+
+// NOTE: The characters a Diagnostic's Label covers, which is the only way to
+// say "it points at what the Program wrote" without counting columns by hand.
+// Single line spans only; every Label asked this covers one call or one name.
+function underlinedText(source: string, label: common.DiagnosticLabel): string {
+	let position = label.position
+
+	return source
+		.split("\n")
+		[position.start.line - 1].slice(
+			position.start.column - 1,
+			position.end.column - 1,
+		)
+}
+
 describe("Dispatch and Resolution", () => {
 	describe("Contextual Function literal Arguments", () => {
 		// NOTE: `IntApplier` wins — its target is strictly more specific than
@@ -606,6 +627,196 @@ describe("Dispatch and Resolution", () => {
 					__print(describeAny(["a"]))
 				}`),
 			).toEqual(['"total"', '"empty"', '"checked"'])
+		})
+
+		// NOTE: What the sort costs a call that FAILS, which is where an order is
+		// visible as something a reader is told rather than as which body ran. A
+		// probe reports about the Arguments it was given, and a losing one's report
+		// is held — but only from the first candidate whose Arguments matched
+		// onwards, because an Argument is enriched exactly once and a report held
+		// before that would be held forever. So the sort decides which entry the
+		// call is reported ABOUT, and these say which, in both directions.
+		describe("the report a call every entry refuses gets", () => {
+			// NOTE: Both entries take the Arguments — `3` is admitted into
+			// `NonZero`, and `true` binds each entry's Type Parameter — and both
+			// fail the bound that Parameter carries. Named differently on purpose:
+			// which Protocol the Diagnostic names is which entry the call was
+			// reported about, and nothing else in the two entries differs.
+			let bounds = (refined: string) => `protocol Showable {
+					§§ Shows it.
+					§§
+					§§ @returns — the text
+					show() -> String
+				}
+
+				protocol Renderable {
+					§§ Renders it.
+					§§
+					§§ @returns — the text
+					render() -> String
+				}
+
+				namespace Ratios for Integer {
+					overload describe {
+						§§ The base entry, written first.
+						§§
+						§§ @param by — any Integer
+						§§ @param with — a Showable
+						§§ @returns — the text
+						<infer Value is Showable>(by other: Integer, with extra: Value) -> String {
+							<- extra::show()
+						}
+
+						§§ The entry appended after it.
+						§§
+						§§ @param by — ${refined}
+						§§ @param with — a Renderable
+						§§ @returns — the text
+						<infer Value is Renderable>(by other: ${refined}, with extra: Value) -> String {
+							<- extra::render()
+						}
+					}
+				}`
+
+			// NOTE: The entry asking for evidence is probed first, so it is the
+			// first whose Arguments match, so it is the one the call is reported
+			// about — its bound is the one named. The report is about the Argument
+			// the Program wrote either way: both entries would refuse `true` for the
+			// same reason, and what the sort decides is which of the two bounds it
+			// is refused by.
+			it("names the entry asking for evidence, which matched first", () => {
+				let source = `implementation {
+					type NonZero = Integer where @::isNot(0)
+
+					${bounds("NonZero")}
+
+					__print(6::describe(by 3, with true))
+				}`
+
+				let diagnostics = diagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["unsatisfied-bound"])
+				expect(diagnostics[0]!.message).toBe(
+					"Boolean does not conform to 'Renderable'",
+				)
+				expect(underlinedText(source, diagnostics[0]!.labels[0]!)).toBe(
+					"6::describe(by 3, with true)",
+				)
+			})
+
+			// NOTE: And the same two entries with the refinement taken out, which is
+			// the assertion that this costs a Program declaring none: with nothing
+			// asking for evidence the entries are probed as written, the entry
+			// written FIRST is the first to match, and its bound is named. Every
+			// Program that was reported on before is reported on the same way.
+			it("names the entry written first where none asks for evidence", () => {
+				let source = `implementation {
+					${bounds("Integer")}
+
+					__print(6::describe(by 3, with true))
+				}`
+
+				let diagnostics = diagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["unsatisfied-bound"])
+				expect(diagnostics[0]!.message).toBe(
+					"Boolean does not conform to 'Showable'",
+				)
+			})
+
+			// NOTE: The other half of a probe's report — not what solving the
+			// candidate's bounds said, but what TYPING an Argument against its
+			// Parameter Types did. An unannotated Function literal is resolved
+			// against each candidate's Parameter Types in turn, and where NO
+			// candidate's Arguments match, every probe is an unheld one: the
+			// literal's body is left compiled under the LAST entry probed, and its
+			// report is that entry's reading of it.
+			//
+			// Which is the sort earning its keep. The entries asking for evidence go
+			// first, so the entry probed LAST is the one a value carrying no
+			// evidence falls through to — the base entry — and the reading a reader
+			// is shown is the base entry's, not the refined entry's. Here the base
+			// entry hands the literal an Integer and the refined one a String, and
+			// `isEven` is a Method only the Integer answers.
+			let appliers = (
+				refined: string,
+			) => `namespace Appliers for Integer {
+					overload apply {
+						§§ The base entry, written first.
+						§§
+						§§ @param transform — over Integers
+						§§ @param with — any Integer
+						§§ @returns — the text
+						(_ transform: (_ item: Integer) -> String, with n: Integer) -> String {
+							<- transform(@)
+						}
+
+						§§ The entry appended after it.
+						§§
+						§§ @param transform — over Strings
+						§§ @param with — ${refined}
+						§§ @returns — the text
+						(_ transform: (_ item: String) -> String, with n: ${refined}) -> String {
+							<- transform("x")
+						}
+					}
+				}`
+
+			it("leaves the literal compiled under the entry a bare value falls through to", () => {
+				let source = `implementation {
+					type NonZero = Integer where @::isNot(0)
+
+					${appliers("NonZero")}
+
+					__print(1::apply((item) { <- item::isEven()::toString() }, with true))
+				}`
+
+				// NOTE: One Diagnostic, and it is about the call rather than about
+				// the literal: the base entry was probed last, it reads `item` as an
+				// Integer, and `isEven` is a Method an Integer answers. The refined
+				// entry's reading — where `item` is a String and `isEven` is nothing
+				// at all — was overwritten by it and is nowhere in the report.
+				expect(
+					diagnosticsFor(source).map((diagnostic) => diagnostic.code),
+				).toEqual(["no-matching-overload"])
+
+				// NOTE: And the entries are still LISTED as they were written. What
+				// the sort decides is the order they are tried in, never the order a
+				// Program's own declarations are read back to it in.
+				expect(diagnosticsFor(source)[0]!.notes).toEqual([
+					"'Appliers::apply' takes 2 Arguments: Parameter 1 is (_: Integer) -> String, Parameter 'with' is Integer.",
+					"'Appliers::apply' takes 2 Arguments: Parameter 1 is (_: String) -> String, Parameter 'with' is NonZero.",
+				])
+			})
+
+			// NOTE: The same call with nothing asking for evidence, which is what
+			// says the paragraph above is the sort's doing: probed as written, the
+			// entry left compiled into the literal is the one written LAST, so the
+			// body is read as a String's and the Method it calls is reported missing
+			// — pointing inside the literal, at the name the Program wrote there.
+			it("leaves it under the entry written last where none asks for evidence", () => {
+				let source = `implementation {
+					${appliers("String")}
+
+					__print(1::apply((item) { <- item::isEven()::toString() }, with true))
+				}`
+
+				let diagnostics = diagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["no-matching-overload", "unknown-method"])
+				expect(diagnostics[1]!.message).toBe(
+					"No Method named 'isEven' for this value",
+				)
+				expect(underlinedText(source, diagnostics[1]!.labels[0]!)).toBe(
+					"isEven",
+				)
+			})
 		})
 	})
 
