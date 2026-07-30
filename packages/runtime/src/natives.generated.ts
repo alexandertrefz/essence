@@ -287,6 +287,8 @@ export type ListNatives = {
 	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 	// compare<ItemType is Comparable>(to: List<ItemType>) -> Ordering
 	compare: <ItemType extends AnyType>(self: ListType<ItemType>, to: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => OrderingType
+	// insert<ItemType>(_: ItemType, at: Integer) -> NonEmptyList
+	insert: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: ItemType, at: IntegerType) => ListType<ItemType>
 	// join<ItemType is Printable>(with: String) -> String
 	join: <ItemType extends AnyType>(self: ListType<ItemType>, argument1: StringType, ItemType__conformance: PrintableConformance<ItemType>) => StringType
 	// pair<ItemType, Other>(with: List<Other>) -> List<{ first: ItemType, second: Other }>
@@ -470,7 +472,7 @@ export const $RecordArity: AssertArities<typeof import("./Record"), {
 
 declare const ListModule: typeof import("./List")
 export const $List: ListNatives = ListModule
-export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "insert" | "replace" | "lastIndex" | "partition" | "repeat"> = true
+export const $ListAbsent: AssertNoEssenceExports<typeof import("./List"), "isNot" | "hasItems" | "isEmpty" | "contains" | "doesNotContain" | "firstItem__overload$1" | "firstItem__overload$2" | "lastItem" | "removeFirst__overload$1" | "removeFirst__overload$2" | "remove" | "removeEvery__overload$1" | "removeEvery__overload$2" | "removeLast__overload$1" | "removeLast__overload$2" | "removeDuplicates" | "prepend__overload$2" | "firstIndex" | "anyItem" | "everyItem" | "count__overload$1" | "count__overload$2" | "replace" | "lastIndex" | "partition" | "repeat"> = true
 export const $ListArity: AssertArities<typeof import("./List"), {
 	is: 3
 	toString: 2
@@ -488,6 +490,7 @@ export const $ListArity: AssertArities<typeof import("./List"), {
 	sort__overload$1: 2
 	sort__overload$2: 2
 	compare: 3
+	insert: 3
 	join: 3
 	pair: 2
 	split: 2

@@ -17,6 +17,13 @@ declarations {
 	§ what the Type carries. A List written DOWN with items in it is its own
 	§ proof; a List a Program is handed goes through an `if` asking `hasItems`.
 	§
+	§ And a List a Method BUILT may arrive already proven, with nothing asked
+	§ of it at all: `append(_:)`, `prepend(_:)`, `insert(_:at:)` and
+	§ `of(integersFrom:through:)` each put something in whatever they were
+	§ given, so each of them answers with this Type rather than with `List`.
+	§ That is the third route to the proof, and the only one that costs the
+	§ Program nothing to take.
+	§
 	§ It is generic, and the predicate is why that costs nothing: whether a List
 	§ has items is not a question about WHAT it holds, so one predicate serves
 	§ every item Type and the Type Argument lives in the base — a
@@ -590,19 +597,24 @@ declarations {
 			}
 		}
 
-		§§ A new List with the given item inserted before the given position. A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one; a position outside the List clamps to the nearer end, so insertion never drops the item.
+		§ The clamping is what makes this a creator rather than a Method that
+		§ might do nothing: a position outside the List settles on the nearer
+		§ end and the item goes THERE, so there is no position, however far
+		§ out or however negative, that drops it. Insertion always inserts —
+		§ which is exactly the promise the return Type makes.
+		§
+		§ Native for the reason `append`'s and `prepend`'s single-item entries
+		§ are. The body it had was the three-part `slice`/`append`/`append`
+		§ the runtime NOTE now describes, and every part of it answered a
+		§ `List` — the item was certainly in there, and Essence had no way to
+		§ say so.
+
+		§§ A new List with the given item inserted before the given position. A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one; a position outside the List clamps to the nearer end, so insertion never drops the item — and the List it answers with therefore certainly has something in it.
 		§§
-		§§ @returns — the List with the item inserted.
-		insert(_ item: ItemType, at index: Integer) -> List<ItemType> {
-			§ Everything before the position, the item, then everything from the
-			§ position on. `slice` clamps both ends, so a position before the
-			§ start empties the first slice and prepends, and one at or past the
-			§ end fills it with the whole List and appends — insertion never
-			§ drops the item.
-			<- @::slice(from 0, to index)
-				::append(item)
-				::append(contentsOf @::slice(from index, to @::length()))
-		}
+		§§ @param item — the item to insert
+		§§ @param at — the position to insert the item before
+		§§ @returns — the List with the item inserted, never empty.
+		insert(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 
 		§§ A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item.
 		§§
