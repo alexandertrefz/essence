@@ -407,6 +407,151 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
+	// NOTE: An Overload set is first fit, and a refinement is freely assignable to
+	// its base — so an entry taking the base Type accepts every Argument a refined
+	// entry would have taken, and the refined entry only ever wins by being read
+	// first. Writing it first is not how it gets there: an Overload's slot is
+	// emitted into its name and, in the Standard Library, its native binding is
+	// keyed by position, so the refined entries are appended. The candidates are
+	// probed refinement-first instead, and what that does is visible only in which
+	// body the Program ends up running — which is what these assert.
+	describe("Overload probe order", () => {
+		let ratios = `type NonZeroInteger = Integer where @::isNot(0)
+
+			namespace Ratios for Integer {
+				overload describe {
+					§ The base entry, written first, and the one that takes any
+					§ Integer at all.
+					(by other: Integer) -> String {
+						<- "checked"
+					}
+
+					§ The entry asking for evidence, appended after it the way the
+					§ Standard Library has to append its own.
+					(by other: NonZeroInteger) -> String {
+						<- "total"
+					}
+				}
+			}`
+
+		it("reaches the entry written last for a value written down", async () => {
+			expect(
+				await run(`implementation {
+					${ratios}
+
+					__print(6::describe(by 3))
+				}`),
+			).toEqual(['"total"'])
+		})
+
+		it("reaches it for a value a branch proved", async () => {
+			expect(
+				await run(`implementation {
+					${ratios}
+
+					function describeChecked(_ n: Integer) -> String {
+						if n::isNot(0) {
+							<- 6::describe(by n)
+						}
+
+						<- "zero"
+					}
+
+					__print(describeChecked(3))
+					__print(describeChecked(0))
+				}`),
+			).toEqual(['"total"', '"zero"'])
+		})
+
+		// NOTE: The other half of the rule, and the reason the sort is a sort
+		// rather than a preference: a value carrying no evidence must still find
+		// the base entry. It compiles green, so this is not only about which body
+		// runs — a refined entry that swallowed the call would report the Argument
+		// it can not take and the Program would not run at all.
+		it("falls through to the base entry for a value nothing proved", async () => {
+			expect(
+				await run(`implementation {
+					${ratios}
+
+					function describeAny(_ n: Integer) -> String {
+						<- 6::describe(by n)
+					}
+
+					__print(describeAny(3))
+					__print(describeAny(0))
+				}`),
+			).toEqual(['"checked"', '"checked"'])
+		})
+
+		// NOTE: Probed first is not selected: a candidate whose bound the Arguments
+		// can not satisfy is no candidate at all, refinement or not. The refined
+		// entry below takes the Arguments — `3` is admitted, `Value` binds the
+		// Boolean — and is passed over for the bound it fails, which is also what
+		// keeps the bound's Diagnostic from being reported about a call that
+		// resolved.
+		it("passes over an entry asking for evidence whose bound fails", async () => {
+			expect(
+				await run(`implementation {
+					type NonZeroInteger = Integer where @::isNot(0)
+
+					protocol Showable {
+						show() -> String
+					}
+
+					type Vector = { x: Integer, y: Integer }
+
+					namespace VectorShowable for Vector is Showable {
+						show() -> String {
+							<- "vector"
+						}
+					}
+
+					namespace Picker for {} {
+						overload static pick {
+							(_ value: Boolean, with extra: Integer) -> String {
+								<- "base"
+							}
+
+							<infer Value is Showable>(_ value: Value, with extra: NonZeroInteger) -> String {
+								<- value::show()
+							}
+						}
+					}
+
+					constant vector: Vector = { x = 1, y = 2 }
+
+					__print(Picker.pick(true, with 3))
+					__print(Picker.pick(vector, with 3))
+				}`),
+			).toEqual(['"base"', '"vector"'])
+		})
+
+		// NOTE: And the assertion that this costs a Program declaring no refinement
+		// nothing. A wide entry written ahead of a narrow one is the same situation
+		// with no evidence asked for anywhere, and it is probed in the order it was
+		// written: the entry written first wins a call both of them accept. Every
+		// Program that compiled before selects exactly what it selected before.
+		it("keeps declaration order where no entry asks for evidence", async () => {
+			expect(
+				await run(`implementation {
+					namespace Ratios for Integer {
+						overload describe {
+							(by other: Number) -> String {
+								<- "wide"
+							}
+
+							(by other: Integer) -> String {
+								<- "narrow"
+							}
+						}
+					}
+
+					__print(6::describe(by 3))
+				}`),
+			).toEqual(['"wide"'])
+		})
+	})
+
 	describe("Static Method bodies", () => {
 		// NOTE: A static Method is emitted without the `_self` Parameter `@`
 		// lowers to, so `@` in one used to compile to an unbound name and the
