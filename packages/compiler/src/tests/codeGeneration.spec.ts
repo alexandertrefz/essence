@@ -3281,4 +3281,46 @@ declarations {
 			).toBe(true)
 		})
 	})
+
+	// NOTE: The same total operation over a Parameter whose Type Argument the CALL
+	// works out, which is the one position where nothing has spelled the refinement
+	// at all: `NonEmptyList<Item>` is a Type only once something says what `Item` is,
+	// and the written List is the only thing that ever could. What runs is again the
+	// Program with no refinement in it — `firstItem` answers the item itself rather
+	// than an Optional, and that is the whole difference.
+	describe("a refined Parameter whose Type Argument is inferred", () => {
+		const SOURCE = `implementation {
+	§ Total for the same reason as ever, and generic on top: there is no first item
+	§ of an empty List, and no value of this Parameter's Type is empty.
+	function firstOf<infer Item>(_ items: NonEmptyList<Item>) -> Item {
+		<- items::firstItem()
+	}
+
+	§ Each call decides 'Item' by the List it is written with, and the List is its
+	§ own proof of the predicate.
+	__print(firstOf(["written", "second"]))
+	__print(firstOf([1, 2]))
+}`
+
+		// NOTE: The empty List is what says the evidence is still being read: it
+		// decides no 'Item' AND answers the predicate with a no, either of which is
+		// enough to refuse it.
+		const EMPTY = `implementation {
+	function firstOf<infer Item>(_ items: NonEmptyList<Item>) -> Item {
+		<- items::firstItem()
+	}
+
+	__print(firstOf([]))
+}`
+
+		it("runs the written List through the total operation", async () => {
+			expect(await run(SOURCE)).toEqual(['"written"', "1"])
+		})
+
+		it("refuses the empty written List", () => {
+			expect(
+				hasCode(diagnosticsOf(EMPTY), "argument-type-mismatch"),
+			).toBe(true)
+		})
+	})
 })

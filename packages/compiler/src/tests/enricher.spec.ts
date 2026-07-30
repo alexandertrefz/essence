@@ -6354,5 +6354,72 @@ describe("Enricher", () => {
 				),
 			).toEqual(["Integer", "Integer"])
 		})
+
+		// NOTE: The one position where the refinement standing there is not yet a
+		// Type: a Parameter written `NonEmptyList<Item>` whose `Item` the CALL has to
+		// work out. Asked as it stands, its base is `List<Item>` and no written List
+		// is of that Type at all — so what the value is asked about is the refinement
+		// the value itself DECIDES, the declared base unified against the written
+		// List's own Type. The Parameter is then bound through the base, exactly as an
+		// unrefined `List<Item>` would bind it.
+		describe("a Type Argument the call infers", () => {
+			// NOTE: The evidence is all that tells the two entries apart — the second
+			// one pins the items rather than inferring them, so the List that decides
+			// nothing still has an entry to fall to and the answer says which.
+			function counted(argument: string): string {
+				return `implementation {
+					namespace Counting for {} {
+						overload static counted {
+							<infer Item>(_ items: NonEmptyList<Item>) -> String {
+								<- "refined"
+							}
+
+							(_ items: List<String>) -> String {
+								<- "base"
+							}
+						}
+					}
+
+					constant countedValue = Counting.counted(${argument})
+				}`
+			}
+
+			it("should admit a written List into the instantiation it decides", () => {
+				expect(
+					lastConstantFunctionInvocation(counted(`["a"]`))
+						.overloadedMethodIndex,
+				).toBe(0)
+			})
+
+			// NOTE: An empty List decides nothing — `List<Item>` accepts a
+			// `List<Unknown>` without saying what `Item` is, and a refinement over a
+			// base nobody decided would hand the call a Type nobody wrote. So the
+			// unrefined entry answers, as it does for a List the predicate simply
+			// fails.
+			it("should not admit a written List that decides no Type Argument", () => {
+				expect(
+					lastConstantFunctionInvocation(counted("[]"))
+						.overloadedMethodIndex,
+				).toBe(1)
+			})
+
+			// NOTE: A Type Parameter binds the BASE and never the refinement — the v1
+			// rule, asked of the one Parameter a refinement is what decided. The
+			// return Type IS the binding here, and `firstItem` is total for it: the
+			// whole point of the Parameter having been admitted.
+			it("should bind the Type Parameter to the base's items", () => {
+				expect(
+					printType(
+						lastConstantValue(`implementation {
+							function firstOf<infer Item>(_ items: NonEmptyList<Item>) -> Item {
+								<- items::firstItem()
+							}
+
+							constant first = firstOf(["a"])
+						}`).type,
+					),
+				).toBe("String")
+			})
+		})
 	})
 })

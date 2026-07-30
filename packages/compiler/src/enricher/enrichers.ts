@@ -42,7 +42,10 @@ import {
 	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
-import { admittedByEvaluation } from "../helpers/predicateEval"
+import {
+	admittedByEvaluation,
+	refinementDecidedBy,
+} from "../helpers/predicateEval"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -4418,11 +4421,19 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 			// a candidate that loses leaves nothing behind for the winner to read.
 			// It is also why the Node needs nothing — a refinement erases to its
 			// base, which is the Type the literal already has.
-			if (
-				expectedType.type === "Refinement" &&
-				admitted(value, expectedType)
-			) {
-				return expectedType
+			//
+			// NOTE: Asked about the refinement THIS value decides rather than about
+			// the Parameter Type as it stands — the two differ only where the
+			// Parameter's own Type Arguments are still open, and there the Parameter
+			// as it stands is not yet a Type any value could be of. What comes back
+			// is matched against the Parameter as DECLARED, which is what binds the
+			// Type Parameter the value just decided.
+			if (expectedType.type === "Refinement") {
+				let asked = refinementDecidedBy(expectedType, type)
+
+				if (asked !== null && admitted(value, asked)) {
+					return asked
+				}
 			}
 
 			return type

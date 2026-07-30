@@ -27,6 +27,7 @@ import {
 import {
 	admittedByEvaluation,
 	describePredicate,
+	refinementDecidedBy,
 } from "../helpers/predicateEval"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -2452,16 +2453,27 @@ function refinementEvidence(expected: common.Type | undefined): {
 // reason beyond the Diagnostic: a committed Overload whose Arguments do not
 // match is an ICE here, so a call the Enricher admitted a literal into would
 // fail the compile outright if this asked only about assignability.
+//
+// Which is why the question is asked in full, `refinementDecidedBy` and all: a
+// Parameter whose Type Arguments the call worked out is a refinement nothing
+// spelled, and asking about it as it STANDS would refuse the very literal the
+// Enricher admitted — an ICE out of a Program that is perfectly well typed.
 function matchableArgumentsFromTypedNodes(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): Array<MatchableArgument> {
 	return argumentNodes.map((argumentNode) => ({
 		name: argumentNode.name,
-		getType: (expectedType) =>
-			expectedType.type === "Refinement" &&
-			admittedByEvaluation(expectedType, argumentNode.value)
-				? expectedType
-				: argumentNode.type,
+		getType: (expectedType) => {
+			let asked =
+				expectedType.type === "Refinement"
+					? refinementDecidedBy(expectedType, argumentNode.value.type)
+					: null
+
+			return asked !== null &&
+				admittedByEvaluation(asked, argumentNode.value)
+				? asked
+				: argumentNode.type
+		},
 	}))
 }
 

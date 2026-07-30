@@ -2866,6 +2866,71 @@ describe("Validator", () => {
 				).toHaveLength(1)
 			})
 
+			// NOTE: A Parameter written with a Type Parameter the CALL works out is
+			// the one position where the refinement is not yet a Type: its base is
+			// `List<Item>`, and no written List is ever of that. So the value is asked
+			// about the refinement IT decides — its own Type unified against the
+			// declared base — and the Parameter is bound through that base, exactly as
+			// an unrefined `List<Item>` binds it.
+			describe("a Type Argument the call infers", () => {
+				function withCountOf(
+					body: string,
+					generics = "<infer Item>",
+				): string {
+					return `implementation {
+						type Filled<Item> = List<Item> where @::hasItems()
+
+						function countOf${generics}(_ items: Filled<Item>) -> Integer {
+							<- items::length()
+						}
+
+						${body}
+					}`
+				}
+
+				it("should admit a written List, deciding the Type Argument by it", () => {
+					expect(
+						diagnosticsFor(withCountOf(`__print(countOf(["a"]))`)),
+					).toEqual([])
+				})
+
+				// NOTE: The refusal names the Type as the Declaration spells it,
+				// Parameter and all. Named by the Alias alone it read 'Filled', which
+				// is not a Type anything can be written as — a help offering to pass a
+				// value of it names something the Program would refuse for taking no
+				// Arguments, and the note claimed a predicate had been proven of it.
+				it("should refuse an empty written List, naming the Type with its Parameter", () => {
+					let diagnostics = diagnosticsFor(
+						withCountOf("__print(countOf([]))"),
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0].code).toBe("argument-type-mismatch")
+					expect(diagnostics[0].notes).toEqual([
+						"Parameter 1 is Filled<Item>.",
+						"Every value of 'Filled<Item>' has been proven to answer '@::hasItems()'.",
+					])
+					expect(diagnostics[0].helps).toEqual([
+						"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'Filled<Item>'.",
+					])
+				})
+
+				// NOTE: The instantiation is what the value is ASKED about, never what
+				// it is allowed to answer with: an `Item` the call can not bind is the
+				// enclosing Declaration's own opaque symbol, and a written String
+				// decides nothing whatever about it. Which is the ordinary
+				// assignability rule doing it — the admission hands back a
+				// `Filled<String>`, and `Filled<Item>` accepts no such thing.
+				it("should refuse a written List against an opaque Type Parameter", () => {
+					let diagnostics = diagnosticsFor(
+						withCountOf(`__print(countOf(["a"]))`, "<Item>"),
+					)
+
+					expect(diagnostics).toHaveLength(1)
+					expect(diagnostics[0].code).toBe("argument-type-mismatch")
+				})
+			})
+
 			// NOTE: Two applications of ONE Alias are two questions about the same
 			// written List, and the answer to each is kept for the Overload probes
 			// that follow. Keyed by the Alias' name alone, the first entry probed
