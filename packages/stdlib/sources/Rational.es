@@ -74,15 +74,34 @@ declarations {
 	§ computed Integers. Arithmetic never rounds — an operation that leaves
 	§ the Rationals widens into the Type that can still say the answer.
 	namespace Rational for Rational is Equatable, is Printable, is Comparable {
+		§ The one gateway a Rational is built through, in two entries. Which one a
+		§ call reaches is decided by what it knows about the DENOMINATOR: a bare
+		§ Integer might be zero, so the answer is an Optional, while a denominator
+		§ already proven not to be zero leaves nothing to answer empty for. The
+		§ refined entry stands LAST because an Overload's entries are numbered in
+		§ the order they are written and a native binding is named by that number
+		§ — but it is READ first, so a call that can prove its denominator gets
+		§ the total answer rather than an Optional it would only unwrap.
+
 		§§ Builds the Rational one Integer over another — the way to write a ratio of computed values, where the literal form `3/4` is not available.
-		§§
-		§§ @param numerator — the numerator
-		§§ @param over — the denominator
-		§§ @returns — the Rational, or nothing when the denominator is zero.
-		static of(
-			_ numerator: Integer,
-			over denominator: Integer,
-		) -> Optional<Rational>
+		overload static of {
+			§§ Builds the Rational from two Integers, with nothing known about either.
+			§§
+			§§ @param numerator — the numerator
+			§§ @param over — the denominator
+			§§ @returns — the Rational, or nothing when the denominator is zero.
+			(
+				_ numerator: Integer,
+				over denominator: Integer,
+			) -> Optional<Rational>
+
+			§§ Builds the Rational over a denominator already proven not to be zero. There is no failure left to report, so the Rational itself is the answer.
+			§§
+			§§ @param numerator — the numerator
+			§§ @param over — the denominator, proven not to be zero
+			§§ @returns — the Rational.
+			(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational
+		}
 
 		§§ Checks whether the Rational has the same value as another — compared in lowest terms, so `1/2 is 2/4` holds.
 		§§
@@ -102,11 +121,14 @@ declarations {
 
 		§ The arithmetic here is written on the lowest-terms accessors and
 		§ `Rational.of`, so every result passes through the one gateway a
-		§ Rational may be built by. `of` can only come back empty for a zero
-		§ denominator, and a product of two denominators — each positive in
-		§ lowest terms — never is one, so each `otherwise` below is
-		§ unreachable. The irrational entries lean on commutativity: the other
-		§ operand's own Namespace already declares the sum with a Rational.
+		§ Rational may be built by — and none of it launders an Optional any
+		§ more. `denominator` answers with a NonZeroInteger, a product of two of
+		§ those is one as well, and `of` over one of those is a Rational: the
+		§ chain the answers travel is total from end to end, and every entry
+		§ below used to end in an `::otherwise(0/1)` for a case it could not
+		§ reach, guarded by nothing but this paragraph saying so. The irrational
+		§ entries lean on commutativity: the other operand's own Namespace
+		§ already declares the sum with a Rational.
 
 		§§ Adds a number to this Rational, staying exact for every member of the numeric tower.
 		overload add {
@@ -120,14 +142,14 @@ declarations {
 							other::numerator()::multiply(with @::denominator()),
 						),
 					over @::denominator()::multiply(with other::denominator()),
-				)::otherwise(0/1)
+				)
 			}
 
 			(_ other: Integer) -> Rational {
 				<- Rational.of(
 					@::numerator()::add(other::multiply(with @::denominator())),
 					over @::denominator(),
-				)::otherwise(0/1)
+				)
 			}
 
 			(_ other: Algebraic) -> Algebraic {
@@ -176,8 +198,10 @@ declarations {
 			(by other: Integer) -> Optional<Rational> {
 				§ A zero divisor widens to the Rational `0/1`, whose reciprocal
 				§ the entry above already refuses — so the zero case needs no
-				§ guard of its own.
-				<- @::divide(by Rational.of(other, over 1)::otherwise(0/1))
+				§ guard of its own. Widening it can not fail either: the `1` is
+				§ written where it stands, and a value written down is its own
+				§ proof.
+				<- @::divide(by Rational.of(other, over 1))
 			}
 
 			(by other: Algebraic) -> Algebraic | Rational
@@ -189,14 +213,14 @@ declarations {
 				<- Rational.of(
 					@::numerator()::multiply(with other::numerator()),
 					over @::denominator()::multiply(with other::denominator()),
-				)::otherwise(0/1)
+				)
 			}
 
 			(with other: Integer) -> Rational {
 				<- Rational.of(
 					@::numerator()::multiply(with other),
 					over @::denominator(),
-				)::otherwise(0/1)
+				)
 			}
 
 			(with other: Algebraic) -> Algebraic | Rational {
@@ -283,10 +307,7 @@ declarations {
 
 		§§ The Rational with its sign flipped.
 		negate() -> Rational {
-			<- Rational.of(
-				@::numerator()::negate(),
-				over @::denominator(),
-			)::otherwise(@)
+			<- Rational.of(@::numerator()::negate(), over @::denominator())
 		}
 
 		§§ The Rational flipped upside down — the numerator and denominator exchanged.
@@ -493,13 +514,16 @@ declarations {
 				} else {
 					§ No slash and no dot — a whole number.
 					<- match Integer.parse(unsignedText) -> Optional<Rational> {
-						case #Empty              { <- #Empty }
+						case #Empty { <- #Empty }
 
 						case #Value(parsedWhole) {
-							<- Rational.of(
+							§ Over a denominator of `1`, written where it
+							§ stands — so this arm hands back a Rational rather
+							§ than an Optional, and has to say which it is.
+							<- #Value(Rational.of(
 								parsedWhole::multiply(with signFactor),
 								over 1,
-							)
+							))
 						}
 					}
 				}

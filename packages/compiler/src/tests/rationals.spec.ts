@@ -101,7 +101,7 @@ describe("Rationals", () => {
 
 		it("keeps the sign on the numerator through Rational.of", () => {
 			const built = valueOf(
-				rational.of(
+				rational.of__overload$1(
 					integer.createInteger(1n),
 					integer.createInteger(-6n),
 				),

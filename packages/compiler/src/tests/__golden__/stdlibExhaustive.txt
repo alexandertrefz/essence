@@ -203,6 +203,8 @@
 "Rational.of(_ Integer, over: Integer) => Value(1/2)"
 "Rational.of(_ Integer, over: Integer) [over zero] => Empty"
 "Rational.of(_ Integer, over: Integer) [not reduced] => Value(1/2)"
+"Rational.of(_ Integer, over: NonZeroInteger) => 1/2"
+"Rational.of(_ Integer, over: NonZeroInteger) [not reduced] => 1/2"
 "Rational.is(_ Rational) => true"
 "Rational.is(_ Rational) [differing] => false"
 "Rational.isNot(_ Rational) => true"
