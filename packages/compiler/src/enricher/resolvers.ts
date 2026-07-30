@@ -27,6 +27,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	type NamespaceTarget,
+	refinementWithTypeArguments,
 	typeContainsError,
 	typeMentionsGeneric,
 	withArticle,
@@ -3204,16 +3205,21 @@ function applyGenericAlias(
 	// written into. An instantiation that bound every Parameter to a Parameter
 	// (`namespace NonEmptyList<infer Item> for NonEmptyList<Item>`) is stamped and reads
 	// terse anyway, the way an unbound Case does.
+	//
+	// NOTE: The stamp is a COPY, and a copy of a predicate still being written
+	// down has to be registered or the fill will finish everything except the very
+	// object the signature ended up holding — which is why it goes through
+	// `refinementWithTypeArguments` rather than being spread here.
 	if (
 		appliedType.type === "Refinement" &&
 		appliedType !== aliasType.aliasedType
 	) {
-		return {
-			...appliedType,
-			typeArguments: generics.map(
+		return refinementWithTypeArguments(
+			appliedType,
+			generics.map(
 				(generic) => bindings.get(generic.name) ?? { type: "Error" },
 			),
-		}
+		)
 	}
 
 	return appliedType

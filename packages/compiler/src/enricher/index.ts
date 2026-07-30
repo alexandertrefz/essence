@@ -7,6 +7,11 @@ import {
 	report,
 	reportError,
 } from "../diagnostics/index"
+import {
+	closePendingRefinementCopies,
+	openPendingRefinementCopies,
+	pendingRefinementCopiesOf,
+} from "../helpers/index"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import {
@@ -353,6 +358,15 @@ type PendingPredicate = {
 // for the same reason the hoist loop's own do: the conjuncts are written once
 // and never read a second time, so this is the only moment they can be told.
 //
+// The Alias' own object is not the only one written into. A signature that
+// APPLIED the Alias while its predicate was unread holds a copy — the Type
+// Arguments substitute into the base, which is a new object — and the copy
+// registered itself as one. Every generation of them is handed the SAME
+// conjuncts array here, in the same breath as the original, so that nothing
+// downstream can tell a copy from the Alias it came from. That is what lets the
+// Namespace ANSWERING a predicate apply the Alias in its own signatures: it
+// hoists holding pending copies, and this is where they are finished.
+//
 // The final call decides, but it does NOT report. A predicate that still does
 // not resolve — after every Namespace that will ever hoist has — is handed back
 // to the in-order enrichment whole: the object already bound into signatures is
@@ -390,13 +404,30 @@ function fillPendingPredicates(
 			continue
 		}
 
+		let copies = pendingRefinementCopiesOf(refinement)
+
 		if (result === null) {
+			// NOTE: Each copy is poisoned to ITS OWN base — the instantiated one,
+			// `List<Integer>` where the Alias' is `List<Item>` — so a signature that
+			// applied the Alias goes on saying what it applied it to. No Diagnostic
+			// is reported for any of them: the Alias is unregistered just below, and
+			// the in-order enrichment reports the clause ONCE, with the Program's
+			// Constants in Scope.
 			poisonRefinementToBase(refinement)
+
+			for (let copy of copies) {
+				poisonRefinementToBase(copy)
+			}
+
 			hoistedTypes.delete(node)
 			delete scope.types[node.name.content]
 		} else {
 			sink(node, diagnostics)
 			refinement.conjuncts = result
+
+			for (let copy of copies) {
+				copy.conjuncts = result
+			}
 		}
 
 		pending.splice(index, 1)
@@ -787,10 +818,32 @@ function reportRecursiveTypeDeclarations(
 // it is broken, a duplicate, or references Variables — which are deliberately
 // not hoisted) is left to the in-order enrichment, which reports its
 // Diagnostics.
+//
+// NOTE: The hoist is also the ONE window in which a refinement whose predicate
+// has not been read yet may be copied — a signature applying a generic refined
+// Alias takes one, and the fill below finishes it. The registry that makes that
+// safe is opened here and closed in the `finally`, so that a throw escaping the
+// rounds can not leave it standing open into whatever runs next: outside this
+// window a pending copy has no fill left to complete it, and taking one is a
+// Compiler bug again.
 function hoistDeclarations(
 	units: Array<HoistUnit>,
 	sink: HoistDiagnosticSink = reportOnwards,
 	seedRound?: (final: boolean) => boolean,
+): HoistedTypes {
+	openPendingRefinementCopies()
+
+	try {
+		return hoistDeclarationsInner(units, sink, seedRound)
+	} finally {
+		closePendingRefinementCopies()
+	}
+}
+
+function hoistDeclarationsInner(
+	units: Array<HoistUnit>,
+	sink: HoistDiagnosticSink,
+	seedRound: ((final: boolean) => boolean) | undefined,
 ): HoistedTypes {
 	let hoistedTypes: HoistedTypes = new Map()
 	let pendingPredicates: Array<PendingPredicate> = []

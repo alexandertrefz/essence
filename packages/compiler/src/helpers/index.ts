@@ -789,10 +789,33 @@ export function closePendingRefinementCopies(): void {
 	}
 }
 
-function registerPendingRefinementCopy(
+// NOTE: THE door every copy of a refinement goes through, and the reason there
+// are only two callers rather than a spread at each site: a copy taken while the
+// predicate is still unread is a promise to finish it, and the promise is kept by
+// registering the copy against the object it came from. The fill then hands the
+// Alias and every copy of it the very same conjuncts array, so nothing
+// downstream can tell one from the other.
+//
+// A copy of a RESOLVED refinement needs none of this — its conjuncts already
+// travel by reference — so it passes straight through.
+function trackedRefinementCopy(
 	source: common.RefinementType,
 	copy: common.RefinementType,
-): void {
+): common.RefinementType {
+	if (source.conjuncts !== null) {
+		return copy
+	}
+
+	// NOTE: Outside an open hoist the throw stays and means what it always
+	// meant. There is no fill left to complete the copy, so a pending refinement
+	// reaching here at all is a Compiler bug — the same one every other reader of
+	// `conjuncts` refuses by throwing.
+	if (openHoists === 0) {
+		throw new Error(
+			`Internal Compiler Error: the predicate of refinement '${source.name}' was read before it resolved`,
+		)
+	}
+
 	let copies = pendingRefinementCopies.get(source)
 
 	if (copies === undefined) {
@@ -800,6 +823,22 @@ function registerPendingRefinementCopy(
 	} else {
 		copies.push(copy)
 	}
+
+	return copy
+}
+
+// NOTE: The applied spelling stamped onto an instantiation, which is the second
+// place a refinement is copied — `NonEmptyList<String>` prints as written rather
+// than as the bare Alias name every instantiation would otherwise share. It goes
+// through the same door as the substitution above, because a copy taken here of a
+// still-pending predicate has to be registered exactly as one taken there does:
+// the stamp is what the signature ends up holding, and an unregistered stamp
+// would keep the null after the fill wrote the conjuncts into everything else.
+export function refinementWithTypeArguments(
+	refinement: common.RefinementType,
+	typeArguments: Array<common.Type>,
+): common.RefinementType {
+	return trackedRefinementCopy(refinement, { ...refinement, typeArguments })
 }
 
 // NOTE: Every copy taken of this refinement, copies of those copies included —
@@ -870,51 +909,26 @@ export function applyGenericBindings(
 				return type
 			}
 
-			let copy: common.RefinementType = {
+			// NOTE: Copying a PENDING predicate is what lets the Namespace that
+			// ANSWERS a generic Alias' predicate apply that Alias in its own
+			// signatures — `namespace List` answering `hasItems` while promising
+			// `append(_ item) -> NonEmptyList<ItemType>`. Refusing the copy would send
+			// the Namespace back into the rounds, and the fill would then look for
+			// `hasItems` on a Namespace that never hoisted: a deadlock no ordering can
+			// undo, because each side is the other's precondition. So the copy is
+			// taken and REGISTERED, and the fill finishes it along with the Alias.
+			//
+			// Which is why the identity check sits AHEAD of this. A refinement whose
+			// base holds no Type Parameter — every non-generic one, `NonZeroInteger`
+			// among them — comes back AS ITSELF whatever bindings it is handed, so a
+			// generic Namespace with a refined signature (`divide(by NonZeroInteger)`)
+			// is never copied and never registered, exactly as it was before generic
+			// refinements existed.
+			return trackedRefinementCopy(type, {
 				...type,
 				base,
 				...(typeArguments !== undefined ? { typeArguments } : {}),
-			}
-
-			// NOTE: A copy of a PENDING predicate is a promise to finish it. The
-			// conjuncts are null while the Namespace answering them is still on its
-			// way, and the fill writes into the object the Alias REGISTERED — so a
-			// copy nobody knows about would keep that null for good and ICE at the
-			// first reader past hoisting. Registering it is what makes the copy
-			// legal: the fill hands the very same conjuncts array to the Alias and to
-			// every copy of it in one breath, so the two are indistinguishable
-			// afterwards.
-			//
-			// This is what lets the Namespace that ANSWERS a generic Alias' predicate
-			// apply that Alias in its own signatures — `namespace List` answering
-			// `hasItems` while promising `append(_ item) -> NonEmptyList<ItemType>`.
-			// Refusing the copy would send the Namespace back into the rounds, and the
-			// fill would then look for `hasItems` on a Namespace that never hoisted:
-			// a deadlock no ordering can undo, because each side is the other's
-			// precondition.
-			//
-			// Outside an open hoist the throw stays, and means what it always meant.
-			// There is no fill left to complete the copy, so a pending refinement
-			// reaching here at all is a Compiler bug — the same one every other reader
-			// of `conjuncts` refuses by throwing.
-			//
-			// Which is also why the identity check sits AHEAD of this. A refinement
-			// whose base holds no Type Parameter — every non-generic one,
-			// `NonZeroInteger` among them — comes back AS ITSELF whatever bindings it
-			// is handed, so a generic Namespace with a refined signature (`divide(by
-			// NonZeroInteger)`) is never copied and never registered, exactly as it
-			// was before generic refinements existed.
-			if (type.conjuncts === null) {
-				if (openHoists === 0) {
-					throw new Error(
-						`Internal Compiler Error: the predicate of refinement '${type.name}' was read before it resolved`,
-					)
-				}
-
-				registerPendingRefinementCopy(type, copy)
-			}
-
-			return copy
+			})
 		}
 		case "UnionType": {
 			let types = type.types.map((memberType) =>

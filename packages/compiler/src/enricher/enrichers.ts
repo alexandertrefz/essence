@@ -32,6 +32,7 @@ import {
 	mergeUnionMembers,
 	predicateConjunctKey,
 	provenConjuncts,
+	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
 	typeContainsError,
@@ -3885,14 +3886,20 @@ function instantiatedRefinementFor(
 	// of that Type, and handing the declared object out as a shadow would put a
 	// Parameter nobody can see into the Scope — as well as stamp a spelling onto
 	// the very object a pending predicate is written into.
+	//
+	// NOTE: The stamp goes through the same door every other copy of a refinement
+	// does. Narrowing only ever runs past hoisting, where the copy above would
+	// have thrown on a pending predicate long before this line — so this is not
+	// where a pending one is expected, it is where the rule stays the same
+	// wherever a refinement is copied.
 	return instantiated.type === "Refinement" && instantiated !== refinement
-		? {
-				...instantiated,
-				typeArguments: alias.generics.map(
+		? refinementWithTypeArguments(
+				instantiated,
+				alias.generics.map(
 					(generic) =>
 						bindings.get(generic.name) ?? { type: "Error" },
 				),
-			}
+			)
 		: null
 }
 
