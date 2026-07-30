@@ -550,6 +550,63 @@ describe("Dispatch and Resolution", () => {
 				}`),
 			).toEqual(['"wide"'])
 		})
+
+		// NOTE: The whole rule again over a GENERIC refinement, which the sort sees
+		// for exactly the reason it sees any other: what it asks is whether a
+		// Parameter Type mentions a refinement anywhere, and an applied
+		// `NonEmptyList<String>` is one. A written List reaches the entry asking for
+		// evidence, a narrowed one does too, and a List nothing proved anything about
+		// still finds the base entry.
+		let lists = `type NonEmptyList<Item> = List<Item> where @::hasItems()
+
+			namespace Firsts for {} {
+				overload static describe {
+					§ The base entry, written first, and the one that takes any List
+					§ of Strings at all.
+					(_ items: List<String>) -> String {
+						<- "checked"
+					}
+
+					§ The entry asking for evidence, appended after it.
+					(_ items: NonEmptyList<String>) -> String {
+						<- "total"
+					}
+				}
+			}`
+
+		it("reaches the generic refined entry for a List written down", async () => {
+			expect(
+				await run(`implementation {
+					${lists}
+
+					__print(Firsts.describe(["a"]))
+				}`),
+			).toEqual(['"total"'])
+		})
+
+		it("reaches it for a List a branch proved, and falls through for one it did not", async () => {
+			expect(
+				await run(`implementation {
+					${lists}
+
+					function describeChecked(_ items: List<String>) -> String {
+						if items::hasItems() {
+							<- Firsts.describe(items)
+						}
+
+						<- "empty"
+					}
+
+					function describeAny(_ items: List<String>) -> String {
+						<- Firsts.describe(items)
+					}
+
+					__print(describeChecked(["a"]))
+					__print(describeChecked([]))
+					__print(describeAny(["a"]))
+				}`),
+			).toEqual(['"total"', '"empty"', '"checked"'])
+		})
 	})
 
 	describe("Static Method bodies", () => {

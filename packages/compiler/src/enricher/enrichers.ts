@@ -3597,6 +3597,10 @@ function narrowableReceiverName(
 //
 // `keyOf` is what "the same question" means here, and the complement path passes
 // a looser one — see `predicateShapeKey`.
+//
+// NOTE: A GENERIC refined Alias stands for a different refinement at every use, so
+// it is no candidate until a receiver has decided its Type Arguments — which is
+// why the candidate set is worked out per binding rather than once for the branch.
 function narrowingsFor(
 	evidence: ConditionEvidence,
 	scope: enricher.Scope,
@@ -3606,9 +3610,9 @@ function narrowingsFor(
 		return []
 	}
 
-	let refinements = refinementsInScope(scope)
+	let declared = refinementCandidatesInScope(scope)
 
-	if (refinements.length === 0) {
+	if (declared.concrete.length === 0 && declared.generic.length === 0) {
 		return []
 	}
 
@@ -3637,7 +3641,7 @@ function narrowingsFor(
 
 		let established: common.RefinementType | null = null
 
-		for (let refinement of refinements) {
+		for (let refinement of refinementsFor(declared, proven.receiverType)) {
 			if (
 				!matchesType(refinement.base, proven.receiverType) ||
 				// NOTE: A shadow that forgets something the binding's Type already
@@ -3670,14 +3674,30 @@ function narrowingsFor(
 	return narrowings
 }
 
+// NOTE: The refinements declared in scope, told apart by whether a receiver still
+// has to decide something about them: a `concrete` one is a candidate as it
+// stands, a `generic` one is the Generic Alias wrapping a refinement and stands
+// for nothing until its Type Arguments are worked out.
+type RefinementCandidates = {
+	concrete: Array<common.RefinementType>
+	generic: Array<common.GenericAliasType>
+}
+
 // NOTE: Every refinement a Type name in scope stands for — the candidates a
 // branch may establish. Nearest Scope first, and a name already seen is skipped,
 // so an inner declaration shadows an outer one here exactly as it does everywhere
 // else.
-function refinementsInScope(
+//
+// NOTE: A generic refined Alias is invisible to a search for `type ===
+// "Refinement"` — it is registered as the Generic Alias that applies its
+// Arguments, with the refinement one level in — which is why the two are collected
+// through one walk and kept apart, under the one `seen` set: `NonEmptyList` occupies
+// its name in the Type Scope exactly as `NonZeroInteger` occupies its own.
+function refinementCandidatesInScope(
 	scope: enricher.Scope,
-): Array<common.RefinementType> {
-	let refinements: Array<common.RefinementType> = []
+): RefinementCandidates {
+	let concrete: Array<common.RefinementType> = []
+	let generic: Array<common.GenericAliasType> = []
 	let seen = new Set<string>()
 
 	for (
@@ -3693,12 +3713,98 @@ function refinementsInScope(
 			seen.add(name)
 
 			if (type.type === "Refinement") {
-				refinements.push(type)
+				concrete.push(type)
+			} else if (
+				type.type === "GenericAlias" &&
+				type.aliasedType.type === "Refinement"
+			) {
+				generic.push(type)
 			}
 		}
 	}
 
+	return { concrete, generic }
+}
+
+// NOTE: The candidates ONE receiver could establish — the refinements declared
+// outright, and every generic one this receiver decided the Type Arguments of.
+function refinementsFor(
+	declared: RefinementCandidates,
+	receiverType: common.Type,
+): Array<common.RefinementType> {
+	if (declared.generic.length === 0) {
+		return declared.concrete
+	}
+
+	let refinements = [...declared.concrete]
+
+	for (let alias of declared.generic) {
+		let instantiated = instantiatedRefinementFor(alias, receiverType)
+
+		if (instantiated !== null) {
+			refinements.push(instantiated)
+		}
+	}
+
 	return refinements
+}
+
+// NOTE: The refinement a generic Alias stands for AT this receiver — its declared
+// base unified against the receiver's Type to work the Arguments out, then
+// substituted through, mirroring `instantiateChoiceAlias`: receiver-driven,
+// reporting nothing (the receiver is a Type the Enricher already accepted), and
+// stamping the applied spelling so a Hover reads `NonEmptyList<String>` rather than
+// half of it.
+//
+// A unification that leaves a single Parameter undecided is no candidate at all.
+// An empty List Literal's `List<Unknown>` is accepted by `List<Item>` without
+// deciding `Item` — the Unknown is a slot nothing has filled, not a Type — and a
+// refinement over a base nobody decided would put a Type nobody wrote into the
+// branch.
+function instantiatedRefinementFor(
+	alias: common.GenericAliasType,
+	receiverType: common.Type,
+): common.RefinementType | null {
+	let refinement = alias.aliasedType
+
+	if (refinement.type !== "Refinement") {
+		return null
+	}
+
+	let bindings: GenericBindings = new Map()
+
+	if (
+		!matchesTypeWithBindings(refinement.base, receiverType, {
+			// NOTE: Every Parameter, unlike a signature's, where only an `infer`
+			// one binds — a Type Alias' Parameters are APPLIED rather than
+			// declared bindable, and a receiver standing in front of a branch is
+			// the one thing they are ever worked out FROM.
+			bindableNames: new Set(
+				alias.generics.map((generic) => generic.name),
+			),
+			bindings,
+		}) ||
+		alias.generics.some((generic) => !bindings.has(generic.name))
+	) {
+		return null
+	}
+
+	let instantiated = applyGenericBindings(refinement, bindings)
+
+	// NOTE: A substitution that changed nothing came back as the DECLARED object,
+	// whose base still names the Alias' own Parameters. No value in the branch is
+	// of that Type, and handing the declared object out as a shadow would put a
+	// Parameter nobody can see into the Scope — as well as stamp a spelling onto
+	// the very object a pending predicate is written into.
+	return instantiated.type === "Refinement" && instantiated !== refinement
+		? {
+				...instantiated,
+				typeArguments: alias.generics.map(
+					(generic) =>
+						bindings.get(generic.name) ?? { type: "Error" },
+				),
+			}
+		: null
 }
 
 // NOTE: `a::and(b)` — the one Expression a condition is read THROUGH rather than

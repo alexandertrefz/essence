@@ -5849,6 +5849,198 @@ describe("Enricher", () => {
 				),
 			).toBe("List<String>")
 		})
+
+		// NOTE: A GENERIC refined Alias stands for nothing until something decides
+		// its Type Arguments, and a branch has exactly one thing to decide them
+		// FROM: the receiver the question was asked of. So the candidate is worked
+		// out per binding — the declared base unified against the receiver's Type —
+		// and everything below it is the rule every other refinement is established
+		// by, asked of the refinement that unification built.
+		describe("a generic refinement", () => {
+			const NON_EMPTY =
+				"type NonEmptyList<Item> = List<Item> where @::hasItems()"
+
+			it("should narrow a List to the Alias applied to its items", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${NON_EMPTY}
+
+							constant items = ["a", "b"]
+
+							if items::hasItems() {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("NonEmptyList<String>")
+			})
+
+			// NOTE: The Arguments are worked out from the receiver whatever they are
+			// — a List of Lists decides `Item` as the inner List, and the spelling
+			// says so.
+			it("should narrow a List of Lists to the Alias applied to them", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${NON_EMPTY}
+
+							constant items = [["a"], ["b"]]
+
+							if items::hasItems() {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("NonEmptyList<List<String>>")
+			})
+
+			// NOTE: The narrowing is worth what it lets a Program write, and what it
+			// lets a Program write is a call nothing spelled the Type of: the
+			// Parameter says `NonEmptyList<String>` and the branch worked that out from
+			// a `List<String>`. Asserted end to end in `codeGeneration.spec.ts`,
+			// where the Validator that refuses it outside the branch runs.
+			it("should let a narrowed List reach a refined Parameter", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${NON_EMPTY}
+
+						function firstOf(_ items: NonEmptyList<String>) -> String {
+							<- items::item(at 0)::otherwise("")
+						}
+
+						constant items = ["a", "b"]
+
+						if items::hasItems() {
+							__print(firstOf(items))
+						}
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: The complement table is about the Method pair alone, so the
+			// `else` of an `isEmpty` establishes the instantiated refinement for the
+			// same reason the true branch of a `hasItems` does — one shared helper
+			// asks both.
+			it("should narrow the else branch of isEmpty", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${NON_EMPTY}
+
+							constant items = ["a", "b"]
+
+							if items::isEmpty() {
+								__print(0)
+							} else {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("NonEmptyList<String>")
+			})
+
+			// NOTE: And a Match Handler's Guard, through the same helper again.
+			it("should narrow '@' by a Match Handler's Guard", () => {
+				let value = lastConstantValue(`implementation {
+					${NON_EMPTY}
+
+					constant value: List<String> | String = ["a"]
+
+					constant narrowed = match value -> Integer {
+						case List<String> where @::hasItems() {
+							<- @::length()
+						}
+
+						case _ {
+							<- 0
+						}
+					}
+				}`)
+
+				if (value.nodeType !== "Match") {
+					throw new Error("Last Constant is not a Match.")
+				}
+
+				let returned = value.handlers[0].body[0]
+
+				if (
+					returned.nodeType !== "ReturnStatement" ||
+					returned.expression.nodeType !== "MethodInvocation"
+				) {
+					throw new Error("The first Handler does not return a call.")
+				}
+
+				expect(printType(returned.expression.base.type)).toBe(
+					"NonEmptyList<String>",
+				)
+			})
+
+			it("should not narrow a Variable", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${NON_EMPTY}
+
+							variable items = ["a", "b"]
+
+							if items::hasItems() {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("List<String>")
+			})
+
+			// NOTE: A unification that leaves a Parameter undecided is no candidate:
+			// `B` appears nowhere in the base, so no receiver could ever decide it,
+			// and a refinement whose base nobody decided would put a Type nobody
+			// wrote into the branch.
+			it("should not narrow where the receiver decides only some Parameters", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							type Pairish<A, B> = List<A> where @::hasItems()
+
+							constant items = ["a", "b"]
+
+							if items::hasItems() {
+								__print(items)
+							}
+						}`,
+						"items",
+					),
+				).toBe("List<String>")
+			})
+
+			// NOTE: A receiver whose items are the enclosing Function's own Type
+			// Parameter decides `Item` as that Parameter, which is a decision like
+			// any other — the branch inside a generic Function narrows exactly as one
+			// outside it does. It reads terse because every Argument is a Parameter,
+			// the way an unapplied Case header does.
+			it("should narrow a List whose items are a Type Parameter", () => {
+				expect(
+					narrowedTypeOf(
+						`implementation {
+							${NON_EMPTY}
+
+							function probe<Item>(_ items: List<Item>) -> Integer {
+								if items::hasItems() {
+									__print(items)
+								}
+
+								<- 0
+							}
+						}`,
+						"items",
+					),
+				).toBe("NonEmptyList")
+			})
+		})
 	})
 
 	// NOTE: The doorway nobody has to write — a Match on a bare Integer or String
