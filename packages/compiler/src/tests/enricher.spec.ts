@@ -5495,6 +5495,31 @@ describe("Enricher", () => {
 			).toBe("SmallNonZero")
 		})
 
+		// NOTE: And where several prove exactly as much as each other, the first
+		// candidate the walk reaches stands — nearest Scope first, and inside the
+		// one top-level table the builtins are declared ahead of a Program's own
+		// Aliases. Which of them wins is a spelling and nothing more (two
+		// refinements proving the same conjuncts over the same base are one Type to
+		// everything that reads conjuncts), but it is settled rather than
+		// incidental, and a Hover answering `Nonzero` here would be a change of
+		// behaviour nobody meant to make.
+		it("should establish the builtin where a Program's Alias proves the same", () => {
+			expect(
+				narrowedTypeOf(
+					`implementation {
+						type Nonzero = Integer where @::isNot(0)
+
+						constant d = 3
+
+						if d::isNot(0) {
+							__print(d)
+						}
+					}`,
+					"d",
+				),
+			).toBe("NonZeroInteger")
+		})
+
 		// NOTE: A conjunction proves things about each binding it names, and each
 		// of them narrows on its own.
 		it("should narrow both bindings a conjunction names", () => {
