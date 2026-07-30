@@ -47,7 +47,7 @@ export function negate(integer: IntegerType): IntegerType {
 	return createInteger(-integer.value)
 }
 
-export function remainder(
+export function remainder__overload$1(
 	integer: IntegerType,
 	divisor: IntegerType,
 ): OptionalType<IntegerType> {
@@ -55,6 +55,16 @@ export function remainder(
 		return createEmpty()
 	}
 
+	return createValue(remainder__overload$2(integer, divisor))
+}
+
+// NOTE: The divisor of this entry is a `NonZeroInteger` in the source — proven
+// while compiling, erased to an Integer here — so there is no empty arm to
+// build.
+export function remainder__overload$2(
+	integer: IntegerType,
+	divisor: IntegerType,
+): IntegerType {
 	// NOTE: Euclidean remainder — the result is always in
 	// `0 ≤ r < |divisor|`, whatever the signs of the operands.
 	let remainder = integer.value % divisor.value
@@ -63,7 +73,7 @@ export function remainder(
 		remainder += divisor.value < 0n ? -divisor.value : divisor.value
 	}
 
-	return createValue(createInteger(remainder))
+	return createInteger(remainder)
 }
 
 // NOTE: The other half of the same division, and it has to agree with
@@ -72,7 +82,7 @@ export function remainder(
 // floored towards negative infinity for a positive divisor rather than
 // truncated towards zero, which is where it parts company with JavaScript's
 // `/`. `(-7) ÷ 3` is `-3` remainder `2`, not `-2` remainder `-1`.
-export function quotient(
+export function quotient__overload$1(
 	integer: IntegerType,
 	divisor: IntegerType,
 ): OptionalType<IntegerType> {
@@ -80,6 +90,16 @@ export function quotient(
 		return createEmpty()
 	}
 
+	return createValue(quotient__overload$2(integer, divisor))
+}
+
+// NOTE: The divisor of this entry is a `NonZeroInteger` in the source — proven
+// while compiling, erased to an Integer here — so there is no empty arm to
+// build.
+export function quotient__overload$2(
+	integer: IntegerType,
+	divisor: IntegerType,
+): IntegerType {
 	let truncated = integer.value / divisor.value
 	let remainder = integer.value % divisor.value
 
@@ -89,7 +109,7 @@ export function quotient(
 		truncated += divisor.value < 0n ? 1n : -1n
 	}
 
-	return createValue(createInteger(truncated))
+	return createInteger(truncated)
 }
 
 // NOTE: Division by a divisor the Types have already proven not to be zero —

@@ -109,9 +109,13 @@ export type IntegerNatives = {
 	// negate() -> Integer
 	negate: (self: IntegerType) => IntegerType
 	// remainder(dividingBy: Integer) -> Optional<Integer>
-	remainder: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
+	remainder__overload$1: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
+	// remainder(dividingBy: NonZeroInteger) -> Integer
+	remainder__overload$2: (self: IntegerType, dividingBy: IntegerType) => IntegerType
 	// quotient(dividingBy: Integer) -> Optional<Integer>
-	quotient: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
+	quotient__overload$1: (self: IntegerType, dividingBy: IntegerType) => OptionalType<IntegerType>
+	// quotient(dividingBy: NonZeroInteger) -> Integer
+	quotient__overload$2: (self: IntegerType, dividingBy: IntegerType) => IntegerType
 	// raise(to: Integer) -> Optional<Integer | Rational>
 	raise: (self: IntegerType, to: IntegerType) => OptionalType<IntegerType | RationalType>
 	// toString() -> String
@@ -339,8 +343,10 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	multiply__overload$1: 2
 	squareRoot: 1
 	negate: 1
-	remainder: 2
-	quotient: 2
+	remainder__overload$1: 2
+	remainder__overload$2: 2
+	quotient__overload$1: 2
+	quotient__overload$2: 2
 	raise: 2
 	toString: 1
 	compare: 2

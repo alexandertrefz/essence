@@ -347,11 +347,11 @@ declarations {
 			(toward direction: Rounding) -> Integer {
 				§ The denominator is positive in lowest terms, so the Euclidean
 				§ quotient is the FLOOR — `Down` outright, and the one Integer
-				§ the other three are placed against. `quotient` can only answer
-				§ empty for a zero divisor, and a denominator never is one.
+				§ the other three are placed against. A denominator is a
+				§ NonZeroInteger, so this is the total `quotient` entry and
+				§ there is no empty case to fall back from.
 				constant floored = @::numerator()
 					::quotient(dividingBy @::denominator())
-					::otherwise(0)
 
 				constant isWhole = @::isWholeNumber()
 
