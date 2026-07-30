@@ -298,6 +298,13 @@ export type NestedListNatives = {
 	flatten: <ItemType extends AnyType>(self: ListType<ListType<ItemType>>) => ListType<ItemType>
 }
 
+export type NonEmptyListNatives = {
+	// firstItem<ItemType>() -> ItemType
+	firstItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
+	// lastItem<ItemType>() -> ItemType
+	lastItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
+}
+
 export type FunctionsNatives = {
 	// static loop<State>(startingWith: State, while: (_: State) -> Boolean, step: (_: State) -> State) -> State
 	loop__overload$1: <State extends AnyType>(startingWith: State, argument1: (argument0: State) => BooleanType, step: (argument0: State) => State) => State
@@ -485,6 +492,13 @@ declare const NestedListModule: typeof import("./NestedList")
 export const $NestedList: NestedListNatives = NestedListModule
 export const $NestedListArity: AssertArities<typeof import("./NestedList"), {
 	flatten: 1
+}> = true
+
+declare const NonEmptyListModule: typeof import("./NonEmptyList")
+export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
+export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), {
+	firstItem: 1
+	lastItem: 1
 }> = true
 
 declare const functionsModule: typeof import("./functions")

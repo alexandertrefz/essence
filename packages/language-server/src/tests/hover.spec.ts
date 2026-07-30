@@ -778,6 +778,31 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 			"items: Filled<String>",
 		)
 	})
+
+	// NOTE: And the standard library's own, which nothing in the source names: a
+	// List that answered `hasItems` reads back as the applied `NonEmptyList`, and the
+	// Method the branch made reachable reads back answering an ITEM rather than
+	// the Optional `List` answers outside it — as DECLARED, which is what a
+	// Method Hover always says. That pair is the whole of what a reader hovering
+	// inside such a branch needs told.
+	it("should describe a List a branch proved has something in it", () => {
+		let source = [
+			"implementation {",
+			'\tconstant words = ["essence"]',
+			"",
+			"\tif words::hasItems() {",
+			"\t\t__print(words::firstItem())",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 5, column: 12 })).toBe(
+			"words: NonEmptyList<String>",
+		)
+		expect(hover(source, { line: 5, column: 21 })).toBe(
+			"firstItem<ItemType>() -> ItemType",
+		)
+	})
 })
 
 describe("Hover of conformance clauses", () => {

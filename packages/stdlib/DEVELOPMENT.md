@@ -232,6 +232,16 @@ guards two files, but it is a floor, not a substitute for measuring.
   `ambiguous-namespace`. Naming a Method twice is still worth avoiding: which
   one a call reaches then depends on the receiver's Type rather than on what it
   says.
+- **A receiver narrowed by EVIDENCE is the same rule with a refinement as the
+  target.** `NonEmptyList<ItemType>` is a checked refinement of `List<ItemType>`,
+  and `namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType>` holds the two
+  Methods the proof makes total — `firstItem` and `lastItem`, answering an item
+  where `List`'s own answer an Optional. A refined receiver reaches every
+  Namespace its base reaches and this one besides, so the refined target beats
+  the base target for a Method both declare; a List nothing proved anything
+  about does not reach it at all. Neither Method can be written in Essence,
+  which is the point rather than a gap: a refinement erases before anything
+  runs, so a native is what spending the evidence looks like.
 - **A Type and the Namespace that targets it belong in one file.** `Optional`
   and `Ordering` each declare their Choice and the Namespace over it together;
   splitting them across files works, but leaves the two halves of one idea

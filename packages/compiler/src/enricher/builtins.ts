@@ -73,6 +73,13 @@ export const builtinMemberOrder: Array<string> = [
 	// Method name are separated by target specificity, where the nested target
 	// beats the flat one regardless of this order.
 	"NestedList",
+	// NOTE: And after both, for the third time and the same reason. `NonEmptyList`
+	// targets a refinement of `List`, and its `firstItem`/`lastItem` are named by
+	// `List` as well — so `List` has to be met FIRST, or Completion on any List
+	// would offer the total pair that only a proven List can answer. Which
+	// Namespace a call RESOLVES to is not decided here either: the refined target
+	// beats the base one regardless of this order.
+	"NonEmptyList",
 ]
 
 // NOTE: The same rule for the Type table, and for the same reason — a Type's
