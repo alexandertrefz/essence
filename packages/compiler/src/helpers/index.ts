@@ -1694,7 +1694,18 @@ function matchTypes(
 	// Generic binding (`List<NonZeroInteger>` produced by inference) would
 	// carry evidence into positions nothing proved anything about, and it is
 	// explicitly not part of v1.
-	if (rhs.type === "Refinement" && lhs.type !== "Refinement") {
+	//
+	// NOTE: An expected Union is left to decompose FIRST — unwrapping here
+	// would strip the evidence before the Union's own refinement member could
+	// read it, so `NonZeroInteger | String` refused the very `NonZeroInteger`
+	// it names. Each member then faces the intact refinement: a refinement
+	// member by its conjuncts below, any other member through this same
+	// unwrapping one level down.
+	if (
+		rhs.type === "Refinement" &&
+		lhs.type !== "Refinement" &&
+		lhs.type !== "UnionType"
+	) {
 		return matchTypes(lhs, rhs.base, context)
 	}
 
