@@ -719,6 +719,28 @@ describe("Type matching", () => {
 			expect(matchesType(numberish, nonZero)).toBe(true)
 		})
 
+		// NOTE: The expected Union decomposes BEFORE the refinement is
+		// unwrapped. Stripping the evidence first would leave the Union's own
+		// refinement member facing a bare Integer — so `NonZeroInteger | String`
+		// refused the very `NonZeroInteger` it names, while accepting it
+		// through an `Integer` member it did not have.
+		it("should let a Union holding the refinement accept it", () => {
+			let refined: common.Type = {
+				type: "UnionType",
+				types: [nonZero, string],
+			}
+
+			expect(matchesType(refined, nonZero)).toBe(true)
+
+			// NOTE: Proving more than the member asks is proof enough — the
+			// same subset rule that answers the bare-refinement case.
+			expect(matchesType(refined, positiveNonZero)).toBe(true)
+
+			// NOTE: And the Union stays as demanding as its member: a bare
+			// Integer still has no evidence to offer it.
+			expect(matchesType(refined, integer)).toBe(false)
+		})
+
 		// NOTE: An Error is a poison value and matches in both directions, so
 		// that one mistake does not cascade. A refinement is not an exception to
 		// that, which is what the rules being placed BEHIND the Error guard says.
