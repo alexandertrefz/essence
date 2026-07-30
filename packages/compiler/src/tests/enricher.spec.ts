@@ -5699,4 +5699,110 @@ describe("Enricher", () => {
 			).toBe("List<String>")
 		})
 	})
+
+	// NOTE: A value written DOWN needs no branch in front of it — its predicate is
+	// decided while compiling. What the Enricher does with that is choose an
+	// Overload by it, which is what these assert; the Statements a Program writes
+	// one into are the Validator's, and `validator.spec.ts` asserts those.
+	describe("Refinement literal admission", () => {
+		// NOTE: Two entries under one name, told apart by exactly the evidence the
+		// first one demands — so which one answered says whether the Argument was
+		// admitted, with no Diagnostic and no narrowing anywhere in the source.
+		function scaled(argument: string): string {
+			return `implementation {
+				type NonZeroInteger = Integer where @::isNot(0)
+
+				namespace Scaling for Integer {
+					overload scaled {
+						(by other: NonZeroInteger) -> String {
+							<- "refined"
+						}
+
+						(by other: Integer) -> String {
+							<- "base"
+						}
+					}
+				}
+
+				constant scaledValue = 3::scaled(by ${argument})
+			}`
+		}
+
+		it("should admit a written value the predicate holds of", () => {
+			expect(
+				lastConstantMethodInvocation(scaled("2")).overloadedMethodIndex,
+			).toBe(0)
+		})
+
+		it("should not admit a written value the predicate refuses", () => {
+			expect(
+				lastConstantMethodInvocation(scaled("0")).overloadedMethodIndex,
+			).toBe(1)
+		})
+
+		// NOTE: The evaluator reads a value that is WRITTEN. A name is a value the
+		// Program computes, however plainly it was computed a line above — deciding
+		// that would need an interpreter, which is what the allowlist exists not to
+		// be.
+		it("should not admit a value the Program computes", () => {
+			expect(
+				lastConstantMethodInvocation(`implementation {
+					type NonZeroInteger = Integer where @::isNot(0)
+
+					namespace Scaling for Integer {
+						overload scaled {
+							(by other: NonZeroInteger) -> String {
+								<- "refined"
+							}
+
+							(by other: Integer) -> String {
+								<- "base"
+							}
+						}
+					}
+
+					constant two = 2
+
+					constant scaledValue = 3::scaled(by two)
+				}`).overloadedMethodIndex,
+			).toBe(1)
+		})
+
+		// NOTE: The whole reason admission answers a POSITION rather than writing
+		// the refinement onto the Node: the first entry here admits the Argument it
+		// is asked about and loses anyway, on the Argument after it. Nothing it
+		// admitted may reach the entry that wins — and nothing does, because there
+		// was never anywhere to leave it.
+		it("should leave nothing behind on a Node a losing candidate admitted", () => {
+			let invocation = lastConstantMethodInvocation(`implementation {
+				type NonZeroInteger = Integer where @::isNot(0)
+
+				namespace Scaling for Integer {
+					overload scaled {
+						(by other: NonZeroInteger, and extra: String) -> String {
+							<- "refined"
+						}
+
+						(by other: Integer, and extra: Integer) -> String {
+							<- "base"
+						}
+					}
+				}
+
+				constant scaledValue = 3::scaled(by 2, and 5)
+			}`)
+
+			expect(invocation.overloadedMethodIndex).toBe(1)
+			expect(
+				invocation.arguments.map((argument) =>
+					printType(argument.type),
+				),
+			).toEqual(["Integer", "Integer"])
+			expect(
+				invocation.arguments.map((argument) =>
+					printType(argument.value.type),
+				),
+			).toEqual(["Integer", "Integer"])
+		})
+	})
 })
