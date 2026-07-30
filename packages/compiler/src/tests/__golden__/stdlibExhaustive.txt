@@ -125,6 +125,7 @@
 "Integer.divide(by: Integer) [by zero] => Empty"
 "Integer.divide(by: Rational) => Value(2/1)"
 "Integer.divide(by: Rational) [by zero] => Empty"
+"Integer.divide(by: NonZeroInteger) => 555/1"
 "Integer.multiply(with: Integer) => 100000"
 "Integer.multiply(with: Integer) [beyond IEEE 754] => 4503599627370495500"
 "Integer.multiply(with: Rational) => 1/1"

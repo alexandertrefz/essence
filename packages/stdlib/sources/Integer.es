@@ -101,7 +101,7 @@ declarations {
 			}
 		}
 
-		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by an Algebraic can never fail — an irrational is never zero.
+		§§ Divides this Integer by a number, exactly. Dividing by a possibly-zero Integer or Rational is empty for zero; dividing by a NonZeroInteger or an Algebraic can never fail — the one is proven, the other is irrational and so never zero.
 		overload divide {
 			(by other: Integer) -> Optional<Rational> {
 				<- Rational.of(@, over other)
@@ -118,6 +118,12 @@ declarations {
 			}
 
 			(by other: Algebraic) -> Algebraic | Rational
+
+			§§ Divides this Integer by a divisor proven not to be zero. There is no failure left to report, so the quotient itself is the answer.
+			§§
+			§§ @param by — the divisor, proven not to be zero
+			§§ @returns — the exact quotient.
+			(by other: NonZeroInteger) -> Rational
 		}
 
 		§§ Multiplies this Integer with a number, staying exact for every member of the numeric tower.

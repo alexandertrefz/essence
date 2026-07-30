@@ -1396,25 +1396,28 @@ describe("Validator", () => {
 			)
 		})
 
-		// NOTE: The denominators here are COMPUTED, deliberately. `Rational.of`
-		// has a second entry taking a denominator proven not to be zero, and a
-		// denominator written where it stands is its own proof — so a written `2`
-		// reaches that entry and answers with a Rational rather than an Optional,
-		// which is asserted separately below.
+		// NOTE: The divisors and denominators here are COMPUTED, deliberately.
+		// `Rational.of` and `Integer.divide` each have an entry taking a divisor
+		// proven not to be zero, and a divisor written where it stands is its
+		// own proof — so a written `2` reaches that entry and answers with a
+		// Rational rather than an Optional, which is asserted alongside.
 		it("should type Divisions as Optional<Rational>", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant two = 1::add(1)
 
-					constant a: Optional<Rational> = 1::divide(by 2)
+					constant a: Optional<Rational> = 1::divide(by two)
 					constant b: Optional<Rational> = 1/2::divide(by 2)
 					constant c: Optional<Rational> = Rational.of(1, over two)
 					constant d: Rational = Rational.of(1, over 2)
+					constant e: Rational = 1::divide(by 2)
 				}`),
 			).toEqual([])
 
 			let diagnostics = diagnosticsFor(`implementation {
-				constant a: Rational = 1::divide(by 2)
+				constant two = 1::add(1)
+
+				constant a: Rational = 1::divide(by two)
 			}`)
 
 			expect(diagnostics).toHaveLength(1)

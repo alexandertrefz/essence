@@ -100,6 +100,8 @@ export type IntegerNatives = {
 	add__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// divide(by: Algebraic) -> Algebraic | Rational
 	divide__overload$3: (self: IntegerType, by: AlgebraicType) => AlgebraicType | RationalType
+	// divide(by: NonZeroInteger) -> Rational
+	divide__overload$4: (self: IntegerType, by: IntegerType) => RationalType
 	// multiply(with: Integer) -> Integer
 	multiply__overload$1: (self: IntegerType, argument1: IntegerType) => IntegerType
 	// squareRoot() -> Optional<Integer | Algebraic>
@@ -333,6 +335,7 @@ export const $IntegerAbsent: AssertNoEssenceExports<typeof import("./Integer"), 
 export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	add__overload$1: 2
 	divide__overload$3: 2
+	divide__overload$4: 2
 	multiply__overload$1: 2
 	squareRoot: 1
 	negate: 1

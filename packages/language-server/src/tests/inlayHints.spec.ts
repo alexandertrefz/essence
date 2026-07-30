@@ -293,16 +293,23 @@ describe("Inlay Hints", () => {
 			)
 		})
 
+		// NOTE: The divisor is COMPUTED, deliberately — a written `2` is its
+		// own proof of not being zero and reaches `divide`'s total entry, whose
+		// Hint is the plain `Rational` asserted alongside.
 		it("should describe builtin fallible Methods as `Optional`", () => {
 			let source = [
 				"implementation {",
-				"\tconstant half = 1110::divide(by 2)",
+				"\tconstant two = 1::add(1)",
+				"\tconstant half = 1110::divide(by two)",
+				"\tconstant sure = 1110::divide(by 2)",
 				"\tconstant first = [1, 2, 3]::firstItem()",
 				"}",
 			].join("\n")
 
 			expect(hintsOf(source).map((hint) => hint.label)).toEqual([
+				": Integer",
 				": Optional<Rational>",
+				": Rational",
 				": Optional<Integer>",
 			])
 		})
@@ -393,6 +400,10 @@ describe("Inlay Hints", () => {
 			// `otherwise` to call — `sure` gets no Type and no Hint. A value
 			// that is fallible has to say so by being an `Optional` the whole
 			// way out.
+			// NOTE: The divisor is COMPUTED (`0::add(2)`), deliberately — a
+			// written `2` is its own proof of not being zero and reaches
+			// `divide`'s total entry, and this branch has to stay fallible for
+			// the Union to carry an `Optional` at all.
 			let source = [
 				"implementation {",
 				"\tnamespace Picker for Integer {",
@@ -402,7 +413,7 @@ describe("Inlay Hints", () => {
 				"\t}",
 				"",
 				"\tconstant merged = 1::pick((value) {",
-				"\t\tif value::isGreaterThan(0) { <- value::divide(by 2) }",
+				"\t\tif value::isGreaterThan(0) { <- value::divide(by 0::add(2)) }",
 				"",
 				"\t\t<- value",
 				"\t})",
