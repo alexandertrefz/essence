@@ -11,8 +11,10 @@
 § asked it of, which is what makes a doorway writable: a bare value goes in, and
 § the branch that proved the predicate is the only one that reaches the operation
 § demanding the proof. A value written DOWN needs no branch at all — its
-§ predicate is decided while compiling. A Match over a bare Integer comes in the
-§ work package after this one.
+§ predicate is decided while compiling. And a Match on a bare Integer or String
+§ takes the VALUE apart, which is a doorway nobody has to write: the Case
+§ answering for the rest is reached only by a value none of the Cases above it
+§ named.
 
 implementation {
 
@@ -115,6 +117,24 @@ implementation {
 		<- digit::add(1)
 	}
 
+	§ A Match on a bare Integer or String is the other doorway nobody writes, and
+	§ its Cases are evidence in both directions: reaching `case _` proves the value
+	§ is none of the values the Cases above named — the very `isNot` a
+	§ NonZeroInteger is declared by — while a Case that NAMES a value proves that.
+	type Zero = Integer where @::is(0)
+
+	function doubledOrNamed(_ n: Integer) -> String {
+		<- match n -> String {
+			case 0 { <- named(@) }
+
+			case _ { <- doubled(@)::toString() }
+		}
+	}
+
+	function named(_ zero: Zero) -> String {
+		<- zero::toString()
+	}
+
 	§ A value written DOWN is its own evidence: the predicate is decided while
 	§ compiling, so no branch stands in front of this and nothing has asked
 	§ anything. The doorways above are for the values a Program is HANDED.
@@ -162,4 +182,6 @@ implementation {
 	__print(countOf([]))
 	__print(digitOrZero(7))
 	__print(digitOrZero("seven"))
+	__print(doubledOrNamed(21))
+	__print(doubledOrNamed(0))
 }

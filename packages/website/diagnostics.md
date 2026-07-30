@@ -658,7 +658,49 @@ receiver with a Match before calling the Method.
 ### `match-on-non-union`
 
 `match` requires a Union Type — matching anything else has exactly one
-outcome.
+outcome. An Integer or a String is the one exception: a `match` on either that
+names at least one VALUE takes the value apart rather than the Type, and is held
+to `literal-match-shape` below instead. A `match` on one of them that names no
+value asks nothing, so it reports here as everything else does — and a Boolean
+does too, since `case true` and `case false` are an `if` written the long way.
+
+### `literal-match-shape`
+
+A `match` on an Integer or a String takes the VALUE apart:
+
+```essence
+match n {
+	case 0 { … }
+	case 1 { … }
+	case _ { … }
+}
+```
+
+Every Case names a written value, and the last one answers for every value the
+Cases above it did not name. There are more Integers than a Match can write
+down, so that last Case is what makes the Match answer for all of them — write
+it as `case _`, or as a Case naming the matched Type itself, which asks the same
+thing.
+
+The shape is a rule rather than a style, because the last Case is EVIDENCE:
+reaching it proves the value is none of the values named above, which is exactly
+what a refinement like `type NonZeroInteger = Integer where @::isNot(0)` is
+declared by. So `@` inside `case _` below a `case 0` has Type `NonZeroInteger`
+wherever one is declared, and inside `case 0` it has the Type declared by
+`@::is(0)`. Four things are refused, each because it would make that untrue or
+leave the Match with no answer:
+
+- a Case above the end that names no value (`case Integer` written second) —
+  move it to the end, where it belongs;
+- a Case that names a value and carries a Guard — a Guard decides after the
+  value already matched, so it would let a value the Cases below claim not to
+  see through to them. Ask its question inside the Handler with an `if`;
+- a Case naming a value of another Type (`case "zero"` on an Integer) — the Case
+  is compared to the matched value, and a comparison across Types can never be
+  true;
+- a Match that ends in a Case answering for only some of the values — one naming
+  a value, one carrying a Guard, or one whose Type does not accept everything
+  that reaches it.
 
 ## Protocols
 

@@ -247,7 +247,9 @@ true
 2
 0
 8
-0"
+0
+"42"
+"0""
 `;
 
 exports[`Fixture Sweep String.es should print what it printed before 1`] = `

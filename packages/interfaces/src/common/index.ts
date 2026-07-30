@@ -213,6 +213,7 @@ export type DiagnosticCode =
 	| "erased-case-conflict"
 	| "empty-list-overlap"
 	| "match-on-non-union"
+	| "literal-match-shape"
 	// Protocols and conformance.
 	| "protocol-as-value"
 	| "protocol-as-type"

@@ -35,8 +35,27 @@ implementation {
 		case String  { <- "never" }
 	}
 
-	§ match-on-non-union.
+	§ match-on-non-union. An Integer and a String are taken apart by VALUE, but
+	§ only where a Case names one — this Match asks nothing about the String it was
+	§ given, which is the one outcome the Diagnostic is about.
 	constant only = match "essence" -> String {
 		case String { <- @ }
+	}
+
+	§ literal-match-shape — a Match on an Integer DOES name a value, so its Cases
+	§ are written values and the last one answers for the rest. This one's first
+	§ Case names a value and can still decline it, which would let the value it
+	§ named reach a Case whose evidence says it never sees one.
+	constant count = 3
+
+	constant counted = match count -> String {
+		case 0 where count::isNot(1) { <- "zero" }
+		case _ { <- "some" }
+	}
+
+	§ literal-match-shape — and a Match that names a value and stops there, with
+	§ every other Integer unanswered for.
+	constant partial = match count -> String {
+		case 0 { <- "zero" }
 	}
 }

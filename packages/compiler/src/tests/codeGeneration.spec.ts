@@ -3124,4 +3124,71 @@ declarations {
 			).toBe(true)
 		})
 	})
+
+	// NOTE: The doorway nobody has to write. A Match on a bare Integer takes the
+	// VALUE apart, and its Cases are evidence in both directions: the Case
+	// answering for the rest is reached only by a value none of the Cases above it
+	// named, and a Case that NAMES a value proves that. So both total operations
+	// below are reached with no `if`, no doorway Function and nothing at all to run
+	// — the evidence erases, and what is emitted is the value comparison someone
+	// would have written anyway.
+	describe("a Match on values", () => {
+		const SOURCE = `implementation {
+	type NonZeroInteger = Integer where @::isNot(0)
+	type Zero = Integer where @::is(0)
+
+	§ The operation that can not fail, and says so.
+	function doubled(_ d: NonZeroInteger) -> Integer {
+		<- d::multiply(with 2)
+	}
+
+	§ And its mirror image: an operation only the value zero may reach.
+	function named(_ d: Zero) -> String {
+		<- d::toString()
+	}
+
+	function namedOrDoubled(_ d: Integer) -> String {
+		<- match d -> String {
+			case 0 { <- named(@) }
+
+			case _ { <- doubled(@)::toString() }
+		}
+	}
+
+	__print(namedOrDoubled(21))
+	__print(namedOrDoubled(0))
+}`
+
+		// NOTE: The same Match with a different value named, which is what makes the
+		// run above mean anything: what the last Case knows is decided by the Cases
+		// that were actually written, and a Match naming `1` proves nothing about
+		// zero.
+		const UNCHECKED = `implementation {
+	type NonZeroInteger = Integer where @::isNot(0)
+
+	function doubled(_ d: NonZeroInteger) -> Integer {
+		<- d::multiply(with 2)
+	}
+
+	function namedOrDoubled(_ d: Integer) -> String {
+		<- match d -> String {
+			case 1 { <- "one" }
+
+			case _ { <- doubled(@)::toString() }
+		}
+	}
+
+	__print(namedOrDoubled(21))
+}`
+
+		it("runs the value each Case proved through its total operation", async () => {
+			expect(await run(SOURCE)).toEqual(['"42"', '"0"'])
+		})
+
+		it("refuses the call the Cases written prove nothing for", () => {
+			expect(
+				hasCode(diagnosticsOf(UNCHECKED), "argument-type-mismatch"),
+			).toBe(true)
+		})
+	})
 })

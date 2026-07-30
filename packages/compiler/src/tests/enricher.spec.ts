@@ -5700,6 +5700,216 @@ describe("Enricher", () => {
 		})
 	})
 
+	// NOTE: The doorway nobody has to write — a Match on a bare Integer or String
+	// takes the VALUE apart, and its Cases are evidence in both directions:
+	// reaching the Case for the rest proves the value is none of the values named
+	// above it, and a Case that NAMES a value proves that. The Matcher itself is
+	// untouched throughout, which is what leaves the Rewriter the Match it always
+	// had.
+	describe("Refinement match narrowing", () => {
+		function handlersOf(
+			source: string,
+		): common.typed.MatchNode["handlers"] {
+			let value = lastConstantValue(source)
+
+			if (value.nodeType !== "Match") {
+				throw new Error("Last Constant is not a Match.")
+			}
+
+			return value.handlers
+		}
+
+		// NOTE: The Type `@` has where the Handler ANSWERS, read off the value it
+		// returns rather than searched for — a Handler can hold more than one `@`,
+		// and a Guard's is not the body's.
+		function selfTypesOf(source: string): Array<string> {
+			return handlersOf(source).map((handler) => {
+				let returned = handler.body[0]
+
+				if (returned.nodeType !== "ReturnStatement") {
+					throw new Error("A Handler does not return.")
+				}
+
+				return printType(returned.expression.type)
+			})
+		}
+
+		let nonZero = "type NonZeroInteger = Integer where @::isNot(0)"
+		let zero = "type Zero = Integer where @::is(0)"
+
+		it("should narrow '@' to the values the Cases above did not name", () => {
+			expect(
+				selfTypesOf(`implementation {
+					${nonZero}
+
+					constant n = 3
+
+					constant answer = match n -> Integer {
+						case 0 { <- 0 }
+
+						case _ { <- @ }
+					}
+				}`),
+			).toEqual(["Integer", "NonZeroInteger"])
+		})
+
+		it("should narrow '@' to the value its own Case named", () => {
+			expect(
+				selfTypesOf(`implementation {
+					${zero}
+
+					constant n = 3
+
+					constant answer = match n -> Integer {
+						case 0 { <- @ }
+
+						case _ { <- 0 }
+					}
+				}`),
+			).toEqual(["Zero", "Integer"])
+		})
+
+		// NOTE: Every Case above contributes, so a refinement asking about two values
+		// is established by the two Cases that named them — and set INCLUSION means a
+		// refinement asking about one of them is established too.
+		it("should read every value the Cases above named", () => {
+			expect(
+				selfTypesOf(`implementation {
+					type NotZeroOrOne = Integer where @::isNot(0)::and(@::isNot(1))
+
+					constant n = 3
+
+					constant answer = match n -> Integer {
+						case 0 { <- 0 }
+
+						case 1 { <- 1 }
+
+						case _ { <- @ }
+					}
+				}`).at(-1),
+			).toBe("NotZeroOrOne")
+		})
+
+		it("should narrow a String Case by the String it named", () => {
+			expect(
+				selfTypesOf(`implementation {
+					type NotBlank = String where @::isNot("")
+
+					constant text = "essence"
+
+					constant answer = match text -> String {
+						case "" { <- "" }
+
+						case _ { <- @ }
+					}
+				}`),
+			).toEqual(["String", "NotBlank"])
+		})
+
+		// NOTE: The evidence is read off the Matchers alone, so it holds whatever the
+		// Validator makes of the Match's shape — a Guarded value Case is refused
+		// there, and it hands nothing down here either. Asked of a Union, where such
+		// a Case is legal and the Handlers below it really do see the value it named.
+		it("should not read a value a Guarded Case named", () => {
+			expect(
+				selfTypesOf(`implementation {
+					${nonZero}
+
+					constant flag = true
+					constant value: Integer | String = 3
+
+					constant answer = match value -> Integer {
+						case 0 where flag { <- 0 }
+
+						case Integer { <- @ }
+
+						case String { <- 0 }
+					}
+				}`).at(1),
+			).toBe("Integer")
+		})
+
+		// NOTE: A Guard runs AFTER the Matcher matched, not instead of it, so what the
+		// Handler's own Case named still holds inside its body.
+		it("should keep the value its own Guarded Case named", () => {
+			expect(
+				selfTypesOf(`implementation {
+					${zero}
+
+					constant flag = true
+					constant value: Integer | String = 3
+
+					constant answer = match value -> Integer {
+						case 0 where flag { <- @ }
+
+						case Integer { <- 0 }
+
+						case String { <- 0 }
+					}
+				}`).at(0),
+			).toBe("Zero")
+		})
+
+		// NOTE: Nothing about the Match itself changes — the Matcher is the Type the
+		// runtime check is emitted from, and evidence is not a runtime question. This
+		// is the invariant that leaves the Rewriter needing no change at all.
+		it("should leave every Matcher as it was", () => {
+			expect(
+				handlersOf(`implementation {
+					${nonZero}
+					${zero}
+
+					constant n = 3
+
+					constant answer = match n -> Integer {
+						case 0 { <- @ }
+
+						case _ { <- @ }
+					}
+				}`).map((handler) => printType(handler.matcher)),
+			).toEqual(["Integer", "Integer"])
+		})
+
+		// NOTE: Two questions about the same value are not the same question. A String
+		// that is not the empty one HAS content, and the Compiler has no way to know
+		// that — the same rule an `if` narrows by.
+		it("should not narrow on a differently spelled predicate", () => {
+			expect(
+				selfTypesOf(`implementation {
+					type NonEmptyString = String where @::hasAnyContent()
+
+					constant text = "essence"
+
+					constant answer = match text -> String {
+						case "" { <- "" }
+
+						case _ { <- @ }
+					}
+				}`).at(-1),
+			).toBe("String")
+		})
+
+		// NOTE: A Boolean is no refinable base, and a Case naming one of its two
+		// values proves nothing anything could be declared by.
+		it("should read no evidence out of a Boolean Case", () => {
+			expect(
+				selfTypesOf(`implementation {
+					${nonZero}
+
+					constant value: Boolean | Integer = true
+
+					constant answer = match value -> Integer {
+						case true { <- 0 }
+
+						case Integer { <- @ }
+
+						case Boolean { <- 1 }
+					}
+				}`).at(1),
+			).toBe("Integer")
+		})
+	})
+
 	// NOTE: A value written DOWN needs no branch in front of it — its predicate is
 	// decided while compiling. What the Enricher does with that is choose an
 	// Overload by it, which is what these assert; the Statements a Program writes
