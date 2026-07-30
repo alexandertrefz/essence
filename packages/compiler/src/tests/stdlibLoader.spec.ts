@@ -790,6 +790,104 @@ describe("Standard Library Loader", () => {
 		expect(printType(target)).toBe("NonEmptyList")
 	})
 
+	// NOTE: The deadlock at its tightest, and the shape `List.append(_ item) ->
+	// NonEmptyList<ItemType>` needs. The Namespace that ANSWERS the predicate is the
+	// one applying the Alias, so no ordering of the rounds can put a resolved
+	// predicate in front of it: refusing the copy would send `namespace List` back
+	// into the rounds, and the fill would then look for `hasItems` on a Namespace
+	// that is not in Scope yet — round after round, until both are given up on. So
+	// the copy is TAKEN while the hoist is open and registered against the object it
+	// came from, and the fill writes the conjuncts into the Alias and into every
+	// copy of it in one breath.
+	//
+	// Both roads through the wrapper are here, because they are two different
+	// substitutions: `NonEmptyList<Integer>` binds the Parameter to a concrete Type,
+	// `NonEmptyList<Item>` binds it to the Namespace's own opaque Generic — and each
+	// one still COPIES, since the base it builds is a new object either way. The
+	// `toBe` is the mechanism in one line: every copy holds the very ARRAY the fill
+	// wrote into the Alias.
+	it("lets the answering Namespace apply the Alias it answers for", () => {
+		let stdlib = load([
+			"List.es",
+			`declarations {
+				type NonEmptyList<Item> = List<Item> where @::hasItems()
+
+				namespace List <infer Item> for List<Item> {
+					hasItems() -> Boolean
+
+					append(_ item: Item) -> NonEmptyList<Item>
+
+					firstOf(_ numbers: NonEmptyList<Integer>) -> Integer
+				}
+			}`,
+		])
+
+		let alias = stdlib.types["NonEmptyList"]
+
+		if (
+			alias?.type !== "GenericAlias" ||
+			alias.aliasedType.type !== "Refinement"
+		) {
+			throw new Error(
+				"'NonEmptyList' did not load as a generic refinement",
+			)
+		}
+
+		let declared = alias.aliasedType
+
+		expect(declared.conjuncts).toEqual([
+			{
+				namespaceName: "List",
+				methodName: "hasItems",
+				overloadIndex: null,
+				args: [],
+			},
+		])
+
+		let namespace = namespaceNamed(stdlib, "List")
+		let append = namespace.methods["append"]
+
+		if (append?.type !== "SimpleMethod") {
+			throw new Error("'append' did not load as a simple Method")
+		}
+
+		let grown = append.returnType
+
+		expect(grown.type).toBe("Refinement")
+
+		if (grown.type !== "Refinement") {
+			throw new Error("'append' does not answer with a refinement")
+		}
+
+		expect(grown.base).toEqual({
+			type: "List",
+			itemType: { type: "GenericUse", name: "Item" },
+		})
+		expect(grown.conjuncts).toBe(declared.conjuncts)
+		expect(printType(grown)).toBe("NonEmptyList")
+
+		let firstOf = namespace.methods["firstOf"]
+
+		if (firstOf?.type !== "SimpleMethod") {
+			throw new Error("'firstOf' did not load as a simple Method")
+		}
+
+		let numbers = firstOf.parameterTypes[1]?.type
+
+		expect(numbers?.type).toBe("Refinement")
+
+		if (numbers?.type !== "Refinement") {
+			throw new Error("'firstOf' does not take a refinement")
+		}
+
+		expect(numbers.base).toEqual({
+			type: "List",
+			itemType: { type: "Integer" },
+		})
+		expect(numbers.conjuncts).toBe(declared.conjuncts)
+		expect(printType(numbers)).toBe("NonEmptyList<Integer>")
+	})
+
 	// NOTE: A Diagnostic in the standard library is a Compiler developer's
 	// error — there is no user Program in sight, and every stage downstream
 	// would run against a half-built Scope. It is thrown, rendered exactly as

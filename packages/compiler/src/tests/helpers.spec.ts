@@ -39,6 +39,7 @@ import {
 	openPendingRefinementCopies,
 	pendingRefinementCopiesOf,
 	predicateConjunctKey,
+	refinementWithTypeArguments,
 	resolveOverloadedMethodName,
 	second,
 	stripPosition,
@@ -2676,6 +2677,41 @@ describe("Helpers", () => {
 						new Map([["Item", string]]),
 					),
 				).toBe(pendingScalar)
+			})
+
+			// NOTE: Stamping the applied spelling is the OTHER place a refinement is
+			// copied, and it stands under the same rule for the same reason — a
+			// stamp is what a signature ends up holding, so an unregistered one
+			// would keep the null after the fill wrote the conjuncts into
+			// everything else.
+			it("should hold the applied spelling to the same rule", () => {
+				expect(() =>
+					refinementWithTypeArguments(pendingFilled(), [string]),
+				).toThrow("read before it resolved")
+
+				let pending = pendingFilled()
+
+				openPendingRefinementCopies()
+
+				try {
+					let stamped = refinementWithTypeArguments(pending, [string])
+
+					expect(stamped.typeArguments).toEqual([string])
+					expect(stamped.conjuncts).toBeNull()
+					expect(pendingRefinementCopiesOf(pending)).toEqual([
+						stamped,
+					])
+				} finally {
+					closePendingRefinementCopies()
+				}
+
+				// NOTE: A resolved one is stamped without a word — its conjuncts
+				// already travel by reference, so there is nothing left to finish.
+				let resolved = nonZero as RefinementType
+
+				expect(
+					refinementWithTypeArguments(resolved, [integer]).conjuncts,
+				).toBe(resolved.conjuncts)
 			})
 
 			// NOTE: Inside a hoist the copy is TAKEN and registered against the

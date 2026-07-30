@@ -5301,6 +5301,149 @@ describe("Enricher", () => {
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual(["no-matching-overload"])
 			})
+
+			// NOTE: The same pair one turn harder. A GENERIC refined Alias can not
+			// be bound by reference the way `Proper` is — applying Type Arguments
+			// substitutes them into the base, which COPIES the refinement — so the
+			// answering Namespace hoists holding copies whose predicate is still
+			// unread, and the fill finishes them along with the Alias.
+			//
+			// The predicate asks `isFilled` rather than `hasItems` because the
+			// builtin `namespace List` answers `hasItems`, which would take the
+			// clause off the Program's hands and leave nothing circular to test.
+			function genericallySelfAnswering(entries: string): string {
+				return `implementation {
+					type Filled<Item> = List<Item> where @::isFilled()
+
+					namespace Listing<infer Item> for List<Item> {
+						${entries}
+					}
+				}`
+			}
+
+			// NOTE: The Types the two applications in the Namespace resolved to,
+			// beside the refinement the Alias itself declares — read off the typed
+			// Nodes rather than through a Scope, because what a signature ENDED UP
+			// holding is the whole question.
+			function appliedInAnsweringNamespace(source: string): {
+				declared: common.Type
+				concrete: common.Type
+				generic: common.Type
+				diagnostics: Array<common.Diagnostic>
+			} {
+				let { program, diagnostics } = enrichSource(source)
+				let [alias, namespace] = program.implementation.nodes
+
+				if (
+					alias?.nodeType !== "TypeAliasStatement" ||
+					alias.type.type !== "GenericAlias" ||
+					namespace?.nodeType !== "NamespaceDefinitionStatement"
+				) {
+					throw new Error("The Program is not the shape under test.")
+				}
+
+				let concrete = namespace.type.methods["firstOf"]
+				let generic = namespace.type.methods["sizeOf"]
+
+				if (
+					concrete?.type !== "SimpleMethod" ||
+					generic?.type !== "SimpleMethod"
+				) {
+					throw new Error(
+						"The Namespace is not the shape under test.",
+					)
+				}
+
+				return {
+					declared: alias.type.aliasedType,
+					concrete: concrete.parameterTypes[1]!.type,
+					generic: generic.parameterTypes[1]!.type,
+					diagnostics,
+				}
+			}
+
+			const APPLYING_ENTRIES = `firstOf(_ numbers: Filled<Integer>) -> Integer {
+					<- 0
+				}
+
+				sizeOf(_ items: Filled<Item>) -> Integer {
+					<- items::length()
+				}`
+
+			it("should let the answering Namespace apply the Alias it answers for", () => {
+				let { declared, concrete, generic, diagnostics } =
+					appliedInAnsweringNamespace(
+						genericallySelfAnswering(`isFilled() -> Boolean {
+							<- @::hasItems()
+						}
+
+						${APPLYING_ENTRIES}`),
+					)
+
+				expect(diagnostics).toEqual([])
+
+				if (
+					declared.type !== "Refinement" ||
+					concrete.type !== "Refinement" ||
+					generic.type !== "Refinement"
+				) {
+					throw new Error("The signatures did not hold refinements.")
+				}
+
+				expect(declared.conjuncts).toEqual([
+					{
+						namespaceName: "Listing",
+						methodName: "isFilled",
+						overloadIndex: null,
+						args: [],
+					},
+				])
+
+				// NOTE: The mechanism in two lines — each copy holds the very ARRAY
+				// the fill wrote into the Alias, which no copy taken a round too
+				// early and forgotten about could be holding.
+				expect(concrete.conjuncts).toBe(declared.conjuncts)
+				expect(generic.conjuncts).toBe(declared.conjuncts)
+
+				expect(concrete.base).toEqual({
+					type: "List",
+					itemType: { type: "Integer" },
+				})
+				expect(generic.base).toEqual({
+					type: "List",
+					itemType: { type: "GenericUse", name: "Item" },
+				})
+			})
+
+			// NOTE: The other end of the same road. A predicate nothing answers is
+			// poisoned to its base in place, and so is every copy taken of it while
+			// it was pending — each to ITS OWN base, so a signature that applied
+			// `Filled<Integer>` goes on saying `List<Integer>` rather than borrowing
+			// the Alias' `List<Item>`. One Diagnostic names the clause; the copies
+			// have nothing of their own to report.
+			it("should poison every copy of a predicate nothing answers", () => {
+				let { declared, concrete, generic, diagnostics } =
+					appliedInAnsweringNamespace(
+						genericallySelfAnswering(APPLYING_ENTRIES),
+					)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["unknown-method"])
+
+				expect(declared).toEqual({
+					type: "List",
+					itemType: { type: "GenericUse", name: "Item" },
+				})
+				expect(concrete).toEqual({
+					type: "List",
+					itemType: { type: "Integer" },
+				})
+				expect(generic).toEqual({
+					type: "List",
+					itemType: { type: "GenericUse", name: "Item" },
+				})
+			})
 		})
 	})
 
