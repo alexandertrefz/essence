@@ -165,16 +165,37 @@ function spellScalar(scalar: string | boolean): string {
 // for an Integer, because that is what an Integer is at run time and what its
 // digits mean.
 //
-// A List counts as written when its items are written too. The two List
-// predicates read nothing but the count, which a List of Expressions has as
-// well, but a literal is the shape this whole module is about: admitting one
-// shape by the count alone would be the first crack in a rule that is otherwise
-// exactly "the value is written here".
+// A List is admitted by its LENGTH. `[x, y]` holds exactly two items whatever
+// `x` and `y` turn out to be: a List literal is a bracketed list of
+// Expressions, the grammar has no spread, and so nothing a Program can write
+// makes a written List's length depend on what stands inside it. The two List
+// predicates are `isEmpty` and `hasItems`, which read that count and nothing
+// else. So an item is KEPT where it is written out and stands OPAQUE where it
+// is not, and the List around it counts the same either way.
+//
+// This was once "a List counts as written when its items are written too",
+// which refused `[{ x = 1 }]` for holding a Record — a value written down as
+// plainly as any other, in a position where nothing was ever going to ask what
+// was in it. What that rule was really guarding is still guarded, and by the
+// Type rather than by care: `Opaque` is a kind of its own, every reader below
+// asks for the kind it wants, and so a predicate that ever reads an ITEM
+// answers `null` for an opaque one and refuses — exactly as it does for a value
+// of the wrong shape.
+//
+// NOTE: Only an ITEM is ever opaque. `literalValueOf` answers `null` for an
+// Expression it can not read, and `admittedByEvaluation` refuses on that before
+// a single conjunct is asked: a value the Compiler can not see at all is not a
+// value it may decide anything about, and a List is the one shape it can see
+// something about without seeing the whole of it.
 type LiteralValue =
 	| { kind: "Integer"; value: bigint }
 	| { kind: "String"; value: string }
 	| { kind: "Boolean"; value: boolean }
-	| { kind: "List"; items: Array<LiteralValue> }
+	| { kind: "List"; items: Array<LiteralItem> }
+
+type LiteralItem = LiteralValue | { kind: "Opaque" }
+
+const OPAQUE_ITEM: LiteralItem = { kind: "Opaque" }
 
 // NOTE: `null` is "not a shape this entry can decide" — the wrong kind of value,
 // or Arguments it can not read — and is what makes the table refusable entry by
@@ -331,17 +352,22 @@ function stringQuestion(ask: (value: string) => boolean): PredicateEvaluator {
 }
 
 function listQuestion(
-	ask: (items: Array<LiteralValue>) => boolean,
+	ask: (items: Array<LiteralItem>) => boolean,
 ): PredicateEvaluator {
 	return (value, args) =>
 		value.kind !== "List" || args.length !== 0 ? null : ask(value.items)
 }
 
-function integerLiteral(value: LiteralValue): bigint | null {
+// NOTE: These two take an ITEM rather than a value, which is the wider of the
+// two and costs a caller holding a value nothing. It is what makes an opaque
+// item refuse by the same route a Boolean does where an Integer was wanted: the
+// kind is not the one asked for, so the answer is `null` and the entry above it
+// declines to decide.
+function integerLiteral(value: LiteralItem): bigint | null {
 	return value.kind === "Integer" ? value.value : null
 }
 
-function stringLiteral(value: LiteralValue): string | null {
+function stringLiteral(value: LiteralItem): string | null {
 	return value.kind === "String" ? value.value : null
 }
 
@@ -368,21 +394,16 @@ function literalValueOf(
 			return { kind: "String", value: value.value }
 		case "BooleanValue":
 			return { kind: "Boolean", value: value.value }
-		case "ListValue": {
-			let items: Array<LiteralValue> = []
-
-			for (let item of value.values) {
-				let literal = literalValueOf(item)
-
-				if (literal === null) {
-					return null
-				}
-
-				items.push(literal)
+		// NOTE: Never `null`, whatever stands inside it. What the brackets say
+		// is how many items there are, and they say it whether or not the
+		// Compiler can read one.
+		case "ListValue":
+			return {
+				kind: "List",
+				items: value.values.map(
+					(item) => literalValueOf(item) ?? OPAQUE_ITEM,
+				),
 			}
-
-			return { kind: "List", items }
-		}
 		default:
 			return null
 	}
