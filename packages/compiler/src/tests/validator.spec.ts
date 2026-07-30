@@ -2728,16 +2728,29 @@ describe("Validator", () => {
 			).toHaveLength(1)
 		})
 
-		// NOTE: A List counts as written when its items are. `hasItems` reads
-		// nothing but the count, which this List has too — but a literal is the
-		// shape the whole evaluator is about, and admitting one by the count alone
-		// would be the first crack in a rule that is otherwise exactly "the value
-		// is written here".
-		it("should refuse a List whose items are not written", () => {
+		// NOTE: A List is a different question from the values in it, and it is
+		// answered by the brackets: `[first]` holds exactly one item however
+		// `first` was arrived at, so `hasItems` is decided by what is written
+		// even though the item is not. Nothing in the allowlist asks what an
+		// item IS.
+		it("should admit a List whose items are not written", () => {
 			expect(
 				diagnosticsOfBody(`
 					constant first = "a"
 					constant items: NonEmptyStrings = [first]
+				`),
+			).toEqual([])
+		})
+
+		// NOTE: And the boundary that keeps that from meaning "any List at
+		// all". A name standing for a whole List is a value the Program
+		// computed; how many items it arrived with is written nowhere, because
+		// there are no brackets here to count.
+		it("should refuse a List the Program computes", () => {
+			expect(
+				diagnosticsOfBody(`
+					constant written = ["a"]
+					constant items: NonEmptyStrings = written
 				`),
 			).toHaveLength(1)
 		})
@@ -2956,6 +2969,142 @@ describe("Validator", () => {
 						`),
 					),
 				).toEqual([])
+			})
+		})
+
+		// NOTE: What a written List lets the Compiler decide is its LENGTH, and
+		// the two List predicates in the allowlist read nothing else. `[x, y]`
+		// holds exactly two items whatever `x` and `y` turn out to be — the
+		// grammar has no spread, so nothing a Program can write makes a written
+		// List's length depend on what stands in it. So the items are kept where
+		// they are written out and stand OPAQUE where they are not, and a List
+		// literal is admitted by its length either way.
+		describe("what a written List's items may be", () => {
+			function withCountOf(body: string): string {
+				return `implementation {
+					type Filled<Item> = List<Item> where @::hasItems()
+
+					function countOf(_ items: Filled<{ x: Integer }>) -> Integer {
+						<- items::length()
+					}
+
+					${body}
+				}`
+			}
+
+			// NOTE: THE Program that was refused. Every part of it is written
+			// down — the List, the Record in it, the Integer in that — and it
+			// was refused because a Record was not one of the shapes the
+			// evaluator could read, which the predicate never asked about.
+			it("should admit a List of written Records at all three positions", () => {
+				expect(
+					diagnosticsFor(
+						withCountOf(`
+							constant proven: Filled<{ x: Integer }> = [{ x = 1 }]
+
+							function two() -> Filled<{ x: Integer }> {
+								<- [{ x = 1 }, { x = 2 }]
+							}
+
+							__print(countOf(proven))
+							__print(countOf([{ x = 1 }]))
+							__print(countOf(two()))
+						`),
+					),
+				).toEqual([])
+			})
+
+			// NOTE: The same Program against the standard library's own alias,
+			// which is the spelling a reader reaches for — and where the
+			// admission is worth having, since it is what makes `firstItem`
+			// total.
+			it("should admit a List of written Records into the builtin", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant proven: NonEmptyList<{ x: Integer }> = [{ x = 1 }]
+
+						__print(proven::firstItem().x)
+					}`),
+				).toEqual([])
+			})
+
+			// NOTE: An item nobody wrote out is still an item. What the count
+			// asks is how many stand there, and two stand there whether the
+			// Compiler can read them or not — so this is admitted for exactly
+			// the reason the Records above are, and refusing it was the same
+			// mistake asked of a different shape.
+			it("should admit a List whose items the Program computes", () => {
+				expect(
+					diagnosticsFor(
+						withCountOf(`
+							constant one = { x = 1 }
+
+							function made() -> { x: Integer } {
+								<- { x = 2 }
+							}
+
+							__print(countOf([one, made()]))
+						`),
+					),
+				).toEqual([])
+			})
+
+			// NOTE: And a Record whose member is computed, which is the same
+			// claim one level in: the List still holds one item.
+			it("should admit a Record item with a computed member", () => {
+				expect(
+					diagnosticsFor(
+						withCountOf(`
+							constant n = 1
+
+							__print(countOf([{ x = n }]))
+						`),
+					),
+				).toEqual([])
+			})
+
+			// NOTE: A written List of written Lists is counted at every level it
+			// is written at, and each level is its own question: `[[]]` holds
+			// one item, so the outer List is admitted — while the empty List
+			// inside it, asked the same question in its own right, is refused
+			// for holding none.
+			it("should count a written List of written Lists at each level", () => {
+				let source = (inner: string) => `implementation {
+					type Filled<Item> = List<Item> where @::hasItems()
+
+					constant outer: Filled<List<{ x: Integer }>> = [${inner}]
+					constant inside: Filled<{ x: Integer }> = ${inner}
+
+					__print(outer::length()::add(inside::length()))
+				}`
+
+				expect(diagnosticsFor(source("[{ x = 1 }]"))).toEqual([])
+				expect(diagnosticsFor(source("[]"))).toHaveLength(1)
+			})
+
+			// NOTE: The one List a count refuses, and the reason the count is
+			// worth reading at all.
+			it("should still refuse the empty List", () => {
+				expect(
+					diagnosticsFor(
+						withCountOf(
+							"constant broken: Filled<{ x: Integer }> = []",
+						),
+					),
+				).toHaveLength(1)
+			})
+
+			// NOTE: The base is asked as it always was, so a List of the wrong
+			// Records is refused for its Type rather than admitted for its
+			// length.
+			it("should refuse a written List of the wrong Records", () => {
+				expect(
+					diagnosticsFor(
+						withCountOf(
+							"constant broken: Filled<{ x: Integer }> = [{ y = 1 }]",
+						),
+					),
+				).toHaveLength(1)
 			})
 		})
 	})
