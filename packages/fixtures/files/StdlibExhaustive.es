@@ -464,6 +464,17 @@ third"::lines())
 		<- {}
 	})
 
+	§ ——— NonZeroInteger ———————————————————————————————————————————————————
+	§ The one Method a proven Integer has that a bare one does not. Both
+	§ operands have to be proven, and a value written down is its own proof —
+	§ so the receiver is declared and the Argument is written where it stands.
+	constant provenSix: NonZeroInteger = 6
+
+	show(
+		"NonZeroInteger.multiply(with: NonZeroInteger)",
+		provenSix::multiply(with 7),
+	)
+
 	§ ——— Rational —————————————————————————————————————————————————————————
 	show("Rational.of(_ Integer, over: Integer)", Rational.of(1, over 2))
 	show(

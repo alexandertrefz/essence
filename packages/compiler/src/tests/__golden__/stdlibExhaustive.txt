@@ -199,6 +199,7 @@
 "Integer.divide(by: Algebraic) => 1/2·√2"
 "Integer.multiply(with: Algebraic) => 3·√2"
 "Integer.multiply(with: Algebraic) [collapses to Rational] => 0/1"
+"NonZeroInteger.multiply(with: NonZeroInteger) => 42"
 "Rational.of(_ Integer, over: Integer) => Value(1/2)"
 "Rational.of(_ Integer, over: Integer) [over zero] => Empty"
 "Rational.of(_ Integer, over: Integer) [not reduced] => Value(1/2)"

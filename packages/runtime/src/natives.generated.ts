@@ -118,6 +118,11 @@ export type IntegerNatives = {
 	compare: (self: IntegerType, to: IntegerType) => OrderingType
 }
 
+export type NonZeroIntegerNatives = {
+	// multiply(with: NonZeroInteger) -> NonZeroInteger
+	multiply: (self: IntegerType, argument1: IntegerType) => IntegerType
+}
+
 export type RationalNatives = {
 	// static of(_: Integer, over: Integer) -> Optional<Rational>
 	of: (argument0: IntegerType, over: IntegerType) => OptionalType<RationalType>
@@ -334,6 +339,12 @@ export const $IntegerArity: AssertArities<typeof import("./Integer"), {
 	raise: 2
 	toString: 1
 	compare: 2
+}> = true
+
+declare const NonZeroIntegerModule: typeof import("./NonZeroInteger")
+export const $NonZeroInteger: NonZeroIntegerNatives = NonZeroIntegerModule
+export const $NonZeroIntegerArity: AssertArities<typeof import("./NonZeroInteger"), {
+	multiply: 2
 }> = true
 
 declare const RationalModule: typeof import("./Rational")

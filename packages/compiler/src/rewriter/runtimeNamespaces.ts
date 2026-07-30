@@ -17,6 +17,7 @@
 export const runtimeNamespaceNames = [
 	"String",
 	"Integer",
+	"NonZeroInteger",
 	"Rational",
 	"Algebraic",
 	"Transcendental",
