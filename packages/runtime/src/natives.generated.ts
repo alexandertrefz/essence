@@ -289,7 +289,7 @@ export type ListNatives = {
 	pair: <ItemType extends AnyType, Other extends AnyType>(self: ListType<ItemType>, argument1: ListType<Other>) => ListType<RecordType & { first: ItemType; second: Other }>
 	// split<ItemType>(intoGroupsOf: Integer) -> Optional<List<List<ItemType>>>
 	split: <ItemType extends AnyType>(self: ListType<ItemType>, intoGroupsOf: IntegerType) => OptionalType<ListType<ListType<ItemType>>>
-	// static of(integersFrom: Integer, through: Integer) -> List<Integer>
+	// static of(integersFrom: Integer, through: Integer) -> NonEmptyList
 	of: (integersFrom: IntegerType, through: IntegerType) => ListType<IntegerType>
 }
 
