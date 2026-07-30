@@ -638,6 +638,8 @@
 "NonEmptyList.lastItem<ItemType>() => last"
 "NonEmptyList.firstItem<ItemType>() [single] => 7"
 "NonEmptyList.lastItem<ItemType>() [single] => 7"
+"NonEmptyList.removeDuplicates<ItemType is Equatable>() => [ 3, 1, 2, 4 ]"
+"NonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried] => 4"
 "NonEmptyList.firstItem<ItemType>() [from List.of] => 3"
 "NonEmptyList.lastItem<ItemType>() [from List.append] => 5"
 "NonEmptyList.firstItem<ItemType>() [from List.prepend] => 5"
