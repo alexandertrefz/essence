@@ -3,6 +3,7 @@ import {
 	Boolean        from "./Boolean.es"
 	Comparable     from "./Comparable.es"
 	Integer        from "./Integer.es"
+	NonZeroInteger from "./Integer.es"
 	List           from "./List.es"
 	Optional       from "./Optional.es"
 	Ordering       from "./Ordering.es"
@@ -268,8 +269,8 @@ declarations {
 		§§ The numerator of the Rational in lowest terms. The sign of the Rational lives here — the denominator is always positive.
 		numerator() -> Integer
 
-		§§ The denominator of the Rational in lowest terms — always positive.
-		denominator() -> Integer
+		§§ The denominator of the Rational in lowest terms — always positive, and never zero.
+		denominator() -> NonZeroInteger
 
 		§§ The Rational without its sign — its distance from zero.
 		absolute() -> Rational {
