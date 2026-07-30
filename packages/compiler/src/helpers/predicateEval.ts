@@ -133,10 +133,17 @@ export function refinementDecidedBy(
 // so it is not kept and a labelled Method prints its Arguments bare —
 // `@::isBetween(0, 9)` for a clause written `@::isBetween(0, and 9)`. The text
 // names the question; it is not offered as something to paste.
+// NOTE: Folded from the FIRST conjunct rather than from a seed, because a
+// refinement proving nothing does not exist: a predicate spells one leaf or a
+// conjunction of leaves, so the set is never empty, and the unresolved case is
+// refused by `provenConjuncts` before it gets here. A seeded fold would have to
+// name a `first` that the Type system, with no index checking, calls a String
+// whether one is there or not — and would answer the Diagnostic the text
+// "undefined" for a refinement nobody can write.
 export function describePredicate(refinement: common.RefinementType): string {
-	let [first, ...rest] = provenConjuncts(refinement).map(spellConjunct)
-
-	return rest.reduce((chain, conjunct) => `${chain}::and(${conjunct})`, first)
+	return provenConjuncts(refinement)
+		.map(spellConjunct)
+		.reduce((chain, conjunct) => `${chain}::and(${conjunct})`)
 }
 
 function spellConjunct(conjunct: common.PredicateConjunct): string {
