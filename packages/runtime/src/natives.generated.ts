@@ -127,7 +127,7 @@ export type RationalNatives = {
 	squareRoot: (self: RationalType) => OptionalType<RationalType | AlgebraicType>
 	// numerator() -> Integer
 	numerator: (self: RationalType) => IntegerType
-	// denominator() -> Integer
+	// denominator() -> NonZeroInteger
 	denominator: (self: RationalType) => IntegerType
 	// raise(to: Integer) -> Optional<Rational>
 	raise: (self: RationalType, to: IntegerType) => OptionalType<RationalType>
