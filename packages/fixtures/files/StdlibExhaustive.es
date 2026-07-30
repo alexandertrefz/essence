@@ -1767,6 +1767,13 @@ third"::lines())
 		"NonEmptyList.firstItem<ItemType>() [from List.prepend]",
 		noNumbers::prepend(5)::firstItem(),
 	)
+	§ The position is far outside the empty receiver, which is the input the
+	§ promise turns on: it clamps rather than dropping the item, so there is
+	§ still something in there to ask for.
+	show(
+		"NonEmptyList.firstItem<ItemType>() [from List.insert]",
+		noNumbers::insert(5, at -99)::firstItem(),
+	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its

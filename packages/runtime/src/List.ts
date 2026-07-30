@@ -220,6 +220,34 @@ export function reverse<ItemType extends AnyType>(
 	return createList(originalList.value.slice(0).reverse())
 }
 
+// NOTE: Everything before the position, the item, then everything from the
+// position on — the three parts the Essence body built with `slice`, `append`
+// and `append(contentsOf:)`, kept exactly. The position is resolved from the end
+// and CLAMPED, so one before the start settles on zero and one past the end on
+// the length: there is no position that drops the item, which is what lets the
+// Declaration promise a `NonEmptyList` and is why the body could not stay in
+// Essence — every step of it answered a plain `List`.
+//
+// NOTE: Clamped in bigint before it narrows, exactly as `slice` is: a position
+// past 2³¹ narrowed first would come out as an unrelated one.
+export function insert<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+	at: IntegerType,
+): ListType<ItemType> {
+	let length = BigInt(originalList.value.length)
+	let requested = positionFromEnd(at.value, length)
+	let position = Number(
+		requested < 0n ? 0n : requested > length ? length : requested,
+	)
+
+	return createList([
+		...originalList.value.slice(0, position),
+		item,
+		...originalList.value.slice(position),
+	])
+}
+
 // NOTE: `sort` is one Method with two Overloads, so both bind by position.
 // `$1` is the no-Argument entry, whose `Comparable` bound hands its
 // conformance in as the trailing Argument; it orders by the items' own
