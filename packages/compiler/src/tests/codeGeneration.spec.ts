@@ -3397,4 +3397,57 @@ declarations {
 			).toBe(true)
 		})
 	})
+
+	// NOTE: The one operation that KEEPS the evidence — a product of two proven
+	// Integers is proven too — and the one whose Namespace the Optimiser writes
+	// out. `lower-scalar-operations` lowers `NonZeroInteger.multiply` exactly as
+	// it lowers `Integer.multiply`: the refinement erases before the first pass
+	// runs, so what the call had in its hands was two Integers holding bigints,
+	// and the runtime Method it would have reached is Integer's own product
+	// re-exported. What runs has to be the same product either way, which is what
+	// the two runs below say — bigint arithmetic beyond what a double can hold,
+	// and a sign, so that a lowering to the wrong operator could not read as
+	// right.
+	describe("the product of two proven Integers", () => {
+		const SOURCE = `implementation {
+	§ Both Parameters are proven, so this reaches the Namespace declared for
+	§ proven Integers rather than the one every Integer answers.
+	function product(_ n: NonZeroInteger, _ m: NonZeroInteger) -> NonZeroInteger {
+		<- n::multiply(with m)
+	}
+
+	constant six: NonZeroInteger = 6
+	constant seven: NonZeroInteger = 7
+	constant huge: NonZeroInteger = 9_007_199_254_740_991
+	constant negative: NonZeroInteger = -3
+
+	__print(product(six, seven))
+	__print(product(huge, huge))
+	__print(product(six, negative))
+	§ And the answer is proven in its turn, which is what the Namespace is for.
+	__print(product(product(six, seven), seven))
+}`
+
+		it("runs the proven product through the lowered path", async () => {
+			expect(await run(SOURCE)).toEqual([
+				"42",
+				"81129638414606663681390495662081",
+				"-18",
+				"294",
+			])
+		})
+
+		// NOTE: The same Program with the Optimiser off answers the same thing,
+		// which is the whole contract a pass is held to — there it is the runtime
+		// Method that multiplies, and here it is JavaScript's own operator.
+		it("answers the same with the Optimiser off", async () => {
+			let generated = generate(SOURCE, undefined, {
+				enabled: false,
+				disabledPasses: new Set(),
+			})
+
+			expect(generated).toContain("NonZeroInteger.multiply")
+			expect(generate(SOURCE)).not.toContain("NonZeroInteger.multiply")
+		})
+	})
 })

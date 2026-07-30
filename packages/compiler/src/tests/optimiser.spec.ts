@@ -322,6 +322,12 @@ const unitCaseEquality = `implementation {
 // PRINTS, which is the whole of what the eager-evaluation rule is for — `noisy`
 // runs in a Program that is right and does not run in one that lowered it to
 // `&&`.
+//
+// NOTE: The product of two PROVEN Integers is here as an operation of its own,
+// because the Namespace name is the only thing telling it from the one above it:
+// `NonZeroInteger.multiply` is Integer's own product re-exported, reached because
+// both operands were proven not to be zero, and the evidence that reached it was
+// spent long before this pass runs.
 const scalarOperations = `implementation {
 	§§ Prints as it answers, so that skipping it is visible.
 	§§
@@ -334,6 +340,8 @@ const scalarOperations = `implementation {
 
 	constant a = 3
 	constant b = 5
+	constant proven: NonZeroInteger = 3
+	constant alsoProven: NonZeroInteger = 5
 	constant text = "ab"
 	constant other = "ba"
 	constant yes = true
@@ -348,6 +356,7 @@ const scalarOperations = `implementation {
 	__print(a::add(b))
 	__print(a::subtract(b))
 	__print(a::multiply(with b))
+	__print(proven::multiply(with alsoProven))
 
 	__print(text::is(other))
 	__print(text::isNot(other))
@@ -2190,6 +2199,21 @@ describe("Optimiser", () => {
 			expect(generated).not.toContain("Integer.add__overload$1(a,")
 		})
 
+		// NOTE: The refinement erases before the first pass runs, so the operands
+		// this reads are Integers holding bigints — but the Method the Simplifier
+		// emitted is still the refined Namespace's, and a Namespace name is all
+		// this pass has to go by. `NonZeroInteger` answers `multiply` by
+		// re-exporting Integer's own product, so the two are one operation and are
+		// written out as one.
+		it("multiplies two proven Integers with the same operator", () => {
+			let generated = generate(scalarOperations)
+
+			expect(generated).toContain(
+				"value: proven.value * alsoProven.value",
+			)
+			expect(generated).not.toContain("NonZeroInteger.multiply")
+		})
+
 		it("compares two Strings through the runtime's own comparison", () => {
 			// NOTE: NOT `===`. Two Strings are equal when their characters are,
 			// and the same accent written as one code point and as two is one
@@ -2382,6 +2406,9 @@ describe("Optimiser", () => {
 
 			expect(generated).toContain("$es_Integer_isLessThan__overload$1(a,")
 			expect(generated).toContain("Integer.add__overload$1(a, b)")
+			expect(generated).toContain(
+				"NonZeroInteger.multiply(proven, alsoProven)",
+			)
 			expect(generated).toContain("Boolean.negate(yes)")
 			expect(generated).toContain(
 				"$es_String_is__overload$1(text, other)",
@@ -2407,6 +2434,10 @@ describe("Optimiser", () => {
 				"true",
 				"8",
 				"-2",
+				"15",
+				// NOTE: The proven product, which is the same fifteen — the two
+				// Namespaces multiply the same two bigints and one of them was
+				// entitled to say the answer is not zero.
 				"15",
 				"false",
 				"true",

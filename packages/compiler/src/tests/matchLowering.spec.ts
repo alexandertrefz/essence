@@ -431,12 +431,27 @@ describe("Match Lowering", () => {
 			expect(generated).toContain("anyIs")
 			expect(generated).not.toContain("Divisor")
 
-			// NOTE: What the product DOES name is `NonZeroInteger`, and that is a
-			// Namespace rather than a Type — the standard library declares one for
-			// exactly this predicate, so a `Divisor` is answered by the total
-			// `multiply` written for it. A Namespace name is emitted text like
-			// every other Namespace's; the refinement above is not emitted at all.
-			expect(generated).toContain("NonZeroInteger.multiply")
+			// NOTE: What the product resolved to IS `NonZeroInteger` — a Namespace
+			// rather than a Type, declared for exactly this predicate, so a
+			// `Divisor` is answered by the total `multiply` written for it. Asked
+			// with the Optimiser off, because that is where a Namespace name is
+			// emitted text like every other Namespace's; the refinement above is
+			// not emitted under either setting.
+			let unoptimised = generate(doubledOrZero, {
+				enabled: false,
+				disabledPasses: new Set(),
+			})
+
+			expect(unoptimised).toContain("NonZeroInteger.multiply")
+			expect(unoptimised).not.toContain("Divisor")
+
+			// NOTE: And with the Optimiser on there is no call at all:
+			// `lower-scalar-operations` writes the product out as the bigint
+			// multiplication it always was, exactly as it does for `Integer`'s own
+			// entry — the evidence was spent while compiling, and the two
+			// Namespaces multiply the same two values.
+			expect(generated).not.toContain("NonZeroInteger.multiply")
+			expect(generated).toContain("value: d.value * $pool_0.value")
 		})
 
 		// NOTE: The last Handler of such a Match asks a tag question — every value
