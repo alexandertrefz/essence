@@ -741,6 +741,31 @@ describe("Type matching", () => {
 			expect(matchesType(refined, integer)).toBe(false)
 		})
 
+		// NOTE: A refinement hoists with `conjuncts: null` while the Namespace
+		// answering its predicate is still on its way, and NOTHING may be
+		// decided about a predicate nobody has read — the throw is what the
+		// hoisting rounds read as "not this round". Except the widening
+		// direction, which forgets the evidence rather than reading it: a
+		// refinement flows into its base whatever its predicate turns out to
+		// say, so that answer needs no conjuncts at all.
+		it("should refuse to decide about a pending refinement by throwing", () => {
+			let pending: common.Type = {
+				type: "Refinement",
+				name: "Pending",
+				base: integer,
+				conjuncts: null,
+			}
+
+			expect(() => matchesType(pending, nonZero)).toThrow(
+				"read before it resolved",
+			)
+			expect(() => matchesType(nonZero, pending)).toThrow(
+				"read before it resolved",
+			)
+
+			expect(matchesType(integer, pending)).toBe(true)
+		})
+
 		// NOTE: An Error is a poison value and matches in both directions, so
 		// that one mistake does not cascade. A refinement is not an exception to
 		// that, which is what the rules being placed BEHIND the Error guard says.

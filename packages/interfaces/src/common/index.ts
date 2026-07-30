@@ -521,11 +521,22 @@ export type PredicateConjunct = {
 // NOTE: Refinements are erased before emission — nothing about one survives
 // into the JavaScript, and the Optimiser stage is where they go. `base` is
 // Integer, String or an applied List in v1.
+//
+// NOTE: `conjuncts` is null while the predicate is still UNRESOLVED — the state
+// a refined Alias hoists in when the Namespace answering its predicate has not
+// hoisted yet, which is what lets that very Namespace name the Alias in a
+// signature without the two deadlocking each other. The object is registered
+// once and shared by reference, and the conjuncts are written into it in place
+// when the answering Namespace arrives; every reader of `conjuncts` refuses the
+// null by THROWING, which the hoisting rounds read as "not this round", so no
+// answer is ever computed — or memoised — against a predicate nobody has read.
+// Hoisting guarantees the null does not survive it: a predicate still
+// unresolved after the rounds is reported and the Alias poisoned to its base.
 export type RefinementType = {
 	type: "Refinement"
 	name: string
 	base: Type
-	conjuncts: Array<PredicateConjunct>
+	conjuncts: Array<PredicateConjunct> | null
 }
 
 // NOTE: The compile-time plan a *generic* Choice's derived Equatable follows
