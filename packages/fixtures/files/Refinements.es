@@ -20,8 +20,9 @@ implementation {
 
 	§ `NonZeroInteger` is the standard library's own — the refinement the whole
 	§ design was written for, and the one `Rational::denominator` answers with —
-	§ so it is USED here rather than declared. Everything below is a Program's
-	§ own, declared exactly the way that one is.
+	§ so it is USED here rather than declared, as `NonEmptyList<Item>` is further
+	§ down. Everything else below is a Program's own, declared exactly the way
+	§ those two are.
 
 	§ A String with something in it.
 	type NonEmptyString = String where @::hasAnyContent()
@@ -104,6 +105,30 @@ implementation {
 		<- items::length()
 	}
 
+	§ `NonEmptyList<Item>` is the standard library's other one, and the GENERIC one:
+	§ the Lists that have something in them, whatever they hold. Its predicate is
+	§ the `hasItems` asked just above, so the Type Argument is the one thing left
+	§ to work out and the receiver is what decides it — nothing here writes
+	§ `NonEmptyList<String>` anywhere, and that is what the branch establishes.
+	§
+	§ What it is FOR is the answer that stops being an Optional. There is no first
+	§ item of an empty List, and no value of this Type is empty, so `firstItem`
+	§ here answers with the item — the fallback below stands in front of the
+	§ branch rather than after the call.
+	function firstWordOr(_ words: List<String>, _ fallback: String) -> String {
+		if words::hasItems() {
+			<- words::firstItem()
+		}
+
+		<- fallback
+	}
+
+	§ Two refinements proving the same thing of the same base are ONE Type,
+	§ however each was spelled — the Compiler compares what a proof says, not who
+	§ wrote it down. So a value of the standard library's `NonEmptyList<String>` is
+	§ accepted by `lengthOf`, which asked for this Program's own.
+	constant colours: NonEmptyList<String> = ["red", "green", "blue"]
+
 	§ A Match Handler's Guard proves things about `@` the same way, and it runs
 	§ before any Statement of the body.
 	function digitOrZero(_ value: Integer | String) -> Integer {
@@ -170,6 +195,9 @@ implementation {
 	__print(placed(7))
 	__print(exclaimed("essence"))
 	__print(lengthOf(["a", "b"]))
+	__print(colours::firstItem())
+	__print(colours::lastItem())
+	__print(lengthOf(colours))
 
 	§ And the doorways, answering about values nothing had proven anything about
 	§ before they were asked.
@@ -181,6 +209,8 @@ implementation {
 	__print(shout(""))
 	__print(countOf(["a", "b"]))
 	__print(countOf([]))
+	__print(firstWordOr(["essence", "language"], "none"))
+	__print(firstWordOr([], "none"))
 	__print(digitOrZero(7))
 	__print(digitOrZero("seven"))
 	__print(doubledOrNamed(21))
