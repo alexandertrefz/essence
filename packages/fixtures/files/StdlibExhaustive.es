@@ -1798,6 +1798,28 @@ third"::lines())
 		"NonEmptyList.map<ItemType, Result>(_ (_ ItemType) -> Result) [proof carried]",
 		provenWords::map((word) { <- word::length() })::firstItem(),
 	)
+	show("NonEmptyList.reverse<ItemType>()", provenWords::reverse())
+	show(
+		"NonEmptyList.reverse<ItemType>() [proof carried]",
+		provenWords::reverse()::firstItem(),
+	)
+	show("NonEmptyList.sort<ItemType is Comparable>()", provenNumbers::sort())
+	show(
+		"NonEmptyList.sort<ItemType is Comparable>() [proof carried]",
+		provenNumbers::sort()::firstItem(),
+	)
+	show(
+		"NonEmptyList.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering)",
+		provenNumbers::sort(by (first, second) {
+			<- second::compare(to first)
+		}),
+	)
+	show(
+		"NonEmptyList.sort<ItemType>(by: (_ ItemType, _ ItemType) -> Ordering) [proof carried]",
+		provenNumbers
+			::sort(by (first, second) { <- second::compare(to first) })
+			::firstItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is

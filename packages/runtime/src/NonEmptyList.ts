@@ -89,3 +89,8 @@ export function prepend<ItemType extends AnyType>(
 // same name, since the answer is the same array either way and only what may be
 // said about it differs.
 export { map } from "./List"
+
+// NOTE: The two that only move items about, both `List`'s own natives. `sort`'s
+// entries bind by position exactly as they do there — `$1` takes the items'
+// `compare` as its hidden conformance Argument, `$2` the comparison outright.
+export { reverse, sort__overload$1, sort__overload$2 } from "./List"
