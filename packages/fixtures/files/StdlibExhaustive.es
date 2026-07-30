@@ -1787,6 +1787,17 @@ third"::lines())
 		"NonEmptyList.append<ItemType>(contentsOf: List<ItemType>) [empty, proof carried]",
 		provenOne::append(contentsOf noNumbers)::firstItem(),
 	)
+	§ The item Type CHANGES here and the promise does not, because the promise
+	§ is about the length: Strings go in, their lengths come out, and there are
+	§ as many of one as of the other.
+	show(
+		"NonEmptyList.map<ItemType, Result>(_ (_ ItemType) -> Result)",
+		provenWords::map((word) { <- word::length() }),
+	)
+	show(
+		"NonEmptyList.map<ItemType, Result>(_ (_ ItemType) -> Result) [proof carried]",
+		provenWords::map((word) { <- word::length() })::firstItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is
