@@ -5798,6 +5798,150 @@ describe("Enricher", () => {
 			expect(printType(returned.expression.type)).toBe("Integer")
 		})
 
+		// NOTE: A Guard proves things about the value a Handler NAMED exactly as it
+		// proves them about `@` — `case #Value(item) where item::hasAnyContent()` is
+		// one question about one value, and which of the two ways to spell that value
+		// it was asked of is no part of what it proved.
+		describe("a Match Handler's payload binding", () => {
+			const SHOUT = "type Shout = String where @::hasAnyContent()"
+
+			// NOTE: What the Handler's body reads under a name — navigated rather than
+			// searched, because a Handler holds the name three times over: the Guard's
+			// reading of it, the Constant the binding desugars to, and the body's own
+			// use, which is the only one a Guard narrowed. The body's LAST Statement
+			// is the use every source below is about.
+			function bodyReadingOf(source: string): string {
+				let value = lastConstantValue(source)
+
+				if (value.nodeType !== "Match") {
+					throw new Error("Last Constant is not a Match.")
+				}
+
+				let body = value.handlers[0].body
+				let returned = body[body.length - 1]
+
+				if (returned.nodeType !== "ReturnStatement") {
+					throw new Error("The first Handler does not return.")
+				}
+
+				return printType(returned.expression.type)
+			}
+
+			it("should narrow the binding its Guard proved the predicate of", () => {
+				expect(
+					bodyReadingOf(`implementation {
+						${SHOUT}
+
+						constant value: Optional<String> = #Value("a")
+
+						constant narrowed = match value -> String {
+							case #Value(item) where item::hasAnyContent() {
+								<- item
+							}
+
+							case _ {
+								<- ""
+							}
+						}
+					}`),
+				).toBe("Shout")
+			})
+
+			it("should leave the binding alone where a Guard proves nothing declared", () => {
+				expect(
+					bodyReadingOf(`implementation {
+						${SHOUT}
+
+						constant value: Optional<String> = #Value("a")
+
+						constant narrowed = match value -> String {
+							case #Value(item) where item::is("a") {
+								<- item
+							}
+
+							case _ {
+								<- ""
+							}
+						}
+					}`),
+				).toBe("String")
+			})
+
+			// NOTE: Evidence is about the name it was spelled with and about no
+			// other. A Guard proving the very predicate the binding would need,
+			// of a different value, proves nothing about the binding.
+			it("should not narrow the binding by a Guard about another name", () => {
+				expect(
+					bodyReadingOf(`implementation {
+						${SHOUT}
+
+						constant other = "elsewhere"
+						constant value: Optional<String> = #Value("a")
+
+						constant narrowed = match value -> String {
+							case #Value(item) where other::hasAnyContent() {
+								<- item
+							}
+
+							case _ {
+								<- ""
+							}
+						}
+					}`),
+				).toBe("String")
+			})
+
+			// NOTE: And a Variable is no narrowing receiver under a Guard either — it
+			// can be written to inside the very body the evidence would hold over,
+			// which is the rule a condition narrows Constants alone by.
+			it("should not narrow a Variable a Guard proved the predicate of", () => {
+				expect(
+					bodyReadingOf(`implementation {
+						${SHOUT}
+
+						variable other = "elsewhere"
+						constant value: Optional<String> = #Value("a")
+
+						constant narrowed = match value -> String {
+							case #Value(item) where other::hasAnyContent() {
+								<- other
+							}
+
+							case _ {
+								<- ""
+							}
+						}
+					}`),
+				).toBe("String")
+			})
+
+			// NOTE: The Constant the binding desugars to is a Statement of the body,
+			// so a body declaring that name AGAIN declares it twice — which the
+			// narrowing must not quietly turn into a legal shadow, or the emitted
+			// Program would hold two Constants of one name in one block.
+			it("should still refuse a body that re-declares the narrowed binding", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${SHOUT}
+
+						constant value: Optional<String> = #Value("a")
+
+						constant narrowed = match value -> String {
+							case #Value(item) where item::hasAnyContent() {
+								constant item = "again"
+
+								<- item
+							}
+
+							case _ {
+								<- ""
+							}
+						}
+					}`).map((diagnostic) => diagnostic.code),
+				).toEqual(["duplicate-variable"])
+			})
+		})
+
 		// NOTE: An Error matches everything in both directions, so a poisoned
 		// binding would qualify for whichever refinement is declared first and walk
 		// out of the branch better typed than it went in.
@@ -5984,6 +6128,45 @@ describe("Enricher", () => {
 				expect(printType(returned.expression.base.type)).toBe(
 					"NonEmptyList<String>",
 				)
+			})
+
+			// NOTE: And the value a Handler NAMED, which is what the narrowing is
+			// worth having for: `firstItem` on the binding answers the item itself
+			// rather than an Optional, so the Guard reached the total Method through a
+			// Type nobody in the Program wrote.
+			it("should narrow a payload binding by a Match Handler's Guard", () => {
+				let value = lastConstantValue(`implementation {
+					constant value: Optional<List<String>> = #Value(["a"])
+
+					constant narrowed = match value -> String {
+						case #Value(items) where items::hasItems() {
+							<- items::firstItem()
+						}
+
+						case _ {
+							<- ""
+						}
+					}
+				}`)
+
+				if (value.nodeType !== "Match") {
+					throw new Error("Last Constant is not a Match.")
+				}
+
+				let body = value.handlers[0].body
+				let returned = body[body.length - 1]
+
+				if (
+					returned.nodeType !== "ReturnStatement" ||
+					returned.expression.nodeType !== "MethodInvocation"
+				) {
+					throw new Error("The first Handler does not return a call.")
+				}
+
+				expect(printType(returned.expression.base.type)).toBe(
+					"NonEmptyList<String>",
+				)
+				expect(printType(returned.expression.type)).toBe("String")
 			})
 
 			it("should not narrow a Variable", () => {
