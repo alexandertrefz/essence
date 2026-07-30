@@ -1730,6 +1730,22 @@ third"::lines())
 	show("NestedList.flatten<ItemType>()", [[1, 2], [3]]::flatten())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
 
+	§ ——— NonEmptyList —————————————————————————————————————————————————————————
+	§ The two Methods a List has to have been PROVEN to answer, and the only
+	§ two whose answer is an item rather than an Optional. A List written down
+	§ with something in it is its own proof, so each receiver is declared and
+	§ nothing stands in front of these calls asking anything.
+	§
+	§ Both item Types are here because the Alias is generic: one predicate over
+	§ every List, and the Type Argument told apart by the base.
+	constant provenWords: NonEmptyList<String> = ["first", "middle", "last"]
+	constant provenOne: NonEmptyList<Integer>  = [7]
+
+	show("NonEmptyList.firstItem<ItemType>()", provenWords::firstItem())
+	show("NonEmptyList.lastItem<ItemType>()", provenWords::lastItem())
+	show("NonEmptyList.firstItem<ItemType>() [single]", provenOne::firstItem())
+	show("NonEmptyList.lastItem<ItemType>() [single]", provenOne::lastItem())
+
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
 	§ labels carry no prefix — the coverage net learns them from the member

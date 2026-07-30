@@ -1136,6 +1136,42 @@ describe("Resolvers", () => {
 			]).not.toContain("NonZeroInteger")
 		})
 
+		// NOTE: The same two halves over a GENERIC refinement, and this one needs
+		// no receiver built by hand: `NonEmptyList<String>` is a Type the standard
+		// library declares and a Namespace it declares a Namespace for. The
+		// asymmetry is the whole of what the refinement buys — a List someone
+		// PROVED has something in it reaches the total `firstItem`, and a List
+		// nothing proved anything about reaches only the one answering an Optional.
+		it("should offer a refined List its own Namespace and the base's", () => {
+			let namespaces = stdlibNamespaces()
+			let strings: common.Type = {
+				type: "List",
+				itemType: { type: "String" },
+			}
+			let nonEmptyStrings: common.Type = {
+				type: "Refinement",
+				name: "NonEmptyList",
+				base: strings,
+				typeArguments: [{ type: "String" }],
+				conjuncts: [
+					{
+						namespaceName: "List",
+						methodName: "hasItems",
+						overloadIndex: null,
+						args: [],
+					},
+				],
+			}
+
+			let refined = [
+				...namespacesTargeting(namespaces, nonEmptyStrings).keys(),
+			]
+			let base = [...namespacesTargeting(namespaces, strings).keys()]
+
+			expect(base).toEqual(["List"])
+			expect(refined).toEqual(["List", "NonEmptyList"])
+		})
+
 		// NOTE: Conformance is found through the same widening rule, which is why
 		// nothing was written for it: `Integer is Comparable` covers every value a
 		// `NonZeroInteger` can hold, so the witness the base declares is the

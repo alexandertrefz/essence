@@ -1251,11 +1251,12 @@ describe("Standard Library Loader", () => {
 			"Rounding",
 			"Record",
 			"List",
-			// NOTE: The one Namespace a List value can reach besides `List`,
+			// NOTE: The two Namespaces a List value can reach besides `List`,
 			// listed after it — see `builtinMemberOrder`. `List` has to be
-			// searched FIRST for a `List<List<…>>` receiver, so that the
-			// narrow Namespace reads as the extra it is.
+			// searched FIRST for a `List<List<…>>` receiver and for a proven
+			// one, so that the narrow Namespace reads as the extra it is.
 			"NestedList",
+			"NonEmptyList",
 		])
 	})
 

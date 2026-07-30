@@ -9,6 +9,7 @@ import * as integer from "@essence-lang/runtime/Integer"
 import * as list from "@essence-lang/runtime/List"
 import * as nestedList from "@essence-lang/runtime/NestedList"
 import * as nestedOptional from "@essence-lang/runtime/NestedOptional"
+import * as nonEmpty from "@essence-lang/runtime/NonEmptyList"
 import * as nonZeroInteger from "@essence-lang/runtime/NonZeroInteger"
 import * as normalizationForm from "@essence-lang/runtime/NormalizationForm"
 import * as number from "@essence-lang/runtime/Number"
@@ -52,6 +53,7 @@ const runtimeModules: Record<string, Record<string, unknown>> = {
 	Record: record,
 	List: list,
 	NestedList: nestedList,
+	NonEmptyList: nonEmpty,
 }
 
 // NOTE: What the Simplifier will emit for a declared Method — the bare name for

@@ -742,6 +742,40 @@ declarations {
 		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
 	}
+
+	§ The Methods a List that has something in it can answer with an ITEM.
+	§ Evidence adds Methods to a Type and takes none away, so a NonEmptyList already
+	§ answers every Method of `List` above; what a Namespace of its own is for is
+	§ the Methods the proof makes TOTAL, and there are exactly two.
+	§
+	§ Both for one reason: a List with items in it has a first one and a last
+	§ one, so there is no case left over for an Optional to stand for. Neither
+	§ can be written in Essence — every way to reach an item answers the Optional
+	§ that a position outside the List needs, and taking the item out of it would
+	§ want the very fallback the proof was gathered to remove. That is the point
+	§ rather than a gap: this is where the evidence is SPENT, and a native is what
+	§ spending it looks like.
+	§
+	§ Nothing else is here, and not for want of candidates. `map`, `reverse` and
+	§ `sort` all answer with a List that is not empty either, and none of them
+	§ says so — carrying evidence THROUGH a transform is a decision of its own,
+	§ and this Namespace makes none of them.
+	§
+	§ The target is the refinement, which is what makes these reachable only from
+	§ a List something has proven something about. A List a Program merely wrote
+	§ down in receiver position has been proven nothing and answers `List`'s own
+	§ `firstItem`, with the Optional it always had.
+	namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
+		§§ The first item of the List, which there certainly is one of.
+		§§
+		§§ @returns — the first item.
+		firstItem() -> ItemType
+
+		§§ The last item of the List, which there certainly is one of.
+		§§
+		§§ @returns — the last item.
+		lastItem() -> ItemType
+	}
 }
 
 export {
