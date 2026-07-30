@@ -473,6 +473,19 @@ Seven entries are inlined: the four `loop` Overloads — `while`, `until`, the
 counted `from`/`through` one and the general `Step` one — and List's `map`,
 `keepEvery` and both `reduce` entries.
 
+**A List a Program has PROVEN something about walks the same way.** A checked
+refinement is erased before the first pass runs, so a `NonEmptyList` arrives here
+as the ordinary List it always was — but `NonEmptyList` declares a `map` of its
+own, so that it may promise the answer is not empty either, and the call carries
+that Namespace's name. The Method behind the promise is List's own `map`
+re-exported, so it is inlined as List's is. `map` is the only walking Method the
+two share: `keepEvery` and both `reduce` entries can answer with fewer items than
+they were handed, so a proven receiver reaches List's own entry by widening and
+arrives under List's own name. Everything else `NonEmptyList` declares is left
+alone — `reverse` and `sort` are re-exports this pass does not walk anyway, and
+`prepend(contentsOf:)`, `removeDuplicates` and `replace` are not List's Functions
+at all.
+
 **A callback is inlined only where it is WRITTEN at the call.** A
 Function-valued name is whatever was bound to it, which is not something a
 Compiler can read, so a call passing one stays exactly the call it was. That is

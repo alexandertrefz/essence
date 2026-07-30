@@ -194,6 +194,20 @@ describe("Bundle Size", () => {
 	// bytes and more work is the trade that pass exists to make in the other
 	// direction, and it is made the same way by any Program mapping over a List
 	// it has proven something about with a literal callback.
+	//
+	// NOTE: It measures 52,153 again, up those same 166, and the ceiling STAYS at
+	// 53,200 — 53,200 − 52,153 is 1,047, which is the ~1 kB of headroom every
+	// move above kept, so there is nothing to move. `inline-loops` knows the
+	// second name now: `NonEmptyList` declares a `map` of its own so that it may
+	// promise the answer is not empty, and the Method behind that promise is
+	// `List`'s own `map` re-exported, so `List::repeat` is a `for` again and so
+	// is every other walk over a List a Program has proven something about. This
+	// is the pass paying text for work, which is the trade it exists to make:
+	// minified, where what ships is measured, the same change is 17,489 to
+	// 17,495 — six bytes. Only `map` moved, because it is the only walking Method
+	// the two Namespaces share; `keepEvery` and both `reduce` entries can answer
+	// with fewer items than they were handed, are not declared on `NonEmptyList`
+	// at all, and were reaching `List`'s own entry by widening the whole time.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_200)
 	})
