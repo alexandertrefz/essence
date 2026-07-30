@@ -7585,7 +7585,7 @@ function refinementSkeletonAdmissible(
 	predicateNode: parser.ExpressionNode,
 	aliasedType: common.Type,
 ): boolean {
-	// NOTE: A generic refinement is v2 — `type NonEmpty<Item> = List<Item> where
+	// NOTE: A generic refinement is v2 — `type NonEmptyList<Item> = List<Item> where
 	// @::hasItems()` would have to carry its Type Arguments into the conjunct
 	// keys assignability compares, and a Namespace written for it would be a
 	// generic Namespace targeting a refinement. Refused outright rather than

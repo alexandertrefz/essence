@@ -1727,7 +1727,7 @@ describe("Parser", () => {
 
 			it("should parse a predicate on a generic Alias", () => {
 				let node = alias(
-					"implementation { type NonEmpty<Item> = List<Item> where @::hasItems() }",
+					"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
 				)
 
 				expect(node.generics).toHaveLength(1)

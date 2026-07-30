@@ -2583,6 +2583,75 @@ describe("Helpers", () => {
 				expect(applyGenericBindings(nonZero, new Map())).toBe(nonZero)
 			})
 
+			// NOTE: The applied spelling substitutes right along with the base, so
+			// `NonEmptyList<Item>` heals into `NonEmptyList<String>` and no Hover ever
+			// reads back a Type Argument that was replaced a step earlier.
+			it("should substitute the applied spelling alongside the base", () => {
+				let refined: Type = {
+					type: "Refinement",
+					name: "NonEmptyList",
+					base: {
+						type: "List",
+						itemType: { type: "GenericUse", name: "Item" },
+					},
+					conjuncts: [isNotZero],
+					typeArguments: [{ type: "GenericUse", name: "Item" }],
+				}
+
+				expect(
+					applyGenericBindings(refined, new Map([["Item", string]])),
+				).toEqual({
+					type: "Refinement",
+					name: "NonEmptyList",
+					base: { type: "List", itemType: string },
+					conjuncts: [isNotZero],
+					typeArguments: [string],
+				})
+			})
+
+			// NOTE: A copy of a PENDING refinement is the one soundness edge of a
+			// generic one. `conjuncts` is null while the Namespace answering the
+			// predicate is still on its way; the fill writes into the REGISTERED
+			// object, so a copy taken before it would keep the null for good and
+			// ICE at the first reader past hoisting. The throw is the hoisting
+			// rounds' "not this round" — the declaration instantiating the Alias is
+			// retried after the fill — and it is refused only where a copy is
+			// actually made: a pending refinement holding no Type Parameter comes
+			// back as itself, which is what keeps every v1 shape out of the rounds.
+			it("should refuse to copy a pending refinement by throwing", () => {
+				let pending: Type = {
+					type: "Refinement",
+					name: "Pending",
+					base: {
+						type: "List",
+						itemType: { type: "GenericUse", name: "Item" },
+					},
+					conjuncts: null,
+				}
+
+				expect(() =>
+					applyGenericBindings(pending, new Map([["Item", string]])),
+				).toThrow("read before it resolved")
+
+				expect(
+					applyGenericBindings(pending, new Map([["Other", string]])),
+				).toBe(pending)
+
+				let pendingScalar: Type = {
+					type: "Refinement",
+					name: "Pending",
+					base: integer,
+					conjuncts: null,
+				}
+
+				expect(
+					applyGenericBindings(
+						pendingScalar,
+						new Map([["Item", string]]),
+					),
+				).toBe(pendingScalar)
+			})
+
 			it("should read an undecided slot through the base", () => {
 				expect(
 					typeContainsUnknown(
@@ -2674,6 +2743,33 @@ describe("Helpers", () => {
 						conjuncts: [conjunct("isPositive")],
 					}),
 				).toEqual(integer)
+			})
+
+			// NOTE: An INSTANTIATED generic refinement erases to its instantiated
+			// base — the Type Arguments were substituted into the base long before
+			// the Optimiser saw it, so there is nothing generic left to erase, and
+			// the applied spelling goes the way `name` and `conjuncts` do. Nested
+			// too: `NonEmptyList<NonZeroInteger>` is a List of Integers at run time, and
+			// the two-pass walk was built for exactly this — the refinement in the
+			// base's items is found because the base is still SEEN when the
+			// refinement standing over it is not walked for holders.
+			it("should erase an instantiated generic refinement to its base", () => {
+				let nonEmpty = (itemType: Type): Type => ({
+					type: "Refinement",
+					name: "NonEmptyList",
+					base: { type: "List", itemType },
+					conjuncts: [conjunct("hasItems", [], null, "List")],
+					typeArguments: [itemType],
+				})
+
+				expect(eraseRefinements(nonEmpty(string))).toEqual({
+					type: "List",
+					itemType: string,
+				})
+				expect(eraseRefinements(nonEmpty(nonZero))).toEqual({
+					type: "List",
+					itemType: integer,
+				})
 			})
 
 			it("should hand back a Type carrying none as itself", () => {

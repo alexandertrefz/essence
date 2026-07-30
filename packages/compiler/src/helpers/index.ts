@@ -92,6 +92,27 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
+// NOTE: The Type Arguments an applied refinement should be SPELLED with, or null
+// when the bare Alias name says everything. A non-generic refinement carries none
+// at all, and an instantiation that bound every Parameter to a Parameter — the one
+// a generic Namespace makes of its own target — would only echo the header, so it
+// stays terse. The same rule `caseHeader` reads a Case's Arguments by, for the same
+// reason and with the same wording.
+export function displayedRefinementArguments(
+	type: common.RefinementType,
+): Array<common.Type> | null {
+	if (
+		type.typeArguments === undefined ||
+		type.typeArguments.every(
+			(typeArgument) => typeArgument.type === "GenericUse",
+		)
+	) {
+		return null
+	}
+
+	return type.typeArguments
+}
+
 // NOTE: A compact, one-line description of a Type for Diagnostics — the
 // spelling a reader would recognise from their own source, not the internal
 // Type tag. `printType` in the Language Server is its Hover-oriented sibling;
@@ -114,9 +135,16 @@ export function describeType(type: common.Type): string {
 			return `${displayChoiceName(type.choice)}#${type.name}`
 		// NOTE: A checked refinement is named, never spelled out — the reader
 		// wrote `NonZeroInteger`, and `Integer where @::isNot(0)` is the
-		// Declaration rather than the Type a Diagnostic is about.
-		case "Refinement":
-			return type.name
+		// Declaration rather than the Type a Diagnostic is about. An applied
+		// generic one is named as it was applied: a message about `NonEmptyList` where
+		// the reader wrote `NonEmptyList<String>` names half a Type.
+		case "Refinement": {
+			let typeArguments = displayedRefinementArguments(type)
+
+			return typeArguments === null
+				? type.name
+				: `${type.name}<${typeArguments.map(describeType).join(", ")}>`
+		}
 		case "List":
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
@@ -729,14 +757,61 @@ export function applyGenericBindings(
 				: { type: "List", itemType }
 		}
 		// NOTE: A refinement's conjuncts are keys rather than Types, so only the
-		// base can hold a Generic — and in v1 it never does, since the bases are
-		// Integer, String and applied Lists. The recursion is here so that the
-		// day one can, substituting a refinement is not the one place that
-		// silently stops.
+		// base can hold a Generic — `NonEmptyList<Item>`'s `List<Item>` is where one
+		// does. The conjuncts travel along BY REFERENCE and unsubstituted, which is
+		// the whole reason a generic refinement costs so little: a predicate that
+		// could mention the item Type would not typecheck against an opaque one, so
+		// what survives is item-agnostic and the Type Arguments live in the base,
+		// where `matchTypes` already compares them.
+		//
+		// NOTE: An applied spelling substitutes right along with the base, so
+		// `NonEmptyList<Item>` heals into `NonEmptyList<String>` rather than going stale —
+		// the same healing an applied Union's `alias` gets below, and just as
+		// display-only.
 		case "Refinement": {
 			let base = applyGenericBindings(type.base, bindings)
+			let typeArguments = type.typeArguments?.map((typeArgument) =>
+				applyGenericBindings(typeArgument, bindings),
+			)
 
-			return base === type.base ? type : { ...type, base }
+			if (
+				base === type.base &&
+				(typeArguments === undefined ||
+					typeArguments.every(
+						(typeArgument, index) =>
+							typeArgument === type.typeArguments?.[index],
+					))
+			) {
+				return type
+			}
+
+			// NOTE: A PENDING predicate may not be copied. `conjuncts` is null
+			// while the Namespace answering it is still on its way, and a copy taken
+			// then freezes that null BY VALUE — the fill writes into the registered
+			// object alone, so the copy would carry the empty predicate for good and
+			// ICE at the first reader past hoisting. So the null is refused by
+			// throwing, exactly as every other reader refuses it, and the hoisting
+			// rounds read the throw as "not this round": the declaration
+			// instantiating the Alias lands back in the rounds, and the round after
+			// the fill resolves it with the conjuncts shared by reference.
+			//
+			// Which is why the identity check sits AHEAD of this. A refinement whose
+			// base holds no Type Parameter — every non-generic one, `NonZeroInteger`
+			// among them — comes back AS ITSELF whatever bindings it is handed, so a
+			// generic Namespace with a refined signature (`divide(by
+			// NonZeroInteger)`) neither copies it nor waits a round for it, exactly
+			// as it did before generic refinements existed.
+			if (type.conjuncts === null) {
+				throw new Error(
+					`Internal Compiler Error: the predicate of refinement '${type.name}' was read before it resolved`,
+				)
+			}
+
+			return {
+				...type,
+				base,
+				...(typeArguments !== undefined ? { typeArguments } : {}),
+			}
 		}
 		case "UnionType": {
 			let types = type.types.map((memberType) =>
