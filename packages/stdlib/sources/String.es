@@ -494,11 +494,10 @@ declarations {
 						§ odd count can not split evenly, so the extra
 						§ character goes to the END — the text sits one to the
 						§ left, which is what centring in a fixed width
-						§ conventionally does. `quotient` can only answer
-						§ empty for a zero divisor, and this one is two.
-						constant atStart = needed
-							::quotient(dividingBy 2)
-							::otherwise(0)
+						§ conventionally does. The written `2` is its own proof
+						§ of not being zero, so this is the total `quotient`
+						§ entry and there is nothing to fall back from.
+						constant atStart = needed::quotient(dividingBy 2)
 
 						<- text
 							::prepend(filler::slice(from 0, to atStart))

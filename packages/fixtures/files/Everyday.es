@@ -1,12 +1,14 @@
 implementation {
 
-	§ The everyday Integer Methods. A Method that can fail answers an
-	§ `Optional`, and `__print` shows it whole — `Optional#Value(1024)` rather
-	§ than `1024`. `otherwise` below is how a Program collapses one back to a
-	§ bare value.
+	§ The everyday Integer Methods. A divisor written down is its own proof of
+	§ not being zero, so this remainder can not fail and answers bare. A Method
+	§ that CAN fail answers an `Optional`, and `__print` shows it whole —
+	§ `Optional#Value(1024)` rather than `1024`. `otherwise` below is how a
+	§ Program collapses one back to a bare value.
 	__print(
 		0::subtract(7)::remainder(dividingBy 3),
-	) § Optional#Value(2) — Euclidean, never negative
+	) § 2 — Euclidean, so a negative dividend still leaves a non-negative
+	§ remainder. `7::remainder(dividingBy 3)` is the plain `1`.
 	__print(2::raise(to 10)) § Optional#Value(1024)
 	__print(
 		2::raise(to 0::subtract(2)),

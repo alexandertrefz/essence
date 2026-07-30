@@ -319,7 +319,10 @@ third"::lines())
 	§ Optional; one written where it stands is its own proof that it is not
 	§ zero, and reaches the total entry.
 	constant computedTwo   = 1::add(1)
+	constant computedThree = 1::add(2)
 	constant computedEight = 4::multiply(with 2)
+
+	constant computedNegativeThree = 0::subtract(3)
 
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
@@ -400,27 +403,41 @@ third"::lines())
 	show("Integer.isNegative() [zero]", 0::isNegative())
 	show("Integer.isZero()", 0::isZero())
 	show("Integer.isZero() [non zero]", 1::isZero())
-	show("Integer.remainder(dividingBy: Integer)", 7::remainder(dividingBy 3))
+	show(
+		"Integer.remainder(dividingBy: Integer)",
+		7::remainder(dividingBy computedThree),
+	)
 	show(
 		"Integer.remainder(dividingBy: Integer) [negative dividend]",
-		-7::remainder(dividingBy 3),
+		-7::remainder(dividingBy computedThree),
 	)
 	show(
 		"Integer.remainder(dividingBy: Integer) [by zero]",
 		7::remainder(dividingBy 0),
 	)
-	show("Integer.quotient(dividingBy: Integer)", 7::quotient(dividingBy 3))
+	show(
+		"Integer.remainder(dividingBy: NonZeroInteger)",
+		7::remainder(dividingBy 3),
+	)
+	show(
+		"Integer.quotient(dividingBy: Integer)",
+		7::quotient(dividingBy computedThree),
+	)
 	show(
 		"Integer.quotient(dividingBy: Integer) [negative dividend]",
-		-7::quotient(dividingBy 3),
+		-7::quotient(dividingBy computedThree),
 	)
 	show(
 		"Integer.quotient(dividingBy: Integer) [negative divisor]",
-		7::quotient(dividingBy -3),
+		7::quotient(dividingBy computedNegativeThree),
 	)
 	show(
 		"Integer.quotient(dividingBy: Integer) [by zero]",
 		7::quotient(dividingBy 0),
+	)
+	show(
+		"Integer.quotient(dividingBy: NonZeroInteger)",
+		7::quotient(dividingBy 3),
 	)
 	show("Integer.raise(to: Integer)", 2::raise(to 10))
 	show("Integer.raise(to: Integer) [zero exponent]", 2::raise(to 0))

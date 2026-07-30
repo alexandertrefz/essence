@@ -85,13 +85,27 @@ function diagnosticsFor(source: string) {
 describe("Stdlib", () => {
 	describe("Integer everyday Methods", () => {
 		it("takes the Euclidean remainder — never negative, and is empty on a zero divisor", () => {
-			expect(integer.remainder(int(7n), int(3n))).toEqual(value(int(1n)))
-			expect(integer.remainder(int(-7n), int(3n))).toEqual(value(int(2n)))
-			expect(integer.remainder(int(-7n), int(-3n))).toEqual(
+			expect(integer.remainder__overload$1(int(7n), int(3n))).toEqual(
+				value(int(1n)),
+			)
+			expect(integer.remainder__overload$1(int(-7n), int(3n))).toEqual(
 				value(int(2n)),
 			)
-			expect(integer.remainder(int(7n), int(-3n))).toEqual(value(int(1n)))
-			expect(integer.remainder(int(7n), int(0n))).toEqual(empty())
+			expect(integer.remainder__overload$1(int(-7n), int(-3n))).toEqual(
+				value(int(2n)),
+			)
+			expect(integer.remainder__overload$1(int(7n), int(-3n))).toEqual(
+				value(int(1n)),
+			)
+			expect(integer.remainder__overload$1(int(7n), int(0n))).toEqual(
+				empty(),
+			)
+
+			// NOTE: The total entry — its divisor is a NonZeroInteger in the
+			// source, so there is no Optional around the answer.
+			expect(integer.remainder__overload$2(int(-7n), int(3n))).toEqual(
+				int(2n),
+			)
 		})
 
 		it("raises to a power, exactly in both directions", () => {

@@ -224,18 +224,12 @@ declarations {
 
 		§§ Whether the Integer is divisible by two. Zero is even.
 		isEven() -> Boolean {
-			§ Matched apart rather than written `::is(#Value(0))`, which reads
-			§ better and costs a Program 2.4 kB: a Choice's derived equality on
-			§ a GENERIC Choice goes through `boundChoiceIs` and the descriptor
-			§ machinery behind it, and `isEven` is reached by almost everything.
-			§ `src/tests/bundleSize.spec.ts` is the guard.
-			§
-			§ A divisor of two can not be zero, so the empty arm never runs.
-			<- match @::remainder(dividingBy 2) -> Boolean {
-				case #Value(rest) { <- rest::is(0) }
-
-				case #Empty       { <- false }
-			}
+			§ The written `2` is its own proof of not being zero, so this is
+			§ the total `remainder` entry: a bare Integer, no Optional to take
+			§ apart. The match that used to stand here — kept over
+			§ `::is(#Value(0))` to spare every Program 2.4 kB of generic-Choice
+			§ equality — is simply gone, empty arm and all.
+			<- @::remainder(dividingBy 2)::is(0)
 		}
 
 		§§ Whether the Integer is not divisible by two.
@@ -258,17 +252,39 @@ declarations {
 			<- @::is(0)
 		}
 
-		§§ The remainder of Euclidean division — always at least zero and below the divisor's magnitude, whatever the signs of the operands. `(0 - 7)::remainder(dividingBy 3)` is `2`.
+		§§ What is left over after taking out every whole divisor that fits. `7::remainder(dividingBy 3)` is `1`.
 		§§
-		§§ @param dividingBy — the divisor
-		§§ @returns — the remainder, or nothing when dividing by zero.
-		remainder(dividingBy divisor: Integer) -> Optional<Integer>
+		§§ The division is Euclidean, so the remainder is always at least zero and below the divisor's magnitude, whatever the signs of the operands: `(0 - 7)::remainder(dividingBy 3)` is `2`, not the `0 - 1` that truncating division leaves.
+		overload remainder {
+			§§ The remainder over a divisor nothing is known about.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @returns — the remainder, or nothing when dividing by zero.
+			(dividingBy divisor: Integer) -> Optional<Integer>
 
-		§§ The whole part of Euclidean division — the count of whole divisors, paired with `remainder` so that `quotient · divisor + remainder` is the original Integer. `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, since the remainder is never negative.
+			§§ The remainder over a divisor proven not to be zero. There is no failure left to report, so the remainder itself is the answer.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @returns — the remainder.
+			(dividingBy divisor: NonZeroInteger) -> Integer
+		}
+
+		§§ How many whole divisors fit. `7::quotient(dividingBy 3)` is `2`.
 		§§
-		§§ @param dividingBy — the divisor
-		§§ @returns — the quotient, or nothing when dividing by zero.
-		quotient(dividingBy divisor: Integer) -> Optional<Integer>
+		§§ The other half of the same Euclidean division as `remainder`, and the two always agree: `quotient · divisor + remainder` is the original Integer. Since that remainder is never negative, the quotient floors towards negative infinity rather than truncating towards zero: `(0 - 7)::quotient(dividingBy 3)` is `0 - 3`, leaving a remainder of `2`.
+		overload quotient {
+			§§ The quotient over a divisor nothing is known about.
+			§§
+			§§ @param dividingBy — the divisor
+			§§ @returns — the quotient, or nothing when dividing by zero.
+			(dividingBy divisor: Integer) -> Optional<Integer>
+
+			§§ The quotient over a divisor proven not to be zero. There is no failure left to report, so the quotient itself is the answer.
+			§§
+			§§ @param dividingBy — the divisor, proven not to be zero
+			§§ @returns — the quotient.
+			(dividingBy divisor: NonZeroInteger) -> Integer
+		}
 
 		§§ Raises the Integer to the given power. A non-negative exponent gives an Integer, a negative one the exact reciprocal as a Rational. Zero to the power of zero is one.
 		§§
