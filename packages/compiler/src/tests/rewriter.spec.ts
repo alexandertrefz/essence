@@ -912,23 +912,35 @@ describe("Rewriter", () => {
 		})
 
 		describe("Rational", () => {
-			// NOTE: `of` is fallible, and fallibility is `Optional`, a nominal
-			// generic Choice — so the answer is a tagged Case either way:
-			// `#Value` carrying the Rational under `item`, or the payload-less
-			// `#Empty`. No Union's SHAPE means "missing" any more; the tag says
-			// it. The Rational itself is still asserted on in full, one wrapper
-			// deeper.
+			// NOTE: The FIRST entry of `of` is fallible, and fallibility is
+			// `Optional`, a nominal generic Choice — so the answer is a tagged
+			// Case either way: `#Value` carrying the Rational under `item`, or
+			// the payload-less `#Empty`. No Union's SHAPE means "missing" any
+			// more; the tag says it. The Rational itself is still asserted on in
+			// full, one wrapper deeper.
+			//
+			// NOTE: The SECOND entry is the same construction over a denominator
+			// the Compiler proved is not zero, so it answers with the Rational
+			// itself and there is no wrapper at all. It is reachable only through
+			// that proof, which is why there is no zero case to assert here — a
+			// caller with a zero denominator can not have reached it.
 			describe("of", () => {
 				it("creates a rational", () => {
-					expect(rational.of(integerOne(), integerTwo())).toEqual(
-						optional.createValue(rationalOneHalf()),
-					)
+					expect(
+						rational.of__overload$1(integerOne(), integerTwo()),
+					).toEqual(optional.createValue(rationalOneHalf()))
 				})
 
 				it("is empty for a zero denominator", () => {
-					expect(rational.of(integerOne(), integerZero())).toEqual(
-						optional.createEmpty(),
-					)
+					expect(
+						rational.of__overload$1(integerOne(), integerZero()),
+					).toEqual(optional.createEmpty())
+				})
+
+				it("creates a rational unwrapped over a proven denominator", () => {
+					expect(
+						rational.of__overload$2(integerOne(), integerTwo()),
+					).toEqual(rationalOneHalf())
 				})
 			})
 

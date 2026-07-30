@@ -52,7 +52,7 @@ export function createRational(
 	}
 }
 
-export function of(
+export function of__overload$1(
 	numerator: IntegerType,
 	denominator: IntegerType,
 ): OptionalType<RationalType> {
@@ -61,6 +61,18 @@ export function of(
 	}
 
 	return createValue(createRational(numerator.value, denominator.value))
+}
+
+// NOTE: The same construction with the zero check taken OUT rather than skipped
+// — it was already made. This entry is reached only for a denominator the
+// Compiler proved is not zero, so what is left is exactly what the entry above
+// does once it has decided the same thing, and there is nothing left to wrap an
+// Optional around.
+export function of__overload$2(
+	numerator: IntegerType,
+	denominator: IntegerType,
+): RationalType {
+	return createRational(numerator.value, denominator.value)
 }
 
 // NOTE: The lowest-terms form with the sign on the numerator — the shape the

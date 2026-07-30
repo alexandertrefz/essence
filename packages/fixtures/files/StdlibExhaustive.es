@@ -476,13 +476,29 @@ third"::lines())
 	)
 
 	§ ——— Rational —————————————————————————————————————————————————————————
-	show("Rational.of(_ Integer, over: Integer)", Rational.of(1, over 2))
+	§ The two entries of `of` are told apart by what is known about the
+	§ DENOMINATOR, so the calls below have to be told apart the same way. A
+	§ denominator the Program COMPUTES might be anything, so it reaches the entry
+	§ answering an Optional; one written where it stands is its own proof that it
+	§ is not zero, and reaches the total entry.
+	constant computedTwo   = 1::add(1)
+	constant computedEight = 4::multiply(with 2)
+
+	show(
+		"Rational.of(_ Integer, over: Integer)",
+		Rational.of(1, over computedTwo),
+	)
 	show(
 		"Rational.of(_ Integer, over: Integer) [over zero]",
 		Rational.of(1, over 0),
 	)
 	show(
 		"Rational.of(_ Integer, over: Integer) [not reduced]",
+		Rational.of(4, over computedEight),
+	)
+	show("Rational.of(_ Integer, over: NonZeroInteger)", Rational.of(1, over 2))
+	show(
+		"Rational.of(_ Integer, over: NonZeroInteger) [not reduced]",
 		Rational.of(4, over 8),
 	)
 	show("Rational.is(_ Rational)", 1/2::is(2/4))
