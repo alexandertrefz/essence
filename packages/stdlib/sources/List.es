@@ -870,6 +870,20 @@ declarations {
 		§§ @param contentsOf — the List whose items to add
 		§§ @returns — the extended List, never empty.
 		append(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
+
+		§ One transformed item for every item, so the answer is exactly as long
+		§ as the receiver whatever the transform makes of them — and the item
+		§ Type it makes has nothing to do with the promise, which is about the
+		§ LENGTH. `Result` is the Method's own Generic and must be INFERRED for
+		§ the reason `List::map`'s must: a Type Parameter that is not inferred
+		§ never enters `bindableNames`, and inference would leave it unbound.
+
+		§§ A new List with the given transform applied to every item.
+		§§
+		§§ @returns — the List of transformed items, which certainly has something in it.
+		map<infer Result>(
+			_ transform: (_: ItemType) -> Result,
+		) -> NonEmptyList<Result>
 	}
 }
 

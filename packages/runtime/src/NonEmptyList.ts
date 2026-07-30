@@ -84,3 +84,8 @@ export function prepend<ItemType extends AnyType>(
 ): ListType<ItemType> {
 	return append__overload$2(contentsOf, originalList)
 }
+
+// NOTE: One transformed item for every item — `List`'s own native, under the
+// same name, since the answer is the same array either way and only what may be
+// said about it differs.
+export { map } from "./List"

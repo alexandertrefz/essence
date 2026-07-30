@@ -315,6 +315,8 @@ export type NonEmptyListNatives = {
 	prepend: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// append<ItemType>(contentsOf: List<ItemType>) -> NonEmptyList
 	append: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
+	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> NonEmptyList
+	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
 }
 
 export type FunctionsNatives = {
@@ -517,6 +519,7 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	removeDuplicates: 2
 	prepend: 2
 	append: 2
+	map: 2
 }> = true
 
 declare const functionsModule: typeof import("./functions")
