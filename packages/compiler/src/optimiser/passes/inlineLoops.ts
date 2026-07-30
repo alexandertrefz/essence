@@ -55,9 +55,10 @@ export const inlineLoops: OptimiserPass = {
 		// NOTE: `List` is a name a Program may take for itself — nested, where
 		// it is not taken yet — and a `namespace List for List` writing its own
 		// `map` answers under exactly the name and shape this pass is written
-		// for. The same set answers it for every other pass that reads a
-		// Namespace by name: a name a Program declares below its own top level
-		// is not the standard library's here.
+		// for. `NonEmptyList`, which the walk below reads for the same Method,
+		// is such a name too. The same set answers it for every other pass that
+		// reads a Namespace by name: a name a Program declares below its own top
+		// level is not the standard library's here.
 		//
 		// NOTE: The free `loop` entries need no such guard. They are reached by
 		// their mangled `loop__overload$N` name, an `overload function` block is
@@ -299,7 +300,34 @@ class Inlining {
 	private listWalk(
 		node: common.typedSimple.MethodInvocationNode,
 	): common.typedSimple.InlineLoopDriver | null {
-		if (node.base.name !== "List" || this.shadowed.has(node.base.name)) {
+		if (this.shadowed.has(node.base.name)) {
+			return null
+		}
+
+		// NOTE: A refinement is erased at the head of the stage, before the
+		// first pass runs, so a List a Program has proven has something in it
+		// arrives here as the ordinary List it always was — the Type gate below
+		// asks that unchanged. What survives erasure is the Namespace the
+		// Simplifier NAMED, and `NonEmptyList` declares a `map` of its own so
+		// that it may promise the answer is not empty either. That promise is
+		// the whole of the difference: the runtime Method behind it is `List`'s
+		// own `map`, re-exported, so the walk written out here is the walk that
+		// would have run.
+		//
+		// NOTE: Per Method rather than per Namespace, and `map` is the only one
+		// the two share. `keepEvery` and both `reduce` entries are not declared
+		// on `NonEmptyList` at all — each can answer with fewer items than it
+		// was handed — so a proven receiver reaches `List`'s own entry by
+		// widening and is emitted under `List`'s own name, which is why they
+		// were never affected. Everything else that Namespace declares stays
+		// refused until somebody weighs it: `reverse` and `sort` are re-exports
+		// this pass does not walk, and `prepend(contentsOf:)`,
+		// `removeDuplicates` and `replace` are not `List`'s Functions at all.
+		if (node.base.name === "NonEmptyList") {
+			return node.member.name === "map" ? this.mapWalk(node) : null
+		}
+
+		if (node.base.name !== "List") {
 			return null
 		}
 

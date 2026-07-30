@@ -1106,6 +1106,77 @@ const listWalks = `implementation {
 	__print(items::map(double)::length())
 }`
 
+// NOTE: The same four walks over a receiver a Program has PROVEN something
+// about, beside the twin written the ordinary way — the same three Integers, the
+// same callbacks, the same answers. A refinement is erased before the first pass
+// runs, so what both hold is one \`List\`; what differs is the Namespace the
+// Simplifier named. \`NonEmptyList\` declares a \`map\` of its own, so a proven
+// receiver's map is emitted under THAT name, while \`keepEvery\` and both
+// \`reduce\` entries have no entry there and are reached by widening, so they
+// arrive as \`List\`'s own and were never affected — which is why the gate is
+// per-Method rather than per-Namespace.
+//
+// NOTE: The two transforms after them are what the gate must NOT open.
+// \`reverse\` is \`List\`'s own native re-exported like \`map\` and is still not a
+// walk this pass knows; \`prepend(contentsOf:)\` is not \`List\`'s Function at all
+// but a wrapper calling \`append\` with the two Lists the other way round.
+const provenWalks = `implementation {
+	constant proven: NonEmptyList<Integer> = [1, 2, 3]
+	constant written = [1, 2, 3]
+
+	__print(proven::map((item) { <- item::multiply(with 2) })::length())
+	__print(written::map((item) { <- item::multiply(with 2) })::length())
+
+	__print(proven::keepEvery(where (item) {
+		<- item::isGreaterThan(1)
+	})::length())
+
+	__print(proven::reduce(startingWith 0, (total, item) {
+		<- total::add(item)
+	}))
+
+	__print(proven::reduce(startingWith 0, step (total, item) {
+		if item::isGreaterThan(2) {
+			<- #Done(total)
+		}
+
+		<- #Continue(total::add(item))
+	})::toString())
+
+	__print(proven::reverse()::firstItem())
+	__print(proven::prepend(contentsOf [0])::firstItem())
+}`
+
+// NOTE: The same claim for the second name, and the difference the second name
+// makes: a Program declaring its own \`NonEmptyList\` takes THAT name and no
+// other, so its proven walks are left alone and the ones written the ordinary
+// way are inlined as they always were.
+const shadowedNonEmptyList = `implementation {
+	§§ Answers a doubled Integer, from a Namespace named after a builtin.
+	§§
+	§§ @returns — the doubled Integer.
+	function trick() -> Integer {
+		§§ Not the standard library's.
+		namespace NonEmptyList for Integer {
+			§§ The Integer, handed to the given transform.
+			§§
+			§§ @param transform — the transform to apply
+			§§ @returns — whatever the transform answered.
+			map(_ transform: (_: Integer) -> Integer) -> Integer {
+				<- transform(@)
+			}
+		}
+
+		<- 21::map((n) { <- n::multiply(with 2) })
+	}
+
+	constant proven: NonEmptyList<Integer> = [1, 2]
+
+	__print(trick())
+	__print(proven::map((item) { <- item::add(1) })::length())
+	__print([1, 2]::map((item) { <- item::add(1) })::length())
+}`
+
 // NOTE: A Program that declares a Namespace named \`List\`, which stands in front
 // of the builtin for the rest of its block — so a \`map\` written in it may be a
 // Method the Program wrote, and every walk in the Program is left alone.
@@ -3322,6 +3393,69 @@ describe("Optimiser", () => {
 			expect(generated).toContain("$loop_2_mapped")
 		})
 
+		it("walks a proven List's own positions too", () => {
+			// NOTE: THE Program the gate was answering wrongly. A refinement is
+			// erased before the first pass runs, so `proven` and `written` hold
+			// one List and the two walks below are the same walk — but the
+			// Simplifier named `NonEmptyList` for the first of them, because
+			// that Namespace declares a `map` of its own, and a Namespace name
+			// is all this pass has to go by.
+			let generated = generate(provenWalks)
+
+			expect(generated).toContain("const $loop_0_items = proven.value;")
+			expect(generated).toContain("const $loop_0_mapped = [];")
+			expect(generated).toContain("const $loop_1_items = written.value;")
+			expect(generated).not.toContain("NonEmptyList.map(")
+		})
+
+		it("reaches a proven receiver's other walks by widening", () => {
+			// NOTE: `keepEvery` and both `reduce` entries were never affected,
+			// and it is worth saying why rather than assuming it: none of the
+			// three is declared on `NonEmptyList` — each can answer with fewer
+			// items than it was handed, or with no List at all — so a proven
+			// receiver reaches `List`'s own entry and is emitted under `List`'s
+			// own name. Only `map` needed anything.
+			let unoptimised = generate(provenWalks, {
+				enabled: false,
+				disabledPasses: new Set(),
+			})
+
+			expect(unoptimised).toContain("List.keepEvery(proven,")
+			expect(unoptimised).toContain("List.reduce__overload$1(proven,")
+			expect(unoptimised).toContain("List.reduce__overload$2(proven,")
+		})
+
+		it("leaves a proven receiver's other Methods alone", () => {
+			// NOTE: What the gate opened is one Method, not a Namespace.
+			// `reverse` is `List`'s own native re-exported exactly as `map` is
+			// and is still left alone, because this pass walks four Methods and
+			// that is not one of them; `prepend(contentsOf:)` is not `List`'s
+			// Function at all — it calls `append` with the two Lists the other
+			// way round — and a gate written per Namespace would have to weigh
+			// that before opening.
+			let generated = generate(provenWalks)
+
+			expect(generated).toContain("NonEmptyList.reverse(proven)")
+			expect(generated).toContain("NonEmptyList.prepend(proven,")
+		})
+
+		it("calls the proven Method again when it is turned off", () => {
+			let generated = generate(provenWalks, {
+				enabled: true,
+				disabledPasses: new Set(["inline-loops"]),
+			})
+
+			expect(generated).toContain("NonEmptyList.map(proven,")
+			expect(generated).toContain("List.map(written,")
+			expect(generated).not.toContain("$loop_")
+		})
+
+		it("prints the same thing with the pass off over a proven List", async () => {
+			expect(
+				await expectSamePrintedOutput("inline-loops", provenWalks),
+			).toEqual(["3", "3", "2", "6", '"3"', "3", "0"])
+		})
+
 		it("leaves the call where the Program declares its own List", () => {
 			// NOTE: A Namespace named after a builtin is nested — the name is
 			// taken at the top level — and it REPLACES the builtin for the rest
@@ -3332,6 +3466,19 @@ describe("Optimiser", () => {
 
 			expect(generated).toContain("List.map(")
 			expect(generated).not.toContain("$loop_")
+		})
+
+		it("leaves the proven call where the Program declares its own", () => {
+			// NOTE: The second name is a name a Program may take too, and taking
+			// it refuses the Program's proven walks for the reason taking `List`
+			// refuses its ordinary ones. It refuses THOSE and nothing else: the
+			// walk written the ordinary way below is still written out, because
+			// the name standing in front of a builtin is the one the Program
+			// declared and not every name near it.
+			let generated = generate(shadowedNonEmptyList)
+
+			expect(generated).toContain("NonEmptyList.map(proven,")
+			expect(generated).toContain("const $loop_0_mapped = [];")
 		})
 
 		it("writes a walk in Statement position without a closure", () => {
