@@ -3125,6 +3125,80 @@ declarations {
 		})
 	})
 
+	// NOTE: A Match Handler's Guard is the doorway a Handler carries with it: the
+	// Matcher's own check is ANDed in front of it, so what it proves holds over
+	// every Statement of the body — of the value the Handler NAMED as much as of
+	// `@`. The emitted Program is a Case tag test and an `if`, which is what
+	// someone would have written with no refinement anywhere.
+	describe("a Guard over the value a Handler named", () => {
+		const SOURCE = `implementation {
+	type Shout = String where @::hasAnyContent()
+
+	§ The operation that can not fail, and says so — there is nothing to shout
+	§ where there is nothing written.
+	function shouted(_ text: Shout) -> String {
+		<- text::uppercase()
+	}
+
+	§ The doorway: the Guard asks the question of the value the Case carries, and
+	§ the body reaches the total operation with the value it named.
+	function shoutedOr(_ value: Optional<String>) -> String {
+		<- match value -> String {
+			case #Value(item) where item::hasAnyContent() {
+				<- shouted(item)
+			}
+
+			case _ {
+				<- "nothing"
+			}
+		}
+	}
+
+	__print(shoutedOr(#Value("essence")))
+	__print(shoutedOr(#Value("")))
+	__print(shoutedOr(#Empty))
+}`
+
+		// NOTE: The same Program with the Guard taken out, which is the only thing
+		// that makes the run above mean anything — without it the test would pass
+		// just as well with no narrowing and no refinement at all.
+		const UNGUARDED = `implementation {
+	type Shout = String where @::hasAnyContent()
+
+	function shouted(_ text: Shout) -> String {
+		<- text::uppercase()
+	}
+
+	function shoutedOr(_ value: Optional<String>) -> String {
+		<- match value -> String {
+			case #Value(item) {
+				<- shouted(item)
+			}
+
+			case _ {
+				<- "nothing"
+			}
+		}
+	}
+
+	__print(shoutedOr(#Value("essence")))
+}`
+
+		it("runs the named value through the total operation", async () => {
+			expect(await run(SOURCE)).toEqual([
+				'"ESSENCE"',
+				'"nothing"',
+				'"nothing"',
+			])
+		})
+
+		it("refuses the same call with no Guard in front of it", () => {
+			expect(
+				hasCode(diagnosticsOf(UNGUARDED), "argument-type-mismatch"),
+			).toBe(true)
+		})
+	})
+
 	// NOTE: The doorway nobody has to write. A Match on a bare Integer takes the
 	// VALUE apart, and its Cases are evidence in both directions: the Case
 	// answering for the rest is reached only by a value none of the Cases above it

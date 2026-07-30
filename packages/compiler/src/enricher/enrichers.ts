@@ -1827,43 +1827,61 @@ export function enrichMatch(
 			// the name is lent to.
 			let binding = resolveCaseMatcherBinding(handler.matcher, matcher)
 
-			// NOTE: The Guard is enriched in the body Scope so that it can use
-			// `@` — narrowing is what makes a Guard worth writing. A payload
-			// binding is lent to it through an alias Scope rather than through
-			// the Constant the body reads: see `selfMemberAliases`.
-			let guard =
-				handler.guard === null
-					? null
-					: enrichExpression(
-							handler.guard,
-							binding === null
-								? bodyScope
-								: scopeLendingBinding(
-										binding,
-										matcher,
-										bodyScope,
-									),
-						)
-
 			// NOTE: A Guard proves things about `@` the same way an `if`'s
 			// condition proves them about a Constant, and it runs before any
 			// Statement of the body — the Matcher's own check is ANDed in front
-			// of it — so whatever it establishes holds throughout. The body goes
-			// one Scope deeper only when something WAS established, so a Handler
-			// that narrows nothing keeps declaring its payload binding in the
-			// Scope it always did.
-			let guardNarrowings =
-				guard === null
-					? []
-					: narrowingsFor(
-							conditionEvidence(guard, bodyScope),
-							bodyScope,
-							predicateConjunctKey,
-						)
+			// of it — so whatever it establishes holds throughout. Which is why
+			// the two are worked out together: what a Guard proves is read in the
+			// very Scope it was enriched in.
+			let guard: common.typed.ExpressionNode | null = null
+			let guardNarrowings: Array<Narrowing> = []
+
+			if (handler.guard !== null) {
+				// NOTE: The Guard is enriched in the body Scope so that it can
+				// use `@` — narrowing is what makes a Guard worth writing. A
+				// payload binding is lent to it through an alias Scope rather
+				// than through the Constant the body reads: see
+				// `selfMemberAliases`.
+				let guardScope =
+					binding === null
+						? bodyScope
+						: scopeLendingBinding(binding, matcher, bodyScope)
+
+				guard = enrichExpression(handler.guard, guardScope)
+
+				// NOTE: That Scope is the only one where the value a Handler NAMED
+				// is a name at all — the body Scope has never heard of it, so a
+				// Guard about the payload binding proved nothing about anything.
+				guardNarrowings = narrowingsFor(
+					conditionEvidence(guard, guardScope),
+					guardScope,
+					predicateConjunctKey,
+				)
+			}
+
+			// NOTE: What the Guard established for the payload binding is not
+			// SHADOWED but DECLARED. The binding comes into being at the head of the
+			// body, so there is no earlier declaration for a shadow to stand in front
+			// of — and a shadow one Scope further out would be the wrong shape
+			// anyway: the Constant it stood in front of is a Statement of this very
+			// body, so a body re-declaring that name is declaring it twice, and a
+			// Scope between the two would quietly make that legal and emit one block
+			// holding two Constants of one name.
+			//
+			// Everything else the Guard established is shadowed as an `if`'s
+			// condition shadows it, and the body goes one Scope deeper only when
+			// something WAS established — so a Handler that narrows nothing keeps
+			// declaring its payload binding in the Scope it always did.
+			let bindingNarrowing = guardNarrowings.find(
+				(narrowing) => narrowing.name === binding?.name.content,
+			)
+			let shadowedNarrowings = guardNarrowings.filter(
+				(narrowing) => narrowing !== bindingNarrowing,
+			)
 			let handlerScope =
-				guardNarrowings.length === 0
+				shadowedNarrowings.length === 0
 					? bodyScope
-					: childScope(scopeShadowing(guardNarrowings, bodyScope))
+					: childScope(scopeShadowing(shadowedNarrowings, bodyScope))
 
 			// NOTE: `case #Value(item)` — desugared here rather than carried
 			// through the typed tree, so the Simplifier, Rewriter and every
@@ -1874,7 +1892,12 @@ export function enrichMatch(
 			let bindingStatements =
 				binding === null
 					? []
-					: declareCaseMatcherBinding(binding, matcher, handlerScope)
+					: declareCaseMatcherBinding(
+							binding,
+							matcher,
+							handlerScope,
+							bindingNarrowing?.type,
+						)
 
 			return {
 				body: [
@@ -3574,12 +3597,24 @@ function collectConditionEvidence(
 // inside that very branch, and the evidence would then be about a value that is
 // gone. Nothing carries a narrowing forwards through an assignment in v1, so a
 // Variable simply never narrows.
+//
+// NOTE: A Match Handler's payload binding is a Constant like any other and
+// narrows like one — but a GUARD reads it as `@.member` rather than under its
+// name, because the Constant the body reads does not exist yet where a Guard runs
+// (`scopeLendingBinding` says why). What the Program wrote is the name, and the
+// name is what a shadow can be declared under, so a member read of a LENT name
+// answers with it. `@.item` written out by hand answers the same, and says the
+// same thing about the same value.
 function narrowableReceiverName(
 	base: common.typed.ExpressionNode,
 	scope: enricher.Scope,
 ): string | null {
 	if (base.nodeType === "Self") {
 		return "@"
+	}
+
+	if (base.nodeType === "Lookup" && base.base.nodeType === "Self") {
+		return lentBindingName(base.member.content, scope)
 	}
 
 	if (base.nodeType !== "Identifier") {
@@ -3589,6 +3624,41 @@ function narrowableReceiverName(
 	return findDeclaringScope(base.content, scope)?.constants.has(base.content)
 		? base.content
 		: null
+}
+
+// NOTE: The name a member of `@` is LENT to in this Scope, or null where the
+// member is nobody's name — an ordinary `@.x` on a Record scrutinee is a member of
+// a value rather than a binding of its own, and nothing narrows it. Nearest Scope
+// first, as every name search is, so the innermost Handler's binding answers for
+// its own Guard.
+//
+// The walk stops at the Scope that BINDS the `@` being read, because nothing
+// further out lends a member of it: a Handler nested inside a Guard has an `@` of
+// its own, and the member names of two Cases can agree while their values have
+// nothing to do with each other.
+function lentBindingName(
+	memberName: string,
+	scope: enricher.Scope,
+): string | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		for (let [name, alias] of Object.entries(
+			current.selfMemberAliases ?? {},
+		)) {
+			if (alias.member === memberName) {
+				return name
+			}
+		}
+
+		if (current.members["@"] != null) {
+			return null
+		}
+	}
+
+	return null
 }
 
 // NOTE: The refinements a branch's evidence establishes. A declared refinement is
@@ -6988,14 +7058,22 @@ function scopeLendingBinding(
 // NOTE: Desugared into the Constant an author could have written —
 // `constant item = @.item` at the head of the arm — so the Simplifier, the
 // Rewriter and every walker downstream see nothing new.
+//
+// NOTE: `narrowedType` is what the Handler's Guard proved about this binding, and
+// it is what the SCOPE holds while the body is enriched. The Statement keeps the
+// Case's own member Type, because a refinement is evidence the Enricher carries
+// and never something the emitted Program has heard of — which is the shape a
+// narrowing takes everywhere: a Scope entry the body reads, and a typed tree that
+// says what it always said.
 function declareCaseMatcherBinding(
 	binding: CaseMatcherBinding,
 	matcher: common.Type,
 	bodyScope: enricher.Scope,
+	narrowedType?: common.RefinementType,
 ): Array<common.typed.ImplementationNode> {
 	let { name, memberName, memberType } = binding
 
-	declareVariableInScope(name, memberType, bodyScope, true)
+	declareVariableInScope(name, narrowedType ?? memberType, bodyScope, true)
 
 	return [
 		{
