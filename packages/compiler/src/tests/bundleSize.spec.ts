@@ -170,8 +170,21 @@ describe("Bundle Size", () => {
 	// `boundChoiceIs` and the descriptor machinery behind it — and almost
 	// everything reaches `isEven`. It is a Match instead. This ceiling is what
 	// caught that.
+	//
+	// NOTE: It now measures 52,153, and the ceiling comes down to 53,200 to keep
+	// the ~1 kB of headroom every move above kept. 37 of the fall are
+	// `lower-scalar-operations` reaching `NonZeroInteger.multiply`: the refined
+	// Namespace answers the one Method by re-exporting Integer's own product, so
+	// the same bigint multiplication was being called rather than written out
+	// wherever a proven Integer met another — `Rational`'s own arithmetic
+	// multiplies two denominators that way. 591 more fell with the checked
+	// refinements themselves and went unrecorded here, the figure above staying at
+	// 52,781 while the measurement moved to 52,190: a total `divide`, `remainder`
+	// and `quotient` let the standard library stop laundering answers it had
+	// already proven, and the `::otherwise(…)` fallbacks that did the laundering
+	// left the bundle with them.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
-		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_800)
+		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_200)
 	})
 
 	// NOTE: Measured 42,719 bytes; a reintroduced `Number` spread was 54,849.

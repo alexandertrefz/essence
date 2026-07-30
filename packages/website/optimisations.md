@@ -155,6 +155,12 @@ What is lowered, and nothing else:
   arithmetic becomes the operation inside the branded literal
   `Integer.createInteger` would have built, so `a::subtract(b)` — which is
   `@::add(other::negate())` — is one allocation where it was two, and no call.
+- **NonZeroInteger**: `multiply`, and only that one — the Namespace declares
+  nothing else. A checked refinement is erased before the first pass runs, so
+  what a call of it holds is two Integers with bigints in them, and the Method it
+  would have reached is Integer's own product re-exported under the refined
+  Namespace's name. Same operator, same operands, same answer: the evidence was
+  spent while compiling and there is nothing left of it to run.
 - **Boolean**: `negate`, `and`, `or`, which become `!`, `&&` and `||`.
 - **String**: `is` and `isNot`, which become one call to the runtime's
   `stringEquals`. Two Strings are equal when their CHARACTERS are — the same
