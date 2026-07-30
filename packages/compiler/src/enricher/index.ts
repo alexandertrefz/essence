@@ -14,6 +14,8 @@ import {
 	enrichOverloadedFunctionStatement,
 	type HoistedTypes,
 	resolveNamespaceDefinitionStatementType,
+	resolveRefinementConjuncts,
+	resolveTypeAliasStatementSkeleton,
 	resolveTypeAliasStatementType,
 } from "./enrichers"
 import {
@@ -329,6 +331,85 @@ function isHoistable(
 type HoistableTypeNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
+
+// NOTE: One refined Alias whose predicate has not been read yet — hoisted as a
+// Refinement with `conjuncts: null`, waiting for the Namespace that answers the
+// predicate to arrive. The `refinement` is the very object registered in Scope,
+// held so the fill can write into it in place.
+type PendingPredicate = {
+	node: parser.TypeAliasStatementNode
+	scope: enricher.Scope
+	refinement: common.RefinementType
+}
+
+// NOTE: One attempt at reading each pending predicate, entries dropping off the
+// list as they resolve. During the rounds (`final` false) a Diagnostic means
+// "not this round" and the entry stays — the Namespace it needs may be one
+// round away — while warnings that come WITH a clean resolution go to the sink,
+// for the same reason the hoist loop's own do: the conjuncts are written once
+// and never read a second time, so this is the only moment they can be told.
+//
+// The final call decides, but it does NOT report. A predicate that still does
+// not resolve — after every Namespace that will ever hoist has — is handed back
+// to the in-order enrichment whole: the object already bound into signatures is
+// poisoned to its base in place, and the Alias is UNREGISTERED, so the in-order
+// pass resolves and reports it exactly as it resolves any declaration hoisting
+// gave up on. That pass is the one with the Program's Constants in Scope, and
+// the difference shows: a predicate naming one (`@::isLessThan(limit)`) is
+// refused there for the Argument it is, not for a name hoisting cannot see.
+function fillPendingPredicates(
+	pending: Array<PendingPredicate>,
+	sink: HoistDiagnosticSink,
+	hoistedTypes: HoistedTypes,
+	final: boolean,
+): void {
+	for (let index = pending.length - 1; index >= 0; index--) {
+		let { node, scope, refinement } = pending[index]
+
+		let { result, diagnostics } = collectDiagnostics(
+			(): Array<common.PredicateConjunct> | null =>
+				node.predicate === null
+					? null
+					: resolveRefinementConjuncts(
+							node.predicate,
+							refinement.base,
+							scope,
+						),
+		)
+
+		if (!final && (containsErrors(diagnostics) || result === null)) {
+			continue
+		}
+
+		if (result === null) {
+			poisonRefinementToBase(refinement)
+			hoistedTypes.delete(node)
+			delete scope.types[node.name.content]
+		} else {
+			sink(node, diagnostics)
+			refinement.conjuncts = result
+		}
+
+		pending.splice(index, 1)
+	}
+}
+
+// NOTE: The in-place half of poison recovery. The Refinement was registered and
+// bound by reference before its predicate could be read, so returning the base
+// from a resolver reaches nobody — the object itself has to BECOME its base.
+// The base's own record is left alone; its fields are copied over, and a shared
+// child (a List base's item Type) stays shared, which every reader of a Type
+// already assumes.
+function poisonRefinementToBase(refinement: common.RefinementType): void {
+	let record = refinement as unknown as Record<string, unknown>
+	let base = refinement.base as unknown as Record<string, unknown>
+
+	for (let key of Object.keys(record)) {
+		delete record[key]
+	}
+
+	Object.assign(record, base)
+}
 
 // NOTE: One declaration still waiting for a round, with the Scope it resolves and
 // is declared in. The Scope travels with the Node rather than with the round,
@@ -698,6 +779,7 @@ function hoistDeclarations(
 	seedRound?: (final: boolean) => boolean,
 ): HoistedTypes {
 	let hoistedTypes: HoistedTypes = new Map()
+	let pendingPredicates: Array<PendingPredicate> = []
 	let pendingNodes: Array<PendingDeclaration> = units.flatMap((unit) =>
 		unit.nodes
 			.filter(isHoistable)
@@ -758,6 +840,13 @@ function hoistDeclarations(
 		// import became bindable by the previous round has it in Scope while its
 		// own declarations are resolved.
 		let seeded = seedRound?.(false) ?? false
+
+		// NOTE: Before the declarations too, and for the mirror reason: a
+		// predicate left pending by the previous round may be answerable by a
+		// Namespace that round hoisted, and whatever reads the conjuncts THIS
+		// round — a bodied static Property enriched while its Namespace resolves —
+		// has to find them written in.
+		fillPendingPredicates(pendingPredicates, sink, hoistedTypes, false)
 		let remainingNodes: Array<PendingDeclaration> = []
 		// NOTE: The Protocols this round can still hoist, per Scope — a Namespace
 		// conforming to one of them can not have its conditional bounds woven yet
@@ -790,8 +879,18 @@ function hoistDeclarations(
 			try {
 				speculation = collectDiagnostics(
 					(): common.Type | common.ProtocolType => {
+						// NOTE: The SKELETON, not the full Type — a refined
+						// Alias' predicate is answered by a Namespace that may
+						// name this very Alias in a signature, and resolving
+						// the two in one breath deadlocks the rounds. The
+						// skeleton hoists with `conjuncts: null`, and the fill
+						// at the top of each round writes the predicate in once
+						// the answering Namespace has arrived.
 						if (node.nodeType === "TypeAliasStatement") {
-							return resolveTypeAliasStatementType(node, scope)
+							return resolveTypeAliasStatementSkeleton(
+								node,
+								scope,
+							)
 						} else if (
 							node.nodeType === "ChoiceDeclarationStatement"
 						) {
@@ -904,6 +1003,24 @@ function hoistDeclarations(
 					scope.constants.add(node.name.content)
 				}
 
+				// NOTE: A refined Alias hoists with its predicate still to be
+				// read — `conjuncts: null` — and joins the fill list. The
+				// registered object is shared by reference from here on, which
+				// is the whole trick: the fill writes into it in place, and
+				// every signature that bound the name between now and then is
+				// already holding the answer.
+				if (
+					node.nodeType === "TypeAliasStatement" &&
+					speculation.result.type === "Refinement" &&
+					speculation.result.conjuncts === null
+				) {
+					pendingPredicates.push({
+						node,
+						scope,
+						refinement: speculation.result,
+					})
+				}
+
 				hoistedTypes.set(node, speculation.result)
 			} else {
 				remainingNodes.push(pending)
@@ -922,6 +1039,16 @@ function hoistDeclarations(
 	// so it is offered here. Nothing can hoist off the back of it any more, but
 	// an import naming it still has to bind before the bodies are enriched.
 	seedRound?.(true)
+
+	// NOTE: The predicates still pending get their FINAL reading, after that
+	// seeding for the same reason the seeding itself runs — an answering
+	// Namespace hoisted in the last round may reach the Alias' Scope only
+	// through an import bound just now. This time the answer stands either way:
+	// the conjuncts are written in, or the Alias is poisoned and unregistered
+	// for the in-order enrichment to resolve and report. Nothing past hoisting
+	// ever meets `conjuncts: null` — that is the promise every thrown guard on
+	// it stands on.
+	fillPendingPredicates(pendingPredicates, sink, hoistedTypes, true)
 
 	// NOTE: Each recursive declaration is resolved once, with the seeded Errors
 	// in Scope: the back edges of the cycle resolve to Error silently, so what

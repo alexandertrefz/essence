@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { matchesType } from "./index"
+import { matchesType, provenConjuncts } from "./index"
 
 // NOTE: Whether a value is admitted into a refinement by DECIDING its predicate
 // here, while compiling. A refinement normally needs a branch in front of it —
@@ -48,7 +48,7 @@ export function admittedByEvaluation(
 		return false
 	}
 
-	return refinement.conjuncts.every(
+	return provenConjuncts(refinement).every(
 		(conjunct) => evaluateConjunct(conjunct, literal) === true,
 	)
 }
@@ -65,7 +65,7 @@ export function admittedByEvaluation(
 // `@::isBetween(0, 9)` for a clause written `@::isBetween(0, and 9)`. The text
 // names the question; it is not offered as something to paste.
 export function describePredicate(refinement: common.RefinementType): string {
-	let [first, ...rest] = refinement.conjuncts.map(spellConjunct)
+	let [first, ...rest] = provenConjuncts(refinement).map(spellConjunct)
 
 	return rest.reduce((chain, conjunct) => `${chain}::and(${conjunct})`, first)
 }

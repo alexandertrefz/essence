@@ -1082,6 +1082,22 @@ function stableSerialize(value: unknown): string {
 		return `[${value.map(stableSerialize).join(",")}]`
 	}
 
+	// NOTE: A generic walker does not go through `provenConjuncts`, so it keeps
+	// the same promise by hand: a refinement whose predicate has not resolved
+	// yet must not become anybody's memo key, because the key would keep naming
+	// the empty predicate after the conjuncts were written in. The throw is the
+	// hoisting rounds' "not this round", exactly as it is at every other reader.
+	if (
+		(value as Record<string, unknown>).type === "Refinement" &&
+		(value as Record<string, unknown>).conjuncts === null
+	) {
+		throw new Error(
+			`Internal Compiler Error: the predicate of refinement '${String(
+				(value as Record<string, unknown>).name,
+			)}' was read before it resolved`,
+		)
+	}
+
 	let entries = Object.entries(value as Record<string, unknown>)
 		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
 		.map(([key, val]) => `${JSON.stringify(key)}:${stableSerialize(val)}`)
@@ -1151,6 +1167,27 @@ export function predicateConjunctKey(
 	return `${conjunct.namespaceName}::${conjunct.methodName}:${
 		conjunct.overloadIndex ?? ""
 	}${JSON.stringify(conjunct.args)}`
+}
+
+// NOTE: The one door to a refinement's conjuncts. They are null while the
+// predicate is still unresolved — the state a refined Alias hoists in when the
+// Namespace answering its predicate has not hoisted yet — and NOTHING may be
+// decided about a predicate nobody has read: not assignability, not literal
+// admission, not a narrowing, and above all nothing a memo would keep. So the
+// null is refused by throwing, which the hoisting rounds already read as "not
+// this round" — the asker is retried once the predicate has been written in.
+// Hoisting guarantees the null does not survive it, so a throw reaching anyone
+// ELSE is a Compiler bug by definition, and the message says so.
+export function provenConjuncts(
+	refinement: common.RefinementType,
+): Array<common.PredicateConjunct> {
+	if (refinement.conjuncts === null) {
+		throw new Error(
+			`Internal Compiler Error: the predicate of refinement '${refinement.name}' was read before it resolved`,
+		)
+	}
+
+	return refinement.conjuncts
 }
 
 // NOTE: The canonical form a refinement's conjuncts are stored in — sorted by
@@ -1719,11 +1756,11 @@ function matchTypes(
 			return false
 		}
 
-		let proven = new Set(rhs.conjuncts.map(predicateConjunctKey))
+		let proven = new Set(provenConjuncts(rhs).map(predicateConjunctKey))
 
 		return (
 			matchTypes(lhs.base, rhs.base, context) &&
-			lhs.conjuncts.every((conjunct) =>
+			provenConjuncts(lhs).every((conjunct) =>
 				proven.has(predicateConjunctKey(conjunct)),
 			)
 		)

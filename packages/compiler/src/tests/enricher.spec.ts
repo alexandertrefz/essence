@@ -5114,6 +5114,74 @@ describe("Enricher", () => {
 				),
 			).toHaveLength(1)
 		})
+
+		// NOTE: A refined Alias and the Namespace answering its predicate may
+		// name each other — the Alias asks `isProper`, and a signature next to
+		// `isProper` takes a `Proper` — which no single hoisting round can
+		// resolve in one breath. The Alias hoists with its predicate unread and
+		// the conjuncts are written into the shared object once the Namespace
+		// arrives; these pin that the pair resolves, in either order, and that
+		// what the signatures bound really is the refinement rather than a
+		// poisoned base.
+		describe("self-answering Namespaces", () => {
+			function selfAnswering(body: string, aliasFirst: boolean): string {
+				let alias = "type Proper = String where @::isProper()"
+				let namespace = `namespace Naming for String {
+					isProper() -> Boolean {
+						<- @::hasAnyContent()
+					}
+
+					greet(_ name: Proper) -> String {
+						<- "Hello, "::append(name)
+					}
+				}`
+
+				return `implementation {
+					${aliasFirst ? alias : namespace}
+
+					${aliasFirst ? namespace : alias}
+
+					${body}
+				}`
+			}
+
+			it("should let a Namespace answer the predicate its own signatures name", () => {
+				expect(
+					diagnosticsFor(
+						selfAnswering(
+							`constant raw = "Ada"
+
+							if raw::isProper() {
+								constant greeting = raw::greet(raw)
+							}`,
+							true,
+						),
+					),
+				).toEqual([])
+			})
+
+			it("should resolve the pair written in either order", () => {
+				expect(diagnosticsFor(selfAnswering("", false))).toEqual([])
+			})
+
+			// NOTE: The proof that the signature holds the REFINEMENT — a
+			// clause that failed would poison the Alias to String, and this
+			// call would then pass without a word.
+			it("should still demand the evidence the signature names", () => {
+				let diagnostics = diagnosticsFor(
+					selfAnswering(
+						`constant raw = "Ada"
+
+						constant greeting = raw::greet(raw)`,
+						true,
+					),
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["no-matching-overload"])
+			})
+		})
 	})
 
 	// NOTE: What makes a doorway writable — an `if` whose condition asks a

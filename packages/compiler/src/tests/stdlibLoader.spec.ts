@@ -635,6 +635,57 @@ describe("Standard Library Loader", () => {
 		expect(Object.keys(typed.methods)).toEqual([])
 	})
 
+	// NOTE: A refined Alias and the Namespace answering its predicate may name
+	// each other — the exact shape `NonZeroInteger` and `namespace Integer`
+	// stand in, with `divide(by NonZeroInteger)` beside the `isNot` the
+	// predicate asks — and no single hoisting round can resolve the pair in one
+	// breath. The Alias hoists with its predicate unread, the Namespace binds
+	// the registered object by reference, and the conjuncts are written into it
+	// in place once `isNot` is answerable. The `toBe` is the mechanism in one
+	// line: the Parameter's Type IS the Alias' object, not a copy that could
+	// have missed the fill.
+	it("lets a Namespace answer the predicate its own signatures name", () => {
+		let stdlib = load([
+			"Integer.es",
+			`declarations {
+				type NonZero = Integer where @::isNot(0)
+
+				namespace Integer for Integer {
+					isNot(_ other: Integer) -> Boolean
+
+					halve(by other: NonZero) -> Integer
+				}
+			}`,
+		])
+
+		let alias = stdlib.types["NonZero"]
+
+		expect(alias?.type).toBe("Refinement")
+
+		if (alias?.type !== "Refinement") {
+			throw new Error("'NonZero' did not load as a refinement")
+		}
+
+		expect(alias.conjuncts).toEqual([
+			{
+				namespaceName: "Integer",
+				methodName: "isNot",
+				overloadIndex: null,
+				args: ["0"],
+			},
+		])
+
+		let halve = namespaceNamed(stdlib, "Integer").methods["halve"]
+
+		expect(halve?.type).toBe("SimpleMethod")
+
+		if (halve?.type !== "SimpleMethod") {
+			throw new Error("'halve' did not load as a simple Method")
+		}
+
+		expect(halve.parameterTypes[1]?.type).toBe(alias)
+	})
+
 	// NOTE: A Diagnostic in the standard library is a Compiler developer's
 	// error — there is no user Program in sight, and every stage downstream
 	// would run against a half-built Scope. It is thrown, rendered exactly as

@@ -31,6 +31,7 @@ import {
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	predicateConjunctKey,
+	provenConjuncts,
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
 	typeContainsError,
@@ -3617,7 +3618,7 @@ function narrowingsFor(
 		// proven both things, which is what lets an `else if` inside an `else` add
 		// to what the `else` established rather than start over.
 		if (proven.receiverType.type === "Refinement") {
-			for (let conjunct of proven.receiverType.conjuncts) {
+			for (let conjunct of provenConjuncts(proven.receiverType)) {
 				keys.add(keyOf(conjunct))
 			}
 		}
@@ -3633,7 +3634,7 @@ function narrowingsFor(
 				// assignability answers: the established Type has to flow into the
 				// declared one.
 				!matchesType(proven.receiverType, refinement) ||
-				!refinement.conjuncts.every((conjunct) =>
+				!provenConjuncts(refinement).every((conjunct) =>
 					keys.has(keyOf(conjunct)),
 				)
 			) {
@@ -3642,7 +3643,8 @@ function narrowingsFor(
 
 			if (
 				established === null ||
-				refinement.conjuncts.length > established.conjuncts.length
+				provenConjuncts(refinement).length >
+					provenConjuncts(established).length
 			) {
 				established = refinement
 			}
@@ -7506,20 +7508,62 @@ export function resolveTypeAliasStatementType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
 ): common.Type {
+	let type = resolveTypeAliasStatementSkeleton(node, scope)
+
+	if (
+		type.type !== "Refinement" ||
+		type.conjuncts !== null ||
+		node.predicate === null
+	) {
+		return type
+	}
+
+	let conjuncts = resolveRefinementConjuncts(node.predicate, type.base, scope)
+
+	// NOTE: Poison recovery — a refused clause leaves the Alias meaning exactly
+	// what it would have meant without one. A Diagnostic has already named the
+	// clause, and every use of the name downstream is then about itself rather
+	// than about an Error Type nobody wrote.
+	if (conjuncts === null) {
+		return type.base
+	}
+
+	type.conjuncts = conjuncts
+
+	return type
+}
+
+// NOTE: The Alias' Type up to — but not including — reading its predicate,
+// which is the half hoisting can always resolve on its own. A refined Alias and
+// the Namespace answering its predicate may name each other (`NonZeroInteger`
+// asks Integer's `isNot`; `namespace Integer` declares a `divide` taking a
+// NonZeroInteger), and reading the predicate here would deadlock the two. So
+// what comes back for a clean refined Alias is the Refinement with `conjuncts:
+// null` — registered once, shared by reference, and written into in place when
+// the predicate is read — while every REFUSAL that needs no predicate (a
+// generic Alias, a base outside the v1 three) is decided and reported here, so
+// a broken clause never hoists as a Refinement at all: it poisons to its base
+// exactly as it always did.
+export function resolveTypeAliasStatementSkeleton(
+	node: parser.TypeAliasStatementNode,
+	scope: enricher.Scope,
+): common.Type {
 	let aliasedType = resolveAliasedType(node, scope)
 
 	if (node.predicate === null) {
 		return aliasedType
 	}
 
-	// NOTE: Poison recovery — a refused clause leaves the Alias meaning exactly
-	// what it would have meant without one. A Diagnostic has already named the
-	// clause, and every use of the name downstream is then about itself rather
-	// than about an Error Type nobody wrote.
-	return (
-		refineAliasedType(node, node.predicate, aliasedType, scope) ??
-		aliasedType
-	)
+	if (!refinementSkeletonAdmissible(node, node.predicate, aliasedType)) {
+		return aliasedType
+	}
+
+	return {
+		type: "Refinement",
+		name: node.name.content,
+		base: aliasedType,
+		conjuncts: null,
+	}
 }
 
 // NOTE: The Scope a predicate is read in — the surrounding one plus `@`, bound
@@ -7532,12 +7576,15 @@ function scopeWithRefinedSelf(
 	return declareVariableInScope("@", base, childScope(scope), true)
 }
 
-function refineAliasedType(
+// NOTE: The refusals that need no predicate reading — decided from the written
+// declaration and the resolved base alone, which is what lets the skeleton
+// above answer them without touching a Namespace. Every refusal reports before
+// it answers, so a false here is always a Diagnostic there.
+function refinementSkeletonAdmissible(
 	node: parser.TypeAliasStatementNode,
 	predicateNode: parser.ExpressionNode,
 	aliasedType: common.Type,
-	scope: enricher.Scope,
-): common.RefinementType | null {
+): boolean {
 	// NOTE: A generic refinement is v2 — `type NonEmpty<Item> = List<Item> where
 	// @::hasItems()` would have to carry its Type Arguments into the conjunct
 	// keys assignability compares, and a Namespace written for it would be a
@@ -7568,15 +7615,15 @@ function refineAliasedType(
 			},
 		)
 
-		return null
+		return false
 	}
 
 	// NOTE: A poisoned base says nothing about the clause — the Type it names is
 	// not declared, or names itself — and whatever produced the Error has already
-	// been reported. Refused silently, exactly as the Boolean check below refuses
-	// an Error-typed predicate.
+	// been reported. Refused silently, exactly as the Boolean check in
+	// `resolveRefinementConjuncts` refuses an Error-typed predicate.
 	if (typeContainsError(aliasedType)) {
-		return null
+		return false
 	}
 
 	if (!isRefinableBase(aliasedType)) {
@@ -7595,12 +7642,26 @@ function refineAliasedType(
 			},
 		)
 
-		return null
+		return false
 	}
 
+	return true
+}
+
+// NOTE: The predicate read at last — the half that needs the answering
+// Namespace in Scope, which is why hoisting calls it apart from the skeleton:
+// per round for an Alias whose Namespace is still on its way, with a Diagnostic
+// here read as "not this round". Null when the clause is refused, and every
+// refusal reports before it returns — either here or, for an Error-typed
+// predicate, wherever the Error was made.
+export function resolveRefinementConjuncts(
+	predicateNode: parser.ExpressionNode,
+	base: common.Type,
+	scope: enricher.Scope,
+): Array<common.PredicateConjunct> | null {
 	let predicate = enrichExpression(
 		predicateNode,
-		scopeWithRefinedSelf(aliasedType, scope),
+		scopeWithRefinedSelf(base, scope),
 	)
 
 	// NOTE: The same question `validateCondition` asks of an `if` — a predicate
@@ -7635,12 +7696,7 @@ function refineAliasedType(
 		return null
 	}
 
-	return {
-		type: "Refinement",
-		name: node.name.content,
-		base: aliasedType,
-		conjuncts: canonicalPredicateConjuncts(conjuncts),
-	}
+	return canonicalPredicateConjuncts(conjuncts)
 }
 
 // NOTE: The v1 bases. Integer and String are the two scalars every predicate in
