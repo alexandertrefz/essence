@@ -24,23 +24,117 @@ import type { common } from "@essence-lang/interfaces"
 // traversal and not one allocation. That matters twice over: the standard
 // library's simplified Program is a process-wide value handed out again and
 // again, and the caches around it are keyed by what they were given.
+//
+// NOTE: It runs in two passes because a Type can lead back to itself — a
+// Choice's payload may name the Choice — and a rebuild that discovers what
+// changed WHILE recursing answers a cycle's back-edge before it knows. The
+// original one-pass form did exactly that: the back-edge was answered with the
+// original object, the parent concluded nothing under it had changed, and a
+// refinement standing anywhere on the cycle survived into emission, where the
+// ICE guard turned a legal Program into a compile failure. So the question
+// "does anything under here need erasing?" is answered FIRST, over the whole
+// graph, where a cycle is just an edge already followed; only then does the
+// rebuild run, and only over the values the first pass named. A rebuilt value
+// is registered BEFORE its children are filled in, so a cycle's back-edge wires
+// to the replacement rather than to the original it was built to replace.
 export function eraseRefinements(type: common.Type): common.Type
 export function eraseRefinements(
 	program: common.typedSimple.Program,
 ): common.typedSimple.Program
 export function eraseRefinements(value: object): object {
-	return erase(value, new Map()) as object
+	let bearing = refinementBearing(value)
+
+	if (bearing.size === 0) {
+		return value
+	}
+
+	return rebuild(value, bearing, new Map()) as object
 }
 
-// NOTE: A Choice's payload may name the Choice, so a Type can lead back to one
-// already in hand — and the same Type object stands in thousands of places in a
-// simplified Program, which is what the memo is really for. An entry is written
-// BEFORE the recursion, as the value itself, so a cycle is answered with what it
-// already is; a refinement standing inside such a cycle would then be erased
-// everywhere but there. None can: a `where` clause is written on Integer, String
-// or a List of them, and none of those names itself.
-function erase(value: unknown, seen: Map<object, unknown>): unknown {
-	if (value === null || typeof value !== "object") {
+// NOTE: Every object from which a refinement can be REACHED — the exact set the
+// rebuild must replace, and the exact set the old walk's `changed` flags tried
+// to discover mid-flight. Reachability is asked backwards: one sweep records
+// who holds what and where the refinements stand, then bearing spreads from the
+// refinements along the recorded holders. A cycle needs no care at all here —
+// it is only an edge to something already visited.
+function refinementBearing(root: object): Set<object> {
+	let holders = new Map<object, Array<object>>()
+	let refinements: Array<object> = []
+	let visited = new Set<object>()
+	let pending: Array<object> = [root]
+
+	while (pending.length > 0) {
+		let value = pending.pop() as object
+
+		if (visited.has(value)) {
+			continue
+		}
+
+		visited.add(value)
+
+		if ((value as Record<string, unknown>).type === "Refinement") {
+			refinements.push(value)
+
+			// NOTE: A refinement's OWN subtree is not walked for holders — the
+			// rebuild replaces the whole node with its erased base, so nothing
+			// under it can make an ancestor bear that the node itself does not.
+			// Its base still has to be SEEN though: a refinement nested inside
+			// another's base erases with it, and the inner one must be in
+			// `refinements` for the day such a shape exists.
+			pending.push((value as unknown as common.RefinementType).base)
+
+			continue
+		}
+
+		let children = Array.isArray(value)
+			? value
+			: Object.values(value as Record<string, unknown>)
+
+		for (let child of children) {
+			if (child === null || typeof child !== "object") {
+				continue
+			}
+
+			let known = holders.get(child as object)
+
+			if (known === undefined) {
+				holders.set(child as object, [value])
+			} else {
+				known.push(value)
+			}
+
+			pending.push(child as object)
+		}
+	}
+
+	let bearing = new Set<object>(refinements)
+	let spread = [...refinements]
+
+	while (spread.length > 0) {
+		let value = spread.pop() as object
+
+		for (let holder of holders.get(value) ?? []) {
+			if (!bearing.has(holder)) {
+				bearing.add(holder)
+				spread.push(holder)
+			}
+		}
+	}
+
+	return bearing
+}
+
+// NOTE: Only a bearing value is rebuilt; everything else comes back as itself,
+// which is the identity guarantee above stated as one line. The replacement is
+// registered in `seen` before its children are filled, so a cyclic Type's
+// back-edge lands on the new object — the erased graph has the same shape as
+// the one it replaces, cycles included.
+function rebuild(
+	value: unknown,
+	bearing: Set<object>,
+	seen: Map<object, unknown>,
+): unknown {
+	if (value === null || typeof value !== "object" || !bearing.has(value)) {
 		return value
 	}
 
@@ -50,52 +144,45 @@ function erase(value: unknown, seen: Map<object, unknown>): unknown {
 		return known
 	}
 
-	seen.set(value, value)
-
-	let erased = eraseChildren(value, seen)
-
-	seen.set(value, erased)
-
-	return erased
-}
-
-function eraseChildren(value: object, seen: Map<object, unknown>): unknown {
 	if (Array.isArray(value)) {
-		let changed = false
-		let mapped = value.map((item) => {
-			let result = erase(item, seen)
+		let mapped: Array<unknown> = []
 
-			changed ||= result !== item
+		seen.set(value, mapped)
 
-			return result
-		})
+		for (let item of value) {
+			mapped.push(rebuild(item, bearing, seen))
+		}
 
-		return changed ? mapped : value
+		return mapped
 	}
 
 	let record = value as Record<string, unknown>
 
 	// NOTE: The refinement itself — its base, erased in turn, stands where it
 	// stood. `name` and `conjuncts` are gone with it: a Diagnostic that had
-	// something to say about either said it long before emission.
+	// something to say about either said it long before emission. The base is
+	// what the memo records, so every holder of this refinement reads the one
+	// erased base rather than each rebuilding its own.
 	if (record.type === "Refinement") {
-		return erase((record as unknown as common.RefinementType).base, seen)
+		let base = (record as unknown as common.RefinementType).base
+		let erased = rebuild(base, bearing, seen)
+
+		seen.set(value, erased)
+
+		return erased
 	}
 
-	let entries = Object.entries(record)
-	let changed = false
 	let mapped: Record<string, unknown> = {}
+
+	seen.set(value, mapped)
 
 	// NOTE: Rebuilt key by key in the order the keys were written, which is not
 	// a detail: a Record's members are emitted in the order they were declared,
 	// and the emitted literal's key order is what the runtime's Record equality
 	// and its printer read.
-	for (let [key, child] of entries) {
-		let result = erase(child, seen)
-
-		changed ||= result !== child
-		mapped[key] = result
+	for (let [key, child] of Object.entries(record)) {
+		mapped[key] = rebuild(child, bearing, seen)
 	}
 
-	return changed ? mapped : value
+	return mapped
 }

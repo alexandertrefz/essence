@@ -2769,6 +2769,63 @@ describe("Helpers", () => {
 
 				expect(eraseRefinements(program)).toBe(program)
 			})
+
+			// NOTE: A Choice's payload may name the Choice, so a Type can lead
+			// back to itself — `choice Tree { Node { weight: NonZeroInteger,
+			// children: List<Tree> } }` is legal and its Union IS a cycle. The
+			// one-pass form of this walk answered the cycle's back-edge with the
+			// original object before it knew the payload changed, so the
+			// refinement survived everywhere the back-edge reached and the
+			// Rewriter's ICE guard turned a legal Program into a compile
+			// failure. What the rebuilt graph must show: no refinement anywhere,
+			// and the SAME cycle — the back-edge wired to the replacement.
+			it("should erase a refinement standing on a cycle", () => {
+				let union: common.UnionType = {
+					type: "UnionType",
+					name: "Tree",
+					types: [],
+				}
+				let node: common.CaseType = {
+					type: "Case",
+					choice: "Tree",
+					name: "Node",
+					members: {
+						weight: nonZero,
+						children: { type: "List", itemType: union },
+					},
+				}
+
+				union.types.push(node)
+
+				let erased = eraseRefinements(union) as common.UnionType
+				let erasedNode = erased.types[0] as common.CaseType
+				let children = erasedNode.members["children"] as common.ListType
+
+				expect(erasedNode.members["weight"]).toEqual(integer)
+				expect(children.itemType).toBe(erased)
+				expect(typeContainsRefinement(erased)).toBe(false)
+			})
+
+			it("should hand back a cyclic Type carrying none as itself", () => {
+				let union: common.UnionType = {
+					type: "UnionType",
+					name: "Tree",
+					types: [],
+				}
+				let node: common.CaseType = {
+					type: "Case",
+					choice: "Tree",
+					name: "Node",
+					members: {
+						weight: integer,
+						children: { type: "List", itemType: union },
+					},
+				}
+
+				union.types.push(node)
+
+				expect(eraseRefinements(union)).toBe(union)
+			})
 		})
 	})
 })
