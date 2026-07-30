@@ -31,8 +31,12 @@ declarations {
 	§ `List<String>` against `List<Integer>`, exactly as their bases are.
 	§
 	§ This is what lets `firstItem` and `lastItem` answer with an ITEM rather
-	§ than with an Optional. `NonEmptyList` below holds those two and nothing else:
-	§ every other Method a List has already answers for the empty one.
+	§ than with an Optional — and it is a fourth route as well as an answer,
+	§ because a proof SURVIVES a Method that can not spend it. `NonEmptyList`
+	§ below holds the transforms that carry one through: the answer of each is
+	§ as long as the receiver, or longer, so what goes in comes out and a chain
+	§ of them asks nothing again. Everything a proof does not survive stays on
+	§ `List`, which already answers for the empty one.
 	type NonEmptyList<ItemType> = List<ItemType> where @::hasItems()
 
 	§ The ordered sequence, and everything that reads or rebuilds one. Every
@@ -810,9 +814,13 @@ declarations {
 	§ here is unwritable, it is unSAYABLE. `<- @::map(transform)` is the right
 	§ answer and its Type is `List<Result>` — an expression that can not come back
 	§ empty is not the same as one the language can be TOLD can not, which is the
-	§ wall `List::append(_:)` meets from the other side. So each of these hands
-	§ the work to the `List` operation it mirrors and adds nothing to it but the
-	§ promise.
+	§ wall `List::append(_:)` meets from the other side. So each of these adds
+	§ nothing to what `List` already does but the promise: where `List` answers
+	§ with a native, that native IS the answer, under this Namespace's name;
+	§ where it answers in Essence — `prepend(contentsOf:)`, `removeDuplicates`
+	§ and `replace` — the runtime writes the same operation out beside it, and
+	§ the harness calls both entries over the same inputs so that the two can
+	§ not drift.
 	§
 	§ What is not here is everything the proof does not survive. `keepEvery`,
 	§ `removeEvery`, `slice`, `remove`, `removeFirst` and `removeLast` can all
@@ -917,6 +925,18 @@ declarations {
 				by comparison: (_: ItemType, _: ItemType) -> Ordering,
 			) -> NonEmptyList<ItemType>
 		}
+
+		§ Replacing keeps the length in both of the cases `List`'s own entry
+		§ has: a position inside the List swaps one item for one item, and a
+		§ position outside it — reaching back past the first, or standing at or
+		§ past the end — answers with the receiver untouched. Neither can take
+		§ the last item away, so the proof that came in is still good for what
+		§ goes out.
+
+		§§ A new List with the item at the given position replaced. A negative position counts back from the end: -1 is the last item.
+		§§
+		§§ @returns — the List with the item replaced, or unchanged when the position is outside it — never empty either way.
+		replace(_ item: ItemType, at index: Integer) -> NonEmptyList<ItemType>
 	}
 }
 

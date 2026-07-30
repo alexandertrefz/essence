@@ -129,6 +129,14 @@ implementation {
 	§ accepted by `lengthOf`, which asked for this Program's own.
 	constant colours: NonEmptyList<String> = ["red", "green", "blue"]
 
+	§ A proof CARRIES through a transform that can not spend it. Sorting a List
+	§ moves its items about and drops none, so what comes back has something in
+	§ it exactly because what went in did — and `NonEmptyList` says so in the
+	§ return Type. That is what lets these two read as they do: `sort` hands its
+	§ answer straight to the total `firstItem`, with no `if` between them, and
+	§ `reverse` hands its own to a Function asking for the refinement, with no
+	§ doorway and nothing written down.
+
 	§ A Match Handler's Guard proves things about `@` the same way, and it runs
 	§ before any Statement of the body.
 	function digitOrZero(_ value: Integer | String) -> Integer {
@@ -198,6 +206,8 @@ implementation {
 	__print(colours::firstItem())
 	__print(colours::lastItem())
 	__print(lengthOf(colours))
+	__print(colours::sort()::firstItem())
+	__print(lengthOf(colours::reverse()))
 
 	§ And the doorways, answering about values nothing had proven anything about
 	§ before they were asked.
