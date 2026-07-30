@@ -13,6 +13,8 @@ import {
 	enrichNode,
 	enrichOverloadedFunctionStatement,
 	type HoistedTypes,
+	pendingRefinementIn,
+	refinementPredicateScope,
 	resolveNamespaceDefinitionStatementType,
 	resolveRefinementConjuncts,
 	resolveTypeAliasStatementSkeleton,
@@ -335,7 +337,9 @@ type HoistableTypeNode =
 // NOTE: One refined Alias whose predicate has not been read yet — hoisted as a
 // Refinement with `conjuncts: null`, waiting for the Namespace that answers the
 // predicate to arrive. The `refinement` is the very object registered in Scope,
-// held so the fill can write into it in place.
+// held so the fill can write into it in place — and for a GENERIC Alias it is the
+// object one level inside the Generic Alias that was registered, for the same
+// reason: the wrapper is a spelling, the refinement is what gets written into.
 type PendingPredicate = {
 	node: parser.TypeAliasStatementNode
 	scope: enricher.Scope
@@ -373,7 +377,12 @@ function fillPendingPredicates(
 					: resolveRefinementConjuncts(
 							node.predicate,
 							refinement.base,
-							scope,
+							// NOTE: Rebuilt per attempt rather than kept from the
+							// round the Alias hoisted in, so that a Namespace
+							// hoisted since is in Scope: the Parameters are added
+							// to a CHILD of the Alias' own Scope, which keeps
+							// growing underneath it.
+							refinementPredicateScope(node, scope),
 						),
 		)
 
@@ -400,6 +409,11 @@ function fillPendingPredicates(
 // The base's own record is left alone; its fields are copied over, and a shared
 // child (a List base's item Type) stays shared, which every reader of a Type
 // already assumes.
+//
+// NOTE: A generic Alias needs nothing more: the object handed over is the one
+// INSIDE the Generic Alias, so the wrapper is left standing over a plain
+// `List<Item>` and every `NonEmptyList<String>` written anywhere goes on applying its
+// Arguments — to a Type that has simply stopped claiming anything.
 function poisonRefinementToBase(refinement: common.RefinementType): void {
 	let record = refinement as unknown as Record<string, unknown>
 	let base = refinement.base as unknown as Record<string, unknown>
@@ -1009,16 +1023,23 @@ function hoistDeclarations(
 				// is the whole trick: the fill writes into it in place, and
 				// every signature that bound the name between now and then is
 				// already holding the answer.
-				if (
-					node.nodeType === "TypeAliasStatement" &&
-					speculation.result.type === "Refinement" &&
-					speculation.result.conjuncts === null
-				) {
-					pendingPredicates.push({
-						node,
-						scope,
-						refinement: speculation.result,
-					})
+				//
+				// NOTE: A GENERIC one is registered as a Generic Alias WRAPPING
+				// that object, so the pending refinement is looked for one level
+				// in — and it is the INNER object the entry holds, because the
+				// wrapper is not what the fill writes into.
+				if (node.nodeType === "TypeAliasStatement") {
+					let refinement = pendingRefinementIn(
+						speculation.result as common.Type,
+					)
+
+					if (refinement !== null) {
+						pendingPredicates.push({
+							node,
+							scope,
+							refinement,
+						})
+					}
 				}
 
 				hoistedTypes.set(node, speculation.result)

@@ -233,5 +233,53 @@ describe("printType", () => {
 				).label,
 			).toBe("divide(by: NonZeroInteger) -> NonZeroInteger")
 		})
+
+		// NOTE: An APPLIED generic refinement prints as applied — a Hover reading
+		// `NonEmptyList` where the source says `NonEmptyList<String>` names half a Type,
+		// and the applied spelling is carried for that reason alone. An
+		// instantiation whose every Argument is still a Type Parameter stays terse,
+		// the way an unbound Case does: `NonEmptyList<Item>` echoes its own header.
+		describe("applied to a generic Alias", () => {
+			function nonEmptyOf(itemType: common.Type): common.Type {
+				return {
+					type: "Refinement",
+					name: "NonEmptyList",
+					base: { type: "List", itemType },
+					conjuncts: [
+						{
+							namespaceName: "List",
+							methodName: "hasItems",
+							overloadIndex: null,
+							args: [],
+						},
+					],
+					typeArguments: [itemType],
+				}
+			}
+
+			it("should print the Type Arguments it was applied to", () => {
+				expect(printType(nonEmptyOf({ type: "String" }))).toBe(
+					"NonEmptyList<String>",
+				)
+				expect(printType(nonEmptyOf(nonZeroInteger))).toBe(
+					"NonEmptyList<NonZeroInteger>",
+				)
+			})
+
+			it("should stay terse where every Argument is a Type Parameter", () => {
+				expect(
+					printType(nonEmptyOf({ type: "GenericUse", name: "Item" })),
+				).toBe("NonEmptyList")
+			})
+
+			it("should print inside the Types that hold one", () => {
+				expect(
+					printType({
+						type: "List",
+						itemType: nonEmptyOf({ type: "String" }),
+					}),
+				).toBe("List<NonEmptyList<String>>")
+			})
+		})
 	})
 })

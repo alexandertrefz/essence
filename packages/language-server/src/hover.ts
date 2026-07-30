@@ -455,8 +455,12 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			// a VALUE of one is hovered the name is exactly right, which is what
 			// `printType` answers — the substitution is for this Declaration and
 			// for nowhere else.
-			let declaredType =
-				node.type.type === "Refinement" ? node.type.base : node.type
+			//
+			// NOTE: A GENERIC refined Alias is a Generic Alias wrapping the
+			// refinement, so its base is one level further in — `NonEmptyList<Item>`
+			// reads back as `List<Item>`, which is exactly as much as the
+			// non-generic one says.
+			let declaredType = refinedAliasBase(node.type) ?? node.type
 
 			consider(
 				state,
@@ -705,6 +709,24 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			consider(state, node.position, node.type, null)
 			return
 	}
+}
+
+// NOTE: What a refined Type Alias refines, or null when the Alias declares no
+// refinement at all. A generic one is a Generic Alias wrapping the refinement, so
+// the base sits one level further in than it does for `NonZeroInteger`.
+function refinedAliasBase(type: common.Type): common.Type | null {
+	if (type.type === "Refinement") {
+		return type.base
+	}
+
+	if (
+		type.type === "GenericAlias" &&
+		type.aliasedType.type === "Refinement"
+	) {
+		return type.aliasedType.base
+	}
+
+	return null
 }
 
 // NOTE: A Namespace's own Type Parameter, rendered as declared — `infer Item`,

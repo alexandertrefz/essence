@@ -13,6 +13,7 @@ import {
 	type Stdlib,
 } from "../enricher/stdlib"
 import { parseWithDiagnostics } from "../parser/index"
+import { printType } from "../printType"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
@@ -684,6 +685,109 @@ describe("Standard Library Loader", () => {
 		}
 
 		expect(halve.parameterTypes[1]?.type).toBe(alias)
+	})
+
+	// NOTE: The same deadlock one turn harder. A GENERIC refined Alias hoists as a
+	// Generic Alias WRAPPING the pending refinement, and a signature naming
+	// `NonEmptyList<Integer>` can not bind that object by reference the way
+	// `NonZero` was bound above — applying Type Arguments substitutes them into
+	// the base, which means COPYING the refinement, and a copy taken while the
+	// predicate is still unread would freeze the null by value. So the copy is
+	// refused by throwing: `namespace NonEmptyList` lands back in the rounds, the fill
+	// writes the conjuncts in once `namespace List` has answered `hasItems`, and
+	// the round after that instantiates cleanly.
+	//
+	// The `toBe` is that mechanism in one line — the instantiated refinement's
+	// conjuncts are the very ARRAY the fill wrote into the Alias, shared by
+	// reference, which no copy taken a round too early could be holding. The
+	// Namespace's own target is the unbound instantiation, so it stands beside its
+	// concrete sibling as proof that both roads through the wrapper arrive.
+	it("lets a generic refined Alias be instantiated in the Namespace written for it", () => {
+		let stdlib = load([
+			"List.es",
+			`declarations {
+				type NonEmptyList<Item> = List<Item> where @::hasItems()
+
+				namespace List <infer Item> for List<Item> {
+					hasItems() -> Boolean
+				}
+
+				namespace NonEmptyList <infer Item> for NonEmptyList<Item> {
+					firstItem() -> Item
+
+					firstOf(_ numbers: NonEmptyList<Integer>) -> Integer
+				}
+			}`,
+		])
+
+		let alias = stdlib.types["NonEmptyList"]
+
+		expect(alias?.type).toBe("GenericAlias")
+
+		if (
+			alias?.type !== "GenericAlias" ||
+			alias.aliasedType.type !== "Refinement"
+		) {
+			throw new Error(
+				"'NonEmptyList' did not load as a generic refinement",
+			)
+		}
+
+		let declared = alias.aliasedType
+
+		expect(declared.base).toEqual({
+			type: "List",
+			itemType: { type: "GenericUse", name: "Item" },
+		})
+		expect(declared.conjuncts).toEqual([
+			{
+				namespaceName: "List",
+				methodName: "hasItems",
+				overloadIndex: null,
+				args: [],
+			},
+		])
+
+		let namespace = namespaceNamed(stdlib, "NonEmptyList")
+		let firstOf = namespace.methods["firstOf"]
+
+		expect(firstOf?.type).toBe("SimpleMethod")
+
+		if (firstOf?.type !== "SimpleMethod") {
+			throw new Error("'firstOf' did not load as a simple Method")
+		}
+
+		let instantiated = firstOf.parameterTypes[1]?.type
+
+		expect(instantiated?.type).toBe("Refinement")
+
+		if (instantiated?.type !== "Refinement") {
+			throw new Error("'firstOf' does not take a refinement")
+		}
+
+		expect(instantiated.base).toEqual({
+			type: "List",
+			itemType: { type: "Integer" },
+		})
+		expect(instantiated.conjuncts).toBe(declared.conjuncts)
+		expect(printType(instantiated)).toBe("NonEmptyList<Integer>")
+
+		// NOTE: The Namespace targets the Alias applied to its own Parameter, which
+		// is the same instantiation with nothing bound — the evidence is there, and
+		// the spelling stays terse because `NonEmptyList<Item>` would only echo the
+		// header.
+		let target = namespace.targetType
+
+		expect(target?.type).toBe("Refinement")
+
+		if (target?.type !== "Refinement") {
+			throw new Error(
+				"'namespace NonEmptyList' does not target a refinement",
+			)
+		}
+
+		expect(target.conjuncts).toBe(declared.conjuncts)
+		expect(printType(target)).toBe("NonEmptyList")
 	})
 
 	// NOTE: A Diagnostic in the standard library is a Compiler developer's

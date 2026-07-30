@@ -2740,7 +2740,7 @@ export function enrichTypeAliasStatement(
 		predicate:
 			node.predicate === null
 				? null
-				: enrichAliasPredicate(node.predicate, type, scope),
+				: enrichAliasPredicate(node, node.predicate, type, scope),
 		position: node.position,
 		documentation: node.documentation,
 	}
@@ -2755,17 +2755,29 @@ export function enrichTypeAliasStatement(
 // it cleanly, in which case a second reading finds nothing, or it did not, in
 // which case the line above resolved it in place and reported. Re-reporting here
 // would say it twice for every refined Alias in the Program.
+//
+// NOTE: A GENERIC refined Alias is a Generic Alias wrapping the refinement, so
+// `@` is bound to the base one level further in — and in the Alias' own generic
+// Scope, the way the resolution that read the predicate bound it. Reading it
+// against the wrapper instead left `@` typed as a Type that takes Arguments, and
+// the Language Server got an Error where the Compiler had a Boolean.
 function enrichAliasPredicate(
+	node: parser.TypeAliasStatementNode,
 	predicate: parser.ExpressionNode,
 	type: common.Type,
 	scope: enricher.Scope,
 ): common.typed.ExpressionNode {
+	let refined =
+		type.type === "GenericAlias" && type.aliasedType.type === "Refinement"
+			? type.aliasedType
+			: type
+
 	return collectDiagnostics(() =>
 		enrichExpression(
 			predicate,
 			scopeWithRefinedSelf(
-				type.type === "Refinement" ? type.base : type,
-				scope,
+				refined.type === "Refinement" ? refined.base : refined,
+				refinementPredicateScope(node, scope),
 			),
 		),
 	).result
@@ -7509,28 +7521,66 @@ export function resolveTypeAliasStatementType(
 	scope: enricher.Scope,
 ): common.Type {
 	let type = resolveTypeAliasStatementSkeleton(node, scope)
+	let refinement = pendingRefinementIn(type)
 
-	if (
-		type.type !== "Refinement" ||
-		type.conjuncts !== null ||
-		node.predicate === null
-	) {
+	if (refinement === null || node.predicate === null) {
 		return type
 	}
 
-	let conjuncts = resolveRefinementConjuncts(node.predicate, type.base, scope)
+	let conjuncts = resolveRefinementConjuncts(
+		node.predicate,
+		refinement.base,
+		refinementPredicateScope(node, scope),
+	)
 
 	// NOTE: Poison recovery — a refused clause leaves the Alias meaning exactly
 	// what it would have meant without one. A Diagnostic has already named the
 	// clause, and every use of the name downstream is then about itself rather
-	// than about an Error Type nobody wrote.
+	// than about an Error Type nobody wrote. A generic Alias keeps its wrapper —
+	// what it stands for without the clause is still `List<Item>` applied at each
+	// use, and dropping the wrapper would leave every `NonEmptyList<String>` naming a
+	// Type that takes no Arguments.
 	if (conjuncts === null) {
-		return type.base
+		return type.type === "GenericAlias"
+			? { ...type, aliasedType: refinement.base }
+			: refinement.base
 	}
 
-	type.conjuncts = conjuncts
+	refinement.conjuncts = conjuncts
 
 	return type
+}
+
+// NOTE: The refinement a skeleton hoisted with its predicate unread, or null when
+// the Type is not one. A GENERIC refined Alias resolves to a Generic Alias
+// WRAPPING the refinement — the Arguments are applied through the wrapper, and the
+// refinement one level in is the object the fill writes into — so every reader
+// that means "is this predicate still pending" has to look inside.
+export function pendingRefinementIn(
+	type: common.Type,
+): common.RefinementType | null {
+	let refinement =
+		type.type === "GenericAlias" && type.aliasedType.type === "Refinement"
+			? type.aliasedType
+			: type
+
+	return refinement.type === "Refinement" && refinement.conjuncts === null
+		? refinement
+		: null
+}
+
+// NOTE: The Scope a refined Alias' predicate resolves in. A generic one's base
+// mentions its Type Parameters (`@: List<Item>`), so the Parameters have to be in
+// Scope as the opaque Generics they are — which is also what makes an
+// item-dependent predicate (`@::contains(0)`) fail as the ordinary typechecking
+// mistake it is, rather than needing a special refusal of its own.
+export function refinementPredicateScope(
+	node: parser.TypeAliasStatementNode,
+	scope: enricher.Scope,
+): enricher.Scope {
+	return node.generics.length === 0
+		? scope
+		: scopeWithGenerics(node.generics, scope)
 }
 
 // NOTE: The Alias' Type up to — but not including — reading its predicate,
@@ -7540,10 +7590,16 @@ export function resolveTypeAliasStatementType(
 // NonZeroInteger), and reading the predicate here would deadlock the two. So
 // what comes back for a clean refined Alias is the Refinement with `conjuncts:
 // null` — registered once, shared by reference, and written into in place when
-// the predicate is read — while every REFUSAL that needs no predicate (a
-// generic Alias, a base outside the v1 three) is decided and reported here, so
-// a broken clause never hoists as a Refinement at all: it poisons to its base
-// exactly as it always did.
+// the predicate is read — while every REFUSAL that needs no predicate (a base
+// outside the three) is decided and reported here, so a broken clause never
+// hoists as a Refinement at all: it poisons to its base exactly as it always did.
+//
+// NOTE: A GENERIC refined Alias comes back as the Generic Alias `resolveAliasedType`
+// built with the refinement in place of its body — `NonEmptyList<Item>` is a Generic
+// Alias over `List<Item> where @::hasItems()`, and a use site applies its Arguments
+// through the wrapper, substituting them into the base the refinement stands on.
+// The refinement itself is what the predicate is about, so the admissibility of the
+// base is asked of the BODY rather than of the wrapper.
 export function resolveTypeAliasStatementSkeleton(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
@@ -7554,16 +7610,25 @@ export function resolveTypeAliasStatementSkeleton(
 		return aliasedType
 	}
 
-	if (!refinementSkeletonAdmissible(node, node.predicate, aliasedType)) {
+	let base =
+		aliasedType.type === "GenericAlias"
+			? aliasedType.aliasedType
+			: aliasedType
+
+	if (!refinementSkeletonAdmissible(node, base)) {
 		return aliasedType
 	}
 
-	return {
+	let refinement: common.RefinementType = {
 		type: "Refinement",
 		name: node.name.content,
-		base: aliasedType,
+		base,
 		conjuncts: null,
 	}
+
+	return aliasedType.type === "GenericAlias"
+		? { ...aliasedType, aliasedType: refinement }
+		: refinement
 }
 
 // NOTE: The Scope a predicate is read in — the surrounding one plus `@`, bound
@@ -7582,42 +7647,8 @@ function scopeWithRefinedSelf(
 // it answers, so a false here is always a Diagnostic there.
 function refinementSkeletonAdmissible(
 	node: parser.TypeAliasStatementNode,
-	predicateNode: parser.ExpressionNode,
 	aliasedType: common.Type,
 ): boolean {
-	// NOTE: A generic refinement is v2 — `type NonEmptyList<Item> = List<Item> where
-	// @::hasItems()` would have to carry its Type Arguments into the conjunct
-	// keys assignability compares, and a Namespace written for it would be a
-	// generic Namespace targeting a refinement. Refused outright rather than
-	// half-supported, so nothing depends on a shape that is going to change.
-	if (node.generics.length > 0) {
-		reportError(
-			`Type Alias '${node.name.content}' can not be generic and refined`,
-			predicateNode.position,
-			{
-				code: "invalid-refinement-predicate",
-				labels: [
-					primary(
-						predicateNode.position,
-						"this predicate refines a Type Parameter",
-					),
-					secondary(
-						node.generics[0].position,
-						"declared with a Type Parameter here",
-					),
-				],
-				notes: [
-					"A 'where' clause on a Type Alias proves something about the values of ONE Type, and a generic Alias stands for a different Type at every use.",
-				],
-				helps: [
-					`Drop the Type Parameters, or drop the 'where' clause from '${node.name.content}'.`,
-				],
-			},
-		)
-
-		return false
-	}
-
 	// NOTE: A poisoned base says nothing about the clause — the Type it names is
 	// not declared, or names itself — and whatever produced the Error has already
 	// been reported. Refused silently, exactly as the Boolean check in
@@ -7699,12 +7730,19 @@ export function resolveRefinementConjuncts(
 	return canonicalPredicateConjuncts(conjuncts)
 }
 
-// NOTE: The v1 bases. Integer and String are the two scalars every predicate in
-// the standard library's own slice is about, and an APPLIED List is the third —
-// `List<String>`, never a bare `List`, whose item Type nothing has decided. The
-// list is short because each base is a promise: every Method a base answers, a
-// refinement of it answers too, and every one of those has to keep meaning what
-// it meant.
+// NOTE: The bases a `where` clause may be written on. Integer and String are the
+// two scalars every predicate in the standard library's own slice is about, and an
+// APPLIED List is the third — `List<String>` or `List<Item>`, never a bare `List`,
+// whose item Type nothing has decided. The list is short because each base is a
+// promise: every Method a base answers, a refinement of it answers too, and every
+// one of those has to keep meaning what it meant.
+//
+// NOTE: A generic Alias' base is an applied List whose item Type is still its Type
+// Parameter, which passes for the same reason `List<String>` does — what nothing has
+// decided about a bare `List` is decided here, by the use site. That the Parameter is
+// OPAQUE while the predicate is read is what keeps the conjuncts item-agnostic: a
+// predicate about the items (`@::contains(0)`) is refused by ordinary typechecking,
+// and the ones that survive ask nothing a Type Argument could answer differently.
 function isRefinableBase(type: common.Type): boolean {
 	return (
 		type.type === "Integer" ||
