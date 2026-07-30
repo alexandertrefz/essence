@@ -448,16 +448,16 @@ Error: Type 'Boxed' names itself
 
 exports[`Diagnostic Showcase Refinements.es should render the same report every time 1`] = `
 "[invalid-refinement-predicate]
-Error: Type Alias 'NonEmpty' can not be generic and refined
-    ╭─┤ Refinements.es:19:41 │
+Error: Type Alias 'NonEmptyList' can not be generic and refined
+    ╭─┤ Refinements.es:19:45 │
     │
- 19 │     type NonEmpty<Item> = List<Item> where @::hasItems()
-    │                   ──┬─                     ──────┬──────  
-    │                     ╰────────────────────────────│──────── declared with a Type Parameter here
-    │                                                  │        
-    │                                                  ╰──────── this predicate refines a Type Parameter
+ 19 │     type NonEmptyList<Item> = List<Item> where @::hasItems()
+    │                       ──┬─                     ──────┬──────  
+    │                         ╰────────────────────────────│──────── declared with a Type Parameter here
+    │                                                      │        
+    │                                                      ╰──────── this predicate refines a Type Parameter
     │ 
-    │ Help: Drop the Type Parameters, or drop the 'where' clause from 'NonEmpty'.
+    │ Help: Drop the Type Parameters, or drop the 'where' clause from 'NonEmptyList'.
     │ 
     │ Note: A 'where' clause on a Type Alias proves something about the values of ONE Type, and a generic Alias stands for a different Type at every use.
 ────╯

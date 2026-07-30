@@ -519,8 +519,10 @@ export type PredicateConjunct = {
 // other's: proving more than was asked is proof enough.
 //
 // NOTE: Refinements are erased before emission — nothing about one survives
-// into the JavaScript, and the Optimiser stage is where they go. `base` is
-// Integer, String or an applied List in v1.
+// into the JavaScript, and the Optimiser stage is where they go. `base` is an
+// Integer, a String or an applied List, and a GENERIC Alias' base is an applied
+// List whose item Type is still a Type Parameter — `List<Item>` — which a use
+// site substitutes through the Generic Alias wrapping the refinement.
 //
 // NOTE: `conjuncts` is null while the predicate is still UNRESOLVED — the state
 // a refined Alias hoists in when the Namespace answering its predicate has not
@@ -532,11 +534,26 @@ export type PredicateConjunct = {
 // answer is ever computed — or memoised — against a predicate nobody has read.
 // Hoisting guarantees the null does not survive it: a predicate still
 // unresolved after the rounds is reported and the Alias poisoned to its base.
+//
+// NOTE: `typeArguments` is the applied spelling of a GENERIC refined Alias, and
+// nothing but a spelling: `NonEmptyList<String>` would otherwise print as
+// `NonEmptyList`, which is the one thing a reader did not write. It is stamped where
+// the Type Arguments are applied and substituted along with the base, so it never
+// goes stale, and it is IGNORED by every decision — assignability compares the
+// base and the conjuncts, exactly as it ignores a Union's name.
+//
+// It DOES reach the memo keys `conformanceKey` builds, and the worst that costs is
+// a miss: two refinements agreeing on their base and their conjuncts while
+// disagreeing on their spelling — the declared `NonEmptyList<Item>` beside a Namespace's
+// instantiation of it — are solved twice rather than answered wrongly once. Absent
+// on every non-generic refinement, so `NonZeroInteger` keys byte for byte as it
+// always did.
 export type RefinementType = {
 	type: "Refinement"
 	name: string
 	base: Type
 	conjuncts: Array<PredicateConjunct> | null
+	typeArguments?: Array<Type>
 }
 
 // NOTE: The compile-time plan a *generic* Choice's derived Equatable follows

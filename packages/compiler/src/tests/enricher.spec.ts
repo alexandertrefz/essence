@@ -4953,7 +4953,7 @@ describe("Enricher", () => {
 			it("should refuse a generic Alias", () => {
 				expect(
 					refusal(
-						"implementation { type NonEmpty<Item> = List<Item> where @::hasItems() }",
+						"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
 					),
 				).toEqual({
 					code: "invalid-refinement-predicate",

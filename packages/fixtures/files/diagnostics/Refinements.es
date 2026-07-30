@@ -16,7 +16,7 @@
 implementation {
 	§ invalid-refinement-predicate — a generic Alias stands for a different
 	§ Type at every use, so there is nothing for one predicate to be about.
-	type NonEmpty<Item> = List<Item> where @::hasItems()
+	type NonEmptyList<Item> = List<Item> where @::hasItems()
 
 	§ invalid-refinement-predicate — Boolean is not one of the bases a
 	§ refinement may be written on.

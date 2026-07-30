@@ -355,7 +355,7 @@ has been proven to satisfy — `type NonZeroInteger = Integer where @::isNot(0)`
 is why the predicate is stored as a set of resolved Method calls rather than as
 the text that was written. Five shapes are refused:
 
-- a generic Alias (`type NonEmpty<Item> = List<Item> where @::hasItems()`) —
+- a generic Alias (`type NonEmptyList<Item> = List<Item> where @::hasItems()`) —
   the clause would refine a different Type at every use;
 - a base outside Integer, String and an applied List (`List<String>`, never a
   bare `List`);
