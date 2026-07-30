@@ -1168,9 +1168,9 @@ describe("Validator", () => {
 		it("should take a refined value apart by value", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					type NonZeroInteger = Integer where @::isNot(0)
+					type NonZero = Integer where @::isNot(0)
 
-					function named(_ n: NonZeroInteger) -> String {
+					function named(_ n: NonZero) -> String {
 						<- match n -> String {
 							case 1 { <- "one" }
 							case _ { <- "more" }
@@ -2504,13 +2504,13 @@ describe("Validator", () => {
 	describe("Checked refinements", () => {
 		function withRefinements(body: string): string {
 			return `implementation {
-				type NonZeroInteger = Integer where @::isNot(0)
+				type NonZero = Integer where @::isNot(0)
 				type NonEmptyString = String where @::hasAnyContent()
 				type NonEmptyStrings = List<String> where @::hasItems()
 				type Digit = Integer where @::isBetween(0, and 9)
 				type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))
 
-				function doubled(_ n: NonZeroInteger) -> Integer {
+				function doubled(_ n: NonZero) -> Integer {
 					<- n::multiply(with 2)
 				}
 
@@ -2525,8 +2525,8 @@ describe("Validator", () => {
 		it("should admit a written value into a declared refinement", () => {
 			expect(
 				diagnosticsOfBody(`
-					constant d: NonZeroInteger = 3
-					variable e: NonZeroInteger = 4
+					constant d: NonZero = 3
+					variable e: NonZero = 4
 
 					e = 5
 
@@ -2543,7 +2543,7 @@ describe("Validator", () => {
 		it("should admit a written value where a refinement is returned", () => {
 			expect(
 				diagnosticsOfBody(`
-					function three() -> NonZeroInteger {
+					function three() -> NonZero {
 						<- 3
 					}
 
@@ -2562,7 +2562,7 @@ describe("Validator", () => {
 				diagnosticsOfBody(`
 					namespace Scale for {} {
 						overload static tripled {
-							(_ n: NonZeroInteger) -> Integer {
+							(_ n: NonZero) -> Integer {
 								<- n::multiply(with 3)
 							}
 
@@ -2583,7 +2583,7 @@ describe("Validator", () => {
 		it("should admit a written value into a Namespace's Property", () => {
 			let property = (value: string) => `
 				namespace Scale for {} {
-					static factor: NonZeroInteger = ${value}
+					static factor: NonZero = ${value}
 				}
 
 				__print(Scale.factor)
@@ -2647,24 +2647,22 @@ describe("Validator", () => {
 		})
 
 		it("should refuse a written value the predicate refuses", () => {
-			let diagnostics = diagnosticsOfBody(
-				"constant d: NonZeroInteger = 0",
-			)
+			let diagnostics = diagnosticsOfBody("constant d: NonZero = 0")
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 			expect(diagnostics[0].notes).toEqual([
-				"'d' is declared as NonZeroInteger.",
-				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+				"'d' is declared as NonZero.",
+				"Every value of 'NonZero' has been proven to answer '@::isNot(0)'.",
 			])
 			expect(diagnostics[0].helps).toEqual([
-				"Check '@::isNot(0)' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonZeroInteger'.",
+				"Check '@::isNot(0)' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonZero'.",
 			])
 		})
 
 		it("should name the predicate where a returned value is refused", () => {
 			let diagnostics = diagnosticsOfBody(`
-				function zero() -> NonZeroInteger {
+				function zero() -> NonZero {
 					<- 0
 				}
 
@@ -2674,8 +2672,8 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("return-type-mismatch")
 			expect(diagnostics[0].notes).toEqual([
-				"The Function returns NonZeroInteger.",
-				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+				"The Function returns NonZero.",
+				"Every value of 'NonZero' has been proven to answer '@::isNot(0)'.",
 			])
 		})
 
@@ -2685,8 +2683,8 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("argument-type-mismatch")
 			expect(diagnostics[0].notes).toEqual([
-				"Parameter 1 is NonZeroInteger.",
-				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+				"Parameter 1 is NonZero.",
+				"Every value of 'NonZero' has been proven to answer '@::isNot(0)'.",
 			])
 		})
 
@@ -2714,7 +2712,7 @@ describe("Validator", () => {
 			expect(
 				diagnosticsOfBody(`
 					constant three = 3
-					constant d: NonZeroInteger = three
+					constant d: NonZero = three
 				`),
 			).toHaveLength(1)
 		})
@@ -2737,9 +2735,9 @@ describe("Validator", () => {
 		// refinement is declared over an Integer, so a String is refused whatever
 		// its own predicates would have said.
 		it("should refuse a written value of another base", () => {
-			expect(
-				diagnosticsOfBody(`constant d: NonZeroInteger = "3"`),
-			).toHaveLength(1)
+			expect(diagnosticsOfBody(`constant d: NonZero = "3"`)).toHaveLength(
+				1,
+			)
 		})
 
 		it("should decide a written Integer whatever its sign", () => {

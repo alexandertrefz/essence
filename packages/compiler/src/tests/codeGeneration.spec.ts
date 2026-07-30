@@ -3021,10 +3021,10 @@ declarations {
 	// two assertions together say.
 	describe("a hand-written doorway", () => {
 		const SOURCE = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 
 	§ The operation that can not fail, and says so.
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
@@ -3046,9 +3046,9 @@ declarations {
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNCHECKED = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
@@ -3077,10 +3077,10 @@ declarations {
 	// one: `3` is `3`, and the proof left no trace to run.
 	describe("an admitted literal", () => {
 		const SOURCE = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 	type NonEmptyString = String where @::hasAnyContent()
 
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
@@ -3089,10 +3089,10 @@ declarations {
 	}
 
 	§ Written where the refinement stands, with nothing asking anything.
-	constant twentyOne: NonZeroInteger = 21
+	constant twentyOne: NonZero = 21
 
 	§ And returned as one, which is the same question a third time.
-	function three() -> NonZeroInteger {
+	function three() -> NonZero {
 		<- 3
 	}
 
@@ -3105,9 +3105,9 @@ declarations {
 		// what makes the run above mean anything: admission is a decision about
 		// the value, not a hole that lets every literal through.
 		const REFUSED = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
@@ -3134,11 +3134,11 @@ declarations {
 	// would have written anyway.
 	describe("a Match on values", () => {
 		const SOURCE = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 	type Zero = Integer where @::is(0)
 
 	§ The operation that can not fail, and says so.
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 
@@ -3164,9 +3164,9 @@ declarations {
 		// that were actually written, and a Match naming `1` proves nothing about
 		// zero.
 		const UNCHECKED = `implementation {
-	type NonZeroInteger = Integer where @::isNot(0)
+	type NonZero = Integer where @::isNot(0)
 
-	function doubled(_ d: NonZeroInteger) -> Integer {
+	function doubled(_ d: NonZero) -> Integer {
 		<- d::multiply(with 2)
 	}
 

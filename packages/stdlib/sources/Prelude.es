@@ -15,6 +15,7 @@ export {
 	Boolean           from "./Boolean.es"
 	Comparable        from "./Comparable.es"
 	Integer           from "./Integer.es"
+	NonZeroInteger    from "./Integer.es"
 	List              from "./List.es"
 	NestedList        from "./List.es"
 	loop              from "./Loop.es"

@@ -416,7 +416,7 @@ describe("Dispatch and Resolution", () => {
 	// probed refinement-first instead, and what that does is visible only in which
 	// body the Program ends up running — which is what these assert.
 	describe("Overload probe order", () => {
-		let ratios = `type NonZeroInteger = Integer where @::isNot(0)
+		let ratios = `type NonZero = Integer where @::isNot(0)
 
 			namespace Ratios for Integer {
 				overload describe {
@@ -428,7 +428,7 @@ describe("Dispatch and Resolution", () => {
 
 					§ The entry asking for evidence, appended after it the way the
 					§ Standard Library has to append its own.
-					(by other: NonZeroInteger) -> String {
+					(by other: NonZero) -> String {
 						<- "total"
 					}
 				}
@@ -492,7 +492,7 @@ describe("Dispatch and Resolution", () => {
 		it("passes over an entry asking for evidence whose bound fails", async () => {
 			expect(
 				await run(`implementation {
-					type NonZeroInteger = Integer where @::isNot(0)
+					type NonZero = Integer where @::isNot(0)
 
 					protocol Showable {
 						show() -> String
@@ -512,7 +512,7 @@ describe("Dispatch and Resolution", () => {
 								<- "base"
 							}
 
-							<infer Value is Showable>(_ value: Value, with extra: NonZeroInteger) -> String {
+							<infer Value is Showable>(_ value: Value, with extra: NonZero) -> String {
 								<- value::show()
 							}
 						}

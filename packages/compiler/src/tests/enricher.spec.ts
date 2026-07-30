@@ -4856,10 +4856,10 @@ describe("Enricher", () => {
 
 		it("should resolve a predicate to a refinement of its base", () => {
 			let refinement = refinementOf(
-				"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+				"implementation { type NonZero = Integer where @::isNot(0) }",
 			)
 
-			expect(refinement.name).toBe("NonZeroInteger")
+			expect(refinement.name).toBe("NonZero")
 			expect(refinement.base).toEqual({ type: "Integer" })
 			expect(refinement.conjuncts).toEqual([
 				{
@@ -4918,7 +4918,7 @@ describe("Enricher", () => {
 
 		it("should carry the enriched predicate on the typed Node", () => {
 			let alias = aliasOf(
-				"implementation { type NonZeroInteger = Integer where @::isNot(0) }",
+				"implementation { type NonZero = Integer where @::isNot(0) }",
 			)
 
 			expect(alias.predicate?.nodeType).toBe("MethodInvocation")
@@ -5091,13 +5091,13 @@ describe("Enricher", () => {
 		it("should answer a base's Methods on a refined value", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					type NonZeroInteger = Integer where @::isNot(0)
+					type NonZero = Integer where @::isNot(0)
 
-					function doubled(_ n: NonZeroInteger) -> Integer {
+					function doubled(_ n: NonZero) -> Integer {
 						<- n::multiply(with 2)
 					}
 
-					function forgotten(_ n: NonZeroInteger) -> Integer {
+					function forgotten(_ n: NonZero) -> Integer {
 						<- n
 					}
 				}`),
@@ -5184,14 +5184,10 @@ describe("Enricher", () => {
 			return types[types.length - 1]
 		}
 
-		let nonZero = "type NonZeroInteger = Integer where @::isNot(0)"
-
 		it("should narrow a Constant the condition proved the predicate of", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
-
 						constant d = 3
 
 						if d::isNot(0) {
@@ -5209,8 +5205,6 @@ describe("Enricher", () => {
 		it("should let a narrowed Constant reach a refined Parameter", () => {
 			expect(
 				diagnosticsFor(`implementation {
-					${nonZero}
-
 					function doubled(_ n: NonZeroInteger) -> Integer {
 						<- n::multiply(with 2)
 					}
@@ -5231,8 +5225,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
-
 						variable d = 3
 
 						if d::isNot(0) {
@@ -5252,8 +5244,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
-
 						constant d = 3
 
 						if d::isGreaterThan(0) {
@@ -5269,8 +5259,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
-
 						constant d = 3
 						constant e = 4
 
@@ -5289,8 +5277,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
-
 						constant d = 3
 
 						if d::isNot(0)::and(d::isLessThan(10)) {
@@ -5308,7 +5294,6 @@ describe("Enricher", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						${nonZero}
 						type SmallNonZero = Integer where @::isNot(0)::and(@::isLessThan(10))
 
 						constant d = 3
@@ -5326,7 +5311,6 @@ describe("Enricher", () => {
 		// of them narrows on its own.
 		it("should narrow both bindings a conjunction names", () => {
 			let source = `implementation {
-				${nonZero}
 				type NonEmptyString = String where @::hasAnyContent()
 
 				constant d = 3
@@ -5350,8 +5334,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${nonZero}
-
 							constant d = 3
 
 							if d::is(0) {
@@ -5428,8 +5410,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${nonZero}
-
 							constant d = 3
 
 							if d::is(0)::and(d::isLessThan(10)) {
@@ -5451,8 +5431,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${nonZero}
-
 							constant d = 3
 							constant flag = true
 
@@ -5491,8 +5469,6 @@ describe("Enricher", () => {
 			// declared in, so every branch below it inherits the narrowing.
 			it("should carry the narrowing into an else-if chain", () => {
 				let source = `implementation {
-					${nonZero}
-
 					constant d = 3
 
 					if d::is(0) {
@@ -5520,8 +5496,6 @@ describe("Enricher", () => {
 		// declaration it would collide with is one nobody wrote.
 		it("should leave a body free to re-declare the narrowed name", () => {
 			let source = `implementation {
-				${nonZero}
-
 				constant d = 3
 
 				if d::isNot(0) {
@@ -5539,7 +5513,6 @@ describe("Enricher", () => {
 		// is no narrowing at all.
 		it("should not forget evidence the binding's Type already carries", () => {
 			let source = `implementation {
-				${nonZero}
 				type Odd = Integer where @::isOdd()
 
 				function keeps(_ n: NonZeroInteger) -> Integer {
@@ -5560,7 +5533,6 @@ describe("Enricher", () => {
 		// proves, which is what lets a condition ADD to it.
 		it("should add the condition's evidence to what the Type carries", () => {
 			let source = `implementation {
-				${nonZero}
 				type SmallNonZero = Integer where @::isNot(0)::and(@::isLessThan(10))
 
 				function adds(_ n: NonZeroInteger) -> Integer {
@@ -5581,8 +5553,6 @@ describe("Enricher", () => {
 		// throughout the body.
 		it("should narrow '@' by a Match Handler's Guard", () => {
 			let value = lastConstantValue(`implementation {
-				${nonZero}
-
 				constant value: Integer | String = 3
 
 				constant narrowed = match value -> Integer {
@@ -5614,8 +5584,6 @@ describe("Enricher", () => {
 
 		it("should leave '@' alone where a Guard proves nothing declared", () => {
 			let value = lastConstantValue(`implementation {
-				${nonZero}
-
 				constant value: Integer | String = 3
 
 				constant narrowed = match value -> Integer {
@@ -5734,14 +5702,11 @@ describe("Enricher", () => {
 			})
 		}
 
-		let nonZero = "type NonZeroInteger = Integer where @::isNot(0)"
 		let zero = "type Zero = Integer where @::is(0)"
 
 		it("should narrow '@' to the values the Cases above did not name", () => {
 			expect(
 				selfTypesOf(`implementation {
-					${nonZero}
-
 					constant n = 3
 
 					constant answer = match n -> Integer {
@@ -5813,8 +5778,6 @@ describe("Enricher", () => {
 		it("should not read a value a Guarded Case named", () => {
 			expect(
 				selfTypesOf(`implementation {
-					${nonZero}
-
 					constant flag = true
 					constant value: Integer | String = 3
 
@@ -5856,7 +5819,6 @@ describe("Enricher", () => {
 		it("should leave every Matcher as it was", () => {
 			expect(
 				handlersOf(`implementation {
-					${nonZero}
 					${zero}
 
 					constant n = 3
@@ -5894,8 +5856,6 @@ describe("Enricher", () => {
 		it("should read no evidence out of a Boolean Case", () => {
 			expect(
 				selfTypesOf(`implementation {
-					${nonZero}
-
 					constant value: Boolean | Integer = true
 
 					constant answer = match value -> Integer {
@@ -5920,11 +5880,11 @@ describe("Enricher", () => {
 		// admitted, with no Diagnostic and no narrowing anywhere in the source.
 		function scaled(argument: string): string {
 			return `implementation {
-				type NonZeroInteger = Integer where @::isNot(0)
+				type NonZero = Integer where @::isNot(0)
 
 				namespace Scaling for Integer {
 					overload scaled {
-						(by other: NonZeroInteger) -> String {
+						(by other: NonZero) -> String {
 							<- "refined"
 						}
 
@@ -5957,11 +5917,11 @@ describe("Enricher", () => {
 		it("should not admit a value the Program computes", () => {
 			expect(
 				lastConstantMethodInvocation(`implementation {
-					type NonZeroInteger = Integer where @::isNot(0)
+					type NonZero = Integer where @::isNot(0)
 
 					namespace Scaling for Integer {
 						overload scaled {
-							(by other: NonZeroInteger) -> String {
+							(by other: NonZero) -> String {
 								<- "refined"
 							}
 
@@ -5985,11 +5945,11 @@ describe("Enricher", () => {
 		// was never anywhere to leave it.
 		it("should leave nothing behind on a Node a losing candidate admitted", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
-				type NonZeroInteger = Integer where @::isNot(0)
+				type NonZero = Integer where @::isNot(0)
 
 				namespace Scaling for Integer {
 					overload scaled {
-						(by other: NonZeroInteger, and extra: String) -> String {
+						(by other: NonZero, and extra: String) -> String {
 							<- "refined"
 						}
 
