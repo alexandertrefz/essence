@@ -1731,20 +1731,35 @@ third"::lines())
 	show("NestedList.flatten<ItemType>() [empty]", noNestedNumbers::flatten())
 
 	§ ——— NonEmptyList —————————————————————————————————————————————————————————
-	§ The two Methods a List has to have been PROVEN to answer, and the only
-	§ two whose answer is an item rather than an Optional. A List written down
+	§ The Methods a List has to have been PROVEN to answer. A List written down
 	§ with something in it is its own proof, so each receiver is declared and
 	§ nothing stands in front of these calls asking anything.
 	§
 	§ Both item Types are here because the Alias is generic: one predicate over
 	§ every List, and the Type Argument told apart by the base.
-	constant provenWords: NonEmptyList<String> = ["first", "middle", "last"]
-	constant provenOne: NonEmptyList<Integer>  = [7]
+	constant provenWords: NonEmptyList<String>    = ["first", "middle", "last"]
+	constant provenOne: NonEmptyList<Integer>     = [7]
+	constant provenNumbers: NonEmptyList<Integer> = [3, 1, 2, 1, 4]
 
 	show("NonEmptyList.firstItem<ItemType>()", provenWords::firstItem())
 	show("NonEmptyList.lastItem<ItemType>()", provenWords::lastItem())
 	show("NonEmptyList.firstItem<ItemType>() [single]", provenOne::firstItem())
 	show("NonEmptyList.lastItem<ItemType>() [single]", provenOne::lastItem())
+
+	§ The transforms that CARRY the proof rather than spending it. Each is shown
+	§ twice: once for the value, which has to be the one `List`'s own entry gives
+	§ for the same input, and once chained into a Method only a NonEmptyList
+	§ answers. That second call is what pins the RETURN Type — an entry weakened
+	§ back to `List` would send the chained `firstItem` to `List`'s own and print
+	§ an Optional here.
+	show(
+		"NonEmptyList.removeDuplicates<ItemType is Equatable>()",
+		provenNumbers::removeDuplicates(),
+	)
+	show(
+		"NonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
+		provenNumbers::removeDuplicates()::lastItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is

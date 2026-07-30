@@ -785,23 +785,48 @@ declarations {
 		flatten() -> List<ItemType>
 	}
 
-	§ The Methods a List that has something in it can answer with an ITEM.
-	§ Evidence adds Methods to a Type and takes none away, so a NonEmptyList already
-	§ answers every Method of `List` above; what a Namespace of its own is for is
-	§ the Methods the proof makes TOTAL, and there are exactly two.
+	§ The Methods the proof changes. Evidence ADDS to a Type and takes nothing
+	§ away, so a NonEmptyList already answers every Method of `List` above; what a
+	§ Namespace of its own is for is the Methods that answer BETTER for having the
+	§ proof, and there are two ways to do that.
 	§
-	§ Both for one reason: a List with items in it has a first one and a last
-	§ one, so there is no case left over for an Optional to stand for. Neither
-	§ can be written in Essence — every way to reach an item answers the Optional
-	§ that a position outside the List needs, and taking the item out of it would
-	§ want the very fallback the proof was gathered to remove. That is the point
-	§ rather than a gap: this is where the evidence is SPENT, and a native is what
-	§ spending it looks like.
+	§ `firstItem` and `lastItem` SPEND it: a List with items in it has a first one
+	§ and a last one, so there is no case left over for an Optional to stand for.
+	§ Neither can be written in Essence — every way to reach an item answers the
+	§ Optional that a position outside the List needs, and taking the item out of
+	§ it would want the very fallback the proof was gathered to remove. That is
+	§ the point rather than a gap, and a native is what spending a proof looks
+	§ like.
 	§
-	§ Nothing else is here, and not for want of candidates. `map`, `reverse` and
-	§ `sort` all answer with a List that is not empty either, and none of them
-	§ says so — carrying evidence THROUGH a transform is a decision of its own,
-	§ and this Namespace makes none of them.
+	§ Everything below them CARRIES it. Each is a transform that answers with one
+	§ item for every item it was handed — or one for every DISTINCT item, or those
+	§ items and more besides — so none of them can empty a List that was not
+	§ empty, and each says so with a `NonEmptyList` where `List`'s own entry says
+	§ `List`. That is what keeps a chain of them from asking `hasItems` again at
+	§ every step. They are declared in the order `List` declares them, so the two
+	§ can be read side by side.
+	§
+	§ They are native too, and for a different reason than the first two: nothing
+	§ here is unwritable, it is unSAYABLE. `<- @::map(transform)` is the right
+	§ answer and its Type is `List<Result>` — an expression that can not come back
+	§ empty is not the same as one the language can be TOLD can not, which is the
+	§ wall `List::append(_:)` meets from the other side. So each of these hands
+	§ the work to the `List` operation it mirrors and adds nothing to it but the
+	§ promise.
+	§
+	§ What is not here is everything the proof does not survive. `keepEvery`,
+	§ `removeEvery`, `slice`, `remove`, `removeFirst` and `removeLast` can all
+	§ answer empty from a receiver that was not; `flatten` empties on a List of
+	§ empty Lists; `firstItem(where:)` may find nothing; `partition`, `pair` and
+	§ `split` build Lists nobody has proven anything about. Each of those keeps
+	§ `List`'s own entry, and reaching one costs the proof — which is what a
+	§ later `hasItems` is for.
+	§
+	§ The single-item growers are not here either, for the opposite reason:
+	§ `append(_:)`, `prepend(_:)` and `insert(_:at:)` answer with a
+	§ `NonEmptyList` on `List` itself, whatever they were handed, so a receiver
+	§ that has been proven something reaches them by forgetting the proof and is
+	§ given the same answer back. A second copy here would say nothing new.
 	§
 	§ The target is the refinement, which is what makes these reachable only from
 	§ a List something has proven something about. A List a Program merely wrote
@@ -817,6 +842,16 @@ declarations {
 		§§
 		§§ @returns — the last item.
 		lastItem() -> ItemType
+
+		§ Removing duplicates keeps the FIRST of every group of equal items, so
+		§ it keeps at least one of whatever it was handed. The bound is `List`'s
+		§ own: equality is the item Type's, and the conforming Namespace's `is`
+		§ arrives as the hidden Argument here exactly as it does there.
+
+		§§ A new List keeping only the first occurrence of each item — by the items' own `is` — in the original order. Available whenever the items conform to `Equatable`.
+		§§
+		§§ @returns — the List without duplicates, which certainly has something in it.
+		removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
 	}
 }
 

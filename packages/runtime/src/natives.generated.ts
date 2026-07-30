@@ -309,6 +309,8 @@ export type NonEmptyListNatives = {
 	firstItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
 	// lastItem<ItemType>() -> ItemType
 	lastItem: <ItemType extends AnyType>(self: ListType<ItemType>) => ItemType
+	// removeDuplicates<ItemType is Equatable>() -> NonEmptyList
+	removeDuplicates: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: EquatableConformance<ItemType>) => ListType<ItemType>
 }
 
 export type FunctionsNatives = {
@@ -508,6 +510,7 @@ export const $NonEmptyList: NonEmptyListNatives = NonEmptyListModule
 export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), {
 	firstItem: 1
 	lastItem: 1
+	removeDuplicates: 2
 }> = true
 
 declare const functionsModule: typeof import("./functions")
