@@ -1459,6 +1459,20 @@ function describeMember(
 				bindings,
 				position,
 			)
+		// NOTE: A refinement compares exactly as its base does — the evidence is
+		// not a part the runtime ever hears of, which is what `runtimeShapeOf`
+		// below says in its own words. It reaches here only where the base names a
+		// Type Parameter (`Full { value: NonEmptyList<Item> }`), and reading it as a
+		// leaf would have compared that payload structurally rather than through
+		// `Item`'s witness.
+		case "Refinement":
+			return describeMember(
+				type.base,
+				constrainedOrder,
+				generics,
+				bindings,
+				position,
+			)
 		default:
 			return { k: "eq" }
 	}
@@ -3179,6 +3193,26 @@ function applyGenericAlias(
 						bindings.get(generic.name) ?? { type: "Error" },
 				),
 			},
+		}
+	}
+
+	// NOTE: An applied refinement carries the applied spelling for the same
+	// reason, so `NonEmptyList<String>` prints as written rather than as the bare
+	// Alias name every instantiation would otherwise share. An application that
+	// changed nothing at all keeps the DECLARED object — nothing to spell
+	// differently, and stamping would copy the very object a pending predicate is
+	// written into. An instantiation that bound every Parameter to a Parameter
+	// (`namespace NonEmptyList<infer Item> for NonEmptyList<Item>`) is stamped and reads
+	// terse anyway, the way an unbound Case does.
+	if (
+		appliedType.type === "Refinement" &&
+		appliedType !== aliasType.aliasedType
+	) {
+		return {
+			...appliedType,
+			typeArguments: generics.map(
+				(generic) => bindings.get(generic.name) ?? { type: "Error" },
+			),
 		}
 	}
 

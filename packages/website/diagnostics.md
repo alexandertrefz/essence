@@ -353,12 +353,10 @@ be compared by. A refinement is a base Type plus a predicate every value of it
 has been proven to satisfy — `type NonZeroInteger = Integer where @::isNot(0)`
 — and two refinements are the same Type when they prove the same things, which
 is why the predicate is stored as a set of resolved Method calls rather than as
-the text that was written. Five shapes are refused:
+the text that was written. Four shapes are refused:
 
-- a generic Alias (`type NonEmptyList<Item> = List<Item> where @::hasItems()`) —
-  the clause would refine a different Type at every use;
-- a base outside Integer, String and an applied List (`List<String>`, never a
-  bare `List`);
+- a base outside Integer, String and an applied List (`List<String>` or
+  `List<Item>`, never a bare `List`);
 - a receiver that is not `@` — the clause is a question about the value being
   refined and about nothing else;
 - a chained receiver (`@::trim()::hasAnyContent()`) — the evidence would be
@@ -368,6 +366,14 @@ the text that was written. Five shapes are refused:
 Several predicates joined with `::and(…)` are one predicate: the chain is
 flattened, so `@::isPositive()::and(@::isNot(1))` proves two things and the
 mirror image of it proves the same two.
+
+A GENERIC Alias may be refined — `type NonEmptyList<Item> = List<Item> where
+@::hasItems()` — and needs no rule of its own: the predicate is read with the
+Type Parameters opaque, so a clause that asks about the items (`@::contains(0)`)
+is refused by ordinary typechecking, for the Argument it passes rather than for
+being generic. What survives asks nothing a Type Argument could answer
+differently, which is why `NonEmptyList<String>` and `NonEmptyList<Integer>` are told
+apart by their bases alone.
 
 The Alias still means its base afterwards, so everything naming it stays about
 itself rather than cascading.

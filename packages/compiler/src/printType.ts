@@ -1,6 +1,10 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { displayChoiceName, displayGenericName } from "./helpers/index"
+import {
+	displayChoiceName,
+	displayedRefinementArguments,
+	displayGenericName,
+} from "./helpers/index"
 
 // NOTE: A human-oriented Type printer for Hovers. The Validator's
 // `describeType` is its Diagnostics-oriented sibling — unlike it, this one
@@ -26,9 +30,15 @@ export function printType(type: common.Type): string {
 			return caseHeader(type)
 		// NOTE: A checked refinement prints as the alias it was declared under —
 		// the predicate is what the Declaration says, and a Hover over a value
-		// is about the Type, not about how it was proven.
-		case "Refinement":
-			return type.name
+		// is about the Type, not about how it was proven. An applied generic one
+		// prints as applied, the way `Optional<Integer>` does.
+		case "Refinement": {
+			let typeArguments = displayedRefinementArguments(type)
+
+			return typeArguments === null
+				? type.name
+				: `${type.name}<${typeArguments.map(printType).join(", ")}>`
+		}
 		case "List":
 			return `List<${printType(type.itemType)}>`
 		case "GenericList":

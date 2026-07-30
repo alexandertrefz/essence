@@ -835,5 +835,104 @@ describe("Type matching", () => {
 				"List<NonZeroInteger>",
 			)
 		})
+
+		// NOTE: A GENERIC refinement needs no rule of its own, which is the whole
+		// design finding: its conjuncts say nothing about the items, so two
+		// instantiations of one Alias differ by their BASES — which `matchTypes`
+		// has always compared. Everything below is the ordinary refinement rule
+		// answering a question about `List<String>` versus `List<Integer>`.
+		describe("applied to a generic Alias", () => {
+			function nonEmptyOf(itemType: common.Type): common.Type {
+				return {
+					type: "Refinement",
+					name: "NonEmptyList",
+					base: { type: "List", itemType },
+					conjuncts: [conjunct("hasItems", [], "List")],
+					typeArguments: [itemType],
+				}
+			}
+
+			const nonEmptyStrings = nonEmptyOf(string)
+			const nonEmptyIntegers = nonEmptyOf(integer)
+			const strings: common.Type = { type: "List", itemType: string }
+
+			it("should accept the same instantiation and refuse another", () => {
+				expect(matchesType(nonEmptyStrings, nonEmptyStrings)).toBe(true)
+				expect(matchesType(nonEmptyStrings, nonEmptyIntegers)).toBe(
+					false,
+				)
+			})
+
+			it("should flow into its base and refuse the base back", () => {
+				expect(matchesType(strings, nonEmptyStrings)).toBe(true)
+				expect(matchesType(nonEmptyStrings, strings)).toBe(false)
+			})
+
+			// NOTE: The applied spelling is display-only, exactly as a Union's
+			// name is — two refinements proving the same thing about the same base
+			// are one Type however they were spelled.
+			it("should decide by the base and the conjuncts, never by the spelling", () => {
+				let unstamped: common.Type = {
+					type: "Refinement",
+					name: "Several",
+					base: strings,
+					conjuncts: [conjunct("hasItems", [], "List")],
+				}
+
+				expect(matchesType(nonEmptyStrings, unstamped)).toBe(true)
+				expect(matchesType(unstamped, nonEmptyStrings)).toBe(true)
+			})
+
+			// NOTE: A Type Parameter binds the BASE here too — a `T` inferred from
+			// a NonEmptyList Argument is `List<String>`, and no inference carries
+			// evidence into a position nothing proved anything about.
+			it("should bind a Type Parameter to the instantiated base", () => {
+				let context = createInferenceContext([
+					{ name: "T", infer: true, defaultType: null },
+				])
+
+				expect(
+					matchesTypeWithBindings(
+						{ type: "GenericUse", name: "T" },
+						nonEmptyStrings,
+						context,
+					),
+				).toBe(true)
+				expect(context.bindings.get("T")).toEqual(strings)
+			})
+
+			it("should collapse a Union of an instantiation and its base, either order", () => {
+				expect(buildUnion([strings, nonEmptyStrings])).toEqual(strings)
+				expect(buildUnion([nonEmptyStrings, strings])).toEqual(strings)
+			})
+
+			// NOTE: And two instantiations of one Alias cover nothing of each
+			// other, because their bases do not — the Union keeps both.
+			it("should keep two instantiations a Union does not cover", () => {
+				expect(buildUnion([nonEmptyStrings, nonEmptyIntegers])).toEqual(
+					{
+						type: "UnionType",
+						types: [nonEmptyStrings, nonEmptyIntegers],
+					},
+				)
+			})
+
+			it("should print and describe an instantiation as applied", () => {
+				expect(printType(nonEmptyStrings)).toBe("NonEmptyList<String>")
+				expect(describeType(nonEmptyStrings)).toBe(
+					"NonEmptyList<String>",
+				)
+				expect(printType(nonEmptyOf(nonZero))).toBe(
+					"NonEmptyList<NonZeroInteger>",
+				)
+
+				// NOTE: An instantiation that bound every Parameter to a Parameter
+				// — a generic Namespace's own target — reads terse, because
+				// `NonEmptyList<Item>` would only echo the header it is written under.
+				expect(
+					printType(nonEmptyOf({ type: "GenericUse", name: "Item" })),
+				).toBe("NonEmptyList")
+			})
+		})
 	})
 })

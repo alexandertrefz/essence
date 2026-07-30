@@ -4854,6 +4854,34 @@ describe("Enricher", () => {
 			return aliases[aliases.length - 1]
 		}
 
+		// NOTE: A GENERIC refined Alias resolves to a Generic Alias wrapping the
+		// refinement — the wrapper is what applies the Type Arguments, the
+		// refinement is what carries the evidence — so its refinement is one
+		// level in.
+		function genericRefinementOf(source: string): common.RefinementType {
+			let { program, diagnostics } = enrichSource(source)
+
+			expect(diagnostics).toEqual([])
+
+			let aliases = program.implementation.nodes.filter(
+				(node) => node.nodeType === "TypeAliasStatement",
+			)
+			let type = aliases[aliases.length - 1].type
+
+			expect(type.type).toBe("GenericAlias")
+
+			if (
+				type.type !== "GenericAlias" ||
+				type.aliasedType.type !== "Refinement"
+			) {
+				throw new Error(
+					"The last Type Alias is not a generic refinement.",
+				)
+			}
+
+			return type.aliasedType
+		}
+
 		it("should resolve a predicate to a refinement of its base", () => {
 			let refinement = refinementOf(
 				"implementation { type NonZero = Integer where @::isNot(0) }",
@@ -4883,6 +4911,76 @@ describe("Enricher", () => {
 					"implementation { type NonEmptyStrings = List<String> where @::hasItems() }",
 				).base,
 			).toEqual({ type: "List", itemType: { type: "String" } })
+		})
+
+		// NOTE: The conjunct set of a generic refinement is the point of the whole
+		// design: `hasItems` asks nothing about the items, so the key holds no Type
+		// Argument at all and `NonEmptyList<String>` differs from `NonEmptyList<Integer>`
+		// by its BASE — which `matchTypes` already compares.
+		it("should refine a generic applied List, keying the conjunct without the Argument", () => {
+			let refinement = genericRefinementOf(
+				"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
+			)
+
+			expect(refinement.name).toBe("NonEmptyList")
+			expect(refinement.base).toEqual({
+				type: "List",
+				itemType: { type: "GenericUse", name: "Item" },
+			})
+			expect(refinement.conjuncts).toEqual([
+				{
+					namespaceName: "List",
+					methodName: "hasItems",
+					overloadIndex: null,
+					args: [],
+				},
+			])
+		})
+
+		// NOTE: A use site applies its Arguments through the wrapper, which
+		// substitutes them into the base and stamps the applied spelling. The
+		// conjuncts come along BY REFERENCE — the same array the Declaration
+		// resolved, because a predicate that says nothing about the items has
+		// nothing to substitute.
+		it("should apply a generic refinement's Arguments into its base", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type NonEmptyList<Item> = List<Item> where @::hasItems()
+
+				function lengthOf(_ items: NonEmptyList<String>) -> Integer {
+					<- items::length()
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let alias = program.implementation.nodes[0]
+			let declared = program.implementation.nodes[1]
+
+			if (
+				alias.nodeType !== "TypeAliasStatement" ||
+				alias.type.type !== "GenericAlias" ||
+				alias.type.aliasedType.type !== "Refinement" ||
+				declared.nodeType !== "FunctionStatement" ||
+				declared.type.type !== "Function"
+			) {
+				throw new Error("The Program is not the shape under test.")
+			}
+
+			let applied = declared.type.parameterTypes[0].type
+
+			expect(applied.type).toBe("Refinement")
+
+			if (applied.type !== "Refinement") {
+				throw new Error("The Parameter is not a refinement.")
+			}
+
+			expect(applied.base).toEqual({
+				type: "List",
+				itemType: { type: "String" },
+			})
+			expect(applied.typeArguments).toEqual([{ type: "String" }])
+			expect(applied.conjuncts).toBe(alias.type.aliasedType.conjuncts)
+			expect(printType(applied)).toBe("NonEmptyList<String>")
 		})
 
 		// NOTE: `isBetween` is declared once over the whole numeric tower, so an
@@ -4925,6 +5023,18 @@ describe("Enricher", () => {
 			expect(alias.predicate?.type).toEqual({ type: "Boolean" })
 		})
 
+		// NOTE: A generic Alias too, which takes reading `@` off the base INSIDE
+		// the wrapper: read off the wrapper it was a Type taking Arguments, and the
+		// Language Server got an Error where the Compiler had a Boolean.
+		it("should carry the enriched predicate of a generic Alias too", () => {
+			let alias = aliasOf(
+				"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
+			)
+
+			expect(alias.predicate?.nodeType).toBe("MethodInvocation")
+			expect(alias.predicate?.type).toEqual({ type: "Boolean" })
+		})
+
 		it("should leave an unrefined Alias without a predicate", () => {
 			expect(
 				aliasOf("implementation { type Small = Integer }").predicate,
@@ -4950,14 +5060,19 @@ describe("Enricher", () => {
 				}
 			}
 
-			it("should refuse a generic Alias", () => {
+			// NOTE: A generic Alias is refined like any other, and an
+			// item-dependent predicate needs no rule of its own — `Item` is
+			// opaque while the clause is read, so `@::contains(0)` is refused
+			// for the Argument it passes. Which is what keeps the conjuncts
+			// item-agnostic without anything checking that they are.
+			it("should refuse an item-dependent predicate as the Argument mistake it is", () => {
 				expect(
 					refusal(
-						"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
+						"implementation { type Containing<Item> = List<Item> where @::contains(0) }",
 					),
 				).toEqual({
-					code: "invalid-refinement-predicate",
-					underlined: "@::hasItems()",
+					code: "no-matching-overload",
+					underlined: "@::contains(0)",
 				})
 			})
 

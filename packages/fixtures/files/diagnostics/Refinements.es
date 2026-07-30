@@ -14,10 +14,6 @@
 § showcasing no longer has a home.
 
 implementation {
-	§ invalid-refinement-predicate — a generic Alias stands for a different
-	§ Type at every use, so there is nothing for one predicate to be about.
-	type NonEmptyList<Item> = List<Item> where @::hasItems()
-
 	§ invalid-refinement-predicate — Boolean is not one of the bases a
 	§ refinement may be written on.
 	type Yes = Boolean where @::is(true)
