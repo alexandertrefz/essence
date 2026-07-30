@@ -183,6 +183,17 @@ describe("Bundle Size", () => {
 	// and `quotient` let the standard library stop laundering answers it had
 	// already proven, and the `::otherwise(…)` fallbacks that did the laundering
 	// left the bundle with them.
+	// NOTE: It now measures 51,987, down 166, and the ceiling STAYS at 53,200:
+	// 166 bytes is not a kilobyte, and the headroom is still the ~1 kB every
+	// move above kept. What fell is worth stating, because it fell the wrong way
+	// round. `List::repeat` maps over the List `of` builds; `of` answers a
+	// `NonEmptyList` now, so that `map` is answered by `NonEmptyList` — and
+	// `inline-loops` recognises a walk by the Namespace that answers it and
+	// knows only `List`. The call is a call again where it had become a `for`,
+	// and the indentation it stopped writing out is the whole of the fall. Fewer
+	// bytes and more work is the trade that pass exists to make in the other
+	// direction, and it is made the same way by any Program mapping over a List
+	// it has proven something about with a literal callback.
 	it("keeps Everyday.es from dragging in the whole numeric tower", async () => {
 		expect(await bundleSizeOf("Everyday.es")).toBeLessThan(53_200)
 	})

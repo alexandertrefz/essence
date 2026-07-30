@@ -1820,6 +1820,32 @@ third"::lines())
 			::sort(by (first, second) { <- second::compare(to first) })
 			::firstItem(),
 	)
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer)",
+		provenNumbers::replace(99, at 0),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [negative]",
+		provenNumbers::replace(99, at -1),
+	)
+	§ The three positions that name no item at all. Each answers with the
+	§ receiver untouched, which keeps the length as surely as a swap does.
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [at length]",
+		provenNumbers::replace(99, at provenNumbers::length()),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [from the end, first]",
+		provenNumbers::replace(99, at 0::subtract(provenNumbers::length())),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [before the start]",
+		provenNumbers::replace(99, at -99),
+	)
+	show(
+		"NonEmptyList.replace<ItemType>(_ ItemType, at: Integer) [proof carried]",
+		provenNumbers::replace(99, at -99)::lastItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is

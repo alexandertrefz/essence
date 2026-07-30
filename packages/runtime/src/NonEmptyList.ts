@@ -1,10 +1,13 @@
 // NOTE: The runtime module of the `NonEmptyList` Namespace — the Lists a Program has
 // proven have something in them. The Simplifier emits `<Namespace>.<method>(…)`,
-// so a Namespace needs a module of its own name, and this is the whole of it.
+// so a Namespace needs a module of its own name, and this is it. It comes in two
+// halves: the two Methods that SPEND the proof, written out below, and the
+// transforms that CARRY it, which are `List`'s own operations under this
+// Namespace's names.
 //
-// NOTE: Written here rather than re-exported from `List.ts` the way
-// `NestedList.flatten` is, because there is nothing there to re-export:
-// `List.firstItem` and `List.lastItem` are written in Essence, on the
+// NOTE: `firstItem` and `lastItem` are written here rather than re-exported from
+// `List.ts` the way `NestedList.flatten` is, because there is nothing there to
+// re-export: `List.firstItem` and `List.lastItem` are written in Essence, on the
 // `item(at:)` that has to answer an Optional for every position. These are the
 // TOTAL halves of that pair, and total is the whole of the difference.
 //
@@ -13,9 +16,16 @@
 // off a List nothing proved anything about, position 0 of an empty array
 // answers `undefined` — and that this can not happen is exactly what the
 // Namespace's target bought. The proof is spent HERE, which is why neither of
-// these could be written in Essence: the language has no way to be told it holds.
+// those two could be written in Essence: the language has no way to be told it
+// holds.
 import type { BooleanType } from "./Boolean"
-import { append__overload$2, createList, type ListType } from "./List"
+import type { IntegerType } from "./Integer"
+import {
+	append__overload$2,
+	createList,
+	type ListType,
+	positionFromEnd,
+} from "./List"
 import type { AnyType } from "./type"
 
 export function firstItem<ItemType extends AnyType>(
@@ -94,3 +104,33 @@ export { map } from "./List"
 // entries bind by position exactly as they do there — `$1` takes the items'
 // `compare` as its hidden conformance Argument, `$2` the comparison outright.
 export { reverse, sort__overload$1, sort__overload$2 } from "./List"
+
+// NOTE: The second entry with no native of `List`'s to hand the work to, for the
+// reason `removeDuplicates` has none: `List` answers `replace` in Essence. One
+// item out and one item in, and nothing at all when the position names no item —
+// which is what that four-branch body says at greater length, since a position
+// reaching back past the first item and one standing at or past the end both
+// leave the List alone. Every case keeps the length, which is the whole of why
+// the receiver's proof is still good for the answer.
+//
+// NOTE: The position is resolved from the end in bigint before it narrows,
+// exactly as `slice` and `insert` do and for the same reason — a position past
+// 2³¹ narrowed first would come out as an unrelated one.
+export function replace<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+	at: IntegerType,
+): ListType<ItemType> {
+	let length = BigInt(originalList.value.length)
+	let position = positionFromEnd(at.value, length)
+
+	if (position < 0n || position >= length) {
+		return originalList
+	}
+
+	let replaced = originalList.value.slice(0)
+
+	replaced[Number(position)] = item
+
+	return createList(replaced)
+}
