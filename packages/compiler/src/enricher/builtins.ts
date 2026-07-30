@@ -96,6 +96,11 @@ export const builtinTypeOrder: Array<string> = [
 	"Transcendental",
 	"Record",
 	"List",
+	// NOTE: Directly after the Type it refines, for the reason `NonZeroInteger`
+	// sits directly after `Integer` — a reader of this table meets `List` and
+	// then what a List can be proven to be, and `closestMatch` breaks a tie on
+	// the FIRST candidate, so a typo near both still reads as the base Type.
+	"NonEmptyList",
 	"Irrational",
 	"Number",
 	"Optional",

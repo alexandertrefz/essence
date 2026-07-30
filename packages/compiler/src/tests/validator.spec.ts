@@ -2805,11 +2805,11 @@ describe("Validator", () => {
 		// nothing here is new machinery; what is new is that one Alias asks a
 		// different question at every one of its applications.
 		describe("a generic refinement", () => {
-			function withNonEmpty(body: string): string {
+			function withFilled(body: string): string {
 				return `implementation {
-					type NonEmptyList<Item> = List<Item> where @::hasItems()
+					type Filled<Item> = List<Item> where @::hasItems()
 
-					function firstOf(_ items: NonEmptyList<String>) -> String {
+					function firstOf(_ items: Filled<String>) -> String {
 						<- items::item(at 0)::otherwise("")
 					}
 
@@ -2820,10 +2820,10 @@ describe("Validator", () => {
 			it("should admit a written List at all three positions", () => {
 				expect(
 					diagnosticsFor(
-						withNonEmpty(`
-							constant proven: NonEmptyList<String> = ["a"]
+						withFilled(`
+							constant proven: Filled<String> = ["a"]
 
-							function two() -> NonEmptyList<String> {
+							function two() -> Filled<String> {
 								<- ["a", "b"]
 							}
 
@@ -2837,21 +2837,21 @@ describe("Validator", () => {
 
 			// NOTE: The refusal names the Type as it was APPLIED, because the bare
 			// Alias name is not a Type anything can be written as — a help offering
-			// to pass a value of 'NonEmptyList' names something the Program would refuse
+			// to pass a value of 'Filled' names something the Program would refuse
 			// for taking no Arguments.
 			it("should refuse an empty written List, naming the applied Type", () => {
 				let diagnostics = diagnosticsFor(
-					withNonEmpty("constant broken: NonEmptyList<String> = []"),
+					withFilled("constant broken: Filled<String> = []"),
 				)
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("assignment-type-mismatch")
 				expect(diagnostics[0].notes).toEqual([
-					"'broken' is declared as NonEmptyList<String>.",
-					"Every value of 'NonEmptyList<String>' has been proven to answer '@::hasItems()'.",
+					"'broken' is declared as Filled<String>.",
+					"Every value of 'Filled<String>' has been proven to answer '@::hasItems()'.",
 				])
 				expect(diagnostics[0].helps).toEqual([
-					"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonEmptyList<String>'.",
+					"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'Filled<String>'.",
 				])
 			})
 
@@ -2861,9 +2861,7 @@ describe("Validator", () => {
 			it("should refuse a written List of the wrong items", () => {
 				expect(
 					diagnosticsFor(
-						withNonEmpty(
-							"constant broken: NonEmptyList<String> = [1]",
-						),
+						withFilled("constant broken: Filled<String> = [1]"),
 					),
 				).toHaveLength(1)
 			})
@@ -2875,14 +2873,14 @@ describe("Validator", () => {
 			it("should decide each application of one Alias on its own", () => {
 				expect(
 					diagnosticsFor(
-						withNonEmpty(`
+						withFilled(`
 							namespace Take for {} {
 								overload static count {
-									(_ items: NonEmptyList<Integer>) -> Integer {
+									(_ items: Filled<Integer>) -> Integer {
 										<- items::length()
 									}
 
-									(_ items: NonEmptyList<String>) -> Integer {
+									(_ items: Filled<String>) -> Integer {
 										<- items::length()
 									}
 								}
