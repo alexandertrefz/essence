@@ -703,16 +703,23 @@ declarations {
 		§ counting loops write `List.of(integersFrom 1, through 10)::map(...)`.
 		§ Fixed to Integers, so the Namespace's `ItemType` has nothing to merge
 		§ into.
+		§
+		§ Both ends are INCLUDED, so the shortest List it can build is the
+		§ one-item `[start]` that `of(integersFrom n, through n)` gives — and
+		§ counting down covers the rest, so there is no pair of Integers it
+		§ answers empty for. That is a proof, and it is written into the return
+		§ Type: a counting loop's List is one nothing has to ask `hasItems`
+		§ about.
 
-		§§ The Integers from one value through another, both included — counting down when the first is the greater.
+		§§ The Integers from one value through another, both included — counting down when the first is the greater. There is always at least the first one.
 		§§
 		§§ @param integersFrom — the first Integer of the List
 		§§ @param through — the last Integer of the List, included
-		§§ @returns — the List of Integers.
+		§§ @returns — the List of Integers, which certainly has something in it.
 		static of(
 			integersFrom start: Integer,
 			through end: Integer,
-		) -> List<Integer>
+		) -> NonEmptyList<Integer>
 	}
 
 	§ A List of Lists, and the one Method that only such a List can answer. It

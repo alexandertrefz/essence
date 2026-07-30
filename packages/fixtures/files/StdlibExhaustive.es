@@ -1746,6 +1746,18 @@ third"::lines())
 	show("NonEmptyList.firstItem<ItemType>() [single]", provenOne::firstItem())
 	show("NonEmptyList.lastItem<ItemType>() [single]", provenOne::lastItem())
 
+	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
+	§ receiver below is a call to a `List` Method that says what it builds is
+	§ not empty, written where a Constant of the Type would otherwise stand —
+	§ so what resolves these to `NonEmptyList` is the return Type alone, with
+	§ no annotation and no doorway anywhere in front of them. The label test
+	§ in `stdlibGolden.spec.ts` asks which Namespace each call landed in, so
+	§ a promise quietly weakened back to `List` fails here by name.
+	show(
+		"NonEmptyList.firstItem<ItemType>() [from List.of]",
+		List.of(integersFrom 3, through 7)::firstItem(),
+	)
+
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
 	§ labels carry no prefix — the coverage net learns them from the member
