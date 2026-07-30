@@ -148,10 +148,10 @@ implementation {
 		<- 3
 	}
 
-	§ Until a total division exists, the operations these refinements are ABOUT
-	§ are the Optionals they have always been: an Integer divided by an Integer
-	§ might have been divided by zero, and nothing in the signature says
-	§ otherwise.
+	§ The operation these refinements are ABOUT: dividing by a proven divisor
+	§ can not fail, so the answer is the Rational itself — and a written 3 is
+	§ its own proof. A written 0 proves nothing, so that division still answers
+	§ the Optional it always has.
 	__print(6::divide(by 3))
 	__print(6::divide(by 0))
 

@@ -92,6 +92,17 @@ export function quotient(
 	return createValue(createInteger(truncated))
 }
 
+// NOTE: Division by a divisor the Types have already proven not to be zero —
+// `NonZeroInteger` erases to an Integer, so the Parameter reads as one here —
+// which is why there is no empty arm to build: the check the sibling entries
+// open with was made while compiling.
+export function divide__overload$4(
+	integer: IntegerType,
+	divisor: IntegerType,
+): RationalType {
+	return createRational(integer.value, divisor.value)
+}
+
 export function raise(
 	base: IntegerType,
 	exponent: IntegerType,

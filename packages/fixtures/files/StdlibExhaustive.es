@@ -313,6 +313,14 @@ third"::lines())
 	show("Boolean.toString() [false]", false::toString())
 
 	§ ——— Integer ——————————————————————————————————————————————————————————
+	§ The division family tells its entries apart by what is known about the
+	§ DIVISOR, so the calls have to be told apart the same way. A divisor the
+	§ Program COMPUTES might be anything, so it reaches the entry answering an
+	§ Optional; one written where it stands is its own proof that it is not
+	§ zero, and reaches the total entry.
+	constant computedTwo   = 1::add(1)
+	constant computedEight = 4::multiply(with 2)
+
 	show("Integer.is(_ Integer)", 7::is(7))
 	show("Integer.is(_ Integer) [differing]", 7::is(8))
 	show("Integer.isNot(_ Integer)", 7::isNot(8))
@@ -324,10 +332,11 @@ third"::lines())
 	show("Integer.subtract(_ Integer)", 1234::subtract(234))
 	show("Integer.subtract(_ Rational)", 1::subtract(1/2))
 	show("Integer.subtract(_ Transcendental)", 1::subtract(Number.PI))
-	show("Integer.divide(by: Integer)", 1110::divide(by 2))
+	show("Integer.divide(by: Integer)", 1110::divide(by computedTwo))
 	show("Integer.divide(by: Integer) [by zero]", 1::divide(by 0))
 	show("Integer.divide(by: Rational)", 1::divide(by 1/2))
 	show("Integer.divide(by: Rational) [by zero]", 1::divide(by 0/1))
+	show("Integer.divide(by: NonZeroInteger)", 1110::divide(by 2))
 	show("Integer.multiply(with: Integer)", 100::multiply(with 1000))
 	show(
 		"Integer.multiply(with: Integer) [beyond IEEE 754]",
@@ -477,13 +486,8 @@ third"::lines())
 
 	§ ——— Rational —————————————————————————————————————————————————————————
 	§ The two entries of `of` are told apart by what is known about the
-	§ DENOMINATOR, so the calls below have to be told apart the same way. A
-	§ denominator the Program COMPUTES might be anything, so it reaches the entry
-	§ answering an Optional; one written where it stands is its own proof that it
-	§ is not zero, and reaches the total entry.
-	constant computedTwo   = 1::add(1)
-	constant computedEight = 4::multiply(with 2)
-
+	§ DENOMINATOR — the same split the Integer division family above makes, and
+	§ the same computed Constants keep these calls on the possibly-zero entry.
 	show(
 		"Rational.of(_ Integer, over: Integer)",
 		Rational.of(1, over computedTwo),

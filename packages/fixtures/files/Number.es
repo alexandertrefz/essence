@@ -9,10 +9,11 @@ implementation {
 	__print(1234::subtract(234)) § 1000
 	__print(100::multiply(with 1000)) § 100000
 
-	§ Division leaves the Integers behind — the result is a Rational — and
-	§ dividing by zero comes back empty, so the result wants a fallback before
-	§ chaining onward.
-	constant half = 1110::divide(by 2)::otherwise(1/1)
+	§ Division leaves the Integers behind — the result is a Rational. A divisor
+	§ written down is its own proof that it is not zero, so this division can
+	§ not fail and answers the Rational directly; only a divisor the Program
+	§ computes might be zero, and that division answers an Optional.
+	constant half = 1110::divide(by 2)
 
 	__print(half) § 555/1
 	__print(
