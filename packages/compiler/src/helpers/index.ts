@@ -92,12 +92,16 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
-// NOTE: The Type Arguments an applied refinement should be SPELLED with, or null
-// when the bare Alias name says everything. A non-generic refinement carries none
-// at all, and an instantiation that bound every Parameter to a Parameter — the one
-// a generic Namespace makes of its own target — would only echo the header, so it
-// stays terse. The same rule `caseHeader` reads a Case's Arguments by, for the same
-// reason and with the same wording.
+// NOTE: The Type Arguments an applied refinement is spelled with in a HOVER, or
+// null when the bare Alias name says everything. A non-generic refinement carries
+// none at all, and an instantiation that bound every Parameter to a Parameter —
+// the one a generic Namespace makes of its own target — would only echo the
+// header, so it stays terse. The same rule `caseHeader` reads a Case's Arguments
+// by, for the same reason and with the same wording.
+//
+// A DIAGNOSTIC can not be terse this way: it names a Type the reader is asked to
+// do something about, and `describeType` spells the Arguments out for that reason
+// — see its own NOTE.
 export function displayedRefinementArguments(
 	type: common.RefinementType,
 ): Array<common.Type> | null {
@@ -138,13 +142,20 @@ export function describeType(type: common.Type): string {
 		// Declaration rather than the Type a Diagnostic is about. An applied
 		// generic one is named as it was applied: a message about `NonEmptyList` where
 		// the reader wrote `NonEmptyList<String>` names half a Type.
-		case "Refinement": {
-			let typeArguments = displayedRefinementArguments(type)
-
-			return typeArguments === null
+		//
+		// Which holds just as much where the Arguments are Type PARAMETERS. The
+		// Hover's terser rule drops those, and a Diagnostic must not: it names a
+		// Type the reader is asked to write, check or pass a value of, and
+		// 'NonEmptyList' is not one — a Program spelling it bare is refused for
+		// taking no Arguments. So an applied refinement is spelled as applied,
+		// whatever it was applied TO, and only a refinement that takes no Arguments
+		// at all spells as its name alone.
+		case "Refinement":
+			return type.typeArguments === undefined
 				? type.name
-				: `${type.name}<${typeArguments.map(describeType).join(", ")}>`
-		}
+				: `${type.name}<${type.typeArguments
+						.map(describeType)
+						.join(", ")}>`
 		case "List":
 			return `List<${describeType(type.itemType)}>`
 		case "GenericList":
@@ -1190,6 +1201,29 @@ export function typeMentionsGeneric(
 	genericName: string,
 ): boolean {
 	return typeMentionsAnyGeneric(type, new Set([genericName]))
+}
+
+// NOTE: The same walk where the NAMES are what is wanted rather than a yes or
+// no. Asked of a refinement's base, whose Type Parameters are exactly the ones a
+// value standing at that position may decide: `NonEmptyList<Item>` is a Type only
+// once something says what `Item` is, and unifying the base against the value's
+// own Type is how that is worked out.
+export function genericNamesMentioned(
+	type: common.Type,
+): Set<common.GenericName> {
+	let names = new Set<common.GenericName>()
+
+	// NOTE: A search that never finds anything, so the whole Type is walked —
+	// collecting is what it is here for, and answering would stop it early.
+	typeWalkFinds(type, (record) => {
+		if (record.type === "GenericUse" && typeof record.name === "string") {
+			names.add(record.name)
+		}
+
+		return false
+	})
+
+	return names
 }
 
 // NOTE: The same walk over a whole SET of Generic names, which is what

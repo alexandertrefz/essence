@@ -1,6 +1,13 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { matchesType, provenConjuncts } from "./index"
+import {
+	applyGenericBindings,
+	type GenericBindings,
+	genericNamesMentioned,
+	matchesType,
+	matchesTypeWithBindings,
+	provenConjuncts,
+} from "./index"
 
 // NOTE: Whether a value is admitted into a refinement by DECIDING its predicate
 // here, while compiling. A refinement normally needs a branch in front of it —
@@ -51,6 +58,68 @@ export function admittedByEvaluation(
 	return provenConjuncts(refinement).every(
 		(conjunct) => evaluateConjunct(conjunct, literal) === true,
 	)
+}
+
+// NOTE: The refinement a written value is asked ABOUT, where the position it
+// stands at has not finished saying what it is. A Parameter written
+// `NonEmptyList<Item>` in a signature that infers `Item` is not a Type until
+// something decides that Parameter, and while an Argument is being matched
+// nothing has: the base is `List<Item>`, which no written List is ever of, so the
+// question above could not be asked at all and every literal was refused.
+//
+// So it is asked of the refinement the value itself DECIDES — the declared base
+// unified against the value's own Type, substituted through. `["a"]` decides
+// `Item` as String and answers `hasItems` about a `List<String>`, which is the
+// same question a `NonEmptyList<String>` Parameter would have asked outright.
+//
+// A unification that leaves one Parameter undecided is no question to ask: an
+// empty List's `List<Unknown>` is accepted by `List<Item>` without saying what
+// `Item` is — the Unknown is a slot nothing has filled — and a refinement over a
+// base nobody decided would hand the call a Type nobody wrote. The same rule
+// `instantiatedRefinementFor` establishes a narrowing by, for the same reason.
+//
+// The Parameters asked about are the ones the BASE names, which is what a value
+// can decide anything about. An Alias' Parameter the base does not mention is
+// nothing this value was ever going to answer for — it stays open, and the call
+// reports it uninferable exactly as it does for an unrefined signature. A
+// narrowing demands all of them because there is no call behind it to report
+// anything: the branch either establishes a whole Type or none.
+//
+// NOTE: This is what the value is asked about and NOT what it may answer with.
+// The bindings are worked out in a Map of this call's own, so a losing Overload
+// probe leaves nothing behind; and the instantiation is handed back to
+// `matchTypes` against the Parameter as DECLARED, which binds an `infer`
+// Parameter through the base — never to the refinement, the v1 rule — and refuses
+// an opaque one outright. A `Filled<Item>` whose `Item` belongs to the enclosing
+// Declaration accepts no `Filled<String>`, so a written value proves nothing
+// there, exactly as it should not.
+export function refinementDecidedBy(
+	refinement: common.RefinementType,
+	valueType: common.Type,
+): common.RefinementType | null {
+	let parameters = genericNamesMentioned(refinement.base)
+
+	// NOTE: Every non-generic refinement, which comes back as ITSELF — the
+	// question a `NonZeroInteger` Parameter asks is the one it was written as.
+	if (parameters.size === 0) {
+		return refinement
+	}
+
+	let bindings: GenericBindings = new Map()
+
+	if (
+		!matchesTypeWithBindings(refinement.base, valueType, {
+			bindableNames: parameters,
+			bindings,
+		}) ||
+		[...parameters].some((parameter) => !bindings.has(parameter))
+	) {
+		return null
+	}
+
+	let instantiated = applyGenericBindings(refinement, bindings)
+
+	return instantiated.type === "Refinement" ? instantiated : null
 }
 
 // NOTE: The predicate spelled back out of the conjuncts, for the Diagnostic that
