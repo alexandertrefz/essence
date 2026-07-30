@@ -1044,6 +1044,171 @@ describe("Validator", () => {
 		})
 	})
 
+	// NOTE: A Match on an Integer or a String takes the VALUE apart, and there is
+	// no Union to be exhaustive over — so the SHAPE is what stands in for
+	// exhaustiveness, and it is a rule rather than a style because the last Case
+	// is what a refinement's evidence is read out of.
+	describe("Match on values", () => {
+		let match = (arms: string) => `implementation {
+			constant n = 3
+
+			constant answer = match n -> String {
+				${arms}
+			}
+
+			__print(answer)
+		}`
+
+		it("should accept values above a Case for the rest", () => {
+			expect(
+				diagnosticsFor(
+					match(`case 0 { <- "zero" }
+						case 1 { <- "one" }
+						case _ { <- "more" }`),
+				),
+			).toEqual([])
+		})
+
+		// NOTE: A Case naming the matched Type is `case _` spelled out — the two are
+		// one Matcher by the time a Match is typed, and both are total.
+		it("should accept the matched Type as the Case for the rest", () => {
+			expect(
+				diagnosticsFor(
+					match(`case 0 { <- "zero" }
+						case Integer { <- "more" }`),
+				),
+			).toEqual([])
+		})
+
+		it("should report a Match with no Case for the rest", () => {
+			let diagnostics = diagnosticsFor(match(`case 0 { <- "zero" }`))
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("error")
+			expect(diagnostics[0].code).toBe("literal-match-shape")
+			expect(diagnostics[0].helps).toEqual([
+				"Add a 'case _' below, for every value the Cases above miss.",
+			])
+		})
+
+		it("should report a Case above the end that names no value", () => {
+			let diagnostics = diagnosticsFor(
+				match(`case Integer { <- "any" }
+					case 1 { <- "one" }
+					case _ { <- "more" }`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("literal-match-shape")
+			// NOTE: On the Matcher that can not stand there, not on the Match.
+			expect(diagnostics[0].position?.start.line).toBe(5)
+		})
+
+		// NOTE: The review finding this rule exists for — a Guard decides after the
+		// value already matched, so a Guarded value Case would let the value it named
+		// through to the Cases below, whose evidence says they never see it.
+		it("should report a value Case carrying a Guard", () => {
+			let diagnostics = diagnosticsFor(
+				match(`case 0 where n::isNot(1) { <- "zero" }
+					case _ { <- "more" }`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("literal-match-shape")
+			expect(diagnostics[0].message).toBe(
+				"This Case names a value and can still decline it",
+			)
+		})
+
+		it("should report a Guard on the Case for the rest", () => {
+			let diagnostics = diagnosticsFor(
+				match(`case 0 { <- "zero" }
+					case _ where n::isNot(1) { <- "more" }`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("literal-match-shape")
+			expect(diagnostics[0].message).toBe(
+				"This Match has no Case for the rest of the values",
+			)
+		})
+
+		// NOTE: The Case is compared TO the matched value, so this is the mistake
+		// `n::is("zero")` is — reported in the one place the two Types were never
+		// checked against each other.
+		it("should report a value of another Type", () => {
+			let diagnostics = diagnosticsFor(
+				match(`case "zero" { <- "zero" }
+					case _ { <- "more" }`),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("literal-match-shape")
+			expect(diagnostics[0].message).toBe(
+				"This Case names a value the Match can never be given",
+			)
+		})
+
+		it("should take a String apart by value too", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant text = "essence"
+
+					__print(match text -> String {
+						case "" { <- "nothing" }
+						case _  { <- text }
+					})
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: A refinement is its base with evidence attached, and the values it
+		// holds are the base's values — so a Match on one takes them apart the same
+		// way, and the Cases add to what the Type already carries.
+		it("should take a refined value apart by value", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type NonZeroInteger = Integer where @::isNot(0)
+
+					function named(_ n: NonZeroInteger) -> String {
+						<- match n -> String {
+							case 1 { <- "one" }
+							case _ { <- "more" }
+						}
+					}
+
+					__print(named(3))
+				}`),
+			).toEqual([])
+		})
+
+		// NOTE: Two values are an `if` written the long way, and a Boolean is no
+		// refinable base — so nothing about it changed.
+		it("should keep refusing a Match on a Boolean", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant flag = true
+
+				__print(match flag -> String {
+					case true { <- "yes" }
+					case _    { <- "no" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("match-on-non-union")
+		})
+
+		// NOTE: And a Match on an Integer that names no value asks nothing about the
+		// value it was given, which is the one-outcome Match that Diagnostic has
+		// always been about.
+		it("should keep refusing a Match that names no value", () => {
+			let diagnostics = diagnosticsFor(match(`case _ { <- "any" }`))
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("match-on-non-union")
+		})
+	})
+
 	// NOTE: The dispatch branches of a Method Invocation on a Union-typed
 	// receiver are the Cases nobody wrote — the receiver's runtime Type picks
 	// one, and the first that fits wins, so the two ways a Case can swallow the

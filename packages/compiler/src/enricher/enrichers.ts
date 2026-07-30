@@ -1716,6 +1716,10 @@ export function enrichMatch(
 	let value = enrichExpression(node.value, scope)
 	let returnType = resolveType(node.returnType, scope)
 	let handledMatchers: Array<common.Type> = []
+	// NOTE: The values the Handlers above have NAMED, as the questions they asked
+	// — `case 0` asked `@::is(0)`, and every Handler below it is reached by a value
+	// that answered no. See `refinedSelfType`, which is what reads them.
+	let namedValues: Array<common.PredicateConjunct> = []
 
 	return {
 		nodeType: "Match",
@@ -1793,7 +1797,25 @@ export function enrichMatch(
 				handledMatchers.push(matcher)
 			}
 
-			declareVariableInScope("@", matcher, bodyScope, true)
+			// NOTE: Read from the values the Cases ABOVE this one named, which is
+			// why this Handler's own joins the list only afterwards.
+			declareVariableInScope(
+				"@",
+				refinedSelfType(matcher, namedValues, literal, scope),
+				bodyScope,
+				true,
+			)
+
+			// NOTE: And what this Handler leaves to the ones below it — nothing at
+			// all where a Guard could decline the value it named.
+			let namedValue =
+				literal === null || handler.guard !== null
+					? null
+					: namedValueConjunct(literal)
+
+			if (namedValue !== null) {
+				namedValues.push(namedValue)
+			}
 
 			// NOTE: Resolved before the Guard is enriched, so that the Guard
 			// can name it — and reported here, once, rather than once per place
@@ -3743,18 +3765,106 @@ function complementConjunct(
 		: { ...conjunct, methodName: opposite, overloadIndex: null }
 }
 
-// NOTE: A conjunct's identity WITHOUT which Overload answered it. Only the
-// complement path compares by this, and it has to: the opposite of `is` is
-// `isNot`, and which Overload of `isNot` a receiver would have answered with is
-// not something a Method name and a list of literals can say — `String::is` is
-// overloaded where `String::isNot` is not, so either spelling of the pair would
-// be wrong for the other half. Two Overloads of one Method taking literals that
-// spell the same are conflated by this, which no Namespace in the standard
-// library declares.
+// NOTE: A conjunct's identity WITHOUT which Overload answered it. The two paths
+// that SYNTHESIZE a conjunct rather than reading one off a typed Invocation
+// compare by this, and they have to: the opposite of `is` is `isNot`, and which
+// Overload of either a receiver would have answered with is not something a
+// Method name and a list of literals can say — `String::is` is overloaded where
+// `String::isNot` is not, so either spelling of the pair would be wrong for the
+// other half. Two Overloads of one Method taking literals that spell the same are
+// conflated by this, which no Namespace in the standard library declares.
 function predicateShapeKey(conjunct: common.PredicateConjunct): string {
 	return `${conjunct.namespaceName}::${conjunct.methodName}${JSON.stringify(
 		conjunct.args,
 	)}`
+}
+
+// NOTE: The Type `@` is bound to inside a Match Handler — the Matcher's own,
+// unless a declared refinement says more about the value than the Matcher does.
+// A Match on written values is the second doorway a refinement has, and it is the
+// one nobody has to write a Function for: `case 0` proves the value IS zero, and
+// the Case below it is reached only by a value none of the Cases above named,
+// which is the very `isNot` a `NonZeroInteger` is declared by.
+//
+// NOTE: The evidence is read off the MATCHERS alone, so it holds whatever the
+// Validator makes of the Match's shape — this can not lean on a check that runs
+// after it. Only an unguarded literal Matcher hands evidence DOWN (a Guard can
+// decline the value it named, so the value reaches the Handlers below and the
+// complement would be a claim about a value that is standing right there), while
+// a Handler's own literal proves what it named either way: a Guard runs after the
+// Matcher matched, not instead of it.
+//
+// NOTE: The Matcher itself is untouched. Only `@`'s declared Type carries the
+// evidence, which is what leaves the Rewriter with the Match it always had —
+// literal Cases lowering to `anyIs` and a wildcard to a check on the base.
+function refinedSelfType(
+	matcher: common.Type,
+	namedAbove: Array<common.PredicateConjunct>,
+	literal: common.typed.ExpressionNode | null,
+	scope: enricher.Scope,
+): common.Type {
+	let proven: Array<common.PredicateConjunct> = []
+
+	for (let named of namedAbove) {
+		let complement = complementConjunct(named)
+
+		if (complement !== null) {
+			proven.push(complement)
+		}
+	}
+
+	let named = literal === null ? null : namedValueConjunct(literal)
+
+	if (named !== null) {
+		proven.push(named)
+	}
+
+	if (proven.length === 0) {
+		return matcher
+	}
+
+	// NOTE: The same machinery an `if` narrows through, asked of `@` — which is
+	// what makes a refinement over the wrong base, over a poisoned Type or over a
+	// wildcard nothing is known about (`Unknown`) establish nothing here either,
+	// without a second reading of any of those rules.
+	let narrowings = narrowingsFor(
+		new Map([["@", { receiverType: matcher, conjuncts: proven }]]),
+		scope,
+		predicateShapeKey,
+	)
+
+	return narrowings[0]?.type ?? matcher
+}
+
+// NOTE: The question a literal Matcher ASKS, as a conjunct — `case 0` is
+// `@::is(0)`, and the Handlers below it are reached by a value that answered
+// `false` to exactly that.
+//
+// NOTE: Integer and String only, and null for every other kind of value. The
+// Namespace that answers `is` has to be one whose meaning is known here, and what
+// the Matcher compiles to (`anyIs`) has to answer exactly what that Namespace's
+// `is` answers — those two hold for the two scalars a refinement can be declared
+// over, and a Rational or a Case would need the same argument made about it
+// before its evidence could be trusted.
+function namedValueConjunct(
+	literal: common.typed.ExpressionNode,
+): common.PredicateConjunct | null {
+	if (literal.type.type !== "Integer" && literal.type.type !== "String") {
+		return null
+	}
+
+	let argument = literalPredicateArgument(literal)
+
+	return argument === null
+		? null
+		: {
+				namespaceName: literal.type.type,
+				methodName: "is",
+				// NOTE: Unknowable from here, and dropped by the key this is
+				// compared under — see `predicateShapeKey`.
+				overloadIndex: null,
+				args: [argument],
+			}
 }
 
 // #endregion

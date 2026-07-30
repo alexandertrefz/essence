@@ -389,4 +389,57 @@ describe("Match Lowering", () => {
 			).toEqual(['"took the Integer arm"'])
 		})
 	})
+
+	// NOTE: A Match on an Integer or a String takes the VALUE apart, and there is
+	// no Union under it — so what the Handlers are is a chain of value
+	// comparisons ending in the one Case that answers for the rest. That last Case
+	// is also evidence: reaching it proves the value is none of the values named
+	// above, which is the `isNot` a refinement is declared by. None of that runs —
+	// the evidence erases and the chain is the one someone would have written
+	// without it, which is why this goes all the way through.
+	describe("Matches on values", () => {
+		let doubledOrZero = `implementation {
+			type NonZeroInteger = Integer where @::isNot(0)
+
+			function doubled(_ d: NonZeroInteger) -> Integer {
+				<- d::multiply(with 2)
+			}
+
+			function doubledOrZero(_ d: Integer) -> Integer {
+				<- match d -> Integer {
+					case 0 { <- 0 }
+
+					case _ { <- doubled(@) }
+				}
+			}
+
+			__print(doubledOrZero(21))
+			__print(doubledOrZero(0))
+		}`
+
+		it("answers per value, with the narrowed value reaching the total operation", async () => {
+			expect(await run(doubledOrZero)).toEqual(["42", "0"])
+		})
+
+		it("emits a value comparison and no trace of the evidence", () => {
+			let generated = generate(doubledOrZero)
+
+			// NOTE: A literal Matcher is a value comparison rather than a Type
+			// check, and the refinement is not a Type the emitted Program has ever
+			// heard of — it erases to the Integer it refines, which is the same
+			// object built by the same constructor.
+			expect(generated).toContain("anyIs")
+			expect(generated).not.toContain("NonZeroInteger")
+		})
+
+		// NOTE: The last Handler of such a Match asks a tag question — every value
+		// reaching it is an Integer — so the elision applies exactly as it does to a
+		// Union's last Case, and the chain ends in the Handler rather than in the
+		// throw.
+		it("ends the emitted chain in the Case for the rest", () => {
+			expect(generate(doubledOrZero)).not.toContain(
+				"$type.noCaseMatched(_self)",
+			)
+		})
+	})
 })

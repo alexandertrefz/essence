@@ -1198,6 +1198,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				}
 			}
 		}
+	} else if (isLiteralMatch(node)) {
+		validateLiteralMatchShape(node)
 	} else if (node.value.type.type !== "Error") {
 		reportError(
 			"Match Expressions require a Union Type",
@@ -1327,6 +1329,189 @@ function reportEmptyListOverlap(
 			return
 		}
 	}
+}
+
+// NOTE: A Match that takes a VALUE apart rather than a Type — `match n { case 0
+// { … } case _ { … } }`. There is no Union here to be exhaustive over, so what
+// stands in for exhaustiveness is the SHAPE: every Case names a value, and the
+// last one answers for every value the Cases above it did not name.
+//
+// NOTE: That last Case is also where evidence comes from. Reaching it proves the
+// value is none of the values named above, which is the `isNot` a refinement is
+// declared by — `refinedSelfType` in the Enricher is what reads it — so the
+// shape is a rule about what the Program MEANS rather than a matter of style.
+//
+// NOTE: Integer and String, and no other Type. They are the two refinable scalar
+// bases, and they are the two whose literal Matcher asks exactly what their
+// Namespace's `is` asks: `anyIs` compares Integers as bigints and Strings
+// NFC-normalised, which is what `Integer.is` and `String.is` answer, so a Case
+// that declined really does prove `isNot`. A Boolean's two values are an `if`
+// written the long way, and everything else keeps `match-on-non-union`.
+//
+// NOTE: A Match on one of the two that names NO value at all is not one of
+// these. It asks nothing about the value it was given, which is the one-outcome
+// Match `match-on-non-union` has always been about, and it still reports.
+function isLiteralMatch(node: common.typed.MatchNode): boolean {
+	let scrutinee = eraseRefinements(node.value.type)
+
+	return (
+		(scrutinee.type === "Integer" || scrutinee.type === "String") &&
+		node.handlers.some((handler) => handler.literal !== null)
+	)
+}
+
+// NOTE: One Diagnostic per Case that can not stand where it stands, and one more
+// for a Match that does not end in a Case for the rest — each is a mistake of
+// its own at a Position of its own, which is why they are not merged the way
+// `missing-case` merges the members of a Union.
+function validateLiteralMatchShape(node: common.typed.MatchNode): void {
+	let scrutinee = eraseRefinements(node.value.type)
+	let matchedValue = () =>
+		secondary(
+			node.value.position,
+			`this is ${withArticle(describeType(node.value.type))}`,
+		)
+	let takesValuesApart = `A Match on ${withArticle(describeType(scrutinee))} takes the VALUE apart: every Case names a value, and the last one answers for every value the Cases above it did not name.`
+	let lastIndex = node.handlers.length - 1
+
+	for (let index = 0; index < lastIndex; index++) {
+		let handler = node.handlers[index]
+
+		if (handler.literal === null) {
+			reportError(
+				"This Case does not name a value",
+				handler.matcherPosition,
+				{
+					code: "literal-match-shape",
+					labels: [
+						primary(
+							handler.matcherPosition,
+							"only a written value can stand here",
+						),
+						matchedValue(),
+					],
+					notes: [takesValuesApart],
+					helps: [
+						"Write the value this Case is about — 'case 0' — or move it to the end, where 'case _' answers for the rest.",
+					],
+				},
+			)
+
+			continue
+		}
+
+		if (handler.guard !== null) {
+			reportError(
+				"This Case names a value and can still decline it",
+				handler.matcherPosition,
+				{
+					code: "literal-match-shape",
+					labels: [
+						primary(
+							handler.guard.position,
+							"this decides after the value already matched",
+						),
+						secondary(
+							handler.matcherPosition,
+							"this Case names the value",
+						),
+					],
+					notes: [
+						takesValuesApart,
+						"So the last Case is reached only by a value none of the Cases above named — and a Guard would let one of them through, which makes that untrue.",
+					],
+					helps: [
+						"Take the Guard off, and ask its question inside the Handler with an 'if'.",
+					],
+				},
+			)
+
+			continue
+		}
+
+		// NOTE: The Case is compared TO the matched value, so a Case naming a
+		// value of another Type is a comparison that is false however it is
+		// written — the same mistake `n::is("zero")` is, in the one place the
+		// Types were never checked against each other.
+		if (!matchesType(scrutinee, handler.literal.type)) {
+			reportError(
+				"This Case names a value the Match can never be given",
+				handler.matcherPosition,
+				{
+					code: "literal-match-shape",
+					labels: [
+						primary(
+							handler.matcherPosition,
+							`this is ${withArticle(describeType(handler.literal.type))}`,
+						),
+						matchedValue(),
+					],
+					notes: [
+						"A Case of such a Match is compared to the matched value, and a comparison across Types can never be true.",
+					],
+				},
+			)
+		}
+	}
+
+	let last = node.handlers[lastIndex]
+
+	// NOTE: A Match with no Handlers at all is a Parser error, and this runs on a
+	// tree the Parser accepted.
+	if (last === undefined) {
+		return
+	}
+
+	// NOTE: Unconditional, and accepting every value that can arrive — `case _`,
+	// or a Case naming the matched Type itself, which is the same question spelled
+	// out. Both are indistinguishable by the time a Match is typed, and both are
+	// total, so both are the end of a Match on values.
+	if (
+		isUnconditionalHandler(last) &&
+		acceptsAllAtRuntime(last.matcher, node.value.type)
+	) {
+		return
+	}
+
+	reportError(
+		"This Match has no Case for the rest of the values",
+		node.position,
+		{
+			code: "literal-match-shape",
+			labels: [finalHandlerLabel(last), matchedValue()],
+			notes: [
+				takesValuesApart,
+				`There are more values of ${describeType(scrutinee)} than a Match can write down, so the last Case is what makes it answer for all of them.`,
+			],
+			helps: [
+				"Add a 'case _' below, for every value the Cases above miss.",
+			],
+		},
+	)
+}
+
+// NOTE: WHY the last Handler is not the end of a Match on values — the three ways
+// it can fail to answer for everything the Cases above it left, each underlining
+// the part of the Handler that decides.
+function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
+	if (handler.literal !== null || handler.memberLiterals !== null) {
+		return primary(
+			handler.matcherPosition,
+			"this Case names a value, not the rest of them",
+		)
+	}
+
+	if (handler.guard !== null) {
+		return primary(
+			handler.guard.position,
+			"this decides after the value already matched",
+		)
+	}
+
+	return primary(
+		handler.matcherPosition,
+		"this Case does not accept every value that reaches it",
+	)
 }
 
 // NOTE: A Handler with a literal Matcher, a value-constrained Record member or
