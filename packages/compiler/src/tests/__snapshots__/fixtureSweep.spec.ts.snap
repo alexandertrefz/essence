@@ -1,5 +1,34 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
+exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
+""2"
+"cleared"
+"undone""
+`;
+
+exports[`Fixture Sweep ConditionalConformance.es should print what it printed before 1`] = `
+"[ 1, 2, 3 ]
+[ [ 1, 2 ], [ 3 ] ]
+[ [ [ 1 ] ], [ [ 2 ] ] ]
+"Less""
+`;
+
+exports[`Fixture Sweep Documentation.es should print what it printed before 1`] = `
+""Hello, World!"
+"Hello! Hello again!"
+"Look!!!"
+"Hello, Essence!"
+"3"
+"6"
+"Hello, stranger!"
+"Hello, all 3 of you!""
+`;
+
+exports[`Fixture Sweep Event.es should print what it printed before 1`] = `
+""The Records are the same!"
+"The Records are not the same anymore!""
+`;
+
 exports[`Fixture Sweep Everyday.es should print what it printed before 1`] = `
 "2
 Optional#Value(1024)
@@ -41,35 +70,6 @@ Optional#Value(3)
 Optional#Value([ [ 1, 2 ], [ 3, 4 ], [ 5 ] ])
 [ 1, 2, 3, 4, 5 ]
 [ "x", "x", "x" ]"
-`;
-
-exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
-""2"
-"cleared"
-"undone""
-`;
-
-exports[`Fixture Sweep ConditionalConformance.es should print what it printed before 1`] = `
-"[ 1, 2, 3 ]
-[ [ 1, 2 ], [ 3 ] ]
-[ [ [ 1 ] ], [ [ 2 ] ] ]
-"Less""
-`;
-
-exports[`Fixture Sweep Documentation.es should print what it printed before 1`] = `
-""Hello, World!"
-"Hello! Hello again!"
-"Look!!!"
-"Hello, Essence!"
-"3"
-"6"
-"Hello, stranger!"
-"Hello, all 3 of you!""
-`;
-
-exports[`Fixture Sweep Event.es should print what it printed before 1`] = `
-""The Records are the same!"
-"The Records are not the same anymore!""
 `;
 
 exports[`Fixture Sweep GenericChoice.es should print what it printed before 1`] = `
@@ -238,6 +238,9 @@ true
 8
 "essence!"
 2
+"red"
+"blue"
+3
 42
 0
 21
@@ -246,6 +249,8 @@ true
 ""
 2
 0
+"essence"
+"none"
 8
 0
 "42"
