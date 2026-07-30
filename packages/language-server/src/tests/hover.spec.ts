@@ -660,7 +660,12 @@ describe("Hover inside a Match Handler", () => {
 	it("should describe a Guard's scrutinee and the Method it invokes", () => {
 		// NOTE: `@` is narrowed to what the Matcher established, which is what
 		// makes the Guard's Method resolve at all.
-		expect(hover(source, { line: 7, column: 23 })).toBe("@: Integer")
+		//
+		// NOTE: And to `NonZeroInteger` rather than to a bare Integer, because the
+		// Case above named `0` — so a value reaching this Handler is an Integer
+		// that is not zero, which is exactly what the standard library's
+		// refinement is declared by. The Hover says the name the evidence has.
+		expect(hover(source, { line: 7, column: 23 })).toBe("@: NonZeroInteger")
 		expect(hover(source, { line: 7, column: 30 })).toBe(
 			"isNegative() -> Boolean",
 		)
@@ -728,27 +733,25 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 	})
 
 	// NOTE: A checked refinement reads back as its BASE on its own Declaration —
-	// `NonZeroInteger: NonZeroInteger` is what naming it would say there, and the
+	// `NonZero: NonZero` is what naming it would say there, and the
 	// predicate is on the line the cursor is already on — while a value of it
 	// reads back as the NAME, because that is the Type the value has and the
 	// evidence is the whole point of it.
 	it("should describe a checked refinement", () => {
 		let source = [
 			"implementation {",
-			"\ttype NonZeroInteger = Integer where @::isNot(0)",
+			"\ttype NonZero = Integer where @::isNot(0)",
 			"",
-			"\tfunction doubled(_ n: NonZeroInteger) -> Integer {",
+			"\tfunction doubled(_ n: NonZero) -> Integer {",
 			"\t\t<- n::multiply(with 2)",
 			"\t}",
 			"}",
 		].join("\n")
 
-		expect(hover(source, { line: 2, column: 10 })).toBe(
-			"NonZeroInteger: Integer",
-		)
-		expect(hover(source, { line: 2, column: 26 })).toBe("Integer")
-		expect(hover(source, { line: 4, column: 27 })).toBe("NonZeroInteger")
-		expect(hover(source, { line: 5, column: 7 })).toBe("n: NonZeroInteger")
+		expect(hover(source, { line: 2, column: 10 })).toBe("NonZero: Integer")
+		expect(hover(source, { line: 2, column: 19 })).toBe("Integer")
+		expect(hover(source, { line: 4, column: 27 })).toBe("NonZero")
+		expect(hover(source, { line: 5, column: 7 })).toBe("n: NonZero")
 	})
 })
 

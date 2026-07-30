@@ -15,6 +15,18 @@ import {
 
 declarations {
 
+	§ The Integers that are not zero. It is a checked refinement, so the
+	§ predicate is not a comment about the values — it is what a value has to
+	§ have been proven to satisfy before it may be called one, and the proof is
+	§ what the Type carries. A value written DOWN is its own proof; a value a
+	§ Program is handed goes through an `if` or a `match` that asks the question.
+	§
+	§ This is what lets an operation that can not fail say so. A division by one
+	§ of these is a Rational rather than an Optional, and `Rational::denominator`
+	§ answers with one — so the arithmetic on the lowest-terms accessors composes
+	§ without a single fallback for a case that can not arise.
+	type NonZeroInteger = Integer where @::isNot(0)
+
 	§ Whole numbers of arbitrary size, and the exact arithmetic over them.
 	§ Every Method here stays exact: an operation that leaves the Integers
 	§ widens into the Type that can still say the answer — a Rational, an
@@ -347,4 +359,5 @@ declarations {
 
 export {
 	Integer
+	NonZeroInteger
 }

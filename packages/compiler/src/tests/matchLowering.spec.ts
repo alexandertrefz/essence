@@ -399,9 +399,9 @@ describe("Match Lowering", () => {
 	// without it, which is why this goes all the way through.
 	describe("Matches on values", () => {
 		let doubledOrZero = `implementation {
-			type NonZeroInteger = Integer where @::isNot(0)
+			type NonZero = Integer where @::isNot(0)
 
-			function doubled(_ d: NonZeroInteger) -> Integer {
+			function doubled(_ d: NonZero) -> Integer {
 				<- d::multiply(with 2)
 			}
 
@@ -429,7 +429,7 @@ describe("Match Lowering", () => {
 			// heard of — it erases to the Integer it refines, which is the same
 			// object built by the same constructor.
 			expect(generated).toContain("anyIs")
-			expect(generated).not.toContain("NonZeroInteger")
+			expect(generated).not.toContain("NonZero")
 		})
 
 		// NOTE: The last Handler of such a Match asks a tag question — every value

@@ -81,6 +81,11 @@ export const builtinTypeOrder: Array<string> = [
 	"Boolean",
 	"String",
 	"Integer",
+	// NOTE: Directly after the Type it refines, for the reason `NestedList` sits
+	// directly after `List` — a reader of this table meets `Integer` and then what
+	// an Integer can be proven to be, and `closestMatch` breaks a tie on the FIRST
+	// candidate, so a typo near both still reads as the base Type.
+	"NonZeroInteger",
 	"Rational",
 	"Algebraic",
 	"Transcendental",

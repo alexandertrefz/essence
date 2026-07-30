@@ -18,9 +18,10 @@
 
 implementation {
 
-	§ The refinement the whole design was written for: the denominator of a
-	§ Rational, the divisor of a division that can not fail.
-	type NonZeroInteger = Integer where @::isNot(0)
+	§ `NonZeroInteger` is the standard library's own — the refinement the whole
+	§ design was written for, and the one `Rational::denominator` answers with —
+	§ so it is USED here rather than declared. Everything below is a Program's
+	§ own, declared exactly the way that one is.
 
 	§ A String with something in it.
 	type NonEmptyString = String where @::hasAnyContent()
