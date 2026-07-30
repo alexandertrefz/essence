@@ -15,7 +15,7 @@
 // Namespace's target bought. The proof is spent HERE, which is why neither of
 // these could be written in Essence: the language has no way to be told it holds.
 import type { BooleanType } from "./Boolean"
-import { createList, type ListType } from "./List"
+import { append__overload$2, createList, type ListType } from "./List"
 import type { AnyType } from "./type"
 
 export function firstItem<ItemType extends AnyType>(
@@ -66,4 +66,21 @@ export function removeDuplicates<ItemType extends AnyType>(
 	}
 
 	return createList(kept)
+}
+
+// NOTE: `append(contentsOf:)` is `List`'s own second Overload entry under a name
+// with no `__overload$N` on it — this Namespace declares ONE `append`, so the
+// Simplifier emits it unmangled and the re-export renames it. What is added is
+// beside the point here: the receiver is the proof.
+export { append__overload$2 as append } from "./List"
+
+// NOTE: The mirror of it, and a wrapper rather than a re-export because
+// `List::prepend(contentsOf:)` is written in Essence, as
+// `other::append(contentsOf @)`. This is that body with the two Lists the other
+// way round, which is all prepending has ever been.
+export function prepend<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	contentsOf: ListType<ItemType>,
+): ListType<ItemType> {
+	return append__overload$2(contentsOf, originalList)
 }
