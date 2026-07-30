@@ -3193,23 +3193,23 @@ declarations {
 	})
 
 	// NOTE: The same doorway over a GENERIC refinement, which is the one shape
-	// where the Type the branch establishes was written nowhere: `NonEmptyList<String>`
+	// where the Type the branch establishes was written nowhere: `Filled<String>`
 	// is worked out from the receiver standing in front of the question. What runs
 	// is still the Program someone would have written without a refinement
 	// anywhere — the evidence erases, and a List is a List.
 	describe("a doorway over a generic refinement", () => {
 		const SOURCE = `implementation {
-	type NonEmptyList<Item> = List<Item> where @::hasItems()
+	type Filled<Item> = List<Item> where @::hasItems()
 
 	§ The operation that can not fail, and says so — there is no first item of an
 	§ empty List, and no value of this Parameter's Type is empty.
-	function firstOf(_ items: NonEmptyList<String>) -> String {
+	function firstOf(_ items: Filled<String>) -> String {
 		<- items::item(at 0)::otherwise("")
 	}
 
 	§ The doorway: a bare List goes in, and the branch that proved the predicate
 	§ is the only one that reaches the total operation. Nothing wrote
-	§ 'NonEmptyList<String>' anywhere in it.
+	§ 'Filled<String>' anywhere in it.
 	function firstOrEmpty(_ items: List<String>) -> String {
 		if items::hasItems() {
 			<- firstOf(items)
@@ -3219,7 +3219,7 @@ declarations {
 	}
 
 	§ And a written List is its own proof, with nothing asking anything.
-	constant proven: NonEmptyList<String> = ["written"]
+	constant proven: Filled<String> = ["written"]
 
 	__print(firstOrEmpty(["a", "b"]))
 	__print(firstOrEmpty([]))
@@ -3230,9 +3230,9 @@ declarations {
 		// that makes the run above mean anything — without it the test would pass
 		// just as well with no narrowing and no refinement at all.
 		const UNCHECKED = `implementation {
-	type NonEmptyList<Item> = List<Item> where @::hasItems()
+	type Filled<Item> = List<Item> where @::hasItems()
 
-	function firstOf(_ items: NonEmptyList<String>) -> String {
+	function firstOf(_ items: Filled<String>) -> String {
 		<- items::item(at 0)::otherwise("")
 	}
 
@@ -3246,11 +3246,11 @@ declarations {
 		// NOTE: And the same Program asking about a List of the wrong items, which
 		// is what says that the Type Arguments are part of the evidence: the branch
 		// proves `hasItems` of a `List<Integer>` and proves nothing whatever about a
-		// `NonEmptyList<String>`.
+		// `Filled<String>`.
 		const WRONG_ITEMS = `implementation {
-	type NonEmptyList<Item> = List<Item> where @::hasItems()
+	type Filled<Item> = List<Item> where @::hasItems()
 
-	function firstOf(_ items: NonEmptyList<String>) -> String {
+	function firstOf(_ items: Filled<String>) -> String {
 		<- items::item(at 0)::otherwise("")
 	}
 

@@ -554,10 +554,10 @@ describe("Dispatch and Resolution", () => {
 		// NOTE: The whole rule again over a GENERIC refinement, which the sort sees
 		// for exactly the reason it sees any other: what it asks is whether a
 		// Parameter Type mentions a refinement anywhere, and an applied
-		// `NonEmptyList<String>` is one. A written List reaches the entry asking for
+		// `Filled<String>` is one. A written List reaches the entry asking for
 		// evidence, a narrowed one does too, and a List nothing proved anything about
 		// still finds the base entry.
-		let lists = `type NonEmptyList<Item> = List<Item> where @::hasItems()
+		let lists = `type Filled<Item> = List<Item> where @::hasItems()
 
 			namespace Firsts for {} {
 				overload static describe {
@@ -568,7 +568,7 @@ describe("Dispatch and Resolution", () => {
 					}
 
 					§ The entry asking for evidence, appended after it.
-					(_ items: NonEmptyList<String>) -> String {
+					(_ items: Filled<String>) -> String {
 						<- "total"
 					}
 				}

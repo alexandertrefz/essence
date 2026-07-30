@@ -11,6 +11,23 @@ import {
 
 declarations {
 
+	§ The Lists that have something in them. It is a checked refinement, so the
+	§ predicate is not a comment about the values — it is what a value has to
+	§ have been proven to satisfy before it may be called one, and the proof is
+	§ what the Type carries. A List written DOWN with items in it is its own
+	§ proof; a List a Program is handed goes through an `if` asking `hasItems`.
+	§
+	§ It is generic, and the predicate is why that costs nothing: whether a List
+	§ has items is not a question about WHAT it holds, so one predicate serves
+	§ every item Type and the Type Argument lives in the base — a
+	§ `NonEmptyList<String>` and a `NonEmptyList<Integer>` are told apart by
+	§ `List<String>` against `List<Integer>`, exactly as their bases are.
+	§
+	§ This is what lets `firstItem` and `lastItem` answer with an ITEM rather
+	§ than with an Optional. `NonEmptyList` below holds those two and nothing else:
+	§ every other Method a List has already answers for the empty one.
+	type NonEmptyList<ItemType> = List<ItemType> where @::hasItems()
+
 	§ The ordered sequence, and everything that reads or rebuilds one. Every
 	§ Method here is a Query — a List is never changed in place, a new List is
 	§ returned.
@@ -730,4 +747,5 @@ declarations {
 export {
 	List
 	NestedList
+	NonEmptyList
 }

@@ -756,28 +756,26 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 
 	// NOTE: A GENERIC refined Alias is a Generic Alias WRAPPING the refinement, so
 	// its Declaration has to look one level further in to read back the base —
-	// otherwise the very substitution above answered `NonEmptyList: NonEmptyList`. A value
-	// of one reads back APPLIED, because `NonEmptyList` alone names half the Type the
+	// otherwise the very substitution above answered `Filled: Filled`. A value
+	// of one reads back APPLIED, because `Filled` alone names half the Type the
 	// source wrote.
 	it("should describe a generic checked refinement", () => {
 		let source = [
 			"implementation {",
-			"\ttype NonEmptyList<Item> = List<Item> where @::hasItems()",
+			"\ttype Filled<Item> = List<Item> where @::hasItems()",
 			"",
-			"\tfunction countOf(_ items: NonEmptyList<String>) -> Integer {",
+			"\tfunction countOf(_ items: Filled<String>) -> Integer {",
 			"\t\t<- items::length()",
 			"\t}",
 			"}",
 		].join("\n")
 
 		expect(hover(source, { line: 2, column: 10 })).toBe(
-			"NonEmptyList: List<Item>",
+			"Filled: List<Item>",
 		)
-		expect(hover(source, { line: 4, column: 31 })).toBe(
-			"NonEmptyList<String>",
-		)
+		expect(hover(source, { line: 4, column: 31 })).toBe("Filled<String>")
 		expect(hover(source, { line: 5, column: 8 })).toBe(
-			"items: NonEmptyList<String>",
+			"items: Filled<String>",
 		)
 	})
 })

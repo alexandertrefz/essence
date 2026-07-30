@@ -4915,14 +4915,19 @@ describe("Enricher", () => {
 
 		// NOTE: The conjunct set of a generic refinement is the point of the whole
 		// design: `hasItems` asks nothing about the items, so the key holds no Type
-		// Argument at all and `NonEmptyList<String>` differs from `NonEmptyList<Integer>`
+		// Argument at all and `Filled<String>` differs from `Filled<Integer>`
 		// by its BASE — which `matchTypes` already compares.
+		//
+		// NOTE: A Program's OWN Alias throughout this file, under a name the
+		// standard library does not use — `NonEmptyList` is a builtin now, and
+		// declaring one over again would only be a `duplicate-type`. What is under
+		// test is the mechanism, which is the same one the builtin is declared by.
 		it("should refine a generic applied List, keying the conjunct without the Argument", () => {
 			let refinement = genericRefinementOf(
-				"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
+				"implementation { type Filled<Item> = List<Item> where @::hasItems() }",
 			)
 
-			expect(refinement.name).toBe("NonEmptyList")
+			expect(refinement.name).toBe("Filled")
 			expect(refinement.base).toEqual({
 				type: "List",
 				itemType: { type: "GenericUse", name: "Item" },
@@ -4944,9 +4949,9 @@ describe("Enricher", () => {
 		// nothing to substitute.
 		it("should apply a generic refinement's Arguments into its base", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				type NonEmptyList<Item> = List<Item> where @::hasItems()
+				type Filled<Item> = List<Item> where @::hasItems()
 
-				function lengthOf(_ items: NonEmptyList<String>) -> Integer {
+				function lengthOf(_ items: Filled<String>) -> Integer {
 					<- items::length()
 				}
 			}`)
@@ -4980,7 +4985,7 @@ describe("Enricher", () => {
 			})
 			expect(applied.typeArguments).toEqual([{ type: "String" }])
 			expect(applied.conjuncts).toBe(alias.type.aliasedType.conjuncts)
-			expect(printType(applied)).toBe("NonEmptyList<String>")
+			expect(printType(applied)).toBe("Filled<String>")
 		})
 
 		// NOTE: `isBetween` is declared once over the whole numeric tower, so an
@@ -5028,7 +5033,7 @@ describe("Enricher", () => {
 		// Language Server got an Error where the Compiler had a Boolean.
 		it("should carry the enriched predicate of a generic Alias too", () => {
 			let alias = aliasOf(
-				"implementation { type NonEmptyList<Item> = List<Item> where @::hasItems() }",
+				"implementation { type Filled<Item> = List<Item> where @::hasItems() }",
 			)
 
 			expect(alias.predicate?.nodeType).toBe("MethodInvocation")
@@ -5832,22 +5837,25 @@ describe("Enricher", () => {
 		})
 
 		// NOTE: A refinement over a base the binding is not of establishes nothing,
-		// however the predicate is spelled.
+		// however the predicate is spelled. Asked of a String receiver rather than
+		// of a List one, because the standard library's own `NonEmptyList` is a
+		// refinement over every List and would be established here on its own
+		// account — which is the doorway working, not this rule failing.
 		it("should not narrow across bases", () => {
 			expect(
 				narrowedTypeOf(
 					`implementation {
-						type NonEmptyString = String where @::hasAnyContent()
+						type NonEmptyStrings = List<String> where @::hasItems()
 
-						constant items = ["a", "b"]
+						constant text = "essence"
 
-						if items::hasItems() {
-							__print(items)
+						if text::hasAnyContent() {
+							__print(text)
 						}
 					}`,
-					"items",
+					"text",
 				),
-			).toBe("List<String>")
+			).toBe("String")
 		})
 
 		// NOTE: A GENERIC refined Alias stands for nothing until something decides
@@ -5857,15 +5865,20 @@ describe("Enricher", () => {
 		// and everything below it is the rule every other refinement is established
 		// by, asked of the refinement that unification built.
 		describe("a generic refinement", () => {
-			const NON_EMPTY =
-				"type NonEmptyList<Item> = List<Item> where @::hasItems()"
+			// NOTE: The standard library's own `NonEmptyList` is the generic refinement
+			// every `hasItems` branch establishes now, so these ask nothing of a
+			// Program-declared Alias — a second one proving the same thing is a
+			// candidate beside it, and the builtin is reached first, being declared
+			// first in the one top-level table. A Program's OWN generic refined
+			// Alias is what `Filled` below is for: the value a branch establishes
+			// flows into a Parameter written with it, because two refinements are
+			// one Type when they prove the same thing of the same base.
+			const FILLED = "type Filled<Item> = List<Item> where @::hasItems()"
 
 			it("should narrow a List to the Alias applied to its items", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${NON_EMPTY}
-
 							constant items = ["a", "b"]
 
 							if items::hasItems() {
@@ -5878,14 +5891,12 @@ describe("Enricher", () => {
 			})
 
 			// NOTE: The Arguments are worked out from the receiver whatever they are
-			// — a List of Lists decides `Item` as the inner List, and the spelling
-			// says so.
+			// — a List of Lists decides `ItemType` as the inner List, and the
+			// spelling says so.
 			it("should narrow a List of Lists to the Alias applied to them", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${NON_EMPTY}
-
 							constant items = [["a"], ["b"]]
 
 							if items::hasItems() {
@@ -5899,15 +5910,15 @@ describe("Enricher", () => {
 
 			// NOTE: The narrowing is worth what it lets a Program write, and what it
 			// lets a Program write is a call nothing spelled the Type of: the
-			// Parameter says `NonEmptyList<String>` and the branch worked that out from
+			// Parameter says `Filled<String>` and the branch worked that out from
 			// a `List<String>`. Asserted end to end in `codeGeneration.spec.ts`,
 			// where the Validator that refuses it outside the branch runs.
 			it("should let a narrowed List reach a refined Parameter", () => {
 				expect(
 					diagnosticsFor(`implementation {
-						${NON_EMPTY}
+						${FILLED}
 
-						function firstOf(_ items: NonEmptyList<String>) -> String {
+						function firstOf(_ items: Filled<String>) -> String {
 							<- items::item(at 0)::otherwise("")
 						}
 
@@ -5928,8 +5939,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${NON_EMPTY}
-
 							constant items = ["a", "b"]
 
 							if items::isEmpty() {
@@ -5946,8 +5955,6 @@ describe("Enricher", () => {
 			// NOTE: And a Match Handler's Guard, through the same helper again.
 			it("should narrow '@' by a Match Handler's Guard", () => {
 				let value = lastConstantValue(`implementation {
-					${NON_EMPTY}
-
 					constant value: List<String> | String = ["a"]
 
 					constant narrowed = match value -> Integer {
@@ -5983,8 +5990,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${NON_EMPTY}
-
 							variable items = ["a", "b"]
 
 							if items::hasItems() {
@@ -5999,16 +6004,18 @@ describe("Enricher", () => {
 			// NOTE: A unification that leaves a Parameter undecided is no candidate:
 			// `B` appears nowhere in the base, so no receiver could ever decide it,
 			// and a refinement whose base nobody decided would put a Type nobody
-			// wrote into the branch.
+			// wrote into the branch. The predicate is `isEmpty` so that the ONLY
+			// candidate in the branch is the one under test — the builtin `NonEmptyList`
+			// asks the opposite question and establishes nothing here.
 			it("should not narrow where the receiver decides only some Parameters", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							type Pairish<A, B> = List<A> where @::hasItems()
+							type Pairish<A, B> = List<A> where @::isEmpty()
 
 							constant items = ["a", "b"]
 
-							if items::hasItems() {
+							if items::isEmpty() {
 								__print(items)
 							}
 						}`,
@@ -6026,8 +6033,6 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							${NON_EMPTY}
-
 							function probe<Item>(_ items: List<Item>) -> Integer {
 								if items::hasItems() {
 									__print(items)
