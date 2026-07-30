@@ -3730,6 +3730,22 @@ function narrowingsFor(
 				continue
 			}
 
+			// NOTE: Strictly GREATER, so where two candidates prove the same
+			// number of conjuncts the one walked FIRST stands. That walk is
+			// ordered, and the order is the whole tie-break: nearest Scope first,
+			// insertion order within a table — which puts the builtins ahead of a
+			// Program's own declarations — and every concrete candidate ahead of a
+			// generic one instantiated at this receiver. So a Program declaring a
+			// second Alias with the standard library's own predicate narrows to
+			// `NonZeroInteger` rather than to the name it wrote, while one declared
+			// inside a Function beats both. Pinned in `enricher.spec.ts`.
+			//
+			// Deterministic, and nothing rests on WHICH of them it is: two
+			// refinements proving the same conjuncts over the same base are one
+			// Type to everything that reads conjuncts — assignability, dispatch
+			// specificity and literal admission ask the conjunct set and nothing
+			// besides — so the tie decides the name a Hover prints, not what the
+			// branch may write.
 			if (
 				established === null ||
 				provenConjuncts(refinement).length >
