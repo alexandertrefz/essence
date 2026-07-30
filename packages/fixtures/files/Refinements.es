@@ -10,9 +10,9 @@
 § An `if` whose condition asks a refinement's question narrows the Constant it
 § asked it of, which is what makes a doorway writable: a bare value goes in, and
 § the branch that proved the predicate is the only one that reaches the operation
-§ demanding the proof. A literal admitted against a predicate without any `if`
-§ at all, and a Match over a bare Integer, come in the work packages after this
-§ one.
+§ demanding the proof. A value written DOWN needs no branch at all — its
+§ predicate is decided while compiling. A Match over a bare Integer comes in the
+§ work package after this one.
 
 implementation {
 
@@ -115,6 +115,18 @@ implementation {
 		<- digit::add(1)
 	}
 
+	§ A value written DOWN is its own evidence: the predicate is decided while
+	§ compiling, so no branch stands in front of this and nothing has asked
+	§ anything. The doorways above are for the values a Program is HANDED.
+	constant twentyOne: NonZeroInteger = 21
+
+	§ Which holds wherever a refinement is expected — a declared Constant, a
+	§ returned value, an Argument — and holds of a String and a List as much as
+	§ of an Integer.
+	function three() -> NonZeroInteger {
+		<- 3
+	}
+
 	§ Until a total division exists, the operations these refinements are ABOUT
 	§ are the Optionals they have always been: an Integer divided by an Integer
 	§ might have been divided by zero, and nothing in the signature says
@@ -129,6 +141,14 @@ implementation {
 	__print(["a", "b"]::hasItems())
 	__print(7::isBetween(0, and 9))
 	__print(7::isOdd()::and(7::isLessThan(10)))
+
+	§ The values written down, which need no doorway at all.
+	__print(doubled(twentyOne))
+	__print(doubled(three()))
+	__print(doubled(21))
+	__print(placed(7))
+	__print(exclaimed("essence"))
+	__print(lengthOf(["a", "b"]))
 
 	§ And the doorways, answering about values nothing had proven anything about
 	§ before they were asked.

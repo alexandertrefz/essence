@@ -2329,4 +2329,300 @@ describe("Validator", () => {
 			)
 		})
 	})
+
+	// NOTE: A refinement demands evidence and a value written DOWN carries its
+	// own, so not one source below has an `if` in it anywhere: the predicate is
+	// decided while compiling, and a Program says exactly what it would have said
+	// without the refined Type. What is left for the Validator is the refusal —
+	// and a refusal that names the question, because a value that does not answer
+	// it is not a spelling mistake.
+	describe("Checked refinements", () => {
+		function withRefinements(body: string): string {
+			return `implementation {
+				type NonZeroInteger = Integer where @::isNot(0)
+				type NonEmptyString = String where @::hasAnyContent()
+				type NonEmptyStrings = List<String> where @::hasItems()
+				type Digit = Integer where @::isBetween(0, and 9)
+				type SmallOdd = Integer where @::isOdd()::and(@::isLessThan(10))
+
+				function doubled(_ n: NonZeroInteger) -> Integer {
+					<- n::multiply(with 2)
+				}
+
+				${body}
+			}`
+		}
+
+		function diagnosticsOfBody(body: string): Array<common.Diagnostic> {
+			return diagnosticsFor(withRefinements(body))
+		}
+
+		it("should admit a written value into a declared refinement", () => {
+			expect(
+				diagnosticsOfBody(`
+					constant d: NonZeroInteger = 3
+					variable e: NonZeroInteger = 4
+
+					e = 5
+
+					__print(doubled(d))
+					__print(doubled(e))
+				`),
+			).toEqual([])
+		})
+
+		it("should admit a written value into a refined Parameter", () => {
+			expect(diagnosticsOfBody("__print(doubled(21))")).toEqual([])
+		})
+
+		it("should admit a written value where a refinement is returned", () => {
+			expect(
+				diagnosticsOfBody(`
+					function three() -> NonZeroInteger {
+						<- 3
+					}
+
+					__print(doubled(three()))
+				`),
+			).toEqual([])
+		})
+
+		// NOTE: A committed Overload whose Arguments do not match is an ICE here
+		// rather than a Diagnostic, so an admission the Enricher makes and the
+		// Validator does not would fail the compile outright and report nothing a
+		// reader could act on. This is that crossing, on the call shape that
+		// cross-checks itself.
+		it("should admit a written value an Overload was committed on", () => {
+			expect(
+				diagnosticsOfBody(`
+					namespace Scale for {} {
+						overload static tripled {
+							(_ n: NonZeroInteger) -> Integer {
+								<- n::multiply(with 3)
+							}
+
+							(_ text: String) -> Integer {
+								<- text::length()
+							}
+						}
+					}
+
+					__print(Scale.tripled(7))
+				`),
+			).toEqual([])
+		})
+
+		// NOTE: A static Property's initialiser is the same Declaration written in
+		// a Namespace, and is held to what a Constant Declaration is held to — so
+		// it is admitted the same way, and refused the same way.
+		it("should admit a written value into a Namespace's Property", () => {
+			let property = (value: string) => `
+				namespace Scale for {} {
+					static factor: NonZeroInteger = ${value}
+				}
+
+				__print(Scale.factor)
+			`
+
+			expect(diagnosticsOfBody(property("2"))).toEqual([])
+			expect(diagnosticsOfBody(property("0"))).toHaveLength(1)
+		})
+
+		// NOTE: A String and an applied List are the other two v1 bases, and their
+		// predicates read what is written as plainly as an Integer's: a String with
+		// characters in it, a List with items in it.
+		it("should admit a written String and a written List", () => {
+			expect(
+				diagnosticsOfBody(`
+					function shouted(_ text: NonEmptyString) -> String {
+						<- text::append("!")
+					}
+
+					function counted(_ items: NonEmptyStrings) -> Integer {
+						<- items::length()
+					}
+
+					__print(shouted("essence"))
+					__print(counted(["a", "b"]))
+				`),
+			).toEqual([])
+		})
+
+		// NOTE: `isBetween` is not Integer's own — the conjunct is keyed to the
+		// Namespace that ANSWERED it, which is the one declared over the whole
+		// numeric tower, so the allowlist has to name it under both.
+		it("should admit a predicate the covering Namespace answered", () => {
+			expect(
+				diagnosticsOfBody(`
+					function placed(_ digit: Digit) -> Integer {
+						<- digit::add(1)
+					}
+
+					__print(placed(7))
+				`),
+			).toEqual([])
+		})
+
+		it("should admit a written value only where every conjunct holds", () => {
+			let source = `
+				function tripled(_ n: SmallOdd) -> Integer {
+					<- n::multiply(with 3)
+				}
+
+				__print(tripled(7))
+			`
+
+			expect(diagnosticsOfBody(source)).toEqual([])
+			expect(
+				diagnosticsOfBody(source.replace("tripled(7)", "tripled(11)")),
+			).toHaveLength(1)
+			expect(
+				diagnosticsOfBody(source.replace("tripled(7)", "tripled(8)")),
+			).toHaveLength(1)
+		})
+
+		it("should refuse a written value the predicate refuses", () => {
+			let diagnostics = diagnosticsOfBody(
+				"constant d: NonZeroInteger = 0",
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+			expect(diagnostics[0].notes).toEqual([
+				"'d' is declared as NonZeroInteger.",
+				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Check '@::isNot(0)' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonZeroInteger'.",
+			])
+		})
+
+		it("should name the predicate where a returned value is refused", () => {
+			let diagnostics = diagnosticsOfBody(`
+				function zero() -> NonZeroInteger {
+					<- 0
+				}
+
+				__print(doubled(zero()))
+			`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("return-type-mismatch")
+			expect(diagnostics[0].notes).toEqual([
+				"The Function returns NonZeroInteger.",
+				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+			])
+		})
+
+		it("should name the predicate where an Argument is refused", () => {
+			let diagnostics = diagnosticsOfBody("__print(doubled(0))")
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-type-mismatch")
+			expect(diagnostics[0].notes).toEqual([
+				"Parameter 1 is NonZeroInteger.",
+				"Every value of 'NonZeroInteger' has been proven to answer '@::isNot(0)'.",
+			])
+		})
+
+		// NOTE: The conjuncts are canonical — sorted, so that one predicate is one
+		// set however it was written — and that is the order they are spelled back
+		// out in, rather than the order the clause happened to put them in.
+		it("should name every conjunct of the predicate it refused", () => {
+			let diagnostics = diagnosticsOfBody(`
+				function tripled(_ n: SmallOdd) -> Integer {
+					<- n::multiply(with 3)
+				}
+
+				__print(tripled(12))
+			`)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Check '@::isLessThan(10)::and(@::isOdd())' on the value in an 'if' or a 'match', or pass a value that already has Type 'SmallOdd'.",
+			])
+		})
+
+		// NOTE: A name is a value the Program computes, however plainly it was
+		// computed a line above. Deciding one would need an interpreter, which is
+		// exactly what the allowlist exists not to be.
+		it("should refuse a value the Program computes", () => {
+			expect(
+				diagnosticsOfBody(`
+					constant three = 3
+					constant d: NonZeroInteger = three
+				`),
+			).toHaveLength(1)
+		})
+
+		// NOTE: A List counts as written when its items are. `hasItems` reads
+		// nothing but the count, which this List has too — but a literal is the
+		// shape the whole evaluator is about, and admitting one by the count alone
+		// would be the first crack in a rule that is otherwise exactly "the value
+		// is written here".
+		it("should refuse a List whose items are not written", () => {
+			expect(
+				diagnosticsOfBody(`
+					constant first = "a"
+					constant items: NonEmptyStrings = [first]
+				`),
+			).toHaveLength(1)
+		})
+
+		// NOTE: Evidence is not something a Program can ask for and be given. The
+		// refinement is declared over an Integer, so a String is refused whatever
+		// its own predicates would have said.
+		it("should refuse a written value of another base", () => {
+			expect(
+				diagnosticsOfBody(`constant d: NonZeroInteger = "3"`),
+			).toHaveLength(1)
+		})
+
+		it("should decide a written Integer whatever its sign", () => {
+			let source = (value: string) => `implementation {
+				type EvenInteger = Integer where @::isEven()
+
+				constant d: EvenInteger = ${value}
+			}`
+
+			expect(diagnosticsFor(source("-4"))).toEqual([])
+			expect(diagnosticsFor(source("-3"))).toHaveLength(1)
+		})
+
+		// NOTE: A bound the entry can not read is a conjunct it can not decide, so
+		// nothing is admitted — which is also how the Overload falls out: this
+		// `isLessThan` is Integer's Rational entry, and comparing `1/2` as though
+		// its digits were an Integer's is exactly the mistake the shape check
+		// prevents.
+		it("should not admit against a bound it can not read", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type BelowHalf = Integer where @::isLessThan(1/2)
+
+					constant d: BelowHalf = 0
+				}`),
+			).toHaveLength(1)
+		})
+
+		// NOTE: Essence's String equality is canonical equivalence — `String.is`
+		// is `compare(to other)::is(#Equal)` over the NFC-normalised Strings — so a
+		// composed accent and a decomposed one are the same String and the
+		// evaluator has to agree. `isNot` is why it MUST: comparing the two as
+		// written would prove them different, which is a proof of something false
+		// rather than an admission missed.
+		it("should compare a written String the way the Program does", () => {
+			// NOTE: Written as escapes because the two are the same TEXT — an
+			// editor, a terminal and this file are all free to print them alike, and
+			// which one is which is the whole assertion.
+			let composed = "\u00e9"
+			let decomposed = "e\u0301"
+			let source = (predicate: string) => `implementation {
+				type Accented = String where @::${predicate}("${composed}")
+
+				constant text: Accented = "${decomposed}"
+			}`
+
+			expect(diagnosticsFor(source("is"))).toEqual([])
+			expect(diagnosticsFor(source("isNot"))).toHaveLength(1)
+		})
+	})
 })

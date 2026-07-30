@@ -24,6 +24,10 @@ import {
 	typeContainsError,
 	withArticle,
 } from "../helpers/index"
+import {
+	admittedByEvaluation,
+	describePredicate,
+} from "../helpers/predicateEval"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
@@ -1732,7 +1736,7 @@ function validateConstantDeclarationStatement(
 	node: common.typed.ConstantDeclarationStatementNode,
 ): common.typed.ConstantDeclarationStatementNode {
 	if (node.declaredType !== null) {
-		if (!matchesType(node.declaredType, node.value.type)) {
+		if (!fitsExpectedType(node.declaredType, node.value)) {
 			reportDeclarationMismatch(
 				"Constant",
 				node.name.content,
@@ -1752,7 +1756,7 @@ function validateVariableDeclarationStatement(
 	node: common.typed.VariableDeclarationStatementNode,
 ): common.typed.VariableDeclarationStatementNode {
 	if (node.declaredType !== null) {
-		if (!matchesType(node.declaredType, node.value.type)) {
+		if (!fitsExpectedType(node.declaredType, node.value)) {
 			reportDeclarationMismatch(
 				"Variable",
 				node.name.content,
@@ -1777,6 +1781,8 @@ function reportDeclarationMismatch(
 	declaredType: common.Type,
 	value: common.typed.ExpressionNode,
 ): void {
+	let evidence = refinementEvidence(declaredType)
+
 	reportError(
 		`This value does not fit the declared Type of ${kind} '${name}'`,
 		value.position,
@@ -1788,7 +1794,11 @@ function reportDeclarationMismatch(
 					`this is ${withArticle(describeType(value.type))}`,
 				),
 			],
-			notes: [`'${name}' is declared as ${describeType(declaredType)}.`],
+			notes: [
+				`'${name}' is declared as ${describeType(declaredType)}.`,
+				...evidence.notes,
+			],
+			helps: evidence.helps,
 		},
 	)
 }
@@ -1796,8 +1806,9 @@ function reportDeclarationMismatch(
 function validateVariableAssignmentStatement(
 	node: common.typed.VariableAssignmentStatementNode,
 ): common.typed.VariableAssignmentStatementNode {
-	if (!matchesType(node.name.type, node.value.type)) {
+	if (!fitsExpectedType(node.name.type, node.value)) {
 		let declaredType = describeType(node.name.type)
+		let evidence = refinementEvidence(node.name.type)
 
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
@@ -1820,12 +1831,15 @@ function validateVariableAssignmentStatement(
 								),
 							]),
 				],
-				notes:
-					node.declarationPosition === null
+				notes: [
+					...(node.declarationPosition === null
 						? [
 								`'${node.name.content}' is declared as ${declaredType}.`,
 							]
-						: [],
+						: []),
+					...evidence.notes,
+				],
+				helps: evidence.helps,
 			},
 		)
 	}
@@ -1959,7 +1973,7 @@ function validateNamespaceDefinitionStatement(
 	for (let propertyName in node.properties) {
 		let property = node.properties[propertyName]
 
-		if (!matchesType(property.type, property.value.type)) {
+		if (!fitsExpectedType(property.type, property.value)) {
 			reportDeclarationMismatch(
 				"Property",
 				`${node.name.content}.${property.name.content}`,
@@ -2055,8 +2069,10 @@ function validateReturnStatement(
 			labels: [primary(node.position, "this is outside any Function")],
 		})
 	} else if (
-		!matchesType(currentFunctionContext.returnType, node.expression.type)
+		!fitsExpectedType(currentFunctionContext.returnType, node.expression)
 	) {
+		let evidence = refinementEvidence(currentFunctionContext.returnType)
+
 		reportError(
 			"This value does not fit the declared return Type",
 			node.expression.position,
@@ -2074,7 +2090,9 @@ function validateReturnStatement(
 				],
 				notes: [
 					`The Function returns ${describeType(currentFunctionContext.returnType)}.`,
+					...evidence.notes,
 				],
+				helps: evidence.helps,
 			},
 		)
 	}
@@ -2194,12 +2212,64 @@ function validateDefiniteReturn(
 	}
 }
 
+// NOTE: Whether a value fits where it was written — assignability, plus the one
+// thing assignability alone can not see. A refinement demands evidence, and a
+// value written DOWN carries its own: its predicate is decided while compiling,
+// so `constant d: NonZeroInteger = 3` needs no branch in front of it while `= 0`
+// is still refused. The Enricher admits the same literals as it matches
+// Arguments, and this is that question asked again over the finished tree, at
+// every position the Enricher does not resolve one against the other.
+function fitsExpectedType(
+	expected: common.Type,
+	value: common.typed.ExpressionNode,
+): boolean {
+	return (
+		matchesType(expected, value.type) ||
+		(expected.type === "Refinement" &&
+			admittedByEvaluation(expected, value))
+	)
+}
+
+// NOTE: What a mismatch against a refinement has to say beyond naming the two
+// Types. A base value arriving where evidence is demanded is not a spelling
+// mistake — the value may well satisfy the predicate, and nothing has asked —
+// so the Diagnostic names the question that went unanswered and the two places
+// an answer comes from. Empty for every other Type, which is what lets the sites
+// below spread it without asking first.
+function refinementEvidence(expected: common.Type | undefined): {
+	notes: Array<string>
+	helps: Array<string>
+} {
+	if (expected === undefined || expected.type !== "Refinement") {
+		return { notes: [], helps: [] }
+	}
+
+	let predicate = describePredicate(expected)
+
+	return {
+		notes: [
+			`Every value of '${expected.name}' has been proven to answer '${predicate}'.`,
+		],
+		helps: [
+			`Check '${predicate}' on the value in an 'if' or a 'match', or pass a value that already has Type '${expected.name}'.`,
+		],
+	}
+}
+
+// NOTE: An Argument is asked the same question the Enricher asked it, and for a
+// reason beyond the Diagnostic: a committed Overload whose Arguments do not
+// match is an ICE here, so a call the Enricher admitted a literal into would
+// fail the compile outright if this asked only about assignability.
 function matchableArgumentsFromTypedNodes(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): Array<MatchableArgument> {
 	return argumentNodes.map((argumentNode) => ({
 		name: argumentNode.name,
-		getType: () => argumentNode.type,
+		getType: (expectedType) =>
+			expectedType.type === "Refinement" &&
+			admittedByEvaluation(expectedType, argumentNode.value)
+				? expectedType
+				: argumentNode.type,
 	}))
 }
 
@@ -2274,6 +2344,7 @@ function reportArgumentMismatch(
 	}
 
 	let name = describeParameter(parameter, index)
+	let evidence = refinementEvidence(parameter?.type)
 
 	reportError(
 		`This Argument does not fit ${name}`,
@@ -2286,10 +2357,13 @@ function reportArgumentMismatch(
 					`this is ${withArticle(describeType(argumentNode.value.type))}`,
 				),
 			],
-			notes:
-				parameter === undefined
+			notes: [
+				...(parameter === undefined
 					? []
-					: [`${name} is ${describeType(parameter.type)}.`],
+					: [`${name} is ${describeType(parameter.type)}.`]),
+				...evidence.notes,
+			],
+			helps: evidence.helps,
 		},
 	)
 }

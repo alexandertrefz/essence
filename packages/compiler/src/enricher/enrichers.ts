@@ -40,6 +40,7 @@ import {
 	unionMembersKeepingNames,
 	withArticle,
 } from "../helpers/index"
+import { admittedByEvaluation } from "../helpers/predicateEval"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -3928,6 +3929,7 @@ type ArgumentTyper = {
 
 function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	let cache = new Map<parser.ExpressionNode, common.typed.ExpressionNode>()
+	let admissions = new Map<parser.ExpressionNode, Map<string, boolean>>()
 	let sawErrorArgument = false
 
 	function noteErrors(type: common.Type): common.Type {
@@ -3949,6 +3951,37 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 		}
 
 		return cached
+	}
+
+	// NOTE: Whether this written value is admitted into the refinement its
+	// position demands. Asked again and again — once per Overload candidate, then
+	// once more for the winner as the committed Argument is matched — and a pure
+	// question about a literal, so the answer is kept.
+	//
+	// Keyed by the refinement's NAME, which is its printing identity. Two
+	// refinements one Argument position could be matched against under a single
+	// name would have to be declared in two Modules and added to one Namespace's
+	// Overloads from both, and the Validator asks the whole committed call the
+	// same question again afterwards.
+	function admitted(
+		value: parser.ExpressionNode,
+		refinement: common.RefinementType,
+	): boolean {
+		let byName = admissions.get(value)
+
+		if (byName === undefined) {
+			byName = new Map()
+			admissions.set(value, byName)
+		}
+
+		let answer = byName.get(refinement.name)
+
+		if (answer === undefined) {
+			answer = admittedByEvaluation(refinement, enrichOnce(value))
+			byName.set(refinement.name, answer)
+		}
+
+		return answer
 	}
 
 	// NOTE: An Argument's position is the Parameter Type of whichever candidate
@@ -4135,7 +4168,28 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 				)
 			}
 
-			return noteErrors(enrichOnce(value).type)
+			let type = noteErrors(enrichOnce(value).type)
+
+			// NOTE: The third — and the only one that answers a Type the
+			// Expression itself was never resolved to. A value written DOWN where
+			// a refinement stands is admitted by deciding the predicate while
+			// compiling: `3` really is a NonZeroInteger, so the Argument answers
+			// with the refinement and the call needs no branch in front of it.
+			//
+			// The Node keeps its own Type and nothing is written to it. That is
+			// what makes this safe under the Overload probes: the admission is an
+			// answer about THIS position, given to whichever candidate asked, and
+			// a candidate that loses leaves nothing behind for the winner to read.
+			// It is also why the Node needs nothing — a refinement erases to its
+			// base, which is the Type the literal already has.
+			if (
+				expectedType.type === "Refinement" &&
+				admitted(value, expectedType)
+			) {
+				return expectedType
+			}
+
+			return type
 		},
 		hasErrorArgument() {
 			return sawErrorArgument
