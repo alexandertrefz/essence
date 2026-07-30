@@ -2798,5 +2798,102 @@ describe("Validator", () => {
 			expect(diagnosticsFor(source("is"))).toEqual([])
 			expect(diagnosticsFor(source("isNot"))).toHaveLength(1)
 		})
+
+		// NOTE: A generic refinement is admitted by the very same evaluator — the
+		// predicate reads the item COUNT, which a written List has, and the base is
+		// asked separately, which is where the Type Arguments are compared. So
+		// nothing here is new machinery; what is new is that one Alias asks a
+		// different question at every one of its applications.
+		describe("a generic refinement", () => {
+			function withNonEmpty(body: string): string {
+				return `implementation {
+					type NonEmptyList<Item> = List<Item> where @::hasItems()
+
+					function firstOf(_ items: NonEmptyList<String>) -> String {
+						<- items::item(at 0)::otherwise("")
+					}
+
+					${body}
+				}`
+			}
+
+			it("should admit a written List at all three positions", () => {
+				expect(
+					diagnosticsFor(
+						withNonEmpty(`
+							constant proven: NonEmptyList<String> = ["a"]
+
+							function two() -> NonEmptyList<String> {
+								<- ["a", "b"]
+							}
+
+							__print(firstOf(proven))
+							__print(firstOf(["a"]))
+							__print(firstOf(two()))
+						`),
+					),
+				).toEqual([])
+			})
+
+			// NOTE: The refusal names the Type as it was APPLIED, because the bare
+			// Alias name is not a Type anything can be written as — a help offering
+			// to pass a value of 'NonEmptyList' names something the Program would refuse
+			// for taking no Arguments.
+			it("should refuse an empty written List, naming the applied Type", () => {
+				let diagnostics = diagnosticsFor(
+					withNonEmpty("constant broken: NonEmptyList<String> = []"),
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+				expect(diagnostics[0].notes).toEqual([
+					"'broken' is declared as NonEmptyList<String>.",
+					"Every value of 'NonEmptyList<String>' has been proven to answer '@::hasItems()'.",
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonEmptyList<String>'.",
+				])
+			})
+
+			// NOTE: The base is asked as well as the predicate, and the base is where
+			// the Type Arguments live: `[1]::hasItems()` is true and says nothing
+			// whatever about a List of Strings.
+			it("should refuse a written List of the wrong items", () => {
+				expect(
+					diagnosticsFor(
+						withNonEmpty(
+							"constant broken: NonEmptyList<String> = [1]",
+						),
+					),
+				).toHaveLength(1)
+			})
+
+			// NOTE: Two applications of ONE Alias are two questions about the same
+			// written List, and the answer to each is kept for the Overload probes
+			// that follow. Keyed by the Alias' name alone, the first entry probed
+			// decided both and the call it was not about was refused for it.
+			it("should decide each application of one Alias on its own", () => {
+				expect(
+					diagnosticsFor(
+						withNonEmpty(`
+							namespace Take for {} {
+								overload static count {
+									(_ items: NonEmptyList<Integer>) -> Integer {
+										<- items::length()
+									}
+
+									(_ items: NonEmptyList<String>) -> Integer {
+										<- items::length()
+									}
+								}
+							}
+
+							__print(Take.count(["a"]))
+							__print(Take.count([1]))
+						`),
+					),
+				).toEqual([])
+			})
+		})
 	})
 })

@@ -2421,6 +2421,12 @@ function fitsExpectedType(
 // so the Diagnostic names the question that went unanswered and the two places
 // an answer comes from. Empty for every other Type, which is what lets the sites
 // below spread it without asking first.
+//
+// NOTE: Named as it was APPLIED, because a generic refined Alias' bare name is not
+// a Type anything can be written as — a help offering to pass a value of
+// 'NonEmptyList' names something the Program would refuse for taking no Arguments. A
+// refinement carrying none spells as its name alone, which is every non-generic
+// one.
 function refinementEvidence(expected: common.Type | undefined): {
 	notes: Array<string>
 	helps: Array<string>
@@ -2430,13 +2436,14 @@ function refinementEvidence(expected: common.Type | undefined): {
 	}
 
 	let predicate = describePredicate(expected)
+	let spelling = describeType(expected)
 
 	return {
 		notes: [
-			`Every value of '${expected.name}' has been proven to answer '${predicate}'.`,
+			`Every value of '${spelling}' has been proven to answer '${predicate}'.`,
 		],
 		helps: [
-			`Check '${predicate}' on the value in an 'if' or a 'match', or pass a value that already has Type '${expected.name}'.`,
+			`Check '${predicate}' on the value in an 'if' or a 'match', or pass a value that already has Type '${spelling}'.`,
 		],
 	}
 }

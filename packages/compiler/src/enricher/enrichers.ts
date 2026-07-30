@@ -4083,27 +4083,32 @@ function makeArgumentTyper(scope: enricher.Scope): ArgumentTyper {
 	// once more for the winner as the committed Argument is matched — and a pure
 	// question about a literal, so the answer is kept.
 	//
-	// Keyed by the refinement's NAME, which is its printing identity. Two
-	// refinements one Argument position could be matched against under a single
-	// name would have to be declared in two Modules and added to one Namespace's
-	// Overloads from both, and the Validator asks the whole committed call the
-	// same question again afterwards.
+	// Keyed by the refinement's SPELLING, which is its printing identity —
+	// Arguments and all, because a generic refined Alias stands for a different
+	// Type at every one of them: `NonEmptyList<Integer>` and `NonEmptyList<String>` are
+	// one name and two questions about a written List, and keyed by the name alone
+	// the first Overload probed decided both. Two refinements one Argument
+	// position could be matched against under a single SPELLING would have to be
+	// declared in two Modules and added to one Namespace's Overloads from both,
+	// and the Validator asks the whole committed call the same question again
+	// afterwards.
 	function admitted(
 		value: parser.ExpressionNode,
 		refinement: common.RefinementType,
 	): boolean {
-		let byName = admissions.get(value)
+		let bySpelling = admissions.get(value)
 
-		if (byName === undefined) {
-			byName = new Map()
-			admissions.set(value, byName)
+		if (bySpelling === undefined) {
+			bySpelling = new Map()
+			admissions.set(value, bySpelling)
 		}
 
-		let answer = byName.get(refinement.name)
+		let spelling = describeType(refinement)
+		let answer = bySpelling.get(spelling)
 
 		if (answer === undefined) {
 			answer = admittedByEvaluation(refinement, enrichOnce(value))
-			byName.set(refinement.name, answer)
+			bySpelling.set(spelling, answer)
 		}
 
 		return answer
