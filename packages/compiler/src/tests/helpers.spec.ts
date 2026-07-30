@@ -14,6 +14,7 @@ import type {
 	PrimitiveType,
 	ProtocolType,
 	RecordType,
+	RefinementType,
 	StaticMethodType,
 	Type,
 	UnionType,
@@ -25,6 +26,7 @@ import {
 	applyGenericBindings,
 	buildUnion,
 	canonicalPredicateConjuncts,
+	closePendingRefinementCopies,
 	computeConformanceMethodMap,
 	createInferenceContext,
 	describeType,
@@ -34,6 +36,8 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	mentionsUnsolvedTypeParameter,
+	openPendingRefinementCopies,
+	pendingRefinementCopiesOf,
 	predicateConjunctKey,
 	resolveOverloadedMethodName,
 	second,
@@ -2492,6 +2496,31 @@ describe("Helpers", () => {
 
 		const nonZero = refinementOf(integer)
 
+		// NOTE: A fresh one per use rather than a shared constant: a pending
+		// refinement is the object a fill or a registration WRITES INTO, so a test
+		// sharing one with the test before it would be reading the other's work.
+		function pendingFilled(): RefinementType {
+			return {
+				type: "Refinement",
+				name: "Pending",
+				base: {
+					type: "List",
+					itemType: { type: "GenericUse", name: "Item" },
+				},
+				conjuncts: null,
+			}
+		}
+
+		// NOTE: `applyGenericBindings` answers with a `Type`, and every copy the
+		// registry holds is a refinement — saying so once keeps the assertions below
+		// from repeating one cast.
+		function copyOf(
+			source: RefinementType,
+			bindings: Map<string, Type>,
+		): RefinementType {
+			return applyGenericBindings(source, bindings) as RefinementType
+		}
+
 		describe("predicateConjunctKey", () => {
 			it("should give one question one key", () => {
 				expect(predicateConjunctKey(isNotZero)).toBe(
@@ -2611,27 +2640,24 @@ describe("Helpers", () => {
 
 			// NOTE: A copy of a PENDING refinement is the one soundness edge of a
 			// generic one. `conjuncts` is null while the Namespace answering the
-			// predicate is still on its way; the fill writes into the REGISTERED
-			// object, so a copy taken before it would keep the null for good and
-			// ICE at the first reader past hoisting. The throw is the hoisting
-			// rounds' "not this round" — the declaration instantiating the Alias is
-			// retried after the fill — and it is refused only where a copy is
-			// actually made: a pending refinement holding no Type Parameter comes
-			// back as itself, which is what keeps every v1 shape out of the rounds.
-			it("should refuse to copy a pending refinement by throwing", () => {
-				let pending: Type = {
-					type: "Refinement",
-					name: "Pending",
-					base: {
-						type: "List",
-						itemType: { type: "GenericUse", name: "Item" },
-					},
-					conjuncts: null,
-				}
-
+			// predicate is still on its way, and the fill writes into the object the
+			// Alias registered — so a copy nobody knows about would keep the null for
+			// good and ICE at the first reader past hoisting. Outside a hoist there
+			// is no fill left to finish one, which is why the throw stays THERE: it
+			// is the same Compiler bug every other reader of `conjuncts` refuses.
+			//
+			// It is refused only where a copy is actually made: a pending refinement
+			// holding no Type Parameter comes back as itself, which is what keeps
+			// every v1 shape out of the rounds entirely.
+			it("should refuse to copy a pending refinement outside a hoist", () => {
 				expect(() =>
-					applyGenericBindings(pending, new Map([["Item", string]])),
+					applyGenericBindings(
+						pendingFilled(),
+						new Map([["Item", string]]),
+					),
 				).toThrow("read before it resolved")
+
+				let pending = pendingFilled()
 
 				expect(
 					applyGenericBindings(pending, new Map([["Other", string]])),
@@ -2650,6 +2676,84 @@ describe("Helpers", () => {
 						new Map([["Item", string]]),
 					),
 				).toBe(pendingScalar)
+			})
+
+			// NOTE: Inside a hoist the copy is TAKEN and registered against the
+			// object it came from, because refusing it is what deadlocks the
+			// Namespace that answers a generic Alias' predicate against the fill
+			// waiting for that Namespace. The copy is pending too — nothing has been
+			// decided yet — and the registry is what lets the fill finish it.
+			it("should register a pending copy while a hoist is open", () => {
+				let pending = pendingFilled()
+
+				openPendingRefinementCopies()
+
+				try {
+					let copy = copyOf(pending, new Map([["Item", string]]))
+
+					expect(copy).not.toBe(pending)
+					expect(copy).toEqual({
+						type: "Refinement",
+						name: "Pending",
+						base: { type: "List", itemType: string },
+						conjuncts: null,
+					})
+					expect(pendingRefinementCopiesOf(pending)).toEqual([copy])
+				} finally {
+					closePendingRefinementCopies()
+				}
+			})
+
+			// NOTE: A pending copy is itself pending, so it may be copied again — the
+			// signature holding `NonEmptyList<Item>` is instantiated once more where
+			// it is called. The walk is keyed by the object copied FROM, so every
+			// generation is reachable from the Alias' own object and the fill misses
+			// none of them.
+			it("should reach a copy of a pending copy", () => {
+				let pending = pendingFilled()
+
+				openPendingRefinementCopies()
+
+				try {
+					let copy = copyOf(
+						pending,
+						new Map([
+							["Item", { type: "GenericUse", name: "Other" }],
+						]),
+					)
+					let copyOfCopy = copyOf(copy, new Map([["Other", string]]))
+
+					expect(pendingRefinementCopiesOf(pending)).toEqual([
+						copy,
+						copyOfCopy,
+					])
+					expect(pendingRefinementCopiesOf(copy)).toEqual([
+						copyOfCopy,
+					])
+				} finally {
+					closePendingRefinementCopies()
+				}
+			})
+
+			// NOTE: The registry belongs to the hoist that opened it. Nothing may
+			// survive into the next one, or a stale entry would be handed conjuncts
+			// that answer another Program's predicate — and hoists NEST, so only the
+			// outermost close clears.
+			it("should forget its copies when the outermost hoist closes", () => {
+				let pending = pendingFilled()
+
+				openPendingRefinementCopies()
+				openPendingRefinementCopies()
+
+				let copy = copyOf(pending, new Map([["Item", string]]))
+
+				closePendingRefinementCopies()
+
+				expect(pendingRefinementCopiesOf(pending)).toEqual([copy])
+
+				closePendingRefinementCopies()
+
+				expect(pendingRefinementCopiesOf(pending)).toEqual([])
 			})
 
 			it("should read an undecided slot through the base", () => {

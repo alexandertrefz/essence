@@ -751,6 +751,80 @@ export function filterMostSpecificByTarget<Candidate>(
 	return mostSpecific.length > 0 ? mostSpecific : candidates
 }
 
+// NOTE: The copies taken of a refinement whose predicate is still unread, kept
+// from the source object to the copies made of it. It exists ONLY while a hoist
+// is open — outside one there is no fill left to complete a pending copy, so
+// taking one is a Compiler bug and stays a throw.
+//
+// Keyed by the object copied FROM rather than by the Alias, because a pending
+// copy is itself pending and may be copied again — `NonEmptyList<Item>` in a
+// signature, instantiated once more at a call site — and the fill has to reach
+// those too. Walking the map from the Alias' own object finds every generation.
+//
+// Entries are never removed one at a time. A copy taken during a round that then
+// failed to hoist is speculative garbage the fill writes into for nothing, which
+// costs a field write and is far cheaper than working out which copies a
+// discarded speculation left behind.
+let pendingRefinementCopies = new Map<
+	common.RefinementType,
+	Array<common.RefinementType>
+>()
+
+// NOTE: Hoists NEST — a name resolved during a Program's rounds may be the
+// first to touch the standard library, whose lazy load hoists every library
+// file inside that round. So the registry is opened by counting rather than by
+// replacing: the inner hoist registers into the same map, the outer's fill still
+// finds its own entries, and only the outermost close clears it.
+let openHoists = 0
+
+export function openPendingRefinementCopies(): void {
+	openHoists += 1
+}
+
+export function closePendingRefinementCopies(): void {
+	openHoists -= 1
+
+	if (openHoists === 0) {
+		pendingRefinementCopies.clear()
+	}
+}
+
+function registerPendingRefinementCopy(
+	source: common.RefinementType,
+	copy: common.RefinementType,
+): void {
+	let copies = pendingRefinementCopies.get(source)
+
+	if (copies === undefined) {
+		pendingRefinementCopies.set(source, [copy])
+	} else {
+		copies.push(copy)
+	}
+}
+
+// NOTE: Every copy taken of this refinement, copies of those copies included —
+// what the fill hands the conjuncts to, and what the poison path turns into its
+// own base. The walk terminates without a visited set because every registration
+// is a FRESH object: a copy is never its own source, and no object is ever
+// registered twice, so the entries form a tree rooted at the Alias' object.
+export function pendingRefinementCopiesOf(
+	refinement: common.RefinementType,
+): Array<common.RefinementType> {
+	let copies: Array<common.RefinementType> = []
+	let sources: Array<common.RefinementType> = [refinement]
+
+	while (sources.length > 0) {
+		let source = sources.pop() as common.RefinementType
+
+		for (let copy of pendingRefinementCopies.get(source) ?? []) {
+			copies.push(copy)
+			sources.push(copy)
+		}
+	}
+
+	return copies
+}
+
 // NOTE: Substitutes bound Generics in `type` — unbound bindable Generics are
 // left untouched, opaque Generics always are.
 export function applyGenericBindings(
@@ -796,33 +870,51 @@ export function applyGenericBindings(
 				return type
 			}
 
-			// NOTE: A PENDING predicate may not be copied. `conjuncts` is null
-			// while the Namespace answering it is still on its way, and a copy taken
-			// then freezes that null BY VALUE — the fill writes into the registered
-			// object alone, so the copy would carry the empty predicate for good and
-			// ICE at the first reader past hoisting. So the null is refused by
-			// throwing, exactly as every other reader refuses it, and the hoisting
-			// rounds read the throw as "not this round": the declaration
-			// instantiating the Alias lands back in the rounds, and the round after
-			// the fill resolves it with the conjuncts shared by reference.
-			//
-			// Which is why the identity check sits AHEAD of this. A refinement whose
-			// base holds no Type Parameter — every non-generic one, `NonZeroInteger`
-			// among them — comes back AS ITSELF whatever bindings it is handed, so a
-			// generic Namespace with a refined signature (`divide(by
-			// NonZeroInteger)`) neither copies it nor waits a round for it, exactly
-			// as it did before generic refinements existed.
-			if (type.conjuncts === null) {
-				throw new Error(
-					`Internal Compiler Error: the predicate of refinement '${type.name}' was read before it resolved`,
-				)
-			}
-
-			return {
+			let copy: common.RefinementType = {
 				...type,
 				base,
 				...(typeArguments !== undefined ? { typeArguments } : {}),
 			}
+
+			// NOTE: A copy of a PENDING predicate is a promise to finish it. The
+			// conjuncts are null while the Namespace answering them is still on its
+			// way, and the fill writes into the object the Alias REGISTERED — so a
+			// copy nobody knows about would keep that null for good and ICE at the
+			// first reader past hoisting. Registering it is what makes the copy
+			// legal: the fill hands the very same conjuncts array to the Alias and to
+			// every copy of it in one breath, so the two are indistinguishable
+			// afterwards.
+			//
+			// This is what lets the Namespace that ANSWERS a generic Alias' predicate
+			// apply that Alias in its own signatures — `namespace List` answering
+			// `hasItems` while promising `append(_ item) -> NonEmptyList<ItemType>`.
+			// Refusing the copy would send the Namespace back into the rounds, and the
+			// fill would then look for `hasItems` on a Namespace that never hoisted:
+			// a deadlock no ordering can undo, because each side is the other's
+			// precondition.
+			//
+			// Outside an open hoist the throw stays, and means what it always meant.
+			// There is no fill left to complete the copy, so a pending refinement
+			// reaching here at all is a Compiler bug — the same one every other reader
+			// of `conjuncts` refuses by throwing.
+			//
+			// Which is also why the identity check sits AHEAD of this. A refinement
+			// whose base holds no Type Parameter — every non-generic one,
+			// `NonZeroInteger` among them — comes back AS ITSELF whatever bindings it
+			// is handed, so a generic Namespace with a refined signature (`divide(by
+			// NonZeroInteger)`) is never copied and never registered, exactly as it
+			// was before generic refinements existed.
+			if (type.conjuncts === null) {
+				if (openHoists === 0) {
+					throw new Error(
+						`Internal Compiler Error: the predicate of refinement '${type.name}' was read before it resolved`,
+					)
+				}
+
+				registerPendingRefinementCopy(type, copy)
+			}
+
+			return copy
 		}
 		case "UnionType": {
 			let types = type.types.map((memberType) =>
