@@ -852,6 +852,24 @@ declarations {
 		§§
 		§§ @returns — the List without duplicates, which certainly has something in it.
 		removeDuplicates<infer ItemType is Equatable>() -> NonEmptyList<ItemType>
+
+		§ Adding a whole List proves nothing on `List`, because the List added
+		§ may be the empty one — and proves everything here, where the RECEIVER
+		§ is the proof and what is added to it is beside the point. Both ends
+		§ say so, since which end an item is added at never had anything to do
+		§ with it.
+
+		§§ A new List with the contents of the given List added at the front.
+		§§
+		§§ @param contentsOf — the List whose items to add
+		§§ @returns — the extended List, never empty.
+		prepend(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
+
+		§§ A new List with the contents of the given List added at the end.
+		§§
+		§§ @param contentsOf — the List whose items to add
+		§§ @returns — the extended List, never empty.
+		append(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
 	}
 }
 

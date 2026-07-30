@@ -1760,6 +1760,33 @@ third"::lines())
 		"NonEmptyList.removeDuplicates<ItemType is Equatable>() [proof carried]",
 		provenNumbers::removeDuplicates()::lastItem(),
 	)
+	show(
+		"NonEmptyList.prepend<ItemType>(contentsOf: List<ItemType>)",
+		provenOne::prepend(contentsOf [8, 9]),
+	)
+	§ The List added is the EMPTY one, which is what `List`'s own entry can not
+	§ get past and what this one never had to: nothing was added and the
+	§ receiver was proof enough on its own.
+	show(
+		"NonEmptyList.prepend<ItemType>(contentsOf: List<ItemType>) [empty]",
+		provenOne::prepend(contentsOf noNumbers),
+	)
+	show(
+		"NonEmptyList.prepend<ItemType>(contentsOf: List<ItemType>) [empty, proof carried]",
+		provenOne::prepend(contentsOf noNumbers)::lastItem(),
+	)
+	show(
+		"NonEmptyList.append<ItemType>(contentsOf: List<ItemType>)",
+		provenOne::append(contentsOf [8, 9]),
+	)
+	show(
+		"NonEmptyList.append<ItemType>(contentsOf: List<ItemType>) [empty]",
+		provenOne::append(contentsOf noNumbers),
+	)
+	show(
+		"NonEmptyList.append<ItemType>(contentsOf: List<ItemType>) [empty, proof carried]",
+		provenOne::append(contentsOf noNumbers)::firstItem(),
+	)
 
 	§ The proofs a Method HANDS OVER rather than ones a literal carries. Each
 	§ receiver below is a call to a `List` Method that says what it builds is
