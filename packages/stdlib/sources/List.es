@@ -319,13 +319,22 @@ declarations {
 		}
 
 		§§ A new List with the given item — or the contents of the given List — added at the front.
-		§§
-		§§ @returns — the extended List.
 		overload prepend {
-			(_ item: ItemType) -> List<ItemType> {
-				<- [item]::append(contentsOf @)
-			}
+			§ Native for the reason `append`'s single-item entry is, and with
+			§ the same proof behind it: an item is ADDED, so the answer holds
+			§ one thing more than the receiver did and can not come back
+			§ empty. Which END it is added at has nothing to do with it.
 
+			§§ A new List with the given item added at the front, which is a List that certainly has something in it.
+			§§
+			§§ @param item — the item to add
+			§§ @returns — the extended List, never empty.
+			(_ item: ItemType) -> NonEmptyList<ItemType>
+
+			§§ A new List with the contents of the given List added at the front.
+			§§
+			§§ @param contentsOf — the List whose items to add
+			§§ @returns — the extended List.
 			(contentsOf other: List<ItemType>) -> List<ItemType> {
 				<- other::append(contentsOf @)
 			}

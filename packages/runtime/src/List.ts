@@ -56,6 +56,17 @@ export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(BigInt(originalList.value.length))
 }
 
+// NOTE: The single-item half of `prepend`, whose sibling `prepend(contentsOf:)`
+// stays in Essence on `append(contentsOf:)`. Here for the reason
+// `append__overload$1` is: adding an item can not answer empty, its Declaration
+// says so with a `NonEmptyList`, and no Essence expression can carry that.
+export function prepend__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+): ListType<ItemType> {
+	return createList([item, ...originalList.value])
+}
+
 // NOTE: `append` is one Method with two Overloads, so both bind by position.
 // `$1` adds ONE item, `$2` adds a whole List. The single-item entry is a native
 // rather than the one-line `@::append(contentsOf [item])` it used to be in

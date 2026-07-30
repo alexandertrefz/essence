@@ -640,6 +640,7 @@
 "NonEmptyList.lastItem<ItemType>() [single] => 7"
 "NonEmptyList.firstItem<ItemType>() [from List.of] => 3"
 "NonEmptyList.lastItem<ItemType>() [from List.append] => 5"
+"NonEmptyList.firstItem<ItemType>() [from List.prepend] => 5"
 "loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) => 15"
 "loop<State>(from: Integer, through: Integer, startingWith: State, step: (_ Integer, _ State) -> State) [down] => 321"
 "loop<State>(startingWith: State, while: (_ State) -> Boolean, step: (_ State) -> State) => 128"

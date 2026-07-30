@@ -1763,6 +1763,10 @@ third"::lines())
 		"NonEmptyList.lastItem<ItemType>() [from List.append]",
 		noNumbers::append(5)::lastItem(),
 	)
+	show(
+		"NonEmptyList.firstItem<ItemType>() [from List.prepend]",
+		noNumbers::prepend(5)::firstItem(),
+	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its
