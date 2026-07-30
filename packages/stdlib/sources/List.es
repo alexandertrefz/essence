@@ -884,6 +884,39 @@ declarations {
 		map<infer Result>(
 			_ transform: (_: ItemType) -> Result,
 		) -> NonEmptyList<Result>
+
+		§ The two that only move items about. Neither adds an item and neither
+		§ drops one, so the answer is the receiver's own items in another
+		§ order — which is as good a proof as there is that it is not empty.
+
+		§§ A new List with the items in the opposite order.
+		§§
+		§§ @returns — the reversed List, which certainly has something in it.
+		reverse() -> NonEmptyList<ItemType>
+
+		§ Both entries carry `List`'s own bounds and for `List`'s own reasons:
+		§ the no-Argument one orders by the items' `compare`, arriving as the
+		§ hidden conformance Argument, and the other takes the comparison
+		§ outright. Its bounded `ItemType` shadows the Namespace's, exactly as
+		§ `removeDuplicates`' does.
+
+		§§ A new List in order — by the items' own ordering when called with no Argument, available whenever they conform to `Comparable`, or by the given comparison.
+		§§
+		§§ @returns — the ordered List, which certainly has something in it.
+		overload sort {
+			§§ A new List in ascending order — the items' own ordering, available whenever they conform to `Comparable`. For any other order, use the `by:` entry.
+			§§
+			§§ @returns — the ordered List, which certainly has something in it.
+			<infer ItemType is Comparable>() -> NonEmptyList<ItemType>
+
+			§§ A new List ordered by the given comparison, applied to each pair of items.
+			§§
+			§§ @param by — the comparison to order the items with
+			§§ @returns — the ordered List, which certainly has something in it.
+			(
+				by comparison: (_: ItemType, _: ItemType) -> Ordering,
+			) -> NonEmptyList<ItemType>
+		}
 	}
 }
 

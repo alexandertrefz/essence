@@ -317,6 +317,12 @@ export type NonEmptyListNatives = {
 	append: <ItemType extends AnyType>(self: ListType<ItemType>, contentsOf: ListType<ItemType>) => ListType<ItemType>
 	// map<ItemType, Result>(_: (_: ItemType) -> Result) -> NonEmptyList
 	map: <ItemType extends AnyType, Result extends AnyType>(self: ListType<ItemType>, argument1: (argument0: ItemType) => Result) => ListType<Result>
+	// reverse<ItemType>() -> NonEmptyList
+	reverse: <ItemType extends AnyType>(self: ListType<ItemType>) => ListType<ItemType>
+	// sort<ItemType is Comparable>() -> NonEmptyList
+	sort__overload$1: <ItemType extends AnyType>(self: ListType<ItemType>, ItemType__conformance: ComparableConformance<ItemType>) => ListType<ItemType>
+	// sort<ItemType>(by: (_: ItemType, _: ItemType) -> Ordering) -> NonEmptyList
+	sort__overload$2: <ItemType extends AnyType>(self: ListType<ItemType>, by: (argument0: ItemType, argument1: ItemType) => OrderingType) => ListType<ItemType>
 }
 
 export type FunctionsNatives = {
@@ -520,6 +526,9 @@ export const $NonEmptyListArity: AssertArities<typeof import("./NonEmptyList"), 
 	prepend: 2
 	append: 2
 	map: 2
+	reverse: 1
+	sort__overload$1: 2
+	sort__overload$2: 2
 }> = true
 
 declare const functionsModule: typeof import("./functions")
