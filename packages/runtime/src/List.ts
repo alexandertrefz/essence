@@ -56,6 +56,21 @@ export function length(originalList: ListType<AnyType>): IntegerType {
 	return createInteger(BigInt(originalList.value.length))
 }
 
+// NOTE: `append` is one Method with two Overloads, so both bind by position.
+// `$1` adds ONE item, `$2` adds a whole List. The single-item entry is a native
+// rather than the one-line `@::append(contentsOf [item])` it used to be in
+// Essence, because its Declaration now promises a `NonEmptyList` — adding an
+// item can not answer empty — and no Essence expression can say that about the
+// `List` the other entry hands back. The array it builds is the same one either
+// way; what the native buys is the promise, and the zero-length case it rules
+// out can not arise here.
+export function append__overload$1<ItemType extends AnyType>(
+	originalList: ListType<ItemType>,
+	item: ItemType,
+): ListType<ItemType> {
+	return createList([...originalList.value, item])
+}
+
 export function append__overload$2<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 	contentsOf: ListType<ItemType>,

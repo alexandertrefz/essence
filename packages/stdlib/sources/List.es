@@ -332,15 +332,29 @@ declarations {
 		}
 
 		§§ A new List with the given item — or the contents of the given List — added at the end.
-		§§
-		§§ @returns — the extended List.
 		overload append {
-			(_ item: ItemType) -> List<ItemType> {
-				§ The other entry of this same block — a different emitted
-				§ Function, so this is not recursion.
-				<- @::append(contentsOf [item])
-			}
+			§ An item is ADDED, so whatever the receiver held the answer holds
+			§ one thing more than that — a List built this way is never empty,
+			§ whether or not the one it was built from was. Adding a whole
+			§ List proves nothing of the kind, because the List added may be
+			§ the empty one, so only THIS entry says so.
+			§
+			§ Native, and this is why: written in Essence the body would be
+			§ `@::append(contentsOf [item])`, whose answer is the OTHER entry's
+			§ `List` — an expression that is not empty is not the same as one
+			§ the language can be told is not empty, and Essence has no way to
+			§ be told. The proof is spent here, exactly as `firstItem`'s is.
 
+			§§ A new List with the given item added at the end, which is a List that certainly has something in it.
+			§§
+			§§ @param item — the item to add
+			§§ @returns — the extended List, never empty.
+			(_ item: ItemType) -> NonEmptyList<ItemType>
+
+			§§ A new List with the contents of the given List added at the end.
+			§§
+			§§ @param contentsOf — the List whose items to add
+			§§ @returns — the extended List.
 			(contentsOf other: List<ItemType>) -> List<ItemType>
 		}
 
