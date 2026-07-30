@@ -1757,6 +1757,12 @@ third"::lines())
 		"NonEmptyList.firstItem<ItemType>() [from List.of]",
 		List.of(integersFrom 3, through 7)::firstItem(),
 	)
+	§ The receiver here is EMPTY, which is the whole of what adding an item
+	§ proves: the answer has something in it however little the receiver had.
+	show(
+		"NonEmptyList.lastItem<ItemType>() [from List.append]",
+		noNumbers::append(5)::lastItem(),
+	)
 
 	§ ——— loop ————————————————————————————————————————————————————————————
 	§ The free-Function loop family. `loop` belongs to no Namespace, so its

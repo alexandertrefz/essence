@@ -501,7 +501,6 @@ describe("Stdlib Call Graph", () => {
 			"Integer.subtract__overload$3",
 			"Integer.subtract__overload$4",
 			"List.anyItem",
-			"List.append__overload$1",
 			"List.contains",
 			"List.count__overload$1",
 			"List.count__overload$2",
