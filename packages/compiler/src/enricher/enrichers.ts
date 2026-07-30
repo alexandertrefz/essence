@@ -34,6 +34,7 @@ import {
 	resolveOverloadedMethodName,
 	resolveUnknownSlots,
 	typeContainsError,
+	typeContainsRefinement,
 	typeContainsUnknown,
 	typeMentionsGeneric,
 	unfreshenBindings,
@@ -4531,6 +4532,56 @@ function probeOverload(
 	return { ...result, sawErrorArgument }
 }
 
+// NOTE: The order the candidates are PROBED in, which is not the order they were
+// written in as soon as one of them asks for evidence. Selection is first fit and
+// a refinement is freely assignable to its base, so an entry taking the base Type
+// accepts every Argument a refined entry would have taken — a refined entry
+// written after it could never win a single call. The entries asking for a
+// refinement are probed first instead, and the base entry becomes what a value
+// carrying no evidence falls through to. That is also what lets the Standard
+// Library APPEND its refined entries rather than write them where they need to be
+// read: an Overload's slot is emitted into its name (`divide__overload$3`) and its
+// native binding is keyed by position, so declaration order there is not free.
+//
+// The partition is stable, and answers with the written order when no entry asks
+// for anything: an Overload set with no refinement in it anywhere is probed in
+// exactly the order it always was, which is the whole of what changes for a
+// Program that declares none. Each candidate carries the slot it was DECLARED in
+// either way — that index is what the Simplifier mangles the callee with, not the
+// order it was tried in.
+//
+// A lone candidate is answered without asking anything: every plain Function,
+// SimpleMethod and static Method invocation in a Program comes through here as an
+// Overload set of one, and one candidate has no order to put it in.
+function overloadProbeOrder(
+	overloads: Array<common.BaseFunction>,
+): Array<[number, common.BaseFunction]> {
+	let candidates = [...overloads.entries()]
+
+	if (candidates.length < 2) {
+		return candidates
+	}
+
+	let asking: Array<[number, common.BaseFunction]> = []
+	let rest: Array<[number, common.BaseFunction]> = []
+
+	for (let candidate of candidates) {
+		let [, overload] = candidate
+
+		if (
+			overload.parameterTypes.some((parameter) =>
+				typeContainsRefinement(parameter.type),
+			)
+		) {
+			asking.push(candidate)
+		} else {
+			rest.push(candidate)
+		}
+	}
+
+	return asking.length === 0 ? candidates : [...asking, ...rest]
+}
+
 // NOTE: Bounds are part of selecting an Overload, not a check run on the
 // Overload that matching happened to pick first: a candidate whose Type
 // Parameter bounds the Arguments can not satisfy is no candidate at all while a
@@ -4549,7 +4600,8 @@ function probeOverload(
 // Diagnostics say which bound failed and how to satisfy it, which is what a call
 // with one plausible Overload needs to hear. Turning it into "no Overload
 // accepts these Arguments" would be a worse report about a call whose Arguments
-// were accepted.
+// were accepted. First is first in `overloadProbeOrder`, which is where a
+// refinement-asking entry is read as if it stood where it needs to be read.
 function selectOverload(
 	overloads: Array<common.BaseFunction>,
 	matchableArguments: Array<MatchableArgument>,
@@ -4561,7 +4613,7 @@ function selectOverload(
 		| { selected: SelectedOverload; sawErrorArgument: boolean }
 		| undefined
 
-	for (let [index, overload] of overloads.entries()) {
+	for (let [index, overload] of overloadProbeOrder(overloads)) {
 		// NOTE: Up to and including the first candidate whose Arguments match, a
 		// probe reports and records where it stands — an Argument is enriched
 		// exactly once, so a report held back there would be held back forever.
