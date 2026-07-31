@@ -82,7 +82,7 @@ function expectedExports(
 }
 
 // NOTE: Which entries of a Namespace member are native. Every builtin
-// Namespace is declared in `packages/stdlib/sources/*.es` and so has an entry, but the
+// Namespace is declared in `packages/standard-library/sources/*.es` and so has an entry, but the
 // default stays "all native": a Namespace or Method the loader did not record
 // a binding for is one whose declaration carried no body, which is exactly a
 // native.
@@ -109,7 +109,7 @@ describe("Builtins", () => {
 	// stays because it gives a friendlier, Namespace-grouped message at test
 	// time and is the only check that covers a Namespace with NO runtime module
 	// at all. The set cross-check below closes the registration-site drift the
-	// README warns about: a Namespace declared in `packages/stdlib/sources` but missing from
+	// README warns about: a Namespace declared in `packages/standard-library/sources` but missing from
 	// the Rewriter's import list, or vice versa, emits a call to `undefined`.
 	it("registers every builtin Namespace at every site", () => {
 		let declared = builtinNamespaces()

@@ -12,7 +12,7 @@
 		"generate:natives": "bun run --cwd packages/compiler generate:natives",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
-		"format:essence": "bun packages/formatter/bin/esfmt 'packages/stdlib/sources/*.es' 'packages/fixtures/files/*.es' packages/fixtures/files/modules",
+		"format:essence": "bun packages/formatter/bin/esfmt 'packages/standard-library/sources/*.es' 'packages/fixtures/files/*.es' packages/fixtures/files/modules",
 		"publish:stage": "bun scripts/publishing/stage.ts",
 		"publish:pack": "bun scripts/publishing/stage.ts --pack",
 		"publish:smoke": "bun scripts/publishing/smoke.ts",

@@ -7,7 +7,7 @@ import type { StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// NOTE: The native half of `packages/stdlib/sources/Terminal.es` — everything a
+// NOTE: The native half of `packages/standard-library/sources/Terminal.es` — everything a
 // Program can put in front of a person. Only TWO of the Namespace's entries are
 // native: `write(_:to:)`, because a stream has to be reached somehow, and
 // `inspect`, because the structural rendering below is what it IS. `print` and

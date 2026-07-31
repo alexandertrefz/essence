@@ -28,7 +28,7 @@ type CallGraph = Map<string, Set<string>>
 // NOTE: Only the BODIED Methods are Nodes. A native has no body to walk and
 // can not begin a cycle of Essence Methods — the cycle this test is planted to
 // catch is `Boolean.isNot` -> `Boolean.is` -> `Boolean.isNot`, where every step
-// is a Method someone wrote in `packages/stdlib/sources`.
+// is a Method someone wrote in `packages/standard-library/sources`.
 //
 // NOTE: The bodied free Functions are Nodes on the same footing, keyed by the
 // bare `<name>__overload$N` name they are emitted under — a name that can carry

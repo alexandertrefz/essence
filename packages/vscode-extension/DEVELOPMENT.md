@@ -8,7 +8,7 @@ workspace satisfies that pin, so `buildServer.js` resolves to the sibling
 package's TypeScript sources; anywhere else, `bun install` fetches the
 published package and the same build bundles its compiled `dist/`. The
 standard library's `.es` sources are copied beside the bundle the same way,
-resolved off `@essence-lang/stdlib` rather than a relative path.
+resolved off `@essence-lang/standard-library` rather than a relative path.
 
 ```sh
 bun install        # links the workspace, or fetches the published packages

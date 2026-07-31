@@ -25,7 +25,7 @@ import { validate } from "../validator/index"
 // an Integer-operand `divide` that handed the sign to the DENOMINATOR, which
 // every ordering primitive then read backwards, and a `reduce` that bailed on
 // a zero operand, so a cancelled `0/4` could never reduce itself. The
-// arithmetic is written in Essence now (`packages/stdlib/sources/Rational.es`)
+// arithmetic is written in Essence now (`packages/standard-library/sources/Rational.es`)
 // and funnels every result through `Rational.of` into `createRational`, so the
 // direct half of these tests checks THAT gateway — the one place the invariants
 // are enforced — and the compiled Programs below check the same behaviour

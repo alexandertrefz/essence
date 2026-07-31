@@ -71,7 +71,7 @@ export function resolveSpecifier(
 
 	// NOTE: Asked of `documents.ts` rather than compared against a path of this
 	// stage's own, because that answer already resolves the two layouts the
-	// standard library ships in — `packages/stdlib/sources` in a workspace, and
+	// standard library ships in — `packages/standard-library/sources` in a workspace, and
 	// the copy written beside the bundled Language Server in the VS Code
 	// extension. Hardcoding either one is what shipped the extension broken.
 	if (isStdlibDocument(filePath)) {

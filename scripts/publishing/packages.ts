@@ -37,7 +37,7 @@ export const PUBLISHED_PACKAGES: Array<PublishedPackage> = [
 		],
 	},
 	{ directory: "ariadne" },
-	{ directory: "stdlib", data: ["sources"] },
+	{ directory: "standard-library", data: ["sources"] },
 	{ directory: "runtime", data: ["src"] },
 	{ directory: "compiler" },
 	{ directory: "formatter" },

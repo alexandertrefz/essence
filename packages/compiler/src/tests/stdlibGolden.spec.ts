@@ -474,7 +474,7 @@ describe("Stdlib Golden", () => {
 	})
 
 	// NOTE: The gate that keeps the net exhaustive. A Method added to
-	// `packages/stdlib/sources` is not covered by anything until it is called here, and a
+	// `packages/standard-library/sources` is not covered by anything until it is called here, and a
 	// Method that only LOOKS covered — a label that names an Overload the
 	// Declaration does not have — is just as wrong.
 	it("calls every declared Method of every Namespace", () => {
