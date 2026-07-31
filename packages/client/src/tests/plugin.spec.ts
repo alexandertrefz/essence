@@ -194,6 +194,100 @@ export {
 			"[assignment-type-mismatch]",
 		)
 	})
+
+	// NOTE: The failure this refuses is SILENT otherwise: two entries out of one
+	// graph are two standalone bundles, each with a `typeKeySymbol` of its own, so
+	// a Circle built by one carries nothing the other can read. `areaOf` then
+	// matched `#Blank` and answered `0` — no error, no warning, a wrong number.
+	it("refuses two entries out of one Module graph", async () => {
+		let directory = project({
+			"Shapes.es": `implementation {
+
+	choice Shape {
+		Circle { radius: Integer },
+		Blank,
+	}
+
+	function circleOf(_ radius: Integer) -> Shape {
+		<- #Circle({ radius = radius })
+	}
+}
+
+export {
+	Shape
+	circleOf
+}
+`,
+			"Area.es": `import {
+	Shape from "./Shapes.es"
+}
+
+implementation {
+
+	function areaOf(_ value: Shape) -> Integer {
+		<- match value -> Integer {
+			case #Circle { <- @.radius::multiply(with @.radius) }
+			case #Blank  { <- 0 }
+		}
+	}
+}
+
+export {
+	areaOf
+}
+`,
+			"entry.js": `import { circleOf } from "./Shapes.es"
+import { areaOf } from "./Area.es"
+
+export { circleOf, areaOf }
+`,
+		})
+		let failure = await esbuild
+			.build({
+				entryPoints: [path.join(directory, "entry.js")],
+				bundle: true,
+				write: false,
+				format: "esm",
+				logLevel: "silent",
+				plugins: [essenceEsbuild()],
+			})
+			.catch((thrown: unknown) => thrown as esbuild.BuildFailure)
+
+		expect(failure).toBeInstanceOf(Error)
+		expect((failure as esbuild.BuildFailure).errors[0]?.text).toContain(
+			"two Essence entries out of one Module graph",
+		)
+	})
+
+	// NOTE: Two Programs that share nothing are two Programs. They duplicate the
+	// runtime and their values still may not pass between them, but nothing in
+	// either of them ever claimed otherwise — so there is nothing to refuse.
+	it("compiles two entries that share no source", async () => {
+		let directory = project({
+			"Math.es": MATH_MODULE,
+			"Other.es": `implementation {
+
+	function tripled(_ value: Integer) -> Integer {
+		<- value::multiply(with 3)
+	}
+}
+
+export {
+	tripled
+}
+`,
+			"entry.js": `import { square, $bridge_integer as integer } from "./Math.es"
+import { tripled, $bridge_integer as otherInteger } from "./Other.es"
+
+export const squared = square(integer(12n))
+export const trebled = tripled(otherInteger(4n))
+`,
+		})
+		let bundle = await built(directory, "entry.js", "twoGraphs.mjs")
+
+		expect((bundle.squared as { value: bigint }).value).toBe(144n)
+		expect((bundle.trebled as { value: bigint }).value).toBe(12n)
+	})
 })
 
 describe("The Vite plugin", () => {
