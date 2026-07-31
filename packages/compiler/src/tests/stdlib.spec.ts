@@ -205,7 +205,7 @@ describe("Stdlib", () => {
 		it("negates a Transcendental", () => {
 			const negatedPi = transcendental.negate(number.Pi)
 
-			expect(negatedPi.piCoefficientNumerator).toBe(-1n)
+			expect(negatedPi.terms[0]!.coefficientNumerator).toBe(-1n)
 			expect(transcendental.negate(negatedPi)).toEqual(number.Pi)
 		})
 	})
