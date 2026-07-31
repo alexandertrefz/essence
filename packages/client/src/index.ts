@@ -52,18 +52,19 @@ export {
 	type MarshallerOptions,
 } from "./marshal"
 export {
-	declarationsPath,
-	essence,
 	essenceEsbuild,
 	type EsbuildBuild,
 	type EsbuildLoadArguments,
 	type EsbuildLoadResult,
 	type EsbuildPlugin,
+} from "./esbuild-plugin"
+export { declarationsPath, type PluginOptions } from "./plugin-core"
+export {
+	essence,
 	type PluginContext,
-	type PluginOptions,
 	type ResolvedConfig,
 	type VitePlugin,
-} from "./plugin"
+} from "./vite-plugin"
 export { EssenceRational } from "./rational"
 // NOTE: Re-exported so a host can spell what `raw` holds — the JavaScript name
 // an Essence one is bound under — without importing the Compiler itself.

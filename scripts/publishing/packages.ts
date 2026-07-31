@@ -40,6 +40,7 @@ export const PUBLISHED_PACKAGES: Array<PublishedPackage> = [
 	{ directory: "standard-library", data: ["sources"] },
 	{ directory: "runtime", data: ["src"] },
 	{ directory: "compiler" },
+	{ directory: "client" },
 	{ directory: "formatter" },
 	{ directory: "debug-adapter" },
 	{ directory: "language-server" },

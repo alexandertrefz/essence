@@ -22,6 +22,7 @@
 	"include": [
 		"packages/ariadne/src/**/*",
 		"packages/cli/src/**/*",
+		"packages/client/src/**/*",
 		"packages/compiler/src/**/*",
 		"packages/debug-adapter/src/**/*",
 		"packages/formatter/src/**/*",
