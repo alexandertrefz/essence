@@ -1,13 +1,13 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`Fixture Sweep Choice.es should print what it printed before 1`] = `
-""7 + 5 = 12"
-"6 × 7 = 42"
-"1 ÷ 3 = 1/3"
-"1 ÷ 0 = nothing"
-"√9 = 3"
-"√2 = √2"
-"AC — cleared"
+"7 + 5 = 12
+6 × 7 = 42
+1 ÷ 3 = 1/3
+1 ÷ 0 = nothing
+√9 = 3
+√2 = √2
+AC — cleared
 true"
 `;
 
@@ -19,14 +19,14 @@ exports[`Fixture Sweep ConditionalConformance.es should print what it printed be
 `;
 
 exports[`Fixture Sweep Documentation.es should print what it printed before 1`] = `
-""Hello, World!"
-"Hello! Hello again!"
-"Look!!!"
-"Hello, Essence!"
-"3"
-"6"
-"Hello, stranger!"
-"Hello, all 3 of you!""
+"Hello, World!
+Hello! Hello again!
+Look!!!
+Hello, Essence!
+3
+6
+Hello, stranger!
+Hello, all 3 of you!"
 `;
 
 exports[`Fixture Sweep Event.es should print what it printed before 1`] = `
@@ -102,9 +102,9 @@ Optional#Value(4)
 `;
 
 exports[`Fixture Sweep HelloWorld.es should print what it printed before 1`] = `
-""Greetee can not be empty!"
-"Hello, World."
-"Hello, Universe!""
+"Greetee can not be empty!
+Hello, World.
+Hello, Universe!"
 `;
 
 exports[`Fixture Sweep Inference.es should print what it printed before 1`] = `
@@ -120,14 +120,14 @@ true
 `;
 
 exports[`Fixture Sweep Interpolation.es should print what it printed before 1`] = `
-""Hello, World! You have 3 left."
-"one plus two is 3"
-"the answer is true"
-"reversed: dlroW, upper: WORLD"
-"she said "hi" \\ wrote {braces}"
-"greeting is Hello, World"
-"emptybetween"
-"World has 3 apples today""
+"Hello, World! You have 3 left.
+one plus two is 3
+the answer is true
+reversed: dlroW, upper: WORLD
+she said "hi" \\ wrote {braces}
+greeting is Hello, World
+emptybetween
+World has 3 apples today"
 `;
 
 exports[`Fixture Sweep Irrational.es should print what it printed before 1`] = `
@@ -189,23 +189,23 @@ true
 `;
 
 exports[`Fixture Sweep Loops.es should print what it printed before 1`] = `
-""55"
-"15"
-"128"
-"128"
-"2""
+"55
+15
+128
+128
+2"
 `;
 
 exports[`Fixture Sweep Match.es should print what it printed before 1`] = `
-""a fraction: 1/2"
-"none"
-"exactly one"
-"less than none?"
-"many"
-"not a count at all: lots"
-"many"
-"no count at all"
-"clicked the y axis at 7""
+"a fraction: 1/2
+none
+exactly one
+less than none?
+many
+not a count at all: lots
+many
+no count at all
+clicked the y axis at 7"
 `;
 
 exports[`Fixture Sweep Maybe.es should print what it printed before 1`] = `
@@ -219,9 +219,9 @@ Maybe#None
 exports[`Fixture Sweep Namespace.es should print what it printed before 1`] = `
 "3672
 1
-"1h 1m 12s"
-"01:01:12"
-"12:00:00"
+1h 1m 12s
+01:01:12
+12:00:00
 true"
 `;
 
@@ -238,11 +238,11 @@ Optional#Value(1/6)"
 `;
 
 exports[`Fixture Sweep Protocols.es should print what it printed before 1`] = `
-""12"
-"1420/113"
+"12
+1420/113
 3
 1/3
-"Less"
+Less
 true"
 `;
 
@@ -308,11 +308,11 @@ Optional#Value(2)
 `;
 
 exports[`Fixture Sweep Tree.es should print what it printed before 1`] = `
-""Readme.md"
-"sources/"
-"  Lexer.es"
-"  Parser.es"
-"tests/"
-"  Lexer.es"
-"4 files, 2 directories""
+"Readme.md
+sources/
+  Lexer.es
+  Parser.es
+tests/
+  Lexer.es
+4 files, 2 directories"
 `;

@@ -31,8 +31,8 @@ implementation {
 		}
 	}
 
-	Terminal.inspect(describeArea({ width = 3, height = 4 }))
-	Terminal.inspect(describeArea({ radius = 2 }))
+	Terminal.print(describeArea({ width = 3, height = 4 }))
+	Terminal.print(describeArea({ radius = 2 }))
 
 	§ The builtin Types conform to the core Protocols — Equatable and
 	§ Printable for all of them, and Comparable for the ordered ones:
@@ -47,8 +47,8 @@ implementation {
 		}
 	}
 
-	Terminal.inspect(smallerOf(5, 3))
-	Terminal.inspect(smallerOf(1/2, 1/3))
-	Terminal.inspect(1::compare(to 2)::toString())
-	Terminal.inspect(Ordering#Less::is(1::compare(to 2)))
+	Terminal.print(smallerOf(5, 3))
+	Terminal.print(smallerOf(1/2, 1/3))
+	Terminal.print(1::compare(to 2))
+	Terminal.print(Ordering#Less::is(1::compare(to 2)))
 }

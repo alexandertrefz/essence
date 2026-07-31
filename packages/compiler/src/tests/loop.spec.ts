@@ -40,21 +40,32 @@ async function run(source: string): Promise<Array<string>> {
 
 	writeFileSync(file, js)
 
-	let output: Array<string> = []
+	// NOTE: Both doors, into one buffer in writing order — `Terminal.inspect`
+	// ends its line through `console.log`, `Terminal.print` writes its own to
+	// the stream, and `Loops.es` prints.
+	let written = ""
 	let originalLog = console.log
+	let originalOut = process.stdout.write
 
 	console.log = (...args: Array<unknown>) => {
-		output.push(args.map((argument) => String(argument)).join(" "))
+		written += `${args.map((argument) => String(argument)).join(" ")}\n`
 	}
+
+	process.stdout.write = ((chunk: unknown) => {
+		written += String(chunk)
+
+		return true
+	}) as typeof process.stdout.write
 
 	try {
 		await import(file)
 	} finally {
 		console.log = originalLog
+		process.stdout.write = originalOut
 		rmSync(directory, { recursive: true, force: true })
 	}
 
-	return output
+	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
 describe("loop", () => {
@@ -380,12 +391,6 @@ describe("Loops.es", () => {
 			encoding: "utf-8",
 		})
 
-		expect(await run(source)).toEqual([
-			'"55"',
-			'"15"',
-			'"128"',
-			'"128"',
-			'"2"',
-		])
+		expect(await run(source)).toEqual(["55", "15", "128", "128", "2"])
 	})
 })
