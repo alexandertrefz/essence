@@ -150,7 +150,6 @@ function validateImplementationNode(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ImplementationNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
 		case "MethodInvocation":
 		case "FunctionInvocation":
 		case "Combination":
@@ -189,8 +188,6 @@ function validateExpression(
 	node: common.typed.ExpressionNode,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
-			return validateNativeFunctionInvocation(node)
 		case "MethodInvocation":
 			return validateMethodInvocation(node)
 		case "FunctionInvocation":
@@ -301,40 +298,6 @@ function isBoundFunctionType(type: common.Type): boolean {
 	}
 
 	return false
-}
-
-function validateNativeFunctionInvocation(
-	node: common.typed.NativeFunctionInvocationNode,
-): common.typed.NativeFunctionInvocationNode {
-	const functionType = node.name.type
-
-	for (let argumentNode of node.arguments) {
-		validateNoBoundFunctionValue(argumentNode.value)
-	}
-
-	if (functionType.type === "Function") {
-		validateSimpleFunctionInvocation(
-			functionType,
-			node.arguments,
-			node.position,
-		)
-	} else if (functionType.type !== "Error") {
-		reportError(
-			`'${node.name.content}' is not a native Function`,
-			node.name.position,
-			{
-				code: "unknown-native-function",
-				labels: [
-					primary(
-						node.name.position,
-						"the Compiler provides no such native Function",
-					),
-				],
-			},
-		)
-	}
-
-	return node
 }
 
 // NOTE: The two checks below are about the COMPILER, not about the Program:

@@ -430,18 +430,15 @@ function walkExpression(
 
 // NOTE: The Expression positions a Node holds — and only those. A `type` is
 // walked by nobody: it is a Type, not an Expression, and a Match's `matcher` is
-// one as well. The three Identifier positions that LOOK like Expressions are
-// left alone on purpose: a `MethodInvocation`'s `base` names the answering
-// Namespace, a `NativeFunctionInvocation`'s `name` the runtime Function and a
-// `Lookup`'s `member` the member being read. None of them is a value the
-// Program computes, and none of their fields can hold anything but an
-// Identifier.
+// one as well. The two Identifier positions that LOOK like Expressions are left
+// alone on purpose: a `MethodInvocation`'s `base` names the answering Namespace
+// and a `Lookup`'s `member` the member being read. Neither is a value the
+// Program computes, and neither field can hold anything but an Identifier.
 function walkChildren(
 	node: ExpressionNode,
 	rewrites: NodeRewrites,
 ): ExpressionNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
 		case "MethodInvocation": {
 			let args = walkArguments(node.arguments, rewrites)
 

@@ -366,14 +366,8 @@ class DescentParser {
 		})
 	}
 
-	// NOTE: `parseNativeSigilName` rather than `parseIdentifier`, because a
-	// `__`-sigil name lexes as two Underscore Symbols and an Identifier rather
-	// than as one name — a name a Program can DECLARE has to be a name its
-	// sections can spell, or such a Function could never be exported. Nothing in
-	// the standard library carries the sigil now that printing is `Terminal`'s;
-	// the machinery stays until the phase that takes it out.
 	protected parseImportEntry(): parser.ImportNode {
-		let name = this.parseNativeSigilName()
+		let name = this.parseIdentifier()
 		let alias = this.parseOptionalAlias()
 
 		this.tokens.expect(TokenType.KeywordFrom)
@@ -391,7 +385,7 @@ class DescentParser {
 	// `from` is read the specifier is required, so a `from` with nothing after it
 	// is a Diagnostic rather than a second entry that happens to be named `from`.
 	protected parseExportEntry(): parser.ExportNode {
-		let name = this.parseNativeSigilName()
+		let name = this.parseIdentifier()
 		let alias = this.parseOptionalAlias()
 		let end = (alias ?? name).position.end
 		let source: parser.ModuleSpecifierNode | null = null
@@ -938,12 +932,7 @@ class DescentParser {
 		// whether a block follows; the bodied branch it returns is identical to
 		// what `parseOptionallyGenericFunctionLiteral` builds for a user Program.
 		if (this.mode === "declarations") {
-			// NOTE: `__` is the sigil for a native free Function bound to the
-			// runtime — `__name` lexes as `_ _ name`, so the declaration name is
-			// reassembled the same way `parseNativeFunctionInvocation` does at the
-			// call site. It is the one shape of free Function whose name a Program
-			// can not spell as a bare Identifier, and no declaration uses it.
-			let name = this.parseNativeSigilName()
+			let name = this.parseIdentifier()
 			let documentation = this.tokens.documentationAbove(
 				keyword.position.start.line,
 			)
@@ -974,34 +963,6 @@ class DescentParser {
 			start: keyword.position.start,
 			end: value.position.end,
 		})
-	}
-
-	// NOTE: A free-Function declaration name, allowing the `__` native sigil that
-	// `parseNativeFunctionInvocation` accepts at the call site — `__name` lexes
-	// as two Underscore Symbols and an Identifier, so the `__`-prefixed name is
-	// reassembled here rather than lexed whole. Without the sigil it is an
-	// ordinary Identifier.
-	protected parseNativeSigilName(): parser.IdentifierNode {
-		if (
-			this.tokens.peek()?.type === TokenType.SymbolUnderscore &&
-			this.tokens.peek(1)?.type === TokenType.SymbolUnderscore
-		) {
-			let firstUnderscore = this.tokens.next()
-			this.tokens.next()
-
-			let name = this.parseIdentifier()
-
-			return {
-				nodeType: "Identifier",
-				content: `__${name.content}`,
-				position: {
-					start: firstUnderscore.position.start,
-					end: name.position.end,
-				},
-			}
-		}
-
-		return this.parseIdentifier()
 	}
 
 	// NOTE: An `overload function <name> { … }` block — the free-Function
@@ -1723,8 +1684,6 @@ class DescentParser {
 		}
 
 		switch (token.type) {
-			case TokenType.SymbolUnderscore:
-				return this.parseNativeFunctionInvocation()
 			case TokenType.SymbolHash:
 				return this.parseCaseValue()
 			case TokenType.KeywordMatch:
@@ -1775,19 +1734,6 @@ class DescentParser {
 					token.position,
 				)
 		}
-	}
-
-	protected parseNativeFunctionInvocation(): parser.NativeFunctionInvocationNode {
-		let firstUnderscore = this.tokens.expect(TokenType.SymbolUnderscore)
-		this.tokens.expect(TokenType.SymbolUnderscore)
-
-		let name = this.parseIdentifier()
-		let argumentList = this.parseArgumentList()
-
-		return generators.nativeFunctionInvocation(name, argumentList.args, {
-			start: firstUnderscore.position.start,
-			end: argumentList.position.end,
-		})
 	}
 
 	// NOTE: The payload parens are part of the construction syntax — they are

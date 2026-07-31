@@ -1311,12 +1311,6 @@ export class Printer {
 					this.printArgumentList(node.arguments),
 				])
 
-			case "NativeFunctionInvocation":
-				return concat([
-					text(node.name.content),
-					this.printArgumentList(node.arguments),
-				])
-
 			case "Combination":
 				return this.printCombination(node)
 

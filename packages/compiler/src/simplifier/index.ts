@@ -74,7 +74,6 @@ function simplifyImplementationNode(
 	node: common.typed.ImplementationNode,
 ): common.typedSimple.ImplementationNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
 		case "MethodInvocation":
 		case "FunctionInvocation":
 		case "Combination":
@@ -113,8 +112,6 @@ function simplifyExpression(
 	node: common.typed.ExpressionNode,
 ): common.typedSimple.ExpressionNode {
 	switch (node.nodeType) {
-		case "NativeFunctionInvocation":
-			return simplifyNativeFunctionInvocation(node)
 		case "MethodInvocation":
 			return simplifyMethodInvocation(node)
 		case "FunctionInvocation":
@@ -164,18 +161,6 @@ function simplifyCaseValue(
 				? `${node.type.choice}#${node.type.name}`
 				: "",
 		value: node.value === null ? null : simplifyExpression(node.value),
-		type: node.type,
-		position: node.position,
-	}
-}
-
-function simplifyNativeFunctionInvocation(
-	node: common.typed.NativeFunctionInvocationNode,
-): common.typedSimple.NativeFunctionInvocationNode {
-	return {
-		nodeType: "NativeFunctionInvocation",
-		name: simplifyIdentifier(node.name),
-		arguments: node.arguments.map((arg) => simplifyArgument(arg)),
 		type: node.type,
 		position: node.position,
 	}

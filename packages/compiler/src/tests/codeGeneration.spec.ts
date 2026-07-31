@@ -251,12 +251,12 @@ describe("Code Generation", () => {
 		})
 	})
 
-	// NOTE: Structural printing used to be the free Function `__print`, reached
-	// through the `__` sigil and read off the runtime `functions` module. It is
-	// `Terminal.inspect` now — an ordinary native static Method of an ordinary
-	// Namespace, emitted as a read off that Namespace's runtime import like every
-	// other native. The observable behaviour is unchanged, which is why the
-	// golden file did not move when every call site was rewritten.
+	// NOTE: Structural printing used to be a free Function read off the runtime
+	// `functions` module. It is `Terminal.inspect` now — an ordinary native
+	// static Method of an ordinary Namespace, emitted as a read off that
+	// Namespace's runtime import like every other native. The observable
+	// behaviour is unchanged, which is why the golden file did not move when
+	// every call site was rewritten.
 	describe("Terminal.inspect", () => {
 		it("emits a read off the Terminal module, not the functions one", () => {
 			let generated = generate(`
@@ -266,11 +266,10 @@ describe("Code Generation", () => {
 			`)
 
 			expect(generated).toContain("Terminal.inspect(")
-			// NOTE: The free-Function spellings must both be gone — the `__`
-			// sigil's `$_.__print(` and the prefix-stripped `$_.print(` before
-			// it.
-			expect(generated).not.toContain("$_.__print(")
-			expect(generated).not.toContain("$_.print(")
+			// NOTE: `$_` is the runtime `functions` module, where a native FREE
+			// Function lives. A Namespace member never comes off it, and this is
+			// the assertion that says so.
+			expect(generated).not.toContain("$_.inspect(")
 		})
 
 		it("prints the value and is unchanged at runtime", async () => {
@@ -2182,12 +2181,13 @@ describe("Code Generation", () => {
 				// once — `items::map(Boolean.isNot)` and every native taking a
 				// callback — so it counts as evaluated where a stored one does
 				// not. Without this a Property could be emitted above a Property
-				// the Method it passed along reads.
+				// the Method it passed along reads. The callee here is a native
+				// free Function, the shape whose Arguments the runtime runs.
 				it("evaluates a static Method given to a call as an Argument", () => {
 					let refs = essenceMethodReferences(
 						{
-							nodeType: "NativeFunctionInvocation",
-							name: { nodeType: "Identifier", name: "$_map" },
+							nodeType: "FunctionInvocation",
+							name: { nodeType: "Identifier", name: "loop" },
 							arguments: [
 								{
 									nodeType: "Argument",

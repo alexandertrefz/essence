@@ -308,9 +308,6 @@ function collectCasesFromNode(
 			collectCasesFromNode(node.name, tokens)
 			collectCasesFromArguments(node.arguments, tokens)
 			return
-		case "NativeFunctionInvocation":
-			collectCasesFromArguments(node.arguments, tokens)
-			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
 				collectCasesFromNode(member.value, tokens)

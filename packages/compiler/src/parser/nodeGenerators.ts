@@ -97,29 +97,6 @@ export function moduleSpecifier(
 
 // #region Expressions
 
-export function nativeFunctionInvocation(
-	name: parser.IdentifierNode,
-	args: Array<parser.ArgumentNode>,
-	position: common.Position,
-): parser.NativeFunctionInvocationNode {
-	return {
-		nodeType: "NativeFunctionInvocation",
-		name: {
-			nodeType: "Identifier",
-			content: `__${name.content}`,
-			position: {
-				start: {
-					line: name.position.start.line,
-					column: name.position.start.column - 2,
-				},
-				end: name.position.end,
-			},
-		},
-		arguments: args,
-		position,
-	}
-}
-
 export function methodInvocation(
 	base: parser.ExpressionNode,
 	member: parser.IdentifierNode,
