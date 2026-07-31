@@ -35,6 +35,18 @@
         "@essence-lang/standard-library": "workspace:*",
       },
     },
+    "packages/client": {
+      "name": "@essence-lang/client",
+      "version": "0.1.0",
+      "dependencies": {
+        "@essence-lang/compiler": "workspace:*",
+        "@essence-lang/interfaces": "workspace:*",
+        "@essence-lang/runtime": "workspace:*",
+      },
+      "devDependencies": {
+        "@essence-lang/fixtures": "workspace:*",
+      },
+    },
     "packages/compiler": {
       "name": "@essence-lang/compiler",
       "version": "0.1.0",
@@ -238,6 +250,8 @@
     "@essence-lang/ariadne": ["@essence-lang/ariadne@workspace:packages/ariadne"],
 
     "@essence-lang/cli": ["@essence-lang/cli@workspace:packages/cli"],
+
+    "@essence-lang/client": ["@essence-lang/client@workspace:packages/client"],
 
     "@essence-lang/compiler": ["@essence-lang/compiler@workspace:packages/compiler"],
 
